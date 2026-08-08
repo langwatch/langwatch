@@ -78,7 +78,7 @@ const CODEX_SCOPE_NAMES: ReadonlySet<string> = new Set([
   CODEX_RUST_SCOPE_NAME,
   CODEX_EXEC_SCOPE_NAME,
 ]);
-const CODEX_TURN_SPAN_NAME = "session_task.turn";
+export const CODEX_TURN_SPAN_NAME = "session_task.turn";
 
 // codex's per-response model-call span. Its gen_ai.usage.* is already summed
 // into the `session_task.turn` rollup, so the fold must count the usage on

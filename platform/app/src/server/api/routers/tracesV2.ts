@@ -1032,9 +1032,9 @@ async function loadSpansFullWithProtections({
     ...occurredAtFromInput(input),
   });
   // Claude Code's real `llm_request` spans carry tokens + `request_id` but NO
-  // message content and NO cost — both live in the trace's OTLP log records.
-  // Join them on BEFORE protections run, so the joined content goes through the
-  // same redaction pass as any other span content rather than bypassing it.
+  // message content, which lives in the trace's OTLP log records. Join it on
+  // BEFORE protections run, so the joined content goes through the same
+  // redaction pass as any other span content rather than bypassing it.
   const spans = await enrichCodingAgentSpansFromLogs({
     logRecords: app.traces.logRecords,
     tenantId: input.projectId,

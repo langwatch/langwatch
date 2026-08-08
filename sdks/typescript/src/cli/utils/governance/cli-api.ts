@@ -13,6 +13,8 @@
  *      rows land with `metadata.surface = 'cli'` per @audit-uniform.
  */
 
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+
 import { normalizeEndpoint } from "../../../internal/endpoint";
 import { type GovernanceConfig } from "./config";
 import type { PlatformToolPolicyMap } from "./platform-tool-policy";
@@ -68,15 +70,72 @@ export interface GovernanceSetupState {
   governanceActive: boolean;
 }
 
+/**
+ * The CLI's fallback governance error — thrown for a failure the platform did
+ * NOT name (a bare status, an OAuth `error_description`, a proxy's text) and for
+ * the CLI's own client-side preconditions (no session, a disabled tool policy).
+ *
+ * It carries the ADR-045 handled-error surface — the `isLangWatchHandledError`
+ * brand plus `code` / `httpStatus` / `meta` — so `handledErrorFromThrown`
+ * (behind `reportCommandError`) reads it straight into the domain structure and
+ * the render pipeline treats it exactly like a server-named `HandledError`.
+ * `status` is kept as an alias of `httpStatus` so the existing
+ * `err.status === 404` / `err.code === "tool_disabled"` / `instanceof`
+ * control-flow keeps working unchanged.
+ *
+ * A failure the platform DID name never reaches here: the transports below run
+ * the parsed body through `throwIfHandledError` first, which raises a typed
+ * `LangWatchHandledError` carrying the server's real code / meta / trace id.
+ */
 export class GovernanceCliError extends Error {
+  /** Brands this for `handledErrorFromThrown` — see the SDK's LangWatchHandledError. */
+  readonly isLangWatchHandledError = true as const;
+  /** ADR-045 handled-error status; equals {@link status}, read by the render pipeline. */
+  readonly httpStatus: number;
+  /** Domain context, if any. Empty for the CLI's own client-side failures. */
+  readonly meta: Record<string, unknown>;
+
   constructor(
     public readonly status: number,
     public readonly code: string,
     message: string,
+    options: { meta?: Record<string, unknown> } = {},
   ) {
     super(message);
     this.name = "GovernanceCliError";
+    this.httpStatus = status;
+    this.meta = options.meta ?? {};
   }
+}
+
+/**
+ * The ADR-045 error path for a non-2xx governance response. Before throwing the
+ * CLI's own {@link GovernanceCliError}, hand the parsed body to
+ * `throwIfHandledError`: when the platform NAMED the failure (a domain-error
+ * envelope) that raises a typed `LangWatchHandledError` with the server's real
+ * `code` / `meta` / `traceId`, and the render pipeline surfaces it as such.
+ * When it did not — a bare status, an OAuth `error_description`, a proxy's text —
+ * this falls through to the GovernanceCliError the CLI has always thrown, so the
+ * existing `code` / `status` / `instanceof` control-flow keeps working. The
+ * `message` composed here is reused verbatim in both throws so nothing regresses.
+ *
+ * Mirrors `ApiKeysApiService.request()`.
+ */
+function throwGovernanceHttpError({
+  operation,
+  status,
+  body,
+  code,
+  message,
+}: {
+  operation: string;
+  status: number;
+  body: unknown;
+  code: string;
+  message: string;
+}): never {
+  throwIfHandledError({ operation, error: body, status, message });
+  throw new GovernanceCliError(status, code, message);
 }
 
 export interface CliApiOptions {
@@ -152,7 +211,14 @@ async function getJSON<T>(
     opts,
   );
   if (res.status === 401) {
-    throw new GovernanceCliError(401, "unauthorized", SESSION_EXPIRED_MESSAGE);
+    const body = await res.json().catch(() => undefined);
+    throwGovernanceHttpError({
+      operation: `GET ${path}`,
+      status: 401,
+      body,
+      code: "unauthorized",
+      message: SESSION_EXPIRED_MESSAGE,
+    });
   }
   if (res.status === 402) {
     const body = (await res.json().catch(() => ({}))) as {
@@ -164,29 +230,35 @@ async function getJSON<T>(
     const upgrade = body.upgrade_url
       ? `\n\n  Upgrade your organization at:\n    ${body.upgrade_url}`
       : "";
-    throw new GovernanceCliError(
-      402,
-      "payment_required",
-      `${description}${upgrade}`,
-    );
+    throwGovernanceHttpError({
+      operation: `GET ${path}`,
+      status: 402,
+      body,
+      code: "payment_required",
+      message: `${description}${upgrade}`,
+    });
   }
   if (res.status === 404) {
     const body = (await res.json().catch(() => ({}))) as {
       error_description?: string;
     };
-    throw new GovernanceCliError(
-      404,
-      "not_found",
-      body.error_description ?? "Not found",
-    );
+    throwGovernanceHttpError({
+      operation: `GET ${path}`,
+      status: 404,
+      body,
+      code: "not_found",
+      message: body.error_description ?? "Not found",
+    });
   }
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new GovernanceCliError(
-      res.status,
-      "other",
-      `${res.status} ${body.slice(0, 200)}`,
-    );
+    throwGovernanceHttpError({
+      operation: `GET ${path}`,
+      status: res.status,
+      body,
+      code: "other",
+      message: `${res.status} ${body.slice(0, 200)}`,
+    });
   }
   return (await res.json()) as T;
 }
@@ -406,35 +478,48 @@ async function requestREST<T>(
   const res = await authorizedFetch(cfg, url, buildInit, options);
   if (res.status === 204) return undefined as T;
   if (res.status === 401) {
-    throw new GovernanceCliError(401, "unauthorized", SESSION_EXPIRED_MESSAGE);
+    const body = await res.json().catch(() => undefined);
+    throwGovernanceHttpError({
+      operation: `${method} ${path}`,
+      status: 401,
+      body,
+      code: "unauthorized",
+      message: SESSION_EXPIRED_MESSAGE,
+    });
   }
   if (res.status === 403) {
     const body = (await res.json().catch(() => ({}))) as {
       error?: { message?: string; code?: string };
     };
-    throw new GovernanceCliError(
-      403,
-      body.error?.code ?? "forbidden",
-      body.error?.message ?? "Forbidden",
-    );
+    throwGovernanceHttpError({
+      operation: `${method} ${path}`,
+      status: 403,
+      body,
+      code: body.error?.code ?? "forbidden",
+      message: body.error?.message ?? "Forbidden",
+    });
   }
   if (res.status === 404) {
     const body = (await res.json().catch(() => ({}))) as {
       error?: { message?: string };
     };
-    throw new GovernanceCliError(
-      404,
-      "not_found",
-      body.error?.message ?? "Not found",
-    );
+    throwGovernanceHttpError({
+      operation: `${method} ${path}`,
+      status: 404,
+      body,
+      code: "not_found",
+      message: body.error?.message ?? "Not found",
+    });
   }
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new GovernanceCliError(
-      res.status,
-      "other",
-      `${res.status} ${body.slice(0, 200)}`,
-    );
+    throwGovernanceHttpError({
+      operation: `${method} ${path}`,
+      status: res.status,
+      body,
+      code: "other",
+      message: `${res.status} ${body.slice(0, 200)}`,
+    });
   }
   return (await res.json()) as T;
 }
