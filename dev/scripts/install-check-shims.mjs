@@ -134,7 +134,7 @@ function skipReason(env) {
   return null;
 }
 
-/** The file's contents, or null if it is missing or not text we can read. */
+/** The file's contents, or null if it cannot be read. */
 function readIfText(file) {
   try {
     return fs.readFileSync(file, "utf8");
