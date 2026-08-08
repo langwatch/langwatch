@@ -297,9 +297,9 @@ describe("modelProviderHelpers", () => {
     });
   });
 
-  describe("headerSignature()", () => {
-    describe("given a form header list and the stored list it came from", () => {
-      it("reads them as equal even though only the form list is concealed", () => {
+  describe("given headerSignature() compares a form header list with the stored one", () => {
+    describe("when only the form list carries the display-only concealed flag", () => {
+      it("reads the two lists as equal", () => {
         const stored = [{ key: "api-key", value: MASKED_KEY_PLACEHOLDER }];
         const asShownInTheForm = [
           { key: "api-key", value: MASKED_KEY_PLACEHOLDER, concealed: true },
@@ -309,20 +309,24 @@ describe("modelProviderHelpers", () => {
       });
     });
 
-    describe("given a header the customer actually changed", () => {
-      it("reads a renamed key as different", () => {
+    describe("when a header key was renamed", () => {
+      it("reads the lists as different", () => {
         expect(headerSignature([{ key: "api-key", value: "v" }])).not.toBe(
           headerSignature([{ key: "x-api-key", value: "v" }]),
         );
       });
+    });
 
-      it("reads a new value as different", () => {
+    describe("when a header value was edited", () => {
+      it("reads the lists as different", () => {
         expect(headerSignature([{ key: "api-key", value: "v" }])).not.toBe(
           headerSignature([{ key: "api-key", value: "w" }]),
         );
       });
+    });
 
-      it("reads a reorder as different, because dragging is a real edit", () => {
+    describe("when the headers were dragged into a new order", () => {
+      it("reads the lists as different, because reordering is a real edit", () => {
         const a = [
           { key: "one", value: "1" },
           { key: "two", value: "2" },
@@ -336,7 +340,7 @@ describe("modelProviderHelpers", () => {
       });
     });
 
-    describe("given no headers at all", () => {
+    describe("when there are no headers at all", () => {
       it("treats null, undefined and the empty list the same", () => {
         expect(headerSignature(null)).toBe(headerSignature([]));
         expect(headerSignature(undefined)).toBe(headerSignature([]));

@@ -366,6 +366,68 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
           });
         });
       });
+
+      // The guard reads the provider's own schema rather than a list of
+      // provider names, so it has to hold for the other two providers whose
+      // drawer offers extra headers.
+      //
+      // Which layer says no depends on how strict the provider's schema is,
+      // and both answers are right. `custom` accepts the payload and strips
+      // the unknown key, so the guard is what catches it. `azure_safety`
+      // demands a URL and a non-empty key, so validation rejects it one layer
+      // earlier. That difference is the point: the guard exists precisely
+      // because a loose schema, which is what Azure has, never objects.
+      describe("when the same shape reaches a provider other than azure", () => {
+        it.each([
+          {
+            provider: "custom",
+            stored: {
+              CUSTOM_API_KEY: "custom-secret",
+              CUSTOM_BASE_URL: "https://proxy.acme.internal/v1",
+            },
+            rejectedWith: /would delete the credentials/i,
+          },
+          {
+            provider: "azure_safety",
+            stored: {
+              AZURE_CONTENT_SAFETY_ENDPOINT: "https://safety.acme.internal",
+              AZURE_CONTENT_SAFETY_KEY: "safety-secret",
+            },
+            rejectedWith: /invalid api key configuration/i,
+          },
+        ])("refuses it for $provider and keeps the stored credentials", async ({
+          provider,
+          stored,
+          rejectedWith,
+        }) => {
+          const created = await service().updateModelProvider(
+            {
+              projectId,
+              provider,
+              enabled: true,
+              customKeys: stored,
+              scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+            },
+            ctx(),
+          );
+
+          await expect(
+            service().updateModelProvider(
+              {
+                projectId,
+                id: created.id,
+                provider,
+                enabled: true,
+                customKeys: { "x-tenant": "acme" },
+                scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+              },
+              ctx(),
+            ),
+          ).rejects.toThrow(rejectedWith);
+
+          expect(await keysById(created.id)).toEqual(stored);
+        });
+      });
     });
   },
 );
