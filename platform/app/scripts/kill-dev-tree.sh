@@ -46,12 +46,24 @@ done
 
 # Is anything at all listening there, pid or no pid. Kept separate from
 # resolving pids so "I cannot see who owns this" never reads as "it is free".
+#
+# A lookup that FAILS is not an empty result either, it is a refusal to answer,
+# and this script exists to stop saying "free" about ports nobody checked. `ss`
+# exits 0 with no output for a port that is genuinely free, so a non-zero status
+# is unambiguously a broken lookup and we stop rather than guess. lsof gets no
+# such treatment: it returns 1 both for "found nothing" and for real errors, so
+# its status carries nothing to act on.
 port_busy() {
+  local found
   if command -v lsof >/dev/null 2>&1; then
     [ -n "$(lsof -t -a -iTCP:"$PORTS" -sTCP:LISTEN 2>/dev/null)" ]
     return
   fi
-  [ -n "$(ss -ltnH "( ${SS_FILTER} )" 2>/dev/null)" ]
+  if ! found=$(ss -ltnH "( ${SS_FILTER} )" 2>/dev/null); then
+    echo "ss could not inspect ${PORTS}, refusing to guess whether it is free" >&2
+    exit 69
+  fi
+  [ -n "$found" ]
 }
 
 # Whatever is listening on those ports. lsof is what the rest of the dev

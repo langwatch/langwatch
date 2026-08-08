@@ -153,6 +153,12 @@ Feature: A dev stack does not outlive whoever started it
     Then it says so and exits cleanly
 
   @unit
+  Scenario: A port that cannot be inspected is never called free
+    Given the only tool for looking at ports refuses to answer
+    When the ports are cleared
+    Then it says it could not look and fails, rather than reporting them free
+
+  @unit
   Scenario: A port held by something we did not start is reported, not claimed
     Given one of the ports is held by a process that is not a dev stack of ours
     When the ports are cleared

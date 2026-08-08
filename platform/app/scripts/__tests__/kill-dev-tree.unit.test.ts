@@ -159,6 +159,19 @@ function pathWithOnlySs(port: number): string {
 }
 
 /**
+ * A PATH whose `ss` refuses to answer, the way a too-old or broken iproute2
+ * would. An empty answer and a failed lookup are not the same thing, and only
+ * one of them means the port is free.
+ */
+function pathWithBrokenSs(): string {
+  const stub = path.join(scratch, "broken-stub");
+  mkdirSync(stub, { recursive: true });
+  writeFileSync(path.join(stub, "ss"), "#!/bin/bash\nexit 1\n", "utf8");
+  chmodSync(path.join(stub, "ss"), 0o755);
+  return `/usr/bin:/bin:${stub}`;
+}
+
+/**
  * A stand-in for `start.sh`: it survives being asked to stop and answers a
  * dead lane with a new one, which is what `concurrently --restart-tries -1`
  * does. That is the shape a plain SIGTERM cannot clear.
@@ -359,6 +372,18 @@ describe("clearing the dev ports", () => {
 
         expect(result.status, result.stderr).toBe(0);
         expect(result.stdout).toContain("nothing of ours is listening");
+      });
+
+      /** @scenario "A port that cannot be inspected is never called free" */
+      it("refuses to call a port free when it cannot be inspected", async () => {
+        const port = await freePort();
+
+        const result = clearPorts(String(port), { PATH: pathWithBrokenSs() });
+
+        expect(result.status).not.toBe(0);
+        expect(result.stdout).not.toContain("ports free");
+        expect(result.stdout).not.toContain("nothing of ours");
+        expect(result.stderr).toContain("could not inspect");
       });
 
       it("reports how to call it when given no ports at all", () => {
