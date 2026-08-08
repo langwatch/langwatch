@@ -140,3 +140,11 @@ Rule: Nothing here may cost the user the session they asked for
     And the LangWatch plugin is installed
     When the user runs a wrapped tool
     Then the plugin on the machine is left as it is
+
+  @unit
+  Scenario: A marketplace whose address only looks like ours is never updated from
+    Given a marketplace named langwatch whose address is built to look like our repository
+    And the LangWatch plugin is installed at an older version than that marketplace publishes
+    When the user runs a wrapped tool
+    Then the plugin on the machine is left as it is
+    And the user is told nothing about the plugin

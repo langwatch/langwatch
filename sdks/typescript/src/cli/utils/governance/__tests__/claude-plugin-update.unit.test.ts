@@ -30,6 +30,7 @@ vi.mock("node:child_process", async () => {
 const {
   answerClaude,
   commandsRun,
+  home,
   loadModule,
   readConfig,
   seedInstalledPlugin,
@@ -190,6 +191,34 @@ describe("updateLangwatchClaudePlugin", () => {
 
       expect(updateLangwatchClaudePlugin().action).toBe("unavailable");
       expect(commandsRun()).toEqual([]);
+    });
+
+    /** @scenario "A marketplace whose address only looks like ours is never updated from" */
+    it("does not update through an address built to look like ours", async () => {
+      seedInstalledPlugin({ version: "0.1.0" });
+      // The listing is real and it publishes something newer, so the only
+      // thing standing between it and the user's agent is the address.
+      seedMarketplace({ publishedVersion: "0.2.0" });
+      writeJson({
+        segments: ["plugins", "known_marketplaces.json"],
+        value: {
+          langwatch: {
+            source: {
+              source: "git",
+              url: "https://github.com/langwatch/agent-plugin.evil",
+            },
+            installLocation: `${home()}/.claude/plugins/marketplaces/langwatch`,
+          },
+        },
+      });
+      const onCheckStart = vi.fn();
+      const { updateLangwatchClaudePlugin } = await loadModule();
+
+      expect(updateLangwatchClaudePlugin({ onCheckStart }).action).toBe(
+        "unavailable",
+      );
+      expect(commandsRun()).toEqual([]);
+      expect(onCheckStart).not.toHaveBeenCalled();
     });
 
     /** @scenario "A machine that cannot remember the check does not repeat it every launch" */
