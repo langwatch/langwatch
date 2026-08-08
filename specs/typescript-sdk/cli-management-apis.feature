@@ -12,13 +12,13 @@ Feature: CLI families for the management APIs
 
     @unit
     Scenario: The organization commands cover get and update
-      When the command catalog is built
+      When I read the command catalog the CLI publishes
       Then the organization family carries get and update
       And update accepts the organization name
 
     @unit
     Scenario: The members commands cover the membership lifecycle
-      When the command catalog is built
+      When I read the command catalog the CLI publishes
       Then the members family carries list, get, update, disable, enable, remove and access
       And update accepts the organization role to set
 
@@ -49,6 +49,12 @@ Feature: CLI families for the management APIs
       Then every filter reaches the request unchanged
       And omitted filters are absent from the request rather than sent empty
 
+    @unit
+    Scenario: Role bindings update changes the role a binding grants
+      When a role binding is updated with a new role
+      Then the request patches that binding with the role
+      And a custom role id rides along only when one is given
+
   Rule: Secrets and access changes are handled carefully
 
     @unit
@@ -67,14 +73,14 @@ Feature: CLI families for the management APIs
 
     @unit
     Scenario: Team commands cover the team lifecycle and membership
-      When the command catalog is built
+      When I read the command catalog the CLI publishes
       Then the teams family carries list, get, create, update and archive
       And it carries nested member commands to list, add and remove
       And adding a member accepts the role they get on the team
 
     @unit
     Scenario: Group commands cover groups, membership and bindings
-      When the command catalog is built
+      When I read the command catalog the CLI publishes
       Then the groups family carries list, get, create, rename and delete
       And it carries nested member commands to list, add and remove
       And it carries nested binding commands to list, add and remove
@@ -97,5 +103,5 @@ Feature: CLI families for the management APIs
 
     @unit
     Scenario: Every management command is covered by the feature map
-      When the command catalog is built
+      When I read the command catalog the CLI publishes
       Then every management command appears in the feature map

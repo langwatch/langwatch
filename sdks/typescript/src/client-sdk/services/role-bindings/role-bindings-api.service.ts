@@ -78,6 +78,12 @@ export interface CreateRoleBindingInput {
   scopeId: string;
 }
 
+/** Only the role can change; principal and scope are the binding's identity. */
+export interface UpdateRoleBindingInput {
+  role: ManagementRole;
+  customRoleId?: string;
+}
+
 export class RoleBindingsApiError extends Error {
   constructor(
     message: string,
@@ -116,6 +122,18 @@ export class RoleBindingsApiService {
       operation: "create role binding",
       path: "/api/role-bindings",
       method: "POST",
+      body: input,
+    });
+  }
+
+  async update(
+    id: string,
+    input: UpdateRoleBindingInput,
+  ): Promise<RoleBinding> {
+    return this.#request({
+      operation: `update role binding "${id}"`,
+      path: `/api/role-bindings/${encodeURIComponent(id)}`,
+      method: "PATCH",
       body: input,
     });
   }

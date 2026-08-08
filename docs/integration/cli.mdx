@@ -520,10 +520,12 @@ langwatch role-bindings create \
   --role CUSTOM --custom-role-id <custom_role_id> \
   --scope-type PROJECT --scope-id proj_01HZX...
 
+langwatch role-bindings update <binding_id> --role ADMIN
+
 langwatch role-bindings delete <binding_id>
 ```
 
-Creating a binding that already exists reports `role_binding_already_exists` rather than making a second one, so a provisioning script can run twice.
+Creating a binding that already exists reports `role_binding_already_exists` rather than making a second one, so a provisioning script can run twice. Updating changes only the role a binding grants; the principal and the scope are the binding's identity, so moving a grant means deleting one binding and creating another.
 
 ### SCIM tokens
 

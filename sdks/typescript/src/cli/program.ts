@@ -3705,6 +3705,19 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     roleBindingsCmd
+      .command("update <id>")
+      .description("Change the role a binding grants; principal and scope stay as they are")
+      .requiredOption("--role <role>", "Role to grant: ADMIN, MEMBER, VIEWER or CUSTOM")
+      .option("--custom-role-id <id>", "Custom role to grant, required when the role is CUSTOM")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string, options: { role: string; customRoleId?: string }) => {
+      const { updateRoleBindingCommand: impl } = await import("./commands/role-bindings/update.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    roleBindingsCmd
       .command("delete <id>")
       .description("Delete a role binding")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),

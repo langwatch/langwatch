@@ -34,6 +34,7 @@ import { createInvitesCommand } from "../../invites/create";
 import { listMembersCommand } from "../../members/list";
 import { getOrganizationCommand } from "../../organization/get";
 import { listRoleBindingsCommand } from "../../role-bindings/list";
+import { updateRoleBindingCommand } from "../../role-bindings/update";
 import { listRolesCommand } from "../../roles/list";
 import { createScimTokenCommand } from "../../scim-tokens/create";
 import { listTeamsCommand } from "../../teams/list";
@@ -119,6 +120,36 @@ describe("role-bindings list", () => {
       expect(lastRequest().url).toBe(
         "https://app.langwatch.ai/api/role-bindings",
       );
+    });
+  });
+});
+
+describe("role-bindings update", () => {
+  describe("when a role binding is updated with a new role", () => {
+    /** @scenario Role bindings update changes the role a binding grants */
+    it("patches that binding with the role, carrying a custom role id only when one is given", async () => {
+      const binding = LIST_ROLE_BINDINGS_RESPONSE.bindings[0]!;
+      respondWith({ ...binding, role: "CUSTOM", customRoleId: "crole_1" });
+
+      const result = await updateRoleBindingCommand("rb_1", {
+        role: "custom",
+        customRoleId: "crole_1",
+      });
+
+      const { url, body, init } = lastRequest();
+      expect(url).toBe("https://app.langwatch.ai/api/role-bindings/rb_1");
+      expect(init.method).toBe("PATCH");
+      expect(body).toEqual({ role: "CUSTOM", customRoleId: "crole_1" });
+      expect(result?.data).toEqual({
+        ...binding,
+        role: "CUSTOM",
+        customRoleId: "crole_1",
+      });
+
+      mockFetch.mockClear();
+      respondWith(binding);
+      await updateRoleBindingCommand("rb_1", { role: "admin" });
+      expect(lastRequest().body).toEqual({ role: "ADMIN" });
     });
   });
 });
