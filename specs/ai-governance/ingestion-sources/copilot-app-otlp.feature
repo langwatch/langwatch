@@ -34,14 +34,14 @@ Feature: Copilot app OTLP spans canonicalize on the unified substrate
 
     @unit @unimplemented
     Scenario: An app chat span yields model and token usage on the canonical trace
-      Given a copilot OTLP span named "chat" with gen_ai request model and token usage attributes
+      Given a copilot OTLP span for the "chat" gen_ai operation with request model and token usage attributes
       When the span is ingested with the copilot_app ingest key
       Then the recorded span carries the model name
       And the recorded span carries input and output token counts
 
     @unit
     Scenario: An app tool-execution span canonicalizes as a tool span
-      Given a copilot OTLP span named "execute_tool" with gen_ai tool attributes
+      Given a copilot OTLP span for the "execute_tool" gen_ai operation with tool attributes
       When the span is ingested with the copilot_app ingest key
       Then the recorded span's type reflects a tool execution
 

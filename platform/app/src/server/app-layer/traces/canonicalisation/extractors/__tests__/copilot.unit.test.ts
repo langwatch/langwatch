@@ -321,7 +321,7 @@ describe("CopilotExtractor", () => {
         >[0],
         [],
         {
-          name: "chat",
+          name: "chat oswe-vscode-prime",
           kind: 0,
           instrumentationScope: { name: "copilot-chat" },
           statusMessage: null,

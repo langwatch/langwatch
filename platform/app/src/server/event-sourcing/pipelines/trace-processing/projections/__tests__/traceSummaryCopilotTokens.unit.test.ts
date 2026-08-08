@@ -60,7 +60,7 @@ describe("applySpanToSummary copilot rollup-usage handling", () => {
           "gen_ai.usage.input_tokens": 15560,
           "gen_ai.usage.output_tokens": 153,
         });
-        const agentAttrs = canonicalize("invoke_agent copilot", {
+        const agentAttrs = canonicalize("invoke_agent", {
           "gen_ai.operation.name": "invoke_agent",
           "gen_ai.usage.input_tokens": 15560,
           "gen_ai.usage.output_tokens": 153,
@@ -98,7 +98,7 @@ describe("applySpanToSummary copilot rollup-usage handling", () => {
   describe("given an invoke_agent span with no usage of its own", () => {
     describe("when it is canonicalized", () => {
       it("gets no skip marker, so a future usage-bearing agent span still counts", () => {
-        const agentAttrs = canonicalize("invoke_agent copilot", {
+        const agentAttrs = canonicalize("invoke_agent", {
           "gen_ai.operation.name": "invoke_agent",
           "github.copilot.turn_id": "t1",
         });
