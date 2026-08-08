@@ -5,6 +5,7 @@
  * same way the install path writes it.
  */
 
+import type * as ChildProcessModule from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -37,6 +38,17 @@ import {
 } from "../shell-rc";
 import { scanTelemetryTargets } from "../telemetry-targets";
 
+// The plugin targets shell out to `claude`, and no test may reach a real one.
+// This claude supports plugins and succeeds by default; a scenario that needs a
+// subcommand to fail overrides that one subcommand and leaves `plugin --help`
+// answering, because whether the subcommand exists is probed once per process.
+const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }));
+vi.mock("node:child_process", async () => {
+	const actual =
+		await vi.importActual<typeof ChildProcessModule>("node:child_process");
+	return { ...actual, spawnSync: spawnSyncMock };
+});
+
 let tmpHome: string;
 const origHome = process.env.HOME;
 const origUserprofile = process.env.USERPROFILE;
@@ -48,10 +60,35 @@ const presentLabels = (): string[] =>
 		.filter((t) => t.present)
 		.map((t) => t.label);
 
+const claudeCommandsRun = (): string[] =>
+	spawnSyncMock.mock.calls.map((call: unknown[]) =>
+		(call[1] as string[]).join(" "),
+	);
+
+/** Write a plugin state file under the temp home's claude directory. */
+const writeClaudeJson = (segments: string[], value: unknown): void => {
+	const file = path.join(tmpHome, ".claude", ...segments);
+	fs.mkdirSync(path.dirname(file), { recursive: true });
+	fs.writeFileSync(file, JSON.stringify(value, null, 2));
+};
+
+const seedLangwatchPlugin = (): void =>
+	writeClaudeJson(["plugins", "installed_plugins.json"], {
+		version: 2,
+		plugins: { "langwatch@langwatch": [{ scope: "user" }] },
+	});
+
+const seedMarketplace = (repo = "langwatch/agent-plugin"): void =>
+	writeClaudeJson(["plugins", "known_marketplaces.json"], {
+		langwatch: { source: { source: "github", repo } },
+	});
+
 beforeEach(() => {
 	tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "lw-telemetry-targets-"));
 	process.env.HOME = tmpHome;
 	process.env.USERPROFILE = tmpHome;
+	spawnSyncMock.mockReset();
+	spawnSyncMock.mockReturnValue({ status: 0, stdout: "", stderr: "" });
 	// codex resolves its home from CODEX_HOME first; keep it unset so it
 	// falls back to ~/.codex under the temp HOME. opencode reads
 	// XDG_CONFIG_HOME the same way, for ~/.config/opencode.
@@ -210,6 +247,83 @@ describe("scanTelemetryTargets", () => {
 				"export const Mine = async () => ({});\n",
 			);
 			expect(path.basename(target.path)).toBe(OPENCODE_PLUGIN_FILE_NAME);
+		});
+	});
+
+	describe("when the langwatch claude plugin is installed from our marketplace", () => {
+		beforeEach(() => {
+			seedLangwatchPlugin();
+			seedMarketplace();
+		});
+
+		/** @scenario "Logout lists the installed plugin and the LangWatch marketplace" */
+		it("reports the plugin and the marketplace as present", () => {
+			const labels = presentLabels();
+			expect(labels).toContain("claude langwatch plugin (langwatch@langwatch)");
+			expect(labels).toContain(
+				"claude langwatch plugin marketplace (langwatch)",
+			);
+		});
+
+		/** @scenario "Logout uninstalls the plugin and removes the marketplace" */
+		it("uninstalls the plugin at user scope and removes the marketplace", () => {
+			for (const t of scanTelemetryTargets().filter((t) => t.present)) {
+				expect(t.remove()).toBe(true);
+			}
+
+			expect(claudeCommandsRun()).toContain(
+				"plugin uninstall langwatch@langwatch --scope user",
+			);
+			expect(claudeCommandsRun()).toContain(
+				"plugin marketplace remove langwatch",
+			);
+		});
+	});
+
+	describe("when the plugin is enabled but the uninstall subcommand fails", () => {
+		/** @scenario "A plugin the uninstall subcommand cannot remove is disabled instead" */
+		it("switches the plugin off in the settings file instead", () => {
+			seedLangwatchPlugin();
+			writeClaudeJson(["settings.json"], {
+				model: "claude-sonnet-5",
+				enabledPlugins: { "langwatch@langwatch": true },
+			});
+			spawnSyncMock.mockImplementation((_bin: string, args: string[]) =>
+				args.join(" ").startsWith("plugin uninstall")
+					? { status: 1, stdout: "", stderr: "no" }
+					: { status: 0, stdout: "", stderr: "" },
+			);
+
+			const target = scanTelemetryTargets().find((t) =>
+				t.label.startsWith("claude langwatch plugin ("),
+			)!;
+			expect(target.present).toBe(true);
+			expect(target.remove()).toBe(true);
+
+			const settings = JSON.parse(
+				fs.readFileSync(path.join(tmpHome, ".claude", "settings.json"), "utf8"),
+			) as { model: string; enabledPlugins: Record<string, boolean> };
+			expect(settings.enabledPlugins["langwatch@langwatch"]).toBe(false);
+			expect(settings.model).toBe("claude-sonnet-5");
+		});
+	});
+
+	describe("when a marketplace of our name points at somebody else's repository", () => {
+		/** @scenario "A marketplace LangWatch did not register is left alone" */
+		it("does not report it, and remove() runs no claude subprocess", () => {
+			seedMarketplace("somebody-else/their-plugins");
+
+			expect(
+				presentLabels().some((l) =>
+					l.startsWith("claude langwatch plugin marketplace"),
+				),
+			).toBe(false);
+
+			const target = scanTelemetryTargets().find((t) =>
+				t.label.startsWith("claude langwatch plugin marketplace"),
+			)!;
+			expect(target.remove()).toBe(false);
+			expect(claudeCommandsRun()).toEqual([]);
 		});
 	});
 

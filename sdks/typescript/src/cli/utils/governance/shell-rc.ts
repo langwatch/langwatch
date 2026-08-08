@@ -43,7 +43,14 @@ import {
 	appSettingsTargetFor,
 	installAppEnv,
 } from "./app-settings";
-import { installSessionContextHooks } from "./session-context-hooks";
+import {
+	ensureLangwatchClaudePlugin,
+	readClaudePluginState,
+} from "./claude-plugin";
+import {
+	installSessionContextHooks,
+	removeSessionContextHooks,
+} from "./session-context-hooks";
 import { type GovernanceConfig, saveConfig } from "./config";
 import { envForTool, type ToolEnv } from "./tool-env";
 
@@ -308,9 +315,8 @@ export async function askPersistChoice(
 		output: process.stdout,
 	});
 	const ans = await new Promise<string>((resolve) => {
-		rl.question(
-			`Install env vars to ${rcPathHint} so that next time the plain \`${tool}\` command keeps capturing telemetry data? [Y/n/never] `,
-			(a) => resolve(a),
+		rl.question(persistQuestion({ tool, targetHint: rcPathHint }), (a) =>
+			resolve(a),
 		);
 	});
 	rl.close();
@@ -319,6 +325,30 @@ export async function askPersistChoice(
 	if (norm === "" || norm === "y" || norm === "yes") return "yes";
 	if (norm === "never") return "never";
 	return "no";
+}
+
+/**
+ * What the persist offer asks. Claude gets its own sentence because saying yes
+ * to it does two things rather than one: it saves the env block AND installs the
+ * plugin that reports session context. Consent has to name both, and name what
+ * the plugin's hooks record, or the user is agreeing to something they were
+ * never told about.
+ */
+function persistQuestion({
+	tool,
+	targetHint,
+}: {
+	tool: string;
+	targetHint: string;
+}): string {
+	if (tool === "claude") {
+		return (
+			`Set up LangWatch capture for ${tool}? This saves the telemetry env vars to ` +
+			`${targetHint} and installs the LangWatch Claude Code plugin, whose session ` +
+			`hooks record the repository and branch each session works on. [Y/n/never] `
+		);
+	}
+	return `Install env vars to ${targetHint} so that next time the plain \`${tool}\` command keeps capturing telemetry data? [Y/n/never] `;
 }
 
 /**
@@ -360,12 +390,12 @@ export async function maybeOfferIngestionShellRcPersist({
 	const appTarget = appSettingsTargetFor(tool);
 	if (appTarget) {
 		if (appEnvHasAllVars(appTarget, vars)) {
-			// The exports are current, but the hooks may not be: they arrived
-			// after the env block, so a device that persisted earlier carries the
-			// block and none of them. Same file, same grant, so assert them here
-			// rather than leaving repository identity off every session that
+			// The exports are current, but the session context seam may not be: it
+			// arrived after the env block, so a device that persisted earlier
+			// carries the block and none of it. Same file, same grant, so assert it
+			// here rather than leaving repository identity off every session that
 			// already said yes.
-			assertClaudeSessionContextHooks(tool);
+			reassertClaudeSessionContext(tool);
 			return;
 		}
 		console.log();
@@ -382,7 +412,7 @@ export async function maybeOfferIngestionShellRcPersist({
 					`  ✓ Installed langwatch telemetry exports to ${appTarget.displayPath}`,
 				),
 			);
-			assertClaudeSessionContextHooks(tool);
+			installClaudeSessionContext(tool);
 		} catch (err) {
 			console.log(
 				chalk.yellow(
@@ -492,15 +522,65 @@ export async function maybeOfferIngestionShellRcPersist({
 }
 
 /**
- * Assert the session context hooks for a tool whose telemetry exports live in
- * its own settings file. Claude Code exports no repository identity over
- * telemetry; the hooks are what report it, and they belong to the same "yes"
- * that persisted the exports. Idempotent, and quiet unless it changed
- * something. A hook write that fails is not worth failing the persist over:
- * the exports it rides beside are already installed.
+ * Wire the session context seam for a tool whose telemetry exports live in its
+ * own settings file, on the run where the user just consented. Claude Code
+ * exports no repository identity over telemetry; the seam is what reports it,
+ * and it belongs to the same "yes" that persisted the exports.
+ *
+ * The plugin is the seam we want, so this is the one moment allowed to install
+ * it: the user is present, so a marketplace trust prompt can reach them, and
+ * they just answered a question that named the plugin. Anything that stops the
+ * plugin from landing (a `claude` too old for it, a network that is down) falls
+ * back to the hook entries written straight into the settings file, which are
+ * what this always did.
  */
-function assertClaudeSessionContextHooks(tool: string): void {
+function installClaudeSessionContext(tool: string): void {
 	if (tool !== "claude") return;
+
+	const plugin = ensureLangwatchClaudePlugin({ interactive: true });
+	if (plugin.action === "installed") {
+		console.log(
+			chalk.green(
+				`  ✓ Installed the LangWatch Claude Code plugin, whose hooks report each session's repository and branch`,
+			),
+		);
+		return;
+	}
+	if (plugin.action === "already_installed") return;
+
+	installRawSessionContextHooks();
+}
+
+/**
+ * Re-assert the session context seam on a run that is only verifying an
+ * already-configured device. Nobody was asked anything on this run, so it does
+ * no network and spawns nothing: it reads what is on disk and edits local files.
+ *
+ * The one thing it does change is leftovers. A device that took the plugin on a
+ * previous run may still carry the raw hook entries the plugin replaced, and
+ * leaving both wired runs the same two hooks twice per session.
+ */
+function reassertClaudeSessionContext(tool: string): void {
+	if (tool !== "claude") return;
+
+	if (readClaudePluginState().pluginInstalled) {
+		try {
+			removeSessionContextHooks({ tool: "claude_code" });
+		} catch {
+			// Best-effort: a duplicate hook is worse than tidy, not broken.
+		}
+		return;
+	}
+
+	installRawSessionContextHooks();
+}
+
+/**
+ * Merge the hook entries into the settings file. Idempotent, and quiet unless it
+ * changed something. A hook write that fails is not worth failing the persist
+ * over: the exports it rides beside are already installed.
+ */
+function installRawSessionContextHooks(): void {
 	try {
 		const hooks = installSessionContextHooks({ tool: "claude_code" });
 		if (hooks.action === "unchanged") return;

@@ -13,7 +13,13 @@
  *
  * Drives the Y / n / never branches by mocking readline (the stdin
  * prompt) and saveConfig (the persistence).
+ *
+ * `claude` here is one without plugin support, which is what keeps these
+ * scenarios about the file each tool's exports land in. What consent does for a
+ * `claude` that CAN take the LangWatch plugin lives in
+ * claude-plugin-persist.unit.test.ts.
  */
+import type * as ChildProcessModule from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -35,6 +41,18 @@ vi.mock("node:readline", () => ({
     close: () => undefined,
   }),
 }));
+
+// No test may reach a real `claude`. A non-zero `plugin --help` is exactly what
+// a release without the subcommand answers, so the persist offer falls back to
+// the hook entries it has always written.
+const { spawnSyncMock } = vi.hoisted(() => ({
+  spawnSyncMock: vi.fn(() => ({ status: 1, stdout: "", stderr: "unknown" })),
+}));
+vi.mock("node:child_process", async () => {
+  const actual =
+    await vi.importActual<typeof ChildProcessModule>("node:child_process");
+  return { ...actual, spawnSync: spawnSyncMock };
+});
 
 const saveConfigMock = vi.fn();
 vi.mock("../config", async () => {
