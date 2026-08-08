@@ -276,7 +276,7 @@ describe("given a reviewer walking their annotation queue", () => {
 
       // Seeding the store here would mount the drawer a frame before the URL
       // names it, and the drawer's URL hydrator reads that frame as "no drawer
-      // in the URL, close it" — a fight with the sync writing the URL that
+      // in the URL, close it", a fight with the sync writing the URL that
       // never settles.
       expect(mocks.openTrace).not.toHaveBeenCalled();
       expect(mocks.enterTraceEditMode).not.toHaveBeenCalled();

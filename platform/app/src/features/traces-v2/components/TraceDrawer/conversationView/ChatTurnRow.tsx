@@ -703,7 +703,7 @@ const TurnSeparator: React.FC<{
       />
       {!annotationsOnLeft && badges}
       {/* Hover actions float over one end of the separator instead of sitting
-          in flow — the hidden chrome used to reserve ~180px of width, stopping
+          in flow: the hidden chrome used to reserve ~180px of width, stopping
           the divider line short of the edge. Absolutely positioned, the lines
           span the full width and the actions overlay the end while the pointer
           is on the turn. The badges stay in flow: they are on screen the whole

@@ -32,7 +32,7 @@ import { createInnerTRPCContext } from "../../trpc";
 
 type Caller = ReturnType<typeof appRouter.createCaller>;
 
-describe("storedObjects.headById — who may probe", () => {
+describe("storedObjects.headById: who may probe", () => {
   const ns = `soprobe-${nanoid(8)}`;
   const ORG = `org-${ns}`;
   const TEAM = `team-${ns}`;
@@ -123,7 +123,7 @@ describe("storedObjects.headById — who may probe", () => {
         id: `absent-${nanoid(6)}`,
       });
 
-      // No row for this id, which is the honest answer — the point is that the
+      // No row for this id, which is the honest answer; the point is that the
       // caller reached the service at all instead of being refused.
       expect(result).toEqual({ status: "not_found" });
     });

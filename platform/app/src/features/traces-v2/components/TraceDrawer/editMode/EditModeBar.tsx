@@ -100,8 +100,8 @@ function useSaveTraceEdit({ traceId }: { traceId: string }) {
       return;
     }
     // Read the correction back before merging onto it. The one adopted when
-    // editing started can be minutes old — a suggestion saved in between writes
-    // the same record — and building on a stale one would drop whatever was
+    // editing started can be minutes old (a suggestion saved in between writes
+    // the same record), and building on a stale one would drop whatever was
     // stored since. Two people saving in the same instant still race, and the
     // last write wins; a reviewer racing themselves does not.
     setIsRebasing(true);

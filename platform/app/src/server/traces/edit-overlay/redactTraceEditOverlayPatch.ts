@@ -227,8 +227,8 @@ function redactTraceEdits({
  * window withholds. Content edits (trace input/output, span input/output/params)
  * drop out when the viewer may not read that category or the trace is beyond
  * the visibility window; corrected `params` that survive still go through the
- * restricted-attribute rules. Structural edits — renames, type changes, cleared
- * errors, deleted spans — always stay: they say what the trace should have
+ * restricted-attribute rules. Structural edits (renames, type changes, cleared
+ * errors, deleted spans) always stay: they say what the trace should have
  * looked like without quoting any of it.
  *
  * Pure, and returns the very same patch when the viewer may read all of it, so
@@ -282,7 +282,7 @@ export function redactPatchForViewer({
 
 /**
  * The span fields the stored correction holds that this viewer never received
- * faithfully — either dropped outright or handed over with a redaction
+ * faithfully: either dropped outright or handed over with a redaction
  * placeholder in place of the value. Identity comparison is exactly the test:
  * every gate above passes a readable value through by reference, so anything
  * that comes back different is something the viewer could not have edited.
@@ -446,15 +446,15 @@ function traceEditsWithWithheld({
  * The correction to store when this viewer saves.
  *
  * A save replaces the whole correction, and the viewer composed theirs on top of
- * the one {@link redactPatchForViewer} handed them — so anything withheld from
+ * the one {@link redactPatchForViewer} handed them, so anything withheld from
  * the read would be dropped by the write, and a reviewer who may not read a
  * field would silently delete someone else's correction to it. Whatever the
  * viewer never received faithfully is therefore carried over from the stored
  * correction: they could not have meant to change it.
  *
  * Everything the viewer could read is theirs to decide, including removing it,
- * and the structural side of the patch — renames, type changes, cleared errors,
- * `deletedSpanIds` — comes from the incoming save unchanged. Removing the whole
+ * and the structural side of the patch (renames, type changes, cleared errors,
+ * `deletedSpanIds`) comes from the incoming save unchanged. Removing the whole
  * correction stays a separate, deliberate action.
  */
 export function restoreWithheldEdits({

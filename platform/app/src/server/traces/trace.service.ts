@@ -271,11 +271,11 @@ export class TraceService {
    *
    * A correction never widens what a viewer may read. The trace it lands on has
    * already been through `applyTraceProtections`, so each patch is first cut
-   * down to the edits this viewer may read — content categories they cannot
-   * see, content teased by the plan's visibility window, and attributes a
-   * restrict rule hides from them all drop out — and only then applied. Without
-   * that, a corrected `params` or output would put back exactly what the
-   * redaction pass had just removed, and a dataset record would carry it.
+   * down to the edits this viewer may read, and only then applied: content
+   * categories they cannot see, content teased by the plan's visibility
+   * window, and attributes a restrict rule hides from them all drop out.
+   * Without that, a corrected `params` or output would put back exactly what
+   * the redaction pass had just removed, and a dataset record would carry it.
    */
   private async applyEditOverlays(
     projectId: string,

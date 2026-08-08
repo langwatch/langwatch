@@ -182,7 +182,7 @@ describe("TraceIOAccumulationService — preferText behaviour", () => {
   });
 });
 
-describe("TraceIOAccumulationService — media refs", () => {
+describe("TraceIOAccumulationService: media refs", () => {
   const audioPart = (id: string) => ({
     type: "input_audio",
     input_audio: { url: `/api/files/p1/${id}`, mimeType: "audio/wav" },

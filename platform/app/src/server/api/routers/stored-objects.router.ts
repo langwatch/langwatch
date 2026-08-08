@@ -30,7 +30,7 @@ import { createStoredObjectsService } from "~/server/stored-objects/stored-objec
  * `projectId`, mirroring the `/api/files/:id` route's own gate. The same
  * stored object is trace media for one viewer and scenario media for another,
  * and the two permissions are separate categories a custom role can hold one
- * of — a probe narrower than the read it describes leaves a viewer who can
+ * of. A probe narrower than the read it describes leaves a viewer who can
  * fetch the bytes unable to find out why the player failed, which strands the
  * renderer in its loading state.
  */

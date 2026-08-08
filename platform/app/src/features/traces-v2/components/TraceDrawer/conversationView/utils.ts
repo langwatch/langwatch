@@ -22,8 +22,8 @@ const NO_MEDIA: MediaPartData[] = [];
  * Two sources, in the order the trace table already reads them. A turn's
  * input and output text is flattened at fold time, so the fold-derived
  * references are the only record of what the winning span payload carried and
- * they win whenever they exist. A turn handed over with its raw payload — a
- * threadless trace the host fetched itself — has no references, so its value
+ * they win whenever they exist. A turn handed over with its raw payload (a
+ * threadless trace the host fetched itself) has no references, so its value
  * is walked for parts instead.
  *
  * Either way the same side rule applies as on the summary strips: the caller's

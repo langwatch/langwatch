@@ -24,7 +24,7 @@ function readSystemInstructions(
 /**
  * Build the display string for a span's input. The canonicaliser strips the
  * system prompt out of the chat transcript into `gen_ai.system_instructions`,
- * so a faithfully-rendered Input panel would silently drop it — the
+ * so a faithfully-rendered Input panel would silently drop it: the
  * conversation reads as if nothing steered the model. For display we
  * recombine them: when the input is a chat transcript with no system message
  * of its own and the span carries system instructions, prepend them as a

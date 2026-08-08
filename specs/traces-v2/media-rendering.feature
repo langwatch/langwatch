@@ -81,7 +81,7 @@ Feature: Media rendering across trace surfaces
     Then each message bubble renders its image inline and its audio with a player
 
   # ===========================================================================
-  # Conversation thread — media hangs off the message that carried it
+  # Conversation thread: media hangs off the message that carried it
   # ===========================================================================
   # The thread layout gives each role its own full-width row, so a turn's media
   # belongs to a message, not to the turn as a whole: what the caller sent
@@ -125,7 +125,7 @@ Feature: Media rendering across trace surfaces
     Then the user side shows the redacted marker and no media
 
   # ===========================================================================
-  # Trace summary strips — which side a recording belongs to
+  # Trace summary strips: which side a recording belongs to
   # ===========================================================================
   # The trace's own input and output are flattened text, so the summary strips
   # render the compact media refs the fold derived from the winning span. A

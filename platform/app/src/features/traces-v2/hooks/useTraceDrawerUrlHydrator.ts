@@ -67,7 +67,7 @@ export function useTraceDrawerUrlHydrator(): void {
  * drop an unsaved one with no way to get it back.
  *
  * The reviewer is asked instead, and the question lives in the edit bar, which
- * only exists while the drawer is mounted — parking the exit on its own would
+ * only exists while the drawer is mounted. Parking the exit on its own would
  * park it on a dialog that just unmounted. So the drawer's link is re-asserted
  * first, and the parked exit closes it for real once the reviewer says they are
  * done with the correction.

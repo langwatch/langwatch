@@ -26,7 +26,7 @@ const mockHeadByIdData = vi.fn(
   () => undefined as undefined | HeadByIdProbeResult,
 );
 
-// Whether the probe query itself fails — the shape tRPC reports when the
+// Whether the probe query itself fails: the shape tRPC reports when the
 // caller is refused or the request never lands.
 const mockHeadByIdFails = vi.fn(() => false);
 
@@ -284,7 +284,7 @@ describe("<MediaPart/>", () => {
       expect(screen.getByTestId("media-part-missing")).toHaveTextContent(
         "missing",
       );
-      // The dead player is gone — a lost recording must not look like a
+      // The dead player is gone: a lost recording must not look like a
       // silent one.
       expect(screen.queryByTestId("media-part-audio")).not.toBeInTheDocument();
     });

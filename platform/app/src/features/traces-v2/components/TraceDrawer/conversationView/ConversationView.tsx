@@ -314,7 +314,7 @@ function useTurnSelection({
         fromTraceId: currentTraceIdRef.current,
         fromViewMode: "conversation",
         toTraceId: traceId,
-        // Open the turn's Summary, not the raw Trace tab — and transiently, so
+        // Open the turn's Summary, not the raw Trace tab. Transiently too, so
         // peeking at a turn doesn't repoint the user's remembered tab.
         toViewMode: "summary",
         persistViewMode: false,
@@ -536,7 +536,7 @@ const TurnsView: React.FC<{
   );
 
   // On open, drop the reader at the turn whose trace the drawer is showing
-  // rather than at the top — a long thread otherwise opens scrolled away
+  // rather than at the top: a long thread otherwise opens scrolled away
   // from the turn the operator clicked in from. Centers once per mount; we
   // don't re-scroll on later navigation so we never fight the user.
   const scrollRef = useRef<HTMLDivElement>(null);

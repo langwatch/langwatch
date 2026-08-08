@@ -66,7 +66,7 @@ export class TraceEditOverlayRepository {
   /**
    * The row has a primary key as well as its (projectId, traceId) unique, and
    * Prisma cannot push a two-constraint upsert down to a single INSERT ... ON
-   * CONFLICT — it compiles to a SELECT followed by an INSERT. Two reviewers
+   * CONFLICT; it compiles to a SELECT followed by an INSERT. Two reviewers
    * saving the first correction for the same trace at the same moment therefore
    * both decide to insert, and the loser gets a unique violation. The loser
    * wanted the row to hold its patch, which is exactly an update, so it retries

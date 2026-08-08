@@ -135,7 +135,7 @@ afterEach(cleanup);
 describe("given a voice turn whose payload holds both recordings", () => {
   /**
    * The reply recording rides along in the turn's input as well as its
-   * output — the shape that used to stack two players on the caller's side.
+   * output: the shape that used to stack two players on the caller's side.
    */
   const voiceTurn = () =>
     turn({

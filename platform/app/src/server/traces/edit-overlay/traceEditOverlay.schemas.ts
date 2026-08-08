@@ -33,8 +33,8 @@ const traceIOEditSchema = z.object({ value: z.string() });
  * optional:
  *   - key absent  -> that field is untouched
  *   - key present -> that field is replaced wholesale
- * A field that can be absent from a span in the first place — name, input,
- * output, params, error — also takes null, which clears it. `type` does not:
+ * A field that can be absent from a span in the first place (name, input,
+ * output, params, error) also takes null, which clears it. `type` does not:
  * every span has one, so there is nothing for a cleared type to mean.
  * Field-level replacement (rather than a character diff) is what keeps a
  * correction meaningful while spans are still being ingested.

@@ -9,7 +9,7 @@
  * What it does, in order:
  *   1. Synthesizes two short tones as raw pcm16 (the shape a realtime voice
  *      agent streams): one for the caller, one for the agent's reply.
- *   2. Builds the span a voice agent emits — `langwatch.input` carrying the
+ *   2. Builds the span a voice agent emits: `langwatch.input` carrying the
  *      whole transcript (the caller's message AND the agent's, which is how
  *      the two-players-under-INPUT report was found) and `langwatch.output`
  *      carrying the reply.
@@ -41,7 +41,7 @@ import type { OtlpSpan } from "~/server/event-sourcing/pipelines/trace-processin
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { wrapRawPcmToWav } from "~/shared/audio/pcmToWav";
 
-/** Raw pcm16 is mono 16-bit at 24 kHz — the rate the WAV wrapper writes. */
+/** Raw pcm16 is mono 16-bit at 24 kHz, the rate the WAV wrapper writes. */
 const PCM16_SAMPLE_RATE = 24_000;
 
 interface Args {
@@ -173,7 +173,7 @@ async function resolveProject(slug: string) {
     take: 25,
   });
   if (projects.length === 0) {
-    throw new Error("no projects in this database — sign up in the app first");
+    throw new Error("no projects in this database: sign up in the app first");
   }
   if (projects.length > 1) {
     const slugs = projects.map((p) => p.slug).join(", ");
@@ -188,7 +188,7 @@ async function main() {
 
   if (!process.env.DATABASE_URL) {
     throw new Error(
-      "DATABASE_URL is unset — run this with `npx tsx --env-file=.env` from platform/app",
+      "DATABASE_URL is unset: run this with `npx tsx --env-file=.env` from platform/app",
     );
   }
 
@@ -255,7 +255,7 @@ async function main() {
     } as RecordSpanCommandData,
     deps: {
       // The seeder's whole point is playable stored audio, so it does not ask
-      // the flag or the privacy policy whether to externalize — it always does.
+      // the flag or the privacy policy whether to externalize; it always does.
       isEnabled: async () => true,
       hasContentDropRules: async () => false,
     },
@@ -268,7 +268,7 @@ async function main() {
   const payload = JSON.stringify(extracted.span);
   if (payload.includes(spoken.toString("base64"))) {
     throw new Error(
-      "media extraction did not externalize the audio — check the storage root and ClickHouse in .env",
+      "media extraction did not externalize the audio: check the storage root and ClickHouse in .env",
     );
   }
   const references = [...payload.matchAll(/\/api\/files\/[\w-]+\/[\w-]+/g)].map(

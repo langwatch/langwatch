@@ -178,10 +178,10 @@ function conversationTabState({
 /**
  * Usage and Terminal, the two tabs only a coding-agent trace has.
  *
- * "Usage" (not "Session" — that word already means the agent's own
- * process/session id elsewhere in this UI, and reads as jargon here) comes
- * first: it answers "what happened, what did it cost, what went wrong" in one
- * screen, which is what someone opening a coding-agent trace wants first.
+ * "Usage" (not "Session", which already means the agent's own process/session
+ * id elsewhere in this UI, and reads as jargon here) comes first: it answers
+ * "what happened, what did it cost, what went wrong" in one screen, which is
+ * what someone opening a coding-agent trace wants first.
  * Terminal is the replay you go to once you know which moment you are after.
  */
 function CodingAgentTabs({
@@ -210,7 +210,7 @@ function CodingAgentTabs({
       />
       <ModeTab
         label="Terminal"
-        // NOT M — that's Maximize. The tab advertised a shortcut that did
+        // NOT M: that's Maximize. The tab advertised a shortcut that did
         // something else entirely, which is worse than having none.
         shortcut="E"
         active={viewMode === "terminal"}

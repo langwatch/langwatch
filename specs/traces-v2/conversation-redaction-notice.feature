@@ -1,4 +1,4 @@
-# Conversation view — one notice when content was redacted
+# Conversation view: one notice when content was redacted
 #
 # Implementation:
 #   platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/ConversationView.tsx

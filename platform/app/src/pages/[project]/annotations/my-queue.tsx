@@ -419,8 +419,8 @@ const AnnotationQueuePicker = ({
     const occurredAtMs = partitionHint(
       currentQueueItem.trace?.timestamps?.started_at,
     );
-    // The link states the whole intent — which trace, and that it opens for
-    // editing — and the drawer's URL hydrator opens it. Seeding the drawer
+    // The link states the whole intent (which trace, and that it opens for
+    // editing), and the drawer's URL hydrator opens it. Seeding the drawer
     // store here instead would mount the drawer a frame before the URL names
     // it, and the hydrator reads that frame as "the URL has no drawer, close
     // it", which fights the sync that is writing the URL.

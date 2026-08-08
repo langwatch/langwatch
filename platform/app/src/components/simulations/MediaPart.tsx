@@ -77,7 +77,7 @@ function mediaNoun(category: "audio" | "image" | "video" | "binary"): string {
 
 /**
  * The one placeholder both unavailable states render. Says what kind of media
- * is gone and why, in the viewer's terms — never a status code, a URL, or a
+ * is gone and why, in the viewer's terms: never a status code, a URL, or a
  * probe failure message.
  */
 function MediaUnavailable({
@@ -229,7 +229,7 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
     }
   }, [probeData]);
 
-  // The probe itself can fail — the caller may not hold the permission it
+  // The probe itself can fail: the caller may not hold the permission it
   // needs, or the request may not land at all. We then know the element failed
   // and nothing more, so the viewer gets the same "could not be loaded" answer
   // rather than a player parked at zero seconds forever.
@@ -256,8 +256,8 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
     if (probedRef.current === src) return;
     probedRef.current = src;
 
-    // Nothing to probe — an external URL, or no project context — so there is
-    // no second source of truth to wait for and the failure is stated now.
+    // An external URL, or no project context, leaves nothing to probe: no
+    // second source of truth to wait for, so the failure is stated now.
     if (!storedObjectId || !projectId) {
       setStatus("error");
       return;

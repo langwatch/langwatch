@@ -327,7 +327,7 @@ export function AnnotateBody({ state }: { state: AnnotationFormState }) {
 
 /**
  * Suggest layout uses fixed heights for both the textarea and the diff
- * panel, so the popover never resizes as the user types — no jumping, no
+ * panel, so the popover never resizes as the user types: no jumping, no
  * fight between edit and diff for vertical space.
  */
 export function SuggestBody({
@@ -374,7 +374,7 @@ export function SuggestBody({
         value={state.expectedOutput}
         onChange={(e) => state.setExpectedOutput(e.target.value)}
         placeholder="What should the output have been?"
-        // Fixed height — locked to a stable size so the popover never
+        // Fixed height, locked to a stable size so the popover never
         // grows or jumps based on the user's edit. Internal scroll instead.
         height="180px"
         minHeight="180px"
@@ -784,7 +784,7 @@ function DiffCounts({
 }
 
 /**
- * Read-only word-level diff. Fixed height with internal scroll — the
+ * Read-only word-level diff. Fixed height with internal scroll: the
  * panel size is locked so the popover doesn't resize as the user types.
  * `useDeferredValue` keeps typing snappy by recomputing the diff at idle.
  */

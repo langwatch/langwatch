@@ -4,7 +4,7 @@
  * Cutting a correction down to what a viewer may read, and putting back what
  * was cut when that viewer saves. This runs before the correction is handed to
  * the drawer and before it is applied to a trace on the dataset path, so it is
- * the one place that decides whether corrected content ever reaches a reader —
+ * the one place that decides whether corrected content ever reaches a reader,
  * and the one place that keeps a reader from deleting what it hid from them.
  */
 import { describe, expect, it } from "vitest";

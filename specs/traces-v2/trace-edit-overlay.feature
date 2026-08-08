@@ -1,4 +1,4 @@
-# Trace edit overlay — corrections stored beside an immutable trace
+# Trace edit overlay: corrections stored beside an immutable trace
 #
 # Implementation:
 #   platform/app/src/server/traces/edit-overlay/traceEditOverlay.schemas.ts    (patch contract, version 1)
