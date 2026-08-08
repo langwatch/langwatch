@@ -52,6 +52,7 @@
  */
 
 import { spawn, spawnSync } from "node:child_process";
+import os from "node:os";
 
 /** How long the stack gets between SIGTERM and SIGKILL. */
 const DEFAULT_GRACE_MS = 5_000;
@@ -76,9 +77,14 @@ function alive(pid) {
 
 /**
  * The leader of the process group we were launched into, or null when there is
- * nothing useful to watch: no leader, or the leader is us or one of our own
- * ancestors, which is the interactive-shell shape where the tty already sends
- * SIGHUP to the whole job.
+ * nothing to watch: no leader, or the leader is us, which is the shape an
+ * interactive shell produces for a job of its own and where the tty already
+ * sends SIGHUP to everything.
+ *
+ * A leader that is one of our own ancestors is deliberately NOT excluded. That
+ * is the normal supervised shape: `pnpm dev` delegates through several pnpm
+ * levels, all inside the launching group, and that group's leader dying is
+ * exactly the event this exists to notice.
  */
 function launchingGroupLeader() {
   const result = spawnSync("ps", ["-o", "pgid=", "-p", String(process.pid)], {
@@ -110,8 +116,9 @@ async function main(argv, env) {
     return 64;
   }
 
-  // Nested and opted-out runs replace this process entirely rather than adding
-  // another layer of pipes and another pid between the terminal and the stack.
+  // Nested and opted-out runs still go through here, so stdio and the exit
+  // code behave the same, but the command gets no group of its own and nothing
+  // watches it: exactly what running it directly would have done.
   if (disabled(env) !== null) {
     return await passThrough(argv, env, { detached: false });
   }
@@ -262,9 +269,9 @@ function passThrough(argv, env, { detached, leader = null }) {
 function exitCodeFor(childResult) {
   const { code, signal } = childResult ?? { code: null, signal: "SIGTERM" };
   if (signal) {
-    const number =
-      { SIGHUP: 1, SIGINT: 2, SIGKILL: 9, SIGTERM: 15 }[signal] ?? 0;
-    return 128 + number;
+    // Every signal this platform has, so a stack that dies of SIGQUIT or
+    // SIGSEGV reports 131 or 139 rather than a flat 128.
+    return 128 + (os.constants.signals[signal] ?? 0);
   }
   return code ?? 0;
 }

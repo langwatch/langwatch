@@ -120,3 +120,34 @@ Feature: A dev stack does not outlive whoever started it
     Given a dev script that a supervised script calls in turn
     When the inner one starts
     Then it runs the command directly, because the stack above it is already supervised
+
+  # --- Clearing a stack that got loose anyway ---
+
+  # The port conflict is where an abandoned stack is actually met: `pnpm dev`
+  # refuses to start and offers to kill the tree that holds the port. That
+  # offer used to be a plain SIGTERM to the process group, which a stack under
+  # `concurrently --restart-tries -1` survives, so the port came back and the
+  # developer took the next slot instead. That is how one worktree ends up
+  # running the stack twice.
+  #
+  # Measured: SIGTERM to the group left the group intact with a fresh set of
+  # lane pids, and the port free for under a second while the replacement
+  # bound it. Anything that waits on the port rather than on the group reports
+  # success into that gap.
+
+  @unit
+  Scenario: The port a stack holds is actually free afterwards
+    Given a dev stack holding a port and replacing any lane that dies
+    When I run what the port-conflict check tells me to run
+    Then the stack is gone and the port is still free once its lanes would have come back
+
+  @unit
+  Scenario: Clearing a port leaves the shell that asked alone
+    Given the developer's own shell shares a process group with something on the port
+    When the ports are cleared
+    Then that group is untouched, because clearing a port must not close the terminal asking
+
+  @unit
+  Scenario: Clearing ports that nothing holds is not an error
+    When I clear ports nothing is listening on
+    Then it says so and exits cleanly

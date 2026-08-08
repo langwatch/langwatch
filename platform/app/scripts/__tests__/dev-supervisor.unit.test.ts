@@ -114,9 +114,16 @@ wait
 /**
  * Runs `command` from a detached shell, so the shell is its own process-group
  * leader exactly like the launcher in the real leak. Returns the launcher pid.
+ *
+ * The command goes through a file rather than `sh -c`, so no path built from
+ * the environment is ever spliced into a shell command line.
  */
 function launchFrom(command: string, env: Record<string, string> = {}): number {
-  const child = spawn("sh", ["-c", `${command}; sleep 120`], {
+  const file = path.join(scratch, `${marker}-launcher.sh`);
+  writeFileSync(file, `#!/bin/bash\n${command}\nsleep 120\n`, "utf8");
+  chmodSync(file, 0o755);
+
+  const child = spawn("bash", [file], {
     detached: true,
     stdio: "ignore",
     env: { ...process.env, ...FAST, ...env },
