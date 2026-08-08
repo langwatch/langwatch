@@ -9,9 +9,6 @@
  * And the other side of that branch: when no `spoolRef` is present, because
  * the payload fit inline or because the edge spool failed open, the worker
  * caps oversized attribute values before the span becomes an event.
- *
- * BDD structure: describe("given X") → describe("when Y") → it("…").
- * No "should" in it() names (project convention).
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -346,7 +343,6 @@ describe("given the edge spool PUT failed and the command fell back to inline", 
     } as unknown as BlobStore;
   }
 
-  /** The command the edge actually forwards after its spool attempt fails. */
   async function inlineCommandAfterFailedSpool(): Promise<
     Command<RecordSpanCommandData>
   > {
