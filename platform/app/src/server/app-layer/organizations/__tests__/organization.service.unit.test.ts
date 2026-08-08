@@ -55,6 +55,7 @@ describe("OrganizationService", () => {
     createForProvisioning: vi.fn(),
     listProvisioningSummaries: vi.fn(),
     findProvisioningSummaryById: vi.fn(),
+    deleteProvisionedOrganization: vi.fn(),
     getAllForUser: vi.fn(),
     getOrganizationWithMembers: vi.fn(),
     getMemberById: vi.fn(),
