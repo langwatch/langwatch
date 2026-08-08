@@ -110,7 +110,22 @@ For per-PR / per-issue cloud environments via boxd, see `dev/docs/boxd-makefile.
 
 See `dev/docs/adr/004-docker-dev-environment.md` for architecture decisions.
 
-**Running the app outside Docker (the default for TS work):** just run `pnpm dev` from the repo root (or `PORT=5570 pnpm dev` for a second instance). You never need to hunt processes by hand. If the ports are already held, `check-ports.sh` refuses to start and prints two ready-to-paste options: a free-port-slot command (`PORT=5570 pnpm dev`), and a one-liner that kills only the node processes holding those exact ports by process group (Docker and everything else are left alone). Paste whichever fits. Do not reinvent process-tree walking, `pkill -f`, or pgid hunting; the script already does it correctly and port-scoped.
+**Running the app outside Docker (the default for TS work):** just run `pnpm dev` from the repo root (or `PORT=5570 pnpm dev` for a second instance). You never need to hunt processes by hand. If the ports are already held, `check-ports.sh` refuses to start and prints two ready-to-paste options: a free-port-slot command (`PORT=5570 pnpm dev`), and `scripts/kill-dev-tree.sh <ports>`, which takes down only the process groups behind the node processes holding those exact ports (Docker and everything else are left alone). Paste whichever fits. Do not reinvent process-tree walking, `pkill -f`, or pgid hunting; the script already does it correctly and port-scoped, including the two things a hand-rolled `kill -TERM -<pgid>` gets wrong: a stack under `concurrently --restart-tries -1` answers SIGTERM by starting fresh lanes, and its port is briefly free in between, so a freed port is not a stopped stack. Wait for the group, then escalate.
+
+**A dev stack goes down with whoever started it.** `dev:app` and `dev:worker` run
+the long-lived part through `dev/scripts/dev-supervisor.mjs`, which puts the
+stack in a process group of its own and watches the group it was launched from.
+When that group's leader dies, the whole stack goes down: SIGTERM, then SIGKILL
+for whatever is left. Without it, killing the launching shell killed exactly one
+pid and left everything below it running, because `pnpm` forwards nothing down
+its 8-deep script chain and `concurrently --restart-tries -1` replaces any lane
+that dies. Three abandoned stacks measured 35 processes and 1.27 GB, and since
+an abandoned stack keeps its port, the next `pnpm dev` takes the next slot and
+the worktree ends up running twice. An interactive terminal was never affected:
+the shell puts the job in its own group and the tty sends SIGHUP there. This is
+for a non-interactive launcher (an agent's shell, a `sh -c`) killed by pid.
+`LANGWATCH_DEV_SUPERVISOR=0` turns it off; it never blocks a command from
+starting. See `specs/setup/dev-stack-lifecycle.feature`.
 
 **One process by default (workers).** `pnpm dev` runs the app and the background workers as a **single** Node process: it sets `WORKERS_IN_PROCESS=1`, the app boots with the `"all"` process role, and it hosts the worker stack in-process via `startWorkers()`. Workers keep their `langwatch:workers` logger name, so their lines stay identifiable without a lane of their own. The dev surface is four scripts and no flags to remember, all runnable from the repo root:
 
