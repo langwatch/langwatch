@@ -237,20 +237,26 @@ describe("check-queue bin shims", () => {
 
   describe("given an install that cannot finish", () => {
     /** @scenario "An install that cannot write leaves the tool working" */
-    it("leaves the tool runnable when the bin directory is read-only", () => {
-      writeLauncher("tsgo");
-      chmodSync(binDir, 0o555);
+    // Root ignores directory mode bits, so there would be no failed install to
+    // observe and the test would pass without testing anything. CI runs as a
+    // normal user; this is for a container that does not.
+    it.skipIf(process.getuid?.() === 0)(
+      "leaves the tool runnable when the bin directory is read-only",
+      () => {
+        writeLauncher("tsgo");
+        chmodSync(binDir, 0o555);
 
-      const result = install();
+        const result = install();
 
-      // It reports the failure and still exits 0: an install must not fail
-      // over this.
-      expect(result.status).toBe(0);
-      expect(result.stderr).toContain("could not shim tsgo");
-      // The bin entry is the thing that must survive.
-      expect(runCheck("tsgo", ["--noEmit"]).stdout).toBe("real --noEmit\n");
-      expect(existsSync(path.join(binDir, "tsgo.shim-staging"))).toBe(false);
-    });
+        // It reports the failure and still exits 0: an install must not fail
+        // over this.
+        expect(result.status).toBe(0);
+        expect(result.stderr).toContain("could not shim tsgo");
+        // The bin entry is the thing that must survive.
+        expect(runCheck("tsgo", ["--noEmit"]).stdout).toBe("real --noEmit\n");
+        expect(existsSync(path.join(binDir, "tsgo.shim-staging"))).toBe(false);
+      },
+    );
   });
 
   describe("given an environment the shims are not for", () => {
