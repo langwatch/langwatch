@@ -25,6 +25,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { prisma } from "../../db";
+import { ModelProviderRepository } from "../modelProvider.repository";
 import { ModelProviderService } from "../modelProvider.service";
 
 // Postgres and an encryption key are all this needs (the setup files
@@ -197,6 +198,234 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
             ANTHROPIC_API_KEY: "",
             ANTHROPIC_BASE_URL: SELF_HOSTED,
           });
+        });
+      });
+    });
+
+    // A payload that names none of the provider's credential fields cannot be
+    // a credential edit, and applying it would drop every stored one. Azure's
+    // schema is `.passthrough()` with everything optional, so it accepted such
+    // a payload without a word and the row came back holding only a header.
+    describe("given a payload that would drop every stored credential", () => {
+      // Reads the row by id rather than through the collapsed per-provider
+      // record `storedKeysOf` uses: these cases create several azure rows in
+      // one project, and only one of them wins that collapse.
+      async function keysById(id: string) {
+        const row = await new ModelProviderRepository(
+          prisma,
+        ).findByIdWithDecryptedKeys(id);
+        return row?.customKeys;
+      }
+
+      async function createAzureProvider() {
+        return await service().updateModelProvider(
+          {
+            projectId,
+            provider: "azure",
+            enabled: true,
+            customKeys: {
+              AZURE_OPENAI_API_KEY: STORED_KEY,
+              AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
+            },
+            scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+          },
+          ctx(),
+        );
+      }
+
+      describe("when the payload carries only an extra header", () => {
+        /** @scenario A header-only payload is refused instead of dropping credentials */
+        it("is refused and the stored credentials survive", async () => {
+          const created = await createAzureProvider();
+
+          await expect(
+            service().updateModelProvider(
+              {
+                projectId,
+                id: created.id,
+                provider: "azure",
+                enabled: true,
+                customKeys: { "api-key": "header-secret" },
+                scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+              },
+              ctx(),
+            ),
+          ).rejects.toThrow(/would delete the credentials/i);
+
+          expect(await keysById(created.id)).toEqual({
+            AZURE_OPENAI_API_KEY: STORED_KEY,
+            AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
+          });
+        });
+      });
+
+      describe("when the payload is an empty object", () => {
+        it("is refused rather than emptying the credential bag", async () => {
+          const created = await createAzureProvider();
+
+          await expect(
+            service().updateModelProvider(
+              {
+                projectId,
+                id: created.id,
+                provider: "azure",
+                enabled: true,
+                customKeys: {},
+                scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+              },
+              ctx(),
+            ),
+          ).rejects.toThrow(/would delete the credentials/i);
+
+          expect(await keysById(created.id)).toEqual({
+            AZURE_OPENAI_API_KEY: STORED_KEY,
+            AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
+          });
+        });
+      });
+
+      describe("when the payload names a credential field", () => {
+        it("still goes through, and an unrelated key rides along", async () => {
+          const created = await createAzureProvider();
+
+          await service().updateModelProvider(
+            {
+              projectId,
+              id: created.id,
+              provider: "azure",
+              enabled: true,
+              customKeys: {
+                AZURE_OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+                AZURE_OPENAI_ENDPOINT: "https://acme2.openai.azure.com",
+              },
+              scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+            },
+            ctx(),
+          );
+
+          expect(await keysById(created.id)).toEqual({
+            AZURE_OPENAI_API_KEY: STORED_KEY,
+            AZURE_OPENAI_ENDPOINT: "https://acme2.openai.azure.com",
+          });
+        });
+      });
+
+      describe("when the customer clears every credential on purpose", () => {
+        it("still clears them, because the fields are sent empty rather than left out", async () => {
+          const created = await createAzureProvider();
+
+          await service().updateModelProvider(
+            {
+              projectId,
+              id: created.id,
+              provider: "azure",
+              enabled: true,
+              customKeys: {
+                AZURE_OPENAI_API_KEY: "",
+                AZURE_OPENAI_ENDPOINT: "",
+              },
+              scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+            },
+            ctx(),
+          );
+
+          expect(await keysById(created.id)).toEqual({
+            AZURE_OPENAI_API_KEY: "",
+            AZURE_OPENAI_ENDPOINT: "",
+          });
+        });
+      });
+
+      describe("when the row has no credentials stored yet", () => {
+        it("accepts the payload, since there is nothing to lose", async () => {
+          const created = await service().updateModelProvider(
+            {
+              projectId,
+              provider: "azure",
+              enabled: true,
+              customKeys: { AZURE_OPENAI_API_KEY: "" },
+              scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+            },
+            ctx(),
+          );
+
+          await service().updateModelProvider(
+            {
+              projectId,
+              id: created.id,
+              provider: "azure",
+              enabled: true,
+              customKeys: { "api-key": "header-secret" },
+              scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+            },
+            ctx(),
+          );
+
+          expect(await keysById(created.id)).toEqual({
+            "api-key": "header-secret",
+          });
+        });
+      });
+
+      // The guard reads the provider's own schema rather than a list of
+      // provider names, so it has to hold for the other two providers whose
+      // drawer offers extra headers.
+      //
+      // Which layer says no depends on how strict the provider's schema is,
+      // and both answers are right. `custom` accepts the payload and strips
+      // the unknown key, so the guard is what catches it. `azure_safety`
+      // demands a URL and a non-empty key, so validation rejects it one layer
+      // earlier. That difference is the point: the guard exists precisely
+      // because a loose schema, which is what Azure has, never objects.
+      describe("when the same shape reaches a provider other than azure", () => {
+        it.each([
+          {
+            provider: "custom",
+            stored: {
+              CUSTOM_API_KEY: "custom-secret",
+              CUSTOM_BASE_URL: "https://proxy.acme.internal/v1",
+            },
+            rejectedWith: /would delete the credentials/i,
+          },
+          {
+            provider: "azure_safety",
+            stored: {
+              AZURE_CONTENT_SAFETY_ENDPOINT: "https://safety.acme.internal",
+              AZURE_CONTENT_SAFETY_KEY: "safety-secret",
+            },
+            rejectedWith: /invalid api key configuration/i,
+          },
+        ])("refuses it for $provider and keeps the stored credentials", async ({
+          provider,
+          stored,
+          rejectedWith,
+        }) => {
+          const created = await service().updateModelProvider(
+            {
+              projectId,
+              provider,
+              enabled: true,
+              customKeys: stored,
+              scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+            },
+            ctx(),
+          );
+
+          await expect(
+            service().updateModelProvider(
+              {
+                projectId,
+                id: created.id,
+                provider,
+                enabled: true,
+                customKeys: { "x-tenant": "acme" },
+                scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+              },
+              ctx(),
+            ),
+          ).rejects.toThrow(rejectedWith);
+
+          expect(await keysById(created.id)).toEqual(stored);
         });
       });
     });

@@ -489,6 +489,11 @@ const presentations = {
     describe: () =>
       "A provider added outside a project needs at least one scope, so pick the teams or projects it covers.",
   },
+  model_provider_credentials_would_be_dropped: {
+    title: "That save would delete the stored credentials",
+    describe: () =>
+      "Saving this would remove the API key and endpoint already stored for this provider. Leave the credential fields as they are to keep them, or empty them yourself if removing them is what you want.",
+  },
   missing_provider: {
     // fault: customer — a configuration choice they can change, so the copy
     // names it rather than apologising.
