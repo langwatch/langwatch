@@ -7,7 +7,6 @@ import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { createAppAnalyticsClient } from "~/utils/analyticsClient";
 import { SessionProvider } from "~/utils/auth-client";
 import { ExtraFooterComponents } from "../ee/saas/ExtraFooterComponents";
-import { GraphicsQualityProvider } from "./components/GraphicsQualityProvider";
 import { ColorModeProvider } from "./components/ui/color-mode";
 import { Toaster } from "./components/ui/toaster";
 import { CommandBarProvider } from "./features/command-bar";
@@ -33,9 +32,7 @@ export function OuterProviders({ children }: { children: ReactNode }) {
     <SessionProvider refetchInterval={0} refetchOnWindowFocus={false}>
       <TRPCProvider>
         <ChakraProvider value={system}>
-          <ColorModeProvider>
-            <GraphicsQualityProvider>{children}</GraphicsQualityProvider>
-          </ColorModeProvider>
+          <ColorModeProvider>{children}</ColorModeProvider>
         </ChakraProvider>
       </TRPCProvider>
     </SessionProvider>

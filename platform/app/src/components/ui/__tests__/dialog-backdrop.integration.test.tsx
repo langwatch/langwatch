@@ -12,7 +12,6 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cssRulesForElement } from "~/utils/emotionTestCss";
 import { Dialog } from "../dialog";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -102,23 +101,6 @@ describe("Dialog backdrop", () => {
         ),
       );
       warn.mockRestore();
-    });
-  });
-
-  describe("when rendering the backdrop's blur", () => {
-    /** @scenario "Blur effects turn off when the device can't keep a smooth frame rate" */
-    it("references the shared --lw-backdrop-blur CSS variable instead of a hardcoded value", () => {
-      renderOpenDialog();
-
-      // This backdrop covers the full viewport behind every dialog in the
-      // app (see src/components/ui/dialog.tsx) -- if its blur is ever
-      // hardcoded again instead of routed through --lw-backdrop-blur,
-      // reduced-graphics mode would still pay for a full-screen blur on
-      // every dialog open, silently defeating the fix everywhere dialogs
-      // are used. Scope the assertion to the backdrop's OWN generated class
-      // so an unrelated rule referencing the variable can't keep it green.
-      const backdrop = getBackdrop();
-      expect(cssRulesForElement(backdrop)).toContain("--lw-backdrop-blur");
     });
   });
 
