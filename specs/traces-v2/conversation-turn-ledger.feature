@@ -37,12 +37,15 @@ Feature: Conversation turn ledger
 
   Rule: A turn that recorded events says how many
 
-    Events hoisted from the turn's spans are worth scanning for while reading:
-    a turn that recorded three of them reads differently from one that recorded
+    The events a turn's spans recorded are worth scanning for while reading: a
+    turn that recorded three of them reads differently from one that recorded
     none. Only the count is shown. The legacy thread view also drew the
     thumbs-up / thumbs-down vote an event carried, and the conversation's turn
     data holds no event metrics to draw it from, so that display is left out
     rather than guessed at.
+
+    A turn arrives without its events, which are read back for the whole thread
+    in one go, the same way the trace table reads them for a page.
 
     @integration
     Scenario: A turn with events shows how many it recorded
@@ -58,6 +61,17 @@ Feature: Conversation turn ledger
     Scenario: A turn with no events shows no events segment
       Given a turn that recorded no events
       Then its separator says nothing about events
+
+    @integration
+    Scenario: Each turn in a thread carries the events it recorded
+      Given a conversation whose turns recorded different events
+      When the thread reads its events back
+      Then every turn carries its own count
+
+    @integration
+    Scenario: A turn still waiting on its events reports none
+      Given a conversation whose events have not arrived yet
+      Then no turn claims to have recorded any
 
   Rule: A long inter-turn pause is surfaced as a gap divider
 

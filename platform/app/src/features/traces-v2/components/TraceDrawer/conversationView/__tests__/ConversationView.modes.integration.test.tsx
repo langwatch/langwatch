@@ -36,6 +36,10 @@ vi.mock("../../../../hooks/useTraceDrawerNavigation", () => ({
   useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
 }));
 
+vi.mock("../../../../hooks/useConversationTurnEvents", () => ({
+  useConversationTurnEvents: (rows: TraceListItem[]) => rows,
+}));
+
 vi.mock("../../markdownView", () => ({
   RenderedMarkdown: () => null,
 }));

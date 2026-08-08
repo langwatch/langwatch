@@ -109,7 +109,7 @@ vi.mock("../ChatTurnRow", () => ({
 
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import { useAnnotationDraftStore } from "../../../../stores/annotationDraftStore";
-import type { TraceListItem } from "../../../../types/trace";
+import { NO_TRACE_EVENTS, type TraceListItem } from "../../../../types/trace";
 import { AnnotatedTurnRow } from "../AnnotatedTurnRow";
 import { TurnActionRow } from "../TurnAnnotations";
 import type { ParsedTurn } from "../types";
@@ -148,7 +148,7 @@ function turn(): TraceListItem {
     output: "the original answer",
     origin: "application",
     evaluations: [],
-    events: [],
+    events: NO_TRACE_EVENTS,
   };
 }
 

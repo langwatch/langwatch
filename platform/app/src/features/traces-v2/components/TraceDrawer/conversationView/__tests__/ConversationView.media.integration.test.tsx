@@ -29,6 +29,10 @@ vi.mock("../../../../hooks/useTraceDrawerNavigation", () => ({
   useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
 }));
 
+vi.mock("../../../../hooks/useConversationTurnEvents", () => ({
+  useConversationTurnEvents: (rows: TraceListItem[]) => rows,
+}));
+
 vi.mock("../../../../hooks/useTextTranslation", () => ({
   useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
     displayTexts: texts,
@@ -70,7 +74,7 @@ vi.mock("~/components/simulations/MediaPart", () => ({
 }));
 
 import type { TraceMediaRef } from "~/shared/traces/media-refs";
-import type { TraceListItem } from "../../../../types/trace";
+import { NO_TRACE_EVENTS, type TraceListItem } from "../../../../types/trace";
 import { ConversationView } from "../ConversationView";
 
 const CALLER_RECORDING = "/api/files/project-1/caller";
@@ -95,7 +99,7 @@ function turn(over: Partial<TraceListItem> = {}): TraceListItem {
     output: "your room is booked",
     origin: "application",
     evaluations: [],
-    events: [],
+    events: NO_TRACE_EVENTS,
     ...over,
   };
 }

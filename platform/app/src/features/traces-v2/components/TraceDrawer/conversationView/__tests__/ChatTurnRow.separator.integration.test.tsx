@@ -85,11 +85,12 @@ function turn(over: Partial<TraceListItem>): TraceListItem {
 }
 
 function events(count: number): TraceListItem["events"] {
-  return Array.from({ length: count }, (_, i) => ({
-    spanId: `span-${i}`,
-    timestamp: 1,
-    name: "thumbs_up",
-  }));
+  if (count === 0) return NO_TRACE_EVENTS;
+  return {
+    groups: [{ name: "thumbs_up", count, firstTimestamp: 1 }],
+    totalCount: count,
+    distinctCount: 1,
+  };
 }
 
 function renderRow({

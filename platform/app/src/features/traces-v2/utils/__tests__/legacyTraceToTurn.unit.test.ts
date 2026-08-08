@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Trace } from "~/server/tracer/types";
+import { NO_TRACE_EVENTS } from "../../types/trace";
 import { legacyTraceToTurn } from "../legacyTraceToTurn";
 
 const trace = (overrides: Partial<Trace> = {}): Trace =>
@@ -117,7 +118,7 @@ describe("given a fetched trace to read as one conversation turn", () => {
       expect(turn.models).toEqual([]);
       expect(turn.labels).toEqual([]);
       expect(turn.evaluations).toEqual([]);
-      expect(turn.events).toEqual([]);
+      expect(turn.events).toEqual(NO_TRACE_EVENTS);
       expect(turn.conversationId).toBeUndefined();
     });
   });

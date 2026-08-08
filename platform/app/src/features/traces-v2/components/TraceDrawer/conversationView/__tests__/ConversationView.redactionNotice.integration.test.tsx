@@ -30,6 +30,10 @@ vi.mock("../../../../hooks/useTraceDrawerNavigation", () => ({
   useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
 }));
 
+vi.mock("../../../../hooks/useConversationTurnEvents", () => ({
+  useConversationTurnEvents: (rows: TraceListItem[]) => rows,
+}));
+
 vi.mock("../../markdownView", () => ({ RenderedMarkdown: () => null }));
 
 /** The turn itself is covered by its own tests; the notice sits above them. */
@@ -49,7 +53,7 @@ vi.mock("~/utils/compat/next-link", () => ({
   }) => <a href={href}>{children}</a>,
 }));
 
-import type { TraceListItem } from "../../../../types/trace";
+import { NO_TRACE_EVENTS, type TraceListItem } from "../../../../types/trace";
 import { ConversationView } from "../ConversationView";
 
 function turn(over: Partial<TraceListItem> = {}): TraceListItem {
@@ -71,7 +75,7 @@ function turn(over: Partial<TraceListItem> = {}): TraceListItem {
     output: "your room is booked",
     origin: "application",
     evaluations: [],
-    events: [],
+    events: NO_TRACE_EVENTS,
     ...over,
   };
 }

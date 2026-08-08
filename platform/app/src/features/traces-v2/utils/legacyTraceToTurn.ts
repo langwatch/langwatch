@@ -1,5 +1,5 @@
 import type { Trace } from "~/server/tracer/types";
-import type { TraceListItem } from "../types/trace";
+import { NO_TRACE_EVENTS, type TraceListItem } from "../types/trace";
 
 /** The numbers the turn separator reads out: time, cost, tokens. */
 type TurnLedger = Pick<
@@ -52,7 +52,7 @@ export function legacyTraceToTurn(trace: Trace): TraceListItem {
     conversationId: metadata?.thread_id ?? undefined,
     userId: metadata?.user_id ?? undefined,
     evaluations: [],
-    events: [],
+    events: NO_TRACE_EVENTS,
   };
 }
 

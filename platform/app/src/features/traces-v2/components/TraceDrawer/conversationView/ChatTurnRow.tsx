@@ -576,7 +576,7 @@ const TurnSeparator: React.FC<{
   // How many events the turn recorded. The count only: the legacy thread view
   // also drew the vote an event carried, and the conversation's turn data has
   // no event metrics to draw it from.
-  const eventCount = turn.events.length;
+  const eventCount = turn.events.totalCount;
 
   const Sep = () => (
     <Text textStyle="2xs" color="fg.subtle">

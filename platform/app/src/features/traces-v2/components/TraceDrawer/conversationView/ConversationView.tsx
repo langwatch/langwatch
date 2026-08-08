@@ -24,6 +24,7 @@ import {
 import { PIIRedactionAlert } from "~/components/ui/PIIRedactionNotice";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import { useConversationAnnotations } from "../../../hooks/useConversationAnnotations";
+import { useConversationTurnEvents } from "../../../hooks/useConversationTurnEvents";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
 import { useCopyToClipboard } from "../../../hooks/useCopyToClipboard";
 import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigation";
@@ -108,13 +109,18 @@ export const ConversationView = memo(function ConversationView({
     useState(defaultExpandAll);
   const query = useConversationTurns(conversationId);
 
-  const turns = resolveTurns({
+  const queriedTurns = resolveTurns({
     conversationId,
     queriedTurns: query.data?.items as TraceListItem[] | undefined,
     fallbackTurns,
   });
+  // Events are read back per thread rather than carried on the turn summary.
+  const turns = useConversationTurnEvents(queriedTurns);
 
-  const traceIds = useMemo(() => turns.map((t) => t.traceId), [turns]);
+  const traceIds = useMemo(
+    () => queriedTurns.map((t) => t.traceId),
+    [queriedTurns],
+  );
   const annotations = useConversationAnnotations(traceIds);
 
   // The rail belongs to this conversation only when the composer that opened
