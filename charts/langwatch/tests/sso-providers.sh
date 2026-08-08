@@ -32,8 +32,16 @@ fail() {
   failures=$((failures + 1))
 }
 
-# Renders the chart once per flag set and caches the result. Every assertion
-# otherwise pays for a full render, and they mostly ask about the same one.
+# Renders the chart once per flag set, caches the result, and prints the PATH
+# to the rendered manifest. Every assertion otherwise pays for a full render,
+# and they mostly ask about the same one.
+#
+# Consumers read the file instead of a pipe on purpose: several of the awk
+# programs below `exit` at their first match, and under `set -o pipefail` that
+# early exit SIGPIPEs whatever is still writing into the pipe once the render
+# outgrows the pipe buffer, killing the whole suite with nothing but
+# "cat: write error: Broken pipe". Reading the file directly leaves awk free
+# to exit whenever it likes.
 #
 # A failed render yields an empty manifest rather than killing the run under
 # `set -e`, so a chart that stops rendering is reported as the assertion it
@@ -54,25 +62,25 @@ render() {
       : >"$out"
     fi
   fi
-  cat "$out"
+  printf '%s\n' "$out"
 }
 
 # Every SSO-related env name in the app Deployment, sorted, one per line.
 sso_env_of() {
   local flags="$1"
-  render "$flags" | awk '
+  awk '
     $0 ~ "^# Source: langwatch/templates/app/deployment.yaml" { grab=1; next }
     grab && /^# Source:/ { grab=0 }
     grab && /- name: (NEXTAUTH_PROVIDER|AUTH0_|AZURE_AD_|COGNITO_|GITHUB_CLIENT|GITLAB_|GOOGLE_|OKTA_|ONELOGIN_|OIDC_)/ {
       gsub(/^[ -]*name: /, ""); print
     }
-  ' | sort -u
+  ' "$(render "$flags")" | sort -u
 }
 
 # The value of one env var in the app Deployment.
 env_value_of() {
   local flags="$1" name="$2"
-  render "$flags" | awk -v want="$name" '
+  awk -v want="$name" '
     $0 ~ "^# Source: langwatch/templates/app/deployment.yaml" { grab=1; next }
     grab && /^# Source:/ { grab=0 }
     grab && $0 ~ "- name: " want "$" { found=1; next }
@@ -80,20 +88,20 @@ env_value_of() {
       sub(/^[ ]*value: /, ""); gsub(/"/, ""); print; exit
     }
     found && /- name: / { exit }
-  '
+  ' "$(render "$flags")"
 }
 
 # The secret name a given env var reads from, empty if it is an inline value.
 env_secret_of() {
   local flags="$1" name="$2"
-  render "$flags" | awk -v want="$name" '
+  awk -v want="$name" '
     $0 ~ "^# Source: langwatch/templates/app/deployment.yaml" { grab=1; next }
     grab && /^# Source:/ { grab=0 }
     grab && $0 ~ "- name: " want "$" { found=1; next }
     found && /secretKeyRef/ { inref=1; next }
     inref && /name:/ { sub(/^[ ]*name: /, ""); gsub(/"/, ""); print; exit }
     found && /- name: / { exit }
-  '
+  ' "$(render "$flags")"
 }
 
 flags_for() {

@@ -1,0 +1,67 @@
+---
+title: "Overview"
+description: "Create organizations on a self-hosted instance with an instance administrator credential, and read the ones already there."
+---
+
+<Note>
+  **Self-hosted only.** These endpoints exist on a self-hosted LangWatch deployment that has `LANGWATCH_INSTANCE_ADMIN_API_KEY` configured. Without that variable, and on LangWatch Cloud, they answer 404: the family is absent rather than forbidden. Creating organizations on LangWatch Cloud is not part of this API.
+</Note>
+
+## Intro
+
+This is the one LangWatch API that exists before any organization does, which is what makes it the starting point for provisioning an instance as code. Everything else authenticates as an organization; this authenticates as the instance.
+
+Creating an organization hands back an organization admin API key along with it. That key is what the rest of the management APIs take, so a run can go from an empty deployment to a fully configured organization without a browser step:
+
+```
+instance key  ->  POST /api/organizations  ->  organization + admin API key
+                                                     |
+                                                     v
+                      teams, groups, roles, role bindings, members,
+                      invites, projects, API keys, SCIM tokens
+```
+
+## Authentication
+
+The instance administrator credential, as a Bearer token:
+
+```
+Authorization: Bearer <LANGWATCH_INSTANCE_ADMIN_API_KEY>
+```
+
+Set the variable on the deployment, generate it the way you generate any other secret (`openssl rand -hex 32` is fine), and treat it as the most powerful credential in the instance: it can create organizations, and each organization comes with an admin key. It is not an organization API key and cannot be used anywhere else in the API.
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/organizations` | List the organizations on this instance |
+| `POST` | `/api/organizations` | Create an organization and its bootstrap admin API key |
+| `GET` | `/api/organizations/{id}` | Read one organization |
+
+There is no `DELETE`. Deleting an organization takes everything in it, so it stays a deliberate operation rather than one an automated run can reach.
+
+## Creating an organization
+
+```bash
+curl -X POST https://langwatch.acme.internal/api/organizations \
+  -H "Authorization: Bearer $LANGWATCH_INSTANCE_ADMIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Acme", "slug": "acme", "adminApiKeyName": "Provisioning admin"}'
+```
+
+```json
+{
+  "organization": { "id": "organization_abc123", "name": "Acme", "slug": "acme" },
+  "team": { "id": "team_abc123", "name": "Acme" },
+  "adminApiKey": { "id": "<api_key_id>", "token": "sk-lw-..." }
+}
+```
+
+The slug is optional and is derived from the name when you leave it out. It is also the natural key: taking a slug that already exists is refused with 409 `organization_slug_taken` rather than creating a near-duplicate organization.
+
+`adminApiKey.token` is returned once, here. It is an organization-scoped service key with an admin binding on the whole organization, and it is the credential the [Organization](/api-reference/organization/overview), [Members](/api-reference/members/overview), [Roles](/api-reference/roles/overview) and [Role Bindings](/api-reference/role-bindings/overview) APIs expect. Store it before you do anything else.
+
+## Reading back
+
+`GET /api/organizations` and `GET /api/organizations/{id}` return the organizations on the instance, which is what lets a provisioning run check whether it has work to do before it does any. An id that does not exist answers 404.

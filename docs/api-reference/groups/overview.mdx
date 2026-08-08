@@ -3,15 +3,15 @@ title: 'Overview'
 description: 'Create and manage access groups, their members, and role bindings via the REST API. Enterprise feature.'
 ---
 
+<Note>
+  **Available on Enterprise plans.** An organization without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments need an Enterprise license for the same endpoints. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
+
 ## Intro
 
 The Groups API lets you manage LangWatch access groups via REST. Groups are collections of users that share the same role bindings — when you assign a role to a group, every member inherits that access.
 
 Groups can be created manually via the API or provisioned automatically from your identity provider via [SCIM](/platform/scim).
-
-<Info>
-Groups are an **Enterprise** feature. Contact your account team to enable them.
-</Info>
 
 ## Authentication
 

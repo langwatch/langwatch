@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { RoleService } from "~/server/role";
 import { GroupRestService, UserNotInOrganizationError } from "../group.service";
 import type { GroupRepository } from "../repositories/group.repository";
 
@@ -11,7 +12,12 @@ describe("GroupRestService.create", () => {
         areUsersInOrganization,
         createAtomic,
       } as unknown as GroupRepository;
-      const service = new GroupRestService(repository);
+      const service = new GroupRestService({
+        repo: repository,
+        roleService: {
+          validateRolesAssignable: vi.fn(),
+        } as unknown as RoleService,
+      });
 
       await expect(
         service.create({

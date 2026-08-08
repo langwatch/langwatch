@@ -129,6 +129,18 @@ describe("formatApiErrorMessage", () => {
       expect(formatApiErrorMessage({ error: body })).toBe("TagValidationError");
     });
 
+    it("never prefixes with a bare 'Error' label", () => {
+      // The versioned management families carry the class name in `error`
+      // and the stable code in `message`; the label adds nothing.
+      const body = {
+        error: "Error",
+        message: "enterprise_plan_required",
+      };
+      expect(formatApiErrorMessage({ error: body })).toBe(
+        "enterprise_plan_required",
+      );
+    });
+
     it("does not collapse to 'Internal server error' when other fields exist", () => {
       const body = {
         error: "Internal server error",

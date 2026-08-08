@@ -13,6 +13,7 @@ import {
   type Permission,
   teamRoleHasPermission,
 } from "../api/rbac";
+import { CUSTOM_ROLE_KIND } from "../role/repositories/role.repository";
 import {
   MalformedCustomRolePermissionsError,
   parseCustomRolePermissions,
@@ -272,10 +273,23 @@ export async function checkRoleBindingPermission({
     // checkPermissionFromBindings() in rbac.ts.
     if (!bindingScopeCanGrant(binding.scopeType, permission)) continue;
 
-    // Custom role — look up its permissions
+    // Custom role: look up its permissions. Defense in depth on two axes:
+    // the lookup is scoped to the organization being checked, so a poisoned
+    // binding pointing at another organization's role grants nothing of that
+    // role even if a write path let it through; and an API key's private
+    // permission role (kind system_api_key) backs only that key's own
+    // bindings, never a user's or group's. Either mismatch resolves exactly
+    // like a missing role: the built-in CUSTOM baseline below, which cannot
+    // carry the foreign role's permissions.
     if (binding.role === TeamUserRole.CUSTOM && binding.customRoleId) {
-      const customRole = await prisma.customRole.findUnique({
-        where: { id: binding.customRoleId },
+      const customRole = await prisma.customRole.findFirst({
+        where: {
+          id: binding.customRoleId,
+          organizationId,
+          ...(resolvedPrincipal.type === "apiKey"
+            ? {}
+            : { kind: { not: CUSTOM_ROLE_KIND.SYSTEM_API_KEY } }),
+        },
         select: { permissions: true },
       });
       // Use the shared parser so shape validation is consistent with the

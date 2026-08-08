@@ -17,6 +17,10 @@
  */
 const GENERIC_MESSAGES = new Set([
   "",
+  // The bare class name some envelopes carry in their `error` field; as a
+  // prefix it can only turn "enterprise_plan_required" into
+  // "Error: enterprise_plan_required".
+  "error",
   "internal server error",
   "unknown error",
   "unknown error occurred",

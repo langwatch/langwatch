@@ -6,7 +6,7 @@ import {
   type OrganizationIntent,
   OrganizationUserRole,
   PricingModel,
-  type Prisma,
+  Prisma,
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
@@ -27,22 +27,33 @@ import {
   LiteMemberViewerOnlyError,
   TeamLastAdminRequiredError,
 } from "../../teams/team.service";
+import {
+  CannotDemoteLastAdminError,
+  CannotDisableLastAdminError,
+  CannotRemoveLastAdminError,
+  OrganizationSlugTakenError,
+} from "../errors";
 import type {
   AuditLogFilters,
   CreateAndAssignInput,
   CreateAndAssignResult,
+  CreateForProvisioningInput,
   DeleteMemberInput,
   EnrichedAuditLog,
   FullyLoadedOrganization,
+  MemberTeamBinding,
   OrganizationForBilling,
+  OrganizationMemberSummary,
   OrganizationMemberWithUser,
+  OrganizationProvisioningSummary,
   OrganizationRepository,
+  OrganizationSettings,
   OrganizationWithAdmins,
   OrganizationWithMembersAndTheirTeams,
   SetMemberDisabledInput,
   UpdateMemberRoleInput,
   UpdateMemberRoleResult,
-  UpdateOrganizationInput,
+  UpdateOrganizationSettingsInput,
   UpdateTeamMemberRoleInput,
 } from "./organization.repository";
 
@@ -64,8 +75,113 @@ async function teamNameFor({
   return team?.name ?? null;
 }
 
+/** A credential-bearing settings value encrypted at rest; cleared values store null. */
+function encryptedOrNull(value: string | null): string | null {
+  return value ? encrypt(value) : null;
+}
+
+/**
+ * The profile fields of a partial settings write: only the fields present on
+ * the input are written.
+ */
+function profileSettingsData(
+  input: UpdateOrganizationSettingsInput,
+): Prisma.OrganizationUpdateInput {
+  return {
+    ...(input.name !== undefined ? { name: input.name } : {}),
+    ...(input.supportContact !== undefined
+      ? { supportContact: input.supportContact?.trim() || null }
+      : {}),
+    ...(input.presenceEnabled !== undefined
+      ? { presenceEnabled: input.presenceEnabled }
+      : {}),
+    ...(input.traceSharingEnabled !== undefined
+      ? { traceSharingEnabled: input.traceSharingEnabled }
+      : {}),
+    ...(input.primaryIntent !== undefined
+      ? { primaryIntent: input.primaryIntent }
+      : {}),
+  };
+}
+
+/**
+ * The stored-objects (S3) fields of a partial settings write: only the fields
+ * present on the input are written, and credential-bearing ones are encrypted.
+ */
+function storageSettingsData(
+  input: UpdateOrganizationSettingsInput,
+): Prisma.OrganizationUpdateInput {
+  return {
+    ...(input.s3Endpoint !== undefined
+      ? { s3Endpoint: encryptedOrNull(input.s3Endpoint) }
+      : {}),
+    ...(input.s3AccessKeyId !== undefined
+      ? { s3AccessKeyId: encryptedOrNull(input.s3AccessKeyId) }
+      : {}),
+    ...(input.s3SecretAccessKey !== undefined
+      ? { s3SecretAccessKey: encryptedOrNull(input.s3SecretAccessKey) }
+      : {}),
+    ...(input.s3Bucket !== undefined
+      ? { s3Bucket: input.s3Bucket || null }
+      : {}),
+  };
+}
+
+/**
+ * The organization row of a provisioning run, with a slug race answered as
+ * {@link OrganizationSlugTakenError}.
+ *
+ * Scoped to this one insert because the surrounding transaction also writes
+ * `Team.slug`, `Team.id` and `Organization.id`: a P2002 caught around the
+ * whole transaction would tell a provisioning tool to retry a slug that was
+ * never the problem. Within this insert, `slug` is the only unique column the
+ * caller can collide on twice.
+ */
+async function createProvisionedOrganization(
+  tx: Prisma.TransactionClient,
+  input: CreateForProvisioningInput,
+) {
+  try {
+    return await tx.organization.create({
+      data: {
+        id: input.orgId,
+        name: input.orgName,
+        slug: input.orgSlug,
+        pricingModel: input.pricingModel,
+      },
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002" &&
+      namesSlug(error.meta?.target)
+    ) {
+      throw new OrganizationSlugTakenError(input.orgSlug);
+    }
+    throw error;
+  }
+}
+
+/**
+ * True when a unique-constraint violation names the slug column. Prisma
+ * reports the target as either the field list or the constraint name, so both
+ * shapes are read.
+ */
+function namesSlug(target: unknown): boolean {
+  if (Array.isArray(target)) {
+    return target.some(
+      (field) => typeof field === "string" && field === "slug",
+    );
+  }
+  return typeof target === "string" && target.includes("slug");
+}
+
 export class PrismaOrganizationRepository implements OrganizationRepository {
   constructor(private readonly prisma: PrismaClient) {}
+
+  getClient(): PrismaClient {
+    return this.prisma;
+  }
 
   async getOrganizationIdByTeamId(teamId: string): Promise<string | null> {
     const team = await this.prisma.team.findUnique({
@@ -313,6 +429,68 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
   }
 
+  async createForProvisioning(
+    input: CreateForProvisioningInput,
+  ): Promise<CreateAndAssignResult> {
+    return await this.prisma.$transaction(async (tx) => {
+      // Deterministic answer for the common case; the catch inside
+      // `createProvisionedOrganization` still covers the race where two
+      // provisioning runs claim one slug.
+      const taken = await tx.organization.findUnique({
+        where: { slug: input.orgSlug },
+        select: { id: true },
+      });
+      if (taken) {
+        throw new OrganizationSlugTakenError(input.orgSlug);
+      }
+
+      const organization = await createProvisionedOrganization(tx, input);
+
+      const team = await tx.team.create({
+        data: {
+          id: input.teamId,
+          name: input.orgName,
+          slug: input.teamSlug,
+          organizationId: organization.id,
+        },
+      });
+
+      return {
+        organization: { id: organization.id, name: organization.name },
+        team: { id: team.id, slug: team.slug, name: team.name },
+      };
+    });
+  }
+
+  async listProvisioningSummaries(): Promise<
+    OrganizationProvisioningSummary[]
+  > {
+    return this.prisma.organization.findMany({
+      select: { id: true, name: true, slug: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async deleteProvisionedOrganization(organizationId: string): Promise<void> {
+    // Role bindings first: RoleBinding.apiKeyId restricts api-key deletion.
+    await this.prisma.$transaction([
+      this.prisma.roleBinding.deleteMany({ where: { organizationId } }),
+      this.prisma.apiKey.deleteMany({ where: { organizationId } }),
+      this.prisma.promptTag.deleteMany({ where: { organizationId } }),
+      this.prisma.team.deleteMany({ where: { organizationId } }),
+      this.prisma.organization.deleteMany({ where: { id: organizationId } }),
+    ]);
+  }
+
+  async findProvisioningSummaryById(
+    organizationId: string,
+  ): Promise<OrganizationProvisioningSummary | null> {
+    return this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true, name: true, slug: true, createdAt: true },
+    });
+  }
+
   async getAllForUser(params: {
     userId: string;
     isDemo: boolean;
@@ -485,31 +663,139 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
   }
 
-  async update(input: UpdateOrganizationInput): Promise<void> {
+  async findMembership(params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<OrganizationMemberSummary | null> {
+    const { organizationId, userId } = params;
+    return this.prisma.organizationUser.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: {
+        userId: true,
+        organizationId: true,
+        role: true,
+        disabledAt: true,
+        createdAt: true,
+        updatedAt: true,
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
+  }
+
+  async listMembers(params: {
+    organizationId: string;
+    includeDisabled: boolean;
+    offset: number;
+    limit: number;
+  }): Promise<{ members: OrganizationMemberSummary[]; totalCount: number }> {
+    const { organizationId, includeDisabled, offset, limit } = params;
+    const where = {
+      organizationId,
+      ...(includeDisabled ? {} : { disabledAt: null }),
+    };
+
+    const [members, totalCount] = await Promise.all([
+      this.prisma.organizationUser.findMany({
+        where,
+        select: {
+          userId: true,
+          organizationId: true,
+          role: true,
+          disabledAt: true,
+          createdAt: true,
+          updatedAt: true,
+          user: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: [
+          { user: { name: "asc" } },
+          { user: { email: "asc" } },
+          { userId: "asc" },
+        ],
+        skip: offset,
+        take: limit,
+      }),
+      this.prisma.organizationUser.count({ where }),
+    ]);
+
+    return { members, totalCount };
+  }
+
+  async findMemberTeamBindings(params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<MemberTeamBinding[]> {
+    const { organizationId, userId } = params;
+    const bindings = await this.prisma.roleBinding.findMany({
+      where: {
+        organizationId,
+        userId,
+        scopeType: RoleBindingScopeType.TEAM,
+      },
+      select: {
+        scopeId: true,
+        role: true,
+        customRoleId: true,
+        customRole: { select: { name: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+    if (bindings.length === 0) return [];
+
+    const teams = await this.prisma.team.findMany({
+      where: {
+        id: { in: bindings.map((b) => b.scopeId) },
+        organizationId,
+      },
+      select: { id: true, name: true, isPersonal: true },
+    });
+    const teamsById = new Map(teams.map((team) => [team.id, team]));
+
+    // A binding whose team is missing from the lookup points outside the
+    // organization (or at a deleted team) and carries no manageable access;
+    // personal workspaces are not managed from these surfaces at all.
+    return bindings.flatMap((binding) => {
+      const team = teamsById.get(binding.scopeId);
+      if (!team || team.isPersonal) return [];
+      return [
+        {
+          teamId: team.id,
+          teamName: team.name,
+          role: binding.role,
+          customRoleId: binding.customRoleId,
+          customRoleName: binding.customRole?.name ?? null,
+        },
+      ];
+    });
+  }
+
+  async findSettingsById(
+    organizationId: string,
+  ): Promise<OrganizationSettings | null> {
+    return this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        supportContact: true,
+        presenceEnabled: true,
+        traceSharingEnabled: true,
+        primaryIntent: true,
+        s3Endpoint: true,
+        s3AccessKeyId: true,
+        s3Bucket: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  async updateSettings(input: UpdateOrganizationSettingsInput): Promise<void> {
     await this.prisma.organization.update({
       where: { id: input.organizationId },
       data: {
-        name: input.name,
-        s3Endpoint: input.s3Endpoint ? encrypt(input.s3Endpoint) : null,
-        s3AccessKeyId: input.s3AccessKeyId
-          ? encrypt(input.s3AccessKeyId)
-          : null,
-        s3SecretAccessKey: input.s3SecretAccessKey
-          ? encrypt(input.s3SecretAccessKey)
-          : null,
-        s3Bucket: input.s3Bucket,
-        ...(input.presenceEnabled !== undefined
-          ? { presenceEnabled: input.presenceEnabled }
-          : {}),
-        ...(input.traceSharingEnabled !== undefined
-          ? { traceSharingEnabled: input.traceSharingEnabled }
-          : {}),
-        ...(input.supportContact !== undefined
-          ? { supportContact: input.supportContact?.trim() || null }
-          : {}),
-        ...(input.primaryIntent !== undefined
-          ? { primaryIntent: input.primaryIntent }
-          : {}),
+        ...profileSettingsData(input),
+        ...storageSettingsData(input),
       },
     });
   }
@@ -535,6 +821,35 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     const { organizationId, userId } = input;
 
     await this.prisma.$transaction(async (tx) => {
+      const member = await tx.organizationUser.findUnique({
+        where: { userId_organizationId: { userId, organizationId } },
+        select: { role: true, disabledAt: true },
+      });
+
+      if (!member) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+      }
+
+      // Same guard as disabling or demoting the last admin, and the only
+      // irreversible one of the three: an organization with no admin who can
+      // sign in cannot be recovered from inside the product.
+      if (
+        member.role === OrganizationUserRole.ADMIN &&
+        member.disabledAt === null
+      ) {
+        const activeAdmins = await tx.organizationUser.count({
+          where: {
+            organizationId,
+            role: OrganizationUserRole.ADMIN,
+            disabledAt: null,
+          },
+        });
+
+        if (activeAdmins <= 1) {
+          throw new CannotRemoveLastAdminError();
+        }
+      }
+
       await tx.organizationUser.delete({
         where: {
           userId_organizationId: {
@@ -606,10 +921,11 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         });
 
         if (activeAdmins <= 1) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Cannot disable the last admin of an organization",
-          });
+          // Handled rather than a TRPCError: the tRPC boundary maps a 400
+          // HandledError to BAD_REQUEST anyway, and the REST surface answers
+          // the stable code instead of flattening this refusal to an unknown
+          // 500.
+          throw new CannotDisableLastAdminError();
         }
       }
 
@@ -665,10 +981,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         });
 
         if (adminCount <= 1) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Cannot remove the last admin from an organization",
-          });
+          // Handled for the same reason as the disable guard: the tRPC
+          // boundary still maps the 400 to BAD_REQUEST, and the REST surface
+          // answers the stable code instead of an unknown 500.
+          throw new CannotDemoteLastAdminError();
         }
       }
 

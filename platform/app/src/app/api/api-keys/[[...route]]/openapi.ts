@@ -16,20 +16,108 @@
  *
  * `$ref`s point at components that stay in the JSON; `paths` is replaced on
  * merge but `components` is merged, so they keep resolving.
+ *
+ * Request bodies are NOT declared here: the generator builds them from each
+ * route's zod schema and overwrites whatever this file says, so a body written
+ * out by hand can only ever be a second copy that drifts.
  */
 
 import type { DescribeRouteOptions } from "hono-openapi";
+
+type ResponseSpec = NonNullable<DescribeRouteOptions["responses"]>[string];
+
+/** The organization admin key every operation in this family takes. */
+const ADMIN_KEY_SECURITY: DescribeRouteOptions["security"] = [
+  { admin_api_key: [] },
+];
+
+/** The path parameter the by-id operations share. */
+const ID_PARAMETER: DescribeRouteOptions["parameters"] = [
+  {
+    name: "id",
+    in: "path",
+    required: true,
+    schema: { type: "string" },
+    description: "API key ID",
+  },
+];
+
+const BINDING_ROLES = ["ADMIN", "MEMBER", "VIEWER", "CUSTOM"];
+const BINDING_SCOPE_TYPES = ["ORGANIZATION", "TEAM", "PROJECT"];
+
+/**
+ * One key, as `GET /{id}` and `PATCH /{id}` both report it.
+ *
+ * `roleBindings` is the shape the listing publishes; `bindings` is the same
+ * set in the shape a write accepts, so a key can be read back and compared to
+ * what was sent without translating between two vocabularies.
+ */
+const apiKeyDetailResponse = (description: string): ResponseSpec => ({
+  description,
+  content: {
+    "application/json": {
+      schema: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+          description: { type: "string", nullable: true },
+          keyType: { type: "string", enum: ["personal", "service"] },
+          assignedToUserId: {
+            type: "string",
+            nullable: true,
+            description: "The member who owns the key; null for a service key.",
+          },
+          createdByUserId: { type: "string", nullable: true },
+          permissionMode: {
+            type: "string",
+            enum: ["all", "readonly", "restricted"],
+          },
+          permissions: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "The resource:action permissions a restricted key grants. Empty for the other modes.",
+          },
+          createdAt: { type: "string", format: "date-time" },
+          expiresAt: { type: "string", format: "date-time", nullable: true },
+          lastUsedAt: { type: "string", format: "date-time", nullable: true },
+          revokedAt: { type: "string", format: "date-time", nullable: true },
+          roleBindings: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                role: { type: "string", enum: BINDING_ROLES },
+                scopeType: { type: "string", enum: BINDING_SCOPE_TYPES },
+                scopeId: { type: "string" },
+              },
+            },
+          },
+          bindings: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                role: { type: "string", enum: BINDING_ROLES },
+                scopeType: { type: "string", enum: BINDING_SCOPE_TYPES },
+                scopeId: { type: "string" },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+});
 
 export const LIST_API_KEYS: DescribeRouteOptions = {
   operationId: "listApiKeys",
   summary: "List API keys",
   description:
     "List all API keys owned by the authenticated user in this organization. Requires organization:view permission.",
-  security: [
-    {
-      admin_api_key: [],
-    },
-  ],
+  security: ADMIN_KEY_SECURITY,
   responses: {
     "200": {
       description: "List of API keys",
@@ -62,84 +150,8 @@ export const CREATE_API_KEY: DescribeRouteOptions = {
   operationId: "createApiKey",
   summary: "Create an API key",
   description:
-    'Create a new API key. For service keys, pass keyType:"service". Optionally scope to specific projects via projectIds (ADMIN on each). Omit projectIds for full org access. The plaintext token is returned once \u2014 store it securely.',
-  security: [
-    {
-      admin_api_key: [],
-    },
-  ],
-  requestBody: {
-    required: true,
-    content: {
-      "application/json": {
-        schema: {
-          type: "object",
-          properties: {
-            name: {
-              type: "string",
-              minLength: 1,
-              maxLength: 100,
-              description: "Human-readable name for this token",
-            },
-            description: {
-              type: "string",
-              maxLength: 500,
-              description: "Optional description",
-            },
-            expiresAt: {
-              type: "string",
-              format: "date-time",
-              description: "Optional expiration date (ISO 8601)",
-            },
-            bindings: {
-              type: "array",
-              minItems: 1,
-              maxItems: 20,
-              description:
-                "Role bindings that define what this token can access",
-              items: {
-                type: "object",
-                properties: {
-                  role: {
-                    type: "string",
-                    enum: ["ADMIN", "MEMBER", "VIEWER"],
-                    description: "Role to grant",
-                  },
-                  scopeType: {
-                    type: "string",
-                    enum: ["ORGANIZATION", "TEAM", "PROJECT"],
-                    description: "Scope level",
-                  },
-                  scopeId: {
-                    type: "string",
-                    description: "ID of the organization, team, or project",
-                  },
-                },
-                required: ["role", "scopeType", "scopeId"],
-              },
-            },
-            keyType: {
-              type: "string",
-              enum: ["personal", "service"],
-              default: "personal",
-              description:
-                "personal = tied to a user. service = not tied to any user, for automation.",
-            },
-            projectIds: {
-              type: "array",
-              items: {
-                type: "string",
-              },
-              maxItems: 50,
-              description:
-                "For service keys with restricted scope: list of project IDs to grant ADMIN access to. Omit for full org access.",
-            },
-          },
-          required: ["name", "bindings"],
-        },
-      },
-    },
-  },
+    'Create a new API key. For service keys, pass keyType:"service". Optionally scope to specific projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId to mint the key for another member, and permissionMode:"restricted" with a permissions list to grant exactly those permissions. Minting a service key or a key for another member requires organization admin rights. The plaintext token is returned once \u2014 store it securely.',
+  security: ADMIN_KEY_SECURITY,
   responses: {
     "201": {
       description:
@@ -179,10 +191,61 @@ export const CREATE_API_KEY: DescribeRouteOptions = {
     },
     "403": {
       description:
-        "Requested binding exceeds the creator's own permissions, or scope does not belong to this organization",
+        "Requested binding exceeds the creator's own permissions, the scope does not belong to this organization, or a service key / key for another member was requested without organization admin rights",
     },
     "422": {
       description: "Validation error (missing name, empty bindings, etc.)",
+    },
+  },
+};
+
+export const GET_API_KEY: DescribeRouteOptions = {
+  operationId: "getApiKey",
+  summary: "Get an API key",
+  description:
+    "Read one API key by id, including its role bindings, permission mode and explicit permissions. Returns your own keys; organization admins may read any key in the organization. The secret is never returned. An id that does not exist, belongs to another organization, or belongs to another member all answer 404 api_key_not_found, so the response cannot be used to probe for keys.",
+  security: ADMIN_KEY_SECURITY,
+  parameters: ID_PARAMETER,
+  responses: {
+    "200": apiKeyDetailResponse("The API key"),
+    "401": {
+      description: "Invalid or missing API key token",
+    },
+    "403": {
+      description: "Insufficient permissions (requires organization:view)",
+    },
+    "404": {
+      description: "API key not found (api_key_not_found)",
+    },
+  },
+};
+
+export const UPDATE_API_KEY: DescribeRouteOptions = {
+  operationId: "updateApiKey",
+  summary: "Update an API key",
+  description:
+    "Update an API key's name, description, permission mode, permissions or bindings. Every field is optional; bindings are replaced outright, and the response is exactly what a subsequent GET returns. You may update your own keys; organization admins may update any key in the organization. Bindings can never exceed the access of the member the key belongs to. The token itself never changes.",
+  security: ADMIN_KEY_SECURITY,
+  parameters: ID_PARAMETER,
+  responses: {
+    "200": apiKeyDetailResponse("The updated API key"),
+    "401": {
+      description: "Invalid or missing API key token",
+    },
+    "403": {
+      description:
+        "Insufficient permissions (requires organization:manage), the requested binding exceeds the key owner's own permissions, or the scope does not belong to this organization (api_key_scope_violation)",
+    },
+    "404": {
+      description:
+        "API key not found, or not yours to edit (api_key_not_found)",
+    },
+    "409": {
+      description: "API key is already revoked (api_key_already_revoked)",
+    },
+    "422": {
+      description:
+        "Validation error, for example restricted mode without a permissions list (validation_error)",
     },
   },
 };
@@ -192,22 +255,8 @@ export const REVOKE_API_KEY: DescribeRouteOptions = {
   summary: "Revoke an API key",
   description:
     "Revoke (soft-delete) an API key. Revoked keys can no longer authenticate. Requires organization:manage permission.",
-  security: [
-    {
-      admin_api_key: [],
-    },
-  ],
-  parameters: [
-    {
-      name: "id",
-      in: "path",
-      required: true,
-      schema: {
-        type: "string",
-      },
-      description: "API key ID",
-    },
-  ],
+  security: ADMIN_KEY_SECURITY,
+  parameters: ID_PARAMETER,
   responses: {
     "200": {
       description: "API key revoked successfully",

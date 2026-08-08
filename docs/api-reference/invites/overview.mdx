@@ -1,0 +1,91 @@
+---
+title: "Overview"
+description: "Invite people into the organization in batches, with the teams and roles they land on, and list or revoke the invites still waiting to be accepted."
+---
+
+<Note>
+  **Available on Enterprise plans.** An organization without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments need an Enterprise license for the same endpoints. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
+
+## Intro
+
+The Invites API creates the invitations people accept to join your organization, up to 50 in one call. Each invite carries the organization role the person gets and the teams they land on, so someone who accepts is immediately where they need to be.
+
+Accepting stays a browser step: the person opens the link, signs in or signs up, and joins. This API covers the other three quarters of the job, creating, listing, and revoking.
+
+## Authentication
+
+Requires an **organization-level API key** with `organization:manage`. Pass it as a Bearer token:
+
+```
+Authorization: Bearer sk-lw-<id>_<secret>
+```
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/organization/invites` | List pending invites with their acceptance links |
+| `POST` | `/api/organization/invites` | Create up to 50 invites in one batch |
+| `DELETE` | `/api/organization/invites/{id}` | Revoke a pending invite |
+
+## The acceptance link is part of the response
+
+Every invite comes back with its `inviteCode` and a ready `inviteUrl`. A deployment with no email provider configured still has something to hand the person, and `emailNotSent` tells you, per invite, whether LangWatch managed to deliver the mail itself.
+
+```json
+{
+  "invites": [
+    {
+      "id": "<invite_id>",
+      "email": "engineer@acme.example",
+      "role": "MEMBER",
+      "inviteCode": "...",
+      "inviteUrl": "https://app.langwatch.ai/invite/accept?inviteCode=...",
+      "emailNotSent": true,
+      "teams": [{ "teamId": "team_abc123", "role": "MEMBER", "customRoleId": null }]
+    }
+  ]
+}
+```
+
+## The batch is all or nothing
+
+Validation runs over the whole batch before anything is written, and a problem refuses the batch rather than creating part of it. This is deliberate: silently granting someone less access than the call asked for is worse than an error you can read.
+
+The refusals to expect:
+
+| Code | Status | Meaning |
+|------|--------|---------|
+| `already_organization_member` | 409 | One of the addresses is already in the organization |
+| `duplicate_invite` | 409 | An invite for that address is already pending |
+| `member_seat_limit_reached` | 403 | The batch would take the organization past its seats |
+| `team_not_in_organization` | 422 | A `teamId` belongs to another organization |
+| `custom_role_not_assignable` | 422 | The custom role cannot be handed out on that team |
+
+## Typical flow
+
+```bash
+curl -X POST https://app.langwatch.ai/api/organization/invites \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "invites": [
+      {
+        "email": "engineer@acme.example",
+        "role": "MEMBER",
+        "teams": [{ "teamId": "team_abc123", "role": "MEMBER" }]
+      }
+    ]
+  }'
+```
+
+Someone who never accepts leaves a pending invite behind. List them, then revoke the ones that have gone stale:
+
+```bash
+curl https://app.langwatch.ai/api/organization/invites \
+  -H "Authorization: Bearer sk-lw-..."
+
+curl -X DELETE https://app.langwatch.ai/api/organization/invites/<invite_id> \
+  -H "Authorization: Bearer sk-lw-..."
+```

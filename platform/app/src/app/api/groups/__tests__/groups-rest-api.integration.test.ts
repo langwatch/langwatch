@@ -9,8 +9,12 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
+import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { ENTERPRISE_TEST_PLAN } from "~/test-utils/managementApiOrg";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
@@ -50,6 +54,17 @@ describe("Feature: Groups REST API", () => {
   };
 
   beforeAll(async () => {
+    // Groups are Enterprise-gated on every route, and this suite is about the
+    // family's behavior, not the gate, so the fixture organization is
+    // entitled. The gate's own coverage lives in
+    // groups-enterprise-gate.integration.test.ts.
+    await resetApp();
+    globalForApp.__langwatch_app = createTestApp({
+      planProvider: PlanProviderService.create({
+        getActivePlan: async () => ENTERPRISE_TEST_PLAN,
+      }),
+    });
+
     testOrganization = await prisma.organization.create({
       data: { name: "Groups Test Org", slug: `--test-org-${ns}` },
     });
@@ -138,6 +153,7 @@ describe("Feature: Groups REST API", () => {
         where: { id: testOrganization.id },
       })
       .catch(() => {});
+    await resetApp();
   });
 
   describe("GET /api/groups", () => {
@@ -502,6 +518,127 @@ describe("Feature: Groups REST API", () => {
       await prisma.organization
         .delete({ where: { id: otherOrg.id } })
         .catch(() => {});
+    });
+  });
+
+  describe("given a foreign custom role and an API-key system role exist", () => {
+    let validationGroupId: string;
+    let foreignOrgId: string;
+    let foreignRoleId: string;
+    let apiKeySystemRoleId: string;
+
+    beforeAll(async () => {
+      const group = await prisma.group.create({
+        data: {
+          id: generate(KSUID_RESOURCES.GROUP).toString(),
+          name: `Role Validation ${ns}`,
+          slug: `role-validation-${ns}`,
+          organizationId: testOrganization.id,
+        },
+      });
+      validationGroupId = group.id;
+
+      const foreignOrg = await prisma.organization.create({
+        data: { name: "Foreign Role Org", slug: `--test-foreign-org-${ns}` },
+      });
+      foreignOrgId = foreignOrg.id;
+
+      const foreignRole = await prisma.customRole.create({
+        data: {
+          name: `foreign-role-${ns}`,
+          organizationId: foreignOrg.id,
+          permissions: ["project:manage"],
+          kind: "custom",
+        },
+      });
+      foreignRoleId = foreignRole.id;
+
+      const apiKeySystemRole = await prisma.customRole.create({
+        data: {
+          name: `apikey:fake-${ns}`,
+          organizationId: testOrganization.id,
+          permissions: ["organization:manage"],
+          kind: "system_api_key",
+        },
+      });
+      apiKeySystemRoleId = apiKeySystemRole.id;
+    });
+
+    afterAll(async () => {
+      await cleanupTestRows(prisma, [
+        ["customRole", { id: { in: [foreignRoleId, apiKeySystemRoleId] } }],
+        ["organization", { id: foreignOrgId }],
+      ]);
+    });
+
+    /** @scenario A custom role from another organization cannot be bound to a group */
+    it("rejects a custom role from another organization", async () => {
+      const res = await api.post(`/api/groups/${validationGroupId}/bindings`, {
+        role: "CUSTOM",
+        customRoleId: foreignRoleId,
+        scopeType: "TEAM",
+        scopeId: testTeam.id,
+      });
+      expect(res.status).toBe(422);
+
+      const persisted = await prisma.roleBinding.findFirst({
+        where: {
+          organizationId: testOrganization.id,
+          groupId: validationGroupId,
+          customRoleId: foreignRoleId,
+        },
+      });
+      expect(persisted).toBeNull();
+    });
+
+    /** @scenario An API key's system role cannot be bound to a group */
+    it("rejects an API key's system role", async () => {
+      const res = await api.post(`/api/groups/${validationGroupId}/bindings`, {
+        role: "CUSTOM",
+        customRoleId: apiKeySystemRoleId,
+        scopeType: "TEAM",
+        scopeId: testTeam.id,
+      });
+      expect(res.status).toBe(422);
+
+      const persisted = await prisma.roleBinding.findFirst({
+        where: {
+          organizationId: testOrganization.id,
+          groupId: validationGroupId,
+          customRoleId: apiKeySystemRoleId,
+        },
+      });
+      expect(persisted).toBeNull();
+    });
+
+    it("rejects a custom binding without a role id", async () => {
+      const res = await api.post(`/api/groups/${validationGroupId}/bindings`, {
+        role: "CUSTOM",
+        scopeType: "TEAM",
+        scopeId: testTeam.id,
+      });
+      expect(res.status).toBe(422);
+    });
+
+    it("rejects creating a group with a cross-organization custom role", async () => {
+      const name = `Poisoned Group ${ns}`;
+      const res = await api.post("/api/groups", {
+        name,
+        bindings: [
+          {
+            role: "CUSTOM",
+            customRoleId: foreignRoleId,
+            scopeType: "TEAM",
+            scopeId: testTeam.id,
+          },
+        ],
+      });
+      expect(res.status).toBe(422);
+
+      const persisted = await prisma.group.findFirst({
+        where: { organizationId: testOrganization.id, name },
+      });
+      expect(persisted).toBeNull();
     });
   });
 });

@@ -1,6 +1,7 @@
 import { generate } from "@langwatch/ksuid";
 import {
   OrganizationUserRole,
+  Prisma,
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
@@ -9,12 +10,37 @@ import { TRPCError } from "@trpc/server";
 import {
   getOrganizationRolePermissions,
   getTeamRolePermissions,
+  isOrgExclusivePermission,
+  type Permission,
 } from "~/server/api/rbac";
+import { ApiKeyNotFoundError } from "~/server/api-key/errors";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
-import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
+import { CUSTOM_ROLE_KIND } from "~/server/role/repositories/role.repository";
 import type { RoleService } from "~/server/role/role.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import {
+  CustomRoleIdRequiredError,
+  CustomRoleNotAssignableError,
+  GroupNotInOrganizationError,
+  OrgExclusivePermissionScopeError,
+  RoleBindingAlreadyExistsError,
+  RoleBindingNotFoundError,
+  RoleBindingPrincipalInvalidError,
+  UserNotInOrganizationError,
+} from "./errors";
 import { assertNoPersonalTeamScope } from "./personal-team-scope";
+
+/**
+ * The partial unique indexes on RoleBinding surface an identical binding as
+ * Prisma's P2002; the write paths map it to the deterministic conflict code
+ * a provisioning tool can treat as "already done".
+ */
+function isUniqueConstraintViolation(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
+}
 
 type ScopeRows = {
   orgs: Array<{ id: string; name: string }>;
@@ -65,45 +91,152 @@ export class RoleBindingService {
     private readonly roleService: RoleService,
   ) {}
 
-  private async validateCustomRolesAssignable({
+  /**
+   * Validates the role side of a batch of binding writes, in order: a CUSTOM
+   * role needs its id, the custom roles must be assignable in this
+   * organization, and none of them may carry an organization-exclusive
+   * permission below organization scope.
+   */
+  private async validateBindingRoles({
     organizationId,
     bindings,
   }: {
     organizationId: string;
-    bindings: Array<{ role: TeamUserRole; customRoleId?: string | null }>;
+    bindings: Array<{
+      role: TeamUserRole;
+      customRoleId?: string | null;
+      scopeType: RoleBindingScopeType;
+    }>;
   }) {
     for (const b of bindings) {
       if (b.role === TeamUserRole.CUSTOM && !b.customRoleId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "CUSTOM role requires a customRoleId",
-        });
+        throw new CustomRoleIdRequiredError();
       }
     }
 
-    const customRoleIds = bindings
-      .filter((b) => b.role === TeamUserRole.CUSTOM && b.customRoleId)
-      .map((b) => b.customRoleId!);
+    const customBindings = bindings.filter(
+      (b): b is typeof b & { customRoleId: string } =>
+        b.role === TeamUserRole.CUSTOM && !!b.customRoleId,
+    );
+    if (customBindings.length === 0) return;
 
-    if (customRoleIds.length === 0) return;
-
-    await this.roleService.validateRolesAssignable({
-      roleIds: customRoleIds,
+    await this.assertCustomRolesAssignable({
       organizationId,
+      customRoleIds: [...new Set(customBindings.map((b) => b.customRoleId))],
     });
+    await this.assertNoOrgExclusivePermissionsBelowOrgScope({
+      organizationId,
+      customBindings,
+    });
+  }
+
+  /**
+   * Every one of these custom roles must be assignable in this organization:
+   * its own, user-created ones.
+   */
+  private async assertCustomRolesAssignable({
+    organizationId,
+    customRoleIds,
+  }: {
+    organizationId: string;
+    customRoleIds: string[];
+  }): Promise<void> {
+    const assignable = new Set(
+      await this.roleService.filterAssignableRoleIds({
+        roleIds: customRoleIds,
+        organizationId,
+      }),
+    );
+    const notAssignable = customRoleIds.find((id) => !assignable.has(id));
+    if (notAssignable) {
+      throw new CustomRoleNotAssignableError(notAssignable);
+    }
+  }
+
+  /**
+   * A custom role that lists an organization-exclusive permission cannot be
+   * bound below organization scope. The read side already refuses to grant
+   * such a permission from a team or project binding; accepting the write
+   * anyway would store a grant that silently does nothing, which is worse
+   * than a refusal, because the admin believes it took effect.
+   */
+  private async assertNoOrgExclusivePermissionsBelowOrgScope({
+    organizationId,
+    customBindings,
+  }: {
+    organizationId: string;
+    customBindings: Array<{
+      customRoleId: string;
+      scopeType: RoleBindingScopeType;
+    }>;
+  }): Promise<void> {
+    const belowOrgScope = customBindings.filter(
+      (b) => b.scopeType !== RoleBindingScopeType.ORGANIZATION,
+    );
+    if (belowOrgScope.length === 0) return;
+
+    const roles = await this.prisma.customRole.findMany({
+      where: {
+        id: { in: [...new Set(belowOrgScope.map((b) => b.customRoleId))] },
+        organizationId,
+        kind: CUSTOM_ROLE_KIND.CUSTOM,
+      },
+      select: { id: true, permissions: true },
+    });
+    const permissionsByRoleId = new Map(
+      roles.map((role) => [
+        role.id,
+        Array.isArray(role.permissions)
+          ? role.permissions.filter(
+              (permission): permission is string =>
+                typeof permission === "string",
+            )
+          : [],
+      ]),
+    );
+    for (const binding of belowOrgScope) {
+      const permissions = permissionsByRoleId.get(binding.customRoleId) ?? [];
+      const orgExclusive = permissions.find((permission) =>
+        isOrgExclusivePermission(permission as Permission),
+      );
+      if (orgExclusive) {
+        throw new OrgExclusivePermissionScopeError(
+          orgExclusive,
+          binding.scopeType,
+        );
+      }
+    }
+  }
+
+  /** The user id belongs to a member of this organization, or the write stops. */
+  private async assertUserInOrganization({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<void> {
+    const count = await this.prisma.organizationUser.count({
+      where: { organizationId, userId },
+    });
+    if (count === 0) {
+      throw new UserNotInOrganizationError(userId);
+    }
   }
 
   private async validatePrincipalInOrganization({
     organizationId,
     userId,
     groupId,
+    apiKeyId,
   }: {
     organizationId: string;
     userId?: string;
     groupId?: string;
+    apiKeyId?: string;
   }): Promise<void> {
     if (userId) {
-      await assertUsersInOrganization(this.prisma, organizationId, [userId]);
+      await this.assertUserInOrganization({ organizationId, userId });
     }
     if (groupId) {
       const group = await this.prisma.group.findFirst({
@@ -111,10 +244,16 @@ export class RoleBindingService {
         select: { id: true },
       });
       if (!group) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Group is not in this organization",
-        });
+        throw new GroupNotInOrganizationError(groupId);
+      }
+    }
+    if (apiKeyId) {
+      const apiKey = await this.prisma.apiKey.findFirst({
+        where: { id: apiKeyId, organizationId },
+        select: { id: true },
+      });
+      if (!apiKey) {
+        throw new ApiKeyNotFoundError(apiKeyId);
       }
     }
   }
@@ -247,6 +386,7 @@ export class RoleBindingService {
       include: {
         user: { select: { id: true, name: true, email: true, image: true } },
         group: { select: { id: true, name: true, scimSource: true } },
+        apiKey: { select: { id: true, name: true } },
         customRole: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: "asc" },
@@ -277,6 +417,8 @@ export class RoleBindingService {
       if (!membersByGroup.has(m.groupId)) membersByGroup.set(m.groupId, []);
       membersByGroup.get(m.groupId)!.push(m.userId);
     }
+    const memberUserIdsFor = (groupId: string | null): string[] =>
+      groupId ? (membersByGroup.get(groupId) ?? []) : [];
 
     return manageable.map((b) => ({
       id: b.id,
@@ -287,13 +429,15 @@ export class RoleBindingService {
       groupId: b.groupId,
       groupName: b.group?.name ?? null,
       groupScimSource: b.group?.scimSource ?? null,
+      apiKeyId: b.apiKeyId,
+      apiKeyName: b.apiKey?.name ?? null,
       role: b.role,
       customRoleId: b.customRoleId,
       customRoleName: b.customRole?.name ?? null,
       scopeType: b.scopeType,
       scopeId: b.scopeId,
       scopeName: scopeNames.get(b.scopeId) ?? null,
-      memberUserIds: b.groupId ? (membersByGroup.get(b.groupId) ?? []) : [],
+      memberUserIds: memberUserIdsFor(b.groupId),
       createdAt: b.createdAt,
     }));
   }
@@ -458,6 +602,7 @@ export class RoleBindingService {
     organizationId,
     userId,
     groupId,
+    apiKeyId,
     role,
     customRoleId,
     scopeType,
@@ -466,22 +611,17 @@ export class RoleBindingService {
     organizationId: string;
     userId?: string;
     groupId?: string;
+    apiKeyId?: string;
     role: TeamUserRole;
     customRoleId?: string;
     scopeType: RoleBindingScopeType;
     scopeId: string;
   }) {
-    if (!userId && !groupId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Either userId or groupId must be provided",
-      });
-    }
-    if (userId && groupId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Only one of userId or groupId may be provided",
-      });
+    const principals = [userId, groupId, apiKeyId].filter(
+      (principal) => principal != null && principal !== "",
+    );
+    if (principals.length !== 1) {
+      throw new RoleBindingPrincipalInvalidError();
     }
 
     await this.repo.validateScopeInOrg({ organizationId, scopeType, scopeId });
@@ -493,25 +633,36 @@ export class RoleBindingService {
       organizationId,
       userId,
       groupId,
+      apiKeyId,
     });
-    await this.validateCustomRolesAssignable({
+    await this.validateBindingRoles({
       organizationId,
-      bindings: [{ role, customRoleId }],
+      bindings: [{ role, customRoleId, scopeType }],
     });
 
-    return this.prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId,
-        userId: userId ?? null,
-        groupId: groupId ?? null,
-        role,
-        customRoleId:
-          role === TeamUserRole.CUSTOM ? (customRoleId ?? null) : null,
-        scopeType,
-        scopeId,
-      },
-    });
+    try {
+      return await this.prisma.roleBinding.create({
+        data: {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId,
+          userId: userId ?? null,
+          groupId: groupId ?? null,
+          apiKeyId: apiKeyId ?? null,
+          role,
+          customRoleId:
+            role === TeamUserRole.CUSTOM ? (customRoleId ?? null) : null,
+          scopeType,
+          scopeId,
+        },
+      });
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) {
+        throw new RoleBindingAlreadyExistsError({
+          meta: { scopeType, scopeId },
+        });
+      }
+      throw error;
+    }
   }
 
   async update({
@@ -529,12 +680,12 @@ export class RoleBindingService {
       where: { id: bindingId, organizationId },
     });
     if (!binding) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Binding not found" });
+      throw new RoleBindingNotFoundError(bindingId);
     }
     await assertNoPersonalTeamScope({ client: this.prisma, scopes: [binding] });
-    await this.validateCustomRolesAssignable({
+    await this.validateBindingRoles({
       organizationId,
-      bindings: [{ role, customRoleId }],
+      bindings: [{ role, customRoleId, scopeType: binding.scopeType }],
     });
     return this.prisma.roleBinding.update({
       where: { id: bindingId },
@@ -557,7 +708,7 @@ export class RoleBindingService {
       where: { id: bindingId, organizationId },
     });
     if (!binding) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Binding not found" });
+      throw new RoleBindingNotFoundError(bindingId);
     }
     await assertNoPersonalTeamScope({ client: this.prisma, scopes: [binding] });
     await this.prisma.roleBinding.delete({ where: { id: bindingId } });
@@ -587,7 +738,7 @@ export class RoleBindingService {
   }) {
     // Validate scopes and role assignability up front so a bad input fails
     // the whole batch before we open the transaction.
-    await assertUsersInOrganization(this.prisma, organizationId, [userId]);
+    await this.assertUserInOrganization({ organizationId, userId });
     for (const b of bindingsToCreate) {
       await this.repo.validateScopeInOrg({
         organizationId,
@@ -599,47 +750,102 @@ export class RoleBindingService {
       client: this.prisma,
       scopes: bindingsToCreate,
     });
-    await this.validateCustomRolesAssignable({
+    await this.validateBindingRoles({
       organizationId,
       bindings: bindingsToCreate,
     });
 
     return this.prisma.$transaction(async (tx) => {
       if (bindingIdsToDelete.length > 0) {
-        const existing = await tx.roleBinding.findMany({
-          where: { id: { in: bindingIdsToDelete }, organizationId },
-          select: { id: true, scopeType: true, scopeId: true },
-        });
-        if (existing.length !== bindingIdsToDelete.length) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "One or more bindings not found",
-          });
-        }
-        await assertNoPersonalTeamScope({ client: tx, scopes: existing });
-        await tx.roleBinding.deleteMany({
-          where: { id: { in: bindingIdsToDelete }, organizationId },
+        await this.deleteMemberBindings({
+          tx,
+          organizationId,
+          bindingIdsToDelete,
         });
       }
 
       if (bindingsToCreate.length > 0) {
-        await tx.roleBinding.createMany({
-          data: bindingsToCreate.map((b) => ({
-            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-            organizationId,
-            userId,
-            groupId: null,
-            role: b.role,
-            customRoleId:
-              b.role === TeamUserRole.CUSTOM ? (b.customRoleId ?? null) : null,
-            scopeType: b.scopeType,
-            scopeId: b.scopeId,
-          })),
+        await this.createMemberBindings({
+          tx,
+          organizationId,
+          userId,
+          bindingsToCreate,
         });
       }
 
       return { success: true };
     });
+  }
+
+  /**
+   * Deletes exactly these bindings within the transaction: every id must
+   * exist in the organization, and none may point at a personal workspace.
+   */
+  private async deleteMemberBindings({
+    tx,
+    organizationId,
+    bindingIdsToDelete,
+  }: {
+    tx: Prisma.TransactionClient;
+    organizationId: string;
+    bindingIdsToDelete: string[];
+  }): Promise<void> {
+    // De-duplicated first: `findMany` answers one row per id, so a caller who
+    // repeats an id would fail the count comparison with every id present and
+    // be told a binding that exists is missing.
+    const uniqueIds = [...new Set(bindingIdsToDelete)];
+    const existing = await tx.roleBinding.findMany({
+      where: { id: { in: uniqueIds }, organizationId },
+      select: { id: true, scopeType: true, scopeId: true },
+    });
+    if (existing.length !== uniqueIds.length) {
+      const found = new Set(existing.map((binding) => binding.id));
+      const missing = uniqueIds.find((id) => !found.has(id)) ?? "unknown";
+      throw new RoleBindingNotFoundError(missing);
+    }
+    await assertNoPersonalTeamScope({ client: tx, scopes: existing });
+    await tx.roleBinding.deleteMany({
+      where: { id: { in: uniqueIds }, organizationId },
+    });
+  }
+
+  /** Creates the user's new bindings within the transaction; an identical existing binding is a conflict. */
+  private async createMemberBindings({
+    tx,
+    organizationId,
+    userId,
+    bindingsToCreate,
+  }: {
+    tx: Prisma.TransactionClient;
+    organizationId: string;
+    userId: string;
+    bindingsToCreate: Array<{
+      role: TeamUserRole;
+      customRoleId?: string | null;
+      scopeType: RoleBindingScopeType;
+      scopeId: string;
+    }>;
+  }): Promise<void> {
+    try {
+      await tx.roleBinding.createMany({
+        data: bindingsToCreate.map((b) => ({
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId,
+          userId,
+          groupId: null,
+          role: b.role,
+          customRoleId:
+            b.role === TeamUserRole.CUSTOM ? (b.customRoleId ?? null) : null,
+          scopeType: b.scopeType,
+          scopeId: b.scopeId,
+        })),
+      });
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) {
+        throw new RoleBindingAlreadyExistsError();
+      }
+      throw error;
+    }
   }
 
   /**
@@ -680,7 +886,7 @@ export class RoleBindingService {
       client: this.prisma,
       scopes: bindingsToCreate,
     });
-    await this.validateCustomRolesAssignable({
+    await this.validateBindingRoles({
       organizationId,
       bindings: bindingsToCreate,
     });
@@ -691,7 +897,7 @@ export class RoleBindingService {
         select: { id: true, scimSource: true },
       });
       if (!group) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
+        throw new GroupNotInOrganizationError(groupId);
       }
 
       if (rename) {
@@ -708,40 +914,52 @@ export class RoleBindingService {
       }
 
       if (bindingIdsToDelete.length > 0) {
+        // De-duplicated for the same reason as the member path: one row per
+        // id comes back, so a repeated id must not read as a missing one.
+        const uniqueBindingIds = [...new Set(bindingIdsToDelete)];
         const existing = await tx.roleBinding.findMany({
           where: {
-            id: { in: bindingIdsToDelete },
+            id: { in: uniqueBindingIds },
             organizationId,
             groupId,
           },
           select: { id: true, scopeType: true, scopeId: true },
         });
-        if (existing.length !== bindingIdsToDelete.length) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "One or more bindings not found",
-          });
+        if (existing.length !== uniqueBindingIds.length) {
+          const found = new Set(existing.map((binding) => binding.id));
+          const missing =
+            uniqueBindingIds.find((id) => !found.has(id)) ?? "unknown";
+          throw new RoleBindingNotFoundError(missing);
         }
         await assertNoPersonalTeamScope({ client: tx, scopes: existing });
         await tx.roleBinding.deleteMany({
-          where: { id: { in: bindingIdsToDelete }, organizationId, groupId },
+          where: { id: { in: uniqueBindingIds }, organizationId, groupId },
         });
       }
 
       if (bindingsToCreate.length > 0) {
-        await tx.roleBinding.createMany({
-          data: bindingsToCreate.map((b) => ({
-            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-            organizationId,
-            userId: null,
-            groupId,
-            role: b.role,
-            customRoleId:
-              b.role === TeamUserRole.CUSTOM ? (b.customRoleId ?? null) : null,
-            scopeType: b.scopeType,
-            scopeId: b.scopeId,
-          })),
-        });
+        try {
+          await tx.roleBinding.createMany({
+            data: bindingsToCreate.map((b) => ({
+              id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+              organizationId,
+              userId: null,
+              groupId,
+              role: b.role,
+              customRoleId:
+                b.role === TeamUserRole.CUSTOM
+                  ? (b.customRoleId ?? null)
+                  : null,
+              scopeType: b.scopeType,
+              scopeId: b.scopeId,
+            })),
+          });
+        } catch (error) {
+          if (isUniqueConstraintViolation(error)) {
+            throw new RoleBindingAlreadyExistsError();
+          }
+          throw error;
+        }
       }
 
       if (memberUserIdsToRemove.length > 0) {
@@ -763,22 +981,22 @@ export class RoleBindingService {
             message: "Cannot manually add members to a SCIM-managed group",
           });
         }
+        const uniqueMemberIds = [...new Set(memberUserIdsToAdd)];
         const orgMembers = await tx.organizationUser.findMany({
           where: {
             organizationId,
-            userId: { in: memberUserIdsToAdd },
+            userId: { in: uniqueMemberIds },
           },
           select: { userId: true },
         });
-        if (orgMembers.length !== memberUserIdsToAdd.length) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message:
-              "All users must belong to the organization before joining a group",
-          });
+        if (orgMembers.length !== uniqueMemberIds.length) {
+          const found = new Set(orgMembers.map((member) => member.userId));
+          const missing =
+            uniqueMemberIds.find((id) => !found.has(id)) ?? "unknown";
+          throw new UserNotInOrganizationError(missing);
         }
         await tx.groupMembership.createMany({
-          data: memberUserIdsToAdd.map((userId) => ({ groupId, userId })),
+          data: uniqueMemberIds.map((userId) => ({ groupId, userId })),
           skipDuplicates: true,
         });
       }

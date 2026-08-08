@@ -7,6 +7,7 @@ import type {
   TeamUserRole,
 } from "@prisma/client";
 import { PersonalWorkspaceNotManagedHereError } from "~/server/app-layer/teams/team.service";
+import type { RoleService } from "~/server/role";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 import type {
@@ -40,8 +41,59 @@ export class ScopeNotInOrganizationError extends Error {
   name = "ScopeNotInOrganizationError" as const;
 }
 
+export class CustomRoleRequiredError extends Error {
+  name = "CustomRoleRequiredError" as const;
+}
+
 export class GroupRestService {
-  constructor(readonly repo: GroupRepository) {}
+  readonly repo: GroupRepository;
+  private readonly roleService: RoleService;
+
+  constructor({
+    repo,
+    roleService,
+  }: {
+    repo: GroupRepository;
+    roleService: RoleService;
+  }) {
+    this.repo = repo;
+    this.roleService = roleService;
+  }
+
+  /**
+   * A CUSTOM binding is only as trustworthy as the role it points at, and the
+   * resolver grants whatever that role says, so the ids are validated here,
+   * before anything persists: they must exist, belong to this organization,
+   * and be user-created roles (an API key's private `system_api_key` role is
+   * never assignable to a group). Same rule the tRPC group router applies.
+   */
+  private async assertCustomRolesAssignable({
+    organizationId,
+    bindings,
+  }: {
+    organizationId: string;
+    bindings: Array<{ role: TeamUserRole; customRoleId?: string }>;
+  }): Promise<void> {
+    const customBindings = bindings.filter(
+      (binding) => binding.role === ("CUSTOM" as TeamUserRole),
+    );
+    if (customBindings.length === 0) return;
+
+    if (customBindings.some((binding) => !binding.customRoleId)) {
+      throw new CustomRoleRequiredError(
+        "A CUSTOM binding requires a customRoleId",
+      );
+    }
+
+    await this.roleService.validateRolesAssignable({
+      roleIds: [
+        ...new Set(
+          customBindings.map((binding) => binding.customRoleId as string),
+        ),
+      ],
+      organizationId,
+    });
+  }
 
   /**
    * A personal team holds exactly its owner, which is why plan limits exempt
@@ -104,6 +156,11 @@ export class GroupRestService {
         "All users must belong to the organization before joining a group",
       );
     }
+    await this.assertCustomRolesAssignable({
+      organizationId,
+      bindings: bindings ?? [],
+    });
+
     const baseSlug = slugify(name, { lower: true, strict: true });
     const slug = await this.repo.findUniqueSlug({
       organizationId,
@@ -298,6 +355,10 @@ export class GroupRestService {
       );
     }
 
+    await this.assertCustomRolesAssignable({
+      organizationId,
+      bindings: [{ role, customRoleId }],
+    });
     await this.assertNoPersonalTeamScope([{ scopeType, scopeId }]);
 
     return this.repo.createBinding({

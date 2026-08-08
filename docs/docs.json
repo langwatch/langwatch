@@ -1252,11 +1252,102 @@
             ]
           },
           {
+            "group": "Organization",
+            "pages": [
+              "api-reference/organization/overview",
+              "api-reference/organization/get-organization",
+              "api-reference/organization/update-organization"
+            ]
+          },
+          {
+            "group": "Members",
+            "pages": [
+              "api-reference/members/overview",
+              "api-reference/members/list-members",
+              "api-reference/members/get-member",
+              "api-reference/members/get-member-access",
+              "api-reference/members/update-member",
+              "api-reference/members/remove-member"
+            ]
+          },
+          {
+            "group": "Invites",
+            "pages": [
+              "api-reference/invites/overview",
+              "api-reference/invites/list-invites",
+              "api-reference/invites/create-invites",
+              "api-reference/invites/revoke-invite"
+            ]
+          },
+          {
+            "group": "Roles",
+            "pages": [
+              "api-reference/roles/overview",
+              "api-reference/roles/list-permissions",
+              "api-reference/roles/list-roles",
+              "api-reference/roles/create-role",
+              "api-reference/roles/get-role",
+              "api-reference/roles/update-role",
+              "api-reference/roles/delete-role"
+            ]
+          },
+          {
+            "group": "Role Bindings",
+            "pages": [
+              "api-reference/role-bindings/overview",
+              "api-reference/role-bindings/list-role-bindings",
+              "api-reference/role-bindings/create-role-binding",
+              "api-reference/role-bindings/update-role-binding",
+              "api-reference/role-bindings/delete-role-binding"
+            ]
+          },
+          {
+            "group": "SCIM Tokens",
+            "pages": [
+              "api-reference/scim-tokens/overview",
+              "api-reference/scim-tokens/list-scim-tokens",
+              "api-reference/scim-tokens/create-scim-token",
+              "api-reference/scim-tokens/revoke-scim-token"
+            ]
+          },
+          {
+            "group": "SCIM",
+            "pages": [
+              "api-reference/scim/overview",
+              "api-reference/scim/service-provider-config",
+              "api-reference/scim/resource-types",
+              "api-reference/scim/schemas",
+              "api-reference/scim/list-users",
+              "api-reference/scim/create-user",
+              "api-reference/scim/get-user",
+              "api-reference/scim/replace-user",
+              "api-reference/scim/update-user",
+              "api-reference/scim/delete-user",
+              "api-reference/scim/list-groups",
+              "api-reference/scim/create-group",
+              "api-reference/scim/get-group",
+              "api-reference/scim/replace-group",
+              "api-reference/scim/update-group",
+              "api-reference/scim/delete-group"
+            ]
+          },
+          {
+            "group": "Organizations (Self-Hosted)",
+            "pages": [
+              "api-reference/organizations/overview",
+              "api-reference/organizations/list-organizations",
+              "api-reference/organizations/create-organization",
+              "api-reference/organizations/get-organization"
+            ]
+          },
+          {
             "group": "API Keys",
             "pages": [
               "api-reference/api-keys/overview",
               "api-reference/api-keys/list-api-keys",
               "api-reference/api-keys/create-api-key",
+              "api-reference/api-keys/get-api-key",
+              "api-reference/api-keys/update-api-key",
               "api-reference/api-keys/revoke-api-key"
             ]
           },

@@ -14,6 +14,11 @@
  * `c.get("project")` or `cache.delete(key)`, which are far more common in these
  * files than route registrations are.
  *
+ * Services built on `@langwatch/api` spell two more shapes. `v.sse("/x", ...)`
+ * is a GET once mounted, so it is read as one. `v.withdraw("get", "/x")` is a
+ * 410 tombstone for a path an earlier version served, so it is read as a route
+ * that exists and can never be documented.
+ *
  * The parse is textual on purpose. A route registered through a helper, a loop,
  * or a computed path is invisible to it — the repo has none today, and a check
  * that silently under-reports is the failure mode to watch for if that changes.
@@ -66,12 +71,95 @@ const QUERY_READ_MARKERS = [
 /** A route registration carries `describeRoute` when its span mentions one. */
 const DESCRIBE_ROUTE_MARKER = /describeRoute\(/;
 
+/**
+ * What documents a `@langwatch/api` endpoint. Those services never write
+ * `describeRoute` themselves: the framework emits it from the endpoint config,
+ * and only when the config gives it something to say. So on that family these
+ * two keys are the same precondition, spelled the framework's way.
+ */
+const ENDPOINT_DOC_MARKERS = [/\boutput:/, /\bdescription:/];
+
+/**
+ * Whether a file declares its routes through the `@langwatch/api` framework.
+ *
+ * Everything below that reads a framework shape asks this first, because the
+ * shapes are ordinary words. `output:` appears in code with no service in it at
+ * all, and `createService(...)` is a name a test one directory over already
+ * uses for its own local helper. The import is what separates the framework's
+ * spelling of a route from a coincidence.
+ */
+export function importsApiFramework(source: string): boolean {
+  return /\bfrom\s*["']@langwatch\/api(?:\/[^"']*)?["']/.test(source);
+}
+
 export interface RouteRegistration {
   method: string;
   path: string;
   readsQuery: boolean;
   /** Whether the span carries `describeRoute(` — the generator's precondition. */
   described: boolean;
+  /** Present when the registration is `v.sse(...)`, which mounts as a GET. */
+  sse?: boolean;
+  /** Present when the registration is a `v.withdraw(...)` 410 tombstone. */
+  withdrawn?: boolean;
+}
+
+interface RouteMatch {
+  method: string;
+  path: string;
+  index: number;
+  sse: boolean;
+  withdrawn: boolean;
+}
+
+/**
+ * Every registration in a file, in source order.
+ *
+ * The two shapes are matched by separate patterns and merged by index before
+ * anything slices spans out of the source. Appended one list after the other,
+ * a withdrawal written above a registration would still sort below it, and the
+ * arithmetic that gives each route the source up to its neighbour would run
+ * backwards: the registration's span collapses to nothing while the
+ * withdrawal's runs to the end of the file, crediting a `c.req.query(` or an
+ * `output:` to the wrong route.
+ */
+function routeMatches(source: string): RouteMatch[] {
+  const registrations = new RegExp(
+    `\\.(${[...HTTP_METHODS, "sse"].join("|")})\\(\\s*"(/[^"]*)"`,
+    "g",
+  );
+  const withdrawals = new RegExp(
+    `\\.withdraw\\(\\s*"(${HTTP_METHODS.join("|")})"\\s*,\\s*"(/[^"]*)"`,
+    "g",
+  );
+
+  const matches: RouteMatch[] = [];
+
+  for (const match of source.matchAll(registrations)) {
+    const [, method, path] = match;
+    if (method === undefined || path === undefined) continue;
+    matches.push({
+      method: method === "sse" ? "get" : method,
+      path,
+      index: match.index,
+      sse: method === "sse",
+      withdrawn: false,
+    });
+  }
+
+  for (const match of source.matchAll(withdrawals)) {
+    const [, method, path] = match;
+    if (method === undefined || path === undefined) continue;
+    matches.push({
+      method,
+      path,
+      index: match.index,
+      sse: false,
+      withdrawn: true,
+    });
+  }
+
+  return matches.sort((a, b) => a.index - b.index);
 }
 
 /**
@@ -80,26 +168,21 @@ export interface RouteRegistration {
  * attribute a `c.req.query(` or a `describeRoute(` to the right route.
  */
 export function collectRouteRegistrations(source: string): RouteRegistration[] {
-  const pattern = new RegExp(
-    `\\.(${HTTP_METHODS.join("|")})\\(\\s*"(/[^"]*)"`,
-    "g",
-  );
+  const framework = importsApiFramework(source);
+  const matches = routeMatches(source);
 
-  const starts: { method: string; path: string; index: number }[] = [];
-  for (const match of source.matchAll(pattern)) {
-    const [, method, path] = match;
-    if (method === undefined || path === undefined) continue;
-    starts.push({ method, path, index: match.index });
-  }
-
-  return starts.map((start, i) => {
-    const end = starts[i + 1]?.index ?? source.length;
-    const body = source.slice(start.index, end);
+  return matches.map((match, i) => {
+    const end = matches[i + 1]?.index ?? source.length;
+    const body = source.slice(match.index, end);
     return {
-      method: start.method,
-      path: start.path,
+      method: match.method,
+      path: match.path,
       readsQuery: QUERY_READ_MARKERS.some((marker) => marker.test(body)),
-      described: DESCRIBE_ROUTE_MARKER.test(body),
+      described:
+        DESCRIBE_ROUTE_MARKER.test(body) ||
+        (framework && ENDPOINT_DOC_MARKERS.some((marker) => marker.test(body))),
+      ...(match.sse ? { sse: true } : {}),
+      ...(match.withdrawn ? { withdrawn: true } : {}),
     };
   });
 }
@@ -119,6 +202,125 @@ export function apiBasePathsOf(source: string): string[] {
   }
 
   return declared;
+}
+
+/**
+ * `createService(` with an inline config, past any type argument. The type
+ * argument may not span lines, so a mis-parse cannot run away with the rest of
+ * the file looking for a `({` that closes it.
+ */
+const CREATE_SERVICE_CALL = /\bcreateService\s*(?:<[^()\n]*>)?\s*\(\s*\{/g;
+
+/**
+ * Any `createService(` call, whatever it is passed. Counted against the
+ * inline-config matches so a form this parser cannot read fails loudly instead
+ * of taking the file's whole route surface out of the gate with it.
+ */
+const ANY_CREATE_SERVICE_CALL = /\bcreateService\s*(?:<[^()\n]*>)?\s*\(/g;
+
+/**
+ * Every `/api...` basePath a file declares through `createService`.
+ *
+ * The framework derives `/api/<name>` from the service name, so a file saying
+ * `createService({ name: "roles" })` and nothing else serves `/api/roles/...`
+ * without that string appearing anywhere in it. To a parse that reads only
+ * declared basePaths such a file has none, so every route in it is invisible to
+ * both gates, which is the exact silence the coverage gate exists to break.
+ *
+ * A config that spells its `basePath` out is skipped: `apiBasePathsOf` already
+ * reads that form, and an explicit basePath wins over the derived one in the
+ * framework too.
+ */
+export function serviceBasePathsOf(source: string): string[] {
+  if (!importsApiFramework(source)) return [];
+
+  const declared: string[] = [];
+  for (const config of createServiceConfigs(source)) {
+    if (/\bbasePath:/.test(config)) continue;
+    const name = config.match(/\bname:\s*"([^"]+)"/)?.[1];
+    if (name === undefined) continue;
+
+    const basePath = `/api/${name}`;
+    if (!declared.includes(basePath)) declared.push(basePath);
+  }
+
+  return declared;
+}
+
+/**
+ * The top-level view of every `createService({...})` config in a file: the
+ * object literal with its nested objects removed, so a `name` belonging to a
+ * `_legacy` block or a middleware option cannot be read as the service's own.
+ */
+function createServiceConfigs(source: string): string[] {
+  const configs: string[] = [];
+
+  for (const match of source.matchAll(CREATE_SERVICE_CALL)) {
+    const opening = match.index + match[0].length - 1;
+    const closing = closingBraceIndex({ source, opening });
+    if (closing === -1) {
+      throw new Error(
+        `A createService config at offset ${opening} has no balanced closing brace, ` +
+          `so no base path can be derived from it and every route of that service ` +
+          `would drop out of the coverage gate unseen.`,
+      );
+    }
+    configs.push(topLevelOf(source.slice(opening, closing + 1)));
+  }
+
+  const calls = [...source.matchAll(ANY_CREATE_SERVICE_CALL)].length;
+  if (calls !== configs.length) {
+    throw new Error(
+      `${calls - configs.length} createService call(s) pass something other than an ` +
+        `inline config object, which this parser cannot read. Inline the config, or ` +
+        `teach scripts/lib/hono-route-table.ts the new form, or those services serve ` +
+        `routes no gate can see.`,
+    );
+  }
+
+  return configs;
+}
+
+/** Index of the `}` closing the `{` at `opening`, or -1 when it is unbalanced. */
+function closingBraceIndex({
+  source,
+  opening,
+}: {
+  source: string;
+  opening: number;
+}): number {
+  let depth = 0;
+
+  for (let index = opening; index < source.length; index++) {
+    const character = source[index];
+    if (character === "{") depth++;
+    else if (character === "}") {
+      depth--;
+      if (depth === 0) return index;
+    }
+  }
+
+  return -1;
+}
+
+/** An object literal reduced to the text of its own keys. */
+function topLevelOf(literal: string): string {
+  let depth = 0;
+  let kept = "";
+
+  for (const character of literal) {
+    if (character === "{") {
+      depth++;
+      continue;
+    }
+    if (character === "}") {
+      depth--;
+      continue;
+    }
+    if (depth === 1) kept += character;
+  }
+
+  return kept;
 }
 
 /** A directory that cannot be read holds no route registrations to find. */

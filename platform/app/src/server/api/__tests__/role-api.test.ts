@@ -32,6 +32,7 @@ const mockPrisma = {
     findFirst: vi.fn(),
     deleteMany: vi.fn(),
     create: vi.fn(),
+    count: vi.fn().mockResolvedValue(0),
   },
   organizationUser: {
     findFirst: vi.fn(),
@@ -137,9 +138,9 @@ describe("RoleService Tests", () => {
       await expect(roleService.getRoleById("nonexistent-role")).rejects.toThrow(
         RoleNotFoundError,
       );
-      await expect(roleService.getRoleById("nonexistent-role")).rejects.toThrow(
-        "Role not found",
-      );
+      await expect(
+        roleService.getRoleById("nonexistent-role"),
+      ).rejects.toMatchObject({ code: "custom_role_not_found" });
     });
   });
 
@@ -250,7 +251,7 @@ describe("RoleService Tests", () => {
         roleService.updateRole("nonexistent-role", {
           name: "Updated Role",
         }),
-      ).rejects.toThrow("Role not found");
+      ).rejects.toMatchObject({ code: "custom_role_not_found" });
     });
   });
 
@@ -279,9 +280,9 @@ describe("RoleService Tests", () => {
     it("throws NOT_FOUND when role does not exist", async () => {
       mockPrisma.customRole.findUnique.mockResolvedValue(null);
 
-      await expect(roleService.deleteRole("nonexistent-role")).rejects.toThrow(
-        "Role not found",
-      );
+      await expect(
+        roleService.deleteRole("nonexistent-role"),
+      ).rejects.toMatchObject({ code: "custom_role_not_found" });
     });
 
     it("throws PRECONDITION_FAILED when role is assigned to users", async () => {

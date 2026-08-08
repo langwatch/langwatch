@@ -254,6 +254,28 @@ export type OrgAuthVariables = {
 };
 
 /**
+ * A refusal from {@link createOrgAuthMiddleware} in its throwing mode.
+ *
+ * One class for the three auth refusals rather than one each, because the
+ * refusal descriptors in {@link resolveOrgPrincipal} are the single source of
+ * code, message and status for BOTH modes; a per-code subclass would be a
+ * second place for those to drift apart. Callers branch on `error.code`
+ * (`missing_credentials` / `invalid_credentials` / `organization_not_found`),
+ * which is the cross-boundary discriminant anyway (ADR-045).
+ */
+export class OrgAuthRefusedError extends HandledError {
+  constructor(refusal: AuthRefusal) {
+    super(refusal.code, refusal.message, {
+      httpStatus: refusal.status,
+      // A refusal is the credential's problem; anything 5xx reaching here is
+      // not, and must not be logged as routine customer noise.
+      fault: refusal.status >= 500 ? "platform" : "customer",
+    });
+    this.name = "OrgAuthRefusedError";
+  }
+}
+
+/**
  * Org-level Hono auth middleware for endpoints that operate at the
  * organization level (e.g. project CRUD). Only accepts API key tokens —
  * legacy project keys are rejected since they lack org context.
@@ -267,13 +289,26 @@ export type OrgAuthVariables = {
  * a family that emits the canonical envelope from its handlers must not
  * answer a flat body when the same request fails one layer earlier. Families
  * predating the envelope stay on `legacy` until they migrate deliberately.
+ *
+ * `refusals` picks WHO turns a refusal into a response. The default,
+ * `"respond"`, answers here in the family's `errorEnvelope`, unchanged for
+ * every existing consumer. `"throw"` raises the same refusal as a
+ * `HandledError` instead (`missing_credentials` / `invalid_credentials` /
+ * `organization_not_found`, via {@link OrgAuthRefusedError}) so a family whose
+ * error handler owns the response shape serialises auth refusals exactly like
+ * its domain errors. A database failure during auth is not a refusal and stays
+ * a plain error in throw mode: it rethrows as-is and degrades to the generic
+ * unknown response at the boundary (ADR-045), rather than being dressed up as
+ * handled.
  */
 export function createOrgAuthMiddleware({
   prisma,
   errorEnvelope = "legacy",
+  refusals = "respond",
 }: {
   prisma: PrismaClient;
   errorEnvelope?: ApiErrorEnvelope;
+  refusals?: "respond" | "throw";
 }): MiddlewareHandler {
   const resolver = TokenResolver.create(prisma);
   const orgLogger = createLogger("langwatch:api:org-auth");
@@ -289,6 +324,7 @@ export function createOrgAuthMiddleware({
     });
 
     if (!outcome.ok) {
+      if (refusals === "throw") raiseOrgAuthRefusal(outcome.refusal);
       return c.json(refusal(outcome.refusal), outcome.refusal.status as 401);
     }
 
@@ -318,7 +354,31 @@ type AuthRefusal = {
   code: string;
   legacyError: string;
   message: string;
+  /**
+   * Set when the refusal is an infrastructure failure rather than a credential
+   * problem. Only the throwing mode reads it: it rethrows the underlying error
+   * plain instead of minting a handled one. Carried as its own flag rather
+   * than inferred from `cause`, because a rejection whose value is `undefined`
+   * is still an infrastructure failure. The responding mode ignores both, so
+   * its bodies are unchanged by these fields existing.
+   */
+  isInfrastructureFailure?: boolean;
+  cause?: unknown;
 };
+
+/**
+ * Turns a refusal into the exception the throwing mode raises. An
+ * infrastructure failure is rethrown plain so it stays an unhandled 500, not a
+ * fake handled one; a non-Error rejection value is wrapped so the boundary
+ * still receives a stack.
+ */
+function raiseOrgAuthRefusal(refusal: AuthRefusal): never {
+  if (refusal.isInfrastructureFailure) {
+    if (refusal.cause instanceof Error) throw refusal.cause;
+    throw new Error(refusal.message, { cause: refusal.cause });
+  }
+  throw new OrgAuthRefusedError(refusal);
+}
 
 /**
  * The organization behind a credential, or the reason there isn't one.
@@ -369,6 +429,8 @@ async function resolveOrgPrincipal({
         code: "internal_error",
         legacyError: "Internal Server Error",
         message: "Authentication service error",
+        isInfrastructureFailure: true,
+        cause: error,
       },
     };
   }
