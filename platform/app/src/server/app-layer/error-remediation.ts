@@ -177,6 +177,22 @@ const registry = {
     docsPath: "/platform/scim",
   },
 
+  // ---- personal workspace reads ----
+  // Both are hit almost entirely by agents and CLIs, which have no UI to fall
+  // back on, so the tips have to name the key to swap in rather than restate
+  // the refusal.
+  personal_project_key_required: {
+    tips: [
+      "Send the API key from your own personal workspace; a shared or team workspace key names no single owner to report for",
+      "Every personal workspace carries its own API key on its settings page",
+    ],
+  },
+  personal_usage_key_mismatch: {
+    tips: [
+      "Send a key scoped to your own personal workspace; being allowed to view a workspace is not the same as it being yours",
+    ],
+  },
+
   // ---- evaluations ----
   evaluation_not_found: {
     tips: [

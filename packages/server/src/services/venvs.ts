@@ -75,20 +75,16 @@ const LANGEVALS_BASE_EXTRAS = [
 
 function resolveVenvSpecs(ctx: RuntimeContext): VenvSpec[] {
   const root = appRoot();
-  // Three evaluator families are opt-in. Two for weight: the PII detector
+  // Two evaluator families are opt-in, both for weight: the PII detector
   // brings a ~620MB spacy model and language detection ~95MB of language
-  // models. The deprecated legacy evaluators are opt-in for a different
-  // reason: they exist only so evaluations saved years ago keep running, and
-  // deprecated things should vanish rather than nag (most of their heavy
-  // dependencies are shared with the current ragas family anyway). The
-  // product tells anyone who reaches for one of these how to get it. Nothing
-  // about redaction depends on the PII toggle: LangWatch's own secret and
-  // PII redaction in the ingestion pipeline is not implemented with presidio.
+  // models. The product tells anyone who reaches for one of these how to get
+  // it. Nothing about redaction depends on the PII toggle: LangWatch's own
+  // secret and PII redaction in the ingestion pipeline is not implemented
+  // with presidio.
   const features = resolveEffectiveFeatures(ctx.envFile);
   const extras = [
     ...LANGEVALS_BASE_EXTRAS,
     ...(features.isLinguaEnabled ? ["lingua"] : []),
-    ...(features.isLegacyEvaluatorsEnabled ? ["legacy"] : []),
     ...(features.isPresidioEnabled ? ["presidio"] : []),
   ];
   // langevals is the only Python venv we build — nlpgo runs from the
@@ -101,8 +97,8 @@ function resolveVenvSpecs(ctx: RuntimeContext): VenvSpec[] {
       // langevals's evaluator routes (ROUGE Score, exact match, llm-as-judge,
       // etc.) live in subpackages declared as optional dependencies in
       // services/langevals/pyproject.toml: langevals-ragas, langevals-openai,
-      // langevals-langevals, langevals-azure, langevals-lingua,
-      // langevals-presidio, langevals-legacy. Each is a separate `langevals_*`
+      // langevals-langevals, langevals-azure, langevals-lingua and
+      // langevals-presidio. Each is a separate `langevals_*`
       // distribution; server.py auto-registers FastAPI routes for any
       // `langevals_*` package found via importlib.metadata.distributions().
       // Without any extras, only langevals + langevals-core get installed
@@ -110,7 +106,7 @@ function resolveVenvSpecs(ctx: RuntimeContext): VenvSpec[] {
       // evaluator request 404s, langwatch app's runEvaluation throws
       // `404 {"detail":"Not Found"}`, and the experiments workbench column
       // shows 'Internal error' for every row. So the base set always
-      // installs, and only the three opt-in members have to be asked for.
+      // installs, and only the two opt-in members have to be asked for.
       extras,
     },
   ];

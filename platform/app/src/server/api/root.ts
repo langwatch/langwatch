@@ -36,6 +36,7 @@ import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
 import { gatewayGuardrailsRouter } from "./routers/gatewayGuardrails";
 import { gatewaySpendEventsRouter } from "./routers/gatewaySpendEvents";
 import { gatewayUsageRouter } from "./routers/gatewayUsage";
+import { githubRouter } from "./routers/github";
 import { graphsRouter } from "./routers/graphs";
 import { groupRouter } from "./routers/group";
 import { homeRouter } from "./routers/home";
@@ -43,7 +44,6 @@ import { httpProxyRouter } from "./routers/httpProxy";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
 import { langyRouter } from "./routers/langy";
 import { langyEgressRouter } from "./routers/langyEgress";
-import { langyGithubRouter } from "./routers/langyGithub";
 import { licenseRouter } from "./routers/license";
 import { licenseEnforcementRouter } from "./routers/licenseEnforcement";
 import { limitsRouter } from "./routers/limits";
@@ -168,7 +168,7 @@ const coreRouters = {
   gatewayUsage: gatewayUsageRouter,
   gatewaySpendEvents: gatewaySpendEventsRouter,
   webhookEndpoints: webhookEndpointsRouter,
-  langyGithub: langyGithubRouter,
+  github: githubRouter,
   langyEgress: langyEgressRouter,
   langy: langyRouter,
 };

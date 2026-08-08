@@ -125,7 +125,10 @@ export const Resources = {
   // continues a turn (and forks, which creates one); `langy:update` renames;
   // `langy:delete` archives. Project-scoped, since conversations belong to a
   // project — except `langy:manage`, which also appears in the ORG role bag
-  // to gate the org-wide GitHub App connection.
+  // for the Langy surfaces an admin configures. The organization's GitHub
+  // connection is not one of them: it belongs to the organization, so
+  // `organization:manage` gates it
+  // (specs/integrations/github-connection.feature).
   //
   // Granted from MEMBER upward, and to org admins; VIEWER and EXTERNAL get
   // nothing. The permission grain is not what keeps Langy scarce — the
@@ -433,8 +436,9 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
     "organization:manage",
     "organization:delete",
     // Org admins get Langy at member level, and `langy:manage` additionally
-    // gates connecting the org-wide GitHub App, which grants Langy repository
-    // access for every project underneath. Manage implies the rest via the
+    // gates the org-tier Langy administration. Connecting GitHub is gated by
+    // `organization:manage` instead, because the connection is the
+    // organization's rather than Langy's. Manage implies the rest via the
     // hierarchy rule.
     "langy:view",
     "langy:manage",

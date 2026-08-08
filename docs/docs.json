@@ -961,14 +961,7 @@
               {
                 "group": "RAG Quality",
                 "pages": [
-                  "api-reference/evaluators/ragas-answer-correctness",
-                  "api-reference/evaluators/ragas-answer-relevancy",
-                  "api-reference/evaluators/ragas-context-precision",
-                  "api-reference/evaluators/ragas-context-recall",
-                  "api-reference/evaluators/ragas-context-relevancy",
-                  "api-reference/evaluators/ragas-context-utilization",
                   "api-reference/evaluators/ragas-faithfulness",
-                  "api-reference/evaluators/ragas-faithfulness-1",
                   "api-reference/evaluators/ragas-response-context-precision",
                   "api-reference/evaluators/ragas-response-context-recall",
                   "api-reference/evaluators/ragas-response-relevancy",
@@ -1119,6 +1112,14 @@
               "api-reference/agents/get-agents",
               "api-reference/agents/update-agents",
               "api-reference/agents/delete-agents"
+            ]
+          },
+          {
+            "group": "Coding Agents",
+            "pages": [
+              "api-reference/coding-agents/overview",
+              "api-reference/coding-agents/get-pull-request-coding-agent-usage",
+              "api-reference/coding-agents/list-coding-agent-session-events"
             ]
           },
           {
@@ -1482,7 +1483,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1786109835",
+      "source": "/ci/cache/busted/1786132622",
       "destination": "/"
     },
     {

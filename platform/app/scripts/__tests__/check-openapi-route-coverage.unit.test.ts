@@ -32,12 +32,10 @@ import {
   auditCoverage,
   collectRegisteredRoutes,
   documentedOperations,
-  type Exclusion,
   excludes,
   HANDLER_ROOTS,
   isEntryModule,
   type RegisteredRoute,
-  UNPUBLISHED,
 } from "../check-openapi-route-coverage";
 import {
   apiBasePathsOf,
@@ -46,6 +44,7 @@ import {
   joinRoutePath,
   serviceBasePathsOf,
 } from "../lib/hono-route-table";
+import { type Exclusion, UNPUBLISHED } from "../openapi-route-exclusions";
 
 const route = ({
   key,
@@ -520,7 +519,9 @@ const GENERATOR_PATH = resolve(
 const generatorSource = (): string => readFileSync(GENERATOR_PATH, "utf8");
 
 const appDerivedPrefixes = (source: string): string[] => {
-  const block = source.match(/APP_DERIVED_PREFIXES = \[([\s\S]*?)\n\];/)?.[1];
+  const block = source.match(
+    /APP_DERIVED_PREFIXES = \[([\s\S]*?)\n\](?: as const)?;/,
+  )?.[1];
   return [...(block ?? "").matchAll(/"([^"]+)"/g)].map((match) => match[1]!);
 };
 

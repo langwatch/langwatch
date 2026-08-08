@@ -349,7 +349,6 @@ describe("services/runtime", () => {
 			// gets the truth rather than the app's assume-available default.
 			expect(childEnv.LANGWATCH_ENABLE_PRESIDIO).toBe("false");
 			expect(childEnv.LANGWATCH_ENABLE_LINGUA).toBe("false");
-			expect(childEnv.LANGWATCH_ENABLE_LEGACY_EVALUATORS).toBe("false");
 		});
 	});
 

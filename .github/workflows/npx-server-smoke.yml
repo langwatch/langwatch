@@ -116,6 +116,20 @@ jobs:
       # baked in) — the env-var gate plus the binary-identity assertions
       # below (version match + stripped check) are what catch a regression.
 
+      # node-pty ships prebuilds only for darwin and win32, so on Linux its
+      # postinstall always falls back to `node-gyp rebuild`. Without node-gyp
+      # on PATH that rebuild runs pnpm's vendored copy, whose `gyp/gyp_main.py`
+      # is not executable — harmless while make just compiles, but the moment
+      # make decides the generated Makefile is stale it re-runs gyp_main.py as
+      # a command and the build dies with "Permission denied" / error 126.
+      # Whether it decides that depends on file mtimes, so the failure comes
+      # and goes with how the concurrent native builds happen to interleave
+      # over the shared ~/.cache/node-gyp headers. The published node-gyp
+      # ships the script executable, which removes the landmine entirely.
+      # sdk-javascript-ci.yml installs it for the same reason.
+      - name: Install node-gyp (for node-pty postinstall)
+        run: npm install -g node-gyp@12.3.0
+
       # Install ONLY tools that aren't predeps but the CLI needs to operate
       # (lsof for port-collision detection on linux). Postgres, redis,
       # clickhouse, uv, and goose all flow through their respective predeps,

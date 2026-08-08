@@ -7,12 +7,15 @@
  * config.
  *
  * This is the inverse of the install surface:
- *   - claude   → OTEL keys in ~/.claude/settings.json's `env`, plus the
- *                project-level pin in $CWD/.claude/settings.local.json
- *                (current directory only - other directories' pins are
- *                re-synced or removed by the next wrapper run there)
- *   - codex    → the [otel] + gateway marker blocks in ~/.codex/config.toml
- *                and the sibling langwatch profile file
+ *   - claude   → OTEL keys in ~/.claude/settings.json's `env`, the session
+ *                context hooks in the same file, plus the project-level pin in
+ *                $CWD/.claude/settings.local.json (current directory only -
+ *                other directories' pins are re-synced or removed by the next
+ *                wrapper run there)
+ *   - codex    → the [otel] + gateway marker blocks in ~/.codex/config.toml,
+ *                the sibling langwatch profile file, and the session context
+ *                hooks in ~/.codex/hooks.json
+ *   - opencode → the session context plugin file in the plugins directory
  *   - gemini / opencode → a scoped shell function under the tool's marker
  *                pair in the shell rc
  *   - the global gateway export block in the shell rc (init-shell / legacy)
@@ -40,7 +43,17 @@ import {
 	claudeProjectSettingsTarget,
 	removeAppEnvVars,
 } from "./app-settings";
+import {
+	hasOpencodeSessionContextPlugin,
+	opencodePluginTarget,
+	removeOpencodeSessionContextPlugin,
+} from "./opencode-plugin";
 import { telemetryEnvVarNames } from "./otel-env-block";
+import {
+	hasSessionContextHooks,
+	removeSessionContextHooks,
+	sessionContextHooksTarget,
+} from "./session-context-hooks";
 import {
 	type DetectedShell,
 	GATEWAY_RC_MARKERS,
@@ -96,6 +109,16 @@ export function scanTelemetryTargets(): TelemetryTarget[] {
 					? removeAppEnvVars(claudeTarget, keys)
 					: false,
 		});
+
+		// claude, the session context hook entries in the same settings file.
+		// Ownership here is unambiguous: an entry is ours only when the command
+		// it runs is ours, so a user's own SessionStart or Stop hooks in the
+		// same arrays are neither listed nor removed.
+		targets.push({
+			label: `claude session hooks (${claudeTarget.displayPath})`,
+			present: hasSessionContextHooks({ tool: "claude_code" }),
+			remove: () => removeSessionContextHooks({ tool: "claude_code" }),
+		});
 	}
 
 	// claude — the project-level pin the wrapper maintains in the working
@@ -135,6 +158,23 @@ export function scanTelemetryTargets(): TelemetryTarget[] {
 		label: `codex langwatch profile file (${tildify(codexProfile)})`,
 		present: codexProfileFileIsLangwatchOwned(codexProfile),
 		remove: () => removeCodexGatewayProfileFile(codexProfile),
+	});
+
+	// codex, the session context hook entries in its own hooks file. Same
+	// ownership rule as claude's: an entry is ours only when the command it
+	// runs is ours, so hooks the user wrote are neither listed nor removed.
+	targets.push({
+		label: `codex session hooks (${sessionContextHooksTarget("codex").displayPath})`,
+		present: hasSessionContextHooks({ tool: "codex" }),
+		remove: () => removeSessionContextHooks({ tool: "codex" }),
+	});
+
+	// opencode, the session context plugin file. Ownership is the marker on
+	// its first line, so a file somebody else put at that path is left alone.
+	targets.push({
+		label: `opencode session plugin (${opencodePluginTarget().displayPath})`,
+		present: hasOpencodeSessionContextPlugin(),
+		remove: () => removeOpencodeSessionContextPlugin(),
 	});
 
 	// shell rc files — the global gateway block + per-tool scoped functions.

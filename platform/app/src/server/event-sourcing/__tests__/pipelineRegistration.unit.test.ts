@@ -72,6 +72,19 @@ describe("PipelineRegistry.registerAll", () => {
         // against actually happens.
         expect(registeredPipelineNames()).toContain("blob_maintenance");
       });
+
+      /**
+       * The GitHub branch recheck moved off a per-replica `setTimeout` and onto
+       * this schedule. If the registration is ever dropped, the sweep stops
+       * running entirely and nothing else notices: pull requests opened after a
+       * session goes quiet simply never get linked, which looks like a mapping
+       * bug rather than a missing caller.
+       *
+       * @scenario "The recheck sweep runs once per fleet, not once per replica"
+       */
+      it("mounts the GitHub branch recheck and retention sweep", () => {
+        expect(registeredPipelineNames()).toContain("github_maintenance");
+      });
     });
   });
 });

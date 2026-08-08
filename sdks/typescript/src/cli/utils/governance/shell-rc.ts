@@ -43,6 +43,7 @@ import {
 	appSettingsTargetFor,
 	installAppEnv,
 } from "./app-settings";
+import { installSessionContextHooks } from "./session-context-hooks";
 import { type GovernanceConfig, saveConfig } from "./config";
 import { envForTool, type ToolEnv } from "./tool-env";
 
@@ -358,7 +359,15 @@ export async function maybeOfferIngestionShellRcPersist({
 
 	const appTarget = appSettingsTargetFor(tool);
 	if (appTarget) {
-		if (appEnvHasAllVars(appTarget, vars)) return;
+		if (appEnvHasAllVars(appTarget, vars)) {
+			// The exports are current, but the hooks may not be: they arrived
+			// after the env block, so a device that persisted earlier carries the
+			// block and none of them. Same file, same grant, so assert them here
+			// rather than leaving repository identity off every session that
+			// already said yes.
+			assertClaudeSessionContextHooks(tool);
+			return;
+		}
 		console.log();
 		const choice = await askPersistChoice(appTarget.displayPath, tool);
 		if (choice === "skip" || choice === "no") return;
@@ -373,6 +382,7 @@ export async function maybeOfferIngestionShellRcPersist({
 					`  ✓ Installed langwatch telemetry exports to ${appTarget.displayPath}`,
 				),
 			);
+			assertClaudeSessionContextHooks(tool);
 		} catch (err) {
 			console.log(
 				chalk.yellow(
@@ -478,6 +488,29 @@ export async function maybeOfferIngestionShellRcPersist({
 				`  ! Couldn't write to ${target}: ${(err as Error).message}`,
 			),
 		);
+	}
+}
+
+/**
+ * Assert the session context hooks for a tool whose telemetry exports live in
+ * its own settings file. Claude Code exports no repository identity over
+ * telemetry; the hooks are what report it, and they belong to the same "yes"
+ * that persisted the exports. Idempotent, and quiet unless it changed
+ * something. A hook write that fails is not worth failing the persist over:
+ * the exports it rides beside are already installed.
+ */
+function assertClaudeSessionContextHooks(tool: string): void {
+	if (tool !== "claude") return;
+	try {
+		const hooks = installSessionContextHooks({ tool: "claude_code" });
+		if (hooks.action === "unchanged") return;
+		console.log(
+			chalk.green(
+				`  ✓ Installed the hooks that report each session's repository and branch`,
+			),
+		);
+	} catch {
+		// Best-effort, the same way the telemetry refresh treats them.
 	}
 }
 

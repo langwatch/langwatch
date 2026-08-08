@@ -53,6 +53,13 @@ export default defineConfig({
     // suites that replay goose migrations rebuild rollup tables in place. A
     // file reading such a table while another replays sees it mid-swap.
     //
+    // That mid-swap read does not need this flag to happen: vitest starts the
+    // next file's fork before the previous file has finished, so an `afterAll`
+    // and the next `beforeAll` run at once even with one worker and files
+    // serial. Anything mutating shared schema takes its own cross-process lock
+    // rather than trusting file order; see withReplayLock in
+    // src/server/clickhouse/__tests__/migrationReplay.ts.
+    //
     // So parallelism is opt-in rather than impossible: set both
     // VITEST_INTEGRATION_PARALLEL and VITEST_ISOLATE_WORKER_REDIS (see
     // setupEnv.ts, which then gives each worker its own Redis database) and

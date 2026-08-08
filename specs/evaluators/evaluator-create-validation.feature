@@ -24,7 +24,6 @@ Feature: Creating an evaluator with an unknown type is recoverable
     When I create an evaluator with type "ragas/answer_relevancy"
     Then the failure's reason carries the accepted evaluator types as data
     And the accepted types include "ragas/response_relevancy"
-    And the accepted types include "legacy/ragas_answer_relevancy"
     And the rejected value is echoed back alongside them
 
   Scenario: The accepted types stay out of the prose message
