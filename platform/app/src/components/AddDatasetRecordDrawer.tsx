@@ -48,7 +48,11 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const createDatasetRecord = api.datasetRecord.create.useMutation();
   const editDataset = useDisclosure();
-  const { closeDrawer } = useDrawer();
+  // Leaving this drawer hands the reader back to whatever opened it, the
+  // trace they were reading say, rather than clearing the page. Opened with
+  // nothing underneath (a bulk selection, the end-of-queue hand-off), going
+  // back closes the drawer outright.
+  const { goBack } = useDrawer();
 
   // Selected Dataset ID - Local Storage
   const {
@@ -128,7 +132,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
    * Handle drawer close
    */
   const handleOnClose = () => {
-    closeDrawer();
+    goBack();
     reset();
   };
 
@@ -185,7 +189,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
           // that led here can finish itself off (the annotation queue clears
           // the marks it handed over).
           props.onSuccess?.();
-          closeDrawer();
+          goBack();
           toaster.create({
             title: "Succesfully added to dataset",
             description: (

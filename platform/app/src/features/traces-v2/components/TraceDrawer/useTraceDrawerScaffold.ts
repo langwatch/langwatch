@@ -1,5 +1,5 @@
 import { type RefObject, useCallback, useEffect, useMemo, useRef } from "react";
-import { useDrawer } from "~/hooks/useDrawer";
+import { getTopDrawer, useDrawer } from "~/hooks/useDrawer";
 import type {
   SpanTreeNode,
   TraceHeader,
@@ -42,14 +42,15 @@ interface TraceDrawerScaffold {
  * from `useDrawerStore` by the layout component.
  */
 export function useTraceDrawerScaffold(): TraceDrawerScaffold {
-  // `goBack` so closing the v2 drawer pops just our entry off the
-  // drawer stack — e.g. clicking ✕ from a trace opened via the
-  // scenarioRunDetail drawer restores that scenario drawer instead
-  // of nuking the whole drawer-state (which `closeDrawer` would do,
-  // also stripping the `span` and other shared params from the URL).
-  // `goBack` itself falls back to `closeDrawer` when the stack is at
-  // its root, so deep links still close cleanly.
-  const { goBack } = useDrawer();
+  // `goBack` so closing the drawer pops just our entry off the drawer
+  // stack, e.g. clicking the close button from a trace opened via the
+  // scenarioRunDetail drawer restores that scenario drawer instead of nuking
+  // the whole drawer-state (which `closeDrawer` would do, also stripping the
+  // `span` and other shared params from the URL). `goBack` itself falls back
+  // to `closeDrawer` when the stack is at its root, so deep links still close
+  // cleanly. `closeDrawer` is for when the stack no longer describes this
+  // drawer at all, see `closeDrawerNow`.
+  const { goBack, closeDrawer } = useDrawer();
 
   // The drawer store is the source of truth for `traceId` — see
   // `useTraceDrawerUrlHydrator` (mounted at the page level) for the
@@ -153,8 +154,14 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
     // matches the click flow's synchronous open. The URL push that
     // follows is just cleanup for deep-link / browser-history.
     useDrawerStore.getState().closeDrawer();
-    goBack();
-  }, [goBack, setMaximized, trpcUtils, traceId]);
+    // This drawer mounts from its own store, so it can be on screen while the
+    // shared drawer stack is describing something else entirely. Walking back
+    // through a stack that is not about this drawer is what re-opens a drawer
+    // the reader had already left; when the stack does not have us on top,
+    // closing is just a close.
+    if (getTopDrawer() === "traceV2Details") goBack();
+    else closeDrawer();
+  }, [goBack, closeDrawer, setMaximized, trpcUtils, traceId]);
 
   // Closing the drawer on an unsaved correction asks first: the drawer is the
   // only place that correction exists, so closing is the same as discarding it.
