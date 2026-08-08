@@ -13,7 +13,7 @@ import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TargetPicker, type TargetPickerProps } from "../TargetPicker";
 
-vi.mock("../ui/checkbox", () => ({
+vi.mock("../../ui/checkbox", () => ({
   Checkbox: ({
     checked,
     onCheckedChange,
