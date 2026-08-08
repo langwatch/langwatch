@@ -50,6 +50,25 @@ type Usage struct {
 	AudioSeconds float64 // STT: seconds of audio transcribed
 }
 
+// ReconcileCacheWrites raises CacheCreationTokens to at least
+// CacheCreation1hTokens, restoring the rule that the hour-long count is a
+// portion of the write total.
+//
+// The two can arrive from different sources. On the raw-forward lanes the
+// total comes from the normalized usage struct while the split is read off
+// the provider's own bytes, and the normalized struct reports no writes at
+// all there. An unreconciled pair bills those tokens twice: once inside
+// gen_ai.usage.input_tokens, because the emitter derives fresh input by
+// subtracting the write total, and again as an hour-long write at twice the
+// input rate. Every producer that sets CacheCreation1hTokens calls this
+// before handing the usage on.
+func (u Usage) ReconcileCacheWrites() Usage {
+	if u.CacheCreation1hTokens > u.CacheCreationTokens {
+		u.CacheCreationTokens = u.CacheCreation1hTokens
+	}
+	return u
+}
+
 // StreamIterator provides pull-based iteration over streaming response chunks.
 type StreamIterator interface {
 	// Next advances to the next chunk. Returns false when done or on error.

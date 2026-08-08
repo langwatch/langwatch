@@ -305,8 +305,12 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 			usage := extractUsage(resp)
 			// The normalized usage struct has one flat cache-write count, so
 			// the write's lifetime is only in the provider's own body. Read it
-			// back off the bytes we are about to return.
+			// back off the bytes we are about to return, then reconcile: this
+			// lane mixes the normalized struct's write total with a split read
+			// from the raw bytes, and on Anthropic-native responses the struct
+			// reports no writes at all.
 			usage.CacheCreation1hTokens = anthropicCacheCreation1h(rawBody)
+			usage = usage.ReconcileCacheWrites()
 			return &domain.Response{
 				Body:       rawBody,
 				StatusCode: http.StatusOK,
@@ -1818,6 +1822,10 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 				} else if it.usage.PromptTokens > 0 || it.usage.CompletionTokens > 0 {
 					it.usage.TotalTokens = it.usage.PromptTokens + it.usage.CompletionTokens
 				}
+				// The two cache-write counters merge independently across
+				// chunks, so keep the running usage obeying the rule that the
+				// hour-long count is a portion of the total.
+				it.usage = it.usage.ReconcileCacheWrites()
 			}
 		}
 		return true

@@ -77,6 +77,26 @@ Feature: AI Gateway — prompt-cache token telemetry and cache-aware cost
     Then the span records no hour-long cache write count
     And those writes are priced short-lived, as they were before
 
+  # The raw-forward lane returns the provider's bytes verbatim while taking its
+  # usage from the normalized struct, so the write total and the hour-long split
+  # arrive from two different sources and the normalized struct reports no
+  # writes at all. The span derives fresh input by subtracting the write total,
+  # so leaving the pair unreconciled bills the same tokens as fresh input and
+  # again as an hour-long write.
+
+  @bdd @gateway @cache-telemetry @unit
+  Scenario: An hour-long write count never exceeds the write total it is part of
+    Given a response whose hour-long writes are larger than the reported write total
+    When the usage is reconciled
+    Then the write total covers the hour-long writes
+
+  @bdd @gateway @cache-telemetry @unit
+  Scenario: An hour-long cache write is not also counted as fresh input
+    Given a lane that reports hour-long writes with no write total of its own
+    When the gateway completes the request
+    Then the span's input-token count excludes those written tokens
+    And they are recorded once, as an hour-long cache write
+
   # ==========================================================================
   # Making caching happen: provider defaults, no configuration required
   # ==========================================================================
