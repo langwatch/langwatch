@@ -249,7 +249,13 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
         duration: 5000,
         meta: { closable: true },
       });
+      return;
     }
+
+    // Everything else renders its registry copy, or the fallback headline. An
+    // autosave that reverts the form with no word at all reads as the change
+    // simply not sticking — the last-admin refusal used to land here silently.
+    showErrorToast({ error, fallbackTitle: "Couldn't update this team" });
   }
 
   const onSubmit: SubmitHandler<TeamFormData> = useDebouncedCallback(
