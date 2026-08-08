@@ -8,7 +8,14 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { AlertTriangle, Lightbulb, MessageSquare } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Fragment,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { Markdown } from "~/components/Markdown";
 import { TraceMediaStrip } from "~/components/traces/TraceMediaStrip";
 import { RedactedInline } from "~/components/ui/RedactedField";
@@ -544,6 +551,96 @@ function ThreadMessage({
   );
 }
 
+interface LedgerSegment {
+  id: string;
+  text: string;
+}
+
+/**
+ * The scannable few fields a separator carries, in reading order: duration,
+ * latency, cost, how many events the turn recorded, and how long ago it ran. A
+ * field the turn has nothing to say about is left out rather than shown as
+ * zero. The model abbreviation and the raw input→output token count read as
+ * cryptic here, and live in the trace header and metrics instead.
+ */
+function turnLedgerSegments(turn: TraceListItem): LedgerSegment[] {
+  const segments: LedgerSegment[] = [
+    { id: "duration", text: formatDuration(turn.durationMs) },
+  ];
+  if (turn.ttft != null && turn.ttft > 0) {
+    segments.push({ id: "ttft", text: `ttft ${formatDuration(turn.ttft)}` });
+  }
+  if ((turn.totalCost ?? 0) > 0) {
+    segments.push({ id: "cost", text: formatCost(turn.totalCost) });
+  }
+  // The count only: the legacy thread view also drew the vote an event
+  // carried, and the conversation's turn data has no event metrics for it.
+  const eventCount = turn.events.totalCount;
+  if (eventCount > 0) {
+    segments.push({
+      id: "events",
+      text: `${eventCount} ${eventCount === 1 ? "event" : "events"}`,
+    });
+  }
+  segments.push({ id: "age", text: formatRelativeTimeAgo(turn.timestamp) });
+  return segments;
+}
+
+function Sep() {
+  return (
+    <Text textStyle="2xs" color="fg.subtle">
+      ·
+    </Text>
+  );
+}
+
+/** Which turn this is, what it cost to run, and whether it failed. */
+function TurnLedger({
+  index,
+  turn,
+  isCurrent,
+}: {
+  index: number;
+  turn: TraceListItem;
+  isCurrent: boolean;
+}) {
+  return (
+    <HStack gap={1.5} flexShrink={0} flexWrap="wrap" justify="center">
+      <Text
+        textStyle="2xs"
+        color={isCurrent ? "blue.fg" : "fg.subtle"}
+        fontWeight="600"
+        textTransform="uppercase"
+        letterSpacing="0.06em"
+      >
+        Turn {index}
+      </Text>
+      {turnLedgerSegments(turn).map((segment) => (
+        <Fragment key={segment.id}>
+          <Sep />
+          <Text textStyle="2xs" color="fg.subtle">
+            {segment.text}
+          </Text>
+        </Fragment>
+      ))}
+      {turn.status === "error" && (
+        <>
+          <Sep />
+          <Text
+            textStyle="2xs"
+            color="red.fg"
+            fontWeight="600"
+            textTransform="uppercase"
+            letterSpacing="0.06em"
+          >
+            error
+          </Text>
+        </>
+      )}
+    </HStack>
+  );
+}
+
 const TurnSeparator: React.FC<{
   index: number;
   turn: TraceListItem;
@@ -567,24 +664,17 @@ const TurnSeparator: React.FC<{
   preferRailComposer,
   translation,
 }) => {
-  // Keep the separator to a scannable few fields: duration, latency, cost,
-  // relative time, error state. The model abbreviation and the raw
-  // input→output token count read as cryptic here (they live in the trace
-  // header / metrics), so they're intentionally left off.
-  const hasCost = (turn.totalCost ?? 0) > 0;
-  const isError = turn.status === "error";
-  // How many events the turn recorded. The count only: the legacy thread view
-  // also drew the vote an event carried, and the conversation's turn data has
-  // no event metrics to draw it from.
-  const eventCount = turn.events.totalCount;
-
-  const Sep = () => (
-    <Text textStyle="2xs" color="fg.subtle">
-      ·
-    </Text>
-  );
-
   const annotationsOnLeft = assistantSide === "left";
+  // Rendered in flow rather than in the floating cluster, and nothing at all
+  // when the turn carries no annotation, so an unannotated separator keeps the
+  // spacing it had.
+  const badges = (
+    <TurnAnnotationBadges
+      traceId={turn.traceId}
+      output={turn.output}
+      prefetchedItems={annotationItems}
+    />
+  );
   return (
     <Flex
       position="relative"
@@ -595,6 +685,7 @@ const TurnSeparator: React.FC<{
       role="group"
       _hover={{ "& > .turn-line": { bg: "border.emphasized" } }}
     >
+      {annotationsOnLeft && badges}
       <Box
         className="turn-line"
         height="1px"
@@ -602,63 +693,7 @@ const TurnSeparator: React.FC<{
         bg={isCurrent ? "blue.solid" : "border.muted"}
         transition="background 0.12s ease"
       />
-      <HStack gap={1.5} flexShrink={0} flexWrap="wrap" justify="center">
-        <Text
-          textStyle="2xs"
-          color={isCurrent ? "blue.fg" : "fg.subtle"}
-          fontWeight="600"
-          textTransform="uppercase"
-          letterSpacing="0.06em"
-        >
-          Turn {index}
-        </Text>
-        <Sep />
-        <Text textStyle="2xs" color="fg.subtle">
-          {formatDuration(turn.durationMs)}
-        </Text>
-        {turn.ttft != null && turn.ttft > 0 && (
-          <>
-            <Sep />
-            <Text textStyle="2xs" color="fg.subtle">
-              ttft {formatDuration(turn.ttft)}
-            </Text>
-          </>
-        )}
-        {hasCost && (
-          <>
-            <Sep />
-            <Text textStyle="2xs" color="fg.subtle">
-              {formatCost(turn.totalCost)}
-            </Text>
-          </>
-        )}
-        {eventCount > 0 && (
-          <>
-            <Sep />
-            <Text textStyle="2xs" color="fg.subtle">
-              {eventCount} {eventCount === 1 ? "event" : "events"}
-            </Text>
-          </>
-        )}
-        <Sep />
-        <Text textStyle="2xs" color="fg.subtle">
-          {formatRelativeTimeAgo(turn.timestamp)}
-        </Text>
-        {isError && (
-          <>
-            <Sep />
-            <Text
-              textStyle="2xs"
-              color="red.fg"
-              fontWeight="600"
-              textTransform="uppercase"
-              letterSpacing="0.06em"
-            >
-              error
-            </Text>
-          </>
-        )}
-      </HStack>
+      <TurnLedger index={index} turn={turn} isCurrent={isCurrent} />
       <Box
         className="turn-line"
         height="1px"
@@ -666,11 +701,14 @@ const TurnSeparator: React.FC<{
         bg={isCurrent ? "blue.solid" : "border.muted"}
         transition="background 0.12s ease"
       />
-      {/* Inline actions float over one end of the separator instead of
-          sitting in flow — the hidden hover chrome used to reserve ~180px of
-          width, stopping the divider line short of the edge. Absolutely
-          positioned, the lines now span the full width and the badge/actions
-          overlay the end (badges only when present, actions on hover). */}
+      {!annotationsOnLeft && badges}
+      {/* Hover actions float over one end of the separator instead of sitting
+          in flow — the hidden chrome used to reserve ~180px of width, stopping
+          the divider line short of the edge. Absolutely positioned, the lines
+          span the full width and the actions overlay the end while the pointer
+          is on the turn. The badges stay in flow: they are on screen the whole
+          time a turn carries an annotation, and overlaying them would cover
+          the ledger. */}
       <HStack
         position="absolute"
         top="50%"
@@ -679,11 +717,6 @@ const TurnSeparator: React.FC<{
         {...(annotationsOnLeft ? { left: 0 } : { right: 0 })}
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
       >
-        <TurnAnnotationBadges
-          traceId={turn.traceId}
-          output={turn.output}
-          prefetchedItems={annotationItems}
-        />
         <TurnActionRow
           traceId={turn.traceId}
           output={turn.output}

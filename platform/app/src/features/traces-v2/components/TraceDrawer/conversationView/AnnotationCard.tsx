@@ -37,9 +37,6 @@ export function AnnotationCard({
   isOwn,
   onEdit,
 }: AnnotationCardProps) {
-  const scores = resolveScores(annotation.scoreOptions, scoreNamesById);
-  const hasCorrection = !!annotation.expectedOutput;
-
   return (
     <Box
       role={isOwn ? "button" : undefined}
@@ -62,52 +59,7 @@ export function AnnotationCard({
       transition="background 0.12s ease"
     >
       <VStack align="stretch" gap={2}>
-        <HStack gap={2} align="start">
-          <UserAvatar
-            size="xs"
-            background="gray.solid"
-            color="white"
-            name={annotation.user?.name ?? annotation.email ?? "?"}
-            image={annotation.user?.image}
-          />
-          <VStack align="start" gap={0} flex={1} minWidth={0}>
-            {annotation.user?.name ? (
-              <Text textStyle="xs" fontWeight="600">
-                {annotation.user.name}
-              </Text>
-            ) : (
-              <ApiAuthor email={annotation.email} />
-            )}
-            <Text textStyle="2xs" color="fg.subtle">
-              {new Date(annotation.createdAt).toLocaleString()}
-            </Text>
-          </VStack>
-          <Spacer />
-          {annotation.isThumbsUp === true && (
-            <Icon
-              as={ThumbsUp}
-              boxSize={3.5}
-              color="green.fg"
-              aria-label="Thumbs up"
-            />
-          )}
-          {annotation.isThumbsUp === false && (
-            <Icon
-              as={ThumbsDown}
-              boxSize={3.5}
-              color="red.fg"
-              aria-label="Thumbs down"
-            />
-          )}
-          {isOwn && (
-            <Tooltip
-              content="Edit annotation"
-              positioning={{ placement: "top" }}
-            >
-              <Icon as={Pencil} boxSize={3} color="fg.muted" />
-            </Tooltip>
-          )}
-        </HStack>
+        <CardHeader annotation={annotation} isOwn={isOwn} />
 
         {annotation.comment && (
           <Text textStyle="xs" whiteSpace="pre-wrap">
@@ -115,65 +67,91 @@ export function AnnotationCard({
           </Text>
         )}
 
-        {scores.length > 0 && (
-          <HStack gap={2} wrap="wrap">
-            {scores.map((score) => (
-              <HStack
-                key={score.name}
-                gap={1}
-                paddingX={1.5}
-                paddingY={0.5}
-                borderRadius="sm"
-                borderWidth="1px"
-                borderColor="border.muted"
-                bg="bg.panel"
-              >
-                <Text textStyle="2xs" color="fg.muted" fontWeight="600">
-                  {score.name}
-                </Text>
-                <Text textStyle="2xs">{score.value}</Text>
-                {score.reason && (
-                  <Tooltip content={score.reason}>
-                    <Icon
-                      as={MessageCircle}
-                      boxSize={2.5}
-                      color="fg.muted"
-                      aria-label={`Reason for ${score.name}`}
-                    />
-                  </Tooltip>
-                )}
-              </HStack>
-            ))}
-          </HStack>
-        )}
+        <ScoreBadges
+          scores={resolveScores(annotation.scoreOptions, scoreNamesById)}
+        />
 
-        {hasCorrection && (
-          <VStack align="stretch" gap={1}>
-            <HStack gap={1}>
-              <Icon as={Lightbulb} boxSize={3} color="yellow.fg" />
-              <Text textStyle="2xs" color="fg.muted">
-                correction
-              </Text>
-            </HStack>
-            <Box
-              borderRadius="sm"
-              bg="bg.panel"
-              borderWidth="1px"
-              borderColor="border.muted"
-              paddingX={2}
-              paddingY={1.5}
-              fontSize="xs"
-              whiteSpace="pre-wrap"
-              maxHeight="160px"
-              overflowY="auto"
-            >
-              {annotation.expectedOutput}
-            </Box>
-          </VStack>
-        )}
+        <SuggestedCorrection expectedOutput={annotation.expectedOutput} />
       </VStack>
     </Box>
   );
+}
+
+/** Who left the annotation, how they rated it, and the way into editing it. */
+function CardHeader({
+  annotation,
+  isOwn,
+}: {
+  annotation: AnnotationByTrace;
+  isOwn: boolean;
+}) {
+  return (
+    <HStack gap={2} align="start">
+      <Author annotation={annotation} />
+      <Spacer />
+      <ThumbVerdict isThumbsUp={annotation.isThumbsUp} />
+      {isOwn && (
+        <Tooltip content="Edit annotation" positioning={{ placement: "top" }}>
+          <Icon as={Pencil} boxSize={3} color="fg.muted" />
+        </Tooltip>
+      )}
+    </HStack>
+  );
+}
+
+function Author({ annotation }: { annotation: AnnotationByTrace }) {
+  return (
+    <>
+      <UserAvatar
+        size="xs"
+        background="gray.solid"
+        color="white"
+        name={annotation.user?.name ?? annotation.email ?? "?"}
+        image={annotation.user?.image}
+      />
+      <VStack align="start" gap={0} flex={1} minWidth={0}>
+        {annotation.user?.name ? (
+          <Text textStyle="xs" fontWeight="600">
+            {annotation.user.name}
+          </Text>
+        ) : (
+          <ApiAuthor email={annotation.email} />
+        )}
+        <Text textStyle="2xs" color="fg.subtle">
+          {new Date(annotation.createdAt).toLocaleString()}
+        </Text>
+      </VStack>
+    </>
+  );
+}
+
+/** The thumb a reviewer gave the turn, and nothing at all when they gave none. */
+function ThumbVerdict({
+  isThumbsUp,
+}: {
+  isThumbsUp: AnnotationByTrace["isThumbsUp"];
+}) {
+  if (isThumbsUp === true) {
+    return (
+      <Icon
+        as={ThumbsUp}
+        boxSize={3.5}
+        color="green.fg"
+        aria-label="Thumbs up"
+      />
+    );
+  }
+  if (isThumbsUp === false) {
+    return (
+      <Icon
+        as={ThumbsDown}
+        boxSize={3.5}
+        color="red.fg"
+        aria-label="Thumbs down"
+      />
+    );
+  }
+  return null;
 }
 
 /**
@@ -202,6 +180,75 @@ function ApiAuthor({ email }: { email: string | null }) {
   );
 }
 
+/** Each score the annotation carries, with its reason a hover away. */
+function ScoreBadges({ scores }: { scores: ScoreEntry[] }) {
+  if (scores.length === 0) return null;
+  return (
+    <HStack gap={2} wrap="wrap">
+      {scores.map((score) => (
+        <HStack
+          key={score.name}
+          gap={1}
+          paddingX={1.5}
+          paddingY={0.5}
+          borderRadius="sm"
+          borderWidth="1px"
+          borderColor="border.muted"
+          bg="bg.panel"
+        >
+          <Text textStyle="2xs" color="fg.muted" fontWeight="600">
+            {score.name}
+          </Text>
+          <Text textStyle="2xs">{score.value}</Text>
+          {score.reason && (
+            <Tooltip content={score.reason}>
+              <Icon
+                as={MessageCircle}
+                boxSize={2.5}
+                color="fg.muted"
+                aria-label={`Reason for ${score.name}`}
+              />
+            </Tooltip>
+          )}
+        </HStack>
+      ))}
+    </HStack>
+  );
+}
+
+/** The output the reviewer said the turn should have produced. */
+function SuggestedCorrection({
+  expectedOutput,
+}: {
+  expectedOutput: string | null;
+}) {
+  if (!expectedOutput) return null;
+  return (
+    <VStack align="stretch" gap={1}>
+      <HStack gap={1}>
+        <Icon as={Lightbulb} boxSize={3} color="yellow.fg" />
+        <Text textStyle="2xs" color="fg.muted">
+          correction
+        </Text>
+      </HStack>
+      <Box
+        borderRadius="sm"
+        bg="bg.panel"
+        borderWidth="1px"
+        borderColor="border.muted"
+        paddingX={2}
+        paddingY={1.5}
+        fontSize="xs"
+        whiteSpace="pre-wrap"
+        maxHeight="160px"
+        overflowY="auto"
+      >
+        {expectedOutput}
+      </Box>
+    </VStack>
+  );
+}
+
 /**
  * Turn the stored `{scoreId: {value, reason}}` map into something readable.
  * Ids the project no longer has a name for are dropped rather than rendered
@@ -212,20 +259,26 @@ function resolveScores(
   scoreNamesById: Map<string, string>,
 ): ScoreEntry[] {
   if (!scoreOptions || typeof scoreOptions !== "object") return [];
-  const entries: ScoreEntry[] = [];
-  for (const [id, raw] of Object.entries(
-    scoreOptions as Record<string, unknown>,
-  )) {
-    const name = scoreNamesById.get(id);
-    if (!name || !raw || typeof raw !== "object") continue;
-    const score = raw as { value?: unknown; reason?: unknown };
-    const value = Array.isArray(score.value)
-      ? score.value.join(", ")
-      : String(score.value ?? "");
-    if (!value) continue;
-    entries.push({ name, value, reason: readReason(score.reason) });
-  }
-  return entries;
+  return Object.entries(scoreOptions as Record<string, unknown>)
+    .map(([id, raw]) => readScoreEntry({ name: scoreNamesById.get(id), raw }))
+    .filter((entry): entry is ScoreEntry => entry !== null);
+}
+
+/** One stored score, or nothing when it has no name or no value to show. */
+function readScoreEntry({
+  name,
+  raw,
+}: {
+  name: string | undefined;
+  raw: unknown;
+}): ScoreEntry | null {
+  if (!name || !raw || typeof raw !== "object") return null;
+  const score = raw as { value?: unknown; reason?: unknown };
+  const value = Array.isArray(score.value)
+    ? score.value.join(", ")
+    : String(score.value ?? "");
+  if (!value) return null;
+  return { name, value, reason: readReason(score.reason) };
 }
 
 function readReason(reason: unknown): string | null {

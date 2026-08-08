@@ -125,18 +125,11 @@ export function useAnnotationMutations({
 
   const save = (values: AnnotationDraftValues) => {
     if (!project?.id) return;
-    const cleanScores = Object.fromEntries(
-      Object.entries(values.scoreOptions).filter(([, v]) => {
-        if (v.value === "" || v.value == null) return false;
-        if (Array.isArray(v.value) && v.value.length === 0) return false;
-        return true;
-      }),
-    );
     const payload = {
       projectId: project.id,
       traceId,
       comment: values.comment,
-      scoreOptions: cleanScores,
+      scoreOptions: stripUnratedScores(values.scoreOptions),
       expectedOutput: mode === "suggest" ? values.expectedOutput : undefined,
     };
     const onSuccess = () => {
@@ -192,6 +185,21 @@ export function useAnnotationMutations({
   };
 }
 
+/**
+ * Only the score keys the reviewer actually rated. A key they opened and left
+ * blank is not a rating, and storing it would show up as an empty score on the
+ * annotation.
+ */
+function stripUnratedScores(scoreOptions: ScoreOptions): ScoreOptions {
+  return Object.fromEntries(
+    Object.entries(scoreOptions).filter(([, v]) => {
+      if (v.value === "" || v.value == null) return false;
+      if (Array.isArray(v.value) && v.value.length === 0) return false;
+      return true;
+    }),
+  );
+}
+
 /** What a popover host tells the form about the turn it is annotating. */
 export interface PopoverAnnotationFormInput {
   traceId: string;
@@ -202,6 +210,34 @@ export interface PopoverAnnotationFormInput {
   annotationId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+/**
+ * What a form starts out holding. Editing an annotation reads its stored
+ * values; a new one starts blank, except that suggesting pre-fills the trace's
+ * current output so the reviewer corrects it in place.
+ */
+function seedDraftValues({
+  existing,
+  mode,
+  output,
+}: {
+  existing: TraceAnnotation | undefined;
+  mode: AnnotationMode;
+  output?: string | null;
+}): AnnotationDraftValues {
+  if (existing) {
+    return {
+      comment: existing.comment ?? "",
+      expectedOutput: existing.expectedOutput ?? "",
+      scoreOptions: (existing.scoreOptions as unknown as ScoreOptions) ?? {},
+    };
+  }
+  return {
+    comment: "",
+    expectedOutput: mode === "suggest" ? (output ?? "") : "",
+    scoreOptions: {},
+  };
 }
 
 /**
@@ -224,20 +260,17 @@ export function usePopoverAnnotationForm(
   const [expectedOutput, setExpectedOutput] = useState("");
   const [scoreOptions, setScoreOptions] = useState<ScoreOptions>({});
 
-  // Seed local form state when the popover opens. Edit-mode reads from the
-  // existing annotation; new-mode pre-fills suggest with the trace's
-  // current output so the user edits in place.
+  // Seed local form state when the popover opens.
   useEffect(() => {
     if (!props.open) return;
-    if (isEdit && existing) {
-      setComment(existing.comment ?? "");
-      setExpectedOutput(existing.expectedOutput ?? "");
-      setScoreOptions((existing.scoreOptions as unknown as ScoreOptions) ?? {});
-    } else {
-      setComment("");
-      setExpectedOutput(props.mode === "suggest" ? (props.output ?? "") : "");
-      setScoreOptions({});
-    }
+    const seed = seedDraftValues({
+      existing: isEdit ? existing : undefined,
+      mode: props.mode,
+      output: props.output,
+    });
+    setComment(seed.comment);
+    setExpectedOutput(seed.expectedOutput);
+    setScoreOptions(seed.scoreOptions);
   }, [props.open, isEdit, existing, props.mode, props.output]);
 
   return {
@@ -498,6 +531,42 @@ export interface ScoreChipProps {
   onChange: (value: string | string[], reason?: string) => void;
 }
 
+/** How a rating reads on the chip itself, or nothing when there is none. */
+function describeScoreValue(
+  value: string | string[] | undefined,
+): string | null {
+  if (value == null || value === "") return null;
+  if (!Array.isArray(value)) return String(value);
+  const [first] = value;
+  if (first === undefined) return null;
+  return value.length === 1 ? first : `${value.length} selected`;
+}
+
+/**
+ * The rating that picking an option leaves behind. A multi-value key collects
+ * a set, so picking toggles membership; a single-value key holds one option,
+ * so picking the one already held clears it.
+ */
+function nextScoreValue({
+  current,
+  optValue,
+  isMulti,
+}: {
+  current: string | string[] | undefined;
+  optValue: string;
+  isMulti: boolean;
+}): string | string[] {
+  if (!isMulti) return optValue === current ? "" : optValue;
+  const selected = Array.isArray(current)
+    ? current
+    : current
+      ? [String(current)]
+      : [];
+  return selected.includes(optValue)
+    ? selected.filter((v) => v !== optValue)
+    : [...selected, optValue];
+}
+
 /**
  * One score key as a chip + popover picker. Multi-value (CHECKBOX) keys
  * collect a set; single-value keys are toggle buttons. Optional reason
@@ -521,34 +590,15 @@ export function ScoreChip({
     if (open) setDraftReason(reason);
   }, [open, reason]);
 
-  const display = useMemo(() => {
-    if (value == null || value === "") return null;
-    if (Array.isArray(value)) {
-      if (value.length === 0) return null;
-      return value.length === 1 ? value[0] : `${value.length} selected`;
-    }
-    return String(value);
-  }, [value]);
+  const display = useMemo(() => describeScoreValue(value), [value]);
 
   const toggle = (optValue: string) => {
-    if (isMulti) {
-      const current = Array.isArray(value)
-        ? value
-        : value
-          ? [String(value)]
-          : [];
-      const next = current.includes(optValue)
-        ? current.filter((v) => v !== optValue)
-        : [...current, optValue];
-      onChange(next, draftReason);
-    } else {
-      const next = optValue === value ? "" : optValue;
-      onChange(next, draftReason);
-      // Single-select keys close the popover on pick — there's nothing
-      // more to do unless the user wants to add a reason, which they can
-      // re-open the chip to add.
-      if (next !== "") setOpen(false);
-    }
+    const next = nextScoreValue({ current: value, optValue, isMulti });
+    onChange(next, draftReason);
+    // Single-select keys close the popover on pick: there is nothing more to
+    // do unless the reviewer wants to add a reason, which re-opening the chip
+    // gets them back to.
+    if (typeof next === "string" && next !== "") setOpen(false);
   };
 
   const isSelected = (optValue: string) => {
@@ -556,7 +606,7 @@ export function ScoreChip({
     return value === optValue;
   };
 
-  // Only fire onChange when the reason actually changed — saves a no-op
+  // Only fire onChange when the reason actually changed, which saves a no-op
   // mutation in the quick-rate path each time the popover closes.
   const commitReason = () => {
     if (draftReason !== reason) onChange(value ?? "", draftReason);
@@ -576,23 +626,7 @@ export function ScoreChip({
       unmountOnExit
       positioning={{ placement: "bottom-start" }}
     >
-      <Popover.Trigger asChild>
-        <Button
-          size="2xs"
-          variant={display ? "solid" : "outline"}
-          colorPalette={display ? "blue" : "gray"}
-          paddingX={2}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Text textStyle="2xs" fontWeight="500">
-            {name}
-            {display ? `: ${display}` : ""}
-          </Text>
-          {reason && (
-            <Icon as={MessageSquareText} boxSize={2.5} marginLeft={1} />
-          )}
-        </Button>
-      </Popover.Trigger>
+      <ScoreChipTrigger name={name} display={display} hasReason={!!reason} />
       <Popover.Content
         width="240px"
         bg="bg.panel/92"
@@ -605,30 +639,11 @@ export function ScoreChip({
                 {description}
               </Text>
             )}
-            <VStack align="stretch" gap={0.5}>
-              {options.map((opt) => {
-                const optValue = String(opt.value);
-                const selected = isSelected(optValue);
-                return (
-                  <Button
-                    key={optValue}
-                    size="xs"
-                    variant={selected ? "solid" : "ghost"}
-                    colorPalette={selected ? "blue" : "gray"}
-                    justifyContent="flex-start"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggle(optValue);
-                    }}
-                  >
-                    <Box width="14px">
-                      {selected && <Icon as={Check} boxSize={3} />}
-                    </Box>
-                    <Text textStyle="xs">{opt.label}</Text>
-                  </Button>
-                );
-              })}
-            </VStack>
+            <ScoreOptionList
+              options={options}
+              isSelected={isSelected}
+              onPick={toggle}
+            />
             <Box height="1px" bg="border.muted" />
             <Textarea
               size="sm"
@@ -657,6 +672,75 @@ export function ScoreChip({
         </Popover.Body>
       </Popover.Content>
     </Popover.Root>
+  );
+}
+
+/** The chip itself: the key's name, the rating on it, and whether it carries a reason. */
+function ScoreChipTrigger({
+  name,
+  display,
+  hasReason,
+}: {
+  name: string;
+  display: string | null;
+  hasReason: boolean;
+}) {
+  return (
+    <Popover.Trigger asChild>
+      <Button
+        size="2xs"
+        variant={display ? "solid" : "outline"}
+        colorPalette={display ? "blue" : "gray"}
+        paddingX={2}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Text textStyle="2xs" fontWeight="500">
+          {name}
+          {display ? `: ${display}` : ""}
+        </Text>
+        {hasReason && (
+          <Icon as={MessageSquareText} boxSize={2.5} marginLeft={1} />
+        )}
+      </Button>
+    </Popover.Trigger>
+  );
+}
+
+/** The key's options, with the ones the reviewer picked marked as chosen. */
+function ScoreOptionList({
+  options,
+  isSelected,
+  onPick,
+}: {
+  options: AnnotationScoreOption[];
+  isSelected: (optValue: string) => boolean;
+  onPick: (optValue: string) => void;
+}) {
+  return (
+    <VStack align="stretch" gap={0.5}>
+      {options.map((opt) => {
+        const optValue = String(opt.value);
+        const selected = isSelected(optValue);
+        return (
+          <Button
+            key={optValue}
+            size="xs"
+            variant={selected ? "solid" : "ghost"}
+            colorPalette={selected ? "blue" : "gray"}
+            justifyContent="flex-start"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPick(optValue);
+            }}
+          >
+            <Box width="14px">
+              {selected && <Icon as={Check} boxSize={3} />}
+            </Box>
+            <Text textStyle="xs">{opt.label}</Text>
+          </Button>
+        );
+      })}
+    </VStack>
   );
 }
 

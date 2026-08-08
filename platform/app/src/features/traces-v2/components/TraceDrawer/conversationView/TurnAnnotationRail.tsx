@@ -1,13 +1,12 @@
 import { Button, Icon, Text, VStack } from "@chakra-ui/react";
 import { Edit3 } from "lucide-react";
-import { useMemo } from "react";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
-import { api } from "~/utils/api";
 import { useAnnotationDraftStore } from "../../../stores/annotationDraftStore";
 import { AnnotationCard } from "./AnnotationCard";
 import { AnnotationEditorCard } from "./AnnotationEditorCard";
+import { useScoreNamesById } from "./useScoreNamesById";
 
 interface TurnAnnotationRailProps {
   traceId: string;
@@ -29,22 +28,11 @@ export function TurnAnnotationRail({
   output,
   annotations,
 }: TurnAnnotationRailProps) {
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { hasPermission } = useOrganizationTeamProject();
   const { data: session } = useRequiredSession();
   const draft = useAnnotationDraftStore((s) => s.draft);
   const openDraft = useAnnotationDraftStore((s) => s.openDraft);
-
-  // Every key the project has ever had, not just the active ones: a score
-  // left on a key that was since deactivated still has to read by name.
-  const scoreKeys = api.annotationScore.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id && hasPermission("annotations:view") },
-  );
-  const scoreNamesById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const key of scoreKeys.data ?? []) map.set(key.id, key.name);
-    return map;
-  }, [scoreKeys.data]);
+  const scoreNamesById = useScoreNamesById();
 
   const canManage = hasPermission("annotations:manage");
   const turnDraft = draft?.traceId === traceId ? draft : null;
@@ -101,28 +89,44 @@ export function TurnAnnotationRail({
       )}
 
       {canManage && !turnDraft && (
-        <Button
-          size="xs"
-          variant="ghost"
-          color="fg.muted"
-          justifyContent="flex-start"
-          gap={1.5}
-          paddingX={2}
-          // Visible on an empty rail so the column advertises what it is for,
-          // and out of the way once there are cards to read.
-          opacity={annotations.length === 0 ? 1 : 0}
-          _groupHover={{ opacity: 1 }}
-          _focusVisible={{ opacity: 1 }}
-          transition="opacity 120ms ease"
-          onClick={(e) => {
-            e.stopPropagation();
-            startAnnotation();
-          }}
-        >
-          <Icon as={Edit3} boxSize={3} />
-          <Text textStyle="2xs">Add annotation</Text>
-        </Button>
+        <AddAnnotationButton
+          isRailEmpty={annotations.length === 0}
+          onStart={startAnnotation}
+        />
       )}
     </VStack>
+  );
+}
+
+/** The rail's own way in, for readers who do not know the column is clickable. */
+function AddAnnotationButton({
+  isRailEmpty,
+  onStart,
+}: {
+  isRailEmpty: boolean;
+  onStart: () => void;
+}) {
+  return (
+    <Button
+      size="xs"
+      variant="ghost"
+      color="fg.muted"
+      justifyContent="flex-start"
+      gap={1.5}
+      paddingX={2}
+      // Visible on an empty rail so the column advertises what it is for,
+      // and out of the way once there are cards to read.
+      opacity={isRailEmpty ? 1 : 0}
+      _groupHover={{ opacity: 1 }}
+      _focusVisible={{ opacity: 1 }}
+      transition="opacity 120ms ease"
+      onClick={(e) => {
+        e.stopPropagation();
+        onStart();
+      }}
+    >
+      <Icon as={Edit3} boxSize={3} />
+      <Text textStyle="2xs">Add annotation</Text>
+    </Button>
   );
 }

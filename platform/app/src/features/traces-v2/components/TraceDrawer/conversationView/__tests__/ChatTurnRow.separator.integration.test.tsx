@@ -38,9 +38,13 @@ vi.mock("../../../../hooks/useTextTranslation", () => ({
   }),
 }));
 
+/**
+ * The badge stands in as an empty marker: the tests read the ledger's text, so
+ * anything with words of its own would show up in those assertions.
+ */
 vi.mock("../TurnAnnotations", () => ({
-  TurnActionRow: () => null,
-  TurnAnnotationBadges: () => null,
+  TurnActionRow: () => <div data-testid="turn-action-row" />,
+  TurnAnnotationBadges: () => <div data-testid="turn-annotation-badges" />,
 }));
 
 vi.mock("~/components/Markdown", () => ({
@@ -194,6 +198,30 @@ describe("ChatTurnRow separator ledger", () => {
     it("says nothing about events", () => {
       renderRow({ eventCount: 0 });
       expect(separatorText()).not.toMatch(/event/i);
+    });
+  });
+
+  describe("given a turn that carries an annotation", () => {
+    /** @scenario "The annotation badge takes its own room on the separator" */
+    it("puts the badge in the separator row rather than over it", () => {
+      renderRow();
+
+      const separator = screen.getByText("Turn 3").parentElement!.parentElement;
+
+      expect(screen.getByTestId("turn-annotation-badges").parentElement).toBe(
+        separator,
+      );
+    });
+
+    /** @scenario "The annotation badge takes its own room on the separator" */
+    it("keeps the hover actions floating over the end of the line", () => {
+      renderRow();
+
+      const separator = screen.getByText("Turn 3").parentElement!.parentElement;
+
+      expect(screen.getByTestId("turn-action-row").parentElement).not.toBe(
+        separator,
+      );
     });
   });
 });

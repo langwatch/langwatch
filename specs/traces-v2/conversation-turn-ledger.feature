@@ -73,6 +73,19 @@ Feature: Conversation turn ledger
       Given a conversation whose events have not arrived yet
       Then no turn claims to have recorded any
 
+  Rule: The annotation badge never covers the ledger
+
+    A turn that carries an annotation shows a count badge on its separator. The
+    hover actions may float over the end of the line, since they are only on
+    screen while the pointer is on the turn, but the badge is there the whole
+    time and takes its own room instead.
+
+    @integration
+    Scenario: The annotation badge takes its own room on the separator
+      Given a turn that carries an annotation
+      Then its badge sits in the separator row rather than over it
+      And the hover actions still float over the end of the line
+
   Rule: A long inter-turn pause is surfaced as a gap divider
 
     A noticeable wall-clock gap since the previous turn finished is drawn as an

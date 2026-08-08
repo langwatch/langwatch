@@ -854,6 +854,43 @@ function rowEditingFor({
   };
 }
 
+/**
+ * What one row shows on top of its value: whether the viewer's restrict rules
+ * cover it, what a stored correction replaced there, and what it offers a
+ * reviewer who is correcting the span. Each comes from a resolver the section
+ * may not have been given, in which case the row carries none of that marker.
+ */
+function rowMarkersFor({
+  key,
+  isLeading,
+  restrictionFor,
+  correctionFor,
+  baselineFor,
+  editing,
+}: {
+  key: string;
+  isLeading: boolean;
+  restrictionFor?: (key: string) => AttributeRestriction | null;
+  correctionFor?: (key: string) => AttributeCorrection | null;
+  baselineFor?: (key: string) => unknown;
+  editing?: AttributeEditing;
+}): {
+  restriction: AttributeRestriction | null;
+  correction: AttributeCorrection | null;
+  editing: RowEditing | undefined;
+} {
+  return {
+    restriction: restrictionFor ? restrictionFor(key) : null,
+    correction: correctionFor && !isLeading ? correctionFor(key) : null,
+    editing: rowEditingFor({
+      editing,
+      key,
+      isLeading,
+      baseline: baselineFor ? baselineFor(key) : undefined,
+    }),
+  };
+}
+
 function AttrSection({
   title,
   attributes,
@@ -955,15 +992,13 @@ function AttrSection({
                 onTogglePin={() => togglePin({ source, key })}
                 labelWidth={labelWidth}
                 onLabelResize={onLabelResize}
-                restriction={restrictionFor ? restrictionFor(key) : null}
-                correction={
-                  correctionFor && !isLeading ? correctionFor(key) : null
-                }
-                editing={rowEditingFor({
-                  editing,
+                {...rowMarkersFor({
                   key,
                   isLeading,
-                  baseline: baselineFor ? baselineFor(key) : undefined,
+                  restrictionFor,
+                  correctionFor,
+                  baselineFor,
+                  editing,
                 })}
               />
             );

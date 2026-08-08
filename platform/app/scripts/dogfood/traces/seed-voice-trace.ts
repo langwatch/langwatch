@@ -32,10 +32,13 @@
  */
 
 import { randomBytes } from "node:crypto";
+import { constants } from "node:fs";
+import { access, mkdir } from "node:fs/promises";
 import { maybeExtractSpanMedia } from "~/server/app-layer/traces/edge-media-extraction";
 import { prisma } from "~/server/db";
 import type { RecordSpanCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { OtlpSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
+import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { wrapRawPcmToWav } from "~/shared/audio/pcmToWav";
 
 /** Raw pcm16 is mono 16-bit at 24 kHz — the rate the WAV wrapper writes. */
@@ -134,6 +137,26 @@ function voiceMessage({
   };
 }
 
+/**
+ * The audio is only worth seeding if its bytes can be written. On a local
+ * filesystem root that is the failure worth catching early: the default root
+ * belongs to root, so extraction dies several layers down with an mkdir error
+ * that names neither the setting to change nor the seed that asked for it.
+ */
+async function assertWritableStorageRoot(projectId: string) {
+  const destination = await resolveProjectStorageDestination(projectId);
+  if (destination.kind !== "file") return;
+
+  try {
+    await mkdir(destination.root, { recursive: true });
+    await access(destination.root, constants.W_OK);
+  } catch {
+    throw new Error(
+      `storage root ${destination.root} is not writable. Set LANGWATCH_LOCAL_STORAGE_PATH in platform/app/.env to a directory you own, then re-run. The app reads the same setting, so the seeded audio stays playable only while that directory does.`,
+    );
+  }
+}
+
 async function resolveProject(slug: string) {
   if (slug) {
     const project = await prisma.project.findFirst({
@@ -170,6 +193,7 @@ async function main() {
   }
 
   const project = await resolveProject(args.project);
+  await assertWritableStorageRoot(project.id);
   const apiKey = args.apiKey || project.apiKey;
   if (!apiKey) {
     throw new Error(`project ${project.slug} has no api key; pass --api-key`);
