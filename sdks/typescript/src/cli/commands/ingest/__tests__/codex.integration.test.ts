@@ -203,6 +203,89 @@ describe("ingest codex", () => {
 		});
 	});
 
+	describe("given LangWatch refuses the conversation", () => {
+		/** A reachable server that answers every upload with `status`. */
+		function refusingServer(status: number) {
+			return vi.spyOn(globalThis, "fetch").mockImplementation((async () =>
+				({ ok: false, status }) as any) as any);
+		}
+
+		describe("when the user backfills", () => {
+			/** @scenario "A conversation LangWatch rejects is not reported as recovered" */
+			it("reports the failure instead of a count of recovered turns", async () => {
+				refusingServer(500);
+				enableCapture("https://app.langwatch.test/api/otel");
+				writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mango");
+				const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+				const stderr = vi
+					.spyOn(process.stderr, "write")
+					.mockImplementation(() => true);
+				const exit = vi
+					.spyOn(process, "exit")
+					.mockImplementation((() => undefined) as never);
+
+				await ingestCodexCommand({ all: true });
+
+				expect(log).not.toHaveBeenCalledWith(
+					expect.stringContaining("Recovered"),
+				);
+				expect(stderr).toHaveBeenCalled();
+				expect(exit).toHaveBeenCalledWith(1);
+			});
+
+			/** @scenario "A rejected ingest key reads as an authentication problem" */
+			it("names the key and how to issue a new one when LangWatch refuses it", async () => {
+				refusingServer(401);
+				enableCapture("https://app.langwatch.test/api/otel");
+				writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mango");
+				const stderr = vi
+					.spyOn(process.stderr, "write")
+					.mockImplementation(() => true);
+				vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+
+				await ingestCodexCommand({ all: true });
+
+				const reported = stderr.mock.calls.map((c) => String(c[0])).join("");
+				expect(reported).toContain("ingest key");
+				expect(reported).toContain("langwatch ingest install codex");
+			});
+		});
+
+		describe("when codex runs the harvest after a completed turn", () => {
+			/** @scenario "A rejected turn still leaves the coding session alone" */
+			it("returns quietly, without throwing, exiting, or printing to the session", async () => {
+				refusingServer(401);
+				enableCapture("https://app.langwatch.test/api/otel");
+				writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mango");
+
+				const stdout = vi
+					.spyOn(process.stdout, "write")
+					.mockImplementation(() => true);
+				const stderr = vi
+					.spyOn(process.stderr, "write")
+					.mockImplementation(() => true);
+				const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+				const exit = vi
+					.spyOn(process, "exit")
+					.mockImplementation((() => undefined) as never);
+
+				await expect(
+					ingestCodexCommand({
+						notify: JSON.stringify({
+							type: "agent-turn-complete",
+							"thread-id": "thread-a",
+						}),
+					}),
+				).resolves.toBeUndefined();
+
+				expect(exit).not.toHaveBeenCalled();
+				expect(stdout).not.toHaveBeenCalled();
+				expect(stderr).not.toHaveBeenCalled();
+				expect(log).not.toHaveBeenCalled();
+			});
+		});
+	});
+
 	describe("given the config points somewhere the POST is refused", () => {
 		describe("when the user backfills", () => {
 			it("reports the failure, unlike the turn-completion path which must stay silent", async () => {

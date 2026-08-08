@@ -11,6 +11,11 @@ import {
 } from "@/cli/utils/governance/config";
 import { installOpencodeSessionContextPlugin } from "@/cli/utils/governance/opencode-plugin";
 import { installSessionContextHooks } from "@/cli/utils/governance/session-context-hooks";
+import {
+  CODEX_TURN_HARVEST_BLOCKED_MESSAGE,
+  type CodexTurnHarvestOutcome,
+  installCodexTurnHarvest,
+} from "@/cli/utils/governance/shell-rc";
 import { writeCodexOtelBlock } from "@/cli/utils/codex-config-toml";
 
 /**
@@ -22,7 +27,8 @@ import { writeCodexOtelBlock } from "@/cli/utils/codex-config-toml";
  * needs so the user pastes nothing manual.
  *
  * Tools handled today:
- *   - codex      : toml merge + env exports + the session context hooks
+ *   - codex      : toml merge + env exports + the turn harvest codex runs
+ *                  after a completed turn + the session context hooks
  *                  merged into the codex hooks.json
  *   - claude_code: env exports + the session context hooks merged into
  *                  ~/.claude/settings.json
@@ -70,6 +76,12 @@ interface InstallReport {
   token_prefix: string;
   codex_config_action?: "created" | "updated" | "unchanged";
   codex_config_path?: string;
+  /**
+   * How codex was left with respect to running the harvest after a completed
+   * turn, which is the only thing that recovers the conversation its telemetry
+   * carries none of.
+   */
+  codex_turn_harvest_action?: CodexTurnHarvestOutcome["status"];
   /**
    * How the tool's session context seam was left: the hook entries for
    * claude_code and codex, the plugin file for opencode.
@@ -176,6 +188,14 @@ async function runInstall(
     );
     report.codex_config_action = result.action;
     report.codex_config_path = result.path;
+
+    // Codex exports no conversation, so telemetry alone leaves this install
+    // with traces nobody can read. Running this command IS the consent for the
+    // program codex then runs after each turn, which is what makes capture
+    // reachable from a script with no terminal to answer a prompt.
+    report.codex_turn_harvest_action = installCodexTurnHarvest({
+      filePath: options.codexConfigPath,
+    }).status;
   }
 
   // Every agent knows which repository, branch and worktree a session runs in
@@ -301,6 +321,16 @@ function renderHumanReport(report: InstallReport): void {
           : "already up to date";
     process.stdout.write(
       `${chalk.green("✓")} ${report.codex_config_path} ${verb2}\n`,
+    );
+  }
+
+  if (report.codex_turn_harvest_action === "installed") {
+    process.stdout.write(
+      `${chalk.green("✓")} Codex will record each turn's conversation as it completes\n`,
+    );
+  } else if (report.codex_turn_harvest_action === "blocked") {
+    process.stdout.write(
+      `${chalk.yellow("!")} ${CODEX_TURN_HARVEST_BLOCKED_MESSAGE}\n`,
     );
   }
 

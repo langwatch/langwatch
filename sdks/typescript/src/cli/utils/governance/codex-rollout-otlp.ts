@@ -9,6 +9,7 @@ import { createHash } from "node:crypto";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { GovernanceCliError } from "./cli-api";
 import { type CodexTurnIO, parseCodexRollout } from "./codex-rollout";
 
 /** Deterministic 16-hex span id derived from the turn's trace_id. */
@@ -253,9 +254,36 @@ async function readRolloutTurns(
 }
 
 /**
+ * A refusal from the ingest endpoint, named so the caller can act on it.
+ *
+ * The key codex posts with lives in its config file and is the normal thing to
+ * go stale, so a refusal of the key reads as a key problem rather than as a
+ * status code the reader has to look up.
+ */
+function ingestRefusal(status: number): GovernanceCliError {
+  if (status === 401 || status === 403) {
+    return new GovernanceCliError(
+      status,
+      "ingest_key_rejected",
+      "LangWatch refused the ingest key codex is configured with. Run `langwatch ingest install codex` to issue a new one.",
+    );
+  }
+  return new GovernanceCliError(
+    status,
+    "ingest_rejected",
+    `LangWatch did not accept the conversation (HTTP ${status}).`,
+  );
+}
+
+/**
  * POST a batch of turns as OTLP IO spans. Capped at 5s so a slow or unreachable
- * endpoint can't wedge the user's shell; the caller swallows failures (content
- * recovery must never break a coding session).
+ * endpoint can't wedge the user's shell.
+ *
+ * A refused upload throws, the same as an unreachable one: a response that
+ * arrived is not the same as content that landed, and the turn-completion path
+ * runs after every turn of every session, so "the key expired" would otherwise
+ * read as success forever. Each caller decides what to do with the throw: the
+ * turn-completion path swallows it, the backfill reports it.
  */
 async function postCodexTurns(args: {
   turns: CodexTurnIO[];
@@ -269,8 +297,9 @@ async function postCodexTurns(args: {
   const doFetch = fetchImpl ?? fetch;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5_000);
+  let response: Response;
   try {
-    await doFetch(endpoint, {
+    response = await doFetch(endpoint, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -282,13 +311,14 @@ async function postCodexTurns(args: {
   } finally {
     clearTimeout(timeout);
   }
+  if (!response.ok) throw ingestRefusal(response.status);
 }
 
 /**
  * Recover codex turn I/O from rollouts written during this session and POST it
- * as OTLP spans. Best-effort and fully swallowed: a coding session must never
- * fail because the post-hoc content harvest hit a snag. Returns the number of
- * turns emitted (0 when nothing was found).
+ * as OTLP spans. Returns the number of turns emitted (0 when nothing was
+ * found), and rejects when the upload did not land, so a caller that reports a
+ * count is only ever reporting content the server took.
  */
 export async function harvestAndEmitCodexIO(args: {
   sinceMs: number;

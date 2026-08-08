@@ -29,6 +29,7 @@ import {
 	defaultCodexConfigPath,
 	displayCodexConfigPath,
 } from "@/cli/utils/codex-config-toml";
+import { GovernanceCliError } from "@/cli/utils/governance/cli-api";
 import {
 	harvestAndEmitCodexIO,
 	harvestCodexThread,
@@ -174,7 +175,10 @@ async function runBackfillMode(options: IngestCodexOptions): Promise<void> {
 	try {
 		turns = await harvestAndEmitCodexIO({ sinceMs, nowMs, ...target });
 	} catch (err) {
-		process.stderr.write(`Error: ${(err as Error).message}\n`);
+		// Reaching the server is not the same as landing the content: a refused
+		// upload arrives here too, and is reported rather than counted.
+		const msg = err instanceof GovernanceCliError ? err.message : String(err);
+		process.stderr.write(`Error: ${msg}\n`);
 		process.exit(1);
 		return;
 	}
