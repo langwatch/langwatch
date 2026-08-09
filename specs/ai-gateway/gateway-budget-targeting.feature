@@ -209,15 +209,15 @@ Feature: Gateway budget targeting
   # ────────────────────────────────────────────────────────────────────────────
   #
   # Which team and project a request belongs to used to be read entirely
-  # from where its traces land. That answers a different question, and for
-  # a key that is not scoped to exactly one project it lands on the
-  # organization's governance project. A team-scoped key therefore reported
-  # the governance team, and a budget on the team that owns the key matched
+  # from where its traces land. That answers a different question: a key
+  # shared across a team lands its traces in the organization's governance
+  # inbox unless somebody names a project, so a team-scoped key reported the
+  # governance team, and a budget on the team that owns the key matched
   # nothing while both sides looked correctly configured.
 
   @unit
   Scenario: A key belongs to the teams it is scoped to
-    Given a key scoped to team "platform" with no trace project of its own
+    Given a key scoped to team "platform" whose traces land in another team's project
     When the key's attribution scopes are resolved
     Then they include team "platform"
     And they still include the team its traces land in
