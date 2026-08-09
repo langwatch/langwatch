@@ -30,7 +30,7 @@ const listParams = {
 };
 
 describe("TraceListService.getList position window", () => {
-  describe("when a page is requested whose rows sit past the window", () => {
+  describe("given a page whose rows sit past the window", () => {
     /** @scenario "A position read past the window is refused" */
     it("refuses the read without touching the repository, naming the window", async () => {
       const findAll = vi.fn();
@@ -48,7 +48,7 @@ describe("TraceListService.getList position window", () => {
     });
   });
 
-  describe("when the same depth arrives with a cursor", () => {
+  describe("given the same depth carried by a cursor", () => {
     it("reads it, because keyset depth costs nothing", async () => {
       const findAll = vi
         .fn()
@@ -67,7 +67,7 @@ describe("TraceListService.getList position window", () => {
     });
   });
 
-  describe("when the requested page's last row is exactly the window's edge", () => {
+  describe("given a page whose last row is exactly the window's edge", () => {
     it("still reads it", async () => {
       const findAll = vi
         .fn()
