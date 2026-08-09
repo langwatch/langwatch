@@ -19,9 +19,8 @@ Once, immediately before the deploy that carries the retention sweep. Running it
 first is deliberate:
 
 - The purge does the bulk work with `ctid` batches, which need no index. The
-  migration in the same PR then builds a partial index on
-  `("dispatchedAt") WHERE status='dispatched'` over a near-empty heap instead of
-  over two million dead rows, so the index build is fast and its lock is short.
+  index builds in step 5 then run over a near-empty heap instead of over two
+  million dead rows, so they finish in seconds instead of minutes.
 - The sweep's first tick after deploy then has only the interim backlog to
   drain, which its bounded batches handle comfortably.
 
@@ -90,7 +89,7 @@ leaves the rest of the backlog for the next run or for the sweep.
 
 The delete it issues is `ctid`-batched, which is what makes this work without an
 index: the subquery picks physical row locations off a sequential scan, so there
-is no dependency on the index the migration has not built yet.
+is no dependency on the indexes, which do not exist until step 5 builds them.
 
 ```sql
 WITH batch AS (
@@ -125,6 +124,49 @@ WHERE relname IN ('ProcessManagerOutbox', 'ProcessManagerInbox');
 ```
 
 `n_dead_tup` should be near zero after the vacuum.
+
+### 5. Build the sweep's indexes
+
+The sweep reaps by age across every process name, which neither table's
+existing indexes can answer: the outbox indexes lead on `status` or
+`processName`, and 99.98% of outbox rows are `dispatched`, so an age predicate
+without these indexes falls back to scanning. The sweep still works without
+them, just with sequential scans over tables it keeps bounded, so these builds
+are an optimisation, not a prerequisite.
+
+They are deliberately **not** in a Prisma migration. `prisma migrate deploy`
+runs a plain `CREATE INDEX`, which holds a `SHARE` lock that blocks every
+`INSERT` on these tables for the whole build, and these are the two
+highest-volume insert paths in the system. A timeout only caps the damage; it
+does not remove it. `CREATE INDEX CONCURRENTLY` builds without blocking
+writes, but cannot run inside the transaction Prisma applies migrations in,
+so it is an operator step:
+
+```sql
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "ProcessManagerOutbox_dispatchedAt_idx"
+  ON "ProcessManagerOutbox"("dispatchedAt")
+  WHERE "status" = 'dispatched';
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "ProcessManagerInbox_consumedAt_idx"
+  ON "ProcessManagerInbox"("consumedAt");
+```
+
+The outbox index is partial: restricted to `dispatched` rows it indexes
+exactly the reap set, instead of adding write amplification for every pending
+row on the hot insert path.
+
+If a `CONCURRENTLY` build fails or is interrupted, it leaves an `INVALID`
+index behind, and `IF NOT EXISTS` will then see it as present and skip it.
+Check for that before trusting a re-run:
+
+```sql
+SELECT c.relname
+FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+WHERE NOT i.indisvalid AND c.relname LIKE 'ProcessManager%';
+```
+
+Drop any invalid index it reports (`DROP INDEX "<name>";`) and run the build
+again.
 
 ## After the deploy
 

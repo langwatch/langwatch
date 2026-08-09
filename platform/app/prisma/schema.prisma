@@ -3492,9 +3492,12 @@ model ProcessManagerInbox {
 
   @@unique([processName, projectId, sourceEventKey])
   @@index([processName, projectId, processKey, consumedAt])
-  // The retention sweep reaps by age across every process name, so it can
-  // never bind the leading column of the index above.
-  @@index([consumedAt])
+  // Do not add an index on `consumedAt` here. The retention sweep can use one,
+  // but a deploy-time CREATE INDEX holds a SHARE lock that blocks INSERT on
+  // this table, the highest-volume write path in the system. The index is
+  // ops-managed instead: built with CREATE INDEX CONCURRENTLY, see
+  // dev/docs/runbooks/process-manager-table-purge.md. The sweep works without
+  // it on the bounded table it maintains.
 }
 
 enum ProcessManagerOutboxStatus {
@@ -3528,11 +3531,13 @@ model ProcessManagerOutbox {
   @@unique([processName, projectId, messageKey])
   @@index([processName, projectId, processKey, createdAt])
   @@index([status, nextAttemptAt, leasedUntil])
-  // Prisma cannot express a partial index. The migration creates this one
-  // under the same name but restricted to `status = 'dispatched'`, which is
-  // the only set the retention sweep reads and a small fraction of the writes
-  // this table takes. Keep the declaration for the indexed-column intent.
-  @@index([dispatchedAt])
+  // Do not add an index on `dispatchedAt` here. The retention sweep can use a
+  // partial one (WHERE status = 'dispatched'), but Prisma cannot express a
+  // partial index and a deploy-time CREATE INDEX holds a SHARE lock that
+  // blocks INSERT on this table, the highest-volume write path in the system.
+  // The index is ops-managed instead: built with CREATE INDEX CONCURRENTLY,
+  // see dev/docs/runbooks/process-manager-table-purge.md. The sweep works
+  // without it on the bounded table it maintains.
 }
 
 /// Per-project topic clustering run status (ADR-051): the rebuildable
