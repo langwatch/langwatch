@@ -142,7 +142,7 @@ holds the tables at their steady state: dispatched outbox rows older than 24
 hours, dead outbox rows older than 30 days, consumed inbox rows older than 7
 days. Watch these for the first 48 hours:
 
-- `process_manager_retention_swept_rows_total{table}` climbing every hour.
+- `process_manager_retention_swept_rows_total{family}` climbing every hour.
 - Row counts for both tables flat, rather than resuming their previous slope.
 - The oldest **pending** outbox row's age unchanged. The sweep must never touch
   pending work; if that age starts climbing, the sweep is deleting rows it

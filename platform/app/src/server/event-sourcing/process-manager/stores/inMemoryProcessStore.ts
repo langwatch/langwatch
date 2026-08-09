@@ -68,7 +68,8 @@ function isRequeueTarget(
  */
 export class InMemoryProcessStore implements ProcessStore {
   private readonly instances = new Map<string, PersistedProcessInstance>();
-  private readonly inbox = new Set<string>();
+  /** Inbox key to the epoch ms it was consumed at, which retention reaps by. */
+  private readonly inbox = new Map<string, number>();
   private readonly messages = new Map<string, StoredMessage>();
 
   async findByRef<State = unknown>(params: {
@@ -138,7 +139,7 @@ export class InMemoryProcessStore implements ProcessStore {
     }
 
     if (sourceEventId !== null) {
-      this.inbox.add(inboxKey({ ref, sourceEventId }));
+      this.inbox.set(inboxKey({ ref, sourceEventId }), commit.now);
     }
 
     return {
@@ -252,6 +253,63 @@ export class InMemoryProcessStore implements ProcessStore {
         message.dispatchedAt >= params.before
       )
         continue;
+      this.messages.delete(key);
+      deleted++;
+    }
+    return deleted;
+  }
+
+  async deleteDispatchedOutboxBatch(params: {
+    before: number;
+    limit: number;
+  }): Promise<number> {
+    return this.deleteOutboxBatch(
+      params,
+      (message) =>
+        message.status === "dispatched" &&
+        message.dispatchedAt !== null &&
+        message.dispatchedAt < params.before,
+    );
+  }
+
+  async deleteDeadOutboxBatch(params: {
+    before: number;
+    limit: number;
+  }): Promise<number> {
+    // The durable store reaps dead rows by `updatedAt`, stamped by the
+    // markFailed that retired them. This twin has no updatedAt column, and
+    // `nextAttemptAt` is what that same call sets, so it stands in for it.
+    return this.deleteOutboxBatch(
+      params,
+      (message) =>
+        message.status === "dead" && message.nextAttemptAt < params.before,
+    );
+  }
+
+  async deleteConsumedInboxBatch(params: {
+    before: number;
+    limit: number;
+  }): Promise<number> {
+    if (params.limit <= 0) return 0;
+    let deleted = 0;
+    for (const [key, consumedAt] of this.inbox) {
+      if (deleted >= params.limit) break;
+      if (consumedAt >= params.before) continue;
+      this.inbox.delete(key);
+      deleted++;
+    }
+    return deleted;
+  }
+
+  private deleteOutboxBatch(
+    params: { limit: number },
+    matches: (message: StoredMessage) => boolean,
+  ): number {
+    if (params.limit <= 0) return 0;
+    let deleted = 0;
+    for (const [key, message] of this.messages) {
+      if (deleted >= params.limit) break;
+      if (!matches(message)) continue;
       this.messages.delete(key);
       deleted++;
     }

@@ -137,6 +137,7 @@ import { createGovernanceEventsPipeline } from "./pipelines/governance-events/pi
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
 import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
 import { createLangyMaintenancePipeline } from "./pipelines/langy-maintenance/pipeline";
+import { createProcessManagerMaintenancePipeline } from "./pipelines/process-manager-maintenance/pipeline";
 import { resolveLogCommandShardCount as resolveCanonicalLogCommandShardCount } from "./pipelines/log-processing/canonicalLog";
 import { createLogProcessingPipeline } from "./pipelines/log-processing/pipeline";
 import { CanonicalLogAppendStore } from "./pipelines/log-processing/projections/stores";
@@ -454,6 +455,27 @@ export class PipelineRegistry {
           sweep: () => blobSweeper.sweep(),
           deleteDispatchedBefore: (params) =>
             this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
+    // Retention for the process-manager substrate's own tables. Registered
+    // unconditionally and independently of any domain: it reaps by predicate
+    // across every processName, so no process manager has to opt in and none
+    // added later can be forgotten.
+    this.deps.eventSourcing.register(
+      createProcessManagerMaintenancePipeline({
+        retentionSweep: {
+          deleteDispatchedOutboxBatch: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedOutboxBatch(
+              params,
+            ),
+          deleteDeadOutboxBatch: (params) =>
+            this.deps.repositories.processStore.deleteDeadOutboxBatch(params),
+          deleteConsumedInboxBatch: (params) =>
+            this.deps.repositories.processStore.deleteConsumedInboxBatch(
+              params,
+            ),
         },
       }),
     );

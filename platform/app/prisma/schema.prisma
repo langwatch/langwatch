@@ -3486,6 +3486,9 @@ model ProcessManagerInbox {
 
   @@unique([processName, projectId, sourceEventKey])
   @@index([processName, projectId, processKey, consumedAt])
+  // The retention sweep reaps by age across every process name, so it can
+  // never bind the leading column of the index above.
+  @@index([consumedAt])
 }
 
 enum ProcessManagerOutboxStatus {
@@ -3519,6 +3522,11 @@ model ProcessManagerOutbox {
   @@unique([processName, projectId, messageKey])
   @@index([processName, projectId, processKey, createdAt])
   @@index([status, nextAttemptAt, leasedUntil])
+  // Prisma cannot express a partial index. The migration creates this one
+  // under the same name but restricted to `status = 'dispatched'`, which is
+  // the only set the retention sweep reads and a small fraction of the writes
+  // this table takes. Keep the declaration for the indexed-column intent.
+  @@index([dispatchedAt])
 }
 
 /// Per-project topic clustering run status (ADR-051): the rebuildable

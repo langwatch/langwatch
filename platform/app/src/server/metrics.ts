@@ -814,6 +814,28 @@ export const observeEsProcessManagerDuration = ({
 }) =>
   esProcessManagerDuration.labels(processName, inputKind).observe(durationMs);
 
+// Retention sweep over the process-manager substrate's own tables. Labelled by
+// FAMILY rather than by table because two of the three families (dispatched and
+// dead outbox rows) share one table but carry very different windows, and the
+// question an operator asks is "is the reap keeping up with dispatched rows",
+// not "how much did the outbox table shrink".
+//
+// No process_name label: the sweep reaps by predicate across every process, so
+// a per-process breakdown would be a cardinality cost with no reader.
+register.removeSingleMetric("process_manager_retention_swept_rows_total");
+const processManagerRetentionSweptRows = new Counter({
+  name: "process_manager_retention_swept_rows_total",
+  help: "Rows deleted by the process-manager retention sweep",
+  labelNames: ["family"] as const,
+});
+
+export const incrementProcessManagerRetentionSweptRows = (
+  family: "dispatched_outbox" | "dead_outbox" | "inbox",
+  rows: number,
+) => {
+  if (rows > 0) processManagerRetentionSweptRows.labels(family).inc(rows);
+};
+
 register.removeSingleMetric("es_process_outbox_total");
 const esProcessOutboxTotal = new Counter({
   name: "es_process_outbox_total",
