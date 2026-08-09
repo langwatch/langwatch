@@ -24,6 +24,9 @@ const FIELD_LABELS: Record<string, string> = {
 /** Between the parts of what a comment is about, in the order a reader reads them. */
 const SEPARATOR = " · ";
 
+/** As much of an id as a reader needs to match it against what is on screen. */
+const shortId = (id: string): string => id.slice(0, 8);
+
 /**
  * What a comment is about, in words. Null when it is about the trace as a
  * whole, which is what a card with nothing named on it means.
@@ -38,6 +41,7 @@ export function describeAnnotationAnchor({
   traceId,
   spanName,
   selfLabel = "Trace",
+  withIds = false,
 }: {
   anchor: AnnotationAnchorRef;
   /** The trace the comment is on, which tells its own fields from a span's. */
@@ -50,20 +54,57 @@ export function describeAnnotationAnchor({
    * "Output", because "Trace · Output" repeats the turn it is sitting next to.
    */
   selfLabel?: string | null;
+  /**
+   * Name the trace and the span by id as well, and say "<name> span" rather
+   * than "Span <name>". For a line that leaves the product, a dataset row or an
+   * export, where the reader has no waterfall in front of them and a name alone
+   * is ambiguous the moment two spans share it. On screen it is noise: the
+   * reader is already looking at the trace the comment is on.
+   */
+  withIds?: boolean;
 }): string | null {
   const { anchorKind, anchorId, anchorPath } = anchor;
   if (!anchorKind || !anchorId) return null;
 
   if (anchorKind === "message") return "Message";
 
-  const isTraceItself = anchorId === traceId;
-  const owner = isTraceItself ? selfLabel : `Span ${spanName ?? anchorId}`;
+  const owner = describeAnchorOwner({
+    anchorId,
+    traceId,
+    spanName,
+    selfLabel,
+    withIds,
+  });
 
   if (anchorKind === "span") return owner;
 
   const path = describeFieldPath(anchorPath);
   if (!owner) return path;
   return path ? `${owner}${SEPARATOR}${path}` : owner;
+}
+
+/** Whose field the comment is on: the trace itself, or one of its spans. */
+function describeAnchorOwner({
+  anchorId,
+  traceId,
+  spanName,
+  selfLabel,
+  withIds,
+}: {
+  anchorId: string;
+  traceId: string;
+  spanName?: string | null;
+  selfLabel: string | null;
+  withIds: boolean;
+}): string | null {
+  if (anchorId === traceId) {
+    if (!selfLabel) return null;
+    return withIds ? `${selfLabel} (${shortId(traceId)})` : selfLabel;
+  }
+  if (!withIds) return `Span ${spanName ?? anchorId}`;
+  return spanName
+    ? `${spanName} span (${shortId(anchorId)})`
+    : `span (${shortId(anchorId)})`;
 }
 
 /**

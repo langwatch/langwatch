@@ -229,10 +229,41 @@ const readableScoreParts = ({
 };
 
 /**
+ * What a comment is about, named for a reader who is not looking at the trace:
+ * `web_search span (0af31b2c) · Output`, `Trace (95bf974e) · Output`. Null when
+ * it is about the trace as a whole. */
+const readableAnnotationPart = ({
+  annotation,
+  traceId,
+  spanNamesById,
+}: {
+  annotation: TraceAnnotation;
+  traceId: string;
+  spanNamesById?: Map<string, string | null | undefined>;
+}): string | null => {
+  const anchor: AnnotationAnchorRef = {
+    anchorKind: annotation.anchorKind as AnnotationAnchorRef["anchorKind"],
+    anchorId: annotation.anchorId,
+    anchorPath: annotation.anchorPath,
+  };
+  return describeAnnotationAnchor({
+    anchor,
+    traceId,
+    spanName: annotation.anchorId
+      ? spanNamesById?.get(annotation.anchorId)
+      : undefined,
+    withIds: true,
+  });
+};
+
+/** Who left the comment: their name, their email if they have no name, "Unknown" if neither. */
+const readableAnnotationAuthor = (annotation: TraceAnnotation): string =>
+  oneLine(annotation.user?.name ?? annotation.email ?? "") || "Unknown";
+
+/**
  * Who left the comment and what it is about: `Ada`, or
- * `Ada (on Span web_search · Output)` when they left it on a part of the trace.
- * Someone with no account name reads by their email, and by "Unknown" when we
- * have neither.
+ * `Ada (on web_search span (0af31b2c) · Output)` when they left it on a part of
+ * the trace.
  */
 const readableAnnotationHead = ({
   annotation,
@@ -243,21 +274,8 @@ const readableAnnotationHead = ({
   traceId: string;
   spanNamesById?: Map<string, string | null | undefined>;
 }): string => {
-  const anchor: AnnotationAnchorRef = {
-    anchorKind: annotation.anchorKind as AnnotationAnchorRef["anchorKind"],
-    anchorId: annotation.anchorId,
-    anchorPath: annotation.anchorPath,
-  };
-  const part = describeAnnotationAnchor({
-    anchor,
-    traceId,
-    spanName: annotation.anchorId
-      ? spanNamesById?.get(annotation.anchorId)
-      : undefined,
-  });
-
-  const author =
-    oneLine(annotation.user?.name ?? annotation.email ?? "") || "Unknown";
+  const part = readableAnnotationPart({ annotation, traceId, spanNamesById });
+  const author = readableAnnotationAuthor(annotation);
   return part ? `${author} (on ${part})` : author;
 };
 
@@ -317,6 +335,86 @@ export function buildReadableAnnotation({
   }
 
   return parts.join(" ");
+}
+
+/**
+ * The scores a reviewer answered, keyed by the name the project gave each one
+ * rather than its id. A score they left blank is not an answer, so it is left
+ * out.
+ */
+const namedScoreOptions = ({
+  scoreOptions,
+  projectScores,
+}: {
+  scoreOptions: TraceAnnotation["scoreOptions"];
+  projectScores?: AnnotationScore[];
+}): Record<string, AnnotationScoreOption> => {
+  if (
+    typeof scoreOptions !== "object" ||
+    scoreOptions === null ||
+    Array.isArray(scoreOptions)
+  ) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(scoreOptions as Record<string, AnnotationScoreOption | null>)
+      .filter(([_, score]) => score && score.value !== null)
+      .map(([scoreId, score]) => [
+        projectScores?.find((option) => option.id === scoreId)?.name ?? scoreId,
+        score as AnnotationScoreOption,
+      ]),
+  );
+};
+
+/**
+ * One reviewer's annotation as a record, carrying the same things the single
+ * columns carry and under the same names: who wrote it, what part of the trace
+ * it is about, the comment, the rating, the scores by name and the suggestion.
+ *
+ * Only what the reviewer actually left is in it. A row that says
+ * `"is_thumbs_up": null, "expected_output": null` tells the reader nothing
+ * except that our schema has those columns, and an LLM judge reading the row
+ * has to spend attention deciding they mean nothing. Our storage shape stays
+ * out of it too: no ids of ours, no `email` field standing in for the author.
+ */
+export function buildAnnotationRecord({
+  annotation,
+  traceId,
+  spanNamesById,
+  scoreOptions,
+}: {
+  annotation: TraceAnnotation;
+  traceId: string;
+  spanNamesById?: Map<string, string | null | undefined>;
+  scoreOptions?: AnnotationScore[];
+}): Record<string, unknown> {
+  const part = readableAnnotationPart({ annotation, traceId, spanNamesById });
+  const comment = oneLine(annotation.comment ?? "");
+  const scores = namedScoreOptions({
+    scoreOptions: annotation.scoreOptions,
+    projectScores: scoreOptions,
+  });
+  const suggestion = oneLine(annotation.expectedOutput ?? "");
+  const suggestionKey =
+    suggestionLabel(annotation) === "suggested input"
+      ? "suggested_input"
+      : "expected_output";
+  const createdAt = new Date(annotation.createdAt);
+
+  return {
+    author: readableAnnotationAuthor(annotation),
+    ...(part ? { on: part } : {}),
+    ...(comment ? { comment } : {}),
+    ...(typeof annotation.isThumbsUp === "boolean"
+      ? { is_thumbs_up: annotation.isThumbsUp }
+      : {}),
+    ...(Object.keys(scores).length > 0 ? { score: scores } : {}),
+    ...(suggestion ? { [suggestionKey]: suggestion } : {}),
+    ...(Number.isNaN(createdAt.getTime())
+      ? {}
+      : { created_at: createdAt.toISOString() }),
+  };
 }
 
 export const TRACE_MAPPINGS = {
@@ -543,14 +641,40 @@ export const TRACE_MAPPINGS = {
       subkey: string,
       data: { annotationScoreOptions?: AnnotationScore[] },
     ) => {
-      if (!key) {
-        return trace.annotations ?? [];
-      }
+      const annotations = trace.annotations ?? [];
       const spanNamesById =
-        key === "ai_readable"
+        !key || key === "ai_readable"
           ? buildSpanNameIndex(trace.spans ?? [])
           : undefined;
-      return (trace.annotations ?? []).map((annotation) => {
+
+      if (!key) {
+        return annotations.map((annotation) =>
+          buildAnnotationRecord({
+            annotation,
+            traceId: trace.trace_id,
+            spanNamesById,
+            scoreOptions: data.annotationScoreOptions,
+          }),
+        );
+      }
+
+      // Everything a reviewer said about the trace, as one text rather than a
+      // list of them: the column exists to be read, and a reader handed
+      // `["Ada: too terse","Bo: fine"]` reads JSON before they read the review.
+      if (key === "ai_readable") {
+        return annotations
+          .map((annotation) =>
+            buildReadableAnnotation({
+              annotation,
+              traceId: trace.trace_id,
+              spanNamesById,
+              scoreOptions: data.annotationScoreOptions,
+            }),
+          )
+          .join("\n");
+      }
+
+      return annotations.map((annotation) => {
         if (
           subkey &&
           typeof annotation.scoreOptions === "object" &&
@@ -564,24 +688,11 @@ export const TRACE_MAPPINGS = {
           }
         }
         const scoreOptions = () =>
-          Object.fromEntries(
-            Object.entries(annotation.scoreOptions ?? {})
-              .map(([key, score]) => [
-                data.annotationScoreOptions?.find(
-                  (scoreOpt) => scoreOpt.id === key,
-                )?.name ?? key,
-                score,
-              ])
-              .filter(([_, scoreValue]) => scoreValue?.value !== null),
-          );
+          namedScoreOptions({
+            scoreOptions: annotation.scoreOptions,
+            projectScores: data.annotationScoreOptions,
+          });
         const keyMap = {
-          ai_readable: () =>
-            buildReadableAnnotation({
-              annotation,
-              traceId: trace.trace_id,
-              spanNamesById,
-              scoreOptions: data.annotationScoreOptions,
-            }),
           comment: () => annotation.comment,
           is_thumbs_up: () => annotation.isThumbsUp,
           author: () => annotation.user?.name ?? annotation.email ?? "",
@@ -1038,13 +1149,19 @@ export const mapTraceToDatasetEntry = (
             selectedFields,
           });
 
+          // An expanded trace holds exactly one of whatever it was expanded by,
+          // so a column that lists them holds one entry: take it out of the
+          // list. A column that already reads as one value, the annotations
+          // read as a single text, is that value; indexing it would take its
+          // first character.
           if (
             source_ &&
             "expandable_by" in source_ &&
             source_?.expandable_by &&
-            expansions.has(source_?.expandable_by)
+            expansions.has(source_?.expandable_by) &&
+            Array.isArray(value)
           ) {
-            value = value?.[0];
+            value = value[0];
           }
 
           return [

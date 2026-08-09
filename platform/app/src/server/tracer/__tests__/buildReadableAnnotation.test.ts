@@ -9,7 +9,9 @@ import {
   type TraceAnnotation,
 } from "../tracesMapping";
 
-const TRACE_ID = "trace-1";
+const TRACE_ID = "95bf974e4f330faa31ed1decdeb0a590";
+const SPAN_ID = "0af31b2c9d4e5f60";
+const MISSING_SPAN_ID = "20ce0bb38062fabc";
 
 /** A stored annotation, with only the parts a scenario cares about filled in. */
 const annotationWith = (fields: Partial<TraceAnnotation>): TraceAnnotation => ({
@@ -37,7 +39,7 @@ const GOODNESS: AnnotationScore = {
 } as AnnotationScore;
 
 const SPAN_NAMES = new Map<string, string | null | undefined>([
-  ["span-1", "web_search"],
+  [SPAN_ID, "web_search"],
 ]);
 
 describe("given an annotation left on part of a trace", () => {
@@ -49,14 +51,16 @@ describe("given an annotation left on part of a trace", () => {
           user: { name: "Ada" },
           comment: "too terse",
           anchorKind: "field",
-          anchorId: "span-1",
+          anchorId: SPAN_ID,
           anchorPath: "output",
         }),
         traceId: TRACE_ID,
         spanNamesById: SPAN_NAMES,
       });
 
-      expect(line).toBe("Ada (on Span web_search · Output): too terse");
+      expect(line).toBe(
+        "Ada (on web_search span (0af31b2c) · Output): too terse",
+      );
     });
 
     it("falls back to the span id when the trace does not carry that span", () => {
@@ -65,13 +69,13 @@ describe("given an annotation left on part of a trace", () => {
           user: { name: "Ada" },
           comment: "too terse",
           anchorKind: "span",
-          anchorId: "span-missing",
+          anchorId: MISSING_SPAN_ID,
         }),
         traceId: TRACE_ID,
         spanNamesById: SPAN_NAMES,
       });
 
-      expect(line).toBe("Ada (on Span span-missing): too terse");
+      expect(line).toBe("Ada (on span (20ce0bb3)): too terse");
     });
 
     /** @scenario "A comment left on a message reads as a message" */
@@ -88,6 +92,26 @@ describe("given an annotation left on part of a trace", () => {
       });
 
       expect(line).toBe("Ada (on Message): wrong tone");
+    });
+  });
+});
+
+describe("given an annotation left on the trace's own output", () => {
+  describe("when it is read into the ai_readable column", () => {
+    /** @scenario "A comment about the trace's own field names the trace by id" */
+    it("names the trace with enough id to find it again", () => {
+      const line = buildReadableAnnotation({
+        annotation: annotationWith({
+          user: { name: "Ada" },
+          comment: "it's ok",
+          anchorKind: "field",
+          anchorId: TRACE_ID,
+          anchorPath: "output",
+        }),
+        traceId: TRACE_ID,
+      });
+
+      expect(line).toBe("Ada (on Trace (95bf974e) · Output): it's ok");
     });
   });
 });
@@ -121,7 +145,7 @@ describe("given an annotation carrying everything a reviewer can leave", () => {
         },
         expectedOutput: "A fuller answer.",
         anchorKind: "field",
-        anchorId: "span-1",
+        anchorId: SPAN_ID,
         anchorPath: "output",
       }),
       traceId: TRACE_ID,
@@ -133,7 +157,7 @@ describe("given an annotation carrying everything a reviewer can leave", () => {
     /** @scenario "The readable annotation carries author, part, score and comment in one line" */
     it("carries the author, the part, the comment, the rating, the score and the suggestion", () => {
       expect(everything()).toBe(
-        "Ada (on Span web_search · Output): too terse [thumbs down] " +
+        "Ada (on web_search span (0af31b2c) · Output): too terse [thumbs down] " +
           "[goodness: mild, reason: not enough detail] " +
           "[suggested output: A fuller answer.]",
       );
@@ -166,7 +190,7 @@ describe("given an annotation suggesting what an input should have been", () => 
       });
 
       expect(line).toBe(
-        "Ada (on Trace · Input): the user asked something else " +
+        "Ada (on Trace (95bf974e) · Input): the user asked something else " +
           "[suggested input: what the user meant to ask]",
       );
     });
@@ -177,7 +201,7 @@ describe("given an annotation suggesting what an input should have been", () => 
           user: { name: "Ada" },
           expectedOutput: "capital of the Netherlands",
           anchorKind: "field",
-          anchorId: "span-1",
+          anchorId: SPAN_ID,
           anchorPath: "input",
         }),
         traceId: TRACE_ID,
@@ -185,7 +209,7 @@ describe("given an annotation suggesting what an input should have been", () => 
       });
 
       expect(line).toBe(
-        "Ada (on Span web_search · Input) " +
+        "Ada (on web_search span (0af31b2c) · Input) " +
           "[suggested input: capital of the Netherlands]",
       );
     });
@@ -196,7 +220,7 @@ describe("given an annotation suggesting what an input should have been", () => 
           user: { name: "Ada" },
           expectedOutput: "Amsterdam",
           anchorKind: "field",
-          anchorId: "span-1",
+          anchorId: SPAN_ID,
           anchorPath: "output",
         }),
         traceId: TRACE_ID,
@@ -204,7 +228,7 @@ describe("given an annotation suggesting what an input should have been", () => 
       });
 
       expect(line).toBe(
-        "Ada (on Span web_search · Output) [suggested output: Amsterdam]",
+        "Ada (on web_search span (0af31b2c) · Output) [suggested output: Amsterdam]",
       );
     });
   });

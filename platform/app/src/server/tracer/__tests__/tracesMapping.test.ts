@@ -325,14 +325,16 @@ describe("mapTraceToDatasetEntry span expansion", () => {
 
 describe("mapTraceToDatasetEntry annotations ai_readable column", () => {
   // See specs/datasets/dataset-annotations-mapping.feature.
+  const TRACE_ID = "95bf974e4f330faa31ed1decdeb0a590";
+  const SPAN_ID = "0af31b2c9d4e5f60";
   const reviewedTrace = {
-    trace_id: "trace-1",
+    trace_id: TRACE_ID,
     timestamps: { started_at: Date.now() },
-    spans: [{ span_id: "span-1", name: "web_search", type: "span" }],
+    spans: [{ span_id: SPAN_ID, name: "web_search", type: "span" }],
     annotations: [
       {
         id: "annotation-1",
-        traceId: "trace-1",
+        traceId: TRACE_ID,
         comment: "too terse",
         isThumbsUp: false,
         user: { name: "Ada" },
@@ -340,12 +342,12 @@ describe("mapTraceToDatasetEntry annotations ai_readable column", () => {
         scoreOptions: { "score-abc123": { value: "mild", reason: null } },
         expectedOutput: null,
         anchorKind: "field",
-        anchorId: "span-1",
+        anchorId: SPAN_ID,
         anchorPath: "output",
       },
       {
         id: "annotation-2",
-        traceId: "trace-1",
+        traceId: TRACE_ID,
         comment: "reads well",
         isThumbsUp: true,
         user: null,
@@ -365,7 +367,7 @@ describe("mapTraceToDatasetEntry annotations ai_readable column", () => {
 
   describe("when no expansion is enabled", () => {
     /** @scenario "Every annotation on the trace gets its own readable line" */
-    it("holds one readable line per annotation", () => {
+    it("holds one text with a line per annotation", () => {
       const rows = mapTraceToDatasetEntry(
         reviewedTrace as any,
         annotationsMapping,
@@ -374,10 +376,22 @@ describe("mapTraceToDatasetEntry annotations ai_readable column", () => {
       );
 
       expect(rows).toHaveLength(1);
-      expect(JSON.parse(rows[0]!.annotations as string)).toEqual([
-        "Ada (on Span web_search · Output): too terse [thumbs down] [goodness: mild]",
-        "grace@example.com: reads well [thumbs up]",
-      ]);
+      expect(rows[0]!.annotations).toBe(
+        "Ada (on web_search span (0af31b2c) · Output): too terse [thumbs down] [goodness: mild]\n" +
+          "grace@example.com: reads well [thumbs up]",
+      );
+    });
+
+    /** @scenario "Every annotation on the trace gets its own readable line" */
+    it("hands the reader the review rather than a list to parse", () => {
+      const rows = mapTraceToDatasetEntry(
+        reviewedTrace as any,
+        annotationsMapping,
+        new Set() as any,
+        projectScores,
+      );
+
+      expect(rows[0]!.annotations).not.toContain('["');
     });
   });
 
@@ -391,9 +405,112 @@ describe("mapTraceToDatasetEntry annotations ai_readable column", () => {
       );
 
       expect(rows.map((row) => row.annotations)).toEqual([
-        "Ada (on Span web_search · Output): too terse [thumbs down] [goodness: mild]",
+        "Ada (on web_search span (0af31b2c) · Output): too terse [thumbs down] [goodness: mild]",
         "grace@example.com: reads well [thumbs up]",
       ]);
+    });
+  });
+
+  describe("when the column takes the whole annotation", () => {
+    const wholeAnnotationMapping = {
+      annotations: { source: "annotations", key: "", subkey: "" },
+    };
+    const rowsFor = (annotation: Record<string, unknown>) =>
+      JSON.parse(
+        mapTraceToDatasetEntry(
+          { ...reviewedTrace, annotations: [annotation] } as any,
+          wholeAnnotationMapping,
+          new Set() as any,
+          projectScores,
+        )[0]!.annotations as string,
+      ) as Record<string, unknown>[];
+
+    const commentOnly = {
+      id: "annotation-1",
+      projectId: "project-1",
+      userId: "user-1",
+      traceId: TRACE_ID,
+      comment: "too terse",
+      isThumbsUp: null,
+      user: { name: "Ada" },
+      email: null,
+      scoreOptions: null,
+      expectedOutput: null,
+      createdAt: "2026-08-09T05:54:54.822Z",
+      anchorKind: "field",
+      anchorId: SPAN_ID,
+      anchorPath: "output",
+    };
+
+    /** @scenario "The whole annotation carries what the reviewer left and nothing else" */
+    it("carries the author, the part and the comment", () => {
+      expect(rowsFor(commentOnly)[0]).toMatchObject({
+        author: "Ada",
+        on: "web_search span (0af31b2c) · Output",
+        comment: "too terse",
+      });
+    });
+
+    /** @scenario "The whole annotation carries what the reviewer left and nothing else" */
+    it("carries no field for what the reviewer never left", () => {
+      const record = rowsFor(commentOnly)[0]!;
+
+      expect(record).not.toHaveProperty("is_thumbs_up");
+      expect(record).not.toHaveProperty("score");
+      expect(record).not.toHaveProperty("expected_output");
+      expect(Object.values(record)).not.toContain(null);
+    });
+
+    /** @scenario "The whole annotation reads in the same words as the single columns" */
+    it("names the rating, the scores and the suggestion the reviewer left", () => {
+      const record = rowsFor({
+        ...commentOnly,
+        isThumbsUp: false,
+        scoreOptions: { "score-abc123": { value: "mild", reason: "vague" } },
+        expectedOutput: "A fuller answer.",
+      })[0];
+
+      expect(record).toMatchObject({
+        is_thumbs_up: false,
+        score: { goodness: { value: "mild", reason: "vague" } },
+        expected_output: "A fuller answer.",
+      });
+    });
+
+    /** @scenario "The whole annotation reads in the same words as the single columns" */
+    it("carries none of our storage", () => {
+      const record = rowsFor({
+        ...commentOnly,
+        user: null,
+        email: "grace@example.com",
+      })[0]!;
+
+      expect(record.author).toBe("grace@example.com");
+      for (const ours of [
+        "id",
+        "projectId",
+        "userId",
+        "traceId",
+        "email",
+        "anchorKind",
+        "anchorId",
+        "anchorPath",
+      ]) {
+        expect(record).not.toHaveProperty(ours);
+      }
+    });
+
+    /** @scenario "A suggestion for an input is not read as the expected output" */
+    it("carries a suggestion for the input as a suggested input", () => {
+      const record = rowsFor({
+        ...commentOnly,
+        anchorId: TRACE_ID,
+        anchorPath: "input",
+        expectedOutput: "what the user meant to ask",
+      })[0]!;
+
+      expect(record.suggested_input).toBe("what the user meant to ask");
+      expect(record).not.toHaveProperty("expected_output");
     });
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { describeAnnotationAnchor } from "../annotationAnchorLabel";
 
-const TRACE_ID = "trace-1";
+const TRACE_ID = "95bf974e4f330faa31ed1decdeb0a590";
 
 function describe_({
   anchorKind,
@@ -9,18 +9,21 @@ function describe_({
   anchorPath,
   spanName,
   selfLabel,
+  withIds,
 }: {
   anchorKind: "span" | "field" | "message" | null;
   anchorId: string | null;
   anchorPath?: string | null;
   spanName?: string | null;
   selfLabel?: string | null;
+  withIds?: boolean;
 }) {
   return describeAnnotationAnchor({
     anchor: { anchorKind, anchorId, anchorPath: anchorPath ?? null },
     traceId: TRACE_ID,
     spanName,
     ...(selfLabel === undefined ? {} : { selfLabel }),
+    ...(withIds === undefined ? {} : { withIds }),
   });
 }
 
@@ -141,6 +144,57 @@ describe("describeAnnotationAnchor", () => {
           anchorPath: "text-3f-1a2b",
         }),
       ).toBe("Message");
+    });
+  });
+});
+
+describe("when the reader has no trace in front of them", () => {
+  describe("given a comment on a named span", () => {
+    it("names the span and enough of its id to match it against the waterfall", () => {
+      expect(
+        describe_({
+          anchorKind: "field",
+          anchorId: "0af31b2c9d4e5f60",
+          anchorPath: "output",
+          spanName: "web_search",
+          withIds: true,
+        }),
+      ).toBe("web_search span (0af31b2c) · Output");
+    });
+
+    it("says only the id when nobody named the span", () => {
+      expect(
+        describe_({
+          anchorKind: "span",
+          anchorId: "0af31b2c9d4e5f60",
+          withIds: true,
+        }),
+      ).toBe("span (0af31b2c)");
+    });
+  });
+
+  describe("given a comment on the trace's own field", () => {
+    it("names the trace by id too", () => {
+      expect(
+        describe_({
+          anchorKind: "field",
+          anchorId: TRACE_ID,
+          anchorPath: "output",
+          withIds: true,
+        }),
+      ).toBe("Trace (95bf974e) · Output");
+    });
+
+    it("still leaves the trace out for a caller already reading it", () => {
+      expect(
+        describe_({
+          anchorKind: "field",
+          anchorId: TRACE_ID,
+          anchorPath: "output",
+          selfLabel: null,
+          withIds: true,
+        }),
+      ).toBe("Output");
     });
   });
 });

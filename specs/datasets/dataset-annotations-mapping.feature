@@ -15,6 +15,16 @@ Feature: Annotations in a dataset mapping
   #
   # Everything after the author is left out when it does not exist, so a bare
   # comment on a trace reads as "Ada: too terse" and nothing else.
+  #
+  # The row leaves the product, so it names things for a reader with no trace on
+  # screen: a part reads "web_search span (0af31b2c)" or "Trace (95bf974e)",
+  # carrying enough id to match against the waterfall when two spans share a
+  # name. On screen the ids are noise and the chips stay as they are.
+  #
+  # Whatever the reviewer did not fill in is not in the row at all, in both the
+  # readable line and the whole-annotation column: a row that says
+  # "is_thumbs_up": null, "expected_output": null teaches the reader our schema
+  # and nothing about the review.
 
   Background:
     Given my project has traces that reviewers have commented on
@@ -33,7 +43,13 @@ Feature: Annotations in a dataset mapping
   Scenario: The readable annotation names the part of the trace it is about
     Given a comment left on the output of a span named "web_search"
     When that annotation is read into the ai_readable column
-    Then the column names the span and the field the comment was left on
+    Then the column names the span, its id and the field the comment was left on
+
+  @unit
+  Scenario: A comment about the trace's own field names the trace by id
+    Given a comment left on the output of a trace
+    When that annotation is read into the ai_readable column
+    Then the column names the trace with enough id to find it again
 
   @unit
   Scenario: A comment about the whole trace reads with no part named
@@ -79,7 +95,31 @@ Feature: Annotations in a dataset mapping
   Scenario: Every annotation on the trace gets its own readable line
     Given a trace two reviewers commented on
     When the trace is converted to dataset rows with an ai_readable column
-    Then the column holds one readable line per annotation
+    Then the column holds one text with a line per annotation, not a list of them
+
+  # ============================================================================
+  # The whole annotation, when the column takes all of it
+  # ============================================================================
+
+  @unit
+  Scenario: The whole annotation carries what the reviewer left and nothing else
+    Given a reviewer who left only a comment on a span
+    When the trace is converted to dataset rows with a whole-annotation column
+    Then the row carries the author, the part and the comment
+    And it carries no field for the rating, the scores or the suggestion they never left
+
+  @unit
+  Scenario: The whole annotation reads in the same words as the single columns
+    Given a reviewer who rated a trace, scored it and suggested a better output
+    When the trace is converted to dataset rows with a whole-annotation column
+    Then the row names the author, the rating, the scores by name and the suggestion
+    And it carries none of our storage: no ids of ours, and no email standing in for the author
+
+  @unit
+  Scenario: A suggestion for an input is not read as the expected output
+    Given a reviewer who suggested what the input should have been
+    When the trace is converted to dataset rows with a whole-annotation column
+    Then the row carries it as a suggested input, leaving the expected output alone
 
   # ============================================================================
   # What a new dataset is set up with

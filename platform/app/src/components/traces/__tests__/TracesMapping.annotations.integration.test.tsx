@@ -15,7 +15,8 @@ import type { DatasetRecordEntry } from "~/server/datasets/types";
 import type { MappingState } from "~/server/tracer/tracesMapping";
 import type { Trace } from "~/server/tracer/types";
 
-const TRACE_ID = "trace-1";
+const TRACE_ID = "95bf974e4f330faa31ed1decdeb0a590";
+const SPAN_ID = "0af31b2c9d4e5f60";
 
 const SPAN_ANCHORED_ANNOTATION = {
   id: "annotation-1",
@@ -27,7 +28,7 @@ const SPAN_ANCHORED_ANNOTATION = {
   scoreOptions: null,
   expectedOutput: null,
   anchorKind: "field",
-  anchorId: "span-1",
+  anchorId: SPAN_ID,
   anchorPath: "output",
 };
 
@@ -98,7 +99,7 @@ const REVIEWED_TRACE = {
   project_id: "project-1",
   metadata: {},
   timestamps: { started_at: 1, inserted_at: 1, updated_at: 1 },
-  spans: [{ span_id: "span-1", name: "web_search", type: "span" }],
+  spans: [{ span_id: SPAN_ID, name: "web_search", type: "span" }],
 } as unknown as Trace;
 
 function renderMapping({
@@ -148,7 +149,7 @@ describe("given a trace a reviewer commented on one span of", () => {
       await waitFor(() => {
         const rows = entries.at(-1);
         expect(rows?.[0]?.annotations).toContain(
-          "Ada (on Span web_search · Output): too terse [thumbs down]",
+          "Ada (on web_search span (0af31b2c) · Output): too terse [thumbs down]",
         );
       });
       expect(entries.at(-1)?.[0]?.annotations).toContain(
