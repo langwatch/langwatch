@@ -68,6 +68,7 @@ import { app as opsApp } from "./routes/ops";
 import { app as otelApp } from "./routes/otel";
 import { app as playgroundApp } from "./routes/playground";
 import { app as rumApp } from "./routes/rum";
+import { app as scenarioFanOutApp } from "./routes/scenario-fan-out";
 import { app as scenarioGenerateApp } from "./routes/scenario-generate";
 import { app as sseApp } from "./routes/sse";
 import { app as tracesLegacyApp } from "./routes/traces-legacy";
@@ -169,6 +170,7 @@ export function createApiRouter() {
   api.route("/", langyRelayApp);
   api.route("/", githubApp);
   api.route("/", scenarioGenerateApp);
+  api.route("/", scenarioFanOutApp);
   api.route("/", scimApp);
   api.route("/", webhooksApp);
 

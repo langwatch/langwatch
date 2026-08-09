@@ -4,10 +4,11 @@
 
 import { HStack, Spacer, Spinner, VStack } from "@chakra-ui/react";
 import type { Scenario } from "@prisma/client";
-import { Plus } from "lucide-react";
+import { Plus, Radar } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { BatchActionBar } from "~/components/scenarios/BatchActionBar";
+import { FanOutFlow } from "~/components/scenarios/fan-out/FanOutFlow";
 import { LabelFilterDropdown } from "~/components/scenarios/LabelFilterDropdown";
 import { ScenarioArchiveDialog } from "~/components/scenarios/ScenarioArchiveDialog";
 import { ScenarioCreateModal } from "~/components/scenarios/ScenarioCreateModal";
@@ -43,6 +44,8 @@ function ScenarioLibraryPage() {
   const [archiveTarget, setArchiveTarget] = useState<
     { type: "single"; scenario: Scenario } | { type: "batch" } | null
   >(null);
+
+  const [showFanOut, setShowFanOut] = useState(false);
 
   const utils = api.useContext();
 
@@ -168,6 +171,12 @@ function ScenarioLibraryPage() {
             activeLabels={activeLabels}
             onToggle={handleLabelToggle}
           />
+          <PageLayout.HeaderButton
+            variant="outline"
+            onClick={() => setShowFanOut(true)}
+          >
+            <Radar size={16} /> Find related failures
+          </PageLayout.HeaderButton>
           <PageLayout.HeaderButton onClick={handleNewScenario}>
             <Plus size={16} /> New Scenario
           </PageLayout.HeaderButton>
@@ -236,6 +245,7 @@ function ScenarioLibraryPage() {
         open={showCreateModal}
         onClose={handleCloseCreateModal}
       />
+      <FanOutFlow open={showFanOut} onClose={() => setShowFanOut(false)} />
       <ScenarioArchiveDialog
         open={archiveTarget !== null}
         onClose={handleCloseArchiveDialog}

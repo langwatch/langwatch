@@ -175,7 +175,7 @@ function violationOf(issue: ZodIssue): FieldViolation {
 }
 
 /** The request never parsed, so no schema ever ran. */
-class MalformedRequestError extends HandledError {
+export class MalformedRequestError extends HandledError {
   constructor(args: { target: keyof ValidationTargets; detail: string }) {
     super(
       "malformed_request",

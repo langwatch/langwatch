@@ -213,6 +213,22 @@ export class ScenarioRepository {
     });
   }
 
+  /**
+   * The fields a reader needs to judge a scenario without opening the editor:
+   * what it is called, the situation it sets up, and what it checks.
+   */
+  async findManyDetailsByIds(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<
+    { id: string; name: string; situation: string; criteria: string[] }[]
+  > {
+    return this.prisma.scenario.findMany({
+      where: { id: { in: input.ids }, projectId: input.projectId },
+      select: { id: true, name: true, situation: true, criteria: true },
+    });
+  }
+
   async update(
     id: string,
     projectId: string,

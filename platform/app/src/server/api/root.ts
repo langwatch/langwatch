@@ -30,6 +30,7 @@ import { evaluationsRouter } from "./routers/evaluations";
 import { evaluatorsRouter } from "./routers/evaluators";
 import { experimentsRouter } from "./routers/experiments";
 import { exportRouter } from "./routers/export";
+import { fanOutRouter } from "./routers/fan-out/fan-out.router";
 import { featureFlagRouter } from "./routers/featureFlag";
 import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
 import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
@@ -135,6 +136,7 @@ const coreRouters = {
   onboarding: onboardingRouter,
   scenarios: scenarioRouter,
   suites: suiteRouter,
+  fanOut: fanOutRouter,
   role: roleRouter,
   prompts: promptsRouter,
   promptTags: promptTagsRouter,
