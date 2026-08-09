@@ -100,6 +100,7 @@ Feature: Judge Quality Analysis
     And project "Project B" has annotations for the same evaluator
     When I open the "Judge Quality" tab
     Then I only see annotations from "Project A"
+    And Project B data does not affect the confusion matrix counts, coverage, or trend chart
 
   Scenario: Analysis compares judge score pass/fail against annotation thumbs up/down
     Given a trace where the judge classified the result as pass
