@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.4.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.3.0...typescript-sdk@v1.4.0) (2026-08-09)
+
+
+### Features
+
+* **agent-plugin:** first-class LangWatch plugin for Claude Code and Agent Plugins 1.0 ([#6747](https://github.com/langwatch/langwatch/issues/6747)) ([25625c4](https://github.com/langwatch/langwatch/commit/25625c44e53d6dd23d647e58fad9783464e8a1e2))
+* **cli:** keep the LangWatch Claude Code plugin up to date from every wrapped run ([#6751](https://github.com/langwatch/langwatch/issues/6751)) ([b64a584](https://github.com/langwatch/langwatch/commit/b64a58465e7d35fcc2ae6ba22d9d4ca54e66b7a4))
+* **codex:** capture the conversation for a plain codex, not just the wrapper ([#6433](https://github.com/langwatch/langwatch/issues/6433)) ([38931b4](https://github.com/langwatch/langwatch/commit/38931b4392837c4a011dbde44ec7b80c80b19720))
+* **governance:** copilot capture across three surfaces — CLI wrapper, app login agent, VS Code Chat (ADR-039) ([#5605](https://github.com/langwatch/langwatch/issues/5605)) ([fd6a3b3](https://github.com/langwatch/langwatch/commit/fd6a3b304176137433ad645d718ec1411097c60f))
+
+
+### Documentation
+
+* **sdk:** say which API key family the org-anchored services take ([#6757](https://github.com/langwatch/langwatch/issues/6757)) ([968d317](https://github.com/langwatch/langwatch/commit/968d3171553d8e98ae265359099bc00fe36934a5))
+
 ## [1.3.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.2.0...typescript-sdk@v1.3.0) (2026-08-08)
 
 

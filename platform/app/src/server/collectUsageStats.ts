@@ -40,6 +40,8 @@ export async function collectUsageStats({
     triggerCount,
     workflowCount,
   ] = await Promise.all([
+    // Every comment, whether it is about a whole trace or about one part of it:
+    // this counts the reviewing that happened, not what was said about traces.
     prisma.annotation.count({
       where: { projectId: { in: projectIds } },
     }),

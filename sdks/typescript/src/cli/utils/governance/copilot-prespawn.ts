@@ -33,6 +33,7 @@ import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { compareVersions } from "../compare-versions";
 import { lwTag } from "./brand";
 
 /** First copilot version whose OTel attribute set matches the extractor. */
@@ -124,17 +125,6 @@ export function parseCopilotVersion(raw: string | null): string | null {
   return match ? match[0] : null;
 }
 
-/** Simple semver-triple comparison: negative when a < b. */
-function compareVersions(a: string, b: string): number {
-  const pa = a.split(".").map(Number);
-  const pb = b.split(".").map(Number);
-  for (let i = 0; i < 3; i++) {
-    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
-    if (d !== 0) return d;
-  }
-  return 0;
-}
-
 /** Run `copilot --version` (2s cap). Null on any failure — never block. */
 function readInstalledVersion(): string | null {
   try {
@@ -173,7 +163,10 @@ export function copilotPrespawnWarnings(
   }
 
   const version = (opts.readVersionImpl ?? readInstalledVersion)();
-  if (version && compareVersions(version, COPILOT_MIN_OTEL_VERSION) < 0) {
+  if (
+    version &&
+    compareVersions({ version, against: COPILOT_MIN_OTEL_VERSION }) < 0
+  ) {
     warnings.push(
       `${lwTag()} copilot ${version} exports incomplete telemetry attributes; upgrade to ${COPILOT_MIN_OTEL_VERSION}+ (\`copilot update\`) for full capture.`,
     );

@@ -203,3 +203,9 @@ Rule: Plugin state is read defensively
     Given a marketplace of the same name published by somebody else, mentioning our repository in its notes
     When the plugin state is read
     Then the marketplace is not claimed as ours
+
+  @unit
+  Scenario: A source built to read like ours is not ours
+    Given a marketplace of the same name whose address is built to look like our repository
+    When the plugin state is read
+    Then the marketplace is not claimed as ours

@@ -90,6 +90,20 @@ const describeMissingModel = (error: HandledErrorShape): string =>
   ] ?? "Set the model where this endpoint expects it, then try again.";
 
 /**
+ * Reads a number out of `meta` without trusting it. `meta` crosses a wire,
+ * so a value that arrives as a string or NaN has to read as absent rather
+ * than reach a sentence as "NaN projects".
+ */
+const num = (
+  error: HandledErrorShape,
+  key: string,
+  fallback: number,
+): number => {
+  const value = error.meta[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+};
+
+/**
  * The two plan allowances an admin meets while reconciling seats, in words that
  * read inside a sentence. Not taken from the license-enforcement labels, which
  * are column headings ("Team Members") and land badly mid-sentence.
@@ -852,9 +866,24 @@ const presentations = {
       "Send an organization API key as Authorization: Bearer <api-key>.",
   },
   invalid_credentials: {
+    // Deliberately says nothing about which credential class the route
+    // wanted. A key of the wrong class gets `credential_class_mismatch` and
+    // is told so exactly; naming a class here as well would send everyone
+    // holding a typo or a revoked key to swap a working credential.
     title: "That API key was not accepted",
     describe: () =>
-      "Organization endpoints need an admin API key from Settings > API Keys. A project key cannot be used here.",
+      "Check the key is current and copied in full. If it was revoked or rotated, create a new one in Settings > API Keys.",
+  },
+  credential_class_mismatch: {
+    // Both classes are named, because the fix is to swap one for the other
+    // and a caller holding several keys cannot otherwise tell which is which.
+    title: "That's the wrong kind of API key for this endpoint",
+    describe: (error) => {
+      const required = str(error, "required", "");
+      return required === "organization_api_key"
+        ? "This endpoint needs an organization API key, created in Settings > API Keys. The key sent belongs to a single project."
+        : "Send the credential class this endpoint accepts. Organization API keys are created in Settings > API Keys.";
+    },
   },
   scenario_run_export_unauthenticated: {
     title: "Log in to export simulation runs",
@@ -1524,6 +1553,43 @@ const presentations = {
       return window
         ? `A ${window.toLowerCase()} budget doesn't roll on a cycle, so it has no start date to set. Pick a minute, hour, day, week or month window, or drop the start date.`
         : "This budget doesn't roll on a cycle, so it has no start date to set. Pick a minute, hour, day, week or month window, or drop the start date.";
+    },
+  },
+  trace_project_required: {
+    // Names the one field that fixes it, since the alternative fix (an
+    // administrator setting the organization's governance project up) is
+    // not something the person looking at this form can do.
+    title: "This key needs somewhere for its traces to land",
+    describe: () =>
+      "Pick the project where its traces and costs land, under Ownership. Without one its spend is invisible and no budget can cap it.",
+  },
+  gateway_trace_project_ambiguous: {
+    // The refusal is about what the key did NOT say, so the copy has to
+    // say it back: the caller believes they already picked the project.
+    title: "This key doesn't say where its traces land",
+    describe: (error) => {
+      const scopes = num(error, "project_scope_count", 0);
+      return scopes > 1
+        ? `It can reach ${scopes} projects, so its traces and costs would go to none of them. Pick the one they should land in.`
+        : "Pick the project where its traces and costs land. Without one they go to a hidden governance project, and every budget on the project you had in mind counts nothing.";
+    },
+  },
+  gateway_trace_project_unknown: {
+    // Says the destination is the problem, not the key, because the form
+    // shows a picker and the natural reading of a refusal there is that the
+    // whole key was rejected.
+    title: "That project isn't in this organization",
+    describe: () =>
+      "Pick a project this organization owns for its traces and costs to land in. The one saved on this key no longer resolves.",
+  },
+  gateway_budget_scope_unreachable: {
+    // Says what would have gone wrong rather than what was rejected: a budget
+    // that never fires looks identical to one that was never breached, so the
+    // reason this was worth refusing is the whole message.
+    title: "Nothing would count against this budget",
+    describe: (error) => {
+      const scopeType = str(error, "scope_type", "scope");
+      return `None of your keys send traffic to that ${scopeType}, so this budget would never spend and never stop anything. Put it where your keys already run, scope a key to that ${scopeType}, or save it anyway to set it up ahead of the keys that will use it.`;
     },
   },
   gateway_scope_org_mismatch: {

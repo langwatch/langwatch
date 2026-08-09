@@ -253,15 +253,22 @@ const secured = createOrgApp({
 
 secured.hono.onError(handleGatewaySpendApiError);
 
-const spendSummariesQuerySchema = z.object({
-  group_by: z.enum(["virtual_key", "end_user"]),
-  from: z.coerce.number().int().positive(),
-  to: z.coerce.number().int().positive(),
-  project_id: z.string().min(1).max(100).optional(),
-  cursor: z.string().max(500).optional(),
-  limit: z.coerce.number().int().positive().max(1000).optional().default(500),
-  virtual_key_id: z.string().min(1).max(100).optional(),
-});
+const spendSummariesQuerySchema = z
+  .object({
+    group_by: z.enum(["virtual_key", "end_user"]),
+    from: z.coerce.number().int().positive(),
+    to: z.coerce.number().int().positive(),
+    project_id: z.string().min(1).max(100).optional(),
+    cursor: z.string().max(500).optional(),
+    limit: z.coerce.number().int().positive().max(1000).optional().default(500),
+    virtual_key_id: z.string().min(1).max(100).optional(),
+  })
+  // An inverted window is an empty window, so a caller who swapped the two
+  // reads a confident zero and reconciles against it. /spend-events has
+  // refused this since it shipped; this surface answered instead.
+  .refine((q) => q.from <= q.to, {
+    message: "from must be less than or equal to to",
+  });
 
 secured.access(requires("gatewaySpend:view")).get(
   "/spend-summaries",

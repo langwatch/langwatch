@@ -107,7 +107,19 @@ const SHELLS: DetectedShell[] = ["zsh", "bash", "fish"];
  * Enumerate every telemetry-persist target with a present flag and a
  * remover. Callers filter to `present` targets for display + removal.
  */
-export function scanTelemetryTargets(): TelemetryTarget[] {
+export function scanTelemetryTargets({
+  cwd = process.cwd(),
+}: {
+  /**
+   * The directory whose project pin counts as "this directory". Defaults to
+   * the process's own, which is what logout means by it. Passed explicitly by
+   * the tests, so a suite that scans and REMOVES project pins cannot reach the
+   * checkout it is running inside: `remove()` here deletes real files, and a
+   * developer who had run `langwatch claude` in that directory would find the
+   * pin gone after a test run.
+   */
+  cwd?: string;
+} = {}): TelemetryTarget[] {
 	const targets: TelemetryTarget[] = [];
 
 	// claude — OTEL keys inside ~/.claude/settings.json's `env` object.
@@ -177,7 +189,6 @@ export function scanTelemetryTargets(): TelemetryTarget[] {
 	// requirement as the global target above: `remove()` already gates on
 	// it (removeClaudeProjectTelemetryPin), so `present` must match or the
 	// confirm list would offer a target whose removal silently no-ops.
-	const cwd = process.cwd();
 	const claudePin = claudeProjectSettingsTarget(cwd);
 	targets.push({
 		label: `claude project telemetry pin (${claudePin.displayPath} in this directory)`,

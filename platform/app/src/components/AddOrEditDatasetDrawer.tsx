@@ -95,7 +95,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
     { name: "output", type: "string" },
     { name: "contexts", type: "list" },
     { name: "total_cost", type: "number" },
-    { name: "comments", type: "string" },
+    { name: "annotations", type: "string" },
   ];
 
   const {

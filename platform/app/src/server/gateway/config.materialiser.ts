@@ -409,12 +409,15 @@ export class GatewayConfigMaterialiser {
     vk: VirtualKey,
     traceProject: { id: string; teamId: string } | null,
   ): Promise<ResolvedBudget[]> {
-    return resolveApplicableBudgets(this.prisma, {
-      organizationId: vk.organizationId,
-      virtualKeyId: vk.id,
-      teamId: traceProject?.teamId ?? null,
-      projectId: traceProject?.id ?? null,
-      principalUserId: vk.principalUserId,
+    return resolveApplicableBudgets({
+      client: this.prisma,
+      target: {
+        organizationId: vk.organizationId,
+        virtualKeyId: vk.id,
+        teamId: traceProject?.teamId ?? null,
+        projectId: traceProject?.id ?? null,
+        principalUserId: vk.principalUserId,
+      },
     });
   }
 }

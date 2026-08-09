@@ -113,7 +113,18 @@ case "$scanner" in
     # only stops the walk on reaching that exact commit, and `--all` interleaves
     # other refs' newer commits ahead of it, so they are scanned first. That is
     # how one branch's finding came to fail every open pull request (#6681).
-    args=(git "file://$PWD" --branch "$scan_branch" --fail --no-update "${trufflehog_flags[@]}")
+    # Lob is off because its matcher collides with our own test names and its
+    # verifier does not rule the collision out. It matches `test_` followed by
+    # exactly 35 characters of [A-Za-z0-9_], which is a shape a shell function
+    # reaches by accident: `test_scaling_one_deployment_resizes_both` and
+    # `test_unconfigured_providers_emit_nothing`, both ordinary functions in
+    # charts/langwatch/tests, were each reported as a VERIFIED secret, so
+    # --only-verified does not filter them. charts/langwatch/tests is written
+    # entirely in `test_*` functions, so this recurs by construction. Nothing
+    # in the repository integrates Lob, so the detector can only produce false
+    # positives here — excluding it costs no coverage. Excluded by name rather
+    # than by path so a genuine credential in those files is still caught.
+    args=(git "file://$PWD" --branch "$scan_branch" --fail --no-update --exclude-detectors=Lob "${trufflehog_flags[@]}")
     if [ -n "$base_commit" ]; then
       args+=(--since-commit "$base_commit")
     else
