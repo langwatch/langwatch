@@ -27,7 +27,9 @@ import {
   MissingAnnotatorError,
   NotificationDeliveryError,
   ProjectNotFoundError,
+  TriggerFiltersRequiredError,
 } from "~/server/app-layer/automations/errors";
+import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import {
   buildGraphAlertTriggerData,
   type GraphAlertActionParams,
@@ -297,6 +299,12 @@ export const automationRouter = createTRPCRouter({
           message:
             "Webhook automations must be created through the provider-aware upsert API.",
         });
+      }
+
+      // This path only ever writes AUTOMATION rows (it carries no graph or
+      // report shape), so the condition is always required here.
+      if (!hasActionableTriggerFilters(input.filters)) {
+        throw toTemplateTRPCError(new TriggerFiltersRequiredError());
       }
 
       const project = await getApp().projects.getById(input.projectId);
@@ -662,6 +670,30 @@ export const automationRouter = createTRPCRouter({
           message:
             "This automation only contains unsupported legacy filters. Add at least one supported filter before saving.",
         });
+      }
+
+      // Editing is the other way to end up with a match-everything automation:
+      // create it with a real condition, then clear it here. The existing row
+      // decides whether that is allowed — an automation whose condition lives
+      // in its query keeps a legitimately empty structured set, and alerts and
+      // reports have no trace condition to require in the first place.
+      if (!hasActionableTriggerFilters(sanitized)) {
+        const existing = await getApp().triggers.getById({
+          triggerId: input.triggerId,
+          projectId: input.projectId,
+        });
+        if (!existing) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Automation not found in this project.",
+          });
+        }
+        if (
+          existing.triggerKind === TriggerKind.AUTOMATION &&
+          (existing.filterQuery ?? "").trim() === ""
+        ) {
+          throw toTemplateTRPCError(new TriggerFiltersRequiredError());
+        }
       }
 
       const trigger = await getApp().triggers.update({
@@ -1068,6 +1100,20 @@ export const automationRouter = createTRPCRouter({
             }`,
           });
         }
+      }
+
+      // A trace automation must say which traces it is about. Checked after
+      // the query is normalised, so a whitespace-only query counts as absent
+      // exactly as it does everywhere else. Graph alerts and reports are
+      // exempt: an alert's condition is its threshold and a report's is its
+      // schedule, and both persist `filters: {}` by construction.
+      if (
+        !isGraphAlert &&
+        !isReport &&
+        filterQuery === null &&
+        !hasActionableTriggerFilters(input.filters)
+      ) {
+        throw toTemplateTRPCError(new TriggerFiltersRequiredError());
       }
 
       // ADR-041 Slack bot delivery: encrypt a freshly-entered bot token (or

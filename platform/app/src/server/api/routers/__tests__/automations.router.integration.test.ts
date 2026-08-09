@@ -1022,4 +1022,161 @@ describe("automationRouter", () => {
       });
     });
   });
+
+  // The drawer has always refused a condition-less automation, but only in the
+  // browser. Every server write path accepted one, so the rule was one curl
+  // away from being bypassed — and the REST create went further and DEFAULTED
+  // the condition to empty. A match-everything automation fires on every trace
+  // forever, which is the one genuinely customer-facing hole behind the volume
+  // incident. These pin the rule where it belongs, on the server.
+  describe("when a write would leave an automation with no condition", () => {
+    const baseAutomationInput = {
+      projectId: "proj_123",
+      name: "No condition",
+      action: TriggerAction.SEND_SLACK_MESSAGE,
+      filters: {},
+      customGraphId: null,
+      actionParams: {
+        slackWebhook: "https://hooks.slack.com/services/abc",
+      },
+      templates: {
+        slackTemplate: null,
+        slackTemplateType: null,
+        emailSubjectTemplate: null,
+        emailBodyTemplate: null,
+      },
+    };
+
+    /** @scenario "Creating an automation with no condition is refused" */
+    it("refuses the legacy create and persists nothing", async () => {
+      await expect(
+        caller.create({
+          projectId: "proj_123",
+          name: "No condition",
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+          filters: {},
+          actionParams: {
+            slackWebhook: "https://hooks.slack.com/services/abc",
+          },
+        }),
+      ).rejects.toMatchObject({
+        code: "UNPROCESSABLE_CONTENT",
+        cause: { code: "trigger_filters_required" },
+      });
+
+      expect(mockTriggerCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses the upsert create and persists nothing", async () => {
+      await expect(
+        caller.upsert(baseAutomationInput as any),
+      ).rejects.toMatchObject({
+        code: "UNPROCESSABLE_CONTENT",
+        cause: { code: "trigger_filters_required" },
+      });
+
+      expect(mockTriggerCreate).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Editing an automation down to no condition is refused" */
+    it("refuses to strip the last condition off an existing automation", async () => {
+      mockTriggerFindUnique.mockResolvedValueOnce({
+        id: "trigger_test_123",
+        triggerKind: "AUTOMATION",
+        filterQuery: null,
+        filters: JSON.stringify({ "spans.model": ["gpt-5-mini"] }),
+      });
+
+      await expect(
+        caller.updateTriggerFilters({
+          projectId: "proj_123",
+          triggerId: "trigger_test_123",
+          filters: {},
+        }),
+      ).rejects.toMatchObject({
+        code: "UNPROCESSABLE_CONTENT",
+        cause: { code: "trigger_filters_required" },
+      });
+
+      expect(mockTriggerUpdate).not.toHaveBeenCalled();
+    });
+
+    it("allows clearing the structured set when a query still narrows it", async () => {
+      mockTriggerFindUnique.mockResolvedValueOnce({
+        id: "trigger_test_123",
+        triggerKind: "AUTOMATION",
+        filterQuery: "status:error",
+        filters: JSON.stringify({ "spans.model": ["gpt-5-mini"] }),
+      });
+
+      await caller.updateTriggerFilters({
+        projectId: "proj_123",
+        triggerId: "trigger_test_123",
+        filters: {},
+      });
+
+      expect(mockTriggerUpdate).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A query is a condition on its own" */
+    it("accepts a query as the whole condition", async () => {
+      mockTriggerCreate.mockResolvedValueOnce({
+        id: "trigger_new",
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+      });
+
+      await caller.upsert({
+        ...baseAutomationInput,
+        filterQuery: "status:error",
+      } as any);
+
+      expect(mockTriggerCreate).toHaveBeenCalledTimes(1);
+      const createArgs = mockTriggerCreate.mock.calls[0]![0];
+      expect(createArgs.data.filterQuery).toBe("status:error");
+      // A query supersedes the structured set, which persists empty.
+      expect(createArgs.data.filters).toBe("{}");
+    });
+
+    it("refuses a query that is only whitespace", async () => {
+      await expect(
+        caller.upsert({
+          ...baseAutomationInput,
+          filterQuery: "   ",
+        } as any),
+      ).rejects.toMatchObject({
+        code: "UNPROCESSABLE_CONTENT",
+        cause: { code: "trigger_filters_required" },
+      });
+
+      expect(mockTriggerCreate).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Alerts and reports do not need a trace condition" */
+    it("accepts a graph alert with no trace condition", async () => {
+      mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
+      mockTriggerCreate.mockResolvedValueOnce({
+        id: "trigger_new",
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+      });
+
+      // A graph alert's condition IS the threshold rule; it has no trace
+      // filter to require, and its `filters` is empty by construction.
+      await caller.upsert({
+        ...baseAutomationInput,
+        alertType: "WARNING" as const,
+        customGraphId: "graph_1",
+        graphAlert: {
+          seriesName: "0/latency/p95",
+          operator: "gt" as const,
+          threshold: 250,
+          timePeriod: 60 as const,
+        },
+      } as any);
+
+      expect(mockTriggerCreate).toHaveBeenCalledTimes(1);
+      expect(mockTriggerCreate.mock.calls[0]![0].data.triggerKind).toBe(
+        "ALERT",
+      );
+    });
+  });
 });

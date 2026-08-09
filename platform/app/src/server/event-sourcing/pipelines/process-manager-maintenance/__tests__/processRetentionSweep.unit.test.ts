@@ -166,8 +166,9 @@ describe("processRetentionSweep", () => {
       )();
 
       const after = await familyCounts(counter);
-      expect(after.dispatched_outbox - (before.dispatched_outbox ?? 0)).toBe(3);
-      expect(after.inbox - (before.inbox ?? 0)).toBe(7);
+      expect((after.dispatched_outbox ?? 0) - (before.dispatched_outbox ?? 0))
+        .toBe(3);
+      expect((after.inbox ?? 0) - (before.inbox ?? 0)).toBe(7);
     });
   });
 });

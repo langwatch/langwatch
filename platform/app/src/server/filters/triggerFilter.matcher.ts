@@ -65,6 +65,29 @@ export function triggerFiltersReferenceEvents(
 }
 
 /**
+ * Whether this filter set actually narrows anything.
+ *
+ * A present-but-empty field selects nothing and is therefore not a condition:
+ * `{ "metadata.labels": [] }` reads like a filter and matches every trace, the
+ * same as `{}`. The server-side mirror of the drawer's `filtersAreSet`, so a
+ * shape the browser refuses cannot be saved through an API instead.
+ */
+export function hasActionableTriggerFilters(
+  // Widened past `TriggerFilters` on purpose: the REST surface validates
+  // filters as an open record, and its callers need the same answer without
+  // first proving the field names are known ones.
+  filters: Record<string, unknown>,
+): boolean {
+  return Object.values(filters).some((value) =>
+    Array.isArray(value)
+      ? value.length > 0
+      : typeof value === "object" &&
+        value !== null &&
+        Object.keys(value).length > 0,
+  );
+}
+
+/**
  * Splits trigger filters into trace-time-available and evaluation-time-available groups.
  */
 export function classifyTriggerFilters(filters: TriggerFilters): {
