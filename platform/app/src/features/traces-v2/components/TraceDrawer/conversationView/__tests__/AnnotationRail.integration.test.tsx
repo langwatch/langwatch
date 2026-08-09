@@ -412,11 +412,12 @@ describe("given a suggestion started on the turn's user message", () => {
   });
 
   /** @scenario "A suggestion on the user message starts from the turn's input" */
-  it("starts from the turn's input", () => {
+  it("starts from the turn's input, in a field labelled for the input", () => {
     renderRow();
 
+    expect(screen.getByText("Suggested input")).toBeInTheDocument();
     expect(
-      screen.getByPlaceholderText("What should the output have been?"),
+      screen.getByPlaceholderText("What should the input have been?"),
     ).toHaveValue("a question");
   });
 
@@ -425,13 +426,13 @@ describe("given a suggestion started on the turn's user message", () => {
     renderRow();
 
     fireEvent.change(
-      screen.getByPlaceholderText("What should the output have been?"),
+      screen.getByPlaceholderText("What should the input have been?"),
       { target: { value: "a clearer question" } },
     );
     fireEvent.click(screen.getByRole("button", { name: "Reset" }));
 
     expect(
-      screen.getByPlaceholderText("What should the output have been?"),
+      screen.getByPlaceholderText("What should the input have been?"),
     ).toHaveValue("a question");
   });
 });

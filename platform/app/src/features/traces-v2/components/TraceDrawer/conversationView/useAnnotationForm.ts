@@ -270,6 +270,7 @@ export function usePopoverAnnotationForm(
       },
       traceId: props.traceId,
     }),
+    suggestTarget: props.anchorPath === "input" ? "input" : "output",
     handleSave: () => mutations.save({ comment, expectedOutput, scoreOptions }),
     handleDelete: mutations.remove,
     onCancel: () => props.onOpenChange(false),

@@ -134,6 +134,73 @@ describe("given a queue item opened on a thread of several turns", () => {
   });
 });
 
+describe("given the thread is still laying out when the reader arrives", () => {
+  const originalOffsetTop = Object.getOwnPropertyDescriptor(
+    HTMLElement.prototype,
+    "offsetTop",
+  );
+  let mockOffsetTop = 0;
+
+  beforeEach(() => {
+    vi.useFakeTimers({
+      toFake: [
+        "setTimeout",
+        "clearTimeout",
+        "requestAnimationFrame",
+        "cancelAnimationFrame",
+        "performance",
+        "Date",
+      ],
+    });
+    Object.defineProperty(HTMLElement.prototype, "offsetTop", {
+      configurable: true,
+      get: () => mockOffsetTop,
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    if (originalOffsetTop) {
+      Object.defineProperty(
+        HTMLElement.prototype,
+        "offsetTop",
+        originalOffsetTop,
+      );
+    } else {
+      Reflect.deleteProperty(HTMLElement.prototype, "offsetTop");
+    }
+  });
+
+  // The turns above the one under review (their annotation cards especially)
+  // measure in after the first paint and push it further down, so a single
+  // scroll lands short of where the turn ends up.
+  /** @scenario "Opening a queue item scrolls its turn into view" */
+  it("keeps centering until the turn stops moving, then lets go", () => {
+    mockOffsetTop = 100;
+    renderView({ focusTraceId: "trace-2" });
+
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+    expect(scrollTo).toHaveBeenLastCalledWith(
+      expect.objectContaining({ top: 100 }),
+    );
+
+    mockOffsetTop = 420;
+    vi.advanceTimersByTime(120);
+
+    expect(scrollTo).toHaveBeenLastCalledWith(
+      expect.objectContaining({ top: 420 }),
+    );
+
+    vi.advanceTimersByTime(3000);
+    const settledCalls = scrollTo.mock.calls.length;
+    mockOffsetTop = 900;
+    vi.advanceTimersByTime(300);
+
+    expect(scrollTo.mock.calls.length).toBe(settledCalls);
+  });
+});
+
 describe("given a conversation read with no turn under review", () => {
   it("tints nothing and scrolls nowhere", () => {
     renderView();

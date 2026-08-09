@@ -39,10 +39,16 @@ export function tracePartitionHint(startedAt: unknown): number | null {
  * thread the reviewer just came from. Transiently, because reading a
  * conversation is not a decision to stop reading conversations.
  *
- * The link states the whole intent (which trace, and that it opens for
- * editing) and the drawer's URL hydrator opens it. Seeding the drawer store
- * instead would mount the drawer a frame before the URL names it, and the
- * hydrator reads that frame as "the URL has no drawer, close it".
+ * Who moves first depends on whether the drawer is on screen. Closed, the
+ * link states the whole intent (which trace, and that it opens for editing)
+ * and the drawer's URL hydrator opens it; seeding the store instead would
+ * mount the drawer a frame before the URL names it, and the hydrator reads
+ * that frame as "the URL has no drawer, close it". Open, the store moves
+ * first and the URL follows, the same order every other in-drawer transition
+ * uses: landing a URL that asks for state the store does not hold yet puts
+ * the shell's URL sync one commit ahead of the page-level hydrator, and the
+ * sync strips the edit flag in the same breath the hydrator grants it, the
+ * two rewriting the URL against each other without ever converging.
  */
 export function openTraceEditorFromConversation({
   openDrawer,
@@ -53,15 +59,47 @@ export function openTraceEditorFromConversation({
   traceId: string;
   occurredAtMs: number | null;
 }): void {
-  const drawer = useDrawerStore.getState();
-  if (drawer.viewMode === "conversation") {
-    drawer.setViewModeTransient("summary");
+  const openEditor = () => {
+    const drawer = useDrawerStore.getState();
+    if (drawer.viewMode === "conversation") {
+      drawer.setViewModeTransient("summary");
+    }
+    if (drawer.isOpen) seedOpenDrawerForEdit({ traceId, occurredAtMs });
+    openDrawer("traceV2Details", {
+      traceId,
+      ...(occurredAtMs === null ? {} : { t: String(occurredAtMs) }),
+      urlParams: { edit: "1" },
+    });
+  };
+  // Editing another turn's trace leaves the current correction behind, so an
+  // unsaved one asks first, like every other way out of the editor. The trace
+  // already being corrected has nothing to lose and re-opens directly.
+  if (useTraceEditStore.getState().editingTraceId === traceId) {
+    openEditor();
+  } else {
+    guardTraceEditExit(openEditor);
   }
-  openDrawer("traceV2Details", {
-    traceId,
-    ...(occurredAtMs === null ? {} : { t: String(occurredAtMs) }),
-    urlParams: { edit: "1" },
-  });
+}
+
+/** Moves the on-screen drawer onto the trace, editing, before the URL follows. */
+function seedOpenDrawerForEdit({
+  traceId,
+  occurredAtMs,
+}: {
+  traceId: string;
+  occurredAtMs: number | null;
+}): void {
+  const drawer = useDrawerStore.getState();
+  if (drawer.traceId !== traceId) {
+    drawer.openTrace(traceId, occurredAtMs);
+  }
+  if (useTraceEditStore.getState().editingTraceId !== traceId) {
+    enterTraceEditMode(traceId);
+  } else {
+    // Re-entering the trace already being corrected: the session and its
+    // drafts stay, only the mode bit is re-asserted.
+    useDrawerStore.getState().setIsEditing(true);
+  }
 }
 
 /** Leaves edit mode and drops the uncommitted correction. */

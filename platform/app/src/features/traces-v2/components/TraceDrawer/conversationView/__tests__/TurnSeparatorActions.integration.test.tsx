@@ -59,7 +59,9 @@ import {
   useAnnotationQueueSessionStore,
 } from "../../../../stores/annotationQueueSessionStore";
 import { useDrawerStore } from "../../../../stores/drawerStore";
+import { useTraceEditStore } from "../../../../stores/traceEditStore";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../../types/trace";
+import { enterTraceEditMode } from "../../../../utils/traceEditMode";
 import { ChatTurnRow } from "../ChatTurnRow";
 
 const TRACE_ID = "trace-1";
@@ -129,6 +131,10 @@ beforeEach(() => {
     marks: {},
     handoff: "idle",
   });
+  useDrawerStore.getState().closeDrawer();
+  useDrawerStore.getState().setViewModeTransient("summary");
+  useTraceEditStore.getState().discard();
+  useTraceEditStore.getState().clearPendingExit();
   cleanup();
 });
 
@@ -210,6 +216,116 @@ describe("given a reviewer who may not update annotations", () => {
     expect(
       screen.queryByRole("button", { name: "Edit trace" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("given the drawer is already open on another trace's conversation", () => {
+  // The drawer must already hold the asked-for state when the address changes:
+  // a URL that asks for state the store does not hold yet leaves the shell's
+  // URL sync and the page-level hydrator rewriting the URL against each other.
+  /** @scenario "Edit trace works while the drawer is already open on the conversation" */
+  it("moves the drawer store first, so the address only confirms it", () => {
+    useDrawerStore.getState().openTrace("other-trace", 111);
+    useDrawerStore.getState().setViewModeTransient("conversation");
+    renderTurn();
+
+    fireEvent.click(editTrace());
+
+    const drawer = useDrawerStore.getState();
+    expect(drawer.traceId).toBe(TRACE_ID);
+    expect(drawer.isEditing).toBe(true);
+    expect(drawer.viewMode).toBe("summary");
+    expect(useTraceEditStore.getState().editingTraceId).toBe(TRACE_ID);
+    expect(mocks.openDrawer).toHaveBeenCalledWith("traceV2Details", {
+      traceId: TRACE_ID,
+      t: String(OCCURRED_AT_MS),
+      urlParams: { edit: "1" },
+    });
+  });
+});
+
+describe("given the drawer is closed", () => {
+  /** @scenario "The turn separator offers to edit the turn's trace" */
+  it("leaves the opening to the address, so the hydrator mounts the drawer", () => {
+    renderTurn();
+
+    fireEvent.click(editTrace());
+
+    expect(useDrawerStore.getState().traceId).toBeNull();
+    expect(useDrawerStore.getState().isEditing).toBe(false);
+    expect(useTraceEditStore.getState().editingTraceId).toBeNull();
+    expect(mocks.openDrawer).toHaveBeenCalledOnce();
+  });
+});
+
+describe("given an unsaved correction on another turn's trace", () => {
+  function startDirtyCorrectionOn(traceId: string) {
+    useDrawerStore.getState().openTrace(traceId, 111);
+    enterTraceEditMode(traceId);
+    useTraceEditStore.getState().setTraceOutput({
+      text: "corrected",
+      baselineText: "original",
+    });
+  }
+
+  /** @scenario "Edit trace on another turn with unsaved changes asks first" */
+  it("asks before discarding, and cancelling keeps everything", () => {
+    startDirtyCorrectionOn("other-trace");
+    renderTurn();
+
+    fireEvent.click(editTrace());
+
+    expect(mocks.openDrawer).not.toHaveBeenCalled();
+    expect(useTraceEditStore.getState().pendingExit).not.toBeNull();
+    expect(useDrawerStore.getState().traceId).toBe("other-trace");
+    expect(useTraceEditStore.getState().traceOutputDraft).not.toBeNull();
+
+    useTraceEditStore.getState().clearPendingExit();
+
+    expect(useDrawerStore.getState().traceId).toBe("other-trace");
+    expect(useTraceEditStore.getState().editingTraceId).toBe("other-trace");
+    expect(useTraceEditStore.getState().traceOutputDraft).not.toBeNull();
+  });
+
+  /** @scenario "Edit trace on another turn with unsaved changes asks first" */
+  it("moves to the turn's trace once the discard is confirmed", () => {
+    startDirtyCorrectionOn("other-trace");
+    renderTurn();
+
+    fireEvent.click(editTrace());
+    // What the discard dialog's confirm does: leave the old session, then run
+    // the parked move.
+    const run = useTraceEditStore.getState().pendingExit;
+    useTraceEditStore.getState().discard();
+    useDrawerStore.getState().setIsEditing(false);
+    run?.();
+
+    expect(useDrawerStore.getState().traceId).toBe(TRACE_ID);
+    expect(useDrawerStore.getState().isEditing).toBe(true);
+    expect(useTraceEditStore.getState().editingTraceId).toBe(TRACE_ID);
+    expect(mocks.openDrawer).toHaveBeenCalledOnce();
+  });
+});
+
+describe("given the turn's own trace is already being corrected", () => {
+  /** @scenario "Re-entering edit mode on the same trace keeps the draft" */
+  it("re-opens the editor without asking and keeps the draft", () => {
+    useDrawerStore.getState().openTrace(TRACE_ID, OCCURRED_AT_MS);
+    enterTraceEditMode(TRACE_ID);
+    useTraceEditStore.getState().setTraceOutput({
+      text: "corrected",
+      baselineText: "original",
+    });
+    useDrawerStore.getState().setViewModeTransient("conversation");
+    renderTurn();
+
+    fireEvent.click(editTrace());
+
+    expect(mocks.openDrawer).toHaveBeenCalledOnce();
+    expect(useTraceEditStore.getState().pendingExit).toBeNull();
+    expect(useTraceEditStore.getState().editingTraceId).toBe(TRACE_ID);
+    expect(useTraceEditStore.getState().traceOutputDraft).not.toBeNull();
+    expect(useDrawerStore.getState().isEditing).toBe(true);
   });
 });
 

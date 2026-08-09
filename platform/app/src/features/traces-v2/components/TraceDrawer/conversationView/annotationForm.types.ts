@@ -55,6 +55,12 @@ export interface AnnotationFormState {
    * docks in a column beside it, never has to remember what they clicked.
    */
   anchorLabel: string | null;
+  /**
+   * Which side of the turn a suggestion corrects, so the field is labelled
+   * for what it holds. An input-anchored suggestion corrects the input;
+   * everything else, the whole-turn comments included, corrects the output.
+   */
+  suggestTarget: "input" | "output";
   handleSave: () => void;
   handleDelete: () => void;
   onCancel: () => void;

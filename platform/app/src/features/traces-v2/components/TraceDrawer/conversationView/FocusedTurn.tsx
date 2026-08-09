@@ -67,11 +67,23 @@ export function FocusedTurnFrame({
   );
 }
 
+/** How long arrival keeps chasing the turn while the thread is still laying out. */
+const SETTLE_MS = 1500;
+/** Layout jitter smaller than this is not worth another scroll. */
+const SETTLE_TOLERANCE_PX = 8;
+
 /**
  * Brings the turn under review onto the screen, and brings the next one on when
  * the reader is moved along. Measured against the scroll container the way the
  * open turn's own centering is, because `offsetTop` is relative to the nearest
  * positioned ancestor, which that container is.
+ *
+ * Centering is re-applied until the turn's offset stops moving: the turns
+ * above it (their annotation cards especially) measure in after the first
+ * paint and push it further down, so a single scroll lands short of where the
+ * turn ends up. The loop only issues a scroll when the target has actually
+ * moved, and gives up after a beat so it can never fight the reader's own
+ * scrolling for long.
  */
 export function useScrollFocusedTurnIntoView({
   scrollRef,
@@ -87,8 +99,25 @@ export function useScrollFocusedTurnIntoView({
     const container = scrollRef.current;
     const focused = focusedRef.current;
     if (!container || !focused) return;
-    const top =
-      focused.offsetTop - container.clientHeight / 2 + focused.offsetHeight / 2;
-    container.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    let lastApplied = Number.NEGATIVE_INFINITY;
+    let frame = 0;
+    const startedAt = performance.now();
+    const center = () => {
+      const top = Math.max(
+        0,
+        focused.offsetTop -
+          container.clientHeight / 2 +
+          focused.offsetHeight / 2,
+      );
+      if (Math.abs(top - lastApplied) > SETTLE_TOLERANCE_PX) {
+        lastApplied = top;
+        container.scrollTo({ top, behavior: "smooth" });
+      }
+      if (performance.now() - startedAt < SETTLE_MS) {
+        frame = window.requestAnimationFrame(center);
+      }
+    };
+    center();
+    return () => window.cancelAnimationFrame(frame);
   }, [scrollRef, focusedRef, focusTraceId]);
 }

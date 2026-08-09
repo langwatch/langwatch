@@ -320,6 +320,14 @@ Feature: Editing a trace in the drawer
       Then I am asked whether to discard my changes
 
     @integration
+    Scenario: Edit trace on another turn with unsaved changes asks first
+      Given I am editing the trace
+      And I have renamed a span
+      When I choose "Edit trace" on another turn's separator
+      Then I am asked whether to discard my changes
+      And cancelling keeps the trace and the correction as they were
+
+    @integration
     Scenario: Going back to an earlier trace with unsaved changes asks first
       Given I am editing a trace I opened from another one
       And I have renamed a span

@@ -39,6 +39,17 @@ Feature: Per-message actions in ConversationView
     And choosing it opens that turn's trace in the drawer, in annotation mode
     And the drawer does not open on the conversation tab
 
+  # The drawer moves before the address does. Asking the address to move a
+  # drawer that is already on screen leaves the drawer's two address keepers
+  # correcting each other, one granting the request and one undoing it, and
+  # the page locks up rewriting itself.
+  @integration
+  Scenario: Edit trace works while the drawer is already open on the conversation
+    Given the trace drawer is already open on another trace's conversation
+    When the user chooses "Edit trace" on a turn separator
+    Then the drawer is on that turn's trace, in annotation mode
+    And it settles there at once
+
   # ─── Annotate ───────────────────────────────────────────────────────────
 
   @integration

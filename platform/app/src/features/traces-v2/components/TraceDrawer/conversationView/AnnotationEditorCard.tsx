@@ -74,6 +74,7 @@ function buildComposerFormState({
       // rather than the turn the reader is already looking at.
       selfLabel: null,
     }),
+    suggestTarget: draft.anchorPath === "input" ? "input" : "output",
     handleSave: () =>
       mutations.save({
         comment: draft.comment,

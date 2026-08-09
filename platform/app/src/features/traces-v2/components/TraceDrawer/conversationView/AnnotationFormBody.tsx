@@ -101,11 +101,19 @@ export function SuggestBody({
         <AnchorLine label={state.anchorLabel} />
       </VStack>
 
-      <SectionLabel>Expected output</SectionLabel>
+      <SectionLabel>
+        {state.suggestTarget === "input"
+          ? "Suggested input"
+          : "Expected output"}
+      </SectionLabel>
       <Textarea
         value={state.expectedOutput}
         onChange={(e) => state.setExpectedOutput(e.target.value)}
-        placeholder="What should the output have been?"
+        placeholder={
+          state.suggestTarget === "input"
+            ? "What should the input have been?"
+            : "What should the output have been?"
+        }
         // Fixed height, locked to a stable size so the popover never
         // grows or jumps based on the user's edit. Internal scroll instead.
         height="180px"
