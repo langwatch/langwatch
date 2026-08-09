@@ -42,6 +42,11 @@ const mocks = vi.hoisted(() => ({
   deleteOptions: null as {
     onSuccess?: (result: { deleted: number }) => void;
   } | null,
+  createQueueItemMutate: vi.fn(),
+  createQueueItemOptions: null as {
+    onSuccess?: (result: { created: number; skipped: number }) => void;
+  } | null,
+  pickedAnnotators: [] as { id: string; name: string }[],
   invalidateQueues: vi.fn(),
   invalidatePending: vi.fn(),
   invalidateAssigned: vi.fn(),
@@ -93,8 +98,63 @@ vi.mock("~/utils/api", () => ({
           return { mutate: mocks.deleteMutate, isLoading: false };
         },
       },
+      getQueues: {
+        useQuery: () => ({
+          data: [
+            { id: "q1", name: "Support reviews", slug: "support-reviews" },
+            { id: "q2", name: "Sales reviews", slug: "sales-reviews" },
+          ],
+        }),
+      },
+      createQueueItem: {
+        useMutation: (options: {
+          onSuccess?: (result: { created: number; skipped: number }) => void;
+        }) => {
+          mocks.createQueueItemOptions = options;
+          return { mutate: mocks.createQueueItemMutate, isLoading: false };
+        },
+      },
     },
   },
+}));
+vi.mock("~/utils/auth-client", () => ({
+  useSession: () => ({ data: { user: { id: "me" } } }),
+}));
+vi.mock("~/components/AddAnnotationQueueDrawer", () => ({
+  AddAnnotationQueueDrawer: () => null,
+}));
+// The participants picker is a Chakra multi-select the dialog only composes.
+// The stub keeps the contract the table depends on (who the picker opens on,
+// who it sends to) without driving Ark's select in jsdom.
+vi.mock("~/components/traces/AddParticipants", () => ({
+  AddParticipants: ({
+    annotators,
+    setAnnotators,
+    sendToQueue,
+  }: {
+    annotators: { id: string; name: string }[];
+    setAnnotators: (annotators: { id: string; name: string }[]) => void;
+    sendToQueue?: () => void;
+  }) => (
+    <div>
+      <div data-testid="picked-annotators">
+        {annotators.map((annotator) => annotator.id).join(",")}
+      </div>
+      <button
+        type="button"
+        onClick={() => setAnnotators(mocks.pickedAnnotators)}
+      >
+        Pick participants
+      </button>
+      <button
+        type="button"
+        disabled={annotators.length === 0}
+        onClick={sendToQueue}
+      >
+        Send
+      </button>
+    </div>
+  ),
 }));
 vi.mock("~/components/PeriodSelector", () => ({
   PeriodSelector: () => null,
@@ -126,7 +186,10 @@ vi.mock("~/components/me/usePersonalFeatureGate", () => ({
   }),
 }));
 
-import { AnnotationsTable } from "../AnnotationsTable";
+import {
+  AnnotationsTable,
+  type AnnotationsTableProps,
+} from "../AnnotationsTable";
 import { groupedAnnotationsToRows } from "../annotationRow";
 
 const setItems = (items: QueueItem[]) => {
@@ -139,18 +202,52 @@ const setItems = (items: QueueItem[]) => {
   }));
 };
 
-const queueTable = () => (
+const queueTable = (props: Partial<AnnotationsTableProps> = {}) => (
   <ChakraProvider value={defaultSystem}>
     <AnnotationsTable
       heading="Annotations"
       dateColumnLabel="Date queued"
       showStatusFilter={true}
       rowTarget="queueItem"
+      {...props}
     />
   </ChakraProvider>
 );
 
-const renderTable = () => render(queueTable());
+const renderTable = (props: Partial<AnnotationsTableProps> = {}) =>
+  render(queueTable(props));
+
+/** The named queue page: the page is one queue, which its rows sit on. */
+const renderQueuePage = () =>
+  renderTable({
+    queueId: "q1",
+    pageQueue: { annotatorId: "queue-q1", name: "Support reviews" },
+  });
+
+const renderAllAnnotationsPage = () =>
+  render(
+    <ChakraProvider value={defaultSystem}>
+      <AnnotationsTable
+        heading="All Annotations"
+        dateColumnLabel="Date annotated"
+        showStatusFilter={false}
+        rowTarget="trace"
+        rows={groupedAnnotationsToRows([
+          { traceId: "trace-1", annotations: [] },
+          { traceId: "trace-2", annotations: [] },
+        ])}
+      />
+    </ChakraProvider>,
+  );
+
+const pickedAnnotators = () => screen.getByTestId("picked-annotators");
+
+/** Replaces whoever the picker opened on, then confirms. */
+const pickAndSend = (annotators: { id: string; name: string }[]) => {
+  mocks.pickedAnnotators = annotators;
+  fireEvent.click(screen.getByRole("button", { name: "Pick participants" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+};
 
 const rowCheckbox = (traceId: string) =>
   screen.getByRole("checkbox", { name: `Select trace ${traceId}` });
@@ -166,6 +263,12 @@ beforeEach(() => {
   mocks.query = {};
   mocks.deleteMutate.mockReset();
   mocks.deleteOptions = null;
+  mocks.pickedAnnotators = [];
+  mocks.createQueueItemOptions = null;
+  mocks.createQueueItemMutate.mockReset();
+  mocks.createQueueItemMutate.mockImplementation(() => {
+    mocks.createQueueItemOptions?.onSuccess?.({ created: 2, skipped: 0 });
+  });
   mocks.toastCreate.mockClear();
   mocks.invalidateQueues.mockClear();
   mocks.requestEnable.mockReset();
@@ -403,25 +506,116 @@ describe("AnnotationsTable selection", () => {
   describe("given rows on the all annotations page are selected", () => {
     /** @scenario "The all annotations page never offers to remove from a queue" */
     it("offers no remove-from-queue action", () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <AnnotationsTable
-            heading="All Annotations"
-            dateColumnLabel="Date annotated"
-            showStatusFilter={false}
-            rowTarget="trace"
-            rows={groupedAnnotationsToRows([
-              { traceId: "trace-1", annotations: [] },
-              { traceId: "trace-2", annotations: [] },
-            ])}
-          />
-        </ChakraProvider>,
-      );
+      renderAllAnnotationsPage();
 
       fireEvent.click(headerCheckbox());
 
       expect(selectionBar()).toHaveTextContent("2 selected");
       expect(selectionBar()).not.toHaveTextContent("Remove from queue");
+    });
+
+    /** @scenario "The all annotations page offers to add the selection to a queue" */
+    it("offers to add the selection to a queue", () => {
+      renderAllAnnotationsPage();
+
+      fireEvent.click(headerCheckbox());
+
+      expect(selectionBar()).toHaveTextContent("Add to queue");
+      expect(selectionBar()).not.toHaveTextContent("Move to queue");
+    });
+
+    describe("when the user chooses to add the selection to a queue", () => {
+      /** @scenario "The all annotations page offers to add the selection to a queue" */
+      it("opens the queue dialog with nothing preselected", () => {
+        renderAllAnnotationsPage();
+
+        fireEvent.click(headerCheckbox());
+        fireEvent.click(screen.getByRole("button", { name: /Add to queue/ }));
+
+        expect(screen.getByText("Add to annotation queue")).toBeInTheDocument();
+        expect(pickedAnnotators()).toBeEmptyDOMElement();
+      });
+
+      /** @scenario "The all annotations page offers to add the selection to a queue" */
+      it("sends the selected traces to the chosen queue", () => {
+        renderAllAnnotationsPage();
+
+        fireEvent.click(headerCheckbox());
+        fireEvent.click(screen.getByRole("button", { name: /Add to queue/ }));
+        pickAndSend([{ id: "queue-q2", name: "Sales reviews" }]);
+
+        expect(mocks.createQueueItemMutate).toHaveBeenCalledWith({
+          projectId: "project-1",
+          traceIds: ["trace-1", "trace-2"],
+          annotators: ["queue-q2"],
+        });
+        expect(mocks.deleteMutate).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given rows on a queue page are selected", () => {
+    /** @scenario "A queue page offers to move the selection instead" */
+    it("offers to move the selection and not to add it", () => {
+      renderQueuePage();
+
+      fireEvent.click(rowCheckbox("trace-1"));
+
+      expect(selectionBar()).toHaveTextContent("Move to queue");
+      expect(selectionBar()).not.toHaveTextContent("Add to queue");
+    });
+
+    /** @scenario "A queue page offers to move the selection instead" */
+    it("opens the queue dialog on the queue this page is", () => {
+      renderQueuePage();
+
+      fireEvent.click(rowCheckbox("trace-1"));
+      fireEvent.click(screen.getByRole("button", { name: /Move to queue/ }));
+
+      expect(pickedAnnotators()).toHaveTextContent("queue-q1");
+    });
+
+    describe("when the user deselects this queue, picks another and confirms", () => {
+      /** @scenario "Moving the selection re-queues it and leaves this queue" */
+      it("queues the traces elsewhere and takes their items off this queue", () => {
+        renderQueuePage();
+
+        fireEvent.click(rowCheckbox("trace-1"));
+        fireEvent.click(rowCheckbox("trace-3"));
+        fireEvent.click(screen.getByRole("button", { name: /Move to queue/ }));
+        pickAndSend([{ id: "queue-q2", name: "Sales reviews" }]);
+
+        expect(mocks.createQueueItemMutate).toHaveBeenCalledWith({
+          projectId: "project-1",
+          traceIds: ["trace-1", "trace-3"],
+          annotators: ["queue-q2"],
+        });
+        expect(mocks.deleteMutate).toHaveBeenCalledWith({
+          projectId: "project-1",
+          queueItemIds: ["item-1", "item-3"],
+        });
+      });
+    });
+
+    describe("when the user keeps this queue selected and adds another", () => {
+      /** @scenario "Keeping this queue selected adds without removing" */
+      it("queues the traces elsewhere and leaves their items on this queue", () => {
+        renderQueuePage();
+
+        fireEvent.click(rowCheckbox("trace-1"));
+        fireEvent.click(screen.getByRole("button", { name: /Move to queue/ }));
+        pickAndSend([
+          { id: "queue-q1", name: "Support reviews" },
+          { id: "queue-q2", name: "Sales reviews" },
+        ]);
+
+        expect(mocks.createQueueItemMutate).toHaveBeenCalledWith({
+          projectId: "project-1",
+          traceIds: ["trace-1"],
+          annotators: ["queue-q1", "queue-q2"],
+        });
+        expect(mocks.deleteMutate).not.toHaveBeenCalled();
+      });
     });
   });
 });

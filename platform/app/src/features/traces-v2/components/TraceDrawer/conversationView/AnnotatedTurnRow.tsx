@@ -2,6 +2,7 @@ import { Box, Grid, VStack } from "@chakra-ui/react";
 import { memo } from "react";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import { ChatTurnRow } from "./ChatTurnRow";
+import { FocusedTurnFrame } from "./FocusedTurn";
 import { TurnAnnotationRail } from "./TurnAnnotationRail";
 import type { ParsedTurn, TurnLayout } from "./types";
 import { type RailLayout, THREAD_COLUMN_MAX_WIDTH_PX } from "./useRailLayout";
@@ -30,6 +31,10 @@ interface AnnotatedTurnRowProps {
   railLayout: RailLayout;
   /** Whether the separator offers to count this turn into the session. */
   showSessionCheckbox?: boolean;
+  /** Whether this is the turn the reviewer was sent to. */
+  isFocused?: boolean;
+  /** Whether the turn under review is blinking, to land the reader's eye. */
+  isBlinking?: boolean;
 }
 
 /**
@@ -39,6 +44,9 @@ interface AnnotatedTurnRowProps {
  * on the un-virtualized path, so a turn measures the same height either way
  * however tall its annotations make it. With the rail closed this renders the
  * turn and nothing else.
+ *
+ * The tint marking the turn under review is drawn here rather than around the
+ * whole row, because this is where the messages stop and the rail begins.
  */
 export const AnnotatedTurnRow = memo(function AnnotatedTurnRow({
   parsed,
@@ -51,25 +59,29 @@ export const AnnotatedTurnRow = memo(function AnnotatedTurnRow({
   isRailActive,
   railLayout,
   showSessionCheckbox = false,
+  isFocused = false,
+  isBlinking = false,
 }: AnnotatedTurnRowProps) {
   const turn = (
-    <ChatTurnRow
-      layout={layout}
-      turn={parsed.turn}
-      userText={parsed.userText}
-      assistantText={parsed.assistantText}
-      assistantReasoning={parsed.assistantReasoning}
-      userMedia={parsed.userMedia}
-      assistantMedia={parsed.assistantMedia}
-      gapSecs={parsed.gapSecs}
-      showGap={parsed.showGap}
-      index={index}
-      isCurrent={isCurrent}
-      onSelect={onSelectTurn}
-      annotationItems={annotations}
-      anchoredAnnotationItems={anchoredAnnotations}
-      showSessionCheckbox={showSessionCheckbox}
-    />
+    <FocusedTurnFrame isFocused={isFocused} isBlinking={isBlinking}>
+      <ChatTurnRow
+        layout={layout}
+        turn={parsed.turn}
+        userText={parsed.userText}
+        assistantText={parsed.assistantText}
+        assistantReasoning={parsed.assistantReasoning}
+        userMedia={parsed.userMedia}
+        assistantMedia={parsed.assistantMedia}
+        gapSecs={parsed.gapSecs}
+        showGap={parsed.showGap}
+        index={index}
+        isCurrent={isCurrent}
+        onSelect={onSelectTurn}
+        annotationItems={annotations}
+        anchoredAnnotationItems={anchoredAnnotations}
+        showSessionCheckbox={showSessionCheckbox}
+      />
+    </FocusedTurnFrame>
   );
 
   if (!isRailActive) return turn;
@@ -87,7 +99,10 @@ export const AnnotatedTurnRow = memo(function AnnotatedTurnRow({
   if (railLayout.mode === "stacked") {
     return (
       <VStack align="stretch" gap={2}>
-        {turn}
+        {/* The turn keeps a box of its own here too: the tint pays for its
+            room with negative margins, and those would come out of the stack's
+            own spacing if the turn sat in it directly. */}
+        <Box>{turn}</Box>
         <Box paddingLeft={`${STACKED_RAIL_INSET_PX}px`}>{rail}</Box>
       </VStack>
     );

@@ -21,6 +21,39 @@ beforeEach(() => {
 });
 
 describe("given a sitting at the queue", () => {
+  describe("when the walk brings the reviewer to a turn", () => {
+    /** @scenario "The turn under review is counted from the start" */
+    it("counts that turn's trace into the sitting", () => {
+      state().setActive(true);
+      state().noteWalked("trace-1");
+
+      expect(isSessionMarked(state().marks, "trace-1")).toBe(true);
+      expect(sessionTraceIds(state().marks)).toEqual(["trace-1"]);
+    });
+  });
+
+  describe("when the walk returns to a turn the reviewer unticked", () => {
+    it("leaves it out, since the untick was the reviewer's own", () => {
+      state().noteWalked("trace-2");
+      state().toggle("trace-2");
+
+      state().noteWalked("trace-2");
+
+      expect(isSessionMarked(state().marks, "trace-2")).toBe(false);
+      expect(state().marks["trace-2"]).toBe("off");
+    });
+  });
+
+  describe("when the walk returns to a turn the reviewer ticked by hand", () => {
+    it("leaves the reviewer's own tick standing", () => {
+      state().toggle("trace-3");
+
+      state().noteWalked("trace-3");
+
+      expect(state().marks["trace-3"]).toBe("on");
+    });
+  });
+
   describe("when a turn is annotated", () => {
     /** @scenario "Annotating a turn counts its trace into the session" */
     it("counts its trace into the sitting", () => {

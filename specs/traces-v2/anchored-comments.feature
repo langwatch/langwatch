@@ -209,6 +209,16 @@ Feature: Commenting on one part of a trace
       Given I am reading a span's output and the section headers around it
       Then the comment action reads as a comment action in words
 
+    # An action that is not on screen must not spend the row's width either:
+    # the span name gets the room until the pointer asks for the actions.
+    @integration
+    Scenario: A waterfall row's hidden actions take none of the name's room
+      Given I am reading a span whose name fills its column
+      And my pointer is not on its row
+      Then the name runs to the end of the column, not shortened for hidden actions
+      And the pin and comment actions take room only with the pointer on the row
+      And a pinned row or one carrying comments keeps that mark visible and roomed
+
   Rule: A comment says what it is about
 
     @integration

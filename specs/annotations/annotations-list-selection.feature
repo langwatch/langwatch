@@ -110,6 +110,44 @@ Rule: Selected rows can be added to a dataset
     When the user clicks "Add to dataset" and declines to turn datasets on
     Then the add-to-dataset drawer does not open
 
+Rule: Selected rows can be queued again, or moved to another queue
+
+  A reviewed trace sometimes deserves another pass, and a queued one sometimes
+  sits in the wrong queue. The all annotations page adds; a queue page moves,
+  through the same dialog the rest of the product queues traces with, opened on
+  the membership the rows already have so the change is an edit, not a retype.
+
+  Background:
+    Given the user is authenticated with "annotations:update" permission
+    And the annotations list shows rows
+
+  @integration
+  Scenario: The all annotations page offers to add the selection to a queue
+    Given rows on the all annotations page are selected
+    Then the bar offers "Add to queue"
+    And choosing it opens the queue dialog with nothing preselected
+    And queueing sends the selected traces to the chosen queue
+
+  @integration
+  Scenario: A queue page offers to move the selection instead
+    Given rows on a queue page are selected
+    Then the bar offers "Move to queue" and not "Add to queue"
+    And choosing it opens the queue dialog with this queue already selected
+
+  @integration
+  Scenario: Moving the selection re-queues it and leaves this queue
+    Given 2 rows on a queue page are selected
+    When the user deselects this queue in the dialog, picks another and confirms
+    Then those traces are queued for the other queue
+    And their items leave this queue
+
+  @integration
+  Scenario: Keeping this queue selected adds without removing
+    Given rows on a queue page are selected
+    When the user keeps this queue selected, adds another and confirms
+    Then the traces are queued for the other queue as well
+    And their items stay in this queue
+
 Rule: Selected rows can be taken out of the queue
 
   An item nobody can review is work the reviewer cannot finish, and the queue

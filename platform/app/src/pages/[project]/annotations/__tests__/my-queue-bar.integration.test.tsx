@@ -25,6 +25,8 @@ const mocks = vi.hoisted(() => ({
   items: [] as unknown[],
   queuesLoading: false,
   canUpdateAnnotations: true,
+  /** Which queue item the URL names, which is what the walk moves between. */
+  query: {} as Record<string, string>,
   /** Which drawers the URL currently holds open. */
   openDrawers: [] as string[],
   replace: vi.fn(),
@@ -54,7 +56,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
-    query: {},
+    query: mocks.query,
     push: mocks.push,
     replace: mocks.replace,
   }),
@@ -178,8 +180,10 @@ const page = () => (
 
 const renderPage = () => render(page());
 
-const datasetCheckbox = (name = "Add to dataset at the end") =>
-  screen.getByRole("checkbox", { name });
+/** The walk counts the open item's own trace, so the toggle starts at one. */
+const datasetCheckbox = (
+  name: string | RegExp = /^Add to dataset at the end/,
+) => screen.getByRole("checkbox", { name });
 
 const session = () => useAnnotationQueueSessionStore.getState();
 
@@ -187,10 +191,14 @@ const session = () => useAnnotationQueueSessionStore.getState();
 const annotateTurn = (traceId: string) =>
   act(() => session().noteAnnotationSaved(traceId));
 
+/** What the conversation does when a reviewer unticks a turn's checkbox. */
+const toggleTurn = (traceId: string) => act(() => session().toggle(traceId));
+
 /** What the add-to-dataset drawer does once the records land. */
 const recordsAdded = () => act(() => session().noteHandoffAdded());
 
-const finishesTheLastItem = () => {
+/** What the server does with an item the reviewer finishes. */
+const marksItemsDone = () => {
   mocks.markDone.mockImplementation(
     (
       input: { queueItemId: string },
@@ -210,7 +218,7 @@ const finishesTheLastItem = () => {
 const finishQueueWithHandoff = async ({ traceIds }: { traceIds: string[] }) => {
   const user = userEvent.setup();
   setItems([{ id: "item-1", traceId: "trace-1", doneAt: null }]);
-  finishesTheLastItem();
+  marksItemsDone();
   const view = renderPage();
 
   await user.click(datasetCheckbox());
@@ -230,6 +238,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.queuesLoading = false;
   mocks.canUpdateAnnotations = true;
+  mocks.query = {};
   mocks.openDrawers = [];
   // Asking for the hand-off drawer is what puts it in the URL, so the page can
   // tell it was opened and, later, that it was closed again.
@@ -263,11 +272,10 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(
         screen.getByRole("button", { name: /Previous/ }),
       ).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /Next/ })).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: /Edit trace/ }),
       ).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /Done/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Next/ })).toBeInTheDocument();
       expect(datasetCheckbox()).toBeInTheDocument();
     });
 
@@ -276,6 +284,50 @@ describe("given a reviewer walking their annotation queue", () => {
       renderPage();
 
       expect(screen.getByText("1 of 3")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the reviewer chooses Next with items left after this one", () => {
+    /** @scenario "Next finishes the item and moves on" */
+    it("records the item as done and moves on to the next one", async () => {
+      const user = userEvent.setup();
+      marksItemsDone();
+      renderPage();
+
+      await user.click(screen.getByRole("button", { name: /Next/ }));
+
+      expect(mocks.markDone).toHaveBeenCalledWith(
+        { queueItemId: "item-1", projectId: "project-1" },
+        expect.anything(),
+      );
+      await waitFor(() =>
+        expect(mocks.push).toHaveBeenCalledWith(
+          "/acme/annotations/my-queue?queue-item=item-2",
+        ),
+      );
+    });
+
+    /** @scenario "Next finishes the item and moves on" */
+    it("offers no second way forward", () => {
+      renderPage();
+
+      expect(screen.getAllByRole("button", { name: /Next/ })).toHaveLength(1);
+      expect(
+        screen.queryByRole("button", { name: /Done/ }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given the last item of the queue is open", () => {
+    /** @scenario "The last item's primary action reads Done" */
+    it("reads Done instead of Next", () => {
+      setItems([{ id: "item-1", traceId: "trace-1", doneAt: null }]);
+      renderPage();
+
+      expect(screen.getByRole("button", { name: /Done/ })).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Next/ }),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -291,7 +343,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(
         screen.queryByRole("button", { name: /Edit trace/ }),
       ).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /Done/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Next/ })).toBeInTheDocument();
       expect(datasetCheckbox()).toBeInTheDocument();
     });
   });
@@ -357,15 +409,43 @@ describe("given a reviewer walking their annotation queue", () => {
   });
 
   describe("when turns are counted into the session", () => {
+    /** @scenario "The turn under review is counted from the start" */
+    it("counts the open item's own trace before anything is annotated", () => {
+      renderPage();
+
+      expect(session().marks).toEqual({ "trace-1": "auto" });
+      expect(
+        datasetCheckbox("Add to dataset at the end (1 trace)"),
+      ).toBeInTheDocument();
+    });
+
+    /** @scenario "The turn under review is counted from the start" */
+    it("leaves a turn the reviewer unticked out when the walk returns to it", () => {
+      const view = renderPage();
+      toggleTurn("trace-1");
+
+      mocks.query = { "queue-item": "item-2" };
+      view.rerender(page());
+      mocks.query = { "queue-item": "item-1" };
+      view.rerender(page());
+
+      expect(session().marks["trace-1"]).toBe("off");
+      expect(
+        datasetCheckbox("Add to dataset at the end (1 trace)"),
+      ).toBeInTheDocument();
+    });
+
     /** @scenario "Annotating a turn counts its trace into the session" */
     it("counts an annotated turn's trace on the bar's dataset toggle", () => {
       renderPage();
-      expect(datasetCheckbox()).toBeInTheDocument();
+      expect(
+        datasetCheckbox("Add to dataset at the end (1 trace)"),
+      ).toBeInTheDocument();
 
-      annotateTurn("trace-1");
+      annotateTurn("trace-9");
 
       expect(
-        datasetCheckbox("Add to dataset at the end (1)"),
+        datasetCheckbox("Add to dataset at the end (2 traces)"),
       ).toBeInTheDocument();
     });
 
@@ -373,39 +453,58 @@ describe("given a reviewer walking their annotation queue", () => {
     it("counts a turn in by hand, and an untick wins over the annotation", () => {
       renderPage();
 
-      act(() => session().toggle("trace-2"));
+      toggleTurn("trace-2");
       expect(
-        datasetCheckbox("Add to dataset at the end (1)"),
+        datasetCheckbox("Add to dataset at the end (2 traces)"),
       ).toBeInTheDocument();
 
       annotateTurn("trace-1");
-      act(() => session().toggle("trace-1"));
+      toggleTurn("trace-1");
       // The reviewer's own untick outranks the automatic count, so annotating
       // that turn again does not quietly put it back.
       annotateTurn("trace-1");
 
       expect(
-        datasetCheckbox("Add to dataset at the end (1)"),
+        datasetCheckbox("Add to dataset at the end (1 trace)"),
       ).toBeInTheDocument();
     });
 
-    /** @scenario "The dataset toggle carries the live count" */
-    it("carries the live count on the toggle", () => {
+    /** @scenario "The dataset toggle carries the live count in traces" */
+    it("carries the live count in traces on the toggle", () => {
       renderPage();
 
-      annotateTurn("trace-1");
       annotateTurn("trace-2");
       annotateTurn("trace-3");
+      expect(
+        datasetCheckbox("Add to dataset at the end (3 traces)"),
+      ).toBeInTheDocument();
+
+      toggleTurn("trace-2");
+      toggleTurn("trace-3");
 
       expect(
-        datasetCheckbox("Add to dataset at the end (3)"),
+        datasetCheckbox("Add to dataset at the end (1 trace)"),
       ).toBeInTheDocument();
+    });
+
+    /** @scenario "An empty session disables the dataset toggle" */
+    it("disables the dataset toggle once nothing is counted any more", async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      toggleTurn("trace-1");
+
+      const toggle = datasetCheckbox("Add to dataset at the end");
+      expect(toggle).toBeDisabled();
+
+      await user.click(toggle);
+
+      expect(toggle).not.toBeChecked();
     });
 
     /** @scenario "Session marks belong to the sitting" */
     it("drops the sitting's count on the way out of the queue", () => {
       const { unmount } = renderPage();
-      annotateTurn("trace-1");
       annotateTurn("trace-2");
       expect(session().marks).toEqual({ "trace-1": "auto", "trace-2": "auto" });
 
@@ -418,16 +517,15 @@ describe("given a reviewer walking their annotation queue", () => {
 
   describe("when the reviewer finishes the last item", () => {
     beforeEach(() => {
-      finishesTheLastItem();
+      marksItemsDone();
     });
 
-    /** @scenario "Finishing the last item opens the hand-off with the session's traces" */
-    it("opens the hand-off with the session's traces, and does not celebrate yet", async () => {
+    /** @scenario "Finishing the last item opens the hand-off over the conversation" */
+    it("opens the hand-off over the conversation, and does not celebrate yet", async () => {
       const user = userEvent.setup();
       setItems([{ id: "item-1", traceId: "trace-1", doneAt: null }]);
       const { rerender } = renderPage();
       await user.click(datasetCheckbox());
-      annotateTurn("trace-1");
       annotateTurn("trace-9");
 
       await user.click(screen.getByRole("button", { name: /Done/ }));
@@ -438,7 +536,11 @@ describe("given a reviewer walking their annotation queue", () => {
           selectedTraceIds: ["trace-1", "trace-9"],
         });
       });
+      // The reviewer is still reading the same conversation: nothing says the
+      // queue is finished, and nothing celebrates, until the hand-off resolves.
+      expect(screen.getByTestId("conversation-view")).toBeInTheDocument();
       expect(screen.queryByTestId("tasks-done")).not.toBeInTheDocument();
+      expect(mocks.markDone).not.toHaveBeenCalled();
     });
 
     /** @scenario "Traces counted earlier in the walk are part of the hand-off" */
@@ -450,12 +552,10 @@ describe("given a reviewer walking their annotation queue", () => {
       ]);
       const { rerender } = renderPage();
       await user.click(datasetCheckbox());
-      annotateTurn("trace-1");
 
       // The first item is finished and leaves the walk; its trace stays counted.
-      await user.click(screen.getByRole("button", { name: /Done/ }));
+      await user.click(screen.getByRole("button", { name: /Next/ }));
       rerender(page());
-      annotateTurn("trace-2");
       await user.click(screen.getByRole("button", { name: /Done/ }));
       rerender(page());
 
@@ -467,34 +567,41 @@ describe("given a reviewer walking their annotation queue", () => {
     });
 
     /** @scenario "Finishing with the dataset toggle off celebrates directly" */
-    it("celebrates directly when the dataset toggle is off", async () => {
+    it("records the item as done and celebrates when the toggle is off", async () => {
       const user = userEvent.setup();
       setItems([{ id: "item-1", traceId: "trace-1", doneAt: null }]);
       const { rerender } = renderPage();
-      annotateTurn("trace-1");
 
       await user.click(screen.getByRole("button", { name: /Done/ }));
       rerender(page());
 
       expect(await screen.findByTestId("tasks-done")).toBeInTheDocument();
+      expect(mocks.markDone).toHaveBeenCalledWith(
+        { queueItemId: "item-1", projectId: "project-1" },
+        expect.anything(),
+      );
       expect(mocks.openDrawer).not.toHaveBeenCalled();
     });
   });
 
   describe("given the hand-off drawer is open for the session's traces", () => {
     /** @scenario "The celebration shows once the records are added" */
-    it("celebrates once the records are added, and clears the sitting's set", async () => {
+    it("records the item as done, celebrates and clears the sitting's set", async () => {
       const { view } = await finishQueueWithHandoff({ traceIds: ["trace-1"] });
 
       recordsAdded();
       view.rerender(page());
 
       expect(await screen.findByTestId("tasks-done")).toBeInTheDocument();
+      expect(mocks.markDone).toHaveBeenCalledWith(
+        { queueItemId: "item-1", projectId: "project-1" },
+        expect.anything(),
+      );
       expect(session().marks).toEqual({});
     });
 
     /** @scenario "Closing the hand-off without adding asks before ending the session" */
-    it("asks before ending the session, and confirming celebrates", async () => {
+    it("asks before ending the session, and confirming records it done and celebrates", async () => {
       const { user, view } = await finishQueueWithHandoff({
         traceIds: ["trace-1"],
       });
@@ -508,10 +615,14 @@ describe("given a reviewer walking their annotation queue", () => {
       await user.click(screen.getByRole("button", { name: "Confirm" }));
 
       expect(await screen.findByTestId("tasks-done")).toBeInTheDocument();
+      expect(mocks.markDone).toHaveBeenCalledWith(
+        { queueItemId: "item-1", projectId: "project-1" },
+        expect.anything(),
+      );
     });
 
-    /** @scenario "Cancelling the question returns to the queue with the session intact" */
-    it("closes only the question on cancel, keeping every counted trace", async () => {
+    /** @scenario "Cancelling the question lands back on the conversation, nothing finished" */
+    it("lands back on the conversation with nothing finished and every trace counted", async () => {
       const { user, view } = await finishQueueWithHandoff({
         traceIds: ["trace-1", "trace-2"],
       });
@@ -526,15 +637,13 @@ describe("given a reviewer walking their annotation queue", () => {
           screen.queryByText(END_SESSION_QUESTION),
         ).not.toBeInTheDocument(),
       );
+      expect(screen.getByTestId("conversation-view")).toBeInTheDocument();
       expect(screen.queryByTestId("tasks-done")).not.toBeInTheDocument();
+      expect(mocks.markDone).not.toHaveBeenCalled();
       expect(session().marks).toEqual({ "trace-1": "auto", "trace-2": "auto" });
-      // Finishing again is still on offer, so cancelling is not a dead end.
-      expect(
-        screen.getByRole("button", { name: "Add to dataset" }),
-      ).toBeInTheDocument();
     });
 
-    /** @scenario "Cancelling the question returns to the queue with the session intact" */
+    /** @scenario "Cancelling the question lands back on the conversation, nothing finished" */
     it("offers the hand-off again after the question was cancelled", async () => {
       const { user, view } = await finishQueueWithHandoff({
         traceIds: ["trace-1"],
@@ -544,7 +653,7 @@ describe("given a reviewer walking their annotation queue", () => {
       await screen.findByText(END_SESSION_QUESTION);
       await user.click(screen.getByRole("button", { name: "Cancel" }));
 
-      await user.click(screen.getByRole("button", { name: "Add to dataset" }));
+      await user.click(screen.getByRole("button", { name: /Done/ }));
 
       expect(mocks.openDrawer).toHaveBeenCalledTimes(2);
       expect(mocks.openDrawer).toHaveBeenLastCalledWith("addDatasetRecord", {
@@ -607,8 +716,23 @@ describe("given a reviewer walking their annotation queue", () => {
         screen.queryByRole("button", { name: /Edit trace/ }),
       ).not.toBeInTheDocument();
       expect(
-        screen.queryByRole("checkbox", { name: "Add to dataset at the end" }),
+        screen.queryByRole("checkbox", { name: /Add to dataset at the end/ }),
       ).not.toBeInTheDocument();
+    });
+
+    /** @scenario "An item whose trace is gone says so and offers a way on" */
+    it("moves on from the bar without finishing anything", async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(screen.getByRole("button", { name: /Next/ }));
+
+      await waitFor(() =>
+        expect(mocks.push).toHaveBeenCalledWith(
+          "/acme/annotations/my-queue?queue-item=item-2",
+        ),
+      );
+      expect(mocks.markDone).not.toHaveBeenCalled();
     });
 
     /** @scenario "Removing an item whose trace is gone takes it out of the queue" */
@@ -693,6 +817,7 @@ describe("given a reviewer walking their annotation queue", () => {
 
       try {
         const user = userEvent.setup();
+        marksItemsDone();
         const { unmount } = renderPage();
 
         await user.click(screen.getByRole("button", { name: /Next/ }));

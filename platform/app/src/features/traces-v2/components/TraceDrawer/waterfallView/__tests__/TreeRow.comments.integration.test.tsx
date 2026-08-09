@@ -8,6 +8,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
@@ -64,6 +65,7 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
+import { useSpanHoverStore } from "../../../../stores/spanHoverStore";
 import { TreeRow } from "../TreeRow";
 import type { WaterfallTreeNode } from "../types";
 
@@ -106,7 +108,10 @@ function comment(over: Partial<AnnotationByTrace> = {}): AnnotationByTrace {
   } as unknown as AnnotationByTrace;
 }
 
-function renderRow(comments: AnnotationByTrace[]) {
+function renderRow(
+  comments: AnnotationByTrace[],
+  { isPinned = false }: { isPinned?: boolean } = {},
+) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <TreeRow
@@ -116,7 +121,7 @@ function renderRow(comments: AnnotationByTrace[]) {
         isSelected={false}
         isPrompt={false}
         logCount={0}
-        isPinned={false}
+        isPinned={isPinned}
         isCollapsed={false}
         hasChildren={false}
         hiddenDescendantCount={0}
@@ -135,9 +140,17 @@ function renderRow(comments: AnnotationByTrace[]) {
 beforeEach(() => {
   mocks.canManage = true;
   mocks.create.mockClear();
+  useSpanHoverStore.setState({ hoveredSpanId: null });
 });
 
 afterEach(cleanup);
+
+/** The row itself, which is what the pointer arrives on. */
+const rowOf = (container: HTMLElement) =>
+  container.querySelector('[data-testid="waterfall-row-actions"]')
+    ?.parentElement as HTMLElement;
+
+const actionCluster = () => screen.getByTestId("waterfall-row-actions");
 
 describe("given a span that carries two comments", () => {
   const comments = [
@@ -203,6 +216,62 @@ describe("given a span with nothing said about it", () => {
     expect(
       container.querySelector('[aria-label="Row actions"]'),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("given a span whose name fills its column", () => {
+  describe("when the pointer is not on its row", () => {
+    /** @scenario "A waterfall row's hidden actions take none of the name's room" */
+    it("leaves the name the whole column, with the actions taking none of it", () => {
+      const { container } = renderRow([]);
+
+      expect(actionCluster()).toHaveAttribute("data-roomed", "false");
+      expect(
+        container.querySelector('[aria-label="Pin span tab"]'),
+      ).toHaveAttribute("aria-hidden", "true");
+      expect(
+        container.querySelector('[aria-label="Comment on web_search"]'),
+      ).toHaveAttribute("aria-hidden", "true");
+    });
+  });
+
+  describe("when the pointer is on its row", () => {
+    /** @scenario "A waterfall row's hidden actions take none of the name's room" */
+    it("brings the pin and comment actions on screen", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const { container } = renderRow([]);
+
+      await user.hover(rowOf(container));
+
+      expect(
+        container.querySelector('[aria-label="Pin span tab"]'),
+      ).not.toHaveAttribute("aria-hidden", "true");
+      expect(
+        container.querySelector('[aria-label="Comment on web_search"]'),
+      ).not.toHaveAttribute("aria-hidden", "true");
+    });
+  });
+});
+
+describe("given a row that carries a mark of its own", () => {
+  /** @scenario "A waterfall row's hidden actions take none of the name's room" */
+  it("keeps a pinned span's mark visible and roomed", () => {
+    const { container } = renderRow([], { isPinned: true });
+
+    expect(actionCluster()).toHaveAttribute("data-roomed", "true");
+    expect(
+      container.querySelector('[aria-label="Unpin span tab"]'),
+    ).not.toHaveAttribute("aria-hidden", "true");
+  });
+
+  /** @scenario "A waterfall row's hidden actions take none of the name's room" */
+  it("keeps a commented span's count visible and roomed", () => {
+    const { container } = renderRow([comment()]);
+
+    expect(actionCluster()).toHaveAttribute("data-roomed", "true");
+    expect(
+      container.querySelector('[aria-label="1 comment on web_search"]'),
+    ).not.toHaveAttribute("aria-hidden", "true");
   });
 });
 

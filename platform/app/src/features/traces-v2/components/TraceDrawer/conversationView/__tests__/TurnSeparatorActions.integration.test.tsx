@@ -330,6 +330,22 @@ describe("given the turn's own trace is already being corrected", () => {
 });
 
 describe("given a queue being walked", () => {
+  describe("when the reviewer reads a turn separator", () => {
+    /** @scenario "The session checkbox leads the separator" */
+    it("puts the session tick at the left end, ahead of the ledger", () => {
+      renderTurn({ showSessionCheckbox: true });
+
+      const tick = sessionCheckbox();
+      const leadingSlot = separator().firstElementChild!;
+
+      expect(leadingSlot.contains(tick)).toBe(true);
+      expect(
+        tick.compareDocumentPosition(screen.getByText("Turn 1")) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+  });
+
   describe("when the reviewer ticks a turn", () => {
     /** @scenario "A turn is counted in or out by hand" */
     it("counts that turn's trace into the sitting", async () => {
@@ -343,6 +359,25 @@ describe("given a queue being walked", () => {
           TRACE_ID,
         ),
       ).toBe(true);
+    });
+  });
+
+  describe("when the pointer leaves a turn the sitting counts", () => {
+    // Ticking leaves the checkbox holding focus. Revealing the actions on
+    // anything focused anywhere in the separator left Edit trace lit on every
+    // counted turn, long after the pointer had moved on.
+    /** @scenario "The turn's actions leave with the pointer even on a counted turn" */
+    it("takes Edit trace with it and leaves the tick on screen", async () => {
+      renderTurn({ showSessionCheckbox: true });
+
+      await userEvent.click(sessionCheckbox());
+      await userEvent.unhover(sessionCheckbox());
+
+      // The tick still holds focus, which is what used to keep the whole
+      // cluster lit once the pointer had gone.
+      expect(sessionCheckbox()).toHaveFocus();
+      expect(sessionCheckbox()).toBeChecked();
+      expect(getComputedStyle(turnActions()).opacity).toBe("0");
     });
   });
 

@@ -825,14 +825,6 @@ const TurnSeparator: React.FC<{
     : { right: "100%", marginRight: 2 };
   const badgesWithActions = (
     <Box position="relative" display="flex" alignItems="center" flexShrink={0}>
-      {/* The session's tick is on screen the whole time the queue is being
-          walked, so it sits in flow beside the badge rather than arriving with
-          the pointer like the actions do. */}
-      {showSessionCheckbox && (
-        <Box marginRight={1.5}>
-          <TurnSessionCheckbox traceId={turn.traceId} />
-        </Box>
-      )}
       <TurnAnnotationBadges
         traceId={turn.traceId}
         output={turn.output}
@@ -870,6 +862,11 @@ const TurnSeparator: React.FC<{
       role="group"
       _hover={{ "& > .turn-line": { bg: "border.emphasized" } }}
     >
+      {/* The session's tick leads the separator: ticked state is scanned down
+          the left of a list of turns, and it is on screen the whole time the
+          queue is being walked rather than arriving with the pointer like the
+          actions do. */}
+      {showSessionCheckbox && <TurnSessionCheckbox traceId={turn.traceId} />}
       {annotationsOnLeft && badgesWithActions}
       <Box
         className="turn-line"

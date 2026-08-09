@@ -10,14 +10,28 @@ import { api } from "~/utils/api";
 import { useSession } from "~/utils/auth-client";
 import { useRouter } from "~/utils/compat/next-router";
 
+type Annotator = { id: string; name: string };
+
 interface AddToAnnotationQueueDialogProps {
   open: boolean;
   onClose: () => void;
   /** Traces to queue. One from the drawer, many from the selection bar. */
   traceIds: string[];
+  /**
+   * Who the picker starts on, read when the dialog mounts. A queue page opens
+   * it on its own queue, so moving traces elsewhere is an edit of the
+   * membership they already have rather than a retype of it.
+   */
+  initialAnnotators?: Annotator[];
+  /** Who the traces ended up queued for, once the send went through. */
+  onQueued?: (annotatorIds: string[]) => void;
+  /**
+   * What the sender is doing, so the dialog's words match the button that
+   * opened it: adding queues the traces somewhere new, moving edits the
+   * membership they already have.
+   */
+  intent?: "add" | "move";
 }
-
-type Annotator = { id: string; name: string };
 
 const QUEUE_PREFIX = "queue-";
 const USER_PREFIX = "user-";
@@ -96,13 +110,18 @@ export function AddToAnnotationQueueDialog({
   open,
   onClose,
   traceIds,
+  initialAnnotators,
+  onQueued,
+  intent = "add",
 }: AddToAnnotationQueueDialogProps) {
   const { project } = useOrganizationTeamProject();
   const { data: session } = useSession();
   const router = useRouter();
   const utils = api.useUtils();
   const newQueueDrawer = useDisclosure();
-  const [annotators, setAnnotators] = useState<Annotator[]>([]);
+  const [annotators, setAnnotators] = useState<Annotator[]>(
+    initialAnnotators ?? [],
+  );
 
   // The picker reads the same query, so this shares its cache rather than
   // costing a second round trip.
@@ -131,6 +150,7 @@ export function AddToAnnotationQueueDialog({
 
       setAnnotators([]);
       onClose();
+      onQueued?.(annotators.map((annotator) => annotator.id));
 
       toaster.create({
         title: "Added to annotation queue",
@@ -170,9 +190,15 @@ export function AddToAnnotationQueueDialog({
           <Dialog.CloseTrigger />
           <Dialog.Header paddingBottom={0}>
             <VStack align="start" gap={1}>
-              <Dialog.Title>Add to annotation queue</Dialog.Title>
+              <Dialog.Title>
+                {intent === "move"
+                  ? "Move to queue"
+                  : "Add to annotation queue"}
+              </Dialog.Title>
               <Dialog.Description color="fg.muted" fontSize="sm">
-                Send the selected traces to people or queues for annotation
+                {intent === "move"
+                  ? "Change which people or queues these traces are queued for"
+                  : "Send the selected traces to people or queues for annotation"}
               </Dialog.Description>
             </VStack>
           </Dialog.Header>

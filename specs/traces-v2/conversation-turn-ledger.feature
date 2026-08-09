@@ -107,6 +107,16 @@ Feature: Conversation turn ledger
       Then its actions are on screen
       And they are drawn on a surface of their own, over the ledger
 
+    # A ticked session checkbox stays visible so its state can be scanned, and
+    # that must not drag Edit trace along with it: state persists, actions come
+    # and go with the pointer.
+    @integration
+    Scenario: The turn's actions leave with the pointer even on a counted turn
+      Given a turn whose session checkbox is ticked
+      And the reader's pointer has left the turn
+      Then the Edit trace action is not on screen
+      And the ticked checkbox still is
+
   Rule: A long inter-turn pause is surfaced as a gap divider
 
     A noticeable wall-clock gap since the previous turn finished is drawn as an

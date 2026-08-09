@@ -12,6 +12,12 @@ import { Tooltip } from "~/components/ui/tooltip";
  * actions read as a toolbar floating over the message or the separator instead
  * of as text printed on top of it.
  *
+ * The keyboard reaches it by landing on one of its own actions, which is what
+ * brings it out for a reader who has no pointer. Something else in the same
+ * group holding focus does not: a ticked session checkbox keeps its focus long
+ * after the pointer has moved on, and the actions are meant to leave with the
+ * pointer.
+ *
  * `isHeld` keeps the cluster on screen regardless of the pointer, for as long
  * as what it started is still going: the control the reviewer clicked must not
  * vanish from under them.
@@ -45,7 +51,7 @@ export const HoverActionCluster = forwardRef<
       paddingY={0.5}
       opacity={isHeld ? 1 : 0}
       _groupHover={{ opacity: 1 }}
-      _groupFocusWithin={{ opacity: 1 }}
+      _focusWithin={{ opacity: 1 }}
       transition="opacity 120ms ease"
       // Hover is also what makes the toolbar a click target: while it is not
       // revealed it lies over what it belongs to and would swallow the click
@@ -55,7 +61,7 @@ export const HoverActionCluster = forwardRef<
       css={{
         "@media (hover: hover)": {
           pointerEvents: isHeld ? "auto" : "none",
-          ".group:hover &, .group:focus-within &": { pointerEvents: "auto" },
+          ".group:hover &, &:focus-within": { pointerEvents: "auto" },
         },
       }}
     >

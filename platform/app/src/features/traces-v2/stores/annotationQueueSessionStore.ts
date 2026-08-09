@@ -3,10 +3,11 @@ import { create } from "zustand";
 /**
  * How a turn's trace came to be counted into the session.
  *
- * "auto" is the trace of a turn the reviewer annotated, counted because
- * annotating it is what the sitting is for. "on" and "off" are the reviewer
- * saying so themselves, which is why an "off" is not undone by a later
- * annotation: a deliberate untick outranks a rule of thumb.
+ * "auto" is a trace the walk itself brought in: the turn the reviewer was sent
+ * to, or a turn they annotated. Both are counted because walking and annotating
+ * are what the sitting is for. "on" and "off" are the reviewer saying so
+ * themselves, which is why an "off" is not undone by a later annotation or by
+ * walking back to the turn: a deliberate untick outranks a rule of thumb.
  */
 export type SessionMark = "auto" | "on" | "off";
 
@@ -18,6 +19,8 @@ interface AnnotationQueueSessionState {
   /** Where the end-of-queue hand-off to a dataset has got to. */
   handoff: "idle" | "open" | "added";
   setActive: (active: boolean) => void;
+  /** Counts the trace of the turn the walk has just brought the reviewer to. */
+  noteWalked: (traceId: string) => void;
   /** Counts the trace of a turn that was just annotated. */
   noteAnnotationSaved: (traceId: string) => void;
   /** Counts a trace in or out because the reviewer said so. */
@@ -42,6 +45,14 @@ export const useAnnotationQueueSessionStore =
     handoff: "idle",
     setActive: (active) =>
       set(active ? { active } : { active, marks: {}, handoff: "idle" }),
+    noteWalked: (traceId) =>
+      set((state) =>
+        // Only a trace the sitting has never heard of: walking back to a turn
+        // the reviewer unticked, or ticked by hand, says nothing new about it.
+        state.marks[traceId] === undefined
+          ? { marks: { ...state.marks, [traceId]: "auto" } }
+          : state,
+      ),
     noteAnnotationSaved: (traceId) =>
       set((state) =>
         state.marks[traceId] === "off"

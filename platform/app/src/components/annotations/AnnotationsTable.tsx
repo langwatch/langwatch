@@ -25,6 +25,7 @@ import {
   Database,
   Download,
   Eye,
+  Inbox,
   MessageCircle,
   MoreVertical,
   Trash2,
@@ -37,6 +38,7 @@ import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
 import { showErrorToast } from "~/features/errors";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { traceContextChip } from "~/features/langy/logic/langyContextChips";
+import { AddToAnnotationQueueDialog } from "~/features/traces-v2/components/AddToAnnotationQueueDialog";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -204,6 +206,13 @@ export type AnnotationsTableProps = {
   rowTarget: "queueItem" | "trace";
   /** Queue read: restrict to one queue. */
   queueId?: string;
+  /**
+   * The list this page is, named the way the queue picker names participants
+   * ("queue-<id>" for a named queue, "user-<id>" for a reviewer's own inbox).
+   * A page that is a queue moves its selection to another queue rather than
+   * only adding it to one.
+   */
+  pageQueue?: { annotatorId: string; name: string };
   /** Queue read: include the queues the caller belongs to. */
   showQueueAndUser?: boolean;
   /**
@@ -226,6 +235,7 @@ export const AnnotationsTable = ({
   showStatusFilter,
   rowTarget,
   queueId,
+  pageQueue,
   showQueueAndUser,
   rows: providedRows,
   rowsLoading,
@@ -845,37 +855,112 @@ export const AnnotationsTable = ({
       )}
 
       {selectedCount > 0 && (
-        <SelectionActionBar
-          label={`${selectedCount} selected`}
+        <SelectionActions
+          selectedCount={selectedCount}
+          selectedTraceIds={selectedTraceIds}
+          selectedQueueItemIds={selectedQueueItemIds}
+          pageQueue={pageQueue}
+          isRemoving={deleteQueueItems.isLoading}
           onClear={() => setRowSelection({})}
-          testId="annotations-selection-bar"
-        >
-          <Button
-            size="xs"
-            variant="outline"
-            onClick={() => void addTraceIdsToDataset(selectedTraceIds)}
-          >
-            <Database size={14} />
-            Add to dataset
-          </Button>
-          {selectedQueueItemIds.length > 0 && (
-            <Button
-              size="xs"
-              variant="outline"
-              colorPalette="red"
-              loading={deleteQueueItems.isLoading}
-              onClick={() => removeFromQueue(selectedQueueItemIds)}
-            >
-              <Trash2 size={14} />
-              Remove from queue
-            </Button>
-          )}
-        </SelectionActionBar>
+          onAddToDataset={addTraceIdsToDataset}
+          onRemoveFromQueue={removeFromQueue}
+        />
       )}
       <PersonalFeatureGateDialog state={datasetGate.dialogState} />
     </Flex>
   );
 };
+
+/**
+ * What the reviewer can do with the rows they picked: hand them to a dataset,
+ * queue them for another pass, and take them out of the queue they are on.
+ *
+ * On a queue page the queue action moves rather than adds: the picker opens on
+ * this queue, and leaving it out of the send is what takes the rows off it.
+ */
+function SelectionActions({
+  selectedCount,
+  selectedTraceIds,
+  selectedQueueItemIds,
+  pageQueue,
+  isRemoving,
+  onClear,
+  onAddToDataset,
+  onRemoveFromQueue,
+}: {
+  selectedCount: number;
+  /** The traces behind the picked rows, each one once. */
+  selectedTraceIds: string[];
+  /** The picked rows that are queue items, which is what a queue holds. */
+  selectedQueueItemIds: string[];
+  pageQueue?: AnnotationsTableProps["pageQueue"];
+  isRemoving: boolean;
+  onClear: () => void;
+  onAddToDataset: (traceIds: string[]) => Promise<void>;
+  onRemoveFromQueue: (queueItemIds: string[]) => void;
+}) {
+  const [queueDialogOpen, setQueueDialogOpen] = useState(false);
+
+  const onQueued = (annotatorIds: string[]) => {
+    if (!pageQueue || annotatorIds.includes(pageQueue.annotatorId)) return;
+    onRemoveFromQueue(selectedQueueItemIds);
+  };
+
+  return (
+    <>
+      <SelectionActionBar
+        label={`${selectedCount} selected`}
+        onClear={onClear}
+        testId="annotations-selection-bar"
+      >
+        <Button
+          size="xs"
+          variant="outline"
+          onClick={() => void onAddToDataset(selectedTraceIds)}
+        >
+          <Database size={14} />
+          Add to dataset
+        </Button>
+        <Button
+          size="xs"
+          variant="outline"
+          onClick={() => setQueueDialogOpen(true)}
+        >
+          <Inbox size={14} />
+          {pageQueue ? "Move to queue" : "Add to queue"}
+        </Button>
+        {selectedQueueItemIds.length > 0 && (
+          <Button
+            size="xs"
+            variant="outline"
+            colorPalette="red"
+            loading={isRemoving}
+            onClick={() => onRemoveFromQueue(selectedQueueItemIds)}
+          >
+            <Trash2 size={14} />
+            Remove from queue
+          </Button>
+        )}
+      </SelectionActionBar>
+      {/* Mounted only while it is open, so it opens on the membership the rows
+          have now rather than on what the last send left behind. */}
+      {queueDialogOpen && (
+        <AddToAnnotationQueueDialog
+          open
+          onClose={() => setQueueDialogOpen(false)}
+          traceIds={selectedTraceIds}
+          intent={pageQueue ? "move" : "add"}
+          initialAnnotators={
+            pageQueue
+              ? [{ id: pageQueue.annotatorId, name: pageQueue.name }]
+              : undefined
+          }
+          onQueued={onQueued}
+        />
+      )}
+    </>
+  );
+}
 
 /** Everyone who left an annotation on the row, each named once. */
 function annotatorNames(annotations: AnnotationWithUser[]): string[] {

@@ -26,12 +26,22 @@
 #   - Annotating a turn counts it into the session automatically, because a
 #     turn worth writing about is a turn worth keeping; the reviewer's own
 #     tick or untick always wins over the automatic one.
+#   - The turn the reviewer was sent to is counted into the session from the
+#     start: walking the queue is what the sitting is, so its own traces are in
+#     unless the reviewer says otherwise.
 #   - The bar's "Add to dataset at the end" stays a decision, not a display: it
 #     is the on/off switch for the hand-off, and it carries the live count of
-#     the session's traces so the end of the queue is never a surprise.
+#     the session's traces so the end of the queue is never a surprise. With
+#     nothing counted there is nothing to decide about, so it is disabled.
+#   - One way forward. The bar's primary action is "Next", which finishes the
+#     item and moves on; on the last item it reads "Done". A second, non-
+#     finishing forward button earned its keep by being confused with it.
 #   - The celebration is earned, not automatic. It shows after the dataset add
 #     succeeds, or after the reviewer explicitly confirms ending the session
-#     without one. It never shows under or before the hand-off drawer.
+#     without one. It never shows under or before the hand-off drawer, and no
+#     finished-queue screen ever replaces the conversation: the hand-off plays
+#     out over what the reviewer was reading, and until it resolves the last
+#     item is not finished, so cancelling lands back on it, checkboxes intact.
 #   - The turn the item is about announces itself: the conversation scrolls to
 #     it, blinks it once, and keeps a tint on it, because "which turn was I
 #     sent here for" must survive the reviewer scrolling around.
@@ -60,13 +70,29 @@ Feature: Walking an annotation queue into a dataset
     Given I am signed in to a project with permission to update annotations
     And my queue has items waiting for me
 
-  Rule: The queue bar names every action it offers
+  Rule: The queue bar names every action it offers, and moving forward is finishing
+
+    One way forward: the primary action finishes the item and moves on, so the
+    bar never offers two forward buttons whose difference has to be guessed.
 
     @integration
     Scenario: The queue bar labels its navigation and actions in words
       When I open a queue item
-      Then the bar offers "Previous", "Next", "Edit trace" and "Done"
+      Then the bar offers "Previous", "Edit trace" and "Next"
       And none of them is an unlabelled icon
+
+    @integration
+    Scenario: Next finishes the item and moves on
+      Given my queue has items after this one
+      When I choose "Next"
+      Then the item is recorded as done
+      And the queue moves on to the next item
+      And the bar offers no second way forward
+
+    @integration
+    Scenario: The last item's primary action reads Done
+      Given the last item of my queue is open
+      Then the bar's primary action reads "Done" instead of "Next"
 
     @integration
     Scenario: The queue bar shows my position in the queue
@@ -116,11 +142,36 @@ Feature: Walking an annotation queue into a dataset
       Then the conversation scrolls to the item's own turn
       And that turn blinks once so my eye lands on it
 
+    # Scrolling the instant the thread renders reads as landing on a fragment.
+    # Resting first shows the reviewer they are in a conversation; the carry to
+    # the turn is then legible as movement within it.
+    @integration
+    Scenario: The scroll waits a beat so the conversation is seen first
+      Given the open queue item's thread has more turns than fit on screen
+      When I open that queue item
+      Then the conversation first rests where it loaded
+      And only after a moment does it carry me to the item's turn
+
     @integration
     Scenario: The turn under review keeps a distinct background
       When I open a queue item and scroll the conversation myself
       Then the item's own turn still reads with a distinct background tint
       And no other turn reads that way
+
+    @integration
+    Scenario: The tint hugs the turn and leaves the rail out
+      Given the item's own turn carries annotations in the rail beside it
+      Then the tint wraps the turn's messages with a little breathing room
+      And the annotation rail beside the turn stays outside the tint
+      And the turns around it keep their exact place
+      # The breathing room comes out of the tint's own edges, not the layout:
+      # a focused turn must not push its neighbours around.
+
+    @integration
+    Scenario: The only turn of a conversation is not tinted
+      Given the open queue item's trace is the conversation's only turn
+      Then no tint is drawn on it
+      # A highlight that points at the only thing on screen says nothing.
 
     @integration
     Scenario: Moving to the next item moves the focus
@@ -131,12 +182,27 @@ Feature: Walking an annotation queue into a dataset
 
   Rule: The session's traces are collected as the queue is walked
 
+    Each turn's session checkbox leads its separator, on the left, where ticked
+    state is scanned down a list; the separator's own actions keep the right.
+
+    @integration
+    Scenario: The turn under review is counted from the start
+      When I open a queue item
+      Then that turn's checkbox is already ticked
+      And the bar's dataset toggle counts one trace
+      # The queue sent the reviewer to this trace; the sitting starts from it.
+
+    @integration
+    Scenario: The session checkbox leads the separator
+      When I open a queue item
+      Then each turn's session checkbox sits at the left end of its separator
+
     @integration
     Scenario: Annotating a turn counts its trace into the session
-      Given no turn is counted into the session yet
-      When I annotate one of the conversation's turns
+      Given a turn the session does not count yet
+      When I annotate it
       Then that turn's checkbox reads as ticked
-      And the bar's dataset toggle counts one trace
+      And the bar's count goes up by one
 
     @integration
     Scenario: A turn is counted in or out by hand
@@ -146,9 +212,16 @@ Feature: Walking an annotation queue into a dataset
       And unticking a turn I annotated takes it back out, and my untick wins
 
     @integration
-    Scenario: The dataset toggle carries the live count
+    Scenario: The dataset toggle carries the live count in traces
       Given three turns are counted into the session
-      Then the bar reads "Add to dataset at the end (3)"
+      Then the bar reads "Add to dataset at the end (3 traces)"
+      And with one counted it reads "Add to dataset at the end (1 trace)"
+
+    @integration
+    Scenario: An empty session disables the dataset toggle
+      Given I have unticked every counted turn
+      Then the bar's dataset toggle is disabled
+      And it cannot be ticked until a turn is counted again
 
     @integration
     Scenario: Session marks belong to the sitting
@@ -160,12 +233,21 @@ Feature: Walking an annotation queue into a dataset
 
   Rule: Finishing the queue hands the session's traces to a dataset, then celebrates
 
+    The conversation being read is the whole end of the queue. Done on the last
+    item plays the hand-off out over it: no finished-queue screen replaces it,
+    and the reviewer leaves it only for the celebration, once the records are
+    added or ending without them is confirmed. Until then the item is not
+    finished either, so cancelling lands back on the same item with its
+    checkboxes still in reach.
+
     @integration
-    Scenario: Finishing the last item opens the hand-off with the session's traces
+    Scenario: Finishing the last item opens the hand-off over the conversation
       Given the last item of my queue is open, two traces are counted, and the dataset toggle is on
-      When I mark it done
+      When I choose "Done"
       Then the add-to-dataset drawer opens with those two traces
+      And the conversation I was reading is still behind it
       And the celebration is not shown yet
+      And no screen says the queue is finished
 
     @integration
     Scenario: Traces counted earlier in the walk are part of the hand-off
@@ -177,7 +259,8 @@ Feature: Walking an annotation queue into a dataset
     Scenario: The celebration shows once the records are added
       Given the hand-off drawer is open for the session's traces
       When the records are added to a dataset
-      Then I am told all tasks are complete
+      Then the last item is recorded as done
+      And I am told all tasks are complete
       And the session's set is cleared
 
     @integration
@@ -185,21 +268,23 @@ Feature: Walking an annotation queue into a dataset
       Given the hand-off drawer is open for the session's traces
       When I close it without adding anything
       Then I am asked "Are you sure you want to end this annotation session without adding to a dataset?"
-      And confirming shows the celebration
+      And confirming records the item as done and shows the celebration
 
     @integration
-    Scenario: Cancelling the question returns to the queue with the session intact
+    Scenario: Cancelling the question lands back on the conversation, nothing finished
       Given I was asked about ending the session without a dataset
       When I cancel
-      Then the question closes and nothing else does
-      And every counted trace is still counted
-      And I am offered the hand-off again, or to finish without adding
+      Then the question closes and the conversation I was reading is still there
+      And the last item is not recorded as done
+      And every counted trace is still counted, so I can untick turns before finishing again
+      And choosing "Done" again offers the hand-off again
 
     @integration
     Scenario: Finishing with the dataset toggle off celebrates directly
       Given the last item of my queue is open and the dataset toggle is off
-      When I mark it done
+      When I choose "Done"
       Then no drawer opens
+      And the item is recorded as done
       And I am told all tasks are complete
 
   Rule: An item whose trace is gone is walked past, not stared at
@@ -264,7 +349,7 @@ Feature: Walking an annotation queue into a dataset
       Given the trace behind the open queue item carries no thread id
       When I open that queue item
       Then that trace alone is rendered as a single-turn conversation
-      And I am told to pass the thread_id to capture the whole conversation
+      And no integration hint about thread ids interrupts the reading
 
     # The conversation reads a 90-day window, so a thread older than that comes
     # back empty even though the item's own trace loaded fine. Reading it as an

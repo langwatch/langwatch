@@ -1,6 +1,6 @@
 import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { BookText, ScrollText } from "lucide-react";
-import { memo, useCallback } from "react";
+import { type ComponentProps, memo, useCallback } from "react";
 import {
   LuChevronDown,
   LuChevronRight,
@@ -603,120 +603,18 @@ export const TreeRow = memo(function TreeRow({
             />
           )}
 
-          {/* Delete and restore, only while the trace is being corrected.
-              Shown for a span the correction already removes so bringing it
-              back never depends on finding the right row to hover. */}
-          {isEditing && onToggleDelete && (
-            <Tooltip
-              content={isDraftDeleted ? "Restore span" : "Delete span"}
-              positioning={{ placement: "top" }}
-              openDelay={400}
-            >
-              <Flex
-                as="button"
-                width="20px"
-                height="20px"
-                align="center"
-                justify="center"
-                flexShrink={0}
-                marginLeft={1}
-                borderRadius="xs"
-                color={isDraftDeleted ? "fg" : "red.fg"}
-                opacity={isDraftDeleted || isHovered ? 1 : 0}
-                pointerEvents={isDraftDeleted || isHovered ? "auto" : "none"}
-                tabIndex={isDraftDeleted || isHovered ? 0 : -1}
-                aria-hidden={!isDraftDeleted && !isHovered}
-                _hover={{ bg: "bg.emphasized" }}
-                _focusVisible={{ opacity: 1, bg: "bg.emphasized" }}
-                transition="opacity 0.1s ease"
-                cursor="pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleDelete(span.spanId);
-                }}
-                // Named after the span it acts on: every row carries one of
-                // these, and "Delete span" on all of them tells a screen reader
-                // user nothing about which one they are on.
-                aria-label={
-                  isDraftDeleted
-                    ? `Restore span ${displayName}`
-                    : `Delete span ${displayName}`
-                }
-              >
-                <Icon
-                  as={isDraftDeleted ? LuRotateCcw : LuTrash2}
-                  boxSize={3}
-                />
-              </Flex>
-            </Tooltip>
-          )}
-
-          {/* Comment on this span. Icon-only: the row has no width for a
-              label, so the action names the span it acts on the way the row's
-              delete already does. A span that carries comments shows the count
-              at rest, because a comment nobody can see is a comment nobody
-              reads. */}
-          {traceId && (
-            <AnchorCommentButton
-              traceId={traceId}
-              anchor={{ anchorKind: "span", anchorId: span.spanId }}
-              comments={comments}
-              name={displayName}
-              dense
-              reveal={isHovered ? "always" : "hidden"}
-            />
-          )}
-
-          {/* Pin toggle — hover-revealed on the row (or always shown when
-              the span is already pinned, so the affordance for unpinning
-              is discoverable without having to hover the right span).
-              Click toggles `pinSpan`/`unpinSpan` on the drawer store
-              without selecting the row, so the user can build up a set
-              of tabs without flipping the span detail every time. */}
-          <Tooltip
-            content={isPinned ? "Unpin span tab" : "Pin span tab"}
-            positioning={{ placement: "top" }}
-            openDelay={400}
-          >
-            <Flex
-              as="button"
-              width="20px"
-              height="20px"
-              align="center"
-              justify="center"
-              flexShrink={0}
-              marginLeft={1}
-              borderRadius="xs"
-              color={isPinned ? "fg" : "fg.subtle"}
-              opacity={isPinned || isHovered ? 1 : 0}
-              // Make the button unfocusable + non-interactive while it's
-              // visually hidden. Without this, keyboard users tab onto
-              // an invisible control and the row's navigation flow
-              // breaks (the focus lands somewhere with no visible
-              // target). The hover-revealed pin re-enters tab order
-              // automatically once the row is hovered or already
-              // pinned.
-              pointerEvents={isPinned || isHovered ? "auto" : "none"}
-              tabIndex={isPinned || isHovered ? 0 : -1}
-              aria-hidden={!isPinned && !isHovered}
-              _hover={{ bg: "bg.emphasized", color: "fg" }}
-              _focusVisible={{
-                opacity: 1,
-                bg: "bg.emphasized",
-                color: "fg",
-              }}
-              transition="opacity 0.1s ease, color 0.1s ease"
-              cursor="pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                onTogglePin(span.spanId);
-              }}
-              aria-label={isPinned ? "Unpin span tab" : "Pin span tab"}
-              aria-pressed={isPinned}
-            >
-              <Icon as={isPinned ? LuPinOff : LuPin} boxSize={3} />
-            </Flex>
-          </Tooltip>
+          <RowActions
+            spanId={span.spanId}
+            displayName={displayName}
+            traceId={traceId}
+            comments={comments}
+            isHovered={isHovered}
+            isPinned={isPinned}
+            isEditing={isEditing}
+            isDraftDeleted={isDraftDeleted}
+            onToggleDelete={onToggleDelete}
+            onTogglePin={onTogglePin}
+          />
 
           {/* Cost + duration render as fixed-width right-aligned columns
               (tabular numerals) so every row's trailing figures line up
@@ -754,3 +652,275 @@ export const TreeRow = memo(function TreeRow({
     </Tooltip>
   );
 });
+
+/**
+ * Where the actions sit while they may not spend the name's room: over the end
+ * of the name, on a surface of their own, anchored to the point in the row they
+ * would have occupied. Nothing here is measured, so a virtualized row pays
+ * nothing per frame for it.
+ */
+const FLOATING_ACTIONS: ComponentProps<typeof HStack> = {
+  position: "absolute",
+  right: 0,
+  top: "50%",
+  transform: "translateY(-50%)",
+  // Opaque, so the name it covers never reads through the icons.
+  bg: "bg.panel",
+  boxShadow: "xs",
+  borderRadius: "sm",
+  paddingRight: 1,
+};
+
+/**
+ * Whether one of the row's actions is on screen with the pointer elsewhere: a
+ * pinned span, a commented one, or a span the correction removes. Those are the
+ * rows whose actions keep their room in the name's column.
+ */
+function hasRestingMark({
+  isPinned,
+  commentCount,
+  isEditing,
+  isDraftDeleted,
+}: {
+  isPinned: boolean;
+  commentCount: number;
+  isEditing: boolean;
+  isDraftDeleted: boolean;
+}): boolean {
+  if (isPinned || commentCount > 0) return true;
+  return isEditing && isDraftDeleted;
+}
+
+/**
+ * Where the cluster sits and whether its actions are on screen: roomed in the
+ * row for a mark the reader needs at rest, floating over the end of the name
+ * for actions the pointer has to ask for.
+ */
+function rowActionsLayout({
+  restingMark,
+  isHovered,
+}: {
+  restingMark: boolean;
+  isHovered: boolean;
+}) {
+  const isHidden = !restingMark && !isHovered;
+  return {
+    width: restingMark ? "auto" : "0px",
+    roomed: restingMark ? "true" : "false",
+    surface: {
+      ...(restingMark ? {} : FLOATING_ACTIONS),
+      opacity: isHidden ? 0 : 1,
+      pointerEvents: isHidden ? "none" : "auto",
+    } satisfies ComponentProps<typeof HStack>,
+  };
+}
+
+/**
+ * The actions a waterfall row carries: delete or restore while the trace is
+ * being corrected, comment, and pin.
+ *
+ * An action that is not on screen spends none of the row's width: the cluster
+ * shrinks to nothing and its contents float over the end of the name until the
+ * pointer is on the row. A row that carries a mark the reader needs at rest
+ * keeps the cluster in flow instead, so that mark is both visible and roomed
+ * and the columns beside it never move.
+ */
+function RowActions({
+  spanId,
+  displayName,
+  traceId,
+  comments,
+  isHovered,
+  isPinned,
+  isEditing,
+  isDraftDeleted,
+  onToggleDelete,
+  onTogglePin,
+}: {
+  spanId: string;
+  displayName: string;
+  traceId?: string;
+  comments: AnnotationByTrace[];
+  isHovered: boolean;
+  isPinned: boolean;
+  isEditing: boolean;
+  isDraftDeleted: boolean;
+  onToggleDelete?: (spanId: string) => void;
+  onTogglePin: (spanId: string) => void;
+}) {
+  const layout = rowActionsLayout({
+    restingMark: hasRestingMark({
+      isPinned,
+      commentCount: comments.length,
+      isEditing: isEditing && !!onToggleDelete,
+      isDraftDeleted,
+    }),
+    isHovered,
+  });
+
+  return (
+    <Flex
+      position="relative"
+      alignSelf="stretch"
+      align="center"
+      flexShrink={0}
+      width={layout.width}
+      // Above the row's pulse wash, which paints over the row's own chrome.
+      zIndex={2}
+      data-testid="waterfall-row-actions"
+      data-roomed={layout.roomed}
+    >
+      <HStack gap={0} transition="opacity 0.1s ease" {...layout.surface}>
+        {isEditing && onToggleDelete && (
+          <DeleteSpanAction
+            spanId={spanId}
+            displayName={displayName}
+            isDraftDeleted={isDraftDeleted}
+            isVisible={isDraftDeleted || isHovered}
+            onToggleDelete={onToggleDelete}
+          />
+        )}
+
+        {/* Comment on this span. Icon-only: the row has no width for a label,
+            so the action names the span it acts on the way the row's delete
+            already does. A span that carries comments shows the count at rest,
+            because a comment nobody can see is a comment nobody reads. */}
+        {traceId && (
+          <AnchorCommentButton
+            traceId={traceId}
+            anchor={{ anchorKind: "span", anchorId: spanId }}
+            comments={comments}
+            name={displayName}
+            dense
+            reveal={isHovered ? "always" : "hidden"}
+          />
+        )}
+
+        <PinSpanAction
+          spanId={spanId}
+          isPinned={isPinned}
+          isVisible={isPinned || isHovered}
+          onTogglePin={onTogglePin}
+        />
+      </HStack>
+    </Flex>
+  );
+}
+
+/**
+ * Removes or brings back one span of the correction. Shown for a span the
+ * correction already removes, so bringing it back never depends on finding the
+ * right row to hover.
+ */
+function DeleteSpanAction({
+  spanId,
+  displayName,
+  isDraftDeleted,
+  isVisible,
+  onToggleDelete,
+}: {
+  spanId: string;
+  displayName: string;
+  isDraftDeleted: boolean;
+  isVisible: boolean;
+  onToggleDelete: (spanId: string) => void;
+}) {
+  return (
+    <Tooltip
+      content={isDraftDeleted ? "Restore span" : "Delete span"}
+      positioning={{ placement: "top" }}
+      openDelay={400}
+    >
+      <Flex
+        as="button"
+        width="20px"
+        height="20px"
+        align="center"
+        justify="center"
+        flexShrink={0}
+        marginLeft={1}
+        borderRadius="xs"
+        color={isDraftDeleted ? "fg" : "red.fg"}
+        opacity={isVisible ? 1 : 0}
+        pointerEvents={isVisible ? "auto" : "none"}
+        tabIndex={isVisible ? 0 : -1}
+        aria-hidden={!isVisible}
+        _hover={{ bg: "bg.emphasized" }}
+        _focusVisible={{ opacity: 1, bg: "bg.emphasized" }}
+        transition="opacity 0.1s ease"
+        cursor="pointer"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleDelete(spanId);
+        }}
+        // Named after the span it acts on: every row carries one of these, and
+        // "Delete span" on all of them tells a screen reader user nothing about
+        // which one they are on.
+        aria-label={
+          isDraftDeleted
+            ? `Restore span ${displayName}`
+            : `Delete span ${displayName}`
+        }
+      >
+        <Icon as={isDraftDeleted ? LuRotateCcw : LuTrash2} boxSize={3} />
+      </Flex>
+    </Tooltip>
+  );
+}
+
+/**
+ * Pins the span as a tab, or takes it back off. A pinned span shows it at rest,
+ * so unpinning never depends on finding the right span to hover. Clicking never
+ * selects the row, so a set of tabs can be built up without the span detail
+ * flipping every time.
+ */
+function PinSpanAction({
+  spanId,
+  isPinned,
+  isVisible,
+  onTogglePin,
+}: {
+  spanId: string;
+  isPinned: boolean;
+  isVisible: boolean;
+  onTogglePin: (spanId: string) => void;
+}) {
+  return (
+    <Tooltip
+      content={isPinned ? "Unpin span tab" : "Pin span tab"}
+      positioning={{ placement: "top" }}
+      openDelay={400}
+    >
+      <Flex
+        as="button"
+        width="20px"
+        height="20px"
+        align="center"
+        justify="center"
+        flexShrink={0}
+        marginLeft={1}
+        borderRadius="xs"
+        color={isPinned ? "fg" : "fg.subtle"}
+        opacity={isVisible ? 1 : 0}
+        // Unfocusable and non-interactive while it is invisible: without this,
+        // keyboard users tab onto a control with no visible target. It re-enters
+        // the tab order as soon as the row reveals it.
+        pointerEvents={isVisible ? "auto" : "none"}
+        tabIndex={isVisible ? 0 : -1}
+        aria-hidden={!isVisible}
+        _hover={{ bg: "bg.emphasized", color: "fg" }}
+        _focusVisible={{ opacity: 1, bg: "bg.emphasized", color: "fg" }}
+        transition="opacity 0.1s ease, color 0.1s ease"
+        cursor="pointer"
+        onClick={(e) => {
+          e.stopPropagation();
+          onTogglePin(spanId);
+        }}
+        aria-label={isPinned ? "Unpin span tab" : "Pin span tab"}
+        aria-pressed={isPinned}
+      >
+        <Icon as={isPinned ? LuPinOff : LuPin} boxSize={3} />
+      </Flex>
+    </Tooltip>
+  );
+}

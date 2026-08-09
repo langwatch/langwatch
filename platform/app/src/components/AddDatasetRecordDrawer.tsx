@@ -196,7 +196,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
           if (session.active) session.noteHandoffAdded();
           goBack();
           toaster.create({
-            title: "Succesfully added to dataset",
+            title: "Successfully added to dataset",
             description: (
               <Link
                 colorPalette="white"

@@ -263,15 +263,6 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(screen.getByTestId("conversation-view")).toBeInTheDocument();
       expect(screen.queryAllByRole("textbox")).toHaveLength(0);
     });
-
-    /** @scenario "A trace with no thread is still read as a conversation" */
-    it("says nothing about thread_id", () => {
-      renderPage();
-
-      expect(
-        screen.queryByText(/Pass the thread_id on your integration/),
-      ).not.toBeInTheDocument();
-    });
   });
 
   describe("given the item's own turn is the one under review", () => {
@@ -329,16 +320,6 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(conversationProps().conversationId).toBe("thread-7");
       expect(conversationProps().fallbackTurns).toBeUndefined();
     });
-
-    /** @scenario "A trace with no thread is still read as a conversation" */
-    it("says nothing about thread_id, since the trace carries one", () => {
-      mocks.conversationTurns = { items: [] };
-      renderPage();
-
-      expect(
-        screen.queryByText(/Pass the thread_id on your integration/),
-      ).not.toBeInTheDocument();
-    });
   });
 
   describe("when the reviewer picks another turn of the thread", () => {
@@ -379,16 +360,15 @@ describe("given a reviewer walking their annotation queue", () => {
     });
 
     /** @scenario "A trace with no thread is still read as a conversation" */
-    it("says how to capture the whole conversation, and links the docs", () => {
+    it("interrupts the reading with no integration hint about thread ids", () => {
       renderPage();
 
       expect(
-        screen.getByText(/Pass the thread_id on your integration/),
-      ).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "docs" })).toHaveAttribute(
-        "href",
-        "https://docs.langwatch.ai/integration/python/guide#adding-metadata",
-      );
+        screen.queryByText(/Pass the thread_id on your integration/),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("link", { name: "docs" }),
+      ).not.toBeInTheDocument();
     });
   });
 });

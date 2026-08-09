@@ -54,6 +54,13 @@ export default function Annotations() {
           showStatusFilter={true}
           rowTarget="queueItem"
           queueId={queue.data?.id ?? ""}
+          // The page is this queue, so moving a selection elsewhere starts
+          // from the queue the rows are already on.
+          pageQueue={
+            queue.data
+              ? { annotatorId: `queue-${queue.data.id}`, name: queue.data.name }
+              : undefined
+          }
         />
       </Flex>
     </AnnotationsLayout>
