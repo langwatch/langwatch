@@ -2,8 +2,10 @@ package controlplane
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"sync"
 	"testing"
 
@@ -239,4 +241,34 @@ func TestFetchConfig_UnreadableBody_IsAnError(t *testing.T) {
 			assert.False(t, res.NotModified)
 		})
 	}
+
+	// The nastier shape: the bytes that arrived are complete, valid JSON, and
+	// the stream still failed. Parsing succeeds, so only the read error says
+	// the config is short of whatever the control plane meant to send.
+	t.Run("valid json cut short of its Content-Length", func(t *testing.T) {
+		full := `{"models_allowed":["openai/gpt-5-mini"],"providers_allowed":["mp_1"]}`
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("ETag", "42")
+			w.Header().Set("Content-Type", "application/json")
+			// Promise more than gets written, then return: the connection
+			// closes early and the client's read ends in ErrUnexpectedEOF.
+			w.Header().Set("Content-Length", strconv.Itoa(len(full)+64))
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(full))
+		}))
+		t.Cleanup(srv.Close)
+		cp := NewClient(ClientOptions{
+			BaseURL:    srv.URL,
+			Sign:       func(_ *http.Request, _ []byte) {},
+			HTTPClient: srv.Client(),
+		})
+
+		res, err := cp.FetchConfig(context.Background(), "vk_acme", "41")
+
+		require.Error(t, err, "a truncated body must not pass as config just because it parses")
+		require.ErrorIs(t, err, io.ErrUnexpectedEOF)
+		assert.Empty(t, res.Config.AllowedModels)
+		assert.Empty(t, res.ETag)
+		assert.False(t, res.NotModified)
+	})
 }

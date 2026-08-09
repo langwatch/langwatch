@@ -285,7 +285,7 @@ func (c *Client) FetchConfig(ctx context.Context, vkID, ifNoneMatch string) (dom
 		return domain.ConfigFetchResult{}, err
 	}
 	defer func() { _ = resp.Body.Close() }()
-	body, _ := io.ReadAll(resp.Body)
+	body, readErr := io.ReadAll(resp.Body)
 
 	// A 304 can only answer a conditional request, so it can only mean the
 	// ETag we sent is still current. The result carries that same ETag back:
@@ -296,6 +296,14 @@ func (c *Client) FetchConfig(ctx context.Context, vkID, ifNoneMatch string) (dom
 	}
 	if resp.StatusCode != http.StatusOK {
 		return domain.ConfigFetchResult{}, fmt.Errorf("config fetch returned %d", resp.StatusCode)
+	}
+	// A body that did not arrive whole is not config, even when the bytes that
+	// did arrive parse. A stream cut after the closing brace of the top-level
+	// object unmarshals perfectly well into a bundle missing whatever came
+	// after it, and caching that would drop a key's credentials on the floor
+	// with a fresh ETag stamped on top.
+	if readErr != nil {
+		return domain.ConfigFetchResult{}, fmt.Errorf("config fetch body: %w", readErr)
 	}
 
 	var wire configWire
