@@ -83,6 +83,7 @@ var notMetrics = map[string]string{
 	"gateway_budget_scope_unreachable":    "REST error code",
 	"gateway_trace_project_ambiguous":     "REST error code",
 	"gateway_trace_project_unknown":       "REST error code",
+	"gateway_spend_group_by_unstable":     "REST error code",
 
 	// SDK facade names. The python SDK exposes each resource as a
 	// snake_case attribute, so a documented call reads as a

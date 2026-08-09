@@ -1947,6 +1947,7 @@ The management and webhook APIs answer with the same envelope, and their `type` 
 | `gateway_trace_project_ambiguous` | `400` | A virtual key was created without saying which project its traces and spend land in, and the organization has projects to choose from. Send `trace_project_id`, or scope the key to exactly one project. |
 | `gateway_trace_project_unknown` | `400` | The `trace_project_id` a virtual key named is not a project of this organization, so its traces could not land there. The id is not echoed back. |
 | `gateway_budget_scope_unreachable` | `400` | A `team`, `project` or `group` budget was created that no active key can produce traffic for, so as things stand it cannot spend or block, and it stays that way until some key reaches it. `meta.reachable_project_ids` names where the traffic goes, capped at the first 10 with `meta.reachable_project_count` giving the real total, so a longer list is never mistaken for the whole set. Send `allow_unreachable` to keep it as written. |
+| `gateway_spend_group_by_unstable` | `400` | A spend rollup was grouped by `model` or `provider`, or into time buckets, over a window recent enough that outcomes can still arrive. Until a request settles, the model and provider recorded against it are the ones that were asked for, and they are replaced by the ones that actually served it, so a page walk over such a group counts some requests twice and misses others. `meta.group_by` names the dimensions that move and `meta.settles_at` is when the requested window becomes safe. Reconcile closed periods, or send `allow_unstable` when an approximate shape is enough. |
 | `gateway_budget_cycle_anchor_invalid` | `400` | A `cycle_anchor_at` was sent on a `total` or `manual` budget. Those windows do not cycle. |
 | `group_budget_requires_clickhouse` | `400` | A `group` or `attributed_user` budget needs the ClickHouse spend ledger to tell members apart. |
 | `webhook_endpoint_invalid` | `400` | A webhook endpoint's URL broke the [receiver URL policy](/features/webhooks#what-a-receiver-url-must-look-like). The `message` names the rule. |
@@ -3037,7 +3038,7 @@ GET /api/gateway/v1/spend-events?from=1751328000000&to=1753920000000&cursor=...
 
 - `from` and `to` (unix milliseconds) are **required**, must be safe integers, and `from <= to`; the walk is a ranged read by contract.
 - Pages are **stable under live writes**: rows are served in insert order, so a row folded late is picked up by a later page of the same walk instead of being skipped. Offset pagination cannot promise that; cursors can.
-- Filters: `virtual_key_id`, `end_user_id`, `project_id`, `model`, and `status` (`success`, `error`, `admitted`, `confirmed`, `failed`, `settled`). `limit` defaults to 50, max 200.
+- Filters: `project_id`, `team_id`, `external_id`, `virtual_key_id`, `end_user_id`, `principal_user_id`, `model`, `provider_key`, `request_type`, `label`, `metadata`, and `status` (`success`, `error`, `admitted`, `confirmed`, `failed`, `settled`). The same twelve narrow the summaries, with one exception: `status=admitted` is refused there, because a rollup sums the cost of requests past admission and an in-flight request has none to contribute. `limit` defaults to 50, max 200.
 - Rows come back as the same canonical envelopes the webhooks deliver, plus `next_cursor`. Diff by `gateway_request_id`.
 - A garbled `cursor` is refused with `400` rather than silently restarting the walk.
 - In-flight requests appear with `status=admitted` and null quantities (typed `gateway.request.admitted` on this surface only; they are never pushed). Treat them as not yet billable.
@@ -3072,7 +3073,7 @@ import os
 import langwatch
 
 langwatch.setup(api_key=os.environ["LANGWATCH_ORG_API_KEY"])
-from_ms, to_ms = 1782950400000, 1785628800000
+from_ms, to_ms = 1782864000000, 1785542400000  # 2026-07-01 to 2026-08-01 UTC
 
 # Checksums first, one row per key.
 for row in langwatch.spend_events.iter_summaries(group_by="virtual_key", from_ms=from_ms, to_ms=to_ms):
@@ -3086,6 +3087,43 @@ for event in langwatch.spend_events.iterate(from_ms=from_ms, to_ms=to_ms, virtua
 </CodeGroup>
 
 `iterSummaries` / `iter_summaries` and `iterate` stream rows and fetch pages behind you. Use `summariesPage` / `summaries_page` and `listPage` / `list_page` when you want to hold the cursor yourself, for example to checkpoint a long reconciliation across runs.
+
+Both grains take the same filters, so a divergence can be walked on exactly the narrowing that produced it. Pass an array to widen a filter and name two filters to narrow. The one filter the summaries take differently is `status`, which does not accept `admitted` there: list the events for in-flight requests.
+
+The window below is the closed month declared above, which matters: grouping by `model` or `provider`, or into time buckets, is refused on a window recent enough that outcomes can still arrive. Reconcile closed periods and you never meet it; for a live view, opt out and read the result as approximate: `allow_unstable=true` over REST, `allowUnstable` from the TypeScript SDK, `allow_unstable` from Python.
+
+
+<CodeGroup>
+
+```typescript TypeScript
+for await (const row of langwatch.spendEvents.iterSummaries({
+  groupBy: ["model", "end_user"],
+  bucket: "day",
+  timezone: "Europe/Amsterdam",
+  from, to,
+  model: ["gpt-5-mini", "claude-opus-5"],
+  metadata: { customer_tier: "gold" },
+})) {
+  bill(row.group, row.bucket_start, row.cost.nano_usd);
+}
+```
+
+```python Python
+for row in langwatch.spend_events.iter_summaries(
+    group_by=["model", "end_user"],
+    bucket="day",
+    timezone="Europe/Amsterdam",
+    from_ms=from_ms,
+    to_ms=to_ms,
+    model=["gpt-5-mini", "claude-opus-5"],
+    metadata={"customer_tier": "gold"},
+):
+    bill(row["group"], row["bucket_start"], row["cost"]["nano_usd"])
+```
+
+</CodeGroup>
+
+The full vocabulary, and the groupings that are refused rather than served approximately (`model`, `provider`, and time buckets), are in [Narrowing and grouping](/ai-gateway/cookbooks/metering-and-rebilling#narrowing-and-grouping).
 
 ### The settled work queue
 
@@ -5867,7 +5905,31 @@ curl -sS "$LW/api/gateway/v1/spend-summaries?group_by=virtual_key&from=$FROM_MS&
 # compare event_count and cost.nano_usd per key against your ledger
 ```
 
-Matching checksums end it. On divergence, walk `spend-events` for that key and window by cursor and diff by `gateway_request_id`; the missing or duplicated ids are your fix list. For a delivery gap (receiver outage, endpoint auto-disabled), [replay](/ai-gateway/billing-events#replay) the gap window to your endpoint, honoring your downstream biller's dedup window.
+Matching totals mean no aggregate divergence. They are not proof that both systems hold the same `gateway_request_id` set, since a different set can sum the same, so a biller that needs request-level certainty walks the events regardless. On divergence, walk `spend-events` for that key and window by cursor and compare `gateway_request_id` counts per id rather than set membership: one request dropped and another booked twice leaves the id sets looking close and the money wrong. The ids whose counts disagree are your drops and duplicates. If every count agrees and the totals still differ, no request is missing and the same request is priced differently on each side, so compare `cost.nano_usd` per id rather than its presence. Both reads take the same filters, so you can narrow the walk to exactly what the checksum covered. For a delivery gap (receiver outage, endpoint auto-disabled), [replay](/ai-gateway/billing-events#replay) the gap window to your endpoint, honoring your downstream biller's dedup window.
+
+### Narrowing and grouping
+
+Repeat a filter to widen it and name two filters to narrow. Both reads accept `project_id`, `team_id`, `external_id`, `virtual_key_id`, `end_user_id`, `principal_user_id`, `model`, `provider_key`, `request_type`, `label`, `metadata` and `status`. Only `status=admitted` differs: the summaries refuse it, because a rollup sums the cost of requests past admission and an in-flight request has none. Ask `spend-events` for those.
+
+```bash
+# Two models, one customer tier, one team, in one call
+curl -sS "$LW/api/gateway/v1/spend-summaries?group_by=model,end_user\
+&from=$FROM_MS&to=$TO_MS\
+&model=gpt-5-mini&model=claude-opus-5\
+&metadata=customer_tier:gold\
+&team_id=$TEAM_ID" \
+  -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY"
+```
+
+`metadata` is written `key:value` and splits on the first colon, so a value may contain colons of its own. A key may not contain a colon, and both halves must be non-empty. Repeating a key widens that key: `metadata=tier:gold&metadata=tier:silver` matches either.
+
+`group_by` takes one or two dimensions and `bucket=hour|day` adds a time column in the `timezone` you name. `key` stays the first dimension's value, so an integration written against the single-dimension response keeps working; read `group` to tell two dimensions apart.
+
+<Warning>
+Grouping by `model` or `provider`, or into time buckets, is refused with `gateway_spend_group_by_unstable` on a window recent enough that outcomes can still arrive. Until a request settles, the model and provider recorded against it are the ones that were **asked for**, and they are replaced by the ones that actually served it. A page walk over a group that can move counts some requests twice and misses others, which is the one failure a reconciliation cannot detect on its own.
+
+Reconcile closed periods and this never fires. For a live dashboard where an approximate shape is enough, send `allow_unstable=true`. The refusal carries `meta.settles_at`, so a scheduler can wait rather than guess.
+</Warning>
 
 ## 6. Breach handling and period close
 

@@ -523,6 +523,21 @@
     "/api/annotations": {
       "get": {
         "description": "Returns all annotations for project",
+        "parameters": [
+          {
+            "name": "anchor",
+            "in": "query",
+            "description": "Which comments to return. Omitted returns every comment, including the ones left on a span, a field, an attribute or a message; \"trace\" returns only the comments about whole traces.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "trace",
+                "all"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Annotation response",
@@ -561,6 +576,19 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "anchor",
+            "in": "query",
+            "description": "Which comments to return. Omitted returns every comment, including the ones left on a span, a field, an attribute or a message; \"trace\" returns only the comments about whole traces.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "trace",
+                "all"
+              ]
             }
           }
         ],
@@ -49631,6 +49659,18 @@
                           "key": {
                             "type": "string"
                           },
+                          "group": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          },
+                          "bucket_start": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "event_count": {
                             "type": "integer"
                           },
@@ -49684,6 +49724,8 @@
                         },
                         "required": [
                           "key",
+                          "group",
+                          "bucket_start",
                           "event_count",
                           "settled_count",
                           "usage",
@@ -49893,19 +49935,56 @@
             "name": "group_by",
             "schema": {
               "type": "string",
-              "enum": [
-                "virtual_key",
-                "end_user"
-              ]
+              "description": "One or two dimensions, comma separated: virtual_key, end_user, project, model, provider, principal, request_type. A dimension may not repeat. Each row's `key` is the first dimension's value and `group` names them all, so two rows may share a key.",
+              "example": "model,end_user"
             },
             "required": true
+          },
+          {
+            "in": "query",
+            "name": "bucket",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "none",
+                "hour",
+                "day"
+              ],
+              "default": "none"
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "timezone",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "default": "UTC"
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "allow_unstable",
+            "schema": {
+              "type": "string",
+              "default": "false",
+              "description": "true, 1, yes for yes; false, 0, no or omitted for no. Case does not matter, so a Python True is accepted as sent.",
+              "example": "true"
+            },
+            "required": false
           },
           {
             "in": "query",
             "name": "from",
             "schema": {
               "type": "integer",
-              "exclusiveMinimum": 0
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error.",
+              "example": 1782864000000
             },
             "required": true
           },
@@ -49914,19 +49993,12 @@
             "name": "to",
             "schema": {
               "type": "integer",
-              "exclusiveMinimum": 0
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error.",
+              "example": 1782864000000
             },
             "required": true
-          },
-          {
-            "in": "query",
-            "name": "project_id",
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 100
-            },
-            "required": false
           },
           {
             "in": "query",
@@ -49950,17 +50022,276 @@
           },
           {
             "in": "query",
+            "name": "project_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "team_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "external_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
             "name": "virtual_key_id",
             "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "end_user_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "principal_user_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "model",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "provider_key",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "request_type",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 50
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "label",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "metadata",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 3,
+                  "maxLength": 640
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 640
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 100
+              "enum": [
+                "success",
+                "error",
+                "confirmed",
+                "failed",
+                "settled"
+              ],
+              "description": "Narrow to one lifecycle status. `admitted` is not accepted here: a rollup sums the cost of requests past admission, and an admitted request is still in flight with no cost of its own yet. Ask /spend-events for those."
             },
             "required": false
           }
         ],
         "summary": "List spend summaries",
-        "description": "Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more.",
+        "description": "Reconciliation checksum fast path: spend rollups with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. `group_by` takes one or two of virtual_key, end_user, project, model, provider, principal and request_type, comma-separated, and `bucket` adds an hour or day column in the `timezone` you name. `key` stays the first dimension's value for consumers written against the single-dimension surface; read `group` to tell two dimensions apart. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more. Grouping by model or provider, or into time buckets, is refused with `gateway_spend_group_by_unstable` while the window is recent enough that outcomes can still arrive, because those groups can move under a page walk and the totals would double-count some requests and miss others; ask for an older range, or send `allow_unstable` when an approximate shape is enough. Every filter here is accepted by /spend-events too, and the reverse holds apart from `status=admitted`: a rollup sums the cost of requests past admission, so an admitted request has none to contribute and that narrowing is refused rather than answered with a zero. Ask /spend-events for those.",
         "security": [
           {
             "admin_api_key": []
@@ -50342,8 +50673,10 @@
             "name": "from",
             "schema": {
               "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error.",
+              "example": 1782864000000
             },
             "required": true
           },
@@ -50352,8 +50685,10 @@
             "name": "to",
             "schema": {
               "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error.",
+              "example": 1782864000000
             },
             "required": true
           },
@@ -50379,11 +50714,93 @@
           },
           {
             "in": "query",
+            "name": "project_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "team_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "external_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
             "name": "virtual_key_id",
             "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 100
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "maxItems": 100
+                }
+              ]
             },
             "required": false
           },
@@ -50391,19 +50808,45 @@
             "in": "query",
             "name": "end_user_id",
             "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 256
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "maxItems": 100
+                }
+              ]
             },
             "required": false
           },
           {
             "in": "query",
-            "name": "project_id",
+            "name": "principal_user_id",
             "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 100
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "maxItems": 100
+                }
+              ]
             },
             "required": false
           },
@@ -50411,9 +50854,114 @@
             "in": "query",
             "name": "model",
             "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 200
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "provider_key",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "request_type",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 50
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "label",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "metadata",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 3,
+                  "maxLength": 640
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 640
+                  },
+                  "maxItems": 100
+                }
+              ]
             },
             "required": false
           },
@@ -50435,7 +50983,7 @@
           }
         ],
         "summary": "List spend events",
-        "description": "Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days, Stripe meters 24h+): re-pulling older ranges into a biller past its window can double-bill.",
+        "description": "Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days and Stripe meters 24h+ at the time of writing; both vendors own those numbers, so confirm the current one before you rely on it): re-pulling older ranges into a biller past its window can double-bill. Every filter here is accepted by /spend-summaries too, so a checksum that disagrees can be diffed on exactly the same narrowing; the one difference is `status=admitted`, which only this read answers, because an admitted request is still in flight and contributes no cost to a rollup. Repeat a filter to widen it (`model=a&model=b` matches either); name two different filters to narrow. `metadata` is written `key:value`, split on the first colon, and repeating a key widens that key. `team_id` and `external_id` name Postgres records and are resolved to the projects and keys they cover, so a team with no projects or an external id nobody minted answers with no spend rather than with everything.",
         "security": [
           {
             "admin_api_key": []

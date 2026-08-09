@@ -195,11 +195,13 @@ describe("traces router — #4991 AC2 thread reads", () => {
         threadIds: ["thread-1"],
       });
       expectConstructedWithBlobDeps();
+      // Trace corrections are opt-in per caller, so a thread read that does
+      // not ask for them gets what was captured.
       expect(mockGetTracesWithSpansByThreadIds).toHaveBeenCalledWith(
         "project_123",
         ["thread-1"],
         expect.any(Object),
-        { full: true },
+        { full: true, withEditOverlay: false },
       );
     });
   });

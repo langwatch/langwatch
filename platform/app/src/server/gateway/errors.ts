@@ -383,6 +383,45 @@ export class GatewayBudgetScopeUnreachableError extends HandledError {
 }
 
 /**
+ * A rollup was asked for on a dimension whose groups can still move.
+ *
+ * The walk pages by group key, which is exact only while a row cannot change
+ * groups. Requested model and provider are replaced by the resolved ones when
+ * the outcome lands, so over a window that has not settled a row can cross a
+ * page boundary and be served twice or skipped. A checksum built on that
+ * quietly disagrees with the books and gives no sign it did.
+ *
+ * `meta.group_by` names the dimensions that move, and `meta.settles_at` is
+ * when the requested window will be safe to group this way, so a caller can
+ * schedule the read rather than guess at it.
+ */
+export class GatewaySpendGroupByUnstableError extends HandledError {
+  declare readonly code: "gateway_spend_group_by_unstable";
+
+  constructor({
+    groupBy,
+    settlesAtMs,
+  }: {
+    groupBy: string[];
+    settlesAtMs: number;
+  }) {
+    super(
+      "gateway_spend_group_by_unstable",
+      "That grouping can still change over this window, so the page walk would not be exact",
+      {
+        meta: {
+          group_by: groupBy,
+          settles_at: new Date(settlesAtMs).toISOString(),
+        },
+        httpStatus: 400,
+        fault: "customer",
+      },
+    );
+    this.name = "GatewaySpendGroupByUnstableError";
+  }
+}
+
+/**
  * A cycle anchor was sent on a window that has no cycle to phase.
  *
  * TOTAL never rolls and MANUAL rolls only when someone asks it to, so an

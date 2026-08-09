@@ -1,15 +1,32 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { describe, it } from "node:test";
+import { spawnSync } from "node:child_process";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { after, describe, it } from "node:test";
 
 import {
   bumpedComponents,
   carriesBreakingChange,
+  componentPins,
+  releaseAsVersions,
   releaseComponents,
+  shimPath,
+  shimVersion,
 } from "./guard-breaking-change-scope.ts";
 
 const repoRoot = resolve(import.meta.dirname, "../..");
+const scriptPath = resolve(
+  import.meta.dirname,
+  "guard-breaking-change-scope.ts",
+);
 
 const liveComponents = () =>
   releaseComponents(
@@ -25,6 +42,95 @@ const names = (files: string[]): string[] =>
   bumpedComponents(files, liveComponents())
     .map((component) => component.name)
     .sort();
+
+const temporaryRoots: string[] = [];
+
+after(() => {
+  for (const root of temporaryRoots) {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+/**
+ * A checkout shaped the way the workflow hands one to the guard: the live
+ * release-please config and manifest, the shim contents at the pull request
+ * head, and the two input files the collect step writes.
+ */
+const checkout = ({
+  files,
+  messages,
+  shims = {},
+}: {
+  files: string[];
+  messages: string[];
+  shims?: Record<string, string>;
+}): string => {
+  const root = mkdtempSync(join(tmpdir(), "release-scope-guard-"));
+  temporaryRoots.push(root);
+
+  mkdirSync(join(root, ".github"));
+  for (const file of [
+    ".github/release-please-config.json",
+    ".github/.release-please-manifest.json",
+  ]) {
+    copyFileSync(resolve(repoRoot, file), join(root, file));
+  }
+  for (const [path, content] of Object.entries(shims)) {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), `${content}\n`);
+  }
+
+  writeFileSync(join(root, "changed-files.txt"), `${files.join("\n")}\n`);
+  writeFileSync(
+    join(root, "commit-messages.txt"),
+    `${messages.map((message) => JSON.stringify(message)).join("\n")}\n`,
+  );
+  return root;
+};
+
+const runGuard = (
+  root: string,
+): { status: number; stdout: string; stderr: string } => {
+  const result = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      scriptPath,
+      root,
+      join(root, "changed-files.txt"),
+      join(root, "commit-messages.txt"),
+    ],
+    { encoding: "utf8" },
+  );
+  return {
+    status: result.status ?? -1,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  };
+};
+
+const shimSaying = (version: string): string =>
+  `release-please shadow marker (v9), next: ${version}`;
+
+const pinCommit = (component: string, version: string): string =>
+  [
+    `chore(release): pin ${component} at ${version}`,
+    "",
+    `Release-As: ${version}`,
+  ].join("\n");
+
+const breakingCommit = "feat(gateway)!: a key must say where its traces land";
+
+/** One ordinary file per component, so three components come up bumped. */
+const threeComponents = [
+  "platform/app/src/server/gateway/spendFilters.ts",
+  "sdks/python/src/langwatch/spend_events.py",
+  "sdks/typescript/src/index.ts",
+];
+
+const rootShim = ".release-please-shim";
+const pythonShim = "sdks/python/.release-please-shim";
+const typescriptShim = "sdks/typescript/.release-please-shim";
 
 describe("breaking-change scope guard", () => {
   describe("when reading the markers release-please reads", () => {
@@ -180,6 +286,390 @@ describe("breaking-change scope guard", () => {
         packages: { ".": { component: "root", "exclude-paths": ["/skills/"] } },
       });
       assert.deepEqual(component?.excludePaths, ["skills"]);
+    });
+  });
+
+  describe("when reading the two halves of a pin", () => {
+    it("collects every `Release-As:` footer, and nothing that only reads like one", () => {
+      assert.deepEqual(
+        releaseAsVersions([
+          "chore(release): pin the SDK\n\nRelease-As: 1.5.0",
+          "chore(release): pin the product\n\nrelease-as: 3.11.0",
+          "docs: explain that Release-As: beats every other signal",
+          "feat: something else entirely",
+        ]),
+        ["1.5.0", "3.11.0"],
+      );
+    });
+
+    it("reads the version out of every shim this repository ships", () => {
+      for (const component of liveComponents()) {
+        const shim = shimPath(component);
+        const version = shimVersion(
+          readFileSync(resolve(repoRoot, shim), "utf8"),
+        );
+        assert.match(
+          version ?? "",
+          /^\d+\.\d+\.\d+$/,
+          `${shim} has to record a version the guard can match a footer to`,
+        );
+      }
+    });
+
+    it("takes a component as pinned only with the shim edit and the footer", () => {
+      const [component] = releaseComponents({
+        packages: { "sdks/typescript": { component: "typescript-sdk" } },
+      });
+      assert.ok(component);
+      const pinFor = ({
+        files,
+        footerVersions,
+      }: {
+        files: string[];
+        footerVersions: string[];
+      }) =>
+        componentPins({
+          components: [component],
+          files,
+          footerVersions,
+          readShim: () => shimSaying("1.5.0"),
+        })[0];
+
+      assert.equal(
+        pinFor({ files: [typescriptShim], footerVersions: ["1.5.0"] })?.pinned,
+        "1.5.0",
+      );
+      assert.equal(
+        pinFor({ files: [typescriptShim], footerVersions: [] })?.pinned,
+        undefined,
+      );
+      assert.equal(
+        pinFor({ files: [typescriptShim], footerVersions: ["1.4.1"] })?.pinned,
+        undefined,
+      );
+      assert.equal(
+        pinFor({
+          files: ["sdks/typescript/src/index.ts"],
+          footerVersions: ["1.5.0"],
+        })?.pinned,
+        undefined,
+      );
+    });
+  });
+
+  describe("when the pull request pins the components it must not major", () => {
+    it("passes once every bumped component is pinned", () => {
+      const result = runGuard(
+        checkout({
+          files: [...threeComponents, rootShim, pythonShim, typescriptShim],
+          messages: [
+            breakingCommit,
+            pinCommit("typescript-sdk", "1.5.0"),
+            pinCommit("python-sdk", "1.2.1"),
+            pinCommit("langwatch", "3.11.0"),
+          ],
+          shims: {
+            [rootShim]: shimSaying("3.11.0"),
+            [pythonShim]: shimSaying("1.2.1"),
+            [typescriptShim]: shimSaying("1.5.0"),
+          },
+        }),
+      );
+
+      assert.equal(result.status, 0, result.stderr);
+      assert.ok(
+        result.stdout.includes(
+          `typescript-sdk pinned to 1.5.0 by ${typescriptShim}`,
+        ),
+        result.stdout,
+      );
+      assert.ok(
+        result.stdout.includes(`python-sdk pinned to 1.2.1 by ${pythonShim}`),
+        result.stdout,
+      );
+      assert.ok(
+        result.stdout.includes(`langwatch pinned to 3.11.0 by ${rootShim}`),
+        result.stdout,
+      );
+    });
+
+    it("passes with one component left unpinned, the one taking the major", () => {
+      const result = runGuard(
+        checkout({
+          files: [...threeComponents, pythonShim, typescriptShim],
+          messages: [
+            breakingCommit,
+            pinCommit("typescript-sdk", "1.5.0"),
+            pinCommit("python-sdk", "1.2.1"),
+          ],
+          shims: {
+            [pythonShim]: shimSaying("1.2.1"),
+            [typescriptShim]: shimSaying("1.5.0"),
+          },
+        }),
+      );
+
+      assert.equal(result.status, 0, result.stderr);
+      assert.ok(
+        result.stdout.includes("breaking change scoped to langwatch"),
+        result.stdout,
+      );
+    });
+
+    it("fails while more than one bumped component is still unpinned", () => {
+      const result = runGuard(
+        checkout({
+          files: [...threeComponents, typescriptShim],
+          messages: [breakingCommit, pinCommit("typescript-sdk", "1.5.0")],
+          shims: { [typescriptShim]: shimSaying("1.5.0") },
+        }),
+      );
+
+      assert.equal(result.status, 1);
+      assert.ok(
+        result.stderr.includes(
+          "- typescript-sdk (sdks/typescript), now 1.4.0, pinned to 1.5.0",
+        ),
+        result.stderr,
+      );
+      assert.ok(result.stderr.includes("- python-sdk (sdks/python)"));
+      assert.ok(result.stderr.includes("- langwatch (.)"));
+    });
+
+    it("fails naming the shim whose footer never arrived", () => {
+      const result = runGuard(
+        checkout({
+          files: [...threeComponents, typescriptShim],
+          messages: [breakingCommit],
+          shims: { [typescriptShim]: shimSaying("1.5.0") },
+        }),
+      );
+
+      assert.equal(result.status, 1);
+      assert.ok(
+        result.stderr.includes(`- ${typescriptShim} records next: 1.5.0,`),
+        result.stderr,
+      );
+      assert.ok(
+        result.stderr.includes("and no commit carries `Release-As: 1.5.0`."),
+        result.stderr,
+      );
+    });
+
+    it("fails naming the mismatch when the footer version drifted from the shim", () => {
+      const result = runGuard(
+        checkout({
+          files: [...threeComponents, typescriptShim],
+          messages: [breakingCommit, pinCommit("typescript-sdk", "1.4.1")],
+          shims: { [typescriptShim]: shimSaying("1.5.0") },
+        }),
+      );
+
+      assert.equal(result.status, 1);
+      assert.ok(
+        result.stderr.includes(`- ${typescriptShim} records next: 1.5.0,`),
+        result.stderr,
+      );
+      assert.ok(
+        result.stderr.includes("and no commit carries `Release-As: 1.5.0`."),
+        result.stderr,
+      );
+      assert.ok(
+        result.stderr.includes("Footers on this pull request: 1.4.1."),
+        result.stderr,
+      );
+    });
+
+    it("fails naming the shim that records no version to match", () => {
+      const result = runGuard(
+        checkout({
+          files: [...threeComponents, typescriptShim],
+          messages: [breakingCommit, pinCommit("typescript-sdk", "1.5.0")],
+          shims: { [typescriptShim]: "release-please shadow marker (v9)" },
+        }),
+      );
+
+      assert.equal(result.status, 1);
+      assert.ok(
+        result.stderr.includes(`- ${typescriptShim} changed but records no`),
+        result.stderr,
+      );
+    });
+
+    it("fails when a footer arrives with no shim edit to route it", () => {
+      const result = runGuard(
+        checkout({
+          files: threeComponents,
+          messages: [breakingCommit, pinCommit("typescript-sdk", "1.5.0")],
+        }),
+      );
+
+      assert.equal(result.status, 1);
+      assert.ok(
+        result.stderr.includes("but changes no shim, so nothing routes them"),
+        result.stderr,
+      );
+    });
+
+    it("keeps a breaking change inside one component passing, pins or not", () => {
+      const result = runGuard(
+        checkout({
+          files: ["sdks/typescript/src/index.ts"],
+          messages: [breakingCommit],
+        }),
+      );
+
+      assert.equal(result.status, 0, result.stderr);
+      assert.ok(
+        result.stdout.includes("breaking change scoped to typescript-sdk"),
+        result.stdout,
+      );
+    });
+
+    it("leaves the label override where it lives, ahead of the script", () => {
+      const workflow = readFileSync(
+        resolve(repoRoot, ".github/workflows/release-scope-guard.yml"),
+        "utf8",
+      );
+      const label = workflow.indexOf(
+        "contains(github.event.pull_request.labels.*.name, 'multi-component-major')",
+      );
+      const shortCircuit = workflow.indexOf(
+        'if [ "$ACKNOWLEDGED" = "true" ]; then',
+      );
+      const guardRun = workflow.lastIndexOf(
+        ".github/scripts/guard-breaking-change-scope.ts",
+      );
+
+      assert.ok(label > -1, "the label still reaches the job");
+      assert.ok(
+        shortCircuit > label && shortCircuit < guardRun,
+        "the label still exits before the guard runs at all",
+      );
+      assert.ok(
+        workflow.indexOf("exit 0", shortCircuit) < guardRun,
+        "the label short circuit still exits 0",
+      );
+    });
+  });
+
+  describe("when replaying the pull request that motivated pin detection", () => {
+    // #6656: a stacked branch that inherited a `!` commit from its base, bumped
+    // three components, and pinned all three the way this guard's own
+    // remediation says to. The file list and the commits are the ones the
+    // workflow collects from the API, reduced to the messages that carry a
+    // marker or a footer, and the shim contents are the ones at its head. The
+    // guard failed it anyway, so the only unblock was the
+    // `multi-component-major` label, which asserted three majors nobody wanted.
+    const files = [
+      ".github/workflows/gateway-matrix.yaml",
+      ".release-please-shim",
+      "docs/ai-gateway/api/errors.mdx",
+      "docs/ai-gateway/billing-events.mdx",
+      "docs/ai-gateway/cookbooks/metering-and-rebilling.mdx",
+      "docs/api-reference/openapiLangWatch.json",
+      "docs/llms-full.txt",
+      "platform/app/src/app/api/gateway-spend/[[...route]]/app.ts",
+      "platform/app/src/app/api/gateway-spend/[[...route]]/contract.ts",
+      "platform/app/src/app/api/gateway-spend/__tests__/gateway-spend-rest-api.integration.test.ts",
+      "platform/app/src/app/api/gateway-spend/__tests__/spendFilterParity.unit.test.ts",
+      "platform/app/src/app/api/openapiLangWatch.json",
+      "platform/app/src/features/errors/logic/codes.ts",
+      "platform/app/src/features/errors/logic/presentation.ts",
+      "platform/app/src/pages/settings/gateway/__tests__/billing-events.integration.test.tsx",
+      "platform/app/src/pages/settings/gateway/billing-events.tsx",
+      "platform/app/src/server/api/routers/__tests__/gatewaySpendEvents.unit.test.ts",
+      "platform/app/src/server/api/routers/gatewaySpendEvents.ts",
+      "platform/app/src/server/clickhouse/migrations/00076_gateway_spend_filter_indices.sql",
+      "platform/app/src/server/gateway/__tests__/spendEventsCursor.unit.test.ts",
+      "platform/app/src/server/gateway/__tests__/spendFiltering.integration.test.ts",
+      "platform/app/src/server/gateway/__tests__/spendFilters.unit.test.ts",
+      "platform/app/src/server/gateway/__tests__/spendGrouping.unit.test.ts",
+      "platform/app/src/server/gateway/errors.ts",
+      "platform/app/src/server/gateway/spendEvents.clickhouse.repository.ts",
+      "platform/app/src/server/gateway/spendFilters.ts",
+      "platform/app/src/server/gateway/spendGrouping.ts",
+      "platform/app/src/server/gateway/spendScope.ts",
+      "sdks/python/.release-please-shim",
+      "sdks/python/src/langwatch/spend_events.py",
+      "sdks/python/tests/test_webhooks_and_spend_facades.py",
+      "sdks/typescript/.release-please-shim",
+      "sdks/typescript/src/cli/commands/spend-events/summary.ts",
+      "sdks/typescript/src/cli/program.ts",
+      "sdks/typescript/src/client-sdk/services/spend-events/__tests__/spend-events-api.paging.unit.test.ts",
+      "sdks/typescript/src/client-sdk/services/spend-events/spend-events-api.service.ts",
+      "sdks/typescript/src/index.ts",
+      "sdks/typescript/src/internal/generated/openapi/api-client.ts",
+      "services/aigateway/adapters/gatewaymetrics/docs_contract_test.go",
+      "specs/ai-gateway/gateway-spend-rest.feature",
+    ];
+
+    const shims = {
+      ".release-please-shim": "release-please shadow marker (v5), next: 3.11.0",
+      "sdks/python/.release-please-shim":
+        "release-please shadow marker (v4), next: 1.2.1",
+      "sdks/typescript/.release-please-shim":
+        "release-please shadow marker (v6), next: 1.5.0",
+    };
+
+    const inheritedBreak =
+      "feat(gateway)!: a key must say where its traces land, instead of having it guessed";
+
+    const pins = [
+      "chore(release): pin typescript-sdk at 1.5.0 under the inherited breaking marker\n\nRelease-As: 1.5.0",
+      "chore(release): pin python-sdk at 1.2.1 under the inherited breaking marker\n\nRelease-As: 1.2.1",
+      "chore(release): pin langwatch at 3.11.0 under the inherited breaking marker\n\nRelease-As: 3.11.0",
+    ];
+
+    // The workflow appends the pull request title, since a squash merge puts it
+    // in the subject line.
+    const title =
+      "feat(spend): one filter vocabulary on both reads, and a grouping that refuses to lie";
+
+    it("accepts it, with all three components pinned and none going major", () => {
+      const result = runGuard(
+        checkout({
+          files,
+          messages: [inheritedBreak, ...pins, title],
+          shims,
+        }),
+      );
+
+      assert.equal(result.status, 0, result.stderr);
+      assert.ok(
+        result.stdout.includes(
+          "typescript-sdk pinned to 1.5.0 by sdks/typescript/.release-please-shim",
+        ),
+        result.stdout,
+      );
+      assert.ok(
+        result.stdout.includes(
+          "python-sdk pinned to 1.2.1 by sdks/python/.release-please-shim",
+        ),
+        result.stdout,
+      );
+      assert.ok(
+        result.stdout.includes(
+          "langwatch pinned to 3.11.0 by .release-please-shim",
+        ),
+        result.stdout,
+      );
+    });
+
+    it("still refuses it with the pin commits dropped, shims and all", () => {
+      const result = runGuard(
+        checkout({ files, messages: [inheritedBreak, title], shims }),
+      );
+
+      assert.equal(result.status, 1);
+      for (const [shim, content] of Object.entries(shims)) {
+        assert.ok(
+          result.stderr.includes(
+            `- ${shim} records next: ${shimVersion(content)},`,
+          ),
+          result.stderr,
+        );
+      }
     });
   });
 });

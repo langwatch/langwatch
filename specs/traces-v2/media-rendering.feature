@@ -81,6 +81,123 @@ Feature: Media rendering across trace surfaces
     Then each message bubble renders its image inline and its audio with a player
 
   # ===========================================================================
+  # Conversation thread: media hangs off the message that carried it
+  # ===========================================================================
+  # The thread layout gives each role its own full-width row, so a turn's media
+  # belongs to a message, not to the turn as a whole: what the caller sent
+  # renders under the user message and what the agent replied under the
+  # assistant message. Which side a part belongs to follows the same rule as
+  # the trace summary strips, so a voice turn never shows the caller's
+  # recording twice.
+  #
+  # A turn's own input and output text is flattened at fold time, so the
+  # fold-derived media references are what the thread reads; a turn handed over
+  # with its raw payload (a threadless trace fetched on its own) is walked for
+  # media parts instead. The side bubbles layout renders no media yet, which the
+  # unimplemented scenario below keeps visible rather than leaving as an aside.
+
+  @integration
+  Scenario: A recording the caller sent renders under the user message
+    Given a turn whose media was recorded on the user's message
+    When I read the turn in the conversation thread
+    Then the user message renders a player for it
+    And the assistant message renders no media
+
+  @integration
+  Scenario: A recording the agent replied with renders under the assistant message
+    Given a turn whose media was recorded on the assistant's message
+    When I read the turn in the conversation thread
+    Then the assistant message renders a player for it
+    And the user message renders no media
+
+  @integration
+  Scenario: Media with no role recorded renders on the side it was recorded under
+    Given a turn whose input and output each carry media with no role, as turns
+      ingested before roles were recorded do
+    When I read the turn in the conversation thread
+    Then the user message renders the input's media
+    And the assistant message renders the output's media
+
+  @integration
+  Scenario: A message hidden by a privacy rule renders no media
+    Given a turn whose input was hidden from this viewer by a privacy rule
+    When I read the turn in the conversation thread
+    Then the user side shows the redacted marker and no media
+
+  @unimplemented
+  Scenario: A recording is still there after switching to the side bubbles layout
+    Given a turn whose media renders in the conversation thread
+    When I switch the conversation to the side bubbles layout
+    Then the recording is still offered on the side it belongs to
+
+  # ===========================================================================
+  # Trace summary strips: which side a recording belongs to
+  # ===========================================================================
+  # The trace's own input and output are flattened text, so the summary strips
+  # render the compact media refs the fold derived from the winning span. A
+  # voice turn carries the caller's recording AND the agent's reply recording in
+  # the same span payload, so a ref remembers the role of the chat message its
+  # part was found under and each strip shows only the side it belongs to.
+  # Traces ingested before roles were recorded carry none, and those keep
+  # rendering on both strips rather than disappearing.
+
+  @unit
+  Scenario: A media ref remembers the role of the message it came from
+    Given a span input holding a user message with a recording and an assistant
+      message with the reply recording
+    When the fold derives the trace's media refs
+    Then the first ref is marked as the user's and the second as the assistant's
+    And a ref reached through a nested JSON string keeps the same role
+    And an unrecognized role is recorded as no role at all
+
+  @integration
+  Scenario: The summary input strip carries only the audio spoken into the trace
+    Given trace media refs where one recording is the user's and one is the assistant's
+    When I open the trace summary
+    Then the input strip shows a player for the user's recording only
+
+  @integration
+  Scenario: The summary output strip carries only the reply audio
+    Given the same trace media refs
+    When I open the trace summary
+    Then the output strip shows a player for the assistant's recording only
+
+  @integration
+  Scenario: Media refs recorded without a role render on both summary strips
+    Given a trace whose media refs carry no role, as traces ingested earlier do
+    When I open the trace summary
+    Then both the input and the output strip render the recording, as they did before
+
+  # ===========================================================================
+  # When the media cannot be played
+  # ===========================================================================
+  # A player that sits at zero seconds with no indication is worse than no
+  # player: the viewer cannot tell a silent recording from a lost one. Every
+  # exit from the loading state is visible, including the one where we cannot
+  # even ask the server whether the bytes are still there.
+
+  @integration
+  Scenario: A recording whose bytes are gone shows an unavailable state, not a dead player
+    Given a trace whose recording no longer has bytes in storage
+    When I open the trace and the player fails to load
+    Then the player is replaced by an unavailable state naming the media kind
+    And no error internals are shown to the viewer
+
+  @integration
+  Scenario: A media probe the viewer cannot run still leaves the unavailable state
+    Given a viewer whose probe of the stored object fails
+    When the player fails to load
+    Then a placeholder is shown while the probe is in flight
+    And the player resolves to an unavailable state instead of loading forever
+
+  @integration
+  Scenario: A viewer with trace access can probe trace media
+    Given a viewer who holds traces:view on the project and nothing else
+    When the trace drawer probes a stored object
+    Then the probe answers, matching what the file route already allows
+    And a viewer holding neither trace nor scenario access is refused
+
+  # ===========================================================================
   # URL trust
   # ===========================================================================
   # Span content is attacker-controllable by anyone who can send traces to a

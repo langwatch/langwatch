@@ -42,8 +42,11 @@ the components that should not go major, below.
 
 `release-scope-guard` enforces this on every PR. It fails when the PR title or any
 of its commits carries a breaking marker and the changed files span more than one
-component. If the break really does apply to all of them, add the
-**`multi-component-major`** label and the check passes.
+component, unless the extra components are pinned. It reads the pins described
+below and passes once at most one bumped component is left unpinned. If the break
+really does apply to all of them, add the **`multi-component-major`** label and the
+check passes. Reach for that label only when every one of those majors is wanted:
+it asserts intent, while a pin is what says a component is not going major.
 
 It reads the title and the commits because a squash merge builds the commit from
 exactly those two. It deliberately does not read the PR description, which never
@@ -73,6 +76,18 @@ component a file to touch.
 To pin several components, use one commit per component, each touching only its own
 shim and carrying only its own footer. A commit with two footers, or one that
 touches two shims, is what caused the problem in the first place.
+
+`release-scope-guard` reads pins done this way, so a breaking PR that pins its
+extra components passes without the label. It requires both halves and binds them
+by version: the component's shim has to be among the changed files, and some
+commit has to carry a `Release-As:` footer naming the version that shim records
+after `next:`. A shim edit alone moves nothing, since release-please takes the
+version from the footer, and a footer alone reaches every component the PR
+touched, since only paths route it. The guard sees one file list per PR rather
+than one per commit, so the recorded version is what attributes a footer to a
+component. A changed shim with no footer naming its version fails the check by
+name, which catches a pin that would have done nothing before merge rather than
+after the release PR regenerates.
 
 Worked examples: #6704 pinned the root package to 3.10.0, #6734 pinned the
 typescript SDK to 1.3.0, and #3627 pinned six components at once.

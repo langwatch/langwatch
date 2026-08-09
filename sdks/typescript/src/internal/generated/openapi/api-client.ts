@@ -32,7 +32,10 @@ export interface paths {
         /** @description Returns all annotations for project */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Which comments to return. Omitted returns the comments about whole traces; "all" also returns the ones left on a span, a field, an attribute or a message. */
+                    anchor?: "trace" | "all";
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -77,7 +80,10 @@ export interface paths {
         /** @description Returns all annotations for single trace */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Which comments to return. Omitted returns the comments about whole traces; "all" also returns the ones left on a span, a field, an attribute or a message. */
+                    anchor?: "trace" | "all";
+                };
                 header?: never;
                 path: {
                     /** @description ID of trace to fetch */
@@ -1742,7 +1748,7 @@ export interface paths {
         put?: never;
         /**
          * Create virtual key
-         * @description Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
+         * @description Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
          */
         post: operations["postApiGatewayV1Virtual-keys"];
         delete?: never;
@@ -1911,7 +1917,7 @@ export interface paths {
         put?: never;
         /**
          * Create budget
-         * @description Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). `group` budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the calendar, for budgets that have to line up with a billing date. Send `Idempotency-Key` to make a retry safe.
+         * @description Creates an organization-owned budget. The scope discriminates which resource the budget covers, across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user). `group` budgets are per-member allowances and `attributed_user` budgets are per-end-user templates; both require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the calendar, for budgets that have to line up with a billing date. A `team`, `project` or `group` budget that none of the organization's active keys can produce traffic for is refused with `gateway_budget_scope_unreachable`, since it would never spend and never block; send `allow_unreachable` to keep it anyway, and note that an organization with no active keys is never refused. Send `Idempotency-Key` to make a retry safe.
          */
         post: operations["postApiGatewayV1Budgets"];
         delete?: never;
@@ -3084,7 +3090,7 @@ export interface paths {
         };
         /**
          * List spend summaries
-         * @description Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more.
+         * @description Reconciliation checksum fast path: spend rollups with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. `group_by` takes one or two of virtual_key, end_user, project, model, provider, principal and request_type, comma-separated, and `bucket` adds an hour or day column in the `timezone` you name. `key` stays the first dimension's value for consumers written against the single-dimension surface; read `group` to tell two dimensions apart. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more. Grouping by model or provider, or into time buckets, is refused with `gateway_spend_group_by_unstable` while the window is recent enough that outcomes can still arrive, because those groups can move under a page walk and the totals would double-count some requests and miss others; ask for an older range, or send `allow_unstable` when an approximate shape is enough. Every filter here is accepted by /spend-events too, and the reverse holds apart from `status=admitted`: a rollup sums the cost of requests past admission, so an admitted request has none to contribute and that narrowing is refused rather than answered with a zero. Ask /spend-events for those.
          */
         get: operations["getApiGatewayV1Spend-summaries"];
         put?: never;
@@ -3104,7 +3110,7 @@ export interface paths {
         };
         /**
          * List spend events
-         * @description Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days, Stripe meters 24h+): re-pulling older ranges into a biller past its window can double-bill.
+         * @description Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days and Stripe meters 24h+ at the time of writing; both vendors own those numbers, so confirm the current one before you rely on it): re-pulling older ranges into a biller past its window can double-bill. Every filter here is accepted by /spend-summaries too, so a checksum that disagrees can be diffed on exactly the same narrowing; the one difference is `status=admitted`, which only this read answers, because an admitted request is still in flight and contributes no cost to a rollup. Repeat a filter to widen it (`model=a&model=b` matches either); name two different filters to narrow. `metadata` is written `key:value`, split on the first colon, and repeating a key widens that key. `team_id` and `external_id` name Postgres records and are resolved to the projects and keys they cover, so a team with no projects or an external id nobody minted answers with no spend rather than with everything.
          */
         get: operations["getApiGatewayV1Spend-events"];
         put?: never;
@@ -3124,7 +3130,7 @@ export interface paths {
         };
         /**
          * Read one end user's spend
-         * @description Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `cap` is the applicable attributed-user budget cap and its remaining headroom once such a budget template applies; null until then.
+         * @description Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `caps` lists every attributed-user budget that applies to this end user, each with its limit and the spend against it. It is an empty array until such a budget template applies, never null.
          */
         get: operations["getApiGatewayV1End-usersByIdSpend"];
         put?: never;
@@ -9005,6 +9011,11 @@ export interface operations {
                             display_prefix: string;
                             principal_user_id: string | null;
                             trace_project_id: string | null;
+                            /**
+                             * @description Which rule puts this key's traces and costs where they go: `explicit` is the `trace_project_id` on the key, `project_scope` is its single project scope, and `governance_fallback` means the key names no destination and its spend is attributed to the organization's hidden governance project. Only the first two name a project the key itself chose, so a `governance_fallback` key is counted by no project budget a reader would think to look at. New keys can no longer be written in that shape.
+                             * @enum {string}
+                             */
+                            trace_project_source: "explicit" | "project_scope" | "governance_fallback";
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -9253,6 +9264,11 @@ export interface operations {
                             display_prefix: string;
                             principal_user_id: string | null;
                             trace_project_id: string | null;
+                            /**
+                             * @description Which rule puts this key's traces and costs where they go: `explicit` is the `trace_project_id` on the key, `project_scope` is its single project scope, and `governance_fallback` means the key names no destination and its spend is attributed to the organization's hidden governance project. Only the first two name a project the key itself chose, so a `governance_fallback` key is counted by no project budget a reader would think to look at. New keys can no longer be written in that shape.
+                             * @enum {string}
+                             */
+                            trace_project_source: "explicit" | "project_scope" | "governance_fallback";
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -9408,6 +9424,11 @@ export interface operations {
                             display_prefix: string;
                             principal_user_id: string | null;
                             trace_project_id: string | null;
+                            /**
+                             * @description Which rule puts this key's traces and costs where they go: `explicit` is the `trace_project_id` on the key, `project_scope` is its single project scope, and `governance_fallback` means the key names no destination and its spend is attributed to the organization's hidden governance project. Only the first two name a project the key itself chose, so a `governance_fallback` key is counted by no project budget a reader would think to look at. New keys can no longer be written in that shape.
+                             * @enum {string}
+                             */
+                            trace_project_source: "explicit" | "project_scope" | "governance_fallback";
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -9668,6 +9689,11 @@ export interface operations {
                             display_prefix: string;
                             principal_user_id: string | null;
                             trace_project_id: string | null;
+                            /**
+                             * @description Which rule puts this key's traces and costs where they go: `explicit` is the `trace_project_id` on the key, `project_scope` is its single project scope, and `governance_fallback` means the key names no destination and its spend is attributed to the organization's hidden governance project. Only the first two name a project the key itself chose, so a `governance_fallback` key is counted by no project budget a reader would think to look at. New keys can no longer be written in that shape.
+                             * @enum {string}
+                             */
+                            trace_project_source: "explicit" | "project_scope" | "governance_fallback";
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -9956,6 +9982,11 @@ export interface operations {
                             display_prefix: string;
                             principal_user_id: string | null;
                             trace_project_id: string | null;
+                            /**
+                             * @description Which rule puts this key's traces and costs where they go: `explicit` is the `trace_project_id` on the key, `project_scope` is its single project scope, and `governance_fallback` means the key names no destination and its spend is attributed to the organization's hidden governance project. Only the first two name a project the key itself chose, so a `governance_fallback` key is counted by no project budget a reader would think to look at. New keys can no longer be written in that shape.
+                             * @enum {string}
+                             */
+                            trace_project_source: "explicit" | "project_scope" | "governance_fallback";
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -10098,6 +10129,11 @@ export interface operations {
                             display_prefix: string;
                             principal_user_id: string | null;
                             trace_project_id: string | null;
+                            /**
+                             * @description Which rule puts this key's traces and costs where they go: `explicit` is the `trace_project_id` on the key, `project_scope` is its single project scope, and `governance_fallback` means the key names no destination and its spend is attributed to the organization's hidden governance project. Only the first two name a project the key itself chose, so a `governance_fallback` key is counted by no project budget a reader would think to look at. New keys can no longer be written in that shape.
+                             * @enum {string}
+                             */
+                            trace_project_source: "explicit" | "project_scope" | "governance_fallback";
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -10232,6 +10268,11 @@ export interface operations {
                             display_prefix: string;
                             principal_user_id: string | null;
                             trace_project_id: string | null;
+                            /**
+                             * @description Which rule puts this key's traces and costs where they go: `explicit` is the `trace_project_id` on the key, `project_scope` is its single project scope, and `governance_fallback` means the key names no destination and its spend is attributed to the organization's hidden governance project. Only the first two name a project the key itself chose, so a `governance_fallback` key is counted by no project budget a reader would think to look at. New keys can no longer be written in that shape.
+                             * @enum {string}
+                             */
+                            trace_project_source: "explicit" | "project_scope" | "governance_fallback";
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -10366,6 +10407,11 @@ export interface operations {
                             display_prefix: string;
                             principal_user_id: string | null;
                             trace_project_id: string | null;
+                            /**
+                             * @description Which rule puts this key's traces and costs where they go: `explicit` is the `trace_project_id` on the key, `project_scope` is its single project scope, and `governance_fallback` means the key names no destination and its spend is attributed to the organization's hidden governance project. Only the first two name a project the key itself chose, so a `governance_fallback` key is counted by no project budget a reader would think to look at. New keys can no longer be written in that shape.
+                             * @enum {string}
+                             */
+                            trace_project_source: "explicit" | "project_scope" | "governance_fallback";
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -10751,6 +10797,11 @@ export interface operations {
                             member_count?: number;
                             end_users_seen?: number;
                             end_users_over?: number;
+                            /**
+                             * @description Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. This is the only field that tells a budget nothing can reach apart from one that simply has not been breached.
+                             * @enum {string}
+                             */
+                            scope_reach?: "reachable" | "unreachable";
                         }[];
                         spend_available: boolean;
                         /** @description Pass back as `cursor` for the next page. Null means the walk is exhausted; a full page does NOT mean there is more. */
@@ -10901,6 +10952,8 @@ export interface operations {
                      * @description Phases the budget's cycle off this instant instead of the calendar, so a `month` budget anchored 2026-01-17T09:00:00Z starts a fresh period every 17th at 09:00 UTC. Omit for calendar alignment, which is the default and unchanged behaviour. A month cycle anchored past the 28th clamps into shorter months and springs back: anchored on the 31st gives Feb 28, then Mar 31. Immutable after create, since moving it would redraw periods the budget has already reported and enforced on. Rejected with `gateway_budget_cycle_anchor_invalid` on `total` and `manual`, which do not cycle.
                      */
                     cycle_anchor_at?: string;
+                    /** @description Keeps a `team`, `project` or `group` budget that no active key can produce traffic for, which is otherwise refused with `gateway_budget_scope_unreachable`. Send it to provision ahead of the keys that will use the budget. An organization with no active keys is never refused, so this is not needed during first setup. */
+                    allow_unreachable?: boolean;
                 };
             };
         };
@@ -10952,6 +11005,11 @@ export interface operations {
                             member_count?: number;
                             end_users_seen?: number;
                             end_users_over?: number;
+                            /**
+                             * @description Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. This is the only field that tells a budget nothing can reach apart from one that simply has not been breached.
+                             * @enum {string}
+                             */
+                            scope_reach?: "reachable" | "unreachable";
                         };
                     };
                 };
@@ -11114,6 +11172,11 @@ export interface operations {
                             member_count?: number;
                             end_users_seen?: number;
                             end_users_over?: number;
+                            /**
+                             * @description Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. This is the only field that tells a budget nothing can reach apart from one that simply has not been breached.
+                             * @enum {string}
+                             */
+                            scope_reach?: "reachable" | "unreachable";
                         };
                         spend_available: boolean;
                     };
@@ -11277,6 +11340,11 @@ export interface operations {
                             member_count?: number;
                             end_users_seen?: number;
                             end_users_over?: number;
+                            /**
+                             * @description Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. This is the only field that tells a budget nothing can reach apart from one that simply has not been breached.
+                             * @enum {string}
+                             */
+                            scope_reach?: "reachable" | "unreachable";
                         };
                     };
                 };
@@ -11434,6 +11502,11 @@ export interface operations {
                             member_count?: number;
                             end_users_seen?: number;
                             end_users_over?: number;
+                            /**
+                             * @description Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. This is the only field that tells a budget nothing can reach apart from one that simply has not been breached.
+                             * @enum {string}
+                             */
+                            scope_reach?: "reachable" | "unreachable";
                         };
                     };
                 };
@@ -11585,6 +11658,11 @@ export interface operations {
                             member_count?: number;
                             end_users_seen?: number;
                             end_users_over?: number;
+                            /**
+                             * @description Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. This is the only field that tells a budget nothing can reach apart from one that simply has not been breached.
+                             * @enum {string}
+                             */
+                            scope_reach?: "reachable" | "unreachable";
                         };
                     };
                 };
@@ -22330,13 +22408,26 @@ export interface operations {
     "getApiGatewayV1Spend-summaries": {
         parameters: {
             query: {
-                group_by: "virtual_key" | "end_user";
+                group_by: string;
+                bucket?: "none" | "hour" | "day";
+                timezone?: string;
+                allow_unstable?: string;
                 from: number;
                 to: number;
-                project_id?: string;
                 cursor?: string;
                 limit?: number;
-                virtual_key_id?: string;
+                project_id?: string | string[];
+                team_id?: string | string[];
+                external_id?: string | string[];
+                virtual_key_id?: string | string[];
+                end_user_id?: string | string[];
+                principal_user_id?: string | string[];
+                model?: string | string[];
+                provider_key?: string | string[];
+                request_type?: string | string[];
+                label?: string | string[];
+                metadata?: string | string[];
+                status?: "success" | "error" | "confirmed" | "failed" | "settled";
             };
             header?: never;
             path?: never;
@@ -22353,6 +22444,10 @@ export interface operations {
                     "application/json": {
                         data: {
                             key: string;
+                            group: {
+                                [key: string]: string;
+                            };
+                            bucket_start: string | null;
                             event_count: number;
                             settled_count: number;
                             usage: {
@@ -22462,10 +22557,17 @@ export interface operations {
                 to: number;
                 cursor?: string;
                 limit?: number;
-                virtual_key_id?: string;
-                end_user_id?: string;
-                project_id?: string;
-                model?: string;
+                project_id?: string | string[];
+                team_id?: string | string[];
+                external_id?: string | string[];
+                virtual_key_id?: string | string[];
+                end_user_id?: string | string[];
+                principal_user_id?: string | string[];
+                model?: string | string[];
+                provider_key?: string | string[];
+                request_type?: string | string[];
+                label?: string | string[];
+                metadata?: string | string[];
                 status?: "success" | "error" | "admitted" | "confirmed" | "failed" | "settled";
             };
             header?: never;

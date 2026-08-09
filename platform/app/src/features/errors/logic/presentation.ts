@@ -1586,6 +1586,19 @@ const presentations = {
       return `None of your keys send traffic to that ${scopeType}, so this budget would never spend and never stop anything. Put it where your keys already run, scope a key to that ${scopeType}, or save it anyway to set it up ahead of the keys that will use it.`;
     },
   },
+  gateway_spend_group_by_unstable: {
+    // Says what the numbers would have done, not what the walk does
+    // internally: "your totals could double-count" is actionable, "the
+    // cursor is not exact over a mutable group key" is not.
+    title: "These totals would not add up yet",
+    describe: (error) => {
+      const settlesAt = str(error, "settles_at", "");
+      const when = settlesAt
+        ? ` Requests in this range finish arriving at ${settlesAt}.`
+        : "";
+      return `Recent requests can still change which model or provider they are counted under, and which time bucket they fall in, so grouping this way now could count some twice and miss others. Ask for an older range, group by key or end user instead, or allow an approximate read if you only need a rough shape.${when}`;
+    },
+  },
   gateway_scope_org_mismatch: {
     // Names the KIND of scope, never the id — the id belongs to a record in
     // another organization, which is exactly what this guard refuses to
