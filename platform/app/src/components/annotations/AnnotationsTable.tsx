@@ -27,7 +27,6 @@ import {
   Eye,
   MessageCircle,
   MoreVertical,
-  Pencil,
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -50,6 +49,7 @@ import { Radio, RadioGroup } from "../../components/ui/radio";
 import { Tooltip } from "../../components/ui/tooltip";
 import { NoDataInfoBlock } from "../NoDataInfoBlock";
 import { Checkbox } from "../ui/checkbox";
+import { ListTable } from "../ui/ListTable";
 import { Pagination } from "../ui/Pagination";
 import { RedactedField } from "../ui/RedactedField";
 import { SelectionActionBar } from "../ui/SelectionActionBar";
@@ -751,27 +751,6 @@ export const AnnotationsTable = ({
         <Button variant="ghost" onClick={onExport ?? exportPage}>
           {exportLabel ?? "Export"} <Download size={16} />
         </Button>
-        {queueId && (
-          <Menu.Root>
-            <Menu.Trigger asChild>
-              <IconButton
-                aria-label="Queue actions"
-                variant="outline"
-                minWidth={0}
-              >
-                <MoreVertical size={16} />
-              </IconButton>
-            </Menu.Trigger>
-            <Menu.Content>
-              <Menu.Item
-                value="edit"
-                onClick={() => openDrawer("addAnnotationQueue", { queueId })}
-              >
-                <Pencil size={14} /> Edit queue
-              </Menu.Item>
-            </Menu.Content>
-          </Menu.Root>
-        )}
       </HStack>
 
       {isLoading ? (
@@ -807,9 +786,12 @@ export const AnnotationsTable = ({
             minWidth={0}
             overflow="auto"
             paddingX={6}
+            paddingBottom={4}
             data-testid="annotations-table-scroll"
           >
-            <Table.Root variant="line" width="full">
+            {/* The card scrolls its own columns, so a table too wide for the
+                page never breaks out of the border around it. */}
+            <ListTable containerProps={{ overflowX: "auto" }} width="full">
               <Table.Header>
                 {table.getHeaderGroups().map((headerGroup) => (
                   <Table.Row key={headerGroup.id}>
@@ -867,7 +849,7 @@ export const AnnotationsTable = ({
                   </LangyContextTarget>
                 ))}
               </Table.Body>
-            </Table.Root>
+            </ListTable>
           </Box>
           <Pagination
             page={paging.page}

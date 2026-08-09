@@ -326,6 +326,32 @@ Rule: The sidebar says which list is open
     Then "All" is the highlighted entry
     And the inbox is not highlighted
 
+Rule: A queue is edited from the sidebar entry that names it
+
+  Editing a queue is about the queue, not about the rows on screen, so the
+  action belongs to the queue wherever it is listed rather than to the header
+  of that one queue's page.
+
+  Background:
+    Given the user is authenticated with "annotations:view" permission
+
+  @integration
+  Scenario: Every queue in the sidebar carries its own actions menu
+    When the sidebar lists the reviewer's queues
+    Then each queue offers an actions menu
+    And picking "Edit queue" opens the edit drawer for that queue
+
+  @integration
+  Scenario: A queue page header offers no queue actions
+    When a queue page renders
+    Then its header carries no queue actions menu
+
+  @integration
+  Scenario: A member who cannot change resources is offered no queue actions
+    Given the reviewer cannot change resources
+    When the sidebar lists their queues
+    Then no queue offers an actions menu
+
 Rule: The all annotations page pages through its rows
 
   The page groups every annotation it loaded, so the pager has to slice them

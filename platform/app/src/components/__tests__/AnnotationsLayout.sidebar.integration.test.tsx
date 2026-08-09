@@ -3,6 +3,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactElement, ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -14,6 +15,8 @@ import "@testing-library/jest-dom/vitest";
 
 const mocks = vi.hoisted(() => ({
   pathname: "/acme/annotations",
+  isLiteMember: false,
+  openDrawer: vi.fn(),
 }));
 
 vi.mock("~/utils/compat/next-navigation", () => ({
@@ -26,10 +29,10 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "p1", slug: "acme" } }),
 }));
 vi.mock("~/hooks/useLiteMemberGuard", () => ({
-  useLiteMemberGuard: () => ({ isLiteMember: false }),
+  useLiteMemberGuard: () => ({ isLiteMember: mocks.isLiteMember }),
 }));
 vi.mock("~/hooks/useDrawer", () => ({
-  useDrawer: () => ({ openDrawer: vi.fn() }),
+  useDrawer: () => ({ openDrawer: mocks.openDrawer }),
 }));
 vi.mock("~/components/DashboardLayout", () => ({
   DashboardLayout: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -101,6 +104,8 @@ const selected = (href: string) =>
 
 beforeEach(() => {
   mocks.pathname = "/acme/annotations";
+  mocks.isLiteMember = false;
+  mocks.openDrawer.mockClear();
 });
 afterEach(cleanup);
 
@@ -126,6 +131,41 @@ describe("AnnotationsLayout sidebar", () => {
       expect(selected("/acme/annotations/all")).toBe("true");
       expect(selected("/acme/annotations")).toBe("false");
       expect(selected("/acme/annotations/me")).toBe("false");
+    });
+  });
+
+  describe("when the sidebar lists the reviewer's queues", () => {
+    /** @scenario "Every queue in the sidebar carries its own actions menu" */
+    it("gives each queue a menu that edits that queue", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      renderLayout();
+
+      expect(
+        screen.getByRole("button", { name: "Actions for queue Sales reviews" }),
+      ).toBeInTheDocument();
+
+      await user.click(
+        screen.getByRole("button", {
+          name: "Actions for queue Support reviews",
+        }),
+      );
+      await user.click(await screen.findByText("Edit queue"));
+
+      expect(mocks.openDrawer).toHaveBeenCalledWith("addAnnotationQueue", {
+        queueId: "q1",
+      });
+    });
+  });
+
+  describe("given the reviewer cannot change resources", () => {
+    /** @scenario "A member who cannot change resources is offered no queue actions" */
+    it("offers no queue actions", () => {
+      mocks.isLiteMember = true;
+      renderLayout();
+
+      expect(
+        screen.queryByRole("button", { name: /Actions for queue/ }),
+      ).not.toBeInTheDocument();
     });
   });
 });

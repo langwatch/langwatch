@@ -250,7 +250,7 @@ export const AddAnnotationQueueDrawer = ({
             </HStack>
             <HStack>
               <Text paddingTop={5} fontSize="2xl">
-                Create Annotation Queue
+                {queueId ? "Edit Annotation Queue" : "Create Annotation Queue"}
               </Text>
             </HStack>
           </Drawer.Header>

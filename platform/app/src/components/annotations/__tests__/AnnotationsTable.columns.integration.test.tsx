@@ -363,6 +363,16 @@ describe("AnnotationsTable columns and row actions", () => {
       expect(screen.getByText("All")).toBeInTheDocument();
     });
 
+    /** @scenario "A queue page header offers no queue actions" */
+    it("leaves editing the queue to the sidebar", () => {
+      renderQueuePage({ queueId: "queue-1" });
+
+      expect(
+        screen.queryByRole("button", { name: "Queue actions" }),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Edit queue")).not.toBeInTheDocument();
+    });
+
     /** @scenario "The header controls sit outside the sideways-scrolling region" */
     it("scrolls only the table sideways", () => {
       renderQueuePage();
