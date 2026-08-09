@@ -252,13 +252,10 @@ const secured = createOrgApp({
 secured.hono.onError(handleGatewaySpendApiError);
 
 /**
- * One to two dimensions, comma-separated. Two is the ceiling because a third
+ * One or two dimensions, comma separated. Two is the ceiling because a third
  * multiplies the group count past what a single cursor walk serves at a
  * useful page size, and a caller who wants a third is really asking for the
  * events read.
- */
-/**
- * One or two dimensions, comma separated.
  *
  * Validated inside the transform rather than piped into an array schema so a
  * refusal names `group_by` and not `group_by.0`. The caller sent one string;
