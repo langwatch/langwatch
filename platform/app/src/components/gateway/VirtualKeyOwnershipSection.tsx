@@ -298,8 +298,7 @@ export function VirtualKeyOwnershipSection({
 
 /**
  * Read-only ownership for the edit drawer: the scope chips the key
- * already has, plus where its traces land. Ownership is fixed after
- * create so trace attribution never silently shifts.
+ * already has, plus where its traces land.
  *
  * The destination is the one stored on the key, not one re-derived from the
  * scopes, so what is shown here is what the gateway actually does. A key
@@ -349,7 +348,7 @@ export function VirtualKeyOwnershipReadOnly({
       <HStack gap={1} alignItems="center">
         <SmallLabel>Ownership</SmallLabel>
         <FieldInfoTooltip
-          description="Ownership is fixed after create so trace attribution never silently shifts. To move a key, revoke it and create a new one where it should live."
+          description="Who can see and manage this key, set at creation. The trace destination is stored on the key, so changing scopes never silently moves where traces and costs land. Move either through the management API, or revoke this key and create a new one."
           docHref="/ai-gateway/virtual-keys#creating-a-vk"
           testId="vk-ownership-info"
         />
@@ -357,8 +356,15 @@ export function VirtualKeyOwnershipReadOnly({
       <ProviderScopeChips scopes={named} principal={principal} />
       <HStack gap={1.5} alignItems="center">
         <Text fontSize="xs" color="fg.muted" data-testid="vk-trace-destination">
-          Traces and costs land in{" "}
-          {destination ?? "the organization's governance inbox"}.
+          {destination ? (
+            <>Traces and costs land in {destination}.</>
+          ) : (
+            <>
+              This key predates stored destinations, so its traces are not filed
+              into any project. Give it a trace project through the management
+              API.
+            </>
+          )}
         </Text>
         {traceProjectArchived && (
           <Badge
@@ -374,7 +380,8 @@ export function VirtualKeyOwnershipReadOnly({
       {traceProjectArchived && (
         <Text fontSize="xs" color="fg.muted">
           This key keeps sending its traces and costs there. Restore the project
-          to see them again.
+          to see them again, or point the key at another project through the
+          management API.
         </Text>
       )}
     </VStack>

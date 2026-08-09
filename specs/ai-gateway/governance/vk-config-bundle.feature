@@ -146,7 +146,7 @@ Feature: AI Gateway — Virtual Key /config bundle materialisation
   ## specs/ai-gateway/virtual-key-creation.feature, and nothing on this path
   ## re-derives it:
   ##   (a) the key's stored destination        → that project's id
-  ##   (b) the key has none                    → null (bundle omits the claim, no 500)
+  ##   (b) the key has none                    → the claim is present and null (no 500)
   ##
   ## Why a shared key still gets one: TEAM/ORG-owned VKs need somewhere to file
   ## their spans so that a single "AI Governance" trace-search filter surfaces
@@ -158,7 +158,7 @@ Feature: AI Gateway — Virtual Key /config bundle materialisation
   ## Why (b) is null and not 500: older self-hosted deployments pre-governance
   ## may have keys written when there was no `internal_governance` project to
   ## give them. The bundle nulling the claim (instead of erroring) is
-  ## forward-compatible — those deployments simply won't see those VKs' spans in
+  ## forward-compatible: those deployments simply won't see those VKs' spans in
   ## any project filter, which matches their existing behavior.
 
   Scenario: JWT project_id is the destination stored on the key
