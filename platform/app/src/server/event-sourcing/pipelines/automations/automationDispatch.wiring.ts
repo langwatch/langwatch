@@ -291,6 +291,7 @@ export function buildAutomationDispatchPorts({
           prisma,
           triggers,
           projects,
+          emailSuppressions,
           baseHost,
           resolveClickHouseClient,
         }),

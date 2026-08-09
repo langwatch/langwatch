@@ -1,6 +1,7 @@
 import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useRef, useState } from "react";
 import { useColorMode } from "~/components/ui/color-mode";
+import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -273,14 +274,14 @@ export function EditAutomationFilterDrawer({
           void queryClient.automation.getTriggers.invalidate();
           closeDrawer();
         },
-        onError: () => {
-          toaster.create({
-            title: "Error",
-            description: "Error updating automation",
-            type: "error",
-            meta: { closable: true },
-          });
-        },
+        // The server rejects a filter set that leaves the automation matching
+        // every trace, and its registered copy says which condition is
+        // missing. A hardcoded title would throw that away.
+        onError: (error) =>
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't update automation",
+          }),
       },
     );
   };

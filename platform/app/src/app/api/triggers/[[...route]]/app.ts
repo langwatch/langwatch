@@ -126,7 +126,7 @@ secured.access(requires("triggers:view")).get(
         ...toTriggerResponse(t),
         platformUrl: platformUrl({
           projectSlug: project.slug,
-          path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${t.id}`,
+          path: `/automations?drawer.open=automation&drawer.automationId=${t.id}`,
         }),
       })),
     );
@@ -173,7 +173,7 @@ secured.access(requires("triggers:view")).get(
       ...toTriggerResponse(trigger),
       platformUrl: platformUrl({
         projectSlug: project.slug,
-        path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${trigger.id}`,
+        path: `/automations?drawer.open=automation&drawer.automationId=${trigger.id}`,
       }),
     });
   },
@@ -231,7 +231,7 @@ secured.access(requires("triggers:create")).post(
         ...toTriggerResponse(trigger),
         platformUrl: platformUrl({
           projectSlug: project.slug,
-          path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${trigger.id}`,
+          path: `/automations?drawer.open=automation&drawer.automationId=${trigger.id}`,
         }),
       },
       201,
@@ -309,7 +309,7 @@ secured.access(requires("triggers:update")).patch(
       ...toTriggerResponse(updated),
       platformUrl: platformUrl({
         projectSlug: project.slug,
-        path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${updated.id}`,
+        path: `/automations?drawer.open=automation&drawer.automationId=${updated.id}`,
       }),
     });
   },

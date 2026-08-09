@@ -41,8 +41,12 @@ export interface RunawayContainmentDeps {
     reason: string;
     at: Date;
   }) => Promise<void>;
-  /** Org admins who should hear about this project's automations. */
-  notificationRecipients: (projectId: string) => Promise<string[]>;
+  /** Org admins who should hear about this project's automations, minus
+   *  anyone who unsubscribed from them. */
+  notificationRecipients: (params: {
+    projectId: string;
+    triggerId: string;
+  }) => Promise<string[]>;
   sendLimitEmail: (params: {
     to: string[];
     kind: "ceiling_reached" | "paused";
@@ -230,7 +234,10 @@ async function notify(
   kind: "ceiling_reached" | "paused",
 ): Promise<void> {
   const { trigger, projectId } = breach;
-  const to = await deps.notificationRecipients(projectId);
+  const to = await deps.notificationRecipients({
+    projectId,
+    triggerId: trigger.id,
+  });
   if (to.length === 0) {
     logger.info(
       { projectId, triggerId: trigger.id, kind },

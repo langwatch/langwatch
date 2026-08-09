@@ -6,6 +6,7 @@ import { sendAutomationLimitEmail } from "~/server/mailer/automationLimitEmail";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { connection } from "~/server/redis";
 import type { ProjectService } from "../projects/project.service";
+import type { EmailSuppressionService } from "./emailSuppression.service";
 import type { RunawayContainmentDeps } from "./runaway-containment.service";
 import type { TriggerService } from "./trigger.service";
 
@@ -66,12 +67,14 @@ export function defaultRunawayContainmentDeps({
   prisma,
   triggers,
   projects,
+  emailSuppressions,
   baseHost,
   resolveClickHouseClient,
 }: {
   prisma: PrismaClient;
   triggers: TriggerService;
   projects: ProjectService;
+  emailSuppressions: EmailSuppressionService;
   baseHost: string;
   resolveClickHouseClient: ClickHouseClientResolver;
 }): RunawayContainmentDeps {
@@ -104,16 +107,40 @@ export function defaultRunawayContainmentDeps({
       await triggers.invalidate(projectId);
     },
 
-    notificationRecipients: async (projectId) => {
+    notificationRecipients: async ({ projectId, triggerId }) => {
       const organizationId = await resolveOrganizationId(projectId);
       if (!organizationId) return [];
       const admins = await prisma.organizationUser.findMany({
         where: { organizationId, role: OrganizationUserRole.ADMIN },
         select: { user: { select: { email: true } } },
       });
-      return admins.flatMap((admin) =>
+      const emails = admins.flatMap((admin) =>
         admin.user.email ? [admin.user.email] : [],
       );
+      if (emails.length === 0) return emails;
+
+      // ADR-031: an admin who unsubscribed from this project's automation mail
+      // is not mailed about its limits either. Fails open, because a
+      // suppression-store failure must not swallow the one mail that explains
+      // why an automation stopped producing records.
+      try {
+        return await emailSuppressions.filterSuppressed({
+          projectId,
+          triggerId,
+          emails,
+        });
+      } catch (error) {
+        logger.warn(
+          {
+            projectId,
+            triggerId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "Could not read the email suppression list for an automation limit " +
+            "email, notifying every admin",
+        );
+        return emails;
+      }
     },
 
     sendLimitEmail: (params) => sendAutomationLimitEmail(params),
@@ -123,10 +150,13 @@ export function defaultRunawayContainmentDeps({
     projectName: async (projectId) =>
       (await projects.getById(projectId))?.name ?? "your project",
 
+    // The authoring drawer (`openDrawer("automation", { automationId })`) is
+    // the only surface that can edit a query-based condition, which is exactly
+    // what the mail asks the customer to narrow.
     automationUrl: async ({ projectId, triggerId }) => {
       const project = await projects.getById(projectId);
       const slug = project?.slug ?? "";
-      return `${baseHost}/${slug}/automations?drawer.open=editAutomationFilter&drawer.automationId=${triggerId}`;
+      return `${baseHost}/${slug}/automations?drawer.open=automation&drawer.automationId=${triggerId}`;
     },
   };
 }

@@ -1,0 +1,150 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  automationLimitEmailSubject,
+  renderAutomationLimitEmail,
+  sendAutomationLimitEmail,
+} from "../automationLimitEmail";
+import { sendEmail } from "../emailSender";
+
+vi.mock("../emailSender", () => ({
+  sendEmail: vi.fn(),
+}));
+
+const baseProps = {
+  automationName: "Failed traces to dataset",
+  projectName: "Project Alpha",
+  dailyCeiling: 1000,
+  skippedToday: 12345,
+  actionUrl:
+    "https://app.langwatch.ai/proj/automations?drawer.open=automation&drawer.automationId=tr_1",
+};
+
+const ceilingProps = { ...baseProps, kind: "ceiling_reached" as const };
+const pausedProps = { ...baseProps, kind: "paused" as const };
+
+describe("automationLimitEmail", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("given the ceiling-reached kind", () => {
+    it("renders the automation and project names", async () => {
+      const html = await renderAutomationLimitEmail(ceilingProps);
+
+      expect(html).toContain("Failed traces to dataset");
+      expect(html).toContain("Project Alpha");
+    });
+
+    it("says the automation starts again tomorrow", async () => {
+      const html = await renderAutomationLimitEmail(ceilingProps);
+
+      expect(html).toContain("It is still switched on");
+      expect(html).toContain("it starts again tomorrow");
+    });
+
+    it("does not claim the automation was paused", async () => {
+      const html = await renderAutomationLimitEmail(ceilingProps);
+
+      expect(html).not.toContain("We have paused it");
+    });
+
+    it("titles the mail with the daily limit rather than a pause", async () => {
+      const html = await renderAutomationLimitEmail(ceilingProps);
+
+      expect(html).toContain("reached its daily limit");
+    });
+  });
+
+  describe("given the paused kind", () => {
+    it("says the automation was paused", async () => {
+      const html = await renderAutomationLimitEmail(pausedProps);
+
+      expect(html).toContain("We have paused it");
+      expect(html).toContain("We paused");
+    });
+
+    it("tells the customer to narrow the condition and switch it back on", async () => {
+      const html = await renderAutomationLimitEmail(pausedProps);
+
+      expect(html).toContain("Narrow its condition");
+      expect(html).toContain("switch it back on");
+    });
+
+    it("does not say it starts again tomorrow", async () => {
+      const html = await renderAutomationLimitEmail(pausedProps);
+
+      expect(html).not.toContain("starts again tomorrow");
+    });
+  });
+
+  describe("given large counts", () => {
+    it("formats the skipped count with thousands separators", async () => {
+      const html = await renderAutomationLimitEmail(ceilingProps);
+
+      // React splits an interpolation from its neighbouring text with a
+      // comment node, so the sentence is matched in its two rendered halves.
+      expect(html).toContain("12,345");
+      expect(html).toContain("matches were skipped today");
+    });
+
+    it("formats the ceiling with thousands separators", async () => {
+      const html = await renderAutomationLimitEmail(ceilingProps);
+
+      expect(html).toContain("its limit of 1,000 a day");
+    });
+  });
+
+  describe("given an action url", () => {
+    it("carries it on the call to action", async () => {
+      const html = await renderAutomationLimitEmail(ceilingProps);
+
+      expect(html).toContain("drawer.open=automation");
+      expect(html).toContain("drawer.automationId=tr_1");
+      expect(html).toContain("Open the automation");
+    });
+  });
+
+  describe("automationLimitEmailSubject", () => {
+    it("names the pause for a paused automation", () => {
+      expect(automationLimitEmailSubject(pausedProps)).toBe(
+        "Automation paused: Failed traces to dataset",
+      );
+    });
+
+    it("names the daily limit for a throttled automation", () => {
+      expect(automationLimitEmailSubject(ceilingProps)).toBe(
+        "Automation reached its daily limit: Failed traces to dataset",
+      );
+    });
+  });
+
+  describe("sendAutomationLimitEmail", () => {
+    describe("when several admins are notified", () => {
+      it("sends one mail per recipient with the matching subject", async () => {
+        await sendAutomationLimitEmail({
+          ...pausedProps,
+          to: ["a@example.com", "b@example.com"],
+        });
+
+        expect(sendEmail).toHaveBeenCalledTimes(2);
+        expect(sendEmail).toHaveBeenCalledWith(
+          expect.objectContaining({
+            to: "a@example.com",
+            subject: "Automation paused: Failed traces to dataset",
+          }),
+        );
+        expect(sendEmail).toHaveBeenCalledWith(
+          expect.objectContaining({ to: "b@example.com" }),
+        );
+      });
+    });
+
+    describe("when there are no recipients", () => {
+      it("sends nothing", async () => {
+        await sendAutomationLimitEmail({ ...pausedProps, to: [] });
+
+        expect(sendEmail).not.toHaveBeenCalled();
+      });
+    });
+  });
+});

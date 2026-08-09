@@ -138,6 +138,32 @@ Feature: Runaway automations are contained without punishing the customer
       When the breach is handled
       Then the breach is counted on a team metric
 
+    # The mail asks the customer to narrow the condition, so its link has to
+    # land somewhere that can. The legacy structured-filter drawer cannot edit
+    # a query-based condition at all, which made the ask unactionable for
+    # exactly the automations most likely to run away.
+    @unit
+    Scenario: The limit email links to a drawer that can edit the condition
+      Given a trigger whose condition is a search query
+      When the limit email is addressed
+      Then its link opens the automation authoring drawer on that automation
+
+    # An admin who unsubscribed from this project's automation mail (ADR-031)
+    # is not mailed about its limits either. The suppression list is read over
+    # the network, and failing to read it must not swallow the one mail that
+    # explains why an automation stopped producing records.
+    @unit
+    Scenario: An unsubscribed admin is not mailed about a limit
+      Given an org admin who unsubscribed from this project's automations
+      When the limit email is addressed
+      Then that admin is not among the recipients
+
+    @unit
+    Scenario: An unreadable suppression list still lets the mail out
+      Given the suppression list cannot be read
+      When the limit email is addressed
+      Then every org admin is still a recipient
+
   Rule: Pausing is reserved for automations that are actually misconfigured
 
     @integration
