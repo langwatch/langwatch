@@ -213,6 +213,25 @@ function pathWithBrokenSs(): string {
 }
 
 /**
+ * An `ss` that can see the socket but fails the moment it is asked who holds
+ * it, which is what a host that cannot map sockets to processes looks like.
+ * Seeing a listener you cannot attribute is not the same as seeing one that
+ * belongs to somebody else.
+ *
+ * Only options are inspected for the `-p`, since the filter expression the
+ * script passes contains "sport".
+ */
+function pathWithUnattributableSs(port: number): string {
+  return pathWithStubbedSs([
+    "#!/bin/bash",
+    'for arg in "$@"; do',
+    '  case "$arg" in -*p*) exit 1 ;; esac',
+    "done",
+    `echo 'LISTEN 0 511 127.0.0.1:${port} 0.0.0.0:*'`,
+  ]);
+}
+
+/**
  * A stand-in for `start.sh`: it survives being asked to stop and answers a
  * dead lane with a new one, which is what `concurrently --restart-tries -1`
  * does. That is the shape a plain SIGTERM cannot clear.
@@ -249,19 +268,26 @@ function startInOwnGroup(command: string, args: string[]): number {
   return child.pid as number;
 }
 
+const strangerReadyFile = (named: string) =>
+  path.join(scratch, `${named}-is-up`);
+
 /**
  * A listener that is emphatically not one of ours: the same node binary,
- * reached through a symlink under another name, so `ps -o comm=` reports
- * something without "node" in it and the script must leave it where it is.
- * Cheaper and more portable than reaching for a second language runtime.
+ * reached through a symlink under another name, so it is a real process
+ * holding a real port that the script must leave where it is. Cheaper and
+ * more portable than reaching for a second language runtime.
+ *
+ * The name is a parameter because it is the whole question. `node_exporter`
+ * holds a port on plenty of machines and is nobody's dev lane, and it is
+ * exactly what a "does the command line mention node" test gets wrong.
  */
-function startStranger(port: number): number {
-  const asAnother = path.join(scratch, "dev-listener");
+function startStranger(port: number, named = "dev-listener"): number {
+  const asAnother = path.join(scratch, named);
   symlinkSync(process.execPath, asAnother);
   return startInOwnGroup(asAnother, [
     writeLane(),
     String(port),
-    path.join(scratch, "stranger-is-up"),
+    strangerReadyFile(named),
   ]);
 }
 
@@ -392,9 +418,7 @@ describe("clearing the dev ports", () => {
         expect(await laneIsUp()).toBe(true);
         const stranger = startStranger(theirs);
         expect(
-          await waitUntil(() =>
-            existsSync(path.join(scratch, "stranger-is-up")),
-          ),
+          await waitUntil(() => existsSync(strangerReadyFile("dev-listener"))),
         ).toBe(true);
 
         const result = clearPorts(`${ours},${theirs}`, {
@@ -405,6 +429,24 @@ describe("clearing the dev ports", () => {
         expect(result.status, said).toBe(1);
         expect(result.stdout).not.toContain("ports free");
         expect(liveMembers(stack), said).toBe(0);
+        expect(liveMembers(stranger), said).toBeGreaterThan(0);
+      }, 30000);
+
+      /** @scenario "A port held by something we did not start is reported, not claimed" */
+      it("leaves a stranger whose own name contains node where it is", async () => {
+        const theirs = await freePort();
+        const stranger = startStranger(theirs, "node_exporter");
+        expect(
+          await waitUntil(() => existsSync(strangerReadyFile("node_exporter"))),
+        ).toBe(true);
+
+        const result = clearPorts(String(theirs), {
+          KILL_DEV_TREE_GRACE: "2",
+        });
+
+        const said = `${result.stdout}${result.stderr}`;
+        expect(result.status, said).toBe(1);
+        expect(result.stdout).not.toContain("ports free");
         expect(liveMembers(stranger), said).toBeGreaterThan(0);
       }, 30000);
     });
@@ -440,6 +482,28 @@ describe("clearing the dev ports", () => {
         expect(result.stdout).not.toContain("nothing of ours");
         expect(result.stderr).toContain("could not inspect");
       });
+
+      /** @scenario "A listener that cannot be attributed is not blamed on a stranger" */
+      it("refuses to call a listener someone else's when it could not attribute it", async () => {
+        const port = await freePort();
+        const lane = startInOwnGroup(process.execPath, [
+          writeLane(),
+          String(port),
+          readyFile(),
+        ]);
+        expect(await laneIsUp()).toBe(true);
+
+        const result = clearPorts(String(port), {
+          PATH: pathWithUnattributableSs(port),
+        });
+
+        const said = `${result.stdout}${result.stderr}`;
+        expect(result.status, said).not.toBe(0);
+        expect(result.stdout).not.toContain("ports free");
+        expect(result.stderr).not.toContain("not a node process of ours");
+        expect(result.stderr).toContain("could not inspect");
+        expect(liveMembers(lane), said).toBeGreaterThan(0);
+      }, 30000);
 
       it("reports how to call it when given no ports at all", () => {
         const result = spawnSync("bash", [SCRIPT], { encoding: "utf8" });

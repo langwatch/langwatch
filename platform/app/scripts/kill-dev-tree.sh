@@ -68,27 +68,47 @@ port_busy() {
 
 # Whatever is listening on those ports. lsof is what the rest of the dev
 # scripts use; ss covers the Linux hosts that ship iproute2 and not lsof.
-# A failing `ss` stops us the same way it does in port_busy: an empty answer
-# from a lookup that broke is not "nobody is listening".
+# A failing `ss` is reported the same way it is in port_busy: an empty answer
+# from a lookup that broke is not "nobody is listening". It returns that as a
+# status rather than exiting, because every caller reads it through a pipe and
+# an `exit` there would leave only the subshell, with the script carrying on
+# over an answer it just said it did not have.
 listening_pids() {
   local found
   if command -v lsof >/dev/null 2>&1; then
     lsof -t -a -iTCP:"$PORTS" -sTCP:LISTEN 2>/dev/null
-    return
+    # Its own 1 means "found nothing", which is an answer, not a failure.
+    return 0
   fi
   if ! found=$(ss -ltnpH "( ${SS_FILTER} )" 2>/dev/null); then
     echo "ss could not inspect ${PORTS}, refusing to guess whether it is free" >&2
-    exit 69
+    return 69
   fi
   printf '%s\n' "$found" | grep -o 'pid=[0-9]*' | cut -d= -f2
+  # Likewise for grep: no pids in the output is a result, and under pipefail
+  # its 1 would otherwise come back as a broken lookup.
+  return 0
 }
 
-# What a pid is. Linux answers from /proc, which is authoritative and needs no
-# output parsing at all; ps is the fallback for macOS, asked two ways because
-# neither is portable on its own. `comm` is the bare binary name on Linux and
-# the full path on macOS, and `args` is the whole command line, which always
-# begins with the interpreter. Relying on `comm` alone is what made this miss
-# node processes it had correctly found.
+# What a pid was started as, down to the bare binary name. Linux answers from
+# /proc, which is authoritative and needs no output parsing at all; ps is the
+# fallback for macOS, where `comm` is the same argv[0] spelled as a full path.
+# Reading `comm` as if it were already the bare name is what made this miss node
+# processes it had correctly found, because on macOS it never is.
+lane_binary() {
+  local argv0
+  if [ -r "/proc/$1/cmdline" ]; then
+    argv0=$(tr '\0' '\n' <"/proc/$1/cmdline")
+    argv0=${argv0%%$'\n'*}
+  else
+    argv0=$(ps -p "$1" -o comm= 2>/dev/null)
+  fi
+  echo "${argv0##*/}"
+}
+
+# The whole command line, for saying what we saw rather than only how we
+# classified it. `args` alongside `comm` on macOS because the two disagree:
+# one is the binary, the other is what it was told to run.
 describe_pid() {
   if [ -r "/proc/$1/cmdline" ]; then
     tr '\0' ' ' <"/proc/$1/cmdline"
@@ -103,10 +123,14 @@ describe_pid() {
 # Never our own group either: this is usually pasted into the very shell that
 # is about to retry `pnpm dev`, and closing that would be its own surprise.
 listening_groups() {
-  listening_pids | sort -u | while read -r pid; do
+  printf '%s\n' "$LISTENERS" | while read -r pid; do
     [ -n "$pid" ] || continue
-    case "$(describe_pid "$pid")" in
-      *node*) ;;
+    # The node binary itself, not a command line with "node" somewhere in it:
+    # node_exporter holds a port, and so does anything running node-config.py,
+    # and neither is a dev lane. The digits cover distros that install node
+    # under its major version, and `nodejs` covers Debian's spelling.
+    case "$(lane_binary "$pid")" in
+      node | nodejs | node[0-9]*) ;;
       *) continue ;;
     esac
     pgid=$(ps -p "$pid" -o pgid= 2>/dev/null | tr -d ' ')
@@ -120,7 +144,7 @@ listening_groups() {
 # rather than an assertion. Without this the message is the same whether the
 # port really belongs to someone else or we simply failed to identify it.
 describe_listeners() {
-  listening_pids | sort -u | while read -r pid; do
+  printf '%s\n' "$LISTENERS" | while read -r pid; do
     [ -n "$pid" ] || continue
     echo "${pid}:$(describe_pid "$pid" | tr '\n' ' ' | cut -c1-60)"
   done | tr '\n' ' '
@@ -153,6 +177,13 @@ signal_groups() {
     kill "-${signal}" "-${pgid}" 2>/dev/null
   done
 }
+
+# Asked once, so the group we take down and the listeners we name in a failure
+# are the same moment rather than two lookups that can disagree.
+if ! LISTENERS=$(listening_pids); then
+  exit 69
+fi
+LISTENERS=$(printf '%s\n' "$LISTENERS" | sort -u)
 
 targets=$(listening_groups)
 if [ -z "$targets" ]; then
