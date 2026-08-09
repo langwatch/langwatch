@@ -7,7 +7,14 @@
  * cells, portal editor); only the tRPC transport is mocked.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -477,7 +484,7 @@ describe("given the saved dataset's record count", () => {
   });
 });
 
-// ── Pagination (classic page N of M) ─────────────────────────────────
+// ── Pagination ───────────────────────────────────────────────────────
 
 describe("given a saved dataset larger than one page", () => {
   const TOTAL_PAGES = 3;
@@ -527,7 +534,7 @@ describe("given a saved dataset larger than one page", () => {
     renderPaged();
     await waitFor(() =>
       expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "Page 1 of 3",
+        "showing 1–50",
       ),
     );
     // Total reflects the whole dataset, not just the loaded page.
@@ -549,7 +556,7 @@ describe("given a saved dataset larger than one page", () => {
     await user.click(screen.getByTestId("pagination-next"));
     await waitFor(() =>
       expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "Page 2 of 3",
+        "showing 51–100",
       ),
     );
     // The editor requested page 2 from the server (windowed read, not a slice).
@@ -561,7 +568,7 @@ describe("given a saved dataset larger than one page", () => {
     await user.click(screen.getByTestId("pagination-prev"));
     await waitFor(() =>
       expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "Page 1 of 3",
+        "showing 1–50",
       ),
     );
   });
@@ -619,7 +626,7 @@ describe("given a saved dataset larger than one page", () => {
       });
       await waitFor(() =>
         expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-          "Page 1 of 3",
+          "showing 1–50",
         ),
       );
 
@@ -628,7 +635,7 @@ describe("given a saved dataset larger than one page", () => {
       // and the last request must be for page 2.
       await waitFor(() =>
         expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-          "Page 2 of 3",
+          "showing 51–100",
         ),
       );
       expect(
@@ -683,7 +690,7 @@ describe("given a saved dataset larger than one page", () => {
     await user.click(screen.getByTestId("pagination-next")); // page 3 (last)
     await waitFor(() =>
       expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "Page 3 of 3",
+        "showing 101–150",
       ),
     );
     expect(screen.getByTestId("add-row")).toBeInTheDocument();
@@ -695,25 +702,27 @@ describe("given a saved dataset larger than one page", () => {
     renderPaged();
     await screen.findByTestId("pagination-indicator");
 
-    // The active size (default 50) is a no-op — disabled so it can't re-trigger
-    // the clear-selection / reset-to-page-1 / refetch path with no real change.
-    expect(screen.getByTestId("pagination-size-50")).toBeDisabled();
+    // The size in force is the one the control already shows, so re-picking it
+    // is not on offer as a distinct choice.
+    expect(screen.getByTestId("pagination-page-size")).toHaveValue("50");
 
     // Move off page 1 first so the reset-to-page-1 is observable.
     await user.click(screen.getByTestId("pagination-next"));
     await waitFor(() =>
       expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "Page 2 of 3",
+        "showing 51–100",
       ),
     );
 
     // Switch to 100 rows per page. The page count is derived from
     // count / pageSize, so 150 records collapse to 2 pages immediately, and the
     // server is re-read with the new limit from page 1.
-    await user.click(screen.getByTestId("pagination-size-100"));
+    fireEvent.change(screen.getByTestId("pagination-page-size"), {
+      target: { value: "100" },
+    });
     await waitFor(() =>
       expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "Page 1 of 2",
+        "showing 1–100",
       ),
     );
     const lastCall = getAllQuery.mock.calls.at(-1)![0] as {

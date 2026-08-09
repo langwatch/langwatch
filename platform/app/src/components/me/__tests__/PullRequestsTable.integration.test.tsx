@@ -12,7 +12,7 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -703,7 +703,9 @@ describe("the personal Pull Requests table", () => {
       const user = userEvent.setup();
       renderTable();
 
-      await user.click(screen.getByTestId("pagination-size-10"));
+      fireEvent.change(screen.getByTestId("pagination-page-size"), {
+        target: { value: "10" },
+      });
       expect(screen.getByText("Pull request 0")).toBeInTheDocument();
       expect(screen.queryByText("Pull request 11")).not.toBeInTheDocument();
 
@@ -732,7 +734,9 @@ describe("the personal Pull Requests table", () => {
       const user = userEvent.setup();
       const { rerender } = renderTable();
 
-      await user.click(screen.getByTestId("pagination-size-10"));
+      fireEvent.change(screen.getByTestId("pagination-page-size"), {
+        target: { value: "10" },
+      });
       await user.click(screen.getByRole("button", { name: /next/i }));
       expect(screen.getByText("Pull request 11")).toBeInTheDocument();
 
@@ -746,7 +750,7 @@ describe("the personal Pull Requests table", () => {
 
       expect(screen.getByText("Pull request 0")).toBeInTheDocument();
       expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "Page 1 of 1",
+        "3 pull requests · showing 1–3",
       );
     });
   });
