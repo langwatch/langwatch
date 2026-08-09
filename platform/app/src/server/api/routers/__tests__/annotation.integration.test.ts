@@ -873,9 +873,12 @@ describe("Annotation CRUD", () => {
         expect(
           (JSON.parse(row!.comments as string) as string[]).sort(),
         ).toEqual(everyComment);
-        const readable = JSON.parse(row!.readable as string) as string[];
+        // The readable column is one text with a rule between reviews, not a
+        // list to parse: it is written to be read, by a person or a judge.
+        const readable = (row!.readable as string).split("\n---\n");
+        expect(readable).toHaveLength(everyComment.length);
         expect(
-          readable.filter((line) => line.includes("(on Span span-")),
+          readable.filter((line) => line.includes("(on span (span-")),
         ).toHaveLength(3);
       });
 
