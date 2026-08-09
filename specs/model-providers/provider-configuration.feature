@@ -148,6 +148,25 @@ Feature: Model Provider Configuration
     Then the save is rejected with an error the customer can act on
     And the stored API key and endpoint are preserved
 
+  # A save that names one credential is editing that one. An API key is never
+  # shown back, so nobody can send one they did not type, and leaving it out
+  # asks for nothing rather than asking for its removal.
+  @integration
+  Scenario: A save that names one credential keeps the ones it leaves out
+    Given I have "azure" provider configured with an API key and an endpoint
+    When a save carries a new endpoint and no API key
+    Then the endpoint is updated
+    And the stored API key is preserved
+
+  # Everything else is on screen, so a save states it in full. That is how the
+  # API gateway option switches over, and it must not take the key with it.
+  @integration
+  Scenario: Switching Azure to its API gateway keeps the key and drops the direct endpoint
+    Given I have "azure" provider configured with an API key and an endpoint
+    When I switch the provider to its API gateway and save
+    Then the direct endpoint gives way to the gateway address
+    And the stored API key is preserved
+
   @integration @unimplemented
   Scenario: Configure API keys from environment variables
     Given I have "openai" provider enabled via environment variable "OPENAI_API_KEY"

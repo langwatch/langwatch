@@ -4,12 +4,12 @@
  * Real-Postgres coverage for the credential a customer never retyped.
  *
  * The drawer shows a stored API key masked, so every save of an unrelated
- * field carries that placeholder back. The service is supposed to swap it
- * for the credential already on file. The sibling unit test asserts that
- * rule against a copy of the merge function, which is exactly why it stayed
- * green while a base-URL edit through the real path wrote the row without
- * any key at all: the credential the customer never touched was gone, and
- * the provider stopped working with no visible cause.
+ * field carries that placeholder back, and the service swaps it for the
+ * credential already on file. A write that leaves the key out entirely gets
+ * the same protection, since a masked value is one nobody can retype. Both
+ * rules are asserted here, against the row the service actually wrote: the
+ * credential a customer never touched has gone missing twice, each time
+ * leaving a provider that had stopped working with nothing to explain why.
  *
  * Covers @integration scenarios from
  * specs/model-providers/provider-configuration.feature.
@@ -363,6 +363,97 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
 
           expect(await keysById(created.id)).toEqual({
             "api-key": "header-secret",
+          });
+        });
+      });
+
+      // A write that names some credentials passes the guard above, and then
+      // the merge decides what happens to the ones it did not name. A secret
+      // is masked on read, so nobody can resend one they did not type: leaving
+      // it out is not a request to delete it. The visible fields are a
+      // different matter, and the API gateway option depends on that.
+      describe("when the payload names only some of the stored credentials", () => {
+        /** @scenario A save that names one credential keeps the ones it leaves out */
+        it("keeps the API key it never mentioned and updates the endpoint", async () => {
+          const created = await createAzureProvider();
+
+          await service().updateModelProvider(
+            {
+              projectId,
+              id: created.id,
+              provider: "azure",
+              enabled: true,
+              customKeys: {
+                AZURE_OPENAI_ENDPOINT: "https://acme3.openai.azure.com",
+              },
+              scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+            },
+            ctx(),
+          );
+
+          expect(await keysById(created.id)).toEqual({
+            AZURE_OPENAI_API_KEY: STORED_KEY,
+            AZURE_OPENAI_ENDPOINT: "https://acme3.openai.azure.com",
+          });
+        });
+
+        // The REST upsert is the entry a script uses, and a script sends the
+        // one field it means to change. It reaches the same merge through a
+        // different door, so it is worth its own case.
+        /** @scenario A save that names one credential keeps the ones it leaves out */
+        it("keeps it through the REST upsert entry as well", async () => {
+          const created = await service().updateModelProvider(
+            {
+              projectId,
+              provider: "bedrock",
+              enabled: true,
+              customKeys: {
+                AWS_ACCESS_KEY_ID: "AKIAEXAMPLE",
+                AWS_SECRET_ACCESS_KEY: STORED_KEY,
+                AWS_REGION_NAME: "us-east-1",
+              },
+              scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+            },
+            ctx(),
+          );
+
+          await service().upsertByProviderKey({
+            projectId,
+            provider: "bedrock",
+            enabled: true,
+            customKeys: { AWS_REGION_NAME: "eu-west-1" },
+          });
+
+          expect(await keysById(created.id)).toEqual({
+            AWS_ACCESS_KEY_ID: "AKIAEXAMPLE",
+            AWS_SECRET_ACCESS_KEY: STORED_KEY,
+            AWS_REGION_NAME: "eu-west-1",
+          });
+        });
+
+        /** @scenario Switching Azure to its API gateway keeps the key and drops the direct endpoint */
+        it("drops the direct endpoint when the gateway fields take over, and keeps the key", async () => {
+          const created = await createAzureProvider();
+
+          await service().updateModelProvider(
+            {
+              projectId,
+              id: created.id,
+              provider: "azure",
+              enabled: true,
+              customKeys: {
+                AZURE_API_GATEWAY_BASE_URL: "https://apim.acme.com",
+                AZURE_API_GATEWAY_VERSION: "2024-05-01-preview",
+              },
+              scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+            },
+            ctx(),
+          );
+
+          expect(await keysById(created.id)).toEqual({
+            AZURE_API_GATEWAY_BASE_URL: "https://apim.acme.com",
+            AZURE_API_GATEWAY_VERSION: "2024-05-01-preview",
+            AZURE_OPENAI_API_KEY: STORED_KEY,
           });
         });
       });
