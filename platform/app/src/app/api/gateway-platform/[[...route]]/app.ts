@@ -508,7 +508,7 @@ const updateVirtualKeySchema = z.object({
     .nullable()
     .optional()
     .describe(
-      "Where the key's traces and costs land. Omit it and the destination stays exactly where it is, scope edits included. A value moves it, validated the way create validates it. Explicit null does not clear it: it asks for the destination to be worked out again from what the key is now, under the same rules create uses, so a shared key in an organization with projects to choose from is refused with `gateway_trace_project_ambiguous`.",
+      "Where the key's traces and costs land. Omit it and the destination stays exactly where it is, scope edits included. A value moves it, validated the way create validates it. Explicit null does not clear it: it asks for the destination to be worked out again from what the key is now, under the same rules create uses. It lands on the key's single project scope when it has exactly one, and is refused with `gateway_trace_project_ambiguous` when it has none to take and the organization has projects that could have been named.",
     ),
   routing_policy_id: z.string().nullable().optional(),
   routing_mode: routingModeWireSchema.optional(),

@@ -2,10 +2,14 @@
  * READ-ONLY. Reports what the stored-trace-destination backfill would do.
  *
  * This script issues SELECT queries only. It performs no INSERT, UPDATE or
- * DELETE, opens no transaction, and is safe to point at production: the keys
- * are walked a page at a time and folded into counters as they arrive, so what
- * it holds in memory is one page plus the organization's projects, whatever the
- * size of the instance.
+ * DELETE and opens no transaction, so it is safe to point at production. The
+ * keys are the unbounded side and they are walked a page at a time, folded into
+ * counters as they arrive; the projects and the organization ids are read whole
+ * and held, which is a few thousand rows on the largest instance we run.
+ *
+ * The counts are a shape, not a ledger. There is no snapshot around the walk,
+ * so a key written while it runs may or may not be seen. Run it again if a
+ * number looks off, rather than reading it as exact to the row.
  * Its whole job is to answer, before the migration runs, the one question the
  * backfill cannot answer for itself: are there keys it will leave without a
  * destination, and are there organizations that cannot give it one.
@@ -144,11 +148,13 @@ type KeyFold = {
 };
 
 /**
- * Walk every key and fold it into counters as it arrives.
+ * Walk every key and fold it into counters as it arrives, so a full instance's
+ * worth of keys never has to fit in memory at once.
  *
- * Keyset pagination on the primary key: a full instance's worth of keys never
- * has to fit in memory at once, and the walk cannot skip or repeat a row the
- * way an OFFSET walk can under concurrent writes.
+ * Keyset pagination rather than OFFSET, which under concurrent writes can hand
+ * back the same row twice or skip one entirely. Keyset does neither to a row
+ * that was there when the walk started; a key inserted behind the cursor while
+ * it runs is simply missed, which the header says out loud.
  */
 async function foldKeys({
   prisma,
@@ -185,7 +191,11 @@ async function foldKeys({
   return { counts, total, orgsWithKeysNeedingGovernance };
 }
 
-/** Classify one page and add it to the running counters. */
+/**
+ * Split out of the walk because the walk is about paging and this is about
+ * classification, and together they were one function nobody could hold in
+ * their head.
+ */
 function foldPage({
   page,
   byId,

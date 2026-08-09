@@ -87,7 +87,7 @@ export async function resolveApplicableBudgetsForDraftKey(
   // refuse previews as no destination, which is what an incomplete form is.
   const traceProject = draft.virtualKeyId
     ? await traceProjectFor(prisma, draft.traceProjectId)
-    : await decidedTraceProject(prisma, draft);
+    : await decidedTraceProject({ prisma, draft });
 
   const resolved = await resolveApplicableBudgets({
     client: prisma,
@@ -145,10 +145,13 @@ export async function resolveApplicableBudgetsForDraftKey(
  * save will make, so the list cannot preview a destination the key will not
  * get. A draft the save would refuse has none yet.
  */
-async function decidedTraceProject(
-  prisma: PrismaClient,
-  draft: DraftVirtualKey,
-): Promise<TraceProject | null> {
+async function decidedTraceProject({
+  prisma,
+  draft,
+}: {
+  prisma: PrismaClient;
+  draft: DraftVirtualKey;
+}): Promise<TraceProject | null> {
   const decision = await decideTraceDestination(prisma, {
     organizationId: draft.organizationId,
     scopes: draft.scopes.map((s) => ({
