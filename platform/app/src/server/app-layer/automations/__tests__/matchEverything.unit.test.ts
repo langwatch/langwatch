@@ -56,6 +56,12 @@ describe("isMatchEverythingTrigger", () => {
           ),
         ).toBe(true);
       });
+
+      it("treats a whitespace-only query as no query at all", () => {
+        expect(isMatchEverythingTrigger(trigger({ filterQuery: "   " }))).toBe(
+          true,
+        );
+      });
     });
   });
 
@@ -81,12 +87,6 @@ describe("isMatchEverythingTrigger", () => {
         expect(
           isMatchEverythingTrigger(trigger({ filterQuery: "status:error" })),
         ).toBe(false);
-      });
-
-      it("treats a whitespace-only query as no query at all", () => {
-        expect(isMatchEverythingTrigger(trigger({ filterQuery: "   " }))).toBe(
-          true,
-        );
       });
     });
   });

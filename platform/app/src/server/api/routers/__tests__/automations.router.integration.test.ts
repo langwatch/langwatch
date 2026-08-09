@@ -4,7 +4,9 @@
  * Router-level tests for automation filter validation and update sanitization.
  */
 import { TriggerAction } from "@prisma/client";
+import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { connection } from "~/server/redis";
 import { globalForApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
 
@@ -86,6 +88,7 @@ vi.mock("@ee/audit-log/auditLog", () => ({
 import {
   _resetMemoryPersistCapStore,
   consumePersistCapSlot,
+  persistCapKey,
   resolvePersistDailyCap,
 } from "../../../app-layer/automations/dispatch/persistCap";
 import { PrismaTriggerRepository } from "../../../app-layer/automations/repositories/trigger.prisma.repository";
@@ -1032,29 +1035,51 @@ describe("automationRouter", () => {
   // it, a customer sees an automation switched on and producing nothing, with
   // nothing on the page to explain the gap.
   describe("given an automation that passed its ceiling today", () => {
+    // The cap counter lives on the real Redis under a 25h TTL, so ids reused
+    // across runs would carry one run's count into the next one on the same UTC
+    // day and make the skipped assertion drift. Run-unique ids keep each run on
+    // its own counter, and the keys they write are deleted after it.
+    const writtenKeys: string[] = [];
+
+    afterEach(async () => {
+      if (writtenKeys.length > 0) await connection?.del(...writtenKeys);
+      writtenKeys.length = 0;
+    });
+
     describe("when the automations list reads the daily cap status", () => {
       /** @scenario "The automations list shows what was skipped today" */
       it("reports today's skipped count per automation alongside the ceiling", async () => {
         _resetMemoryPersistCapStore();
-        const cap = await resolvePersistDailyCap("proj_123");
+        const projectId = `proj_${nanoid(8)}`;
+        const busyTrigger = `trigger_busy_${nanoid(8)}`;
+        const quietTrigger = `trigger_quiet_${nanoid(8)}`;
+        const now = new Date();
+
+        const cap = await resolvePersistDailyCap(projectId);
+        writtenKeys.push(
+          `ttlcache:persist-daily-cap:${projectId}`,
+          persistCapKey({ projectId, triggerId: busyTrigger, now }),
+        );
         for (let index = 0; index <= cap; index++) {
+          const dedupKey = `${projectId}/${busyTrigger}:persist:trace-${index}`;
+          writtenKeys.push(`persist-cap-claimed:${dedupKey}`);
           await consumePersistCapSlot({
-            projectId: "proj_123",
-            triggerId: "trigger_busy",
-            now: new Date(),
+            projectId,
+            triggerId: busyTrigger,
+            now,
             cap,
-            dedupKey: `proj_123/trigger_busy:persist:trace-${index}`,
+            dedupKey,
           });
         }
 
         const status = await caller.getDailyCapStatus({
-          projectId: "proj_123",
-          triggerIds: ["trigger_busy", "trigger_quiet"],
+          projectId,
+          triggerIds: [busyTrigger, quietTrigger],
         });
 
         expect(status.cap).toBe(cap);
-        expect(status.counts.trigger_busy?.skipped).toBe(1);
-        expect(status.counts.trigger_quiet?.skipped).toBe(0);
+        expect(status.counts[busyTrigger]?.skipped).toBe(1);
+        expect(status.counts[quietTrigger]?.skipped).toBe(0);
       });
     });
   });

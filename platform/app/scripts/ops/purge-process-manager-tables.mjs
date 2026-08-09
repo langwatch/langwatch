@@ -24,16 +24,51 @@
  *     env APPLY=1 node scripts/ops/purge-process-manager-tables.mjs
  *
  * Env overrides: RETENTION_DAYS (7), BATCH_SIZE (10000), SLEEP_MS (200),
- * MAX_BATCHES (10000).
+ * MAX_BATCHES (10000). Each is validated before anything runs, see `intEnv`.
  */
 
 import { PrismaClient } from "@prisma/client";
 
+/** A whole number and nothing else: no hex, no exponent, no decimal point. */
+const INTEGER_PATTERN = /^[+-]?\d+$/;
+
+/**
+ * Reads one integer override, failing closed on anything unusable.
+ *
+ * Unset or empty takes the fallback. Everything else must be a whole number of
+ * at least `min`, or the script prints why and exits before it opens a
+ * connection. These values go straight into the retention predicate and the
+ * batch bounds, where a quiet coercion is destructive: `RETENTION_DAYS=0` would
+ * make the window `now()`, which is every dispatched and consumed row in both
+ * tables, `RETENTION_DAYS=7d` would reach the database as `NaN` and abort
+ * mid-run, and `BATCH_SIZE=0` would delete nothing while reporting success.
+ *
+ * @param {string} name
+ * @param {number} fallback
+ * @param {number} min
+ * @returns {number}
+ */
+function intEnv(name, fallback, min) {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === "") return fallback;
+
+  const trimmed = raw.trim();
+  const value = INTEGER_PATTERN.test(trimmed) ? Number(trimmed) : Number.NaN;
+  if (!Number.isSafeInteger(value) || value < min) {
+    console.error(
+      `ERROR: ${name}="${raw}" is not usable. Pass a whole number of at ` +
+        `least ${min}, or leave it unset to use ${fallback}. Nothing was deleted.`,
+    );
+    process.exit(1);
+  }
+  return value;
+}
+
 const APPLY = process.env.APPLY === "1";
-const RETENTION_DAYS = Number(process.env.RETENTION_DAYS ?? 7);
-const BATCH_SIZE = Number(process.env.BATCH_SIZE ?? 10_000);
-const SLEEP_MS = Number(process.env.SLEEP_MS ?? 200);
-const MAX_BATCHES = Number(process.env.MAX_BATCHES ?? 10_000);
+const RETENTION_DAYS = intEnv("RETENTION_DAYS", 7, 1);
+const BATCH_SIZE = intEnv("BATCH_SIZE", 10_000, 1);
+const SLEEP_MS = intEnv("SLEEP_MS", 200, 0);
+const MAX_BATCHES = intEnv("MAX_BATCHES", 10_000, 1);
 
 const prisma = new PrismaClient();
 

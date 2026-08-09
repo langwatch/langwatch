@@ -249,8 +249,13 @@ export async function consumePersistCapSlot({
  * one slot for every dispatch that hit that window.
  *
  * KEYS[1] is the per-dispatch claim, KEYS[2] the day counter, ARGV[1] the TTL.
- * The EXPIRE carries NX so the TTL never slides, while a transient first-hit
- * failure still cannot leave an immortal key.
+ * The counter is only given a TTL when it has none, so the TTL never slides,
+ * while a transient first-hit failure still cannot leave an immortal key. That
+ * guard is a TTL read rather than `EXPIRE ... NX` because the NX option needs
+ * Redis 7, and self-hosted installs still run Redis 6, where the whole eval
+ * would fail and degrade the fleet-wide ceiling to per-worker counters.
+ * A negative TTL means either no expiry (-1) or no key (-2), and the INCR
+ * above has just created or bumped the key, so both cases want the EXPIRE.
  */
 const CLAIM_AND_COUNT_SCRIPT = `
 local claimed = redis.call('SET', KEYS[1], '1', 'EX', ARGV[1], 'NX')
@@ -258,7 +263,9 @@ if not claimed then
   return tonumber(redis.call('GET', KEYS[2]) or '0')
 end
 local count = redis.call('INCR', KEYS[2])
-redis.call('EXPIRE', KEYS[2], ARGV[1], 'NX')
+if redis.call('TTL', KEYS[2]) < 0 then
+  redis.call('EXPIRE', KEYS[2], ARGV[1])
+end
 return count
 `;
 
