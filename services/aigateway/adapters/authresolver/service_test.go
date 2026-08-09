@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
 
@@ -57,6 +58,68 @@ func (f *fakeResolver) ResolveKey(_ context.Context, _ string) (*domain.Bundle, 
 
 func (f *fakeResolver) FetchConfig(_ context.Context, _ string) (domain.BundleConfig, error) {
 	return domain.BundleConfig{}, nil
+}
+
+// fakeL2 is an in-memory stand-in for the shared cache tier every gateway
+// node reads, so a test can prove an invalidation reaches further than the
+// node that saw the event. delErr makes the store unreachable.
+type fakeL2 struct {
+	mu      sync.Mutex
+	entries map[string]CachedBundle
+	delErr  error
+}
+
+func newFakeL2() *fakeL2 {
+	return &fakeL2{entries: make(map[string]CachedBundle)}
+}
+
+func (f *fakeL2) Get(_ context.Context, hash string) (*CachedBundle, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	cached, ok := f.entries[hash]
+	if !ok {
+		return nil, nil
+	}
+	return &cached, nil
+}
+
+func (f *fakeL2) Set(_ context.Context, hash string, cached CachedBundle) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.entries[hash] = cached
+}
+
+func (f *fakeL2) Delete(_ context.Context, hash string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.delErr != nil {
+		return f.delErr
+	}
+	delete(f.entries, hash)
+	return nil
+}
+
+func (f *fakeL2) has(hash string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	_, ok := f.entries[hash]
+	return ok
+}
+
+// l2Key is the shared-tier key for a raw virtual key, the one Resolve computes.
+func l2Key(rawKey string) string {
+	h := hashKey(rawKey)
+	return string(h[:])
+}
+
+// seedBothTiers primes L1 and the shared tier with the same bundle, the state
+// a node is in after it has served a request for that key.
+func seedBothTiers(svc *Service, l2 *fakeL2, rawKey string, bundle *domain.Bundle) {
+	svc.storeL1(hashKey(rawKey), bundle)
+	l2.Set(context.Background(), l2Key(rawKey), CachedBundle{
+		Bundle:          bundle,
+		ConfigFetchedAt: time.Now(),
+	})
 }
 
 func newService(t *testing.T, opts Options) (*Service, *observer.ObservedLogs) {
@@ -300,7 +363,8 @@ func TestApplyChange_ModelProviderUpdatedEvictsMatchingModelProvider(t *testing.
 
 func TestApplyChange_BudgetMutationWithoutProjectIDEvictsOrganization(t *testing.T) {
 	resolver := &fakeResolver{}
-	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
+	l2 := newFakeL2()
+	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver, L2: l2})
 
 	for _, kind := range []string{
 		ChangeKindBudgetCreated,
@@ -308,17 +372,22 @@ func TestApplyChange_BudgetMutationWithoutProjectIDEvictsOrganization(t *testing
 		ChangeKindBudgetDeleted,
 	} {
 		t.Run(kind, func(t *testing.T) {
-			matchingKey := hashKey("vk-lw-budget-matching-" + kind)
-			otherKey := hashKey("vk-lw-budget-other-" + kind)
-			svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"})
-			svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"})
+			matchingRaw := "vk-lw-budget-matching-" + kind
+			otherRaw := "vk-lw-budget-other-" + kind
+			seedBothTiers(svc, l2, matchingRaw, &domain.Bundle{OrganizationID: "org-1"})
+			seedBothTiers(svc, l2, otherRaw, &domain.Bundle{OrganizationID: "org-2"})
 
 			svc.applyChange("org-1", CacheChange{Kind: kind})
 
-			_, isMatchingPresent := svc.l1.Get(matchingKey)
-			_, isOtherPresent := svc.l1.Get(otherKey)
+			_, isMatchingPresent := svc.l1.Get(hashKey(matchingRaw))
+			_, isOtherPresent := svc.l1.Get(hashKey(otherRaw))
 			assert.False(t, isMatchingPresent, "budget changes must evict the polled organization")
 			assert.True(t, isOtherPresent, "other organizations must remain cached")
+			// The shared tier is the half a single node's eviction cannot
+			// fix by itself: leave the bundle there and the next request
+			// rehydrates the budget the event just changed.
+			assert.False(t, l2.has(l2Key(matchingRaw)), "budget changes must drop the shared tier's copy too")
+			assert.True(t, l2.has(l2Key(otherRaw)), "other organizations must remain in the shared tier")
 		})
 	}
 }
@@ -408,6 +477,110 @@ func TestApplyChange_CacheRuleMutationEvictsOrganization(t *testing.T) {
 			assert.True(t, isOtherPresent, "other organizations must remain cached")
 		})
 	}
+}
+
+// --- Invalidation reaches the shared tier ------------------------------------
+
+/** @scenario "a change event drops the entry from the shared cache tier too" */
+func TestApplyChange_RoutingPolicyUpdate_EvictsBothTiers(t *testing.T) {
+	l2 := newFakeL2()
+	exp := time.Now().Add(1 * time.Hour)
+	resolver := &fakeResolver{returns: []resolverReturn{{bundle: freshBundle("vk-policy", exp)}}}
+	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver, L2: l2})
+
+	invalidatedRaw := "vk-lw-policy-shared"
+	invalidated := &domain.Bundle{VirtualKeyID: "vk-policy", OrganizationID: "org-1", ExpiresAt: exp}
+	invalidated.Config.AllowedModels = []string{"model-from-the-old-policy"}
+	seedBothTiers(svc, l2, invalidatedRaw, invalidated)
+	otherRaw := "vk-lw-policy-shared-other"
+	seedBothTiers(svc, l2, otherRaw, &domain.Bundle{OrganizationID: "org-2", ExpiresAt: exp})
+
+	svc.applyChange("org-1", CacheChange{Kind: ChangeKindRoutingPolicyUpdated})
+
+	_, isPresentInL1 := svc.l1.Get(hashKey(invalidatedRaw))
+	assert.False(t, isPresentInL1, "the polled organization must be evicted locally")
+	assert.False(t, l2.has(l2Key(invalidatedRaw)), "and dropped from the shared tier")
+	assert.True(t, l2.has(l2Key(otherRaw)), "other organizations must stay in the shared tier")
+
+	// The whole point of the deletion: without it this request finds the
+	// invalidated bundle in the shared tier and puts it straight back, so the
+	// policy the event announced never takes effect on this node.
+	got, err := svc.Resolve(context.Background(), invalidatedRaw)
+	require.NoError(t, err)
+	assert.Empty(t, got.Config.AllowedModels, "the next request must re-resolve, not rehydrate the invalidated bundle")
+	assert.Equal(t, int64(1), resolver.calls.Load(), "the evicted key must reach the control plane")
+}
+
+/** @scenario "a shared tier that cannot be reached does not hold up the local eviction" */
+func TestApplyChange_SharedTierUnreachable_StillEvictsLocallyAndReports(t *testing.T) {
+	l2 := newFakeL2()
+	l2.delErr = errors.New("shared cache unreachable")
+	resolver := &fakeResolver{}
+	svc, logs := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver, L2: l2})
+
+	rawKey := "vk-lw-shared-tier-down"
+	seedBothTiers(svc, l2, rawKey, &domain.Bundle{OrganizationID: "org-1"})
+
+	svc.applyChange("org-1", CacheChange{Kind: ChangeKindCacheRuleUpdated})
+
+	_, isPresent := svc.l1.Get(hashKey(rawKey))
+	assert.False(t, isPresent, "an unreachable shared tier must not hold up the local eviction")
+	assert.Len(t, logs.FilterMessage("auth_cache_l2_delete_failed").All(), 1,
+		"a shared-tier deletion that failed must be reported, it leaves that copy stale until the config TTL")
+}
+
+/** @scenario "rehydrating from the shared tier keeps the config's real age" */
+func TestResolve_L2Hit_KeepsTheConfigFetchTimeItWasStoredWith(t *testing.T) {
+	rawKey := "vk-lw-shared-tier-age"
+
+	t.Run("when the shared entry's config is older than the TTL", func(t *testing.T) {
+		l2 := newFakeL2()
+		fetcher := &fakeConfigFetcher{cfg: domain.BundleConfig{Credentials: []domain.Credential{{ID: "cred-fresh"}}}}
+		svc, _ := newService(t, Options{
+			Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher, L2: l2,
+			ConfigTTL: 60 * time.Second, RefreshThreshold: time.Second,
+		})
+		bundle := freshBundle("vk_shared_age", time.Now().Add(1*time.Hour))
+		bundle.Credentials = []domain.Credential{{ID: "cred-old"}}
+		l2.Set(context.Background(), l2Key(rawKey), CachedBundle{
+			Bundle:          bundle,
+			ConfigFetchedAt: time.Now().Add(-2 * time.Minute),
+		})
+
+		got, err := svc.Resolve(context.Background(), rawKey)
+		require.NoError(t, err)
+		assert.Equal(t, "cred-old", got.Credentials[0].ID, "the triggering request still serves what the shared tier held")
+		// Stamping the rehydrate moment instead would leave this entry
+		// looking fresh for another full TTL, so config staleness could
+		// reach twice the TTL and an eviction could be undone by it.
+		assert.Eventually(t, func() bool { return fetcher.fetches.Load() == 1 }, 2*time.Second, 10*time.Millisecond,
+			"a rehydrated entry past its config TTL must refresh rather than restart the clock")
+	})
+
+	t.Run("when the shared entry's config is inside the TTL", func(t *testing.T) {
+		l2 := newFakeL2()
+		fetcher := &fakeConfigFetcher{}
+		svc, _ := newService(t, Options{
+			Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher, L2: l2,
+			ConfigTTL: 60 * time.Second, RefreshThreshold: time.Second,
+		})
+		fetchedAt := time.Now().Add(-5 * time.Second)
+		l2.Set(context.Background(), l2Key(rawKey), CachedBundle{
+			Bundle:          freshBundle("vk_shared_age_fresh", time.Now().Add(1*time.Hour)),
+			ConfigFetchedAt: fetchedAt,
+		})
+
+		_, err := svc.Resolve(context.Background(), rawKey)
+		require.NoError(t, err)
+
+		e, ok := svc.l1.Peek(hashKey(rawKey))
+		require.True(t, ok, "the rehydrated bundle must land in L1")
+		e.mu.Lock()
+		storedFetchedAt := e.configFetchedAt
+		e.mu.Unlock()
+		assert.True(t, storedFetchedAt.Equal(fetchedAt), "L1 must inherit the shared tier's config-fetch time")
+		assert.Equal(t, int64(0), fetcher.fetches.Load(), "config inside the TTL must not be refetched")
+	})
 }
 
 // --- Background refresh classification --------------------------------------

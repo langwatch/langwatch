@@ -26,10 +26,28 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-// L2Store is an optional second-level cache (e.g., Redis).
+// CachedBundle is what an L2 store holds: the bundle plus the moment its
+// config was fetched from the control plane. The timestamp travels with the
+// value because L2 is shared across nodes, and a node rehydrating an entry
+// has to inherit the config's real age. Stamping the rehydrate moment
+// instead would restart the ConfigTTL clock on every L2 hit.
+type CachedBundle struct {
+	// Bundle is the cached resolution result.
+	Bundle *domain.Bundle
+	// ConfigFetchedAt is when the config baked into Bundle was fetched. The
+	// zero value means unknown, which every reader must treat as stale now:
+	// a value we cannot date is one we cannot vouch for.
+	ConfigFetchedAt time.Time
+}
+
+// L2Store is an optional second-level cache (e.g., Redis) shared by every
+// gateway node. Delete is what makes a change-feed eviction reach the other
+// nodes' shared copy; without it an evicted entry is rehydrated from L2 on
+// the very next request, still carrying the config the event invalidated.
 type L2Store interface {
-	Get(ctx context.Context, hash string) (*domain.Bundle, error)
-	Set(ctx context.Context, hash string, bundle *domain.Bundle)
+	Get(ctx context.Context, hash string) (*CachedBundle, error)
+	Set(ctx context.Context, hash string, cached CachedBundle)
+	Delete(ctx context.Context, hash string) error
 }
 
 // KeyResolver resolves a raw API key into a Bundle via an upstream source.
@@ -96,6 +114,11 @@ const (
 	tierL1      = "l1"
 	tierL2Redis = "l2_redis"
 )
+
+// l2DeleteTimeout bounds one change-feed batch of L2 deletions. Generous
+// enough for a slow store, short enough that the poll loop keeps moving when
+// the store is gone.
+const l2DeleteTimeout = 5 * time.Second
 
 type Service struct {
 	l1            *lru.Cache[[64]byte, *entry]
@@ -393,18 +416,38 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 	}
 
 	// L2: optional store
-	if s.l2 != nil {
-		hStr := string(h[:])
-		if bundle, err := s.l2.Get(ctx, hStr); err == nil && bundle != nil {
-			s.recordHit(tierL2Redis)
-			s.storeL1(h, bundle)
-			return bundle, nil
-		}
-		s.recordMiss(tierL2Redis)
+	if bundle := s.serveFromL2(ctx, h); bundle != nil {
+		return bundle, nil
 	}
 
 	// L3: upstream resolver
 	return s.resolveFresh(ctx, rawKey, h)
+}
+
+// serveFromL2 answers from the shared store when it holds a live bundle,
+// rehydrating L1 on the way. Returns nil when L2 is not configured, misses,
+// or errors, leaving the caller to resolve upstream.
+func (s *Service) serveFromL2(ctx context.Context, h [64]byte) *domain.Bundle {
+	if s.l2 == nil {
+		return nil
+	}
+	cached, err := s.l2.Get(ctx, string(h[:]))
+	if err != nil || cached == nil || cached.Bundle == nil {
+		s.recordMiss(tierL2Redis)
+		return nil
+	}
+	s.recordHit(tierL2Redis)
+	// Rehydrate with the config-fetch time L2 carries, never with now.
+	// Stamping now would restart the ConfigTTL clock on every L2 hit, so an
+	// entry 50 seconds into a 60 second TTL would come back with a fresh 60
+	// and config staleness could reach twice the TTL. An entry that is
+	// already past its TTL refreshes here rather than waiting for a second
+	// request to notice.
+	e := s.storeL1Fetched(h, cached.Bundle, cached.ConfigFetchedAt)
+	if e.configStale(s.configTTL) && e.tryBeginConfigRefresh() {
+		go s.refreshConfigBackground(h, e) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
+	}
+	return cached.Bundle
 }
 
 // CacheLen reports how many virtual keys L1 is currently holding, so the
@@ -443,9 +486,7 @@ func (s *Service) resolveFresh(ctx context.Context, rawKey string, h [64]byte) (
 		return nil, errConfigUnavailable(ctx, cfgErr)
 	}
 	s.storeL1(h, bundle)
-	if s.l2 != nil {
-		s.l2.Set(ctx, string(h[:]), bundle)
-	}
+	s.setL2(ctx, h, bundle)
 	return bundle, nil
 }
 
@@ -471,9 +512,7 @@ func (s *Service) refreshOrServeStale(ctx context.Context, rawKey string, h [64]
 			return s.serveStaleAfterFailure(ctx, h, stale, staleBundle, vkID, hardExpiresAt, cls, cfgErr)
 		}
 		s.storeL1(h, bundle)
-		if s.l2 != nil {
-			s.l2.Set(ctx, string(h[:]), bundle)
-		}
+		s.setL2(ctx, h, bundle)
 		return bundle, nil
 
 	case classAuthRejection:
@@ -580,21 +619,40 @@ func (s *Service) Stop() {
 
 // --- Internal ---
 
+// storeL1 caches a bundle whose config was just fetched.
 func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle) {
-	s.l1.Add(h, &entry{
+	s.storeL1Fetched(h, bundle, time.Now())
+}
+
+// storeL1Fetched caches a bundle whose config was fetched at a known moment,
+// which is not always now: an L2 rehydrate inherits the age the shared store
+// recorded, so the ConfigTTL clock keeps running across nodes.
+func (s *Service) storeL1Fetched(h [64]byte, bundle *domain.Bundle, configFetchedAt time.Time) *entry {
+	e := &entry{
 		bundle:          bundle,
 		softExpiresAt:   bundle.ExpiresAt,
 		hardExpiresAt:   bundle.ExpiresAt.Add(s.hardGrace),
-		configFetchedAt: time.Now(),
-	})
+		configFetchedAt: configFetchedAt,
+	}
+	s.l1.Add(h, e)
 	// Record the bundle's org so the change-feed loop knows which orgs
-	// to subscribe to. LoadOrStore is the first-write-wins shape — if
+	// to subscribe to. LoadOrStore is the first-write-wins shape: if
 	// the org's already known, the existing cursor is preserved so we
 	// don't reset to "0" and re-stream the entire history on every new
 	// bundle for an existing org.
 	if bundle.OrganizationID != "" {
 		s.activeOrgs.LoadOrStore(bundle.OrganizationID, &orgCursor{since: "0"})
 	}
+	return e
+}
+
+// setL2 mirrors a bundle into the shared store. Only called right after a
+// successful config fetch, so now is the config's fetch time.
+func (s *Service) setL2(ctx context.Context, h [64]byte, bundle *domain.Bundle) {
+	if s.l2 == nil {
+		return
+	}
+	s.l2.Set(ctx, string(h[:]), CachedBundle{Bundle: bundle, ConfigFetchedAt: time.Now()})
 }
 
 // changeFeedLoop drives the per-org cache invalidation: long-polls the
@@ -727,8 +785,10 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 }
 
 // evictWhere walks the L1 LRU once and removes every entry whose bundle
-// matches the predicate. O(N) over LRUSize per call — acceptable for
-// 10k-ish caches and the low frequency of admin mutations.
+// matches the predicate, then drops the same entries from L2. Evicting only
+// L1 would be undone by the next request, which finds the invalidated bundle
+// in the shared store and rehydrates it. O(N) over LRUSize per call:
+// acceptable for 10k-ish caches and the low frequency of admin mutations.
 //
 // Peek, not Get: the scan reads the whole cache, and Get takes the
 // exclusive lock and promotes what it reads. That queues every in-flight
@@ -739,7 +799,7 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 // reason refreshConfigBackground uses it.
 func (s *Service) evictWhere(match func(*domain.Bundle) bool, reason, target string) {
 	keys := s.l1.Keys()
-	evicted := 0
+	evicted := make([][64]byte, 0, len(keys))
 	for _, h := range keys {
 		e, ok := s.l1.Peek(h)
 		if !ok {
@@ -749,13 +809,50 @@ func (s *Service) evictWhere(match func(*domain.Bundle) bool, reason, target str
 			continue
 		}
 		s.l1.Remove(h)
-		evicted++
+		evicted = append(evicted, h)
 	}
-	if evicted > 0 {
-		s.logger.Info("auth_cache_change_evict",
+	if len(evicted) == 0 {
+		return
+	}
+	s.logger.Info("auth_cache_change_evict",
+		zap.String("reason", reason),
+		zap.String("target", target),
+		zap.Int("evicted", len(evicted)),
+	)
+	s.deleteL2(evicted, reason, target)
+}
+
+// deleteL2 drops evicted hashes from the shared store, after the L1 walk so
+// no Redis round trip sits inside it. Best effort: a store that cannot be
+// reached leaves those entries to the ConfigTTL refresh, which is the same
+// bound the gateway had before the change feed existed, so the eviction that
+// already happened in L1 still stands.
+//
+// It runs synchronously in the change-feed loop, which is off the request
+// path, on its own bounded context so a hung store cannot stall the loop and
+// a shutdown mid-delete does not abandon the rest of the batch.
+func (s *Service) deleteL2(hashes [][64]byte, reason, target string) {
+	if s.l2 == nil || len(hashes) == 0 {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), l2DeleteTimeout)
+	defer cancel()
+
+	failed := 0
+	var lastErr error
+	for _, h := range hashes {
+		if err := s.l2.Delete(ctx, string(h[:])); err != nil {
+			failed++
+			lastErr = err
+		}
+	}
+	if failed > 0 {
+		s.logger.Warn("auth_cache_l2_delete_failed",
 			zap.String("reason", reason),
 			zap.String("target", target),
-			zap.Int("evicted", evicted),
+			zap.Int("failed", failed),
+			zap.Int("total", len(hashes)),
+			zap.Error(lastErr),
 		)
 	}
 }
@@ -781,9 +878,7 @@ func (s *Service) refreshBackground(rawKey string, h [64]byte) {
 			return
 		}
 		s.storeL1(h, bundle)
-		if s.l2 != nil {
-			s.l2.Set(ctx, string(h[:]), bundle)
-		}
+		s.setL2(ctx, h, bundle)
 		s.logger.Debug("auth_cache_refresh_success", zap.String("vk_id", bundle.VirtualKeyID))
 
 	case classAuthRejection:
@@ -865,9 +960,7 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 		return
 	}
 	s.storeL1(h, &fresh)
-	if s.l2 != nil {
-		s.l2.Set(ctx, string(h[:]), &fresh)
-	}
+	s.setL2(ctx, h, &fresh)
 	s.logger.Debug("config_ttl_refresh_success", zap.String("vk_id", stale.VirtualKeyID))
 }
 

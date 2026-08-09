@@ -305,6 +305,41 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then no change event is appended
       And already-issued keys keep the policy they were issued against
 
+  Rule: Invalidation reaches every cache tier, not just the node that saw the event
+    L1 is one node's own copy; L2 is the copy every node shares. Dropping an
+    entry from L1 alone is undone by the very next request, which finds the
+    invalidated bundle in the shared tier and puts it straight back, so the
+    mutation the event announced does not take effect until the config TTL
+    expires. The rehydrate also has to carry the config's real age: stamping
+    it as freshly fetched restarts the staleness clock, so an entry most of
+    the way through its TTL comes back with a whole new one and staleness can
+    reach twice the TTL. This holds for every change kind, not only the
+    newest ones.
+
+    @unit
+    Scenario: a change event drops the entry from the shared cache tier too
+      Given a bundle is cached in both the node's own tier and the shared tier
+      When the change feed reports a mutation that invalidates it
+      Then the bundle is gone from both tiers
+      And the next request for that key re-resolves against the control plane
+      And bundles for other organizations stay in both tiers
+
+    @unit
+    Scenario: a shared tier that cannot be reached does not hold up the local eviction
+      Given a bundle is cached in both tiers
+      And the shared tier is unreachable
+      When the change feed reports a mutation that invalidates it
+      Then the entry is still evicted from the node's own tier
+      And the failed deletion is reported, since that copy stays stale until the config TTL
+
+    @unit
+    Scenario: rehydrating from the shared tier keeps the config's real age
+      Given the shared tier holds a bundle whose config was fetched longer ago than the config TTL
+      When a node whose own tier is empty serves a request with that key
+      Then the cached bundle is served
+      And its config is refreshed rather than treated as freshly fetched
+      And a shared entry whose config is still inside the TTL is not refetched
+
   Rule: L2 Redis cache warms new gateway nodes
 
     @integration @unimplemented
