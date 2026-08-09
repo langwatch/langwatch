@@ -323,6 +323,35 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then no change event is appended
       And already-issued keys keep the policy they were issued against
 
+  Rule: The config safety net revalidates, it does not re-download
+    The change feed is how a config edit reaches a running gateway. The config
+    TTL is the safety net under it, for the mutations that emit no event, and a
+    safety net fires mostly when nothing is wrong: almost every time it runs,
+    the key is exactly as it was. So it asks rather than downloads. The control
+    plane already versions each key's config with an ETag it derives from the
+    key's revision, which every mutation bumps, and answers 304 to a matching
+    If-None-Match. The gateway keeps that ETag beside the cached bundle and
+    offers it back, so an unchanged key costs a revision lookup instead of a
+    whole bundle materialized, serialized and parsed, on every cached key, every
+    TTL, on every pod.
+
+    A confirmation is worth as much as a download: the config was checked
+    against the control plane and found current, so it restarts the staleness
+    clock. What it must never do is answer with less than it was asked for. A
+    304 to a request that offered no ETag confirms nothing, and an error or an
+    unreadable answer leaves the cached config in place rather than replacing it
+    with an empty one.
+
+    @unit
+    Scenario: the staleness refresh revalidates instead of re-downloading
+      Given a cached bundle whose config the control plane served with a version token
+      When the config TTL elapses and the safety net runs
+      Then the refresh offers that token back to the control plane
+      And a key nobody changed is confirmed rather than sent again
+      And the confirmed entry keeps serving its credentials with its staleness clock restarted
+      And a key that did change comes back with the new config and the new token, which the next refresh offers in turn
+      And a response that carried no token leaves the next refresh unconditional
+
   Rule: The grace window moves the hard cap, not the bundle's own expiry
     LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS sets how far past its JWT expiry
     a cached bundle may keep serving while the control plane is unreachable,

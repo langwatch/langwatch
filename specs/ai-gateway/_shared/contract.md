@@ -707,6 +707,8 @@ Documented here so Go code + infra agree:
 
 Background refresh: single goroutine long-polls `/api/internal/gateway/changes?since=<rev>` with 25s timeout. On diff → re-fetch affected VK configs and invalidate the matching L1 entries.
 
+Config staleness is bounded by a TTL refresh underneath the change feed, and that refresh is conditional: it sends `If-None-Match: <etag>` to §4.2 and takes the 304 as "keep the bundle, restart the staleness clock". A key nobody changed costs the control plane a revision lookup rather than a full config materialization.
+
 No filesystem-persisted secrets. JWTs and configs are in-memory only; on restart we re-fetch.
 
 ---

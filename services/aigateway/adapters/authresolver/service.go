@@ -32,9 +32,12 @@ type KeyResolver interface {
 	ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle, error)
 }
 
-// ConfigFetcher retrieves configuration for a virtual key.
+// ConfigFetcher retrieves configuration for a virtual key. ifNoneMatch is the
+// ETag of the config the caller already holds, so an unchanged key can be
+// revalidated rather than materialized again; empty asks for the config
+// outright, and only a conditional call may be answered NotModified.
 type ConfigFetcher interface {
-	FetchConfig(ctx context.Context, vkID string) (domain.BundleConfig, error)
+	FetchConfig(ctx context.Context, vkID, ifNoneMatch string) (domain.ConfigFetchResult, error)
 }
 
 // ChangeKind discriminates the cache-invalidation triggers the gateway
@@ -138,6 +141,19 @@ type entry struct {
 	// in-flight guard so at most one background config fetch runs per entry.
 	configFetchedAt  time.Time
 	configRefreshing bool
+	// configETag is what the control plane stamped on the config this entry
+	// carries. The staleness refresh sends it as If-None-Match so a key
+	// nobody changed comes back 304 instead of a re-materialized bundle.
+	// Empty means we have no token to revalidate with, and the next refresh
+	// goes out unconditional.
+	configETag string
+}
+
+// currentConfigETag reports the ETag of the config this entry is carrying.
+func (e *entry) currentConfigETag() string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.configETag
 }
 
 // configStale reports whether the entry's config is older than ttl.
@@ -451,12 +467,13 @@ func (s *Service) resolveFresh(ctx context.Context, rawKey string, h [64]byte) (
 	if err != nil {
 		return nil, err
 	}
-	if cfgErr := s.populateConfig(ctx, bundle); cfgErr != nil {
+	etag, cfgErr := s.populateConfig(ctx, bundle)
+	if cfgErr != nil {
 		// Cold miss: no stale entry to fall back on. Cache nothing — a
 		// bundle without its config is not a resolution result.
 		return nil, errConfigUnavailable(ctx, cfgErr)
 	}
-	s.storeL1(h, bundle)
+	s.storeL1(h, bundle, etag)
 	return bundle, nil
 }
 
@@ -473,7 +490,8 @@ func (s *Service) refreshOrServeStale(ctx context.Context, rawKey string, h [64]
 
 	switch cls {
 	case classNone:
-		if cfgErr := s.populateConfig(ctx, bundle); cfgErr != nil {
+		etag, cfgErr := s.populateConfig(ctx, bundle)
+		if cfgErr != nil {
 			// The control plane authenticated the key but could not hand
 			// over its provider config. Serving the fresh, config-less
 			// bundle would surface as no_provider_configured for an org
@@ -481,7 +499,7 @@ func (s *Service) refreshOrServeStale(ctx context.Context, rawKey string, h [64]
 			// serve the stale entry's known-good credentials instead.
 			return s.serveStaleAfterFailure(ctx, h, stale, staleBundle, vkID, hardExpiresAt, cls, cfgErr)
 		}
-		s.storeL1(h, bundle)
+		s.storeL1(h, bundle, etag)
 		return bundle, nil
 
 	case classAuthRejection:
@@ -542,19 +560,33 @@ func (s *Service) serveStaleAfterFailure(ctx context.Context, h [64]byte, stale 
 // not cache or serve the bundle as-is: dispatch would answer the terminal
 // no_provider_configured ("add a provider API key in Settings") for an org
 // whose keys are fine, and a cached config-less bundle keeps giving that
-// answer until it expires.
-func (s *Service) populateConfig(ctx context.Context, bundle *domain.Bundle) error {
+// answer until it expires. Returns the ETag the config was served under, for
+// the entry that will carry it.
+//
+// Unconditional on purpose: this path is materializing config for a bundle
+// that has none, so "still current" would be an answer about nothing. The
+// conditional request belongs to refreshConfigBackground, which already holds
+// a config a 304 can confirm.
+func (s *Service) populateConfig(ctx context.Context, bundle *domain.Bundle) (string, error) {
 	if bundle == nil {
-		return nil
+		return "", nil
 	}
-	cfg, err := s.configFetcher.FetchConfig(ctx, bundle.VirtualKeyID)
+	res, err := s.configFetcher.FetchConfig(ctx, bundle.VirtualKeyID, "")
 	if err != nil {
 		s.logger.Warn("config_fetch_failed", zap.String("vk_id", bundle.VirtualKeyID), zap.Error(err))
-		return err
+		return "", err
 	}
-	bundle.Config = cfg
-	bundle.Credentials = cfg.Credentials
-	return nil
+	if res.NotModified {
+		// Nothing was revalidated, so there is no config behind this answer.
+		// Treated as a failed fetch rather than cached as an empty one, which
+		// would strip the key of every credential it has.
+		err := errors.New("config fetch answered not-modified to an unconditional request")
+		s.logger.Warn("config_fetch_failed", zap.String("vk_id", bundle.VirtualKeyID), zap.Error(err))
+		return "", err
+	}
+	bundle.Config = res.Config
+	bundle.Credentials = res.Config.Credentials
+	return res.ETag, nil
 }
 
 // errConfigUnavailable is the fail-closed answer when the control plane
@@ -588,14 +620,17 @@ func (s *Service) Stop() {
 
 // --- Internal ---
 
-// storeL1 caches a bundle whose config was just fetched and records its org
-// for the change feed.
-func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle) {
+// storeL1 caches a bundle whose config was just fetched under configETag, and
+// records its org for the change feed. An empty configETag is the honest state
+// after a response that carried none: the next staleness refresh asks for the
+// config outright rather than revalidating against a token we do not have.
+func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) {
 	s.l1.Add(h, &entry{
 		bundle:          bundle,
 		softExpiresAt:   bundle.ExpiresAt,
 		hardExpiresAt:   bundle.ExpiresAt.Add(s.hardGrace),
 		configFetchedAt: time.Now(),
+		configETag:      configETag,
 	})
 	// Record the bundle's org so the change-feed loop knows which orgs
 	// to subscribe to. LoadOrStore is the first-write-wins shape: if
@@ -800,7 +835,8 @@ func (s *Service) refreshBackground(rawKey string, h [64]byte) {
 
 	switch cls {
 	case classNone:
-		if cfgErr := s.populateConfig(ctx, bundle); cfgErr != nil {
+		etag, cfgErr := s.populateConfig(ctx, bundle)
+		if cfgErr != nil {
 			// Keep the existing entry serving its known-good credentials.
 			// Replacing it with a config-less bundle would proactively
 			// poison a perfectly healthy cache entry into answering
@@ -808,7 +844,7 @@ func (s *Service) refreshBackground(rawKey string, h [64]byte) {
 			s.bumpEntryAfterTransportFailure(h, cfgErr)
 			return
 		}
-		s.storeL1(h, bundle)
+		s.storeL1(h, bundle, etag)
 		s.logger.Debug("auth_cache_refresh_success", zap.String("vk_id", bundle.VirtualKeyID))
 
 	case classAuthRejection:
@@ -856,6 +892,13 @@ func (s *Service) bumpEntryAfterTransportFailure(h [64]byte, cause error) {
 // pointer stays immutable, so in-flight requests holding the old bundle
 // are unaffected. On failure the stale config keeps serving and the next
 // attempt waits a full TTL (endConfigRefresh stamps configFetchedAt).
+//
+// This is the safety net rather than the propagation path: the change feed
+// already evicts on the mutations that emit events, and this bounds staleness
+// for the ones that do not. Which is exactly why it revalidates instead of
+// re-downloading. Most of the time it fires, nothing about the key has
+// changed, and the conditional request turns a full config materialization
+// into a 304 the control plane answers from the key's revision.
 func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 	defer e.endConfigRefresh()
 
@@ -863,7 +906,7 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 	defer cancel()
 
 	stale, _, _ := e.snapshot()
-	cfg, err := s.configFetcher.FetchConfig(ctx, stale.VirtualKeyID)
+	res, err := s.configFetcher.FetchConfig(ctx, stale.VirtualKeyID, e.currentConfigETag())
 	if err != nil {
 		s.logger.Warn("config_ttl_refresh_failed",
 			zap.String("vk_id", stale.VirtualKeyID),
@@ -871,10 +914,18 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 		)
 		return
 	}
+	if res.NotModified {
+		// The config this entry carries is still the current one, so there is
+		// nothing to swap in. The deferred endConfigRefresh restarts the
+		// staleness clock, which is what a confirmation is worth: the entry
+		// was just checked against the control plane, not merely tolerated.
+		s.logger.Debug("config_ttl_refresh_not_modified", zap.String("vk_id", stale.VirtualKeyID))
+		return
+	}
 
 	fresh := *stale
-	fresh.Config = cfg
-	fresh.Credentials = cfg.Credentials
+	fresh.Config = res.Config
+	fresh.Credentials = res.Config.Credentials
 
 	// Guard against resurrecting an entry that another path evicted or
 	// replaced while FetchConfig was in flight: a change-feed eviction
@@ -889,7 +940,7 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 		)
 		return
 	}
-	s.storeL1(h, &fresh)
+	s.storeL1(h, &fresh, res.ETag)
 	s.logger.Debug("config_ttl_refresh_success", zap.String("vk_id", stale.VirtualKeyID))
 }
 

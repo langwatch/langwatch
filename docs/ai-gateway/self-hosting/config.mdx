@@ -49,7 +49,9 @@ All three are a plain count of seconds, not a duration string: `300`, not `5m`.
 |----------------------------------------------|----------------|----------------------------------------------------------------------------------------------|
 | `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`    | `300` (5m)     | Per-failure soft-expiry extension during a control-plane outage.                             |
 | `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`   | `21600` (6h)   | Outage cap measured from JWT exp. A negative value disables stale-while-error.                |
-| `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS`   | `60`           | How stale a cached key's config (credentials, base URLs, routing) can get before a background re-fetch. A negative value disables the refresh. |
+| `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS`   | `60`           | How stale a cached key's config (credentials, base URLs, routing) can get before a background revalidation. A negative value disables the refresh. |
+
+The config refresh is conditional: the gateway sends back the version token the control plane stamped on the config it holds, and a key nobody changed is confirmed with a 304 instead of materialized and sent again. Lowering the TTL therefore costs the control plane a revision lookup per key per interval, not a bundle.
 
 See [Auth Cache Architecture](/ai-gateway/observability#auth-cache-architecture) for the design and the [Production runbook → Control-plane outage](/ai-gateway/cookbooks/production-runbook#recipe-8--control-plane-outage--stale-while-error) for the operator playbook.
 
