@@ -209,6 +209,40 @@ func (e *entry) endConfigRefresh() {
 	e.configFetchedAt = time.Now()
 }
 
+// entryState is what the cache has decided about an entry it is holding, and
+// it is the same question on every tier: serve it as is, refresh it before
+// serving, or treat it as gone.
+type entryState int
+
+const (
+	// entryFresh is inside its JWT exp and serves without asking anyone.
+	entryFresh entryState = iota
+	// entryStale is past its JWT exp but inside the hard cap, so the control
+	// plane decides: a rejection evicts, a transport failure serves stale.
+	entryStale
+	// entryDead is past the hard cap and is not servable at all.
+	entryDead
+)
+
+// classifyEntry is the one place that decides which of the three an entry is,
+// so a warm tier and a cold one cannot answer differently about the same
+// bundle. The order is load-bearing: soft expiry is checked BEFORE the hard
+// cap, because a negative HardGrace deliberately puts the cap earlier than
+// the JWT exp (the stale-while-error opt-out, LW_GATEWAY_AUTH_CACHE_HARD_
+// GRACE_SECONDS), and a bundle that has not reached its own expiry is
+// servable wherever the cap happens to sit. Testing the cap first would
+// throw away perfectly valid credentials under that configuration.
+func classifyEntry(e *entry) entryState {
+	switch {
+	case !e.softExpired():
+		return entryFresh
+	case !e.hardExpired():
+		return entryStale
+	default:
+		return entryDead
+	}
+}
+
 func (e *entry) softExpired() bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -394,9 +428,9 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 
 	// L1: in-memory
 	if e, ok := s.l1.Get(h); ok {
-		switch {
-		case !e.softExpired():
-			// Fresh: serve, maybe trigger background refresh on near-expiry.
+		switch classifyEntry(e) {
+		case entryFresh:
+			// Serve, maybe trigger background refresh on near-expiry.
 			s.recordHit(tierL1)
 			if e.nearSoftExpiry(s.refreshThreshold) {
 				go s.refreshBackground(rawKey, h) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
@@ -405,7 +439,7 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 			}
 			return e.bundle, nil
 
-		case !e.hardExpired():
+		case entryStale:
 			// Soft-expired but within hard grace. A foreground refresh is
 			// needed before the entry can serve, so it counts as a miss
 			// even when stale-while-error ends up serving the old bundle.
@@ -455,21 +489,24 @@ func (s *Service) serveFromL2(ctx context.Context, rawKey string, h [64]byte) (*
 		s.recordMiss(tierL2Redis)
 		return nil, nil
 	}
-	// A store is not required to filter what it hands back, and the L1 path
-	// will not serve a bundle past its hard cap either. Same rule at this
-	// boundary: past the cap is a miss, so the request resolves fresh rather
-	// than running on credentials nothing has re-checked in hours.
-	if time.Now().After(cached.Bundle.ExpiresAt.Add(s.hardGrace)) {
+	// Build the entry before deciding anything, so this tier asks
+	// classifyEntry the same question L1 asks about an entry it already
+	// holds, from the same fields. A store is not required to filter what it
+	// hands back, and the answer must not depend on which tier the bundle
+	// arrived from. The config-fetch time is the one L2 carries, never now:
+	// stamping now would restart the ConfigTTL clock on every hit, so an
+	// entry 50 seconds into a 60 second TTL would come back with a fresh 60.
+	e := s.newEntry(cached.Bundle, cached.ConfigFetchedAt)
+
+	switch classifyEntry(e) {
+	case entryDead:
+		// Past the hard cap and not servable, so it never enters L1: the
+		// request resolves fresh rather than running on credentials nothing
+		// has re-checked in hours.
 		s.recordMiss(tierL2Redis)
 		return nil, nil
-	}
-	// Rehydrate with the config-fetch time L2 carries, never with now.
-	// Stamping now would restart the ConfigTTL clock on every L2 hit, so an
-	// entry 50 seconds into a 60 second TTL would come back with a fresh 60
-	// and config staleness could reach twice the TTL.
-	e := s.storeL1Fetched(h, cached.Bundle, cached.ConfigFetchedAt)
 
-	if e.softExpired() {
+	case entryStale:
 		// Past its JWT exp and inside the hard cap: ask the control plane
 		// before serving, exactly as an L1 entry in this state does. A key
 		// revoked during the grace window is rejected here rather than
@@ -477,17 +514,20 @@ func (s *Service) serveFromL2(ctx context.Context, rawKey string, h [64]byte) (*
 		// unreachable still gets the stale bundle served. Counted a miss for
 		// the same reason the L1 path counts one: the request paid a
 		// foreground refresh, whatever it ends up being answered with.
+		s.storeL1Entry(h, e)
 		s.recordMiss(tierL2Redis)
 		return s.refreshOrServeStale(ctx, rawKey, h, e)
-	}
 
-	s.recordHit(tierL2Redis)
-	// An entry that arrives already past its config TTL refreshes here rather
-	// than waiting for a second request to notice.
-	if e.configStale(s.configTTL) && e.tryBeginConfigRefresh() {
-		go s.refreshConfigBackground(h, e) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
+	default:
+		s.storeL1Entry(h, e)
+		s.recordHit(tierL2Redis)
+		// An entry that arrives already past its config TTL refreshes here
+		// rather than waiting for a second request to notice.
+		if e.configStale(s.configTTL) && e.tryBeginConfigRefresh() {
+			go s.refreshConfigBackground(h, e) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
+		}
+		return cached.Bundle, nil
 	}
-	return cached.Bundle, nil
 }
 
 // CacheLen reports how many virtual keys L1 is currently holding, so the
@@ -668,12 +708,26 @@ func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle) {
 // which is not always now: an L2 rehydrate inherits the age the shared store
 // recorded, so the ConfigTTL clock keeps running across nodes.
 func (s *Service) storeL1Fetched(h [64]byte, bundle *domain.Bundle, configFetchedAt time.Time) *entry {
-	e := &entry{
+	e := s.newEntry(bundle, configFetchedAt)
+	s.storeL1Entry(h, e)
+	return e
+}
+
+// newEntry builds a cache entry without publishing it. Separate from the
+// store so a caller can classify a bundle first and decline to cache one it
+// would refuse to serve.
+func (s *Service) newEntry(bundle *domain.Bundle, configFetchedAt time.Time) *entry {
+	return &entry{
 		bundle:          bundle,
 		softExpiresAt:   bundle.ExpiresAt,
 		hardExpiresAt:   bundle.ExpiresAt.Add(s.hardGrace),
 		configFetchedAt: configFetchedAt,
 	}
+}
+
+// storeL1Entry publishes an entry to L1 and records its org for the change feed.
+func (s *Service) storeL1Entry(h [64]byte, e *entry) {
+	bundle := e.bundle
 	s.l1.Add(h, e)
 	// Record the bundle's org so the change-feed loop knows which orgs
 	// to subscribe to. LoadOrStore is the first-write-wins shape: if
@@ -683,7 +737,6 @@ func (s *Service) storeL1Fetched(h [64]byte, bundle *domain.Bundle, configFetche
 	if bundle.OrganizationID != "" {
 		s.activeOrgs.LoadOrStore(bundle.OrganizationID, &orgCursor{since: "0"})
 	}
-	return e
 }
 
 // setL2 mirrors a bundle into the shared store. Only called right after a

@@ -364,6 +364,14 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And the eviction is reported once with how many entries were left behind
 
     @unit
+    Scenario: the grace window classifies a cached bundle the same way on both tiers
+      Given a cached bundle and a configured grace window
+      When the same request is answered from the node's own tier and from the shared tier in turn
+      Then both tiers reach the same verdict
+      And both consult the control plane exactly as often
+      And a bundle inside its own expiry is still served when the grace window is negative, since that setting moves the cap, not the expiry
+
+    @unit
     Scenario: a key revoked during the grace window is refused on a node whose own tier is cold
       Given the shared tier holds a bundle past its JWT expiry but inside the grace window
       And the key has been revoked since that bundle was cached

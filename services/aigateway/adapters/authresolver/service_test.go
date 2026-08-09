@@ -602,6 +602,72 @@ func TestApplyChange_SharedTierUnreachable_StillEvictsLocallyAndReports(t *testi
 		"a shared-tier deletion that failed must be reported, it leaves that copy stale until the config TTL")
 }
 
+/** @scenario "the grace window classifies a cached bundle the same way on both tiers" */
+func TestResolve_HardGrace_ClassifiesABundleTheSameOnBothTiers(t *testing.T) {
+	const cachedCred = "cred-from-cache"
+	const freshCred = "cred-from-control-plane"
+
+	cases := []struct {
+		name      string
+		hardGrace time.Duration
+		expiresIn time.Duration
+		wantCred  string
+		wantCalls int64
+	}{
+		// A bundle inside its own expiry serves untouched, whatever the cap
+		// is doing. The negative case is the one that used to diverge: the
+		// cap sits an hour in the PAST, so a tier that tested the cap first
+		// threw away a credential that had not expired.
+		{"a positive grace serves a bundle inside its expiry", time.Hour, 10 * time.Minute, cachedCred, 0},
+		{"a zero grace takes the default and serves it", 0, 10 * time.Minute, cachedCred, 0},
+		{"a negative grace still serves a bundle inside its expiry", -time.Hour, 10 * time.Minute, cachedCred, 0},
+		// Past its own expiry, the control plane decides.
+		{"a positive grace refreshes an expired bundle before serving", time.Hour, -30 * time.Second, freshCred, 1},
+		{"a negative grace refuses to serve an expired bundle", -time.Hour, -30 * time.Second, freshCred, 1},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, tier := range []string{"L1", "L2"} {
+				t.Run(tier, func(t *testing.T) {
+					l2 := newFakeL2()
+					fresh := freshBundle("vk_fresh", time.Now().Add(1*time.Hour))
+					fresh.Credentials = []domain.Credential{{ID: freshCred}}
+					fetcher := &fakeConfigFetcher{
+						cfg: domain.BundleConfig{Credentials: []domain.Credential{{ID: freshCred}}},
+					}
+					fetcher.returns = []resolverReturn{{bundle: fresh}}
+					svc, _ := newService(t, Options{
+						Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher, L2: l2,
+						HardGrace: tc.hardGrace, RefreshThreshold: time.Second,
+					})
+
+					rawKey := "vk-lw-grace-" + tier + "-" + tc.name
+					cached := freshBundle("vk_cached", time.Now().Add(tc.expiresIn))
+					cached.Credentials = []domain.Credential{{ID: cachedCred}}
+					if tier == "L1" {
+						svc.storeL1(hashKey(rawKey), cached)
+					} else {
+						l2.Set(context.Background(), l2Key(rawKey), CachedBundle{
+							Bundle:          cached,
+							ConfigFetchedAt: time.Now(),
+						})
+					}
+
+					got, err := svc.Resolve(context.Background(), rawKey)
+
+					require.NoError(t, err)
+					require.NotNil(t, got)
+					assert.Equal(t, tc.wantCred, got.Credentials[0].ID,
+						"a cold tier must reach the same verdict a warm one does")
+					assert.Equal(t, tc.wantCalls, fetcher.calls.Load(),
+						"and must consult the control plane exactly as often")
+				})
+			}
+		})
+	}
+}
+
 /** @scenario "a key revoked during the grace window is refused on a node whose own tier is cold" */
 func TestResolve_L2Hit_SoftExpiredBundleRevokedUpstream_IsRefusedNotServed(t *testing.T) {
 	l2 := newFakeL2()
