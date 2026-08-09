@@ -108,7 +108,7 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
     });
 
     describe("when consecutive distinct dispatches hit the same hour key", () => {
-      it("re-applies the TTL with NX on every hit (no immortal-key leak)", async () => {
+      it("re-attempts the TTL on every hit while the key has none (no immortal-key leak)", async () => {
         const expire = vi.fn().mockResolvedValue(1);
         let counter = 0;
         redisMock.connection = {
@@ -116,6 +116,8 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
           set: vi.fn().mockResolvedValue("OK"),
           get: vi.fn().mockResolvedValue(null),
           incr: vi.fn().mockImplementation(async () => ++counter),
+          // -1: the key exists with no TTL, as if the first EXPIRE was lost.
+          ttl: vi.fn().mockResolvedValue(-1),
           expire,
         };
 
@@ -135,14 +137,38 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
           dedupKey: "proj-1/trig-1:digest:d2",
         });
 
-        // expire is attempted on BOTH hits, with the NX flag, so a transient
-        // first-hit failure can't leave the key without a TTL.
+        // expire is attempted on BOTH hits while the key reports no TTL, so a
+        // transient first-hit failure can't leave the key immortal. The plain
+        // two-argument form is deliberate: EXPIRE's NX option needs Redis 7.
         expect(expire).toHaveBeenCalledTimes(2);
         for (const call of expire.mock.calls) {
           expect(call[0]).toMatch(/^trigger-email-cap:/);
           expect(call[1]).toBe(7200);
-          expect(call[2]).toBe("NX");
+          expect(call.length).toBe(2);
         }
+      });
+
+      it("never slides a window that is already ticking", async () => {
+        const expire = vi.fn().mockResolvedValue(1);
+        let counter = 0;
+        redisMock.connection = {
+          set: vi.fn().mockResolvedValue("OK"),
+          get: vi.fn().mockResolvedValue(null),
+          incr: vi.fn().mockImplementation(async () => ++counter),
+          // The key already carries a live TTL from its first hit.
+          ttl: vi.fn().mockResolvedValue(5400),
+          expire,
+        };
+
+        await consumeEmailCapSlot({
+          projectId: PROJECT_ID,
+          triggerId: TRIGGER_ID,
+          now: new Date("2026-06-11T10:15:00Z"),
+          cap: 3,
+          dedupKey: "proj-1/trig-1:digest:d3",
+        });
+
+        expect(expire).not.toHaveBeenCalled();
       });
     });
 
@@ -159,6 +185,7 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
           set,
           get: vi.fn().mockResolvedValue("1"),
           incr,
+          ttl: vi.fn().mockResolvedValue(-1),
           expire: vi.fn().mockResolvedValue(1),
         };
 
@@ -448,6 +475,7 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
           get: vi.fn().mockResolvedValue(null),
           incr: vi.fn(),
           incrby,
+          ttl: vi.fn().mockResolvedValue(-1),
           expire: vi.fn().mockResolvedValue(1),
         };
 
@@ -480,6 +508,7 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
           get: vi.fn().mockResolvedValue("4"),
           incr: vi.fn(),
           incrby,
+          ttl: vi.fn().mockResolvedValue(-1),
           expire: vi.fn().mockResolvedValue(1),
         };
 
