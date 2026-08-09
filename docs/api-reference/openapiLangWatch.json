@@ -245,6 +245,7 @@
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": ["comment", "isThumbsUp"],
                 "properties": {
                   "comment": {
                     "type": "string"
