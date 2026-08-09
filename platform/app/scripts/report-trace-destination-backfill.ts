@@ -71,45 +71,11 @@ async function main(): Promise<void> {
     const byId = new Map(projects.map((project) => [project.id, project]));
     const governanceByOrg = oldestLiveGovernanceByOrg(projects);
 
-    const counts = new Map<Resolution, number>(
-      RESOLUTIONS.map((resolution) => [resolution, 0]),
-    );
-    const orgsWithKeysNeedingGovernance = new Set<string>();
-    let total = 0;
-
-    // Keyset pagination on the primary key: a full instance's worth of keys
-    // never has to fit in memory at once, and the walk cannot skip or repeat
-    // a row the way an OFFSET walk can under concurrent writes.
-    let cursor: string | null = null;
-    for (;;) {
-      const page: {
-        id: string;
-        organizationId: string;
-        traceProjectId: string | null;
-        scopes: { scopeType: string; scopeId: string }[];
-      }[] = await prisma.virtualKey.findMany({
-        ...(cursor ? { where: { id: { gt: cursor } } } : {}),
-        select: {
-          id: true,
-          organizationId: true,
-          traceProjectId: true,
-          scopes: { select: { scopeType: true, scopeId: true } },
-        },
-        orderBy: { id: "asc" },
-        take: KEY_PAGE_SIZE,
-      });
-      if (page.length === 0) break;
-      for (const key of page) {
-        const resolution = classify({ key, byId, governanceByOrg });
-        counts.set(resolution, (counts.get(resolution) ?? 0) + 1);
-        if (resolution === "null") {
-          orgsWithKeysNeedingGovernance.add(key.organizationId);
-        }
-      }
-      total += page.length;
-      cursor = page[page.length - 1]!.id;
-      if (page.length < KEY_PAGE_SIZE) break;
-    }
+    const { counts, total, orgsWithKeysNeedingGovernance } = await foldKeys({
+      prisma,
+      byId,
+      governanceByOrg,
+    });
 
     // Read from Organization, not from the projects: an organization with no
     // projects at all has no governance project either, and counting it off
@@ -138,6 +104,107 @@ async function main(): Promise<void> {
     }
   } finally {
     await prisma.$disconnect();
+  }
+}
+
+/** One key, with only the fields a resolution depends on. */
+type KeyRow = {
+  id: string;
+  organizationId: string;
+  traceProjectId: string | null;
+  scopes: { scopeType: string; scopeId: string }[];
+};
+
+/** One page of keys, ordered by id, starting after `cursor`. */
+async function readKeyPage({
+  prisma,
+  cursor,
+}: {
+  prisma: PrismaClient;
+  cursor: string | null;
+}): Promise<KeyRow[]> {
+  return await prisma.virtualKey.findMany({
+    ...(cursor ? { where: { id: { gt: cursor } } } : {}),
+    select: {
+      id: true,
+      organizationId: true,
+      traceProjectId: true,
+      scopes: { select: { scopeType: true, scopeId: true } },
+    },
+    orderBy: { id: "asc" },
+    take: KEY_PAGE_SIZE,
+  });
+}
+
+type KeyFold = {
+  counts: Map<Resolution, number>;
+  total: number;
+  /** Organizations that would be left with at least one destinationless key. */
+  orgsWithKeysNeedingGovernance: Set<string>;
+};
+
+/**
+ * Walk every key and fold it into counters as it arrives.
+ *
+ * Keyset pagination on the primary key: a full instance's worth of keys never
+ * has to fit in memory at once, and the walk cannot skip or repeat a row the
+ * way an OFFSET walk can under concurrent writes.
+ */
+async function foldKeys({
+  prisma,
+  byId,
+  governanceByOrg,
+}: {
+  prisma: PrismaClient;
+  byId: Map<string, ProjectRow>;
+  governanceByOrg: Map<string, string>;
+}): Promise<KeyFold> {
+  const counts = new Map<Resolution, number>(
+    RESOLUTIONS.map((resolution) => [resolution, 0]),
+  );
+  const orgsWithKeysNeedingGovernance = new Set<string>();
+  let total = 0;
+  let cursor: string | null = null;
+
+  for (;;) {
+    const page = await readKeyPage({ prisma, cursor });
+    if (page.length === 0) break;
+
+    foldPage({
+      page,
+      byId,
+      governanceByOrg,
+      counts,
+      orgsWithKeysNeedingGovernance,
+    });
+    total += page.length;
+    cursor = page[page.length - 1]!.id;
+    if (page.length < KEY_PAGE_SIZE) break;
+  }
+
+  return { counts, total, orgsWithKeysNeedingGovernance };
+}
+
+/** Classify one page and add it to the running counters. */
+function foldPage({
+  page,
+  byId,
+  governanceByOrg,
+  counts,
+  orgsWithKeysNeedingGovernance,
+}: {
+  page: KeyRow[];
+  byId: Map<string, ProjectRow>;
+  governanceByOrg: Map<string, string>;
+  counts: Map<Resolution, number>;
+  orgsWithKeysNeedingGovernance: Set<string>;
+}): void {
+  for (const key of page) {
+    const resolution = classify({ key, byId, governanceByOrg });
+    counts.set(resolution, (counts.get(resolution) ?? 0) + 1);
+    if (resolution === "null") {
+      orgsWithKeysNeedingGovernance.add(key.organizationId);
+    }
   }
 }
 
