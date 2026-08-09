@@ -79,7 +79,11 @@ async function reachOf(budgetId: string): Promise<boolean | undefined> {
   const budgets = await prisma.gatewayBudget.findMany({
     where: { organizationId: ORG_ID, archivedAt: null },
   });
-  const reach = await resolveBudgetScopeReach(prisma, ORG_ID, budgets);
+  const reach = await resolveBudgetScopeReach({
+    prisma,
+    organizationId: ORG_ID,
+    budgets,
+  });
   return reach.get(budgetId)?.reachable;
 }
 
