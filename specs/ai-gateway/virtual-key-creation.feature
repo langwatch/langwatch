@@ -88,6 +88,52 @@ Feature: AI Gateway virtual key creation
     # otherwise. The two would disagree forever and nothing would say so.
 
   @integration
+  Scenario: A project that was deleted is no longer a destination
+    Given organization "acme" has projects "web-app" and "batch"
+    And "batch" has since been deleted
+    When I create a key naming "batch" for its traces
+    Then the key is refused because the project is not in this organization
+    And no key is written
+    # Deleting a project archives it rather than removing the row, so a
+    # destination that only has to exist and belong to the organization
+    # still answers after the customer deleted it. The key would keep
+    # exporting traces into a project they cannot open, and keep attributing
+    # its spend there.
+
+  @integration
+  Scenario: A key whose destination is deleted later keeps serving traffic
+    Given a key owned by organization "acme" whose traces land in "batch"
+    When "batch" is deleted
+    Then the key still resolves a destination for its traces
+    And it lands them in the governance inbox
+    But the key still says "batch" is where it was told to send them
+    # The refusal belongs to the write path. Failing the key here would take
+    # its traffic down for an act performed on a different screen, so
+    # resolution falls through the way it always has for a destination that
+    # no longer answers, and the disagreement stays visible: the key's own
+    # stated destination is one thing, the rule that answered is another.
+
+  @integration
+  Scenario: An organization whose projects were all deleted can still create a shared key
+    Given organization "acme" whose only projects are a governance inbox and a deleted one
+    When I create a key owned by organization "acme" without saying where its traces land
+    Then the key is created
+    And its traces land in the governance inbox
+    # The refusal for not naming a destination exists because there was one
+    # worth naming. A deleted project is not one, so demanding a choice here
+    # would refuse the key for not picking from an empty list, while every
+    # project it could pick is itself refused as unknown.
+
+  @integration
+  Scenario: A key scoped to a deleted project falls back rather than tracing into it
+    Given a key whose only project scope is a project that has since been deleted
+    When its configuration is resolved
+    Then its traces land in the governance inbox
+    # Same rule as a named destination, one stage later: the scope is a
+    # claim about where traffic may go, not a licence to go somewhere the
+    # customer removed.
+
+  @integration
   Scenario: A key says which rule decides where its traces land
     Given keys that name a project, take one from their scope, and name none
     When each is read back

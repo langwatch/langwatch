@@ -49,6 +49,25 @@ const CHOICE_GOV_PROJECT_ID = `proj-vktp-choice-gov-${suffix}`;
 const CHOICE_PROJECT_A_ID = `proj-vktp-choice-a-${suffix}`;
 const CHOICE_PROJECT_B_ID = `proj-vktp-choice-b-${suffix}`;
 
+// An org where projects have been deleted. Deletion is soft, so every row
+// below is still readable and the only thing telling it apart from a live
+// project is `archivedAt`.
+const ORG_ARCH_ID = `org-vktp-arch-${suffix}`;
+const TEAM_ARCH_ID = `team-vktp-arch-${suffix}`;
+const ARCH_GOV_PROJECT_ID = `proj-vktp-arch-gov-${suffix}`;
+const ARCH_DELETED_PROJECT_ID = `proj-vktp-arch-deleted-${suffix}`;
+// Live at seed, deleted partway through the test that needs a destination
+// to disappear from under a key that already exists.
+const ARCH_DOOMED_PROJECT_ID = `proj-vktp-arch-doomed-${suffix}`;
+
+// An org whose older governance project and only application project have
+// both been deleted: nothing here is nameable but the newer inbox.
+const ORG_GOVARCH_ID = `org-vktp-govarch-${suffix}`;
+const TEAM_GOVARCH_ID = `team-vktp-govarch-${suffix}`;
+const GOVARCH_OLD_GOV_ID = `proj-vktp-govarch-old-${suffix}`;
+const GOVARCH_LIVE_GOV_ID = `proj-vktp-govarch-live-${suffix}`;
+const GOVARCH_DELETED_APP_ID = `proj-vktp-govarch-app-${suffix}`;
+
 const USER_ID = `usr-vktp-${suffix}`;
 
 describe("virtual keys must have a home for their traces (real PG)", () => {
@@ -144,13 +163,107 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
       });
     }
 
+    await prisma.organization.create({
+      data: {
+        id: ORG_ARCH_ID,
+        name: `VKTP Arch ${suffix}`,
+        slug: `vktp-arch-${suffix}`,
+      },
+    });
+    await prisma.team.create({
+      data: {
+        id: TEAM_ARCH_ID,
+        name: `VKTP Arch Team ${suffix}`,
+        slug: `vktp-arch-team-${suffix}`,
+        organizationId: ORG_ARCH_ID,
+      },
+    });
+    await prisma.organization.create({
+      data: {
+        id: ORG_GOVARCH_ID,
+        name: `VKTP GovArch ${suffix}`,
+        slug: `vktp-govarch-${suffix}`,
+      },
+    });
+    await prisma.team.create({
+      data: {
+        id: TEAM_GOVARCH_ID,
+        name: `VKTP GovArch Team ${suffix}`,
+        slug: `vktp-govarch-team-${suffix}`,
+        organizationId: ORG_GOVARCH_ID,
+      },
+    });
+    // `createdAt` is set by hand rather than left to insertion order: the
+    // governance rule picks the oldest, and two rows written in the same
+    // millisecond would make which one it picks a coin toss.
+    for (const [id, teamId, kind, archivedAt, createdAt] of [
+      [ARCH_GOV_PROJECT_ID, TEAM_ARCH_ID, "internal_governance", null, null],
+      [
+        ARCH_DELETED_PROJECT_ID,
+        TEAM_ARCH_ID,
+        "application",
+        new Date("2026-01-01T00:00:00Z"),
+        null,
+      ],
+      [ARCH_DOOMED_PROJECT_ID, TEAM_ARCH_ID, "application", null, null],
+      [
+        GOVARCH_OLD_GOV_ID,
+        TEAM_GOVARCH_ID,
+        "internal_governance",
+        new Date("2026-01-01T00:00:00Z"),
+        new Date("2025-01-01T00:00:00Z"),
+      ],
+      [
+        GOVARCH_LIVE_GOV_ID,
+        TEAM_GOVARCH_ID,
+        "internal_governance",
+        null,
+        new Date("2025-06-01T00:00:00Z"),
+      ],
+      [
+        GOVARCH_DELETED_APP_ID,
+        TEAM_GOVARCH_ID,
+        "application",
+        new Date("2026-01-01T00:00:00Z"),
+        null,
+      ],
+    ] as const) {
+      await prisma.project.create({
+        data: {
+          id,
+          name: id,
+          slug: id,
+          teamId,
+          language: "en",
+          framework: "openai",
+          apiKey: `key-${id}`,
+          kind,
+          archivedAt,
+          ...(createdAt ? { createdAt } : {}),
+        },
+      });
+    }
+
     await prisma.user.create({
       data: { id: USER_ID, email: `${suffix}@vktp.local`, name: "VKTP" },
     });
   }, 120_000);
 
   afterAll(async () => {
-    const orgIds = [ORG_BARE_ID, ORG_GOV_ID, ORG_CHOICE_ID];
+    const orgIds = [
+      ORG_BARE_ID,
+      ORG_GOV_ID,
+      ORG_CHOICE_ID,
+      ORG_ARCH_ID,
+      ORG_GOVARCH_ID,
+    ];
+    const teamIds = [
+      TEAM_BARE_ID,
+      TEAM_GOV_ID,
+      TEAM_CHOICE_ID,
+      TEAM_ARCH_ID,
+      TEAM_GOVARCH_ID,
+    ];
     await prisma.auditLog.deleteMany({
       where: { organizationId: { in: orgIds } },
     });
@@ -163,12 +276,8 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
     await prisma.virtualKey.deleteMany({
       where: { organizationId: { in: orgIds } },
     });
-    await prisma.project.deleteMany({
-      where: { teamId: { in: [TEAM_BARE_ID, TEAM_GOV_ID, TEAM_CHOICE_ID] } },
-    });
-    await prisma.team.deleteMany({
-      where: { id: { in: [TEAM_BARE_ID, TEAM_GOV_ID, TEAM_CHOICE_ID] } },
-    });
+    await prisma.project.deleteMany({ where: { teamId: { in: teamIds } } });
+    await prisma.team.deleteMany({ where: { id: { in: teamIds } } });
     await prisma.user.deleteMany({ where: { id: USER_ID } });
     await prisma.organization.deleteMany({ where: { id: { in: orgIds } } });
     await stopTestContainers();
@@ -282,7 +391,7 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
     });
   });
 
-  describe("when the destination a key names is not one of this organization's", () => {
+  describe("given the destination a key names is not one of this organization's", () => {
     /** @scenario "A destination that is named has to be one that exists" */
     it("refuses a project belonging to another organization, and writes nothing", async () => {
       const service = VirtualKeyService.create(prisma);
@@ -329,6 +438,103 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
       // Same refusal as a foreign project on purpose: telling the two apart
       // would confirm which project ids exist somewhere else.
       expect(refusal).toMatchObject({ code: "gateway_trace_project_unknown" });
+    });
+  });
+
+  describe("given a project the customer has deleted", () => {
+    /** @scenario "A project that was deleted is no longer a destination" */
+    it("refuses a create that names it, and writes nothing", async () => {
+      const service = VirtualKeyService.create(prisma);
+      const name = `deleted-destination-${suffix}`;
+
+      const refusal = await service
+        .create({
+          organizationId: ORG_ARCH_ID,
+          name,
+          actorUserId: USER_ID,
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_ARCH_ID }],
+          traceProjectId: ARCH_DELETED_PROJECT_ID,
+        })
+        .catch((error: unknown) => error);
+
+      expect(refusal).toMatchObject({ code: "gateway_trace_project_unknown" });
+      expect(
+        await prisma.virtualKey.count({
+          where: { organizationId: ORG_ARCH_ID, name },
+        }),
+      ).toBe(0);
+    });
+
+    /** @scenario "A key scoped to a deleted project falls back rather than tracing into it" */
+    it("passes over a single project scope naming it", async () => {
+      const resolved = await resolveTraceProject(prisma, {
+        organizationId: ORG_ARCH_ID,
+        scopes: [{ scopeType: "PROJECT", scopeId: ARCH_DELETED_PROJECT_ID }],
+      });
+
+      expect(resolved).toMatchObject({
+        id: ARCH_GOV_PROJECT_ID,
+        source: "governance_fallback",
+      });
+    });
+
+    /** @scenario "A key whose destination is deleted later keeps serving traffic" */
+    it("keeps serving a key whose named destination is deleted afterwards", async () => {
+      const service = VirtualKeyService.create(prisma);
+      const repo = new VirtualKeyRepository(prisma);
+      const { virtualKey } = await service.create({
+        organizationId: ORG_ARCH_ID,
+        name: `doomed-destination-${suffix}`,
+        actorUserId: USER_ID,
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_ARCH_ID }],
+        traceProjectId: ARCH_DOOMED_PROJECT_ID,
+      });
+
+      await prisma.project.update({
+        where: { id: ARCH_DOOMED_PROJECT_ID },
+        data: { archivedAt: new Date() },
+      });
+
+      // The write path refuses this shape, the read path must not: the
+      // deletion happened on another screen, and failing here would take
+      // the key's traffic down with it.
+      const vk = await repo.findById(virtualKey.id, ORG_ARCH_ID);
+      const resolved = await resolveTraceProject(prisma, vk!);
+      expect(resolved).toMatchObject({
+        id: ARCH_GOV_PROJECT_ID,
+        source: "governance_fallback",
+      });
+
+      // And the disagreement stays visible rather than being papered over:
+      // the key still says what it was told to do.
+      const dto = toVirtualKeySnakeDto(vk!);
+      expect(dto.trace_project_id).toBe(ARCH_DOOMED_PROJECT_ID);
+      expect(dto.trace_project_source).toBe("explicit");
+    });
+  });
+
+  describe("given an organization whose projects have all been deleted", () => {
+    /** @scenario "An organization whose projects were all deleted can still create a shared key" */
+    it("creates a shared key rather than demanding it choose between none", async () => {
+      const service = VirtualKeyService.create(prisma);
+      const repo = new VirtualKeyRepository(prisma);
+
+      const { virtualKey } = await service.create({
+        organizationId: ORG_GOVARCH_ID,
+        name: `govarch-shared-${suffix}`,
+        actorUserId: USER_ID,
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_GOVARCH_ID }],
+      });
+
+      // Not the older inbox, which is deleted, and not the deleted
+      // application project, which is what the ambiguity refusal would have
+      // told the creator to name.
+      const vk = await repo.findById(virtualKey.id, ORG_GOVARCH_ID);
+      const resolved = await resolveTraceProject(prisma, vk!);
+      expect(resolved).toMatchObject({
+        id: GOVARCH_LIVE_GOV_ID,
+        source: "governance_fallback",
+      });
     });
   });
 
