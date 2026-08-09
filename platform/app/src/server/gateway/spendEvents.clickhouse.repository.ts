@@ -31,6 +31,14 @@ import { nanoUsdToDecimalString } from "./wireMoney";
 
 const TABLE = "gateway_spend" as const;
 
+/**
+ * Deadline for one page of the rollup walk. Generous, because a reconciliation
+ * over a closed month is expected to be slow and is worth waiting for; finite,
+ * because the aggregation is rebuilt per page and an unbounded one would let a
+ * single wide query hold a reader open for as long as it liked.
+ */
+const SUMMARIES_MAX_EXECUTION_SECONDS = 60;
+
 const logger = createLogger("langwatch:gateway:spend-repository");
 
 export type SpendEventStatus = "admitted" | "confirmed" | "failed" | "settled";
@@ -722,6 +730,19 @@ export class GatewaySpendEventsRepository {
       `,
       query_params: params,
       format: "JSONEachRow",
+      // LIMIT bounds the rows returned, not the rows aggregated: every page of
+      // the walk rebuilds the whole group set under FINAL before discarding all
+      // but one page of it. A wide window bucketed by hour and grouped on two
+      // dimensions is therefore paid for once per page, so the walk gets a
+      // deadline instead of running for as long as the group set takes.
+      //
+      // Memory is deliberately NOT capped here: the server profile already
+      // enforces a per-query ceiling and the shared defaults spill GROUP BY
+      // state to disk, so a client-side cap could only raise the ceiling
+      // (server/clickhouse/queryDefaults.ts).
+      clickhouse_settings: {
+        max_execution_time: SUMMARIES_MAX_EXECUTION_SECONDS,
+      },
     });
     const raw = (await result.json()) as Array<Record<string, unknown>>;
     const last = raw[raw.length - 1];
