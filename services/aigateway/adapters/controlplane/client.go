@@ -297,11 +297,13 @@ func (c *Client) FetchConfig(ctx context.Context, vkID, ifNoneMatch string) (dom
 	if resp.StatusCode != http.StatusOK {
 		return domain.ConfigFetchResult{}, fmt.Errorf("config fetch returned %d", resp.StatusCode)
 	}
-	// A body that did not arrive whole is not config, even when the bytes that
-	// did arrive parse. A stream cut after the closing brace of the top-level
-	// object unmarshals perfectly well into a bundle missing whatever came
-	// after it, and caching that would drop a key's credentials on the floor
-	// with a fresh ETag stamped on top.
+	// A read that ended in an error leaves the response's integrity unknown,
+	// and the bytes that did arrive parsing is not evidence to the contrary:
+	// a prefix can be a complete JSON object while the message it was cut out
+	// of never arrived whole. Config is only worth caching when the whole
+	// answer was seen, the more so because accepting it stamps the server's
+	// ETag on it, and every later refresh then revalidates against a token
+	// vouching for a response this node never fully read.
 	if readErr != nil {
 		return domain.ConfigFetchResult{}, fmt.Errorf("config fetch body: %w", readErr)
 	}

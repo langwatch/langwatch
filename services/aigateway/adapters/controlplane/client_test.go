@@ -243,8 +243,8 @@ func TestFetchConfig_UnreadableBody_IsAnError(t *testing.T) {
 	}
 
 	// The nastier shape: the bytes that arrived are complete, valid JSON, and
-	// the stream still failed. Parsing succeeds, so only the read error says
-	// the config is short of whatever the control plane meant to send.
+	// the stream still failed. Parsing succeeds either way, so the read error
+	// is the only thing left saying the response did not arrive whole.
 	t.Run("valid json cut short of its Content-Length", func(t *testing.T) {
 		full := `{"models_allowed":["openai/gpt-5-mini"],"providers_allowed":["mp_1"]}`
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
