@@ -276,7 +276,7 @@ The gateway is a cache of the control plane, so a surprising amount continues to
 |---|---|---|---|
 | LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default 21600, 6 h) of stale-while-error; a VK the pod has never resolved is not covered | Spend accounting is unaffected: cost rides the spend commands the gateway spools, and the ledger catches up once the control plane returns. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
 | One upstream provider | None for VKs with fallback; 502/504 for VKs without | Indefinite, circuit breaker + fallback chain absorb it | `gateway_circuit_state{credential_id}` shows which provider is down |
-| Gateway pod (crash, eviction) | None, HPA replaces, PDB holds ≥ 2 replicas | N/A | Stateless; the new pod warms from the control plane on its first request per key |
+| Gateway pod (crash, eviction) | Streams in flight on that pod are cut; other requests retry onto a surviving replica | N/A | Stateless; the replacement pod warms from the control plane on its first request per key. The PDB (`minAvailable: 1` by default, against 2 replicas) only bounds voluntary disruptions like a drain, so it does not apply to a crash |
 
 For multi-region deployments with shared control plane: a gateway region down is handled by Route53 latency-based failover. See [Scaling → Regional placement](/ai-gateway/self-hosting/scaling#regional-placement).
 

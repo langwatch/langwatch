@@ -352,6 +352,23 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And a key that did change comes back with the new config and the new token, which the next refresh offers in turn
       And a response that carried no token leaves the next refresh unconditional
 
+    @unit
+    Scenario: a refresh the control plane cannot answer leaves the cached config serving
+      Given a cached bundle whose config has crossed the TTL
+      And the control plane cannot answer the refresh
+      When the safety net runs
+      Then the bundle keeps serving the credentials it already had
+      And the failed attempt is reported
+      And the next attempt waits a full TTL rather than retrying on every request
+
+    @unit
+    Scenario: an answer the gateway cannot read is a failed refresh, not an empty config
+      Given the control plane answers the refresh with a body the gateway cannot parse
+      When the safety net runs
+      Then the answer is treated as a failure
+      And no config is taken from it, so a working bundle is never replaced by an empty one
+      And no version token is stored from it, so the next refresh does not revalidate against one
+
   Rule: The grace window moves the hard cap, not the bundle's own expiry
     LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS sets how far past its JWT expiry
     a cached bundle may keep serving while the control plane is unreachable,
@@ -371,9 +388,12 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
 
   Rule: Bootstrap-pull enables gateway to serve when control plane is cold
 
+    # The flag is named the way contract.md §6 and §9 name it. Nothing reads
+    # it yet, so the point of naming it here is that this file and the
+    # contract agree on one name rather than two.
     @integration @unimplemented
     Scenario: enterprise bootstrap-all pulls every non-revoked VK on startup
-      Given GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true
+      Given LW_GATEWAY_BOOTSTRAP_PULL=true
       And the control plane has 250 active VKs
       When the gateway starts
       Then the gateway calls GET /internal/gateway/bootstrap (paginated)

@@ -849,9 +849,10 @@ func TestResolve_FreshEntry_ConfigTTLDisabled_NeverRefreshes(t *testing.T) {
 	}
 }
 
+/** @scenario "a refresh the control plane cannot answer leaves the cached config serving" */
 func TestResolve_FreshEntry_ConfigRefreshFailure_KeepsStaleAndWaitsFullTTL(t *testing.T) {
 	fetcher := &fakeConfigFetcher{cfgErr: errors.New("control plane down")}
-	svc, _ := newService(t, Options{
+	svc, logs := newService(t, Options{
 		Resolver:         &fetcher.fakeResolver,
 		ConfigFetcher:    fetcher,
 		ConfigTTL:        60 * time.Second,
@@ -899,6 +900,11 @@ func TestResolve_FreshEntry_ConfigRefreshFailure_KeepsStaleAndWaitsFullTTL(t *te
 	if n := fetcher.fetches.Load(); n != 1 {
 		t.Fatalf("expected exactly one fetch until next TTL, got %d", n)
 	}
+	// A safety net that quietly stops working is worse than one that fails
+	// loudly: the config keeps serving either way, and the warn is the only
+	// thing telling an operator the staleness bound is no longer held.
+	assert.Len(t, logs.FilterMessage("config_ttl_refresh_failed").All(), 1,
+		"a refresh the control plane could not answer must be reported")
 }
 
 // blockingConfigFetcher blocks inside FetchConfig until released, so a test

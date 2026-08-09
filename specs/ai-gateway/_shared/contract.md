@@ -702,8 +702,10 @@ Pattern (from Bifrost `ObservabilityPlugin.Inject(trace)`):
 
 Documented here so Go code + infra agree:
 
-1. **L1 in-memory LRU:** 64k entries, TTL = JWT `exp`. Resolved JWT cached by SHA-256(vk_plain). Zero-RTT hot path. One per pod, shared with nothing: a cross-node tier buys a warm start that a rolling deploy pays for anyway, and costs an invalidation path that has to reach it.
-2. **Bootstrap-pull (enterprise opt-in):** on startup, gateway calls `GET /api/internal/gateway/bootstrap` → paginated stream of all non-revoked VKs' JWTs. Enables gateway to serve traffic when control-plane is offline. Flag: `$LW_GATEWAY_BOOTSTRAP_PULL=true`.
+1. **L1 in-memory LRU:** 10k entries by default (`Options.LRUSize`; the chart's `cache.lruSize` is not wired yet). Resolved JWT cached by SHA-256(vk_plain). Zero-RTT hot path. One per pod, shared with nothing: a cross-node tier buys a warm start that a rolling deploy pays for anyway, and costs an invalidation path that has to reach it.
+
+   JWT `exp` bounds normal freshness, it is not the eviction point. Past `exp` an entry is refreshed before it serves, and if that refresh fails for transport reasons the entry keeps serving while its soft expiry is bumped, up to a hard cap of `exp + LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default 6h, negative disables the grace entirely). An auth-class rejection evicts immediately at any point.
+2. **Bootstrap-pull (enterprise opt-in):** on startup, gateway calls `GET /api/internal/gateway/bootstrap` → paginated stream of all non-revoked VKs' JWTs. Enables gateway to serve traffic when control-plane is offline. Flag: `$LW_GATEWAY_BOOTSTRAP_PULL=true`, the same name §6 uses. Nothing reads it yet, so it is a name this document reserves rather than one the binary honors.
 
 Background refresh: single goroutine long-polls `/api/internal/gateway/changes?since=<rev>` with 25s timeout. On diff → re-fetch affected VK configs and invalidate the matching L1 entries.
 

@@ -329,7 +329,7 @@ gateway:
 - `ingress-nginx` namespace → port `5563` (customer traffic via your Ingress).
 - `monitoring` namespace Prometheus pod → port `5563` `/metrics`.
 
-Everything else is rejected, including traffic from other namespaces, lateral pod-to-pod dials, and direct NodePort hits. The pprof admin listener is loopback-bound on `127.0.0.1:6060` and is unaffected by `NetworkPolicy` because `kubectl port-forward` tunnels through the Kubernetes API server, not the pod network.
+Everything else is rejected, including traffic from other namespaces, lateral pod-to-pod dials, and direct NodePort hits. The v1 binary opens no admin or pprof listener at all, so there is nothing extra on the pod to reach; the planned listener binds `127.0.0.1:6060` and would be unaffected by `NetworkPolicy` anyway, because `kubectl port-forward` tunnels through the Kubernetes API server rather than the pod network.
 
 **Egress**:
 
@@ -459,7 +459,7 @@ Notable omissions:
 - **`writeTimeout` is NOT exposed.** It would bound the whole response, which terminates long SSE streams (reasoning models, Claude thinking traces) at the cap. Per-chunk streaming deadlines live in the dispatcher, not here. If you're behind an ingress that enforces its own `proxy_read_timeout`, match it there instead.
 - **`idleTimeout` MUST exceed your nginx-ingress `keepalive_timeout`** (typical 75 s). If the gateway closes first, nginx's pool has dead sockets and a request fails mid-flight. The chart default 120 s is safe under the typical 75 s nginx value; if you run a custom ingress with a longer keepalive, bump this value proportionally.
 
-All three timeouts apply to the public listener and the admin listener identically.
+All three timeouts apply to the public listener, which is the only listener the v1 binary opens. They will cover the [admin listener](#admin-listener) identically once it ships.
 
 ## Chart and data-plane CI
 
@@ -479,4 +479,4 @@ Gateway and control plane are versioned in **lockstep**: release-please bumps bo
 1. `helm diff upgrade langwatch langwatch/langwatch -f values.yaml --version <new>` to preview the change set.
 2. `helm upgrade langwatch langwatch/langwatch -f values.yaml --version <new>`. The umbrella's `langwatch-app` and gateway Deployments roll concurrently, both use Kubernetes' standard `RollingUpdate` strategy and the chart does not enforce ordering. Safety during the overlap window is handled by the dual-key signature contract documented under [Secret rotation](#secret-rotation): the new control-plane image accepts both old and new signatures, so a brief window where gateway pods on the new image talk to control-plane pods still on the old image (or vice versa) does not break authentication. If you want to enforce ordering for an extra-cautious rollout, run `helm upgrade ... --set gateway.enabled=false` first to roll the app alone, then re-enable the gateway in a second `helm upgrade`, but for the standard upgrade path the dual-key contract is what makes the concurrent roll safe.
 3. Monitor `gateway_provider_duration_seconds` and `gateway_http_requests_total{status=~"5.."}` for ~30 min.
-4. Roll back via `helm rollback langwatch <revision>` if anomalies appear, the gateway's cache survives restarts and requests resume immediately. Both sub-charts roll back together.
+4. Roll back via `helm rollback langwatch <revision>` if anomalies appear. Each replaced gateway pod starts with an empty auth cache and warms from the control plane on its first request per key, the same cost every rolling update pays. Both sub-charts roll back together.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -80,7 +81,12 @@ type configServer struct {
 	revision string
 	// omitETag drops the ETag header from the 200, the way a proxy that strips
 	// it would, so the caller has nothing to revalidate with next time.
-	omitETag       bool
+	omitETag bool
+
+	// mu guards requestHeaders, which the handler goroutine appends to and the
+	// test goroutine reads. Do returning is not a documented happens-before
+	// against the handler, so the ordering would be net/http's to change.
+	mu             sync.Mutex
 	requestHeaders []string
 }
 
@@ -88,7 +94,9 @@ func (s *configServer) start(t *testing.T) *Client {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ifNoneMatch := r.Header.Get("If-None-Match")
+		s.mu.Lock()
 		s.requestHeaders = append(s.requestHeaders, ifNoneMatch)
+		s.mu.Unlock()
 		if ifNoneMatch != "" && ifNoneMatch == s.revision {
 			w.Header().Set("ETag", s.revision)
 			w.WriteHeader(http.StatusNotModified)
@@ -110,6 +118,13 @@ func (s *configServer) start(t *testing.T) *Client {
 	})
 }
 
+// conditionals reports the If-None-Match each request carried, in order.
+func (s *configServer) conditionals() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.requestHeaders...)
+}
+
 func TestFetchConfig_Conditional(t *testing.T) {
 	t.Run("when the caller has no ETag yet", func(t *testing.T) {
 		srv := &configServer{revision: "42"}
@@ -121,7 +136,7 @@ func TestFetchConfig_Conditional(t *testing.T) {
 		assert.False(t, res.NotModified, "an unconditional fetch has nothing to confirm")
 		assert.Equal(t, "42", res.ETag, "the version token has to come back for the next fetch to use")
 		assert.Equal(t, []string{"openai/gpt-5-mini"}, res.Config.AllowedModels)
-		assert.Equal(t, []string{""}, srv.requestHeaders, "nothing to send when we hold no ETag")
+		assert.Equal(t, []string{""}, srv.conditionals(), "nothing to send when we hold no ETag")
 	})
 
 	t.Run("when the caller sends the ETag it already holds", func(t *testing.T) {
@@ -133,7 +148,7 @@ func TestFetchConfig_Conditional(t *testing.T) {
 		second, err := cp.FetchConfig(context.Background(), "vk_acme", first.ETag)
 
 		require.NoError(t, err)
-		assert.Equal(t, []string{"", "42"}, srv.requestHeaders,
+		assert.Equal(t, []string{"", "42"}, srv.conditionals(),
 			"the second fetch has to offer the revision the first one came back with")
 		assert.True(t, second.NotModified, "an unchanged key is confirmed, not re-downloaded")
 		assert.Equal(t, "42", second.ETag, "the confirmed token stays usable for the fetch after this one")
@@ -163,7 +178,7 @@ func TestFetchConfig_Conditional(t *testing.T) {
 		second, err := cp.FetchConfig(context.Background(), "vk_acme", first.ETag)
 
 		require.NoError(t, err)
-		assert.Equal(t, []string{"", ""}, srv.requestHeaders,
+		assert.Equal(t, []string{"", ""}, srv.conditionals(),
 			"with no token to offer, the next fetch goes out unconditional rather than inventing one")
 		assert.False(t, second.NotModified)
 		assert.Equal(t, []string{"openai/gpt-5-mini"}, second.Config.AllowedModels)
@@ -188,4 +203,40 @@ func TestFetchConfig_Conditional(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "304")
 	})
+}
+
+/** @scenario "an answer the gateway cannot read is a failed refresh, not an empty config" */
+func TestFetchConfig_UnreadableBody_IsAnError(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body string
+	}{
+		{"truncated json", `{"models_allowed":["openai/gpt-5-mini"`},
+		{"not json at all", `<html>502 Bad Gateway</html>`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("ETag", "42")
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(tc.body))
+			}))
+			t.Cleanup(srv.Close)
+			cp := NewClient(ClientOptions{
+				BaseURL:    srv.URL,
+				Sign:       func(_ *http.Request, _ []byte) {},
+				HTTPClient: srv.Client(),
+			})
+
+			res, err := cp.FetchConfig(context.Background(), "vk_acme", "41")
+
+			// A 200 the gateway cannot parse is a failure, never an empty
+			// config: handing one back would let the caller cache a key with
+			// no credentials over the working config it already holds.
+			require.Error(t, err)
+			assert.Empty(t, res.Config.Credentials)
+			assert.Empty(t, res.ETag, "a token from an unreadable answer must not be stored")
+			assert.False(t, res.NotModified)
+		})
+	}
 }

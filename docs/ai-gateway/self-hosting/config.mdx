@@ -51,7 +51,7 @@ All three are a plain count of seconds, not a duration string: `300`, not `5m`.
 | `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`   | `21600` (6h)   | Outage cap measured from JWT exp. A negative value disables stale-while-error.                |
 | `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS`   | `60`           | How stale a cached key's config (credentials, base URLs, routing) can get before a background revalidation. A negative value disables the refresh. |
 
-The config refresh is conditional: the gateway sends back the version token the control plane stamped on the config it holds, and a key nobody changed is confirmed with a 304 instead of materialized and sent again. Lowering the TTL therefore costs the control plane a revision lookup per key per interval, not a bundle.
+The config refresh is conditional whenever the gateway has a version token to offer: it sends back the token the control plane stamped on the config it holds, and a key nobody changed is confirmed with a 304 instead of materialized and sent again. Lowering the TTL then costs the control plane a revision lookup per key per interval rather than a bundle. A cached config with no token, which is what a response that arrived without an `ETag` leaves behind, is refreshed unconditionally and does cost a full bundle, so a proxy that strips `ETag` gives up the saving.
 
 See [Auth Cache Architecture](/ai-gateway/observability#auth-cache-architecture) for the design and the [Production runbook → Control-plane outage](/ai-gateway/cookbooks/production-runbook#recipe-8--control-plane-outage--stale-while-error) for the operator playbook.
 
