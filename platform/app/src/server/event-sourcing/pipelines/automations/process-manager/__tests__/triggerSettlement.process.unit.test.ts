@@ -278,20 +278,24 @@ describe("trigger settlement process", () => {
         });
         const evolve =
           definition.config.handlers[TRIGGER_MATCH_RECORDED_EVENT_TYPE]!;
+        // The oldest entry is the one that flushes; persist-class keeps this
+        // fixture about the overflow key rather than digest batching.
+        const pendingEntry = (offset: number, index: number) =>
+          [
+            `trace-${offset}-${index}`,
+            {
+              settleDueAt: index,
+              dispatchDueAt: index === 0 ? 1_000 : index,
+              actionClass:
+                index === 0 ? ("persist" as const) : ("notify" as const),
+              settleWindowBucket: "30000-0",
+            },
+          ] as const;
         const fullPending = (offset: number) =>
           Object.fromEntries(
-            Array.from({ length: MAX_PENDING_MATCHES }, (_, index) => [
-              `trace-${offset}-${index}`,
-              {
-                settleDueAt: index,
-                dispatchDueAt: index === 0 ? 1_000 : index,
-                // The oldest is the one that flushes; persist-class keeps this
-                // fixture about the overflow key rather than digest batching.
-                actionClass:
-                  index === 0 ? ("persist" as const) : ("notify" as const),
-                settleWindowBucket: "30000-0",
-              },
-            ]),
+            Array.from({ length: MAX_PENDING_MATCHES }, (_, index) =>
+              pendingEntry(offset, index),
+            ),
           );
         const overflowKeyAt = (at: number, triggerId: string) =>
           evolve(

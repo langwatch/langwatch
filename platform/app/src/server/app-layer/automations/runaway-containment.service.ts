@@ -111,7 +111,7 @@ export async function handlePersistCapBreach(
 
     const shouldPause = await isMisconfigured(deps, breach);
     if (shouldPause) {
-      await pauseAndNotify(deps, breach, now, dayBucket);
+      await pauseAndNotify({ deps, breach, now, dayBucket });
       return;
     }
 
@@ -153,12 +153,17 @@ async function isMisconfigured(
   return breach.count >= projectTraces * RUNAWAY_TRAFFIC_SHARE;
 }
 
-async function pauseAndNotify(
-  deps: RunawayContainmentDeps,
-  breach: PersistCapBreach,
-  now: Date,
-  dayBucket: number,
-): Promise<void> {
+async function pauseAndNotify({
+  deps,
+  breach,
+  now,
+  dayBucket,
+}: {
+  deps: RunawayContainmentDeps;
+  breach: PersistCapBreach;
+  now: Date;
+  dayBucket: number;
+}): Promise<void> {
   const { trigger, projectId } = breach;
   // Claimed on the PAUSE, not on the day: pausing is a state transition, so a
   // second worker racing the same breach must not mail the customer twice, and

@@ -698,6 +698,78 @@ async function dispatchNotifyDigest({
 }
 
 /**
+ * Consumes one slot of the trigger's daily ceiling for this confirmed match,
+ * and reports whether the action may go ahead.
+ *
+ * A refusal is a TERMINAL drop rather than a throw: retrying would not find a
+ * slot and would only churn the outbox. The trigger stays ACTIVE and works
+ * again next UTC day, unless containment decides its shape is misconfigured
+ * rather than merely busy.
+ */
+async function allowedByDailyCeiling({
+  deps,
+  trigger,
+  projectId,
+  traceId,
+}: {
+  deps: TriggerSettlementDispatchDeps;
+  trigger: TriggerSummary;
+  projectId: string;
+  traceId: string;
+}): Promise<boolean> {
+  const triggerId = trigger.id;
+  const cap = await deps.resolvePersistDailyCap(projectId);
+  const slot = await deps.consumePersistCapSlot({
+    projectId,
+    triggerId,
+    // The (trigger, trace) pair is this dispatch's identity, so an outbox
+    // retry of the same dispatch presents the same key and re-reads the count
+    // instead of burning a second slot.
+    dedupKey: `${projectId}/${triggerId}:persist:${traceId}`,
+    now: new Date(),
+    cap,
+  });
+  if (slot.allowed) return true;
+
+  logger.warn(
+    { projectId, triggerId, traceId, count: slot.count, cap: slot.cap },
+    "Automation passed its daily match ceiling — skipping this match for " +
+      "the rest of the UTC day",
+  );
+  // Containment is bookkeeping ABOUT a match that has already been dropped.
+  // Letting it throw would send the whole dispatch back through the outbox's
+  // retry ladder, and every one of those attempts would reach this same point
+  // and drop the match again. The failure is recorded and the dispatch still
+  // completes.
+  try {
+    await deps.handlePersistCapBreach({
+      trigger,
+      projectId,
+      count: slot.count,
+      cap: slot.cap,
+      skipped: slot.skipped,
+    });
+  } catch (containmentError) {
+    logger.error(
+      {
+        projectId,
+        triggerId,
+        error:
+          containmentError instanceof Error
+            ? containmentError.message
+            : String(containmentError),
+      },
+      "Runaway containment threw while handling a ceiling breach — the match " +
+        "stays dropped and the dispatch is not retried",
+    );
+    captureException(toError(containmentError), {
+      extra: { projectId, triggerId, phase: "persist-cap-breach" },
+    });
+  }
+  return false;
+}
+
+/**
  * Persist-class dispatch (ADR-035): one settled match per intent. The
  * per-trace message key makes retries independent; `TriggerSent` claims
  * keep the side effect at-most-once, written AFTER a successful dispatch.
@@ -766,56 +838,7 @@ async function dispatchPersistMatch({
   // for every active trigger on every trace and only evaluates filters later,
   // so that volume is our amplification and pressing the customer about it
   // would be charging them for our design.
-  const cap = await deps.resolvePersistDailyCap(projectId);
-  const slot = await deps.consumePersistCapSlot({
-    projectId,
-    triggerId,
-    // The (trigger, trace) pair is this dispatch's identity, so an outbox
-    // retry of the same dispatch presents the same key and re-reads the count
-    // instead of burning a second slot.
-    dedupKey: `${projectId}/${triggerId}:persist:${traceId}`,
-    now: new Date(),
-    cap,
-  });
-  if (!slot.allowed) {
-    // Terminal drop, not a throw: retrying would not get a slot and the outbox
-    // would churn. The trigger stays ACTIVE and works again tomorrow, unless
-    // containment decides the shape is misconfigured rather than merely busy.
-    logger.warn(
-      { projectId, triggerId, traceId, count: slot.count, cap: slot.cap },
-      "Automation passed its daily match ceiling — skipping this match for " +
-        "the rest of the UTC day",
-    );
-    // Containment is bookkeeping ABOUT a match that has already been dropped.
-    // Letting it throw would send the whole dispatch back through the outbox's
-    // retry ladder, and every one of those attempts would reach this same
-    // point and drop the match again. The failure is recorded and the dispatch
-    // still completes.
-    try {
-      await deps.handlePersistCapBreach({
-        trigger,
-        projectId,
-        count: slot.count,
-        cap: slot.cap,
-        skipped: slot.skipped,
-      });
-    } catch (containmentError) {
-      logger.error(
-        {
-          projectId,
-          triggerId,
-          error:
-            containmentError instanceof Error
-              ? containmentError.message
-              : String(containmentError),
-        },
-        "Runaway containment threw while handling a ceiling breach — the " +
-          "match stays dropped and the dispatch is not retried",
-      );
-      captureException(toError(containmentError), {
-        extra: { projectId, triggerId, phase: "persist-cap-breach" },
-      });
-    }
+  if (!(await allowedByDailyCeiling({ deps, trigger, projectId, traceId }))) {
     return;
   }
 
