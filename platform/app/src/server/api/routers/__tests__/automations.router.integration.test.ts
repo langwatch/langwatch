@@ -88,6 +88,7 @@ vi.mock("@ee/audit-log/auditLog", () => ({
 import {
   _resetMemoryPersistCapStore,
   consumePersistCapSlot,
+  persistCapClaimKey,
   persistCapKey,
   resolvePersistDailyCap,
 } from "../../../app-layer/automations/dispatch/persistCap";
@@ -1066,7 +1067,13 @@ describe("automationRouter", () => {
         );
         for (let index = 0; index <= cap; index++) {
           const dedupKey = `${projectId}/${busyTrigger}:persist:trace-${index}`;
-          writtenKeys.push(`persist-cap-claimed:${dedupKey}`);
+          writtenKeys.push(
+            persistCapClaimKey({
+              projectId,
+              triggerId: busyTrigger,
+              dedupKey,
+            }),
+          );
           await consumePersistCapSlot({
             projectId,
             triggerId: busyTrigger,

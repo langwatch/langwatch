@@ -14,7 +14,11 @@
 import { nanoid } from "nanoid";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { connection } from "~/server/redis";
-import { consumePersistCapSlot, persistCapKey } from "../persistCap";
+import {
+  consumePersistCapSlot,
+  persistCapClaimKey,
+  persistCapKey,
+} from "../persistCap";
 
 const PROJECT_ID = `proj-${nanoid(8)}`;
 const NOW = new Date("2026-08-09T12:00:00.000Z");
@@ -37,7 +41,11 @@ function consume({
   const dedupKey = `${PROJECT_ID}/${trigger}:persist:${traceId}`;
   writtenKeys.push(
     persistCapKey({ projectId: PROJECT_ID, triggerId: trigger, now: NOW }),
-    `persist-cap-claimed:${dedupKey}`,
+    persistCapClaimKey({
+      projectId: PROJECT_ID,
+      triggerId: trigger,
+      dedupKey,
+    }),
   );
   return consumePersistCapSlot({
     projectId: PROJECT_ID,
@@ -57,7 +65,12 @@ beforeAll(() => {
 });
 
 afterEach(async () => {
-  if (writtenKeys.length > 0) await connection?.del(...writtenKeys);
+  // One key per DEL: keys for different triggers carry different hash tags, so
+  // a multi-key DEL would fail with CROSSSLOT on a Redis Cluster connection
+  // and a failed teardown would strand keys with a 25h TTL.
+  for (const key of writtenKeys) {
+    await connection?.del(key);
+  }
   writtenKeys.length = 0;
 });
 

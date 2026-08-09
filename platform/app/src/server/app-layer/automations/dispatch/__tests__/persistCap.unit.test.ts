@@ -37,6 +37,8 @@ import { env } from "~/env.mjs";
 import {
   _resetMemoryPersistCapStore,
   consumePersistCapSlot,
+  persistCapClaimKey,
+  persistCapKey,
   readPersistCapCounts,
   resolvePersistDailyCap,
 } from "../persistCap";
@@ -60,6 +62,33 @@ function plan(overrides: Record<string, unknown>) {
     ...overrides,
   });
 }
+
+describe("given the two keys one Lua script touches together", () => {
+  describe("when their Redis Cluster slots are compared", () => {
+    /** @scenario "The ceiling survives a clustered Redis" */
+    it("routes both to one slot by sharing a hash tag", () => {
+      const hashTag = (key: string) => key.match(/\{([^}]*)\}/)?.[1];
+      const dedupKey = `${PROJECT_ID}/${TRIGGER_ID}:persist:trace-1`;
+      const counter = persistCapKey({
+        projectId: PROJECT_ID,
+        triggerId: TRIGGER_ID,
+        now: new Date("2026-08-09T12:00:00.000Z"),
+      });
+      const claim = persistCapClaimKey({
+        projectId: PROJECT_ID,
+        triggerId: TRIGGER_ID,
+        dedupKey,
+      });
+
+      // Cluster hashes only what is between the braces. Without a shared tag
+      // the EVAL is rejected with CROSSSLOT, which this module catches as an
+      // ordinary Redis error and answers by dropping to per-worker counters,
+      // so the fleet-wide ceiling silently stops being fleet-wide.
+      expect(hashTag(counter)).toBe(`${PROJECT_ID}:${TRIGGER_ID}`);
+      expect(hashTag(claim)).toBe(hashTag(counter));
+    });
+  });
+});
 
 describe("given a project on a plan", () => {
   beforeEach(() => {

@@ -98,7 +98,28 @@ export interface PersistCapDecision {
   skipped: number;
 }
 
-/** `persist-cap:{projectId}:{triggerId}:{utcDay}` */
+/**
+ * The hash tag both cap keys share.
+ *
+ * Redis Cluster routes a key by the substring inside the first `{}` and
+ * rejects a multi-key script whose keys land in different slots. The claim and
+ * the day counter are read and written together by one Lua script, so without
+ * a shared tag every eval on a clustered install fails with `CROSSSLOT`, gets
+ * caught as an ordinary Redis error, and drops the whole fleet to per-worker
+ * counters. The (project, trigger) pair is the natural tag: both keys belong
+ * to exactly one of them.
+ */
+function capSlotTag({
+  projectId,
+  triggerId,
+}: {
+  projectId: string;
+  triggerId: string;
+}): string {
+  return `{${projectId}:${triggerId}}`;
+}
+
+/** `persist-cap:<tag>:<utcDay>`, where the tag is braced and literal. */
 export function persistCapKey({
   projectId,
   triggerId,
@@ -108,9 +129,22 @@ export function persistCapKey({
   triggerId: string;
   now: Date;
 }): string {
-  return `persist-cap:${projectId}:${triggerId}:${Math.floor(
+  return `persist-cap:${capSlotTag({ projectId, triggerId })}:${Math.floor(
     now.getTime() / DAY_MS,
   )}`;
+}
+
+/** `persist-cap-claimed:<tag>:<dedupKey>`, sharing the counter's slot. */
+export function persistCapClaimKey({
+  projectId,
+  triggerId,
+  dedupKey,
+}: {
+  projectId: string;
+  triggerId: string;
+  dedupKey: string;
+}): string {
+  return `persist-cap-claimed:${capSlotTag({ projectId, triggerId })}:${dedupKey}`;
 }
 
 interface MemoryEntry {
@@ -225,7 +259,7 @@ export async function consumePersistCapSlot({
   dedupKey: string;
 }): Promise<PersistCapDecision> {
   const key = persistCapKey({ projectId, triggerId, now });
-  const claimKey = `persist-cap-claimed:${dedupKey}`;
+  const claimKey = persistCapClaimKey({ projectId, triggerId, dedupKey });
   const decide = (count: number): PersistCapDecision => ({
     allowed: count <= cap,
     count,

@@ -65,6 +65,17 @@ Feature: Runaway automations are contained without punishing the customer
       When the outbox retries that same dispatch
       Then the ceiling count is unchanged
 
+    # The claim and the counter are read and written by one Lua script, and a
+    # clustered Redis rejects a multi-key script whose keys land in different
+    # slots. That rejection is indistinguishable from any other Redis error, so
+    # it would be answered by falling back to per-worker counting: the ceiling
+    # would still appear to work while no longer being shared.
+    @unit
+    Scenario: The ceiling survives a clustered Redis
+      Given a trigger whose claim and day counter are used in one script
+      When their Redis Cluster slots are compared
+      Then both keys carry the same hash tag
+
   Rule: The ceiling is a per-trigger daily allowance that follows the plan
 
     @unit

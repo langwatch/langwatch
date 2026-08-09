@@ -85,17 +85,26 @@ const tenantClaimStore = new Map<string, number>();
  * Applies the window TTL only while the key has none, so an existing window
  * never slides and a transient first-hit EXPIRE failure is re-attempted by
  * every later hit instead of leaking an immortal key. This is EXPIRE's NX
- * option spelled out as a TTL guard: the option itself needs Redis 7, and
- * self-hosted installs still run Redis 6. The guard is two commands rather
- * than one, but racing first hits can only set the same duration twice in the
- * same instant, which slides nothing.
+ * option spelled out as a TTL guard, because the option itself needs Redis 7
+ * and self-hosted installs still run Redis 6.
+ *
+ * The read and the write go in one script so they cannot be interleaved: as
+ * two round trips, a caller that stalls between them re-applies the full
+ * duration on top of a window another caller already started, sliding it by
+ * however long the stall lasted. One key, so no Redis Cluster slot to share.
  */
+const EXPIRE_IF_UNSET_SCRIPT = `
+if redis.call('TTL', KEYS[1]) < 0 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+`;
+
 async function expireIfUnset(
   redis: NonNullable<typeof connection>,
   key: string,
   seconds: number,
 ): Promise<void> {
-  if ((await redis.ttl(key)) < 0) await redis.expire(key, seconds);
+  await redis.eval(EXPIRE_IF_UNSET_SCRIPT, 1, key, String(seconds));
 }
 
 const MEMORY_GC_THRESHOLD = 1000;
