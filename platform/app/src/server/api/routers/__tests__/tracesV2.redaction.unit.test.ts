@@ -590,6 +590,105 @@ describe("redactTraceLogContent", () => {
       ).toBeUndefined();
     });
   });
+
+  /**
+   * Only Claude Code emits bare event names. codex and gemini namespace theirs,
+   * and the transcript derivation resolves both through the canonical
+   * vocabulary — so the gate has to as well, or a namespaced record matches no
+   * known content key and leaves with its payload intact.
+   */
+  describe("given a namespaced agent's wire spelling", () => {
+    const blind = { canSeeCapturedInput: false, canSeeCapturedOutput: false };
+    const inputOnly = {
+      canSeeCapturedInput: true,
+      canSeeCapturedOutput: false,
+    };
+    const outputOnly = {
+      canSeeCapturedInput: false,
+      canSeeCapturedOutput: true,
+    };
+
+    const codexPrompt = logRow({
+      "event.name": "codex.user_prompt",
+      prompt: "summarise the private repo",
+    });
+    const codexToolResult = logRow({
+      "event.name": "codex.tool_result",
+      call_id: "call_1",
+      tool_name: "shell",
+      arguments: '{"command":"cat /etc/private"}',
+      output: "the secret file contents",
+      success: "true",
+    });
+    const geminiResponse = logRow({
+      "event.name": "gemini_cli.api_response",
+      role: "main",
+      response_text:
+        '{"candidates":[{"content":{"parts":[{"text":"secret"}]}}]}',
+    });
+
+    it("withholds a codex prompt behind captured-input visibility", () => {
+      expect(
+        redactTraceLogContent(codexPrompt, blind).attributes.prompt,
+      ).toBeUndefined();
+      expect(
+        redactTraceLogContent(codexPrompt, inputOnly).attributes.prompt,
+      ).toBe("summarise the private repo");
+    });
+
+    it("withholds a gemini reply behind captured-output visibility", () => {
+      expect(
+        redactTraceLogContent(geminiResponse, blind).attributes.response_text,
+      ).toBeUndefined();
+      expect(
+        redactTraceLogContent(geminiResponse, inputOnly).attributes
+          .response_text,
+      ).toBeUndefined();
+      expect(
+        redactTraceLogContent(geminiResponse, outputOnly).attributes
+          .response_text,
+      ).toBe('{"candidates":[{"content":{"parts":[{"text":"secret"}]}}]}');
+    });
+
+    /**
+     * One record, two categories: the arguments are what the agent was asked to
+     * run, the output is what came back. A single verdict for the record could
+     * only ever be right in one direction.
+     */
+    it("gates a codex tool run's arguments and output independently", () => {
+      const hidOutput = redactTraceLogContent(codexToolResult, inputOnly);
+      expect(hidOutput.attributes.arguments).toBe(
+        '{"command":"cat /etc/private"}',
+      );
+      expect(hidOutput.attributes.output).toBeUndefined();
+      // The flag is what makes the UI say "content withheld" rather than
+      // render an empty record as "nothing happened here".
+      expect(hidOutput.bodyRedacted).toBe(true);
+
+      const hidInput = redactTraceLogContent(codexToolResult, outputOnly);
+      expect(hidInput.attributes.arguments).toBeUndefined();
+      expect(hidInput.attributes.output).toBe("the secret file contents");
+      expect(hidInput.bodyRedacted).toBe(true);
+
+      const hidBoth = redactTraceLogContent(codexToolResult, blind);
+      expect(hidBoth.attributes.arguments).toBeUndefined();
+      expect(hidBoth.attributes.output).toBeUndefined();
+      expect(hidBoth.bodyRedacted).toBe(true);
+      // Metadata survives: which tool ran, and whether it worked.
+      expect(hidBoth.attributes.tool_name).toBe("shell");
+      expect(hidBoth.attributes.success).toBe("true");
+    });
+
+    it("names no audience when a record shed both categories at once", () => {
+      const out = redactTraceLogContent(codexToolResult, {
+        ...blind,
+        capturedInputVisibleTo: "Admins",
+        capturedOutputVisibleTo: "Admins",
+      });
+
+      expect(out.bodyVisibleTo).toBeNull();
+    });
+  });
 });
 
 /**

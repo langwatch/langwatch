@@ -304,6 +304,14 @@ export class SpendEventsApiError extends Error {
  * query filter rather than scoping on a header, so the project belongs to the
  * call, not to the client.
  *
+ * The key MUST be an organization API key (`sk-lw-{id}_{secret}`, from
+ * Settings > API Keys). A project API key is refused before any permission is
+ * consulted, with `credential_class_mismatch`, and no header makes it work:
+ * these are organization-scoped routes and a project key names one project.
+ * The same organization key also reaches the project-scoped surfaces when
+ * given `X-Project-Id`, so one key covers both families and a project key
+ * covers only one.
+ *
  * Neither collection on this service offers an eager whole-set read. The
  * ledger is unbounded, and materialising a window of it is the very
  * under-counting and out-of-memory footgun the page docstrings warn about:

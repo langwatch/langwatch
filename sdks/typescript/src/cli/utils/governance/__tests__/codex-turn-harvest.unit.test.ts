@@ -1,0 +1,321 @@
+/**
+ * Recovering a codex session's conversation from its rollout transcript and
+ * emitting it onto the trace codex already reported tokens on.
+ *
+ * These exercise the real transcript shape codex 0.146 writes, captured from a
+ * live session rather than invented, because the whole mechanism rests on two
+ * fields codex is under no obligation to keep: `task_started.trace_id` (the
+ * join key) and `agent_message.phase == "final_answer"` (the reply). A drift in
+ * either is silent — content simply stops arriving — so it is pinned here.
+ */
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import {
+	findRolloutForThread,
+	harvestCodexThread,
+} from "../codex-rollout-otlp";
+
+const THREAD = "019fc156-02e3-76a1-b462-14c38b450cb6";
+const TRACE = "add81f7dde443979dde88487bd7fb454";
+
+let root: string;
+
+beforeEach(() => {
+	root = mkdtempSync(join(tmpdir(), "lw-codex-sessions-"));
+	mkdirSync(join(root, "2026", "08", "02"), { recursive: true });
+});
+
+afterEach(() => {
+	rmSync(root, { recursive: true, force: true });
+});
+
+function writeRollout(threadId: string, lines: unknown[]): string {
+	const file = join(
+		root,
+		"2026",
+		"08",
+		"02",
+		`rollout-2026-08-02T09-15-46-${threadId}.jsonl`,
+	);
+	writeFileSync(file, lines.map((l) => JSON.stringify(l)).join("\n"));
+	return file;
+}
+
+const taskStarted = (traceId: string) => ({
+	type: "event_msg",
+	payload: {
+		type: "task_started",
+		turn_id: "019fc154-29dc-76d1-8e29-e807065670cd",
+		trace_id: traceId,
+		started_at: 1785654946,
+	},
+});
+
+const userMessage = (text: string) => ({
+	type: "response_item",
+	payload: {
+		type: "message",
+		role: "user",
+		content: [{ type: "input_text", text }],
+	},
+});
+
+const agentFinal = (message: string) => ({
+	type: "event_msg",
+	payload: { type: "agent_message", message, phase: "final_answer" },
+});
+
+/** A fetch double that records the OTLP bodies it was handed. */
+function recordingFetch() {
+	const bodies: any[] = [];
+	const impl = vi.fn(async (_url: string, init?: any) => {
+		bodies.push(JSON.parse(init.body));
+		return { ok: true, status: 200 } as any;
+	});
+	return { bodies, impl: impl as unknown as typeof fetch };
+}
+
+const spansOf = (bodies: any[]) =>
+	bodies.flatMap((b) =>
+		b.resourceSpans.flatMap((rs: any) =>
+			rs.scopeSpans.flatMap((ss: any) => ss.spans),
+		),
+	);
+
+const attrOf = (span: any, key: string) =>
+	span.attributes.find((a: any) => a.key === key)?.value?.stringValue;
+
+describe("harvestCodexThread", () => {
+	describe("given a session that ran without the langwatch wrapper", () => {
+		describe("when its completed turn is harvested", () => {
+			/** @scenario "A session run without the wrapper still records the assistant reply" */
+			it("records the assistant reply codex never put on the wire", async () => {
+				writeRollout(THREAD, [
+					taskStarted(TRACE),
+					userMessage("reply with exactly: mango"),
+					agentFinal("mango"),
+				]);
+				const { bodies, impl } = recordingFetch();
+
+				const turns = await harvestCodexThread({
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					fetchImpl: impl,
+				});
+
+				expect(turns).toBe(1);
+				expect(attrOf(spansOf(bodies)[0], "langwatch.output")).toBe("mango");
+			});
+
+			/** @scenario "The recovered conversation lands on the trace codex already reported tokens on" */
+			it("puts it on the trace id the transcript recorded, not a fresh one", async () => {
+				writeRollout(THREAD, [
+					taskStarted(TRACE),
+					userMessage("hi"),
+					agentFinal("hello"),
+				]);
+				const { bodies, impl } = recordingFetch();
+
+				await harvestCodexThread({
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					fetchImpl: impl,
+				});
+
+				expect(spansOf(bodies)[0].traceId).toBe(TRACE);
+			});
+		});
+	});
+
+	describe("given a turn that ran a tool before answering", () => {
+		describe("when the turn is harvested", () => {
+			/** @scenario "The recovered turn carries the prompt and the tool calls, not just the reply" */
+			it("records the prompt, the tool call and its result alongside the reply", async () => {
+				writeRollout(THREAD, [
+					taskStarted(TRACE),
+					userMessage("what is in the repo?"),
+					{
+						type: "response_item",
+						payload: {
+							type: "function_call",
+							name: "exec_command",
+							arguments: '{"cmd":"ls"}',
+							call_id: "call_1",
+						},
+					},
+					{
+						type: "response_item",
+						payload: {
+							type: "function_call_output",
+							call_id: "call_1",
+							output: "README.md",
+						},
+					},
+					agentFinal("Just a README."),
+				]);
+				const { bodies, impl } = recordingFetch();
+
+				await harvestCodexThread({
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					fetchImpl: impl,
+				});
+
+				const input = JSON.parse(
+					attrOf(spansOf(bodies)[0], "langwatch.input") ?? "{}",
+				);
+				const roles = input.value.map((m: any) => m.role);
+				expect(roles).toContain("user");
+				expect(roles).toContain("tool");
+				expect(JSON.stringify(input.value)).toContain("exec_command");
+				expect(JSON.stringify(input.value)).toContain("README.md");
+			});
+		});
+	});
+
+	describe("given a turn that has started but has no reply yet", () => {
+		describe("when the turn is harvested", () => {
+			/** @scenario "A turn that has not been answered yet records nothing" */
+			it("posts nothing rather than an empty span", async () => {
+				writeRollout(THREAD, [taskStarted(TRACE), userMessage("thinking...")]);
+				const { bodies, impl } = recordingFetch();
+
+				const turns = await harvestCodexThread({
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					fetchImpl: impl,
+				});
+
+				expect(turns).toBe(0);
+				expect(bodies).toHaveLength(0);
+			});
+		});
+	});
+
+	describe("given a turn that was already harvested", () => {
+		describe("when the same turn is harvested again", () => {
+			// The hook fires after EVERY turn and re-reads the whole transcript, so
+			// this is the normal case, not an edge one.
+			/** @scenario "Harvesting the same turn twice does not duplicate the conversation" */
+			it("re-emits the same span id, which the receiver drops as a duplicate", async () => {
+				writeRollout(THREAD, [
+					taskStarted(TRACE),
+					userMessage("hi"),
+					agentFinal("hello"),
+				]);
+				const { bodies, impl } = recordingFetch();
+				const args = {
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					fetchImpl: impl,
+				};
+
+				await harvestCodexThread(args);
+				await harvestCodexThread(args);
+
+				const spans = spansOf(bodies);
+				expect(spans).toHaveLength(2);
+				expect(spans[0].spanId).toBe(spans[1].spanId);
+				expect(spans[0].traceId).toBe(spans[1].traceId);
+			});
+		});
+	});
+
+	describe("given several sessions on disk", () => {
+		describe("when one thread is harvested", () => {
+			/** @scenario "The finished turn identifies its own session" */
+			it("reads only the named session's transcript", async () => {
+				const other = "019fc999-dead-beef-0000-000000000000";
+				writeRollout(THREAD, [
+					taskStarted(TRACE),
+					userMessage("mine"),
+					agentFinal("mine reply"),
+				]);
+				writeRollout(other, [
+					taskStarted("ffffffffffffffffffffffffffffffff"),
+					userMessage("theirs"),
+					agentFinal("theirs reply"),
+				]);
+				const { bodies, impl } = recordingFetch();
+
+				await harvestCodexThread({
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					fetchImpl: impl,
+				});
+
+				const spans = spansOf(bodies);
+				expect(spans).toHaveLength(1);
+				expect(attrOf(spans[0], "langwatch.output")).toBe("mine reply");
+			});
+		});
+	});
+
+	describe("given a thread with no transcript on disk", () => {
+		describe("when it is harvested", () => {
+			it("posts nothing instead of failing", async () => {
+				const { bodies, impl } = recordingFetch();
+
+				const turns = await harvestCodexThread({
+					threadId: "019fc000-0000-0000-0000-000000000000",
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					fetchImpl: impl,
+				});
+
+				expect(turns).toBe(0);
+				expect(bodies).toHaveLength(0);
+			});
+		});
+	});
+});
+
+describe("findRolloutForThread", () => {
+	describe("given a thread id that is not a plain identifier", () => {
+		describe("when the transcript is resolved", () => {
+			it("refuses it rather than letting it walk out of the sessions directory", async () => {
+				writeRollout(THREAD, [taskStarted(TRACE), agentFinal("hi")]);
+
+				expect(await findRolloutForThread("../../etc/passwd", root)).toBeNull();
+				expect(await findRolloutForThread("a/b", root)).toBeNull();
+			});
+		});
+	});
+
+	describe("given the session exists", () => {
+		describe("when the transcript is resolved", () => {
+			it("finds it under the year/month/day nesting codex writes", async () => {
+				const expected = writeRollout(THREAD, [
+					taskStarted(TRACE),
+					agentFinal("hi"),
+				]);
+
+				expect(await findRolloutForThread(THREAD, root)).toBe(expected);
+			});
+		});
+	});
+});

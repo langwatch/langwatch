@@ -32,10 +32,16 @@ import * as readline from "node:readline";
 import chalk from "chalk";
 
 import {
+	codexHasNotifyBlock,
+	type CodexNotifyWriteResult,
+	codexNotifyCommand,
+	codexNotifyCommandIsEphemeral,
 	codexOtelBlockHasAuthHeader,
 	codexTraceEndpoint,
 	defaultCodexConfigPath,
+	defaultCodexNotifyCommand,
 	displayCodexConfigPath,
+	writeCodexNotifyBlock,
 	writeCodexOtelBlock,
 } from "../codex-config-toml";
 import {
@@ -43,12 +49,43 @@ import {
 	appSettingsTargetFor,
 	installAppEnv,
 } from "./app-settings";
-import { installSessionContextHooks } from "./session-context-hooks";
+import {
+	ensureLangwatchClaudePlugin,
+	readClaudePluginState,
+} from "./claude-plugin";
+import {
+	installSessionContextHooks,
+	removeSessionContextHooks,
+} from "./session-context-hooks";
 import { type GovernanceConfig, saveConfig } from "./config";
 import { envForTool, type ToolEnv } from "./tool-env";
 
-/** Wrapped tools included in the union'd export block. */
+/**
+ * Wrapped tools included in the union'd export block. copilot is
+ * deliberately ABSENT: its gateway env is COPILOT_PROVIDER_* BYOK vars,
+ * and a global export would force every bare `copilot` run into gateway
+ * billing (off the user's Copilot seat) — ADR-039 Decision 7.
+ */
 const TOOLS = ["claude", "codex", "cursor", "gemini", "opencode"] as const;
+
+/**
+ * Tools whose Path B telemetry persists as a scoped shell function (no
+ * config-file env target). Drives BOTH the logout target scan
+ * (telemetry-targets.ts) and the gateway spawn's `unset -f`
+ * (wrapper.ts) — a persisted rc function re-injects the OTel env at
+ * invocation time, AFTER the wrapper's exports, so gateway runs must
+ * remove the function from the shell session (never from the rc file)
+ * or the same calls get captured twice.
+ */
+export const SHELL_FUNCTION_TOOLS: readonly string[] = [
+  "gemini",
+  "opencode",
+  "copilot",
+  // `code` (VS Code Copilot Chat) is a CLI-launched editor with no
+  // config-file env target for the auth header, so it uses the same
+  // scoped-function tier. ADR-039 §Extension #2.
+  "code",
+] as const;
 
 const BLOCK_BEGIN = "# >>> langwatch begin >>>";
 const BLOCK_END = "# <<< langwatch end <<<";
@@ -297,21 +334,30 @@ export function removeBlockFromRc(
  */
 export type PersistChoice = "yes" | "no" | "never" | "skip";
 
-export async function askPersistChoice(
-	rcPathHint: string,
-	tool: string,
-): Promise<PersistChoice> {
+/**
+ * `question` replaces the default wording for a tool whose "yes" buys more than
+ * an env block. Whatever it says has to be said BEFORE the answer, because a
+ * bare Enter is a yes, so it is part of the question rather than a line printed
+ * around it.
+ */
+export async function askPersistChoice({
+	target,
+	tool,
+	question,
+}: {
+	target: string;
+	tool: string;
+	question?: string;
+}): Promise<PersistChoice> {
 	if (!process.stdin.isTTY) return "skip";
 
 	const rl = readline.createInterface({
 		input: process.stdin,
 		output: process.stdout,
 	});
+	const asked = question ?? persistQuestion({ tool, targetHint: target });
 	const ans = await new Promise<string>((resolve) => {
-		rl.question(
-			`Install env vars to ${rcPathHint} so that next time the plain \`${tool}\` command keeps capturing telemetry data? [Y/n/never] `,
-			(a) => resolve(a),
-		);
+		rl.question(`${asked} [Y/n/never] `, (a) => resolve(a));
 	});
 	rl.close();
 
@@ -319,6 +365,30 @@ export async function askPersistChoice(
 	if (norm === "" || norm === "y" || norm === "yes") return "yes";
 	if (norm === "never") return "never";
 	return "no";
+}
+
+/**
+ * What the persist offer asks. Claude gets its own sentence because saying yes
+ * to it does two things rather than one: it saves the env block AND installs the
+ * plugin that reports session context. Consent has to name both, and name what
+ * the plugin's hooks record, or the user is agreeing to something they were
+ * never told about.
+ */
+function persistQuestion({
+	tool,
+	targetHint,
+}: {
+	tool: string;
+	targetHint: string;
+}): string {
+	if (tool === "claude") {
+		return (
+			`Set up LangWatch capture for ${tool}? This saves the telemetry env vars to ` +
+			`${targetHint} and installs the LangWatch Claude Code plugin, whose session ` +
+			`hooks record the repository and branch each session works on.`
+		);
+	}
+	return `Install env vars to ${targetHint} so that next time the plain \`${tool}\` command keeps capturing telemetry data?`;
 }
 
 /**
@@ -360,16 +430,19 @@ export async function maybeOfferIngestionShellRcPersist({
 	const appTarget = appSettingsTargetFor(tool);
 	if (appTarget) {
 		if (appEnvHasAllVars(appTarget, vars)) {
-			// The exports are current, but the hooks may not be: they arrived
-			// after the env block, so a device that persisted earlier carries the
-			// block and none of them. Same file, same grant, so assert them here
-			// rather than leaving repository identity off every session that
+			// The exports are current, but the session context seam may not be: it
+			// arrived after the env block, so a device that persisted earlier
+			// carries the block and none of it. Same file, same grant, so assert it
+			// here rather than leaving repository identity off every session that
 			// already said yes.
-			assertClaudeSessionContextHooks(tool);
+			reassertClaudeSessionContext(tool);
 			return;
 		}
 		console.log();
-		const choice = await askPersistChoice(appTarget.displayPath, tool);
+		const choice = await askPersistChoice({
+			target: appTarget.displayPath,
+			tool,
+		});
 		if (choice === "skip" || choice === "no") return;
 		if (choice === "never") {
 			recordNeverChoice(cfg);
@@ -382,7 +455,7 @@ export async function maybeOfferIngestionShellRcPersist({
 					`  ✓ Installed langwatch telemetry exports to ${appTarget.displayPath}`,
 				),
 			);
-			assertClaudeSessionContextHooks(tool);
+			installClaudeSessionContext(tool);
 		} catch (err) {
 			console.log(
 				chalk.yellow(
@@ -401,15 +474,26 @@ export async function maybeOfferIngestionShellRcPersist({
 	// plain `codex` captures.
 	if (tool === "codex") {
 		const configPath = defaultCodexConfigPath();
-		// Already persisted on a prior run — stay quiet.
-		if (codexOtelBlockHasAuthHeader(configPath)) return;
+		if (codexOtelBlockHasAuthHeader(configPath)) {
+			// The exports are current, but the turn harvest may not be: it is what
+			// recovers the conversation those exports carry none of, and it is a
+			// separate write into the same file under the same grant. Assert it here
+			// rather than leaving content recovery off every device that persisted
+			// the header on an earlier run.
+			assertCodexTurnHarvest();
+			return;
+		}
 
 		const endpointBase = vars.OTEL_EXPORTER_OTLP_ENDPOINT;
 		const token = bearerFromHeaders(vars.OTEL_EXPORTER_OTLP_HEADERS);
 		if (!endpointBase || !token) return;
 
 		console.log();
-		const choice = await askPersistChoice(displayCodexConfigPath(), tool);
+		const choice = await askPersistChoice({
+			target: displayCodexConfigPath(),
+			tool,
+			question: codexConsentQuestion(configPath),
+		});
 		if (choice === "skip" || choice === "no") return;
 		if (choice === "never") {
 			recordNeverChoice(cfg);
@@ -429,6 +513,7 @@ export async function maybeOfferIngestionShellRcPersist({
 					`  ✓ Installed langwatch telemetry exports to ${displayCodexConfigPath()}`,
 				),
 			);
+			assertCodexTurnHarvest();
 		} catch (err) {
 			console.log(
 				chalk.yellow(
@@ -465,7 +550,7 @@ export async function maybeOfferIngestionShellRcPersist({
 	}
 	const target = rcPath(shell);
 	console.log();
-	const choice = await askPersistChoice(target, tool);
+	const choice = await askPersistChoice({ target, tool });
 	if (choice === "skip" || choice === "no") return;
 	if (choice === "never") {
 		recordNeverChoice(cfg);
@@ -492,15 +577,191 @@ export async function maybeOfferIngestionShellRcPersist({
 }
 
 /**
- * Assert the session context hooks for a tool whose telemetry exports live in
- * its own settings file. Claude Code exports no repository identity over
- * telemetry; the hooks are what report it, and they belong to the same "yes"
- * that persisted the exports. Idempotent, and quiet unless it changed
- * something. A hook write that fails is not worth failing the persist over:
- * the exports it rides beside are already installed.
+ * What asking codex to run the turn harvest left behind.
+ *
+ * `blocked` is an outcome rather than a thrown error because it is the one
+ * failure the user can fix, and every caller wants to say so and carry on
+ * rather than abandon an install that otherwise worked.
  */
-function assertClaudeSessionContextHooks(tool: string): void {
+export type CodexTurnHarvestOutcome =
+	| { status: "installed"; chained: string[] | null; ephemeral: boolean }
+	| { status: "unchanged" }
+	| { status: "skipped" }
+	| { status: "blocked" };
+
+/** What every caller says when the merge was refused. */
+export const CODEX_TURN_HARVEST_BLOCKED_MESSAGE =
+	"Your codex configuration already runs a program of its own after every turn, and it cannot be moved safely, so the conversation will not be recorded. Remove that setting and run this again.";
+
+/**
+ * The merge refuses rather than leave two top-level `notify` keys behind, which
+ * would stop codex from starting at all. It travels as a message because it is
+ * raised where the TOML is read, one module below this one.
+ */
+function isNotifyMergeRefusal(err: unknown): boolean {
+	return err instanceof Error && err.message.startsWith("refusing to write ");
+}
+
+/**
+ * Ask codex to run the turn harvest after every completed turn. Idempotent.
+ *
+ * Codex's telemetry export carries tokens, model and timing but no
+ * conversation: the reply is dropped before export and no codex setting brings
+ * it back. What codex does offer is `notify`, a program it runs after every
+ * completed turn. Pointed at our own harvest, that is what turns a plain
+ * `codex` into traces with something to read.
+ */
+export function installCodexTurnHarvest(
+	options: { filePath?: string } = {},
+): CodexTurnHarvestOutcome {
+	const command = defaultCodexNotifyCommand();
+	if (!command) return { status: "skipped" };
+	let result: CodexNotifyWriteResult;
+	try {
+		result = writeCodexNotifyBlock({ command }, options);
+	} catch (err) {
+		if (isNotifyMergeRefusal(err)) return { status: "blocked" };
+		throw err;
+	}
+	if (result.action === "unchanged") return { status: "unchanged" };
+	return {
+		status: "installed",
+		chained: result.chained,
+		ephemeral: codexNotifyCommandIsEphemeral(command),
+	};
+}
+
+/**
+ * What the user is agreeing to when they keep codex capture on.
+ *
+ * "Keeps capturing" would understate it: this asks codex to RUN a program after
+ * every completed turn, and codex allows exactly one, so a program the user
+ * already set is started by ours from then on. A bare Enter is a yes, so both
+ * facts are in the question rather than printed after the answer. The
+ * displacement is named only when there is something to displace, since our own
+ * block already accounts for one.
+ */
+function codexConsentQuestion(configPath: string): string {
+	const lines = [
+		"LangWatch can keep capturing codex sessions after this one.",
+		`It saves your LangWatch connection details to ${displayCodexConfigPath()}, and asks`,
+		"codex to run `langwatch ingest codex` after every completed turn so the",
+		"conversation is recorded.",
+	];
+	if (codexNotifyCommand(configPath) && !codexHasNotifyBlock(configPath)) {
+		lines.push(
+			"Codex runs a single program after a turn, so the one you have set will be",
+			"started by this one instead of by codex.",
+		);
+	}
+	lines.push("Install it?");
+	return lines.join("\n");
+}
+
+/**
+ * Assert the turn harvest for codex, which belongs to the same "yes" that
+ * persisted the exports: those exports carry no conversation, and this is what
+ * recovers it. Idempotent, and quiet unless it changed something.
+ *
+ * A write that fails is not worth failing the persist over, since the exports
+ * it rides beside are already installed and capturing. The exception is a
+ * config shape the merge refuses, which the user can fix and would otherwise
+ * never hear about.
+ */
+function assertCodexTurnHarvest(): void {
+	let outcome: CodexTurnHarvestOutcome;
+	try {
+		outcome = installCodexTurnHarvest();
+	} catch {
+		return;
+	}
+	if (outcome.status === "blocked") {
+		console.log(chalk.yellow(`  ! ${CODEX_TURN_HARVEST_BLOCKED_MESSAGE}`));
+		return;
+	}
+	if (outcome.status !== "installed") return;
+	console.log(
+		chalk.green(
+			"  ✓ Codex will record each turn's conversation as it completes",
+		),
+	);
+	if (outcome.chained) {
+		console.log(
+			chalk.dim(
+				`    Your existing notify program still runs: ${outcome.chained[0]}`,
+			),
+		);
+	}
+	if (outcome.ephemeral) {
+		console.log(
+			chalk.yellow(
+				"    Heads up: this points at an npx cache that npm may clean up.\n" +
+					"    Install the CLI (npm i -g langwatch) so it keeps working.",
+			),
+		);
+	}
+}
+
+/**
+ * Wire the session context seam for a tool whose telemetry exports live in its
+ * own settings file, on the run where the user just consented. Claude Code
+ * exports no repository identity over telemetry; the seam is what reports it,
+ * and it belongs to the same "yes" that persisted the exports.
+ *
+ * The plugin is the seam we want, so this is the one moment allowed to install
+ * it: the user is present, so a marketplace trust prompt can reach them, and
+ * they just answered a question that named the plugin. Anything that stops the
+ * plugin from landing (a `claude` too old for it, a network that is down) falls
+ * back to the hook entries written straight into the settings file, which are
+ * what this always did.
+ */
+function installClaudeSessionContext(tool: string): void {
 	if (tool !== "claude") return;
+
+	const plugin = ensureLangwatchClaudePlugin({ interactive: true });
+	if (plugin.action === "installed") {
+		console.log(
+			chalk.green(
+				`  ✓ Installed the LangWatch Claude Code plugin, whose hooks report each session's repository and branch`,
+			),
+		);
+		return;
+	}
+	if (plugin.action === "already_installed") return;
+
+	installRawSessionContextHooks();
+}
+
+/**
+ * Re-assert the session context seam on a run that is only verifying an
+ * already-configured device. Nobody was asked anything on this run, so it does
+ * no network and spawns nothing: it reads what is on disk and edits local files.
+ *
+ * The one thing it does change is leftovers. A device that took the plugin on a
+ * previous run may still carry the raw hook entries the plugin replaced, and
+ * leaving both wired runs the same two hooks twice per session.
+ */
+function reassertClaudeSessionContext(tool: string): void {
+	if (tool !== "claude") return;
+
+	if (readClaudePluginState().pluginInstalled) {
+		try {
+			removeSessionContextHooks({ tool: "claude_code" });
+		} catch {
+			// Best-effort: a duplicate hook is worse than tidy, not broken.
+		}
+		return;
+	}
+
+	installRawSessionContextHooks();
+}
+
+/**
+ * Merge the hook entries into the settings file. Idempotent, and quiet unless it
+ * changed something. A hook write that fails is not worth failing the persist
+ * over: the exports it rides beside are already installed.
+ */
+function installRawSessionContextHooks(): void {
 	try {
 		const hooks = installSessionContextHooks({ tool: "claude_code" });
 		if (hooks.action === "unchanged") return;

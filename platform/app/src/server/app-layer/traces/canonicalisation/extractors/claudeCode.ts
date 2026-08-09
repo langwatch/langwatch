@@ -55,8 +55,12 @@ const CLAUDE_CODE_SCOPE_NAMES: ReadonlySet<string> = new Set([
   "com.anthropic.claude_code.events",
 ]);
 
-/** The CLI's own native model-call span — see the span-side doc above. */
-const LLM_REQUEST_SPAN_NAME = "claude_code.llm_request";
+/**
+ * The CLI's own native model-call span, see the span-side doc above. It is
+ * the span that names its model under a bare `model` attribute, which is why
+ * cost enrichment needs it by name.
+ */
+export const CLAUDE_CODE_LLM_REQUEST_SPAN_NAME = "claude_code.llm_request";
 
 /**
  * Claude Code emits an `api_response_body` event for EVERY model call it
@@ -110,7 +114,7 @@ export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
   apply(ctx: ExtractorContext): void {
     // Gateway-proxied claude_code traffic already arrives as gen_ai.* spans
     // (GenAIExtractor's job) — only the CLI's own native span needs lifting.
-    if (ctx.span.name !== LLM_REQUEST_SPAN_NAME) return;
+    if (ctx.span.name !== CLAUDE_CODE_LLM_REQUEST_SPAN_NAME) return;
 
     const attrs = ctx.bag.attrs;
     let fired = false;
@@ -133,6 +137,14 @@ export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
       "cache_creation_tokens",
       ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
     );
+    // No hour-long count is lifted here. The span says how many tokens were
+    // written to the cache but never how long they live, and Anthropic bills an
+    // hour-long entry at twice the input rate against a five-minute entry's
+    // 1.25x. The real split is stated only in the response body, which reaches
+    // us on the log stream: liftApiResponseBodyUsage reads it there, and a
+    // response can report both buckets at once. Deriving an hour-long count
+    // from the write total would assert a lifetime nothing measured, so a span
+    // whose writes are unqualified prices them short-lived.
 
     const model = attrs.get("model");
     if (typeof model === "string" && model.length > 0) {
