@@ -32,7 +32,7 @@ fi
 # How long the stack gets to go down on its own before SIGKILL.
 GRACE_SECONDS="${KILL_DEV_TREE_GRACE:-5}"
 
-OWN_PGID=$(ps -o pgid= -p $$ 2>/dev/null | tr -d ' ')
+OWN_PGID=$(ps -p $$ -o pgid= 2>/dev/null | tr -d ' ')
 
 if ! command -v lsof >/dev/null 2>&1 && ! command -v ss >/dev/null 2>&1; then
   echo "need lsof or ss to find what is holding ${PORTS}" >&2
@@ -68,12 +68,34 @@ port_busy() {
 
 # Whatever is listening on those ports. lsof is what the rest of the dev
 # scripts use; ss covers the Linux hosts that ship iproute2 and not lsof.
+# A failing `ss` stops us the same way it does in port_busy: an empty answer
+# from a lookup that broke is not "nobody is listening".
 listening_pids() {
+  local found
   if command -v lsof >/dev/null 2>&1; then
     lsof -t -a -iTCP:"$PORTS" -sTCP:LISTEN 2>/dev/null
     return
   fi
-  ss -ltnpH "( ${SS_FILTER} )" 2>/dev/null | grep -o 'pid=[0-9]*' | cut -d= -f2
+  if ! found=$(ss -ltnpH "( ${SS_FILTER} )" 2>/dev/null); then
+    echo "ss could not inspect ${PORTS}, refusing to guess whether it is free" >&2
+    exit 69
+  fi
+  printf '%s\n' "$found" | grep -o 'pid=[0-9]*' | cut -d= -f2
+}
+
+# What a pid is. Linux answers from /proc, which is authoritative and needs no
+# output parsing at all; ps is the fallback for macOS, asked two ways because
+# neither is portable on its own. `comm` is the bare binary name on Linux and
+# the full path on macOS, and `args` is the whole command line, which always
+# begins with the interpreter. Relying on `comm` alone is what made this miss
+# node processes it had correctly found.
+describe_pid() {
+  if [ -r "/proc/$1/cmdline" ]; then
+    tr '\0' ' ' <"/proc/$1/cmdline"
+    return
+  fi
+  ps -p "$1" -o comm= 2>/dev/null
+  ps -p "$1" -o args= 2>/dev/null
 }
 
 # The process groups behind those listeners, node ones only, so a port that
@@ -82,15 +104,26 @@ listening_pids() {
 # is about to retry `pnpm dev`, and closing that would be its own surprise.
 listening_groups() {
   listening_pids | sort -u | while read -r pid; do
-    case "$(ps -o comm= -p "$pid" 2>/dev/null)" in
+    [ -n "$pid" ] || continue
+    case "$(describe_pid "$pid")" in
       *node*) ;;
       *) continue ;;
     esac
-    pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')
+    pgid=$(ps -p "$pid" -o pgid= 2>/dev/null | tr -d ' ')
     [ -n "$pgid" ] || continue
     [ "$pgid" -gt 1 ] 2>/dev/null || continue
     if [ "$pgid" != "$OWN_PGID" ]; then echo "$pgid"; fi
   done | sort -u
+}
+
+# What we saw but did not claim, so "not a node process of ours" is a finding
+# rather than an assertion. Without this the message is the same whether the
+# port really belongs to someone else or we simply failed to identify it.
+describe_listeners() {
+  listening_pids | sort -u | while read -r pid; do
+    [ -n "$pid" ] || continue
+    echo "${pid}:$(describe_pid "$pid" | tr '\n' ' ' | cut -c1-60)"
+  done | tr '\n' ' '
 }
 
 # Whether any member of the group is still running, asked of the process table
@@ -98,7 +131,7 @@ listening_groups() {
 # Zombies deliberately do not count: they hold no port and no memory, and a
 # leader whose parent has not reaped it yet would otherwise read as alive.
 group_alive() {
-  ps -Ao pgid=,stat= 2>/dev/null |
+  ps -Ao pgid= -o stat= 2>/dev/null |
     awk -v want="$1" '$1 == want && $2 !~ /^Z/ { alive = 1 } END { exit !alive }'
 }
 
@@ -127,7 +160,7 @@ if [ -z "$targets" ]; then
   # them is good news. Saying "free" over a port we simply could not attribute
   # is how a takedown reports success and leaves the stack running.
   if port_busy; then
-    echo "something is listening on ${PORTS} that is not a node process of ours, leaving it alone" >&2
+    echo "something is listening on ${PORTS} that is not a node process of ours, leaving it alone (saw: $(describe_listeners))" >&2
     exit 1
   fi
   echo "nothing of ours is listening on ${PORTS}"

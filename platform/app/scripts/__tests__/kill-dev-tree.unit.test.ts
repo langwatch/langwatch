@@ -107,7 +107,9 @@ function listening(port: number): boolean {
  * and it holds neither a port nor any memory.
  */
 function liveMembers(pgid: number): number {
-  const result = spawnSync("ps", ["-Ao", "pgid=,stat="], { encoding: "utf8" });
+  const result = spawnSync("ps", ["-Ao", "pgid=", "-o", "stat="], {
+    encoding: "utf8",
+  });
   return (result.stdout ?? "")
     .split("\n")
     .map((line) => line.trim().split(/\s+/))
@@ -225,6 +227,12 @@ function writeRestartingStack(port: number): string {
       "while true; do",
       `  ${asBashWord(process.execPath)} ${asBashWord(writeLane())} ${port} ${asBashWord(readyFile())} &`,
       "  wait $! 2>/dev/null",
+      // Paced deliberately. A lane that cannot bind exits at once, and an
+      // unpaced loop then reissues it as fast as the kernel will fork: one
+      // orphaned copy of this shape was measured sustaining ~1800 processes a
+      // second for hours, starving the machine. The takedown is still what is
+      // under test, since a fifth of a second is far inside its grace period.
+      "  sleep 0.2",
       "done",
       "",
     ].join("\n"),
