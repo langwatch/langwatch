@@ -106,6 +106,9 @@ describe("given an organization whose keys all send traffic to one project", () 
         hashedSecret: `hash-${VK_ID}`,
         displayPrefix: "vk-lw-xxxxxxx",
         createdById: ADMIN_ID,
+        // The destination is stored on the key rather than taken from its
+        // scope, so a row written straight to PG has to carry it.
+        traceProjectId: LIVE_PROJECT_ID,
         scopes: {
           create: [{ scopeType: "PROJECT", scopeId: LIVE_PROJECT_ID }],
         },

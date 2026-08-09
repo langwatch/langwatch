@@ -20,7 +20,7 @@ import type {
 import { budgetPeriodFloorMs } from "./budgetPeriod";
 import { resolveApplicableBudgets } from "./budgetResolution.service";
 import { resolveProviderLabels } from "./providerLabels";
-import { resolveTraceProject } from "./scopeResolver";
+import { decideTraceDestination } from "./scopeResolver";
 import type { ScopeInput } from "./virtualKey.repository";
 
 export type DraftVirtualKey = {
@@ -70,8 +70,11 @@ export async function resolveApplicableBudgetsForDraftKey(
   chRepo?: GatewayBudgetClickHouseRepository,
 ): Promise<ApplicableBudget[]> {
   // Where the draft's traces would land, which is what decides whether
-  // team- and project-scoped budgets reach it at all.
-  const traceProject = await resolveTraceProject(prisma, {
+  // team- and project-scoped budgets reach it at all. The same decision the
+  // save will make, so the list cannot preview a destination the key will
+  // not get; a draft the save would refuse previews as no destination at
+  // all, which is the honest answer while the form is still incomplete.
+  const decision = await decideTraceDestination(prisma, {
     organizationId: draft.organizationId,
     scopes: draft.scopes.map((s) => ({
       scopeType: s.scopeType,
@@ -79,6 +82,8 @@ export async function resolveApplicableBudgetsForDraftKey(
     })),
     traceProjectId: draft.traceProjectId,
   });
+  const traceProject =
+    decision.outcome === "resolved" ? decision.project : null;
 
   const resolved = await resolveApplicableBudgets({
     client: prisma,

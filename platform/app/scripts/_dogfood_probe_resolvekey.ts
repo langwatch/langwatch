@@ -5,7 +5,7 @@
  */
 import { prisma } from "~/server/db";
 import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
-import { resolveTraceProject } from "~/server/gateway/scopeResolver";
+import { traceProjectFor } from "~/server/gateway/scopeResolver";
 import { hashVirtualKeySecret } from "~/server/gateway/virtualKey.crypto";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 
@@ -26,7 +26,7 @@ async function main() {
   console.log("vk:", vk ? `${vk.id} (${vk.name})` : "null");
   if (!vk) return;
 
-  const traceProject = await resolveTraceProject(prisma, vk);
+  const traceProject = await traceProjectFor(prisma, vk.traceProjectId);
   console.log("traceProject:", traceProject);
 
   const { jwt } = signGatewayJwt({

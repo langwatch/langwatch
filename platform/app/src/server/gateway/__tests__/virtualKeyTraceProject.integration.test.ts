@@ -1,16 +1,15 @@
 /**
  * @vitest-environment node
  *
- * Every virtual key must resolve a project for its traces to land in,
+ * Every virtual key stores the project its traces and costs land in,
  * against real Postgres.
  *
- * Debits ride the gateway's spend commands and no longer depend on this,
- * but a key whose traces land nowhere is invisible in every usage view,
- * and per-key spend is read from the trace path.
- * These tests pin the write-path refusal (`trace_project_required`) on
- * create, on the update that would remove the destination, and on edits
- * to keys that predate the rule, plus the governance-project fallback
- * that makes org/team ownership legal without a hand-picked project.
+ * Per-key spend is read from the trace path, so a key whose traces land
+ * nowhere is invisible in every usage view and accrues against no budget.
+ * These tests pin the four cases creation decides between, the three
+ * refusals, and the two things the stored answer changed: editing a key's
+ * scopes does not move its destination, and deleting the project a key
+ * traces into does not reroute it.
  *
  * Spec: specs/ai-gateway/virtual-key-creation.feature
  */
@@ -22,8 +21,11 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { resolveTraceProject } from "../scopeResolver";
-import { toVirtualKeySnakeDto } from "../virtualKey.dto";
+import { traceProjectFor } from "../scopeResolver";
+import {
+  loadTraceDestinationFacts,
+  toVirtualKeySnakeDto,
+} from "../virtualKey.dto";
 import { VirtualKeyRepository } from "../virtualKey.repository";
 import { VirtualKeyService } from "../virtualKey.service";
 
@@ -465,21 +467,9 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
       ).toBe(0);
     });
 
-    /** @scenario "A key scoped to a deleted project falls back rather than tracing into it" */
-    it("passes over a single project scope naming it", async () => {
-      const resolved = await resolveTraceProject(prisma, {
-        organizationId: ORG_ARCH_ID,
-        scopes: [{ scopeType: "PROJECT", scopeId: ARCH_DELETED_PROJECT_ID }],
-      });
-
-      expect(resolved).toMatchObject({
-        id: ARCH_GOV_PROJECT_ID,
-        source: "governance_fallback",
-      });
-    });
-
-    /** @scenario "A key whose destination is deleted later keeps serving traffic" */
-    it("keeps serving a key whose named destination is deleted afterwards", async () => {
+    /** @scenario "A key whose destination is deleted later keeps sending traces there" */
+    /** @scenario "A deleted destination is badged wherever the key is read" */
+    it("keeps a key pointed at a destination deleted afterwards, and says it is gone", async () => {
       const service = VirtualKeyService.create(prisma);
       const repo = new VirtualKeyRepository(prisma);
       const { virtualKey } = await service.create({
@@ -496,20 +486,22 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
       });
 
       // The write path refuses this shape, the read path must not: the
-      // deletion happened on another screen, and failing here would take
-      // the key's traffic down with it.
+      // deletion happened on another screen. Rerouting would scatter one
+      // key's history across two projects, and failing would take its
+      // traffic down. The materialiser follows the pointer as it stands.
       const vk = await repo.findById(virtualKey.id, ORG_ARCH_ID);
-      const resolved = await resolveTraceProject(prisma, vk!);
-      expect(resolved).toMatchObject({
-        id: ARCH_GOV_PROJECT_ID,
-        source: "governance_fallback",
-      });
+      const followed = await traceProjectFor(prisma, vk!.traceProjectId);
+      expect(followed?.id).toBe(ARCH_DOOMED_PROJECT_ID);
 
-      // And the disagreement stays visible rather than being papered over:
-      // the key still says what it was told to do.
-      const dto = toVirtualKeySnakeDto(vk!);
+      // And the state is surfaced rather than acted on, which is the only
+      // way a reader can tell: the project still answers, and the traces
+      // still arrive.
+      const dto = toVirtualKeySnakeDto(
+        vk!,
+        await loadTraceDestinationFacts(prisma, [vk!]),
+      );
       expect(dto.trace_project_id).toBe(ARCH_DOOMED_PROJECT_ID);
-      expect(dto.trace_project_source).toBe("explicit");
+      expect(dto.trace_project_archived).toBe(true);
     });
   });
 
@@ -517,7 +509,6 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
     /** @scenario "An organization whose projects were all deleted can still create a shared key" */
     it("creates a shared key rather than demanding it choose between none", async () => {
       const service = VirtualKeyService.create(prisma);
-      const repo = new VirtualKeyRepository(prisma);
 
       const { virtualKey } = await service.create({
         organizationId: ORG_GOVARCH_ID,
@@ -529,19 +520,27 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
       // Not the older inbox, which is deleted, and not the deleted
       // application project, which is what the ambiguity refusal would have
       // told the creator to name.
-      const vk = await repo.findById(virtualKey.id, ORG_GOVARCH_ID);
-      const resolved = await resolveTraceProject(prisma, vk!);
-      expect(resolved).toMatchObject({
-        id: GOVARCH_LIVE_GOV_ID,
-        source: "governance_fallback",
+      expect(virtualKey.traceProjectId).toBe(GOVARCH_LIVE_GOV_ID);
+    });
+
+    /** @scenario "A key scoped only to a deleted project cannot take it as a destination" */
+    it("passes over a single project scope naming a deleted project", async () => {
+      const service = VirtualKeyService.create(prisma);
+
+      const { virtualKey } = await service.create({
+        organizationId: ORG_GOVARCH_ID,
+        name: `govarch-scoped-deleted-${suffix}`,
+        actorUserId: USER_ID,
+        scopes: [{ scopeType: "PROJECT", scopeId: GOVARCH_DELETED_APP_ID }],
       });
+
+      expect(virtualKey.traceProjectId).toBe(GOVARCH_LIVE_GOV_ID);
     });
   });
 
   /** @scenario "The governance inbox is a home for a shared key's traces" */
-  it("resolves org- and team-owned keys to the governance project", async () => {
+  it("stores the governance project on org- and team-owned keys", async () => {
     const service = VirtualKeyService.create(prisma);
-    const repo = new VirtualKeyRepository(prisma);
 
     const { virtualKey: orgKey } = await service.create({
       organizationId: ORG_GOV_ID,
@@ -556,15 +555,13 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
       scopes: [{ scopeType: "TEAM", scopeId: TEAM_GOV_ID }],
     });
 
-    for (const id of [orgKey.id, teamKey.id]) {
-      const vk = await repo.findById(id, ORG_GOV_ID);
-      const traceProject = await resolveTraceProject(prisma, vk!);
-      expect(traceProject?.id).toBe(GOV_PROJECT_ID);
+    for (const vk of [orgKey, teamKey]) {
+      expect(vk.traceProjectId).toBe(GOV_PROJECT_ID);
     }
   });
 
-  /** @scenario "A key cannot be updated into dropping its traces" */
-  it("refuses the re-scope that would remove the trace destination, keeping the key intact", async () => {
+  /** @scenario "Moving a key above the project it was scoped to keeps its traces there" */
+  it("keeps the destination when the key is re-scoped above its project", async () => {
     const service = VirtualKeyService.create(prisma);
     const { virtualKey } = await service.create({
       organizationId: ORG_BARE_ID,
@@ -572,29 +569,51 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
       actorUserId: USER_ID,
       scopes: [{ scopeType: "PROJECT", scopeId: PROJECT_BARE_ID }],
     });
+    expect(virtualKey.traceProjectId).toBe(PROJECT_BARE_ID);
+
+    // This used to be refused, because the destination came from the scope
+    // the edit was taking away. It comes from the key now, so the edit takes
+    // nothing away and there is nothing to refuse.
+    const updated = await service.update({
+      id: virtualKey.id,
+      organizationId: ORG_BARE_ID,
+      actorUserId: USER_ID,
+      name: `projected-renamed-${suffix}`,
+      scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_BARE_ID }],
+    });
+
+    expect(updated.name).toBe(`projected-renamed-${suffix}`);
+    expect(updated.traceProjectId).toBe(PROJECT_BARE_ID);
+    expect(updated.scopes.map((s) => s.scopeType)).toEqual(["ORGANIZATION"]);
+  });
+
+  /** @scenario "Clearing a key's destination is refused when it leaves nowhere for its traces" */
+  it("refuses clearing the destination of a shared key that has projects to choose from", async () => {
+    const service = VirtualKeyService.create(prisma);
+    const { virtualKey } = await service.create({
+      organizationId: ORG_CHOICE_ID,
+      name: `cleared-${suffix}`,
+      actorUserId: USER_ID,
+      scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_CHOICE_ID }],
+      traceProjectId: CHOICE_PROJECT_A_ID,
+    });
 
     await expect(
       service.update({
         id: virtualKey.id,
-        organizationId: ORG_BARE_ID,
+        organizationId: ORG_CHOICE_ID,
         actorUserId: USER_ID,
-        name: `projected-renamed-${suffix}`,
-        scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_BARE_ID }],
+        name: `cleared-renamed-${suffix}`,
+        traceProjectId: null,
       }),
-    ).rejects.toMatchObject({ code: "trace_project_required" });
+    ).rejects.toMatchObject({ code: "gateway_trace_project_ambiguous" });
 
-    // The whole update rolled back: scopes untouched, rename included.
+    // The whole update rolled back: destination kept, rename included.
     const after = await prisma.virtualKey.findUniqueOrThrow({
       where: { id: virtualKey.id },
-      include: { scopes: true },
     });
-    expect(after.name).toBe(`projected-${suffix}`);
-    expect(after.scopes).toEqual([
-      expect.objectContaining({
-        scopeType: "PROJECT",
-        scopeId: PROJECT_BARE_ID,
-      }),
-    ]);
+    expect(after.name).toBe(`cleared-${suffix}`);
+    expect(after.traceProjectId).toBe(CHOICE_PROJECT_A_ID);
   });
 
   /** @scenario "A key that predates this rule must be given a home before it changes" */
@@ -654,50 +673,124 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
     expect(revoked.status).toBe("REVOKED");
   });
 
-  describe("when keys reach their destination three different ways", () => {
-    /** @scenario "A key says which rule decides where its traces land" */
-    it("reports which rule answered for each", async () => {
+  describe("when a key reaches its destination each of the ways it can", () => {
+    /** @scenario "A key that names a destination stores the one it names" */
+    /** @scenario "A key owned by one project stores that project as its destination" */
+    it("stores the answer rather than leaving it to be worked out per read", async () => {
       const service = VirtualKeyService.create(prisma);
-      const repo = new VirtualKeyRepository(prisma);
 
       const named = await service.create({
         organizationId: ORG_CHOICE_ID,
-        name: `source-named-${suffix}`,
+        name: `stored-named-${suffix}`,
         actorUserId: USER_ID,
         scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_CHOICE_ID }],
         traceProjectId: CHOICE_PROJECT_B_ID,
       });
       const scoped = await service.create({
         organizationId: ORG_CHOICE_ID,
-        name: `source-scoped-${suffix}`,
+        name: `stored-scoped-${suffix}`,
         actorUserId: USER_ID,
         scopes: [{ scopeType: "PROJECT", scopeId: CHOICE_PROJECT_A_ID }],
       });
-      // The third shape can no longer be created, so it is written the way
-      // the keys that carry it were: before the rule existed.
-      const legacy = await service.create({
-        organizationId: ORG_GOV_ID,
-        name: `source-legacy-${suffix}`,
+
+      // Read off the rows, not off the returned objects: the column is what
+      // every later read follows.
+      const rows = await prisma.virtualKey.findMany({
+        where: { id: { in: [named.virtualKey.id, scoped.virtualKey.id] } },
+        select: { id: true, traceProjectId: true },
+        orderBy: { name: "asc" },
+      });
+      expect(rows).toEqual([
+        { id: named.virtualKey.id, traceProjectId: CHOICE_PROJECT_B_ID },
+        { id: scoped.virtualKey.id, traceProjectId: CHOICE_PROJECT_A_ID },
+      ]);
+    });
+
+    /** @scenario "A live destination reads back as present, not deleted" */
+    it("reads a live destination back without the deleted flag", async () => {
+      const service = VirtualKeyService.create(prisma);
+      const repo = new VirtualKeyRepository(prisma);
+      const { virtualKey } = await service.create({
+        organizationId: ORG_CHOICE_ID,
+        name: `stored-live-${suffix}`,
         actorUserId: USER_ID,
-        scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_GOV_ID }],
+        scopes: [{ scopeType: "PROJECT", scopeId: CHOICE_PROJECT_A_ID }],
       });
 
-      const sources = await Promise.all(
-        [
-          [named.virtualKey.id, ORG_CHOICE_ID],
-          [scoped.virtualKey.id, ORG_CHOICE_ID],
-          [legacy.virtualKey.id, ORG_GOV_ID],
-        ].map(async ([id, orgId]) => {
-          const vk = await repo.findById(id!, orgId!);
-          return toVirtualKeySnakeDto(vk!).trace_project_source;
-        }),
+      const vk = await repo.findById(virtualKey.id, ORG_CHOICE_ID);
+      const dto = toVirtualKeySnakeDto(
+        vk!,
+        await loadTraceDestinationFacts(prisma, [vk!]),
       );
+      expect(dto.trace_project_id).toBe(CHOICE_PROJECT_A_ID);
+      expect(dto.trace_project_archived).toBe(false);
+    });
+  });
 
-      expect(sources).toEqual([
-        "explicit",
-        "project_scope",
-        "governance_fallback",
-      ]);
+  describe("when a key is edited after it has a destination", () => {
+    /** @scenario "Changing which teams a key is scoped to leaves its destination alone" */
+    it("leaves the destination where it is when the scopes change", async () => {
+      const service = VirtualKeyService.create(prisma);
+      const { virtualKey } = await service.create({
+        organizationId: ORG_CHOICE_ID,
+        name: `rescoped-${suffix}`,
+        actorUserId: USER_ID,
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_CHOICE_ID }],
+        traceProjectId: CHOICE_PROJECT_A_ID,
+      });
+
+      // A scope edit that the old derivation would have answered
+      // differently: one PROJECT scope naming another project used to win
+      // the moment the explicit destination stopped resolving, and the
+      // team scope changed which team the spend was counted under.
+      const updated = await service.update({
+        id: virtualKey.id,
+        organizationId: ORG_CHOICE_ID,
+        actorUserId: USER_ID,
+        scopes: [
+          { scopeType: "TEAM", scopeId: TEAM_CHOICE_ID },
+          { scopeType: "PROJECT", scopeId: CHOICE_PROJECT_B_ID },
+        ],
+      });
+
+      expect(updated.traceProjectId).toBe(CHOICE_PROJECT_A_ID);
+    });
+
+    /** @scenario "Naming a new destination on an update moves it, and is validated the same way" */
+    it("moves the destination when one is named, and refuses one that is not live here", async () => {
+      const service = VirtualKeyService.create(prisma);
+      const { virtualKey } = await service.create({
+        organizationId: ORG_CHOICE_ID,
+        name: `removed-${suffix}`,
+        actorUserId: USER_ID,
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_CHOICE_ID }],
+        traceProjectId: CHOICE_PROJECT_A_ID,
+      });
+
+      const moved = await service.update({
+        id: virtualKey.id,
+        organizationId: ORG_CHOICE_ID,
+        actorUserId: USER_ID,
+        traceProjectId: CHOICE_PROJECT_B_ID,
+      });
+      expect(moved.traceProjectId).toBe(CHOICE_PROJECT_B_ID);
+
+      const refusal = await service
+        .update({
+          id: virtualKey.id,
+          organizationId: ORG_CHOICE_ID,
+          actorUserId: USER_ID,
+          traceProjectId: PROJECT_BARE_ID,
+        })
+        .catch((error: unknown) => error);
+      expect(refusal).toMatchObject({ code: "gateway_trace_project_unknown" });
+
+      // The refused update rolled back whole: the destination it would have
+      // moved to is not where the key points.
+      const after = await prisma.virtualKey.findUniqueOrThrow({
+        where: { id: virtualKey.id },
+      });
+      expect(after.traceProjectId).toBe(CHOICE_PROJECT_B_ID);
     });
   });
 });

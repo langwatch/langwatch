@@ -5,8 +5,8 @@
  * The match is decided by GatewayBudgetRepository.applicableForRequest,
  * against scopes derived from the VK that served the request and from the
  * project its trace landed in, which for a key that is not scoped to
- * exactly one project is the organization's governance project, not the
- * project the key's team owns (see resolveTraceProject).
+ * exactly one project is usually the organization's governance project
+ * rather than the project the key's team owns.
  *
  * That makes two reasonable-looking configurations silently inert: a
  * project-scoped budget and a team-scoped key never interact, and neither
@@ -17,7 +17,7 @@
  */
 import type { GatewayBudget, PrismaClient } from "@prisma/client";
 
-import { resolveTraceProjects } from "./scopeResolver";
+import { traceProjectsByIds } from "./scopeResolver";
 
 /**
  * The scopes one active key contributes. Mirrors ApplicableScopes, which is
@@ -27,9 +27,9 @@ type KeyReach = {
   organizationId: string;
   /**
    * The team the key's traces land in, plus every team the key is scoped
-   * to. Both count, and they differ whenever the trace project falls back
-   * to governance, which is what used to make a team-scoped key look like
-   * it belonged to the governance team and nothing else.
+   * to. Both count, and they differ whenever the destination is the
+   * governance inbox, which is what used to make a team-scoped key look
+   * like it belonged to the governance team and nothing else.
    */
   teamIds: string[];
   projectId: string | null;
@@ -57,10 +57,10 @@ export type BudgetScopeReach = {
 /**
  * Resolve, once per organization, the scopes every active key can put on a
  * request. The whole thing is a fixed handful of queries no matter how many
- * keys the organization has: trace projects resolve in one batch, and group
- * membership is read for every principal in one more. That matters because
- * an organization running a project per customer has hundreds of keys, and
- * this runs on every budget list.
+ * keys the organization has: the keys' trace destinations are read in one
+ * batch, and group membership is read for every principal in one more. That
+ * matters because an organization running a project per customer has
+ * hundreds of keys, and this runs on every budget list.
  */
 async function loadKeyReach(
   prisma: PrismaClient,
@@ -77,11 +77,16 @@ async function loadKeyReach(
       organizationId,
       keys.map((key) => key.principalUserId),
     ),
-    resolveTraceProjects(prisma, keys),
+    traceProjectsByIds(
+      prisma,
+      keys.map((key) => key.traceProjectId),
+    ),
   ]);
 
-  return keys.map((key, index) => {
-    const traceProject = traceProjects[index];
+  return keys.map((key) => {
+    const traceProject = key.traceProjectId
+      ? traceProjects.get(key.traceProjectId)
+      : undefined;
     return {
       organizationId: key.organizationId,
       teamIds: Array.from(
