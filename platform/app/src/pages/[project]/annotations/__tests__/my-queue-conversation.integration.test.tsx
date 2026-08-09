@@ -17,6 +17,8 @@ import type { TraceListItem } from "~/features/traces-v2/types/trace";
 interface ConversationViewProps {
   conversationId: string | null;
   currentTraceId: string;
+  focusTraceId?: string;
+  showSessionCheckboxes?: boolean;
   fallbackTurns?: TraceListItem[];
   defaultExpandAll?: boolean;
   onSelectTurn?: (turn: { traceId: string; timestamp: number }) => void;
@@ -27,8 +29,8 @@ const OTHER_TURN = { traceId: "trace-9", timestamp: 1_700_000_009_000 };
 const mocks = vi.hoisted(() => ({
   items: [] as unknown[],
   traceDetails: undefined as unknown,
+  query: {} as Record<string, string>,
   openDrawer: vi.fn(),
-  setFlowCallbacks: vi.fn(),
   conversationProps: null as unknown,
   // What the conversation read answers with. `undefined` is "not answered yet".
   conversationTurns: undefined as { items: unknown[] } | undefined,
@@ -55,13 +57,13 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 }));
 
 vi.mock("~/utils/compat/next-router", () => ({
-  useRouter: () => ({ query: {}, push: vi.fn(), replace: vi.fn() }),
+  useRouter: () => ({ query: mocks.query, push: vi.fn(), replace: vi.fn() }),
 }));
 
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
     openDrawer: mocks.openDrawer,
-    setFlowCallbacks: mocks.setFlowCallbacks,
+    drawerOpen: () => false,
   }),
 }));
 
@@ -112,7 +114,6 @@ vi.mock("~/utils/api", () => ({
     useContext: () => ({
       annotation: {
         getOptimizedAnnotationQueues: { invalidate: vi.fn() },
-        getMarkedForDatasetItems: { invalidate: vi.fn() },
         getPendingItemsCount: { invalidate: vi.fn() },
         getAssignedItemsCount: { invalidate: vi.fn() },
         getQueueItemsCounts: { invalidate: vi.fn() },
@@ -130,16 +131,7 @@ vi.mock("~/utils/api", () => ({
       },
     },
     annotation: {
-      getMarkedForDatasetItems: {
-        useQuery: () => ({ data: [], isLoading: false }),
-      },
       markQueueItemDone: {
-        useMutation: () => ({ mutate: vi.fn(), isLoading: false }),
-      },
-      markQueueItemForDataset: {
-        useMutation: () => ({ mutate: vi.fn(), isLoading: false }),
-      },
-      clearDatasetMarks: {
         useMutation: () => ({ mutate: vi.fn(), isLoading: false }),
       },
       deleteQueueItems: {
@@ -155,8 +147,14 @@ const { default: MyQueuePage } = await import(
 
 const TRACE_STARTED_AT = 1_700_000_000_000;
 
-const trace = ({ threadId }: { threadId?: string }) => ({
-  trace_id: "trace-1",
+const trace = ({
+  threadId,
+  traceId = "trace-1",
+}: {
+  threadId?: string;
+  traceId?: string;
+}) => ({
+  trace_id: traceId,
   project_id: "project-1",
   metadata: threadId ? { thread_id: threadId } : {},
   timestamps: {
@@ -170,34 +168,52 @@ const trace = ({ threadId }: { threadId?: string }) => ({
   spans: [],
 });
 
+const queueItem = ({
+  id,
+  traceId,
+  threadId,
+}: {
+  id: string;
+  traceId: string;
+  threadId?: string;
+}) => ({
+  id,
+  traceId,
+  projectId: "project-1",
+  annotationQueueId: "queue-1",
+  userId: null,
+  doneAt: null,
+  createdAt: new Date("2026-08-01T10:00:00Z"),
+  trace: trace({ threadId, traceId }),
+  annotations: [],
+});
+
 const setQueue = ({ threadId }: { threadId?: string }) => {
-  const item = trace({ threadId });
-  mocks.items = [
-    {
-      id: "item-1",
-      traceId: "trace-1",
-      projectId: "project-1",
-      annotationQueueId: "queue-1",
-      userId: null,
-      doneAt: null,
-      createdAt: new Date("2026-08-01T10:00:00Z"),
-      trace: item,
-      annotations: [],
-    },
-  ];
-  mocks.traceDetails = item;
+  mocks.items = [queueItem({ id: "item-1", traceId: "trace-1", threadId })];
+  mocks.traceDetails = trace({ threadId });
 };
 
-const renderPage = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <MyQueuePage />
-    </ChakraProvider>,
-  );
+/** Two items of the same thread, so the walk moves between its turns. */
+const setThreadQueue = ({ threadId }: { threadId: string }) => {
+  mocks.items = [
+    queueItem({ id: "item-1", traceId: "trace-1", threadId }),
+    queueItem({ id: "item-2", traceId: "trace-2", threadId }),
+  ];
+  mocks.traceDetails = trace({ threadId });
+};
+
+const page = () => (
+  <ChakraProvider value={defaultSystem}>
+    <MyQueuePage />
+  </ChakraProvider>
+);
+
+const renderPage = () => render(page());
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.conversationProps = null;
+  mocks.query = {};
   // The thread reads back inside the conversation's window unless a test says
   // otherwise, so the turns are the thread's own.
   mocks.conversationTurns = { items: [{ traceId: "trace-1" }] };
@@ -255,6 +271,40 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(
         screen.queryByText(/Pass the thread_id on your integration/),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given the item's own turn is the one under review", () => {
+    // Scrolling to it, blinking it once and keeping a tint on it are the
+    // conversation's own doing. The page's part is naming which turn, which is
+    // what these bind.
+
+    /** @scenario "Opening a queue item scrolls its turn into view" */
+    it("names the item's own turn as the one to land on", () => {
+      renderPage();
+
+      expect(conversationProps().focusTraceId).toBe("trace-1");
+    });
+
+    /** @scenario "Moving to the next item moves the focus" */
+    it("moves the focus to the next item's turn", () => {
+      setThreadQueue({ threadId: "thread-7" });
+      const view = renderPage();
+      expect(conversationProps().focusTraceId).toBe("trace-1");
+
+      mocks.query = { "queue-item": "item-2" };
+      view.rerender(page());
+
+      expect(conversationProps().focusTraceId).toBe("trace-2");
+    });
+  });
+
+  describe("given the walk collects traces for a dataset", () => {
+    /** @scenario "A turn is counted in or out by hand" */
+    it("gives every turn its own way in and out of the sitting's set", () => {
+      renderPage();
+
+      expect(conversationProps().showSessionCheckboxes).toBe(true);
     });
   });
 

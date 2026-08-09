@@ -100,14 +100,15 @@ async function authenticateRequest(c: Context, permission: Permission) {
 }
 
 /**
- * Which comments a list endpoint returns. Absent means the comments about whole
- * traces, which is every annotation that existed before a comment could be left
- * on part of a trace, so a caller written against the old endpoint keeps
- * receiving exactly what it did. `?anchor=all` asks for the anchored ones too.
+ * Which comments a list endpoint returns. Absent means every comment on the
+ * trace, each carrying the part of it that was commented on: an anchored
+ * comment is the primary annotation now, so a list that left them out would
+ * answer with silence exactly when a reviewer had spoken. `?anchor=trace` asks
+ * for only what was said about the traces as a whole.
  */
 function anchorScopeFromQuery(c: Context): AnnotationAnchorScope {
   const requested = c.req.query("anchor");
-  if (requested === undefined) return "trace";
+  if (requested === undefined) return "all";
 
   const parsed = annotationAnchorScopeSchema.safeParse(requested);
   if (!parsed.success) {

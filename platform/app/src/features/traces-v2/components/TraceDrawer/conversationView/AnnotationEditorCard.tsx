@@ -11,8 +11,27 @@ import { useAnnotationMutations } from "./useAnnotationForm";
 
 interface AnnotationEditorCardProps {
   draft: AnnotationDraft;
-  /** The turn's current output, which the suggestion diff reads against. */
+  /** What the user sent, which a correction of the message reads against. */
+  input?: string | null;
+  /** The turn's current output, which a correction of the reply reads against. */
   output?: string | null;
+}
+
+/**
+ * The text a suggestion is a correction of: the side of the turn the comment
+ * was left on. A comment about the turn as a whole corrects the reply, which is
+ * the answer such a comment is a judgement on.
+ */
+function originalTextForDraft({
+  draft,
+  input,
+  output,
+}: {
+  draft: AnnotationDraft;
+  input?: string | null;
+  output?: string | null;
+}): string {
+  return (draft.anchorPath === "input" ? input : output) ?? "";
 }
 
 /** The form contract, built from the draft store instead of local state. */
@@ -44,7 +63,6 @@ function buildComposerFormState({
     isDeleting: mutations.isDeleting,
     hasExisting: mutations.hasExisting,
     isSaveBlocked: mutations.isSaveBlocked,
-    isAnchored: !!draft.anchorKind,
     anchorLabel: describeAnnotationAnchor({
       anchor: {
         anchorKind: draft.anchorKind ?? null,
@@ -76,6 +94,7 @@ function buildComposerFormState({
  */
 export function AnnotationEditorCard({
   draft,
+  input,
   output,
 }: AnnotationEditorCardProps) {
   const patchDraft = useAnnotationDraftStore((s) => s.patchDraft);
@@ -127,7 +146,10 @@ export function AnnotationEditorCard({
     >
       <VStack align="stretch" gap={3}>
         {draft.mode === "suggest" ? (
-          <SuggestBody state={state} originalOutput={output ?? ""} />
+          <SuggestBody
+            state={state}
+            originalOutput={originalTextForDraft({ draft, input, output })}
+          />
         ) : (
           <AnnotateBody state={state} />
         )}

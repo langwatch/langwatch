@@ -19,7 +19,7 @@
 #   platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/MessageAnnotateCluster.tsx (the affordance on a message)
 #   platform/app/src/features/traces-v2/components/TraceTable/registry/addons/conversation/Bubble.tsx      (the same affordance in bubbles layout)
 #   platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/AnnotationCard.tsx        (what a card is about)
-#   platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/AnnotationScoreFields.tsx (scores stay trace-level)
+#   platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/AnnotationScoreFields.tsx (scores ride any comment)
 #   platform/app/src/features/traces-v2/components/TraceDrawer/TraceHeaderChips.tsx               (every comment on the trace, with its anchor)
 #
 # Motivation: a reviewer reading a trace can only ever say something about the
@@ -42,10 +42,14 @@
 #   - The anchor is fixed when the comment is written. Editing a comment changes
 #     what it says, never what it is about, so a card can never quietly start
 #     describing a different part of the trace than the one its author read.
-#   - Scores stay a judgement about the whole trace. A score is a project-wide
-#     key with no notion of a target, and it becomes a dataset column for the
-#     trace, so offering it on a comment about one attribute would produce a
-#     score nobody can interpret.
+#   - Every new comment names its target. A comment about "the whole trace"
+#     said less than the reviewer knew, so the composer now always writes an
+#     anchored comment; the ones written before anchoring existed keep reading
+#     and editing exactly as they did.
+#   - Scores ride any comment and stay a judgement about the whole trace. A
+#     score is a project-wide key that becomes a dataset column for the trace;
+#     it saves on the comment the reviewer was writing, wherever that comment
+#     is anchored, and reads back trace-level everywhere.
 #   - A comment on a field may carry the correction it is asking for, and that
 #     correction becomes the trace's correction for exactly that field. An
 #     attribute row and a message take a comment only, because there is nothing
@@ -53,22 +57,21 @@
 #   - A turn in the conversation is a trace, so its two sides are the trace's own
 #     input and output. Commenting on one of them is commenting on a field, and
 #     it reads in the turn's rail rather than in a popover: that is the same
-#     column the remark about the whole turn reads in, and the two belong
-#     together. Only the reply carries a correction, because the trace's input is
-#     not something a correction can replace.
+#     column every remark about the turn reads in, and they belong together.
+#     Both sides carry corrections: suggesting what the user's message should
+#     have been corrects the trace's input the same way suggesting a better
+#     reply corrects its output.
 #   - A card in a turn's rail names the part without repeating the turn: it is
 #     already beside the turn it belongs to, so "Input" is the whole of what the
 #     reader needs and "Trace · Input" is one word of noise on every card.
-#   - Every surface that reads whole traces reads only the comments about whole
-#     traces: the annotations list and its export, the annotation queue, the
-#     trace projections that feed the table and the dataset columns, the REST
-#     list endpoints, and a turn's annotation count. This is the load-bearing
-#     rule of the feature. Without it, one reviewer marking six spans buries
-#     every other trace-level surface in the product.
-#   - Three reads stay deliberately unfiltered, because they answer "has a human
-#     touched this trace at all" and a comment on a span means yes: the
-#     has-annotation filter in search, the trigger filters that watch for
-#     annotated traces, and usage reporting.
+#   - Every surface that reads a trace's annotations reads all of them, each
+#     one naming its target: the annotations list and its export, the
+#     annotation queue, the trace projections that feed the table and the
+#     dataset columns, and the REST list endpoints. Anchored comments are the
+#     primary annotation now, so a list that hid them answered with silence
+#     exactly when a reviewer had spoken. What keeps the surfaces readable is
+#     the label, not a filter; the API takes an anchor scope for callers who
+#     want the old trace-only read.
 #   - An anchor that no longer resolves is a designed state, not a bug. A span
 #     a correction deleted, or a message whose content changed, leaves a comment
 #     that still reads in the trace's comment list, says it is about a part that
@@ -141,11 +144,11 @@ Feature: Commenting on one part of a trace
       And the header shows how many comments that section carries
 
     @integration
-    Scenario: Commenting on a conversation turn stays a comment about the whole turn
-      Given I am reading the conversation
-      When I annotate a turn the way I already could
-      Then the comment is saved as being about that turn's trace and nothing narrower
-      And it reads in the turn's rail exactly as it did before
+    Scenario: A comment written before anchoring still reads and edits as a comment about the whole turn
+      Given a turn whose trace carries a comment written before comments had targets
+      When I read the conversation
+      Then that comment reads in the turn's rail as a comment about the whole turn
+      And editing it changes what it says and nothing else
 
     @integration
     Scenario: Commenting on one side of a turn records which side it was left on
@@ -155,10 +158,10 @@ Feature: Commenting on one part of a trace
       And a comment left on the reply is saved as being about its output
 
     @integration
-    Scenario: The message a user sent takes a comment and no correction
+    Scenario: Either side of a turn takes a comment and a correction
       Given I am reading the conversation
-      Then the user's message offers only to be commented on
-      And the reply offers to be corrected as well
+      Then the user's message offers a comment and a correction of what it should have been
+      And the reply offers a comment and a correction as well
 
     @integration
     Scenario: A side of a turn a privacy rule hid offers nothing to comment on
@@ -390,6 +393,13 @@ Feature: Commenting on one part of a trace
       Then the row carries the suggested output rather than the captured one
 
     @integration
+    Scenario: A suggestion on the trace's own input becomes the corrected trace input
+      Given a trace with no correction
+      When I comment on the message the user sent and suggest what it should have been
+      Then the comment records my suggestion
+      And the trace has a correction whose input is my suggestion
+
+    @integration
     Scenario: A comment on an attribute row offers no suggestion
       Given I am commenting on an attribute row
       Then I am not offered a correction to go with the comment
@@ -399,43 +409,47 @@ Feature: Commenting on one part of a trace
       Given I am commenting on a message in a transcript
       Then I am not offered a correction to go with the comment
 
-  Rule: Scores stay a judgement about the whole trace
+  Rule: Scores ride any comment and stay a judgement about the whole trace
 
     @integration
-    Scenario: A comment on one part of a trace is not offered scores
+    Scenario: A comment on one part of a trace is offered the same scores
       Given the project has active annotation score keys
       When I comment on a span
-      Then no scores are offered on the comment
+      Then the scores are offered on the comment
 
     @integration
-    Scenario: A comment about the whole trace is still offered scores
+    Scenario: Scores given with an anchored comment save on that comment and read trace-level
       Given the project has active annotation score keys
-      When I annotate the trace as a whole
-      Then the scores are offered as they always were
+      When I comment on the reply of a turn and rate a score
+      Then the score is saved with my comment
+      And it reads wherever the trace's scores read
 
-  Rule: A comment on one part of a trace never floods the surfaces that read whole traces
+  Rule: The surfaces that read whole traces read every comment, labelled
 
-    This is the rule the whole feature rests on. Every surface below answers a
-    question about a trace, a queue item or a dataset row, and a reviewer who
-    marks up six spans of one trace must not change what any of them says.
+    Hiding anchored comments kept these surfaces tidy and made them dishonest:
+    a reviewer who marked one message of a trace had annotated it, and the
+    annotations list said nothing had happened. Each surface below reads every
+    comment and says what each one is about; the label is what keeps six span
+    comments on one trace readable, not a filter.
 
     @integration
-    Scenario: The project's annotations list holds only what was said about whole traces
+    Scenario: The project's annotations list holds every comment with its target named
       Given a trace with one comment about the trace and three comments about its spans
       When I read the project's annotations list
-      Then only the comment about the trace is listed
+      Then all four comments are listed for that trace
+      And each anchored one names the part it is about
 
     @integration
     Scenario: Exporting the annotations list exports the rows the list shows
       Given a trace with one comment about the trace and three comments about its spans
       When I export the annotations list
-      Then the export holds the same one row the list showed
+      Then the export holds the same four comments the list showed
 
     @integration
-    Scenario: A queue item carries the comments about its trace
+    Scenario: A queue item carries every comment about its trace
       Given a queue item on a trace with one comment about the trace and three about its spans
       When I read the queue
-      Then the item carries the one comment about the trace
+      Then the item carries all four comments
 
     @integration
     Scenario: A turn's annotation count counts what was said about the turn
@@ -445,17 +459,18 @@ Feature: Commenting on one part of a trace
       And the comments about its spans are still listed beside the turn
 
     @integration
-    Scenario: A dataset column of annotations carries only the trace-level ones
+    Scenario: A dataset column of annotations carries every comment, each naming its target
       Given a trace with one comment about the trace and three comments about its spans
       When the trace is mapped into a dataset row
-      Then the annotations column holds the one comment about the trace
+      Then the annotations column holds all four comments
+      And each anchored one names the part it is about
 
     @integration
-    Scenario: The annotations API returns what it always returned
+    Scenario: The annotations API returns every annotation by default
       Given a trace with one comment about the trace and three comments about its spans
-      When an existing caller reads the annotations for that trace
-      Then it receives the one comment about the trace
-      And it can ask for every comment instead, and receive all four
+      When a caller reads the annotations for that trace
+      Then it receives all four comments
+      And it can ask for only the trace-level ones instead, and receive the one
 
     @integration
     Scenario: A trace commented only on one of its spans still counts as annotated

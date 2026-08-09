@@ -5,6 +5,7 @@ import {
   type AnnotationAnchorRef,
   describeAnnotationAnchor,
 } from "../annotations/annotationAnchorLabel";
+import { annotationSuggestedOutput } from "../annotations/annotationSuggestedOutput";
 import { datasetSpanSchema } from "../datasets/types";
 import {
   type Trace as BaseTrace,
@@ -261,6 +262,16 @@ const readableAnnotationHead = ({
 };
 
 /**
+ * What a suggestion left with a comment is a suggestion FOR, in words. A
+ * comment on an input asks for a different input; everything else, including a
+ * comment about the whole trace, asks for a different output.
+ */
+const suggestionLabel = (annotation: TraceAnnotation): string =>
+  annotation.anchorKind === "field" && annotation.anchorPath === "input"
+    ? "suggested input"
+    : "suggested output";
+
+/**
  * One reviewer's annotation as a single line anyone can read, a person or an
  * LLM judge, without knowing how we store annotations:
  *
@@ -271,7 +282,8 @@ const readableAnnotationHead = ({
  * comment reads `Ada: too terse` and a bare rating reads `Ada [thumbs down]`.
  * A reviewer with no account name reads by their email, and by "Unknown" when
  * we have neither. A score with no value is left out; its name is the one the
- * project gave it, never its id.
+ * project gave it, never its id. A suggestion on an input reads as a suggested
+ * input rather than a suggested output, so the line says what was asked for.
  */
 export function buildReadableAnnotation({
   annotation,
@@ -299,9 +311,9 @@ export function buildReadableAnnotation({
     }),
   );
 
-  const expectedOutput = oneLine(annotation.expectedOutput ?? "");
-  if (expectedOutput) {
-    parts.push(`[suggested output: ${expectedOutput}]`);
+  const suggestion = oneLine(annotation.expectedOutput ?? "");
+  if (suggestion) {
+    parts.push(`[${suggestionLabel(annotation)}: ${suggestion}]`);
   }
 
   return parts.join(" ");
@@ -575,7 +587,11 @@ export const TRACE_MAPPINGS = {
           author: () => annotation.user?.name ?? annotation.email ?? "",
           score: scoreOptions,
           "score.reason": scoreOptions,
-          expected_output: () => annotation.expectedOutput,
+          expected_output: () =>
+            annotationSuggestedOutput({
+              annotation,
+              traceId: trace.trace_id,
+            }),
         };
         const func = keyMap[key as keyof typeof keyMap];
         return func ? func() : undefined;

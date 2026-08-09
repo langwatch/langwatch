@@ -47,7 +47,8 @@ export type DeleteAnnotationInput = {
 
 /**
  * One annotation as the trace projections read it: the fields the projection
- * DSL exposes and nothing heavier.
+ * DSL exposes, plus the anchor, which decides what a suggestion on the comment
+ * is a suggestion for.
  */
 export type ProjectionAnnotationRow = {
   id: string;
@@ -57,6 +58,9 @@ export type ProjectionAnnotationRow = {
   expectedOutput: string | null;
   scoreOptions: JsonValue;
   createdAt: Date;
+  anchorKind: string | null;
+  anchorId: string | null;
+  anchorPath: string | null;
 };
 
 /**
@@ -89,9 +93,9 @@ export class AnnotationRepository {
 
   /**
    * Annotations for a page of traces as the trace projections read them.
-   * `anchorScope` decides whether a comment left on one part of a trace counts:
-   * the projections feed the trace table, the export and the dataset columns,
-   * all of which answer questions about whole traces.
+   * `anchorScope` decides whether a comment left on one part of a trace counts;
+   * the projections that feed the trace table, the export and the dataset
+   * columns read every comment and carry its anchor along with it.
    */
   async findAllForProjection({
     projectId,
@@ -116,6 +120,9 @@ export class AnnotationRepository {
         expectedOutput: true,
         scoreOptions: true,
         createdAt: true,
+        anchorKind: true,
+        anchorId: true,
+        anchorPath: true,
       },
       orderBy: { createdAt: "asc" },
     });

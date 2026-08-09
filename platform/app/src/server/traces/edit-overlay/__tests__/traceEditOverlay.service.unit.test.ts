@@ -48,9 +48,18 @@ const buildService = (stored: unknown | null) => {
 };
 
 const removeOutput = (service: TraceEditOverlayService) =>
-  service.removeTraceOutputEdit({
+  service.removeTraceIOEdit({
     projectId: "project-1",
     traceId: "trace-1",
+    field: "output",
+    userId: "user-2",
+  });
+
+const removeInput = (service: TraceEditOverlayService) =>
+  service.removeTraceIOEdit({
+    projectId: "project-1",
+    traceId: "trace-1",
+    field: "input",
     userId: "user-2",
   });
 
@@ -64,10 +73,11 @@ describe("TraceEditOverlayService", () => {
         deletedSpanIds: ["span-noise"],
       });
 
-      const merged = await service.mergeTraceOutputEdit({
+      const merged = await service.mergeTraceIOEdit({
         projectId: "project-1",
         traceId: "trace-1",
-        output: "the right answer",
+        field: "output",
+        value: "the right answer",
         userId: "user-2",
       });
 
@@ -86,10 +96,11 @@ describe("TraceEditOverlayService", () => {
     it("starts a correction holding only the suggested output", async () => {
       const { service } = buildService(null);
 
-      const merged = await service.mergeTraceOutputEdit({
+      const merged = await service.mergeTraceIOEdit({
         projectId: "project-1",
         traceId: "trace-1",
-        output: "the right answer",
+        field: "output",
+        value: "the right answer",
         userId: "user-2",
       });
 
@@ -98,6 +109,102 @@ describe("TraceEditOverlayService", () => {
         trace: { output: { value: "the right answer" } },
         spans: [],
         deletedSpanIds: [],
+      });
+    });
+
+    describe("when the trace's own input is suggested", () => {
+      /** @scenario "A suggestion on the trace's own input becomes the corrected trace input" */
+      it("starts a correction holding only the corrected input", async () => {
+        const { service } = buildService(null);
+
+        const merged = await service.mergeTraceIOEdit({
+          projectId: "project-1",
+          traceId: "trace-1",
+          field: "input",
+          value: "the real question",
+          userId: "user-2",
+        });
+
+        expect(merged.patch).toEqual({
+          version: 1,
+          trace: { input: { value: "the real question" } },
+          spans: [],
+          deletedSpanIds: [],
+        });
+      });
+    });
+  });
+
+  describe("given a correction carrying both of the trace's own fields", () => {
+    const bothFields = {
+      version: 1,
+      spans: [],
+      deletedSpanIds: [],
+      trace: {
+        input: { value: "the real question" },
+        output: { value: "the right answer" },
+      },
+    };
+
+    describe("when the corrected input is taken back off", () => {
+      it("keeps the corrected output", async () => {
+        const { service, deleteRow } = buildService(bothFields);
+
+        const remaining = await removeInput(service);
+
+        expect(remaining?.patch.trace).toEqual({
+          output: { value: "the right answer" },
+        });
+        expect(deleteRow).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the corrected input is suggested again", () => {
+      it("replaces it and leaves the output alone", async () => {
+        const { service } = buildService(bothFields);
+
+        const merged = await service.mergeTraceIOEdit({
+          projectId: "project-1",
+          traceId: "trace-1",
+          field: "input",
+          value: "what the user meant to ask",
+          userId: "user-2",
+        });
+
+        expect(merged.patch.trace).toEqual({
+          input: { value: "what the user meant to ask" },
+          output: { value: "the right answer" },
+        });
+      });
+    });
+  });
+
+  describe("given a correction whose only edit is the trace input", () => {
+    describe("when the corrected input is taken back off", () => {
+      it("removes the correction outright", async () => {
+        const { service, deleteRow, upsert } = buildService({
+          version: 1,
+          spans: [],
+          deletedSpanIds: [],
+          trace: { input: { value: "the real question" } },
+        });
+
+        expect(await removeInput(service)).toBeNull();
+        expect(deleteRow).toHaveBeenCalledTimes(1);
+        expect(upsert).not.toHaveBeenCalled();
+      });
+
+      it("writes nothing when the correction never touched the trace input", async () => {
+        const { service, deleteRow, upsert } = buildService({
+          version: 1,
+          spans: [],
+          deletedSpanIds: [],
+          trace: { output: { value: "the right answer" } },
+        });
+
+        expect(await removeInput(service)).toBeNull();
+        expect(deleteRow).not.toHaveBeenCalled();
+        expect(upsert).not.toHaveBeenCalled();
       });
     });
   });
@@ -128,10 +235,11 @@ describe("TraceEditOverlayService", () => {
     it("is replaced wholesale rather than merged into", async () => {
       const { service } = buildService({ version: 99 });
 
-      const merged = await service.mergeTraceOutputEdit({
+      const merged = await service.mergeTraceIOEdit({
         projectId: "project-1",
         traceId: "trace-1",
-        output: "the right answer",
+        field: "output",
+        value: "the right answer",
         userId: "user-2",
       });
 

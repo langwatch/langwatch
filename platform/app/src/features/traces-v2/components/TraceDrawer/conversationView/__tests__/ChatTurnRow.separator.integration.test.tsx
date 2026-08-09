@@ -43,7 +43,8 @@ vi.mock("../../../../hooks/useTextTranslation", () => ({
  * anything with words of its own would show up in those assertions.
  */
 vi.mock("../TurnAnnotations", () => ({
-  TurnActionRow: () => <div data-testid="turn-action-row" />,
+  TurnEditTraceAction: () => <div data-testid="turn-edit-trace-action" />,
+  TurnSessionCheckbox: () => <div data-testid="turn-session-checkbox" />,
   TurnAnnotationBadges: () => <div data-testid="turn-annotation-badges" />,
 }));
 
@@ -222,25 +223,24 @@ describe("ChatTurnRow separator ledger", () => {
     it("keeps the hover actions floating over the end of the line", () => {
       renderRow();
 
-      const floating = screen.getByTestId("turn-action-row").parentElement!;
+      const floating = screen.getByTestId("turn-edit-trace-action")
+        .parentElement!;
 
       expect(floating).not.toBe(separatorRow());
       expect(getComputedStyle(floating).position).toBe("absolute");
     });
 
-    /**
-     * A hidden action row is still a click target. Anchored to the separator's
-     * own edge it lay across the badge, and clicking the badge activated the
-     * last action under it ("Dataset") instead of opening the annotation list.
-     *
-     * @scenario "The annotation badge takes its own room on the separator"
-     */
+    // A hidden action row is still a click target. Anchored to the separator's
+    // own edge it lay across the badge, and clicking the badge activated the
+    // action under it instead of opening the annotation list.
+    /** @scenario "The annotation badge takes its own room on the separator" */
     it("floats the hover actions clear of the badge, not across it", () => {
       renderRow();
 
       const badgeSlot = screen.getByTestId("turn-annotation-badges")
         .parentElement!;
-      const floating = screen.getByTestId("turn-action-row").parentElement!;
+      const floating = screen.getByTestId("turn-edit-trace-action")
+        .parentElement!;
 
       // Anchored to the badge's own slot, and past its far edge, so no part of
       // the action row can ever sit on top of the badge.

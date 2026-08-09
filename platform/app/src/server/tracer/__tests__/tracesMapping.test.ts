@@ -398,6 +398,84 @@ describe("mapTraceToDatasetEntry annotations ai_readable column", () => {
   });
 });
 
+describe("mapTraceToDatasetEntry annotations expected_output column", () => {
+  const suggestionMapping = {
+    expected: { source: "annotations", key: "expected_output", subkey: "" },
+  };
+
+  const tracedWith = (annotation: Record<string, unknown>) => ({
+    trace_id: "trace-1",
+    timestamps: { started_at: Date.now() },
+    spans: [{ span_id: "span-1", name: "web_search", type: "span" }],
+    annotations: [
+      {
+        id: "annotation-1",
+        traceId: "trace-1",
+        comment: null,
+        isThumbsUp: null,
+        user: null,
+        email: null,
+        scoreOptions: null,
+        anchorKind: null,
+        anchorId: null,
+        anchorPath: null,
+        ...annotation,
+      },
+    ],
+  });
+
+  const expectedColumnOf = (annotation: Record<string, unknown>) =>
+    mapTraceToDatasetEntry(
+      tracedWith(annotation) as any,
+      suggestionMapping,
+      new Set() as any,
+    )[0]?.expected;
+
+  describe("when the suggestion is about the trace's output", () => {
+    it("carries the suggestion", () => {
+      expect(
+        expectedColumnOf({
+          expectedOutput: "the right answer",
+          anchorKind: "field",
+          anchorId: "trace-1",
+          anchorPath: "output",
+        }),
+      ).toBe(JSON.stringify(["the right answer"]));
+    });
+
+    it("carries it for a comment about the whole trace too", () => {
+      expect(expectedColumnOf({ expectedOutput: "the right answer" })).toBe(
+        JSON.stringify(["the right answer"]),
+      );
+    });
+  });
+
+  describe("when the suggestion is about something else", () => {
+    /** @scenario "A suggestion on the trace's own input becomes the corrected trace input" */
+    it("leaves the column empty for a suggested trace input", () => {
+      expect(
+        expectedColumnOf({
+          expectedOutput: "what the user meant to ask",
+          anchorKind: "field",
+          anchorId: "trace-1",
+          anchorPath: "input",
+        }),
+      ).toBe(JSON.stringify([null]));
+    });
+
+    it("leaves the column empty for a suggested span output", () => {
+      expect(
+        expectedColumnOf({
+          expectedOutput: "Amsterdam",
+          anchorKind: "field",
+          anchorId: "span-1",
+          anchorPath: "output",
+        }),
+      ).toBe(JSON.stringify([null]));
+    });
+  });
+});
+
 describe("TRACE_MAPPINGS.annotations.keys", () => {
   it("offers ai_readable alongside the single-field annotation keys", () => {
     const keys = TRACE_MAPPINGS.annotations.keys([]).map((key) => key.key);

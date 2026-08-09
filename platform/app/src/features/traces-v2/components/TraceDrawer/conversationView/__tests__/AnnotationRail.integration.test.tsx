@@ -7,6 +7,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -96,16 +97,13 @@ vi.mock("~/utils/api", () => ({
 vi.mock("../ChatTurnRow", () => ({
   ChatTurnRow: ({
     turn,
-    shouldUseRailComposer,
     annotationItems,
   }: {
     turn: { traceId: string };
-    shouldUseRailComposer?: boolean;
     annotationItems?: unknown[];
   }) => (
     <div
       data-testid="chat-turn-row"
-      data-uses-rail-composer={String(!!shouldUseRailComposer)}
       // What the turn itself counts, which is what its badge reads.
       data-annotation-count={String(annotationItems?.length ?? 0)}
     >
@@ -116,9 +114,12 @@ vi.mock("../ChatTurnRow", () => ({
 
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import { useAnnotationDraftStore } from "../../../../stores/annotationDraftStore";
+import {
+  isSessionMarked,
+  useAnnotationQueueSessionStore,
+} from "../../../../stores/annotationQueueSessionStore";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../../types/trace";
 import { AnnotatedTurnRow } from "../AnnotatedTurnRow";
-import { TurnActionRow } from "../TurnAnnotations";
 import type { ParsedTurn, TurnLayout } from "../types";
 import {
   RAIL_WIDTH_SLIM_PX,
@@ -152,7 +153,7 @@ function turn(): TraceListItem {
     status: "ok",
     spanCount: 1,
     sizeBytes: 0,
-    input: null,
+    input: "a question",
     output: "the original answer",
     origin: "application",
     evaluations: [],
@@ -223,7 +224,61 @@ beforeEach(() => {
   mocks.storedAnnotations = [];
   mocks.activeScores = [];
   useAnnotationDraftStore.setState({ draft: null });
+  useAnnotationQueueSessionStore.setState({
+    active: false,
+    marks: {},
+    handoff: "idle",
+  });
   cleanup();
+});
+
+/** Writes a comment from the rail and lets the write report back. */
+function saveFromTheRail() {
+  renderRow();
+  fireEvent.click(rail());
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  const options = (mocks.create as Mock).mock.calls[0]?.[1] as
+    | MutationOptions
+    | undefined;
+  options?.onSuccess?.();
+}
+
+const isCounted = () =>
+  isSessionMarked(useAnnotationQueueSessionStore.getState().marks, TRACE_ID);
+
+describe("given a queue being walked", () => {
+  describe("when the reviewer annotates one of the conversation's turns", () => {
+    /** @scenario "Annotating a turn counts its trace into the session" */
+    it("counts that turn's trace into the sitting", () => {
+      useAnnotationQueueSessionStore.getState().setActive(true);
+
+      saveFromTheRail();
+
+      expect(isCounted()).toBe(true);
+    });
+
+    /** @scenario "A turn is counted in or out by hand" */
+    it("leaves a turn the reviewer had already dropped out of it", () => {
+      useAnnotationQueueSessionStore.getState().setActive(true);
+      useAnnotationQueueSessionStore.getState().toggle(TRACE_ID);
+      useAnnotationQueueSessionStore.getState().toggle(TRACE_ID);
+
+      saveFromTheRail();
+
+      expect(isCounted()).toBe(false);
+    });
+  });
+});
+
+describe("given a conversation read outside a queue", () => {
+  describe("when the reviewer annotates a turn", () => {
+    /** @scenario "Session marks belong to the sitting" */
+    it("counts nothing into a sitting that is not happening", () => {
+      saveFromTheRail();
+
+      expect(isCounted()).toBe(false);
+    });
+  });
 });
 
 describe("given the conversation has no rail", () => {
@@ -250,34 +305,36 @@ describe("given the rail is open beside a turn", () => {
     expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("routes the turn's annotate actions to the rail composer", () => {
-    renderRow();
-
-    expect(screen.getByTestId("chat-turn-row")).toHaveAttribute(
-      "data-uses-rail-composer",
-      "true",
-    );
-  });
-
   describe("when the reviewer clicks the empty rail beside the turn", () => {
-    /** @scenario "Clicking the empty rail beside a turn starts an annotation on it" */
-    it("opens a composer for that turn", () => {
+    /** @scenario "Clicking the empty rail beside a turn starts an annotation on its output" */
+    it("opens a composer about that turn's output", () => {
       renderRow();
 
       fireEvent.click(rail());
 
-      expect(draft()).toMatchObject({ traceId: TRACE_ID, mode: "annotate" });
+      expect(draft()).toMatchObject({
+        traceId: TRACE_ID,
+        mode: "annotate",
+        anchorKind: "field",
+        anchorId: TRACE_ID,
+        anchorPath: "output",
+      });
       expect(screen.getByLabelText("Annotation composer")).toBeInTheDocument();
     });
   });
 
   describe("when the reviewer uses the rail's add affordance", () => {
-    it("opens a composer for that turn", () => {
+    /** @scenario "Clicking the empty rail beside a turn starts an annotation on its output" */
+    it("opens the same composer about that turn's output", () => {
       renderRow();
 
       fireEvent.click(screen.getByRole("button", { name: /Add annotation/ }));
 
-      expect(draft()).toMatchObject({ traceId: TRACE_ID, mode: "annotate" });
+      expect(draft()).toMatchObject({
+        traceId: TRACE_ID,
+        mode: "annotate",
+        anchorPath: "output",
+      });
     });
   });
 
@@ -296,71 +353,86 @@ describe("given the rail is open beside a turn", () => {
   });
 });
 
-describe("given a turn in thread layout, where the rail lives", () => {
-  describe("when the reviewer uses the turn's annotate action", () => {
-    /** @scenario "The turn's own annotate action writes in the rail" */
-    it("opens the composer in the rail rather than over the conversation", async () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <TurnActionRow
-            traceId={TRACE_ID}
-            output="the original answer"
-            shouldUseRailComposer
-          />
-        </ChakraProvider>,
-      );
-
-      fireEvent.click(screen.getByRole("button", { name: "Annotate" }));
-      await vi.waitFor(() =>
-        expect(draft()).toMatchObject({
-          traceId: TRACE_ID,
-          mode: "annotate",
-        }),
-      );
-
-      expect(screen.queryByPlaceholderText("Optional")).not.toBeInTheDocument();
+describe("given a comment started from one of the turn's messages", () => {
+  const startFromMessage = (anchorPath: "input" | "output") =>
+    useAnnotationDraftStore.getState().openDraft({
+      traceId: TRACE_ID,
+      mode: "annotate",
+      anchorKind: "field",
+      anchorId: TRACE_ID,
+      anchorPath,
     });
 
-    /** @scenario "Commenting on a conversation turn stays a comment about the whole turn" */
-    it("writes about the turn's trace and nothing narrower", async () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <TurnActionRow
-            traceId={TRACE_ID}
-            output="the original answer"
-            shouldUseRailComposer
-          />
-        </ChakraProvider>,
-      );
+  describe.each([
+    "input",
+    "output",
+  ] as const)("when it was started on the turn's %s", (anchorPath) => {
+    /** @scenario "The message's annotate action writes in the rail" */
+    it("opens the composer in the rail rather than over the conversation", () => {
+      startFromMessage(anchorPath);
 
-      fireEvent.click(screen.getByRole("button", { name: "Annotate" }));
+      renderRow();
 
-      await vi.waitFor(() => expect(draft()).not.toBeNull());
-      expect(draft()?.anchorKind).toBeUndefined();
-      expect(draft()?.anchorId).toBeUndefined();
-      expect(draft()?.anchorPath).toBeUndefined();
+      const composer = screen.getByLabelText("Annotation composer");
+      expect(rail().contains(composer)).toBe(true);
     });
+  });
 
-    it("starts a suggestion from the turn's output", async () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <TurnActionRow
-            traceId={TRACE_ID}
-            output="the original answer"
-            shouldUseRailComposer
-          />
-        </ChakraProvider>,
-      );
+  describe("when it was started on the reply", () => {
+    /** @scenario "Annotate opens the composer in the rail beside the turn" */
+    it("docks the composer in the rail, about the turn's output", () => {
+      startFromMessage("output");
 
-      fireEvent.click(screen.getByRole("button", { name: "Suggest" }));
+      renderRow();
 
-      await vi.waitFor(() =>
-        expect(draft()).toMatchObject({
-          mode: "suggest",
-          expectedOutput: "the original answer",
-        }),
-      );
+      expect(
+        rail().contains(screen.getByLabelText("Annotation composer")),
+      ).toBe(true);
+      expect(
+        screen.getByTestId("annotation-composer-anchor"),
+      ).toHaveTextContent("Output");
     });
+  });
+});
+
+/**
+ * A correction is an edit of what was actually said, so it starts from the side
+ * of the turn the comment is about. See specs/traces-v2/annotation-rail.feature.
+ */
+describe("given a suggestion started on the turn's user message", () => {
+  beforeEach(() => {
+    useAnnotationDraftStore.getState().openDraft({
+      traceId: TRACE_ID,
+      mode: "suggest",
+      anchorKind: "field",
+      anchorId: TRACE_ID,
+      anchorPath: "input",
+      output: "a question",
+    });
+  });
+
+  /** @scenario "A suggestion on the user message starts from the turn's input" */
+  it("starts from the turn's input", () => {
+    renderRow();
+
+    expect(
+      screen.getByPlaceholderText("What should the output have been?"),
+    ).toHaveValue("a question");
+  });
+
+  /** @scenario "A suggestion on the user message starts from the turn's input" */
+  it("reads its diff against the input rather than the reply", () => {
+    renderRow();
+
+    fireEvent.change(
+      screen.getByPlaceholderText("What should the output have been?"),
+      { target: { value: "a clearer question" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+
+    expect(
+      screen.getByPlaceholderText("What should the output have been?"),
+    ).toHaveValue("a question");
   });
 });
 
@@ -618,9 +690,9 @@ describe("given a turn commented on as a whole and on two of its spans", () => {
 });
 
 /**
- * A score is a project-wide key with no notion of a target and becomes a column
- * for the whole trace, so it is a judgement about the trace and nothing
- * narrower. See specs/traces-v2/anchored-comments.feature.
+ * A score is a project-wide key with no notion of a target: it reads as a
+ * judgement about the trace wherever it was given, so every comment is offered
+ * the same ones. See specs/traces-v2/anchored-comments.feature.
  */
 describe("given the project has active annotation score keys", () => {
   const own = (over: Partial<AnnotationByTrace>) =>
@@ -643,8 +715,8 @@ describe("given the project has active annotation score keys", () => {
   });
 
   describe("when the reviewer comments on one part of the trace", () => {
-    /** @scenario "A comment on one part of a trace is not offered scores" */
-    it("offers no scores on the comment", () => {
+    /** @scenario "A comment on one part of a trace is offered the same scores" */
+    it("offers the same scores on the comment", () => {
       const onASpan = own({
         id: "annotation-on-span",
         anchorKind: "span",
@@ -656,12 +728,39 @@ describe("given the project has active annotation score keys", () => {
       fireEvent.click(screen.getByLabelText("Edit annotation"));
 
       expect(screen.getByLabelText("Annotation composer")).toBeInTheDocument();
-      expect(screen.queryByText("Scores")).not.toBeInTheDocument();
+      expect(screen.getByText("Scores")).toBeInTheDocument();
+      expect(screen.getByText("Helpfulness")).toBeInTheDocument();
     });
   });
 
-  describe("when the reviewer annotates the trace as a whole", () => {
-    /** @scenario "A comment about the whole trace is still offered scores" */
+  describe("when the reviewer rates a score alongside a comment on the reply", () => {
+    /** @scenario "Scores given with an anchored comment save on that comment and read trace-level" */
+    it("saves the rating with that comment", async () => {
+      renderRow();
+
+      fireEvent.click(rail());
+      await userEvent.click(
+        screen.getByRole("button", { name: /Helpfulness/ }),
+      );
+      await userEvent.click(await screen.findByRole("radio", { name: "Good" }));
+      await userEvent.click(screen.getByRole("button", { name: "OK" }));
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(mocks.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          traceId: TRACE_ID,
+          anchorKind: "field",
+          anchorId: TRACE_ID,
+          anchorPath: "output",
+          scoreOptions: { "score-1": { value: "good", reason: "" } },
+        }),
+        expect.anything(),
+      );
+    });
+  });
+
+  describe("when the reviewer starts a comment from the rail", () => {
+    /** @scenario "A comment on one part of a trace is offered the same scores" */
     it("offers the scores as it always did", () => {
       renderRow();
 
@@ -670,6 +769,56 @@ describe("given the project has active annotation score keys", () => {
       expect(screen.getByText("Scores")).toBeInTheDocument();
       expect(screen.getByText("Helpfulness")).toBeInTheDocument();
     });
+  });
+});
+
+/**
+ * Comments written before comments had targets carry none, and still read and
+ * edit as remarks about the turn as a whole.
+ * See specs/traces-v2/anchored-comments.feature.
+ */
+describe("given a turn carrying a comment written before anchoring", () => {
+  const beforeAnchoring = annotation({
+    userId: "user-1",
+    user: { id: "user-1", name: "Ada", image: null },
+    comment: "the model invented a policy number",
+  });
+
+  beforeEach(() => {
+    mocks.storedAnnotations = [beforeAnchoring];
+  });
+
+  /** @scenario "A comment written before anchoring still reads and edits as a comment about the whole turn" */
+  it("reads in the rail as a comment about the whole turn", () => {
+    renderRow({ annotations: [beforeAnchoring] });
+
+    expect(
+      screen.getByText("the model invented a policy number"),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("annotation-anchor")).not.toBeInTheDocument();
+  });
+
+  /** @scenario "A comment written before anchoring still reads and edits as a comment about the whole turn" */
+  it("changes what it says and nothing else when edited", () => {
+    renderRow({ annotations: [beforeAnchoring] });
+
+    fireEvent.click(screen.getByLabelText("Edit annotation"));
+    fireEvent.change(screen.getByPlaceholderText("Optional"), {
+      target: { value: "the policy number was invented" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Update" }));
+
+    expect(
+      screen.queryByTestId("annotation-composer-anchor"),
+    ).not.toBeInTheDocument();
+    expect(mocks.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "annotation-1",
+        comment: "the policy number was invented",
+      }),
+      expect.anything(),
+    );
+    expect(mocks.update.mock.calls[0]?.[0]).not.toHaveProperty("anchorKind");
   });
 });
 

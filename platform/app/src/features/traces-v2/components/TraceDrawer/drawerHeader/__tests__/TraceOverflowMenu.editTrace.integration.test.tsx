@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * Who is offered the annotation pass. The overflow menu is where a reviewer
- * reaches for "Annotate trace", and it is the only place the action is offered
+ * reaches for "Edit trace", and it is the only place the action is offered
  * on a trace that is being read, so the permission and the share view are gated
  * here. The header hands the menu its own `readOnly`, which is what a public
  * share page renders with.
@@ -101,7 +101,7 @@ const openMenu = async (user: ReturnType<typeof userEvent.setup>) => {
   await screen.findByText("Copy trace ID");
 };
 
-const editTraceItem = () => screen.queryByText("Annotate trace");
+const editTraceItem = () => screen.queryByText("Edit trace");
 
 const annotationQueueItem = () => screen.queryByText("Add to annotation queue");
 
@@ -119,7 +119,7 @@ afterEach(() => {
 
 describe("given a reviewer reading a trace in the drawer", () => {
   describe("when they open the trace actions menu", () => {
-    /** @scenario "The overflow menu offers to annotate the trace" */
+    /** @scenario "The overflow menu offers to edit the trace" */
     it("offers an action to annotate the trace", async () => {
       const user = userEvent.setup();
       renderMenu();
@@ -129,13 +129,13 @@ describe("given a reviewer reading a trace in the drawer", () => {
       expect(editTraceItem()).toBeInTheDocument();
     });
 
-    /** @scenario "The overflow menu offers to annotate the trace" */
+    /** @scenario "The overflow menu offers to edit the trace" */
     it("starts annotating that trace when the action is chosen", async () => {
       const user = userEvent.setup();
       renderMenu();
       await openMenu(user);
 
-      await user.click(screen.getByText("Annotate trace"));
+      await user.click(screen.getByText("Edit trace"));
 
       expect(useTraceEditStore.getState().editingTraceId).toBe("trace-1");
       expect(useDrawerStore.getState().isEditing).toBe(true);
@@ -153,7 +153,7 @@ describe("given a reviewer reading a trace in the drawer", () => {
       renderMenu();
       await openMenu(user);
 
-      await user.click(screen.getByText("Annotate trace"));
+      await user.click(screen.getByText("Edit trace"));
 
       expect(useDrawerStore.getState().viewMode).toBe("conversation");
       expect(useDrawerStore.getState().isEditing).toBe(true);

@@ -1,49 +1,51 @@
-# Per-turn annotate, suggest, and add-to-dataset actions
-# Covers: turn action row, annotation score keys, suggest correction, add-to-dataset (turn + conversation)
+# Per-message annotate, suggest and translate actions
+# Covers: the message action cluster, the separator's edit-trace action,
+# annotation score keys, suggest correction
 #
-# Each turn in the trace drawer's ConversationView gets its own action row so
-# reviewers can rate, correct, or capture a single turn without scrolling away
-# from the conversation. The whole-conversation actions live in the drawer
-# header and operate on the full thread.
+# Each message in the trace drawer's ConversationView carries its own boxed
+# action cluster so reviewers can translate, comment on, or correct exactly
+# the side of the turn they are reading. Every action names its target: a
+# comment or suggestion is about the turn's input or its output, never about
+# an unnamed whole. The turn separator keeps one action of its own, opening
+# the turn's trace in the editor. The whole-conversation actions live in the
+# drawer header and operate on the full thread.
 
-Feature: Per-turn actions in ConversationView
-  Reviewers act on individual turns — annotating, suggesting corrections,
-  and capturing turns into datasets — without leaving the conversation flow.
+Feature: Per-message actions in ConversationView
+  Reviewers act on individual messages, translating, annotating and
+  suggesting corrections, without leaving the conversation flow.
 
   Background:
     Given the user is authenticated with "annotations:manage" permission
     And the user opens a trace drawer on a conversation with 3 turns
 
-  # ─── Action row visibility ──────────────────────────────────────────────
+  # ─── Message action cluster ─────────────────────────────────────────────
 
-  Scenario: Action row renders on every turn separator
-    Then each of the 3 turn separators renders a `TurnActionRow`
-    And the row contains "Annotate", "Suggest", and "Dataset" buttons
-
-  @planned
-  Scenario: Action row collapses with a collapsed turn
-    # Not yet implemented as of 2026-05-01 — turns in ConversationView are
-    # not collapsible; every turn always renders its action row.
-    Given a turn is collapsed
-    Then its action row is not rendered until the turn is expanded
+  @integration
+  Scenario: Each message offers Translate, Annotate and Suggest on hover
+    Then the user message and the reply of a turn each reveal a boxed action
+    cluster on hover
+    And the cluster reads "Translate", "Annotate", "Suggest" in that order
 
   @integration
   Scenario: Each action asks for the permission its own work needs
     Given the user only has "annotations:view" permission
-    Then the turn offers no way to annotate or suggest
-    And the turn still offers to be captured into a dataset
-    And translating the turn is offered to every reader
-    # Capturing a turn into a dataset is dataset work and is offered wherever
-    # add-to-dataset is offered, rather than behind the annotation permission
-    # it happens to sit beside.
+    Then no message offers a way to annotate or suggest
+    And translating each message is still offered to every reader
+
+  @integration
+  Scenario: The turn separator offers to edit the turn's trace
+    When the user hovers a turn separator
+    Then it reveals a single "Edit trace" action
+    And choosing it opens that turn's trace in the drawer, in annotation mode
+    And the drawer does not open on the conversation tab
 
   # ─── Annotate ───────────────────────────────────────────────────────────
 
   @integration
   Scenario: Annotate opens the composer in the rail beside the turn
-    When the user clicks "Annotate" on the second turn
+    When the user clicks "Annotate" on the second turn's reply
     Then the composer opens in that turn's rail
-    And the form is pre-scoped to the second turn's traceId
+    And the form is anchored to the second turn's output
 
   @integration
   Scenario: In bubbles layout, existing annotations are edited via the badge popover
@@ -129,31 +131,31 @@ Feature: Per-turn actions in ConversationView
     Then the "Scores" section is omitted from the popover body
     And the "Annotate" trigger remains visible
 
-  @planned
-  Scenario: Inline score-key quick buttons on the turn action row
-    # Not yet implemented as of 2026-05-01 — score keys live inside the
-    # AnnotationPopover, not as inline buttons on the turn action row.
-    Given the project has 2 active annotation score keys
-    Then each turn's action row shows one button per key
-
   # ─── Suggest correction ────────────────────────────────────────────────
 
-  Scenario: Suggest opens AnnotationPopover with the expected-output field focused
-    When the user clicks "Suggest" on the third turn
-    Then the annotation popover opens in `mode="suggest"` scoped to that turn
+  Scenario: Suggest opens the composer with the expected-output field focused
+    When the user clicks "Suggest" on the third turn's reply
+    Then the suggest composer opens in that turn's rail, anchored to its output
     And the expected-output textarea is autofocused
     And the field is pre-filled with the turn's current output
 
-  Scenario: Suggest renders an inline word-level diff against the original output
+  @integration
+  Scenario: Suggest on the user message pre-fills the message text
+    When the user clicks "Suggest" on the second turn's user message
+    Then the suggest composer opens anchored to that turn's input
+    And the field is pre-filled with the user message's text
+    And the diff reads against that text, not against the reply
+
+  Scenario: Suggest renders an inline word-level diff against the original text
     When the user edits the expected-output textarea
     Then the diff panel below shows additions / removals via `diffWordsWithSpace`
     And a +N / −N counts row updates as the user types
 
   Scenario: Submitting a suggestion saves it as the annotation's expectedOutput
-    Given the user has edited the expected-output field on the third turn
+    Given the user has edited the expected-output field on the third turn's reply
     When the user submits the form
     Then an annotation is created on the third turn's trace with the new expectedOutput
-    And the turn's `TurnAnnotationBadges` chip renders a yellow Lightbulb "correction" indicator
+    And the reply's annotation chip renders a yellow Lightbulb "correction" indicator
 
   # ─── A suggestion is also the trace's correction ───────────────────────
   #
@@ -198,24 +200,12 @@ Feature: Per-turn actions in ConversationView
     Then nothing is written, so the turn does not end up carrying it twice
     And the save control says it is not ready
 
-  # ─── Add to dataset (turn) ─────────────────────────────────────────────
-
-  Scenario: "Dataset" on a turn opens the AddDatasetRecord drawer scoped to that turn
-    When the user clicks "Dataset" on the first turn
-    Then `openDrawer("addDatasetRecord", { traceId })` is called for the first turn
-    And the dataset drawer is preloaded for that single trace
-
-  @planned
-  Scenario: Saving the turn record adds one row to the chosen dataset
-    # The post-save invariant is implemented inside AddDatasetRecordDrawerV2,
-    # not in traces-v2. Marked planned here because the spec describes the
-    # full end-to-end record-count behaviour, which this surface only
-    # delegates to.
-    Given the user picked dataset "regression-cases" in the drawer
-    When the user saves
-    Then exactly 1 record is added to "regression-cases"
-
   # ─── Add to dataset (whole conversation) ───────────────────────────────
+  #
+  # A single turn no longer has a one-click dataset action in the
+  # conversation: capturing one turn goes through "Edit trace" to that turn
+  # and the drawer header's add-to-dataset, and the annotation queue's session
+  # flow captures turns in bulk (specs/annotations/annotation-queue-workflow.feature).
 
   Scenario: Drawer header surfaces a conversation-level add-to-dataset entry
     # Lives in TraceOverflowMenu, shown when the trace belongs to a

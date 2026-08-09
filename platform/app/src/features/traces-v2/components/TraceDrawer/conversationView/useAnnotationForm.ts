@@ -5,6 +5,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { AnnotationAnchorColumns } from "~/server/annotations/annotationAnchor";
 import { describeAnnotationAnchor } from "~/server/annotations/annotationAnchorLabel";
 import { api } from "~/utils/api";
+import { useAnnotationQueueSessionStore } from "../../../stores/annotationQueueSessionStore";
 import { useAnnotationSessionStore } from "../../../stores/annotationSessionStore";
 import type {
   AnnotationDraftValues,
@@ -123,6 +124,11 @@ export function useAnnotationMutations({
         {
           onSuccess: () => {
             useAnnotationSessionStore.getState().recordSaved();
+            // Annotating a turn is what a sitting at the queue is for, so the
+            // trace it was left on is counted into that sitting by the act of
+            // annotating it.
+            const queueSession = useAnnotationQueueSessionStore.getState();
+            if (queueSession.active) queueSession.noteAnnotationSaved(traceId);
             onSuccess();
           },
           onError,
@@ -256,7 +262,6 @@ export function usePopoverAnnotationForm(
     isDeleting: mutations.isDeleting,
     hasExisting: mutations.hasExisting,
     isSaveBlocked: mutations.isSaveBlocked,
-    isAnchored: !!props.anchorKind,
     anchorLabel: describeAnnotationAnchor({
       anchor: {
         anchorKind: props.anchorKind ?? null,

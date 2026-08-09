@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   traces: [] as unknown[],
   downloadCsv: vi.fn(),
   tableProps: null as Record<string, any> | null,
+  annotationsByTraceIdsArgs: null as Record<string, unknown> | null,
 }));
 
 vi.mock("~/components/AnnotationsLayout", () => ({
@@ -52,7 +53,10 @@ vi.mock("~/hooks/useFilterParams", () => ({
   }),
 }));
 vi.mock("~/hooks/useAnnotationsByTraceIds", () => ({
-  useAnnotationsByTraceIds: () => ({ data: [], isLoading: false }),
+  useAnnotationsByTraceIds: (args: Record<string, unknown>) => {
+    mocks.annotationsByTraceIdsArgs = args;
+    return { data: [], isLoading: false };
+  },
 }));
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "p1", slug: "acme" } }),
@@ -98,6 +102,9 @@ const annotation = (overrides: Record<string, unknown> = {}) => ({
   expectedOutput: null,
   scoreOptions: {},
   isThumbsUp: true,
+  anchorKind: null,
+  anchorId: null,
+  anchorPath: null,
   createdAt: new Date("2026-07-20T10:00:00Z"),
   user: { id: "user-1", name: "Ana", image: null },
   ...overrides,
@@ -106,6 +113,7 @@ const annotation = (overrides: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   mocks.downloadCsv.mockReset();
   mocks.tableProps = null;
+  mocks.annotationsByTraceIdsArgs = null;
   mocks.traces = [
     {
       trace_id: "trace-1",
@@ -135,6 +143,41 @@ describe("All annotations page", () => {
       expect(call.fields).toContain("Trace ID");
       expect(call.rows[0]).toContain("the question");
       expect(call.fileName).toBe("Traces - 2026-08-08.csv");
+    });
+
+    /** @scenario "Suggestions are a count chip that opens on hover" */
+    it("exports the suggestions under the part each was left on", () => {
+      mocks.annotations = [
+        annotation({ id: "a1", expectedOutput: "a better answer" }),
+        annotation({
+          id: "a2",
+          expectedOutput: "thirty days",
+          anchorKind: "field",
+          anchorId: "span-abc123",
+          anchorPath: "output",
+        }),
+        annotation({ id: "a3" }),
+      ];
+      renderPage();
+
+      fireEvent.click(screen.getByRole("button", { name: "Export all" }));
+
+      const call = mocks.downloadCsv.mock.calls[0]?.[0];
+      const suggestionsAt = call.fields.indexOf("Suggestions");
+      expect(suggestionsAt).toBeGreaterThan(-1);
+      expect(call.fields).not.toContain("Expected output");
+      expect(call.rows[0][suggestionsAt]).toBe("a better answer");
+      expect(call.rows[1][suggestionsAt]).toBe(
+        "Span span-abc123 · Output: thirty days",
+      );
+      expect(call.rows[2][suggestionsAt]).toBe("");
+    });
+
+    /** @scenario "Comments are a count chip that opens on hover" */
+    it("reads every comment on these traces, anchored ones included", () => {
+      renderPage();
+
+      expect(mocks.annotationsByTraceIdsArgs?.anchor).toBe("all");
     });
 
     it("groups the annotations by trace and dates each row by its newest one", () => {

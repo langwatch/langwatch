@@ -4,6 +4,7 @@ import { UserAvatar } from "~/components/UserAvatar";
 import { Tooltip } from "~/components/ui/tooltip";
 import { AnnotationPopover } from "~/features/traces-v2/components/TraceDrawer/conversationView/AnnotationPopover";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { annotationSuggestedOutput } from "~/server/annotations/annotationSuggestedOutput";
 import { api } from "~/utils/api";
 
 /**
@@ -33,8 +34,8 @@ export const AnnotationExpectedOutputs = ({
     },
   );
 
-  const suggestions = (annotations.data ?? []).filter(
-    (annotation) => annotation.expectedOutput,
+  const suggestions = (annotations.data ?? []).filter((annotation) =>
+    annotationSuggestedOutput({ annotation, traceId }),
   );
 
   if (suggestions.length === 0) return null;

@@ -423,44 +423,7 @@ Feature: Correcting a trace without rewriting it
       Then the correction is still there
       And removing the correction is a separate, explicit action
 
-  Rule: Queue items carry the mark for the end-of-queue dataset hand-off
-
-    @integration
-    Scenario: Marking a queue item for the dataset persists the mark
-      Given an annotation queue item I have not marked
-      When I mark it to be added to a dataset at the end
-      Then the mark is persisted on the queue item
-      And it is still marked when the queue is read again
-
-    @integration
-    Scenario: Unmarking a queue item clears the mark
-      Given an annotation queue item I marked for the dataset
-      When I unmark it
-      Then the queue item carries no mark
-
-    @integration
-    Scenario: Marks are cleared for a batch of queue items at once
-      Given several marked queue items
-      When the marks are cleared for those items
-      Then none of them carries a mark
-      And queue items outside the batch keep their marks
-
-    @integration
-    Scenario: Marking a queue item needs permission to update annotations
-      Given I may view the project but not update its annotations
-      When I mark a queue item for the dataset
-      Then the request is refused
-      And the queue item carries no mark
-
-    @integration
-    Scenario: Marking a teammate's queue item is refused
-      Given a queue item assigned to a teammate, on a queue I do not belong to
-      When I mark it for the dataset
-      Then the request is refused
-      And the queue item carries no mark
-
-    @integration
-    Scenario: Clearing marks leaves a teammate's marks alone
-      Given a marked item of mine and a marked item of a teammate's
-      When I clear the marks for both
-      Then only mine is cleared
+  # The end-of-queue dataset hand-off no longer stores marks on queue items.
+  # Which traces a sitting keeps is collected in the browser for that sitting;
+  # see specs/annotations/annotation-queue-workflow.feature, Rule "The
+  # session's traces are collected as the queue is walked".

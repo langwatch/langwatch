@@ -49,12 +49,6 @@ export interface AnnotationFormState {
   /** Whether saving is off the table right now, and Save says so. */
   isSaveBlocked: boolean;
   /**
-   * Whether the comment is about one part of the trace rather than the whole of
-   * it. A score is a project-wide key with no notion of a target and becomes a
-   * column for the trace, so an anchored comment is not offered any.
-   */
-  isAnchored: boolean;
-  /**
    * The part of the trace the comment is about, in words. Null for a comment
    * about the trace as a whole, which has no part to name. The composer says it
    * out loud so a reviewer typing into a form that floats over the trace, or

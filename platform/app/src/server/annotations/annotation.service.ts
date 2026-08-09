@@ -28,12 +28,12 @@ export class AnnotationService {
   }
 
   /**
-   * What a page of traces carries in its `annotations` collection: only the
-   * comments about the traces themselves. A trace row, an export and a dataset
-   * column each answer a question about a whole trace, so a comment left on one
-   * of its spans is not part of the answer.
+   * What a page of traces carries in its `annotations` collection: every
+   * comment left on those traces, each carrying the part of the trace it is
+   * about. A trace row, an export and a dataset column all show what reviewers
+   * said, and a comment on one span is one of the things they said.
    */
-  async getAllTraceLevelForProjection({
+  async getAllForProjection({
     projectId,
     traceIds,
   }: {
@@ -43,7 +43,7 @@ export class AnnotationService {
     return this.repository.findAllForProjection({
       projectId,
       traceIds,
-      anchorScope: "trace",
+      anchorScope: "all",
     });
   }
 

@@ -20,6 +20,50 @@ export function enterTraceEditMode(traceId: string): void {
   drawer.setIsEditing(true);
 }
 
+/**
+ * A trace timestamp is only useful to the drawer when it is a real number: it
+ * is a hint about which partition the trace lives in, and a missing one is
+ * better left out than sent as "NaN".
+ */
+export function tracePartitionHint(startedAt: unknown): number | null {
+  return typeof startedAt === "number" && Number.isFinite(startedAt)
+    ? startedAt
+    : null;
+}
+
+/**
+ * Opens a turn's trace in the drawer, ready to be corrected.
+ *
+ * The conversation is a thread of traces, and a correction is about one of
+ * them, so the drawer lands on that trace's own summary rather than on the
+ * thread the reviewer just came from. Transiently, because reading a
+ * conversation is not a decision to stop reading conversations.
+ *
+ * The link states the whole intent (which trace, and that it opens for
+ * editing) and the drawer's URL hydrator opens it. Seeding the drawer store
+ * instead would mount the drawer a frame before the URL names it, and the
+ * hydrator reads that frame as "the URL has no drawer, close it".
+ */
+export function openTraceEditorFromConversation({
+  openDrawer,
+  traceId,
+  occurredAtMs,
+}: {
+  openDrawer: (name: "traceV2Details", params: Record<string, unknown>) => void;
+  traceId: string;
+  occurredAtMs: number | null;
+}): void {
+  const drawer = useDrawerStore.getState();
+  if (drawer.viewMode === "conversation") {
+    drawer.setViewModeTransient("summary");
+  }
+  openDrawer("traceV2Details", {
+    traceId,
+    ...(occurredAtMs === null ? {} : { t: String(occurredAtMs) }),
+    urlParams: { edit: "1" },
+  });
+}
+
 /** Leaves edit mode and drops the uncommitted correction. */
 export function exitTraceEditMode(): void {
   useTraceEditStore.getState().discard();

@@ -2,8 +2,8 @@
  * @vitest-environment node
  *
  * The annotations a page of traces carries. This one read feeds the trace
- * table, the export and the dataset columns, so it answers per trace: a comment
- * left on one span of a trace is not part of what the trace says.
+ * table, the export and the dataset columns, so it answers per trace with every
+ * comment left on it, each one carrying the part of the trace it is about.
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -47,8 +47,8 @@ describe("annotations for a page of traces", () => {
         anchorPath: "output",
       },
     });
-    // A kind this build does not recognise is not a comment about the whole
-    // trace either, so it stays out of a per-trace answer.
+    // A kind this build does not recognise still reads, as a comment about the
+    // trace as a whole.
     await prisma.annotation.create({
       data: {
         id: nanoid(),
@@ -66,22 +66,44 @@ describe("annotations for a page of traces", () => {
   });
 
   describe("given a trace with one comment about it and three about its parts", () => {
-    it("carries only the comment about the trace", async () => {
-      const rows = await service.getAllTraceLevelForProjection({
+    /** @scenario "A dataset column of annotations carries every comment, each naming its target" */
+    it("carries every comment", async () => {
+      const rows = await service.getAllForProjection({
         projectId,
         traceIds: [traceId],
       });
 
-      expect(rows.map((row) => row.comment)).toEqual([
+      expect(rows.map((row) => row.comment).sort()).toEqual([
+        "left by a newer build",
         "the whole trace is off",
+        "this output is wrong",
+        "this search returned nothing",
       ]);
+    });
+
+    it("carries the part of the trace each comment is about", async () => {
+      const rows = await service.getAllForProjection({
+        projectId,
+        traceIds: [traceId],
+      });
+
+      expect(
+        rows.find((row) => row.comment === "this output is wrong"),
+      ).toMatchObject({
+        anchorKind: "field",
+        anchorId: "span-search",
+        anchorPath: "output",
+      });
+      expect(
+        rows.find((row) => row.comment === "the whole trace is off"),
+      ).toMatchObject({ anchorKind: null, anchorId: null, anchorPath: null });
     });
   });
 
   describe("given no traces on the page", () => {
     it("reads nothing", async () => {
       expect(
-        await service.getAllTraceLevelForProjection({
+        await service.getAllForProjection({
           projectId,
           traceIds: [],
         }),

@@ -15,6 +15,7 @@ import { useConversationExpand } from "../../../../TraceDrawer/conversationView/
 import {
   MessageAnnotateCluster,
   type MessageAnnotateTarget,
+  type MessageTranslation,
 } from "../../../../TraceDrawer/conversationView/MessageAnnotateCluster";
 import { MessageExpandToggle } from "../../../../TraceDrawer/conversationView/MessageExpandToggle";
 import { ReasoningBlock } from "../../../../TraceDrawer/transcript";
@@ -92,6 +93,11 @@ interface BubbleProps {
    * somebody else's conversation, where there is nothing to annotate.
    */
   annotate?: MessageAnnotateTarget;
+  /**
+   * When set, the bubble offers to flip the message it is showing to English.
+   * Owned by the host, which holds the text and swaps it.
+   */
+  translate?: MessageTranslation;
 }
 
 const DEFAULT_MAX_CHARS = 320;
@@ -131,6 +137,7 @@ export const Bubble: React.FC<BubbleProps> = ({
   maxChars = DEFAULT_MAX_CHARS,
   annotation,
   annotate,
+  translate,
 }) => {
   const palette = BUBBLE_TONES[tone];
   const compact = size === "compact";
@@ -237,7 +244,10 @@ export const Bubble: React.FC<BubbleProps> = ({
           {annotate && (
             <>
               <Spacer />
-              <MessageAnnotateCluster target={annotate} />
+              <MessageAnnotateCluster
+                target={annotate}
+                translation={translate}
+              />
             </>
           )}
         </HStack>

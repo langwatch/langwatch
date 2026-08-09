@@ -117,10 +117,13 @@ Feature: Annotation rail beside each conversation turn
   Rule: The rail area beside a turn is where annotating starts
 
     @integration
-    Scenario: Clicking the empty rail beside a turn starts an annotation on it
+    Scenario: Clicking the empty rail beside a turn starts an annotation on its output
       Given the turn carries no annotation yet
       When the reviewer clicks the empty rail beside it
       Then a composer opens in the rail for that turn
+      And it is anchored to the turn's output
+      # Every new comment names its target; the reply is what a remark beside
+      # the turn is about unless the reviewer picks the input explicitly.
 
     @integration
     Scenario: Clicking an annotation does not start a second one
@@ -129,8 +132,8 @@ Feature: Annotation rail beside each conversation turn
       Then no new composer is opened for the turn
 
     @integration
-    Scenario: The turn's own annotate action writes in the rail
-      When the reviewer uses the turn's annotate action
+    Scenario: The message's annotate action writes in the rail
+      When the reviewer uses the annotate action on either side of the turn
       Then the composer opens in the rail rather than over the conversation
 
     @unit
@@ -141,10 +144,16 @@ Feature: Annotation rail beside each conversation turn
 
     @unit
     Scenario: A suggestion starts from the turn's current output
-      When the reviewer starts a suggestion on a turn
+      When the reviewer starts a suggestion on a turn's reply
       Then the expected output starts as the turn's current output
       # Same starting point as the popover, so a correction is always an edit
       # of what the model actually said.
+
+    @unit
+    Scenario: A suggestion on the user message starts from the turn's input
+      When the reviewer starts a suggestion on a turn's user message
+      Then the expected output starts as the turn's input
+      And the diff reads against the input
 
     @unit
     Scenario: Closing the composer discards what was typed

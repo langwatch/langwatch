@@ -55,11 +55,13 @@ import { RedactedField } from "../ui/RedactedField";
 import { SelectionActionBar } from "../ui/SelectionActionBar";
 import { toaster } from "../ui/toaster";
 import { AnnotationCommentsChip } from "./AnnotationCommentsChip";
+import { AnnotationSuggestionsChip } from "./AnnotationSuggestionsChip";
 import UserAvatarGroup from "./AvatarGroup";
 import {
   type AnnotationRow,
   type AnnotationWithUser,
   queueItemsToRows,
+  suggestionExportLine,
 } from "./annotationRow";
 
 const ChakraButton = chakra("button");
@@ -353,14 +355,6 @@ export const AnnotationsTable = ({
       showErrorToast({ error, fallbackTitle: "Couldn't remove from queue" }),
   });
 
-  const hasExpectedOutput = useMemo(
-    () =>
-      pageRows.some((row) =>
-        row.annotations.some((annotation) => annotation.expectedOutput),
-      ),
-    [pageRows],
-  );
-
   const openTraceDrawer = useCallback(
     (row: AnnotationRow) => {
       openDrawer("traceV2Details", {
@@ -508,37 +502,24 @@ export const AnnotationsTable = ({
           </RedactedField>
         ),
       }),
-      ...(hasExpectedOutput
-        ? [
-            columnHelper.display({
-              id: "expectedOutput",
-              header: "Expected output",
-              cell: ({ row }) => (
-                <VStack align="start" gap={2} divideY="1px" maxWidth="320px">
-                  {row.original.annotations.map((annotation) =>
-                    annotation.expectedOutput ? (
-                      <Text
-                        key={annotation.id}
-                        width="full"
-                        textAlign="left"
-                        whiteSpace="pre-wrap"
-                        wordBreak="break-word"
-                        lineClamp={3}
-                      >
-                        {annotation.expectedOutput}
-                      </Text>
-                    ) : null,
-                  )}
-                </VStack>
-              ),
-            }),
-          ]
-        : []),
       columnHelper.display({
         id: "comments",
         header: "Comments",
         cell: ({ row }) => (
-          <AnnotationCommentsChip annotations={row.original.annotations} />
+          <AnnotationCommentsChip
+            annotations={row.original.annotations}
+            traceId={row.original.traceId}
+          />
+        ),
+      }),
+      columnHelper.display({
+        id: "suggestions",
+        header: "Suggestions",
+        cell: ({ row }) => (
+          <AnnotationSuggestionsChip
+            annotations={row.original.annotations}
+            traceId={row.original.traceId}
+          />
         ),
       }),
       ...activeScoreTypes.map((scoreType) =>
@@ -621,7 +602,6 @@ export const AnnotationsTable = ({
       addTraceIdsToDataset,
       columnHelper,
       dateColumnLabel,
-      hasExpectedOutput,
       openTraceDrawer,
       removeFromQueue,
     ],
@@ -663,8 +643,8 @@ export const AnnotationsTable = ({
       "Trace ID",
       "Input",
       "Output",
-      "Expected output",
       "Comments",
+      "Suggestions",
       ...activeScoreTypes.map((scoreType) => scoreType.name),
       "Annotators",
     ];
@@ -676,11 +656,13 @@ export const AnnotationsTable = ({
       row.trace?.input?.value ?? "",
       row.trace?.output?.value ?? "",
       row.annotations
-        .map((annotation) => annotation.expectedOutput)
+        .map((annotation) => annotation.comment)
         .filter(Boolean)
         .join("\n"),
       row.annotations
-        .map((annotation) => annotation.comment)
+        .map((annotation) =>
+          suggestionExportLine({ annotation, traceId: row.traceId }),
+        )
         .filter(Boolean)
         .join("\n"),
       ...activeScoreTypes.map((scoreType) =>

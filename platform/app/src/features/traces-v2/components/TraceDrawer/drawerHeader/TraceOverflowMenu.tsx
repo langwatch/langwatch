@@ -215,7 +215,7 @@ export function TraceOverflowMenu({
           <Menu.Item value="edit-trace" onClick={handleEditTrace}>
             <HStack gap={2}>
               <Icon as={LuPencil} boxSize={3.5} />
-              <Text>Annotate trace</Text>
+              <Text>Edit trace</Text>
             </HStack>
           </Menu.Item>
         )}

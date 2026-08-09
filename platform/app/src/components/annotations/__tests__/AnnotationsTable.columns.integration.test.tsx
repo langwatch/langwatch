@@ -461,8 +461,8 @@ describe("AnnotationsTable columns and row actions", () => {
         "Trace ID",
         "Input",
         "Output",
-        "Expected output",
         "Comments",
+        "Suggestions",
         "Helpfulness",
         "Annotators",
       ]);
@@ -502,6 +502,79 @@ describe("AnnotationsTable columns and row actions", () => {
       expect(await screen.findByText("reads well")).toBeInTheDocument();
       expect(screen.getByText("missing the caveat")).toBeInTheDocument();
       expect(screen.getByText("Bo")).toBeInTheDocument();
+    });
+
+    /** @scenario "Comments are a count chip that opens on hover" */
+    it("names the part of the trace each comment was left on", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      setItems([
+        {
+          id: "item-1",
+          traceId: "trace-1",
+          annotations: [
+            annotation({
+              id: "a1",
+              comment: "the whole answer misses the point",
+            }),
+            annotation({
+              id: "a2",
+              comment: "this field is wrong",
+              anchorKind: "field",
+              anchorId: "trace-1",
+              anchorPath: "output",
+            }),
+            annotation({
+              id: "a3",
+              comment: "the retriever got the wrong question",
+              anchorKind: "field",
+              anchorId: "span-abc123",
+              anchorPath: "input",
+            }),
+          ],
+        },
+      ]);
+      renderQueuePage();
+
+      await user.hover(screen.getByTestId("annotation-comments-chip"));
+
+      expect(await screen.findByText("Trace · Output")).toBeInTheDocument();
+      expect(screen.getByText("Span span-abc123 · Input")).toBeInTheDocument();
+      // The comment about the trace as a whole is named by nothing, so a
+      // reader never has to work out which of the three is the plain one.
+      expect(screen.queryByText("Trace")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "Comments are a count chip that opens on hover" */
+    it("names nothing for an anchor kind it cannot read", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      setItems([
+        {
+          id: "item-1",
+          traceId: "trace-1",
+          annotations: [
+            annotation({
+              id: "a1",
+              comment: "still the reviewer's words",
+              // The feed is not anchor-normalised, so a kind written by a newer
+              // build arrives as it was stored. Naming it anyway would label the
+              // comment with a part of the trace nobody can point at.
+              anchorKind: "constellation" as never,
+              anchorId: "span-abc123",
+              anchorPath: "input",
+            }),
+          ],
+        },
+      ]);
+      renderQueuePage();
+
+      await user.hover(screen.getByTestId("annotation-comments-chip"));
+
+      expect(
+        await screen.findByText("still the reviewer's words"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText("Span span-abc123 · Input"),
+      ).not.toBeInTheDocument();
     });
 
     /** @scenario "A row with no comments shows no chip" */
@@ -552,24 +625,91 @@ describe("AnnotationsTable columns and row actions", () => {
     });
   });
 
-  describe("given an expected output was suggested", () => {
-    /** @scenario "The expected output column appears only when a row carries one" */
-    it("shows the column only when a row carries one", () => {
-      renderQueuePage();
-      expect(columnHeaders()).not.toContain("Expected output");
-      cleanup();
-
+  describe("given a row carries suggestions", () => {
+    /** @scenario "Suggestions are a count chip that opens on hover" */
+    it("counts the suggestions and lists them with their authors on hover", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
       setItems([
         {
           id: "item-1",
           traceId: "trace-1",
-          annotations: [annotation({ expectedOutput: "a better answer" })],
+          annotations: [
+            annotation({ id: "a1", expectedOutput: "a better answer" }),
+            annotation({
+              id: "a2",
+              expectedOutput: "thirty days, not thirty weeks",
+              anchorKind: "field",
+              anchorId: "span-abc123",
+              anchorPath: "output",
+              user: { id: "user-2", name: "Bo", image: null },
+            }),
+          ],
         },
       ]);
       renderQueuePage();
 
-      expect(columnHeaders()).toContain("Expected output");
-      expect(screen.getByText("a better answer")).toBeInTheDocument();
+      // The wall of text lives behind the count, so the table stays scannable.
+      expect(columnHeaders()).toContain("Suggestions");
+      expect(columnHeaders()).not.toContain("Expected output");
+      const chip = screen.getByTestId("annotation-suggestions-chip");
+      expect(chip).toHaveTextContent("2");
+      expect(chip).not.toHaveTextContent("a better answer");
+
+      await user.hover(chip);
+
+      expect(await screen.findByText("a better answer")).toBeInTheDocument();
+      expect(
+        screen.getByText("thirty days, not thirty weeks"),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Bo")).toBeInTheDocument();
+      expect(screen.getByText("Span span-abc123 · Output")).toBeInTheDocument();
+    });
+
+    /** @scenario "A row with no suggestions shows no chip" */
+    it("shows no chip when nothing was suggested", () => {
+      setItems([
+        {
+          id: "item-1",
+          traceId: "trace-1",
+          annotations: [annotation({ comment: "reads well" })],
+        },
+      ]);
+      renderQueuePage();
+
+      expect(
+        screen.queryByTestId("annotation-suggestions-chip"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByTestId("annotation-comments-chip"),
+      ).toBeInTheDocument();
+    });
+
+    /** @scenario "A queue page exports the rows on screen" */
+    it("exports each suggestion under the part it was left on", () => {
+      setItems([
+        {
+          id: "item-1",
+          traceId: "trace-1",
+          annotations: [
+            annotation({ id: "a1", expectedOutput: "a better answer" }),
+            annotation({
+              id: "a2",
+              expectedOutput: "thirty days",
+              anchorKind: "field",
+              anchorId: "span-abc123",
+              anchorPath: "output",
+            }),
+          ],
+        },
+      ]);
+      renderQueuePage();
+
+      fireEvent.click(screen.getByRole("button", { name: /Export/ }));
+
+      const call = mocks.downloadCsv.mock.calls[0]?.[0];
+      expect(call.rows[0]).toContain(
+        "a better answer\nSpan span-abc123 · Output: thirty days",
+      );
     });
   });
 

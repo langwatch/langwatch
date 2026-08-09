@@ -23,7 +23,10 @@ import { RedactedInline } from "~/components/ui/RedactedField";
 import type { MediaPartData } from "~/shared/traces/mediaParts";
 import type { RouterOutputs } from "~/utils/api";
 import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
-import { useTextTranslation } from "../../../hooks/useTextTranslation";
+import {
+  type UseTextTranslationResult,
+  useTextTranslation,
+} from "../../../hooks/useTextTranslation";
 import type { TraceListItem } from "../../../types/trace";
 import {
   formatCost,
@@ -43,9 +46,14 @@ import { useConversationExpand } from "./expandContext";
 import {
   MessageAnnotateCluster,
   type MessageAnnotateTarget,
+  type MessageTranslation,
 } from "./MessageAnnotateCluster";
 import { MessageExpandToggle } from "./MessageExpandToggle";
-import { TurnActionRow, TurnAnnotationBadges } from "./TurnAnnotations";
+import {
+  TurnAnnotationBadges,
+  TurnEditTraceAction,
+  TurnSessionCheckbox,
+} from "./TurnAnnotations";
 import { TurnSteps } from "./TurnSteps";
 import type { TurnLayout } from "./types";
 import { formatGap } from "./utils";
@@ -96,6 +104,17 @@ function splitAnnotationsBySide({
   };
 }
 
+/** What one message's cluster needs of its translation: the state, and the toggle. */
+function toMessageTranslation(
+  translation: UseTextTranslationResult,
+): MessageTranslation {
+  return {
+    isActive: translation.isActive,
+    isLoading: translation.isLoading,
+    onToggle: translation.toggle,
+  };
+}
+
 function summarizeAnnotations(
   items: AnnotationItem[],
 ): MessageAnnotationSummary | undefined {
@@ -139,8 +158,11 @@ interface ChatTurnRowProps {
    * belong to the surfaces those parts are read from.
    */
   anchoredAnnotationItems?: AnnotationItem[];
-  /** Route Annotate and Suggest to the rail composer instead of a popover. */
-  shouldUseRailComposer?: boolean;
+  /**
+   * Whether the separator offers to count this turn's trace into the annotation
+   * session. Only the queue, which has a session to count into, asks for it.
+   */
+  showSessionCheckbox?: boolean;
 }
 
 export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
@@ -158,30 +180,35 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   layout = "bubbles",
   annotationItems = EMPTY_ANNOTATIONS,
   anchoredAnnotationItems = EMPTY_ANNOTATIONS,
-  shouldUseRailComposer = false,
+  showSessionCheckbox = false,
 }) {
   const handleSelect = useCallback(
     () => onSelect(turn.traceId),
     [onSelect, turn.traceId],
   );
 
-  // Per-turn translate-to-English (specs/traces-v2/message-translation
-  // .feature): the separator's action row toggles it, and both bubbles
-  // swap between original and translated text. Sliced to the translate
-  // endpoint's payload cap so a pathological turn can't become one
-  // giant prompt.
-  const translation = useTextTranslation({
+  // Translate-to-English per message rather than per turn
+  // (specs/traces-v2/message-translation.feature): a reader flips exactly the
+  // side they cannot read, and the other side is left as it was written.
+  // Sliced to the translate endpoint's payload cap so a pathological message
+  // can't become one giant prompt.
+  const userTranslation = useTextTranslation({
     texts: useMemo(
-      () => ({
-        user: originalUserText.slice(0, TRANSLATE_TEXT_MAX_CHARS),
-        assistant: originalAssistantText.slice(0, TRANSLATE_TEXT_MAX_CHARS),
-      }),
-      [originalUserText, originalAssistantText],
+      () => ({ user: originalUserText.slice(0, TRANSLATE_TEXT_MAX_CHARS) }),
+      [originalUserText],
     ),
   });
-  const userText = translation.displayTexts.user ?? originalUserText;
+  const assistantTranslation = useTextTranslation({
+    texts: useMemo(
+      () => ({
+        assistant: originalAssistantText.slice(0, TRANSLATE_TEXT_MAX_CHARS),
+      }),
+      [originalAssistantText],
+    ),
+  });
+  const userText = userTranslation.displayTexts.user ?? originalUserText;
   const assistantText =
-    translation.displayTexts.assistant ?? originalAssistantText;
+    assistantTranslation.displayTexts.assistant ?? originalAssistantText;
 
   const { userAnnotations, assistantAnnotations } = useMemo(
     () =>
@@ -226,17 +253,34 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   const hasAssistantMedia =
     layout === "thread" && visibleAssistantMedia.length > 0;
 
-  // A comment on the reply is about the turn's own output, which is the one
-  // field of a trace a correction can replace, so it may carry a suggestion.
+  // Each side carries what it said, so a correction of it starts from that
+  // text: the reply's from the turn's output, the user message's from the
+  // turn's input, which is the field a correction of it replaces.
+  const userAnnotateTarget = useMemo(
+    () => ({
+      traceId: turn.traceId,
+      anchorPath: "input" as const,
+      text: turn.input,
+    }),
+    [turn.traceId, turn.input],
+  );
   const assistantAnnotateTarget = useMemo(
     () => ({
       traceId: turn.traceId,
       anchorPath: "output" as const,
-      canSuggest: true,
-      output: turn.output,
+      text: turn.output,
     }),
     [turn.traceId, turn.output],
   );
+
+  // Only a side with text of its own can be translated: an empty message has
+  // nothing to flip, and offering it would be a button that does nothing.
+  const userTranslate = originalUserText.trim()
+    ? toMessageTranslation(userTranslation)
+    : undefined;
+  const assistantTranslate = originalAssistantText.trim()
+    ? toMessageTranslation(assistantTranslation)
+    : undefined;
 
   return (
     <VStack align="stretch" gap={layout === "thread" ? 1 : 2}>
@@ -259,12 +303,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
         // no "opposite side" to anchor the inline actions to — pin them right.
         assistantSide={layout === "thread" ? "right" : assistantSide}
         annotationItems={annotationItems}
-        shouldUseRailComposer={shouldUseRailComposer}
-        translation={{
-          isActive: translation.isActive,
-          isLoading: translation.isLoading,
-          onToggle: translation.toggle,
-        }}
+        showSessionCheckbox={showSessionCheckbox}
       />
 
       {userText || hasUserMedia ? (
@@ -279,13 +318,8 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           isSelected={isCurrent}
           onClick={handleSelect}
           annotation={userAnnotations}
-          // A comment here is about the turn's own input. A correction cannot
-          // replace what the user said, so none is offered.
-          annotate={{
-            traceId: turn.traceId,
-            anchorPath: "input",
-            canSuggest: false,
-          }}
+          annotate={userAnnotateTarget}
+          translate={userTranslate}
         />
       ) : turn.inputRedacted ? (
         // Input hidden by a privacy rule — show the shared "Redacted" marker on
@@ -335,6 +369,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           onClick={handleSelect}
           annotation={assistantAnnotations}
           annotate={assistantAnnotateTarget}
+          translate={assistantTranslate}
         />
       ) : turn.error ? (
         <TurnMessage
@@ -350,6 +385,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           onClick={handleSelect}
           annotation={assistantAnnotations}
           annotate={assistantAnnotateTarget}
+          translate={assistantTranslate}
         />
       ) : assistantReasoning || hasAssistantMedia ? (
         <TurnMessage
@@ -365,6 +401,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           onClick={handleSelect}
           annotation={assistantAnnotations}
           annotate={assistantAnnotateTarget}
+          translate={assistantTranslate}
         />
       ) : turn.outputRedacted ? (
         // Output hidden by a privacy rule — the shared "Redacted" marker on the
@@ -473,6 +510,8 @@ interface TurnMessageProps {
   annotation?: MessageAnnotationSummary;
   /** What a comment left on this message is about. */
   annotate?: MessageAnnotateTarget;
+  /** Flipping this message to English, when it has text to flip. */
+  translate?: MessageTranslation;
 }
 
 /**
@@ -508,6 +547,7 @@ function ThreadMessage({
   onClick,
   annotation,
   annotate,
+  translate,
 }: Omit<TurnMessageProps, "layout" | "side">) {
   const palette = getRolePalette(TONE_ROLE[tone]);
   const isError = tone === "error";
@@ -600,7 +640,10 @@ function ThreadMessage({
           {annotate && (
             <>
               <Spacer />
-              <MessageAnnotateCluster target={annotate} />
+              <MessageAnnotateCluster
+                target={annotate}
+                translation={translate}
+              />
             </>
           )}
         </HStack>
@@ -752,12 +795,7 @@ const TurnSeparator: React.FC<{
   onSelect: () => void;
   assistantSide: "left" | "right";
   annotationItems: AnnotationItem[];
-  shouldUseRailComposer: boolean;
-  translation: {
-    isActive: boolean;
-    isLoading: boolean;
-    onToggle: () => void;
-  };
+  showSessionCheckbox: boolean;
 }> = ({
   index,
   turn,
@@ -765,8 +803,7 @@ const TurnSeparator: React.FC<{
   onSelect,
   assistantSide,
   annotationItems,
-  shouldUseRailComposer,
-  translation,
+  showSessionCheckbox,
 }) => {
   const annotationsOnLeft = assistantSide === "left";
   /*
@@ -788,6 +825,14 @@ const TurnSeparator: React.FC<{
     : { right: "100%", marginRight: 2 };
   const badgesWithActions = (
     <Box position="relative" display="flex" alignItems="center" flexShrink={0}>
+      {/* The session's tick is on screen the whole time the queue is being
+          walked, so it sits in flow beside the badge rather than arriving with
+          the pointer like the actions do. */}
+      {showSessionCheckbox && (
+        <Box marginRight={1.5}>
+          <TurnSessionCheckbox traceId={turn.traceId} />
+        </Box>
+      )}
       <TurnAnnotationBadges
         traceId={turn.traceId}
         output={turn.output}
@@ -804,11 +849,9 @@ const TurnSeparator: React.FC<{
         {...badgeAnchor}
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
       >
-        <TurnActionRow
+        <TurnEditTraceAction
           traceId={turn.traceId}
-          output={turn.output}
-          translation={translation}
-          shouldUseRailComposer={shouldUseRailComposer}
+          occurredAtMs={turn.timestamp}
         />
       </HStack>
     </Box>

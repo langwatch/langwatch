@@ -212,16 +212,25 @@ Rule: The columns say what the reviewer needs to judge a row
     And a row carrying several annotations shows the newest one's date
 
   @integration
-  Scenario: The expected output column appears only when a row carries one
-    Given no row on the page carries an expected output
-    Then there is no expected output column
-    And a page where one row carries one shows the column
+  Scenario: Suggestions are a count chip that opens on hover
+    Given a row carries 2 suggestions
+    Then the suggestions cell reads "2"
+    And hovering it lists each suggestion with its author
+    # A suggestion in full is a wall of text; the chip keeps the table
+    # scannable and the hover keeps the text one gesture away. There is no
+    # expected output column any more.
+
+  @integration
+  Scenario: A row with no suggestions shows no chip
+    Given a row carries no suggestion
+    Then its suggestions cell is empty
 
   @integration
   Scenario: Comments are a count chip that opens on hover
     Given a row carries 2 comments
     Then the comments cell reads "2"
     And hovering it lists each comment with its author
+    And names the part each comment was left on
 
   @integration
   Scenario: A row with no comments shows no chip

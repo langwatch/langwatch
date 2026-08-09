@@ -28,6 +28,8 @@ interface AnnotatedTurnRowProps {
   /** Whether the conversation has a rail at all right now. */
   isRailActive: boolean;
   railLayout: RailLayout;
+  /** Whether the separator offers to count this turn into the session. */
+  showSessionCheckbox?: boolean;
 }
 
 /**
@@ -48,6 +50,7 @@ export const AnnotatedTurnRow = memo(function AnnotatedTurnRow({
   anchoredAnnotations = EMPTY_ANNOTATIONS,
   isRailActive,
   railLayout,
+  showSessionCheckbox = false,
 }: AnnotatedTurnRowProps) {
   const turn = (
     <ChatTurnRow
@@ -65,10 +68,7 @@ export const AnnotatedTurnRow = memo(function AnnotatedTurnRow({
       onSelect={onSelectTurn}
       annotationItems={annotations}
       anchoredAnnotationItems={anchoredAnnotations}
-      // Both message layouts write annotations in the rail, so the turn's
-      // actions open the composer there instead of a popover over the
-      // conversation.
-      shouldUseRailComposer
+      showSessionCheckbox={showSessionCheckbox}
     />
   );
 
@@ -77,6 +77,7 @@ export const AnnotatedTurnRow = memo(function AnnotatedTurnRow({
   const rail = (
     <TurnAnnotationRail
       traceId={parsed.turn.traceId}
+      input={parsed.turn.input}
       output={parsed.turn.output}
       annotations={annotations}
       anchoredAnnotations={anchoredAnnotations}

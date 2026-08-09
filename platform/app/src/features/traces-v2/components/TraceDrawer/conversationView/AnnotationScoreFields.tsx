@@ -21,13 +21,12 @@ import type {
 /**
  * The project's active score keys, as chips the reviewer rates on.
  *
- * A comment about one part of the trace is offered none of them. A score is a
- * project-wide key with no notion of a target, and it becomes a column for the
- * whole trace, so a score given while pointing at one attribute would end up
- * read as a judgement on everything the trace did.
+ * Every comment is offered them, whichever part of the trace it is about. A
+ * score is a project-wide key with no notion of a target and reads as a
+ * judgement about the trace, so what the reviewer was pointing at when they
+ * gave it changes nothing about where it lands.
  */
 export function ScoreFields({ state }: { state: AnnotationFormState }) {
-  if (state.isAnchored) return null;
   if (!state.scores.data || state.scores.data.length === 0) return null;
   return (
     <VStack align="stretch" gap={1.5}>

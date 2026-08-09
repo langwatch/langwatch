@@ -149,6 +149,67 @@ describe("given an annotation carrying everything a reviewer can leave", () => {
   });
 });
 
+describe("given an annotation suggesting what an input should have been", () => {
+  describe("when it is read into the ai_readable column", () => {
+    /** @scenario "A suggestion on the trace's own input becomes the corrected trace input" */
+    it("reads as a suggested input when the comment is on the trace's own input", () => {
+      const line = buildReadableAnnotation({
+        annotation: annotationWith({
+          user: { name: "Ada" },
+          comment: "the user asked something else",
+          expectedOutput: "what the user meant to ask",
+          anchorKind: "field",
+          anchorId: TRACE_ID,
+          anchorPath: "input",
+        }),
+        traceId: TRACE_ID,
+      });
+
+      expect(line).toBe(
+        "Ada (on Trace · Input): the user asked something else " +
+          "[suggested input: what the user meant to ask]",
+      );
+    });
+
+    it("reads as a suggested input when the comment is on a span's input", () => {
+      const line = buildReadableAnnotation({
+        annotation: annotationWith({
+          user: { name: "Ada" },
+          expectedOutput: "capital of the Netherlands",
+          anchorKind: "field",
+          anchorId: "span-1",
+          anchorPath: "input",
+        }),
+        traceId: TRACE_ID,
+        spanNamesById: SPAN_NAMES,
+      });
+
+      expect(line).toBe(
+        "Ada (on Span web_search · Input) " +
+          "[suggested input: capital of the Netherlands]",
+      );
+    });
+
+    it("still reads as a suggested output when the comment is on an output", () => {
+      const line = buildReadableAnnotation({
+        annotation: annotationWith({
+          user: { name: "Ada" },
+          expectedOutput: "Amsterdam",
+          anchorKind: "field",
+          anchorId: "span-1",
+          anchorPath: "output",
+        }),
+        traceId: TRACE_ID,
+        spanNamesById: SPAN_NAMES,
+      });
+
+      expect(line).toBe(
+        "Ada (on Span web_search · Output) [suggested output: Amsterdam]",
+      );
+    });
+  });
+});
+
 describe("given an annotation scored against the project's scores", () => {
   describe("when it is read into the ai_readable column", () => {
     /** @scenario "A score reads by its name, not by its id" */

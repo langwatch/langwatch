@@ -6,6 +6,7 @@ import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import {
   type AnnotationWithUser,
   groupedAnnotationsToRows,
+  suggestionExportLine,
 } from "~/components/annotations/annotationRow";
 import { usePeriodSelector } from "~/components/PeriodSelector";
 import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
@@ -55,10 +56,14 @@ export default function Annotations() {
       group.map((trace) => trace.trace_id),
     ) ?? [];
 
+  // Everything said about these traces, anchored comments included: this page
+  // lists the annotations themselves rather than answering a question about each
+  // trace as a whole, so a comment left on one span is one of its rows.
   const filteredAnnotations = useAnnotationsByTraceIds({
     projectId: project?.id ?? "",
     traceIds: filteredTraceIds,
     enabled: hasAnyFilters && project?.id !== undefined,
+    anchor: "all",
   });
 
   const allAnnotations = api.annotation.getAll.useQuery(
@@ -129,7 +134,7 @@ export default function Annotations() {
       "User",
       "Input",
       "Output",
-      "Expected output",
+      "Suggestions",
       "Comment",
       "Trace ID",
       "Rating",
@@ -147,7 +152,7 @@ export default function Annotations() {
           annotation.user?.name ?? "",
           trace?.input?.value ?? "",
           trace?.output?.value ?? "",
-          annotation.expectedOutput ?? "",
+          suggestionExportLine({ annotation, traceId: annotation.traceId }),
           annotation.comment ?? "",
           annotation.traceId ?? "",
           annotation.isThumbsUp ? "Thumbs Up" : "Thumbs Down",

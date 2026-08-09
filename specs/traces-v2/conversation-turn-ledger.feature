@@ -88,10 +88,13 @@ Feature: Conversation turn ledger
 
   Rule: The turn's actions arrive with the pointer, on a surface of their own
 
-    Translate, Annotate, Suggest and Dataset stay off the separator while the
-    reader is reading, and arrive when the pointer is on the turn. They land
-    over the end of the ledger, so they arrive on an opaque surface: the ledger
-    keeps its place and sits underneath rather than reading through them.
+    The separator carries the annotation badge and one action of its own,
+    Edit trace, which stays off the ledger while the reader is reading and
+    arrives when the pointer is on the turn. It lands over the end of the
+    ledger on an opaque surface: the ledger keeps its place and sits
+    underneath rather than reading through it. The annotate, suggest and
+    translate actions live on the messages themselves
+    (specs/traces-v2/annotations.feature).
 
     @integration
     Scenario: The turn's actions stay away until the pointer is on the turn

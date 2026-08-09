@@ -176,7 +176,8 @@ describe("given a reader on a span's output", () => {
 });
 
 describe("given a reader on the trace's own input", () => {
-  it("offers a comment but no correction, which the trace input does not carry", () => {
+  /** @scenario "A suggestion on the trace's own input becomes the corrected trace input" */
+  it("offers the correction the trace input carries alongside a comment", () => {
     render(
       <IOViewer
         label="Input"
@@ -188,8 +189,8 @@ describe("given a reader on the trace's own input", () => {
 
     expect(screen.getByRole("button", { name: "Comment" })).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Suggest edit" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", { name: "Suggest edit" }),
+    ).toBeInTheDocument();
   });
 });
 

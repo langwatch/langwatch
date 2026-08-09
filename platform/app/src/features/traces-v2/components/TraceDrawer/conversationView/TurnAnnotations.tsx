@@ -1,307 +1,90 @@
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { createLogger } from "@langwatch/observability";
-import {
-  Database,
-  Edit3,
-  Languages,
-  Lightbulb,
-  MessageSquare,
-} from "lucide-react";
-import { forwardRef, useState } from "react";
-import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
-import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
+import { Lightbulb, MessageSquare, Pencil } from "lucide-react";
+import { useState } from "react";
 import { UserAvatar } from "~/components/UserAvatar";
+import { Checkbox } from "~/components/ui/checkbox";
 import { Popover } from "~/components/ui/popover";
-import { toaster } from "~/components/ui/toaster";
-import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
-import { useAnnotationDraftStore } from "../../../stores/annotationDraftStore";
+import {
+  isSessionMarked,
+  useAnnotationQueueSessionStore,
+} from "../../../stores/annotationQueueSessionStore";
+import {
+  openTraceEditorFromConversation,
+  tracePartitionHint,
+} from "../../../utils/traceEditMode";
 import { AnnotationPopover } from "./AnnotationPopover";
+import { HoverActionButton, HoverActionCluster } from "./HoverActionCluster";
 
 type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
 
-const logger = createLogger("TurnAnnotations");
-
-interface TurnAnnotationProps {
-  traceId: string;
-  /** The current output for this turn — pre-filled into the suggest form. */
-  output?: string | null;
-  /**
-   * Per-turn translate-to-English control, owned by the ChatTurnRow so the
-   * bubbles can swap text. Rendered here so it sits with the turn's other
-   * inline actions — but unlike them it does NOT require annotation
-   * permissions (reading a conversation is a viewer activity).
-   */
-  translation?: {
-    isActive: boolean;
-    isLoading: boolean;
-    onToggle: () => void;
-  };
-  /**
-   * Write annotations in the rail beside the turn rather than in a popover
-   * over it. Set by the conversation, whose message layouts both have a rail;
-   * a host without one keeps the popover.
-   */
-  shouldUseRailComposer?: boolean;
-}
-
 /**
- * Inline action row that sits in each turn separator. Annotating and suggesting
- * write in the rail beside the turn; a host with no rail gets a popover
- * anchored to the button instead, rather than a heavy panel dropped into the
- * conversation flow. Each action asks for the permission its own work needs.
+ * The one action the turn separator carries: opening the turn's trace where a
+ * correction can be written.
+ *
+ * Everything said about a message is said on the message itself, so the
+ * separator is left with the one thing that is about the turn rather than
+ * about either side of it. Correcting a trace is what the annotation queue's
+ * own Edit trace does, and it asks for the same permission here.
  */
-export function TurnActionRow({
+export function TurnEditTraceAction({
   traceId,
-  output,
-  translation,
-  shouldUseRailComposer = false,
-}: TurnAnnotationProps) {
-  const { project, hasPermission } = useOrganizationTeamProject();
+  occurredAtMs,
+}: {
+  traceId: string;
+  /** When the turn ran, which tells the drawer where to look for it. */
+  occurredAtMs?: number | null;
+}) {
+  const { hasPermission } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
-  const openDraft = useAnnotationDraftStore((s) => s.openDraft);
-  const [openPopover, setOpenPopover] = useState<"annotate" | "suggest" | null>(
-    null,
-  );
 
-  const canManage = hasPermission("annotations:manage");
-  // Capturing a turn into a dataset is dataset work, and the drawer's own
-  // add-to-dataset action asks for nothing beyond being signed in to the
-  // project. Sitting beside the annotation actions is not a reason to demand
-  // the annotation permission for it.
-  const canAddToDataset = !!project;
-
-  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
-
-  const annotationsGate = usePersonalFeatureGate("annotations");
-  const datasetsGate = usePersonalFeatureGate("datasets");
-
-  if (!canManage && !canAddToDataset && !translation) return null;
-
-  // Kept out of the way until the turn is hovered: ~180px of chrome on every
-  // separator adds a lot of weight to a view whose job is "read the
-  // conversation". Held visible while a popover is open so the anchor does not
-  // vanish under the user mid-edit, and while a translation is showing or
-  // loading so the way back to the original text stays discoverable.
-  const isForceVisible =
-    openPopover !== null || !!translation?.isActive || !!translation?.isLoading;
+  if (!hasPermission("annotations:update")) return null;
 
   return (
-    <HStack
-      gap={0.5}
-      flexShrink={0}
-      flexWrap="wrap"
-      justify="flex-end"
-      onClick={stop}
-      // An opaque surface of its own, so the revealed actions read as a
-      // toolbar floating over the separator rather than as words printed on
-      // top of the turn ledger underneath.
-      bg="bg.panel"
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="sm"
-      boxShadow="sm"
-      paddingX={1}
-      paddingY={0.5}
-      opacity={isForceVisible ? 1 : 0}
-      _groupHover={{ opacity: 1 }}
-      _groupFocusWithin={{ opacity: 1 }}
-      transition="opacity 120ms ease"
-      // Hover is also what makes the toolbar a click target: while it is not
-      // revealed it lies over the ledger and would swallow the click that
-      // selects the turn. The rule is scoped to pointers that can hover,
-      // because a pointer that cannot has no way to reveal the toolbar and
-      // would be left unable to reach the actions at all.
-      css={{
-        "@media (hover: hover)": {
-          pointerEvents: isForceVisible ? "auto" : "none",
-          ".group:hover &, .group:focus-within &": { pointerEvents: "auto" },
-        },
-      }}
-    >
-      {translation && (
-        <Tooltip
-          content={
-            translation.isActive
-              ? "Show the original text"
-              : "Translate this turn to English"
-          }
-          positioning={{ placement: "top" }}
-        >
-          <Button
-            size="2xs"
-            variant="ghost"
-            color={translation.isActive ? "blue.fg" : "fg.muted"}
-            gap={1}
-            paddingX={2}
-            aria-pressed={translation.isActive}
-            disabled={translation.isLoading}
-            onClick={(e) => {
-              e.stopPropagation();
-              translation.onToggle();
-            }}
-          >
-            <Icon as={Languages} boxSize={3} />
-            <Text textStyle="2xs">
-              {translation.isLoading
-                ? "Translating…"
-                : translation.isActive
-                  ? "Original"
-                  : "Translate"}
-            </Text>
-          </Button>
-        </Tooltip>
-      )}
-      {canManage && (
-        <>
-          {shouldUseRailComposer ? (
-            <>
-              <RailComposerButton
-                icon={Edit3}
-                label="Annotate"
-                tooltip="Add a note or score"
-                onOpen={async () => {
-                  const allowed = await annotationsGate.requestEnable();
-                  if (!allowed) return;
-                  openDraft({ traceId, mode: "annotate", output });
-                }}
-              />
-              <RailComposerButton
-                icon={Lightbulb}
-                label="Suggest"
-                tooltip="Suggest a corrected output"
-                onOpen={async () => {
-                  const allowed = await annotationsGate.requestEnable();
-                  if (!allowed) return;
-                  openDraft({ traceId, mode: "suggest", output });
-                }}
-              />
-            </>
-          ) : (
-            <>
-              <AnnotationPopover
-                traceId={traceId}
-                output={output}
-                mode="annotate"
-                open={openPopover === "annotate"}
-                onOpenChange={async (open) => {
-                  if (open) {
-                    const allowed = await annotationsGate.requestEnable();
-                    if (!allowed) return;
-                  }
-                  setOpenPopover(open ? "annotate" : null);
-                }}
-                triggerTooltip="Add a note or score"
-                trigger={<ActionButton icon={Edit3} label="Annotate" />}
-              />
-              <AnnotationPopover
-                traceId={traceId}
-                output={output}
-                mode="suggest"
-                open={openPopover === "suggest"}
-                onOpenChange={async (open) => {
-                  if (open) {
-                    const allowed = await annotationsGate.requestEnable();
-                    if (!allowed) return;
-                  }
-                  setOpenPopover(open ? "suggest" : null);
-                }}
-                triggerTooltip="Suggest a corrected output"
-                trigger={<ActionButton icon={Lightbulb} label="Suggest" />}
-              />
-            </>
-          )}
-        </>
-      )}
-      {canAddToDataset && (
-        <Tooltip
-          content="Add this turn to a dataset"
-          positioning={{ placement: "top" }}
-        >
-          <Button
-            size="2xs"
-            variant="ghost"
-            color="fg.muted"
-            gap={1}
-            paddingX={2}
-            onClick={async (e) => {
-              e.stopPropagation();
-              const allowed = await datasetsGate.requestEnable();
-              if (!allowed) return;
-              openDrawer("addDatasetRecord", { traceId });
-            }}
-          >
-            <Icon as={Database} boxSize={3} />
-            <Text textStyle="2xs">Dataset</Text>
-          </Button>
-        </Tooltip>
-      )}
-      <PersonalFeatureGateDialog state={annotationsGate.dialogState} />
-      <PersonalFeatureGateDialog state={datasetsGate.dialogState} />
-    </HStack>
+    <HoverActionCluster label="Turn actions">
+      <HoverActionButton
+        icon={Pencil}
+        label="Edit trace"
+        tooltip="Open this turn's trace to correct it"
+        onActivate={() =>
+          openTraceEditorFromConversation({
+            openDrawer,
+            traceId,
+            occurredAtMs: tracePartitionHint(occurredAtMs),
+          })
+        }
+      />
+    </HoverActionCluster>
   );
 }
 
 /**
- * The rail's flavour of an action button: no popover to anchor, it just opens
- * the composer in the column beside the turn.
+ * Whether this turn's trace is one the sitting at the queue counts.
+ *
+ * Annotating a turn counts it on its own, so the box is mostly a way to
+ * disagree: to keep a trace the reviewer only read, or to drop one they
+ * annotated and thought better of.
  */
-function RailComposerButton({
-  icon,
-  label,
-  tooltip,
-  onOpen,
-}: {
-  icon: typeof Edit3;
-  label: string;
-  tooltip: string;
-  /** Opening asks the personal-workspace gate first, so it may be async. */
-  onOpen: () => void | Promise<void>;
-}) {
+export function TurnSessionCheckbox({ traceId }: { traceId: string }) {
+  const isMarked = useAnnotationQueueSessionStore((s) =>
+    isSessionMarked(s.marks, traceId),
+  );
+  const toggle = useAnnotationQueueSessionStore((s) => s.toggle);
+
   return (
-    <Tooltip content={tooltip} positioning={{ placement: "top" }}>
-      <ActionButton
-        icon={icon}
-        label={label}
-        onClick={(e) => {
-          e.stopPropagation();
-          void Promise.resolve(onOpen()).catch((error) => {
-            logger.error({ error }, "could not open the annotation composer");
-            toaster.create({
-              title: "Could not open the annotation composer",
-              type: "error",
-            });
-          });
-        }}
-      />
-    </Tooltip>
+    <Checkbox
+      size="sm"
+      checked={isMarked}
+      onCheckedChange={() => toggle(traceId)}
+      onClick={(e: React.MouseEvent) => e.stopPropagation()}
+      inputProps={{
+        "aria-label": "Count this turn in the annotation session",
+      }}
+    />
   );
 }
-
-const ActionButton = forwardRef<
-  HTMLButtonElement,
-  {
-    icon: typeof Edit3;
-    label: string;
-  } & React.ComponentProps<typeof Button>
->(function ActionButton({ icon, label, ...buttonProps }, ref) {
-  return (
-    <Button
-      ref={ref}
-      size="2xs"
-      variant="ghost"
-      color="fg.muted"
-      gap={1}
-      paddingX={2}
-      {...buttonProps}
-    >
-      <Icon as={icon} boxSize={3} />
-      <Text textStyle="2xs">{label}</Text>
-    </Button>
-  );
-});
 
 interface TurnAnnotationBadgesProps {
   traceId: string;

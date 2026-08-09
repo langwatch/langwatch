@@ -1,27 +1,46 @@
 # Implementation:
 #   platform/app/src/pages/[project]/annotations/my-queue.tsx     (queue walk, bottom bar, end-of-queue hand-off)
 #   platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/ConversationView.tsx
-#                                                                 (the conversation the reviewer reads and corrects)
+#                                                                 (the conversation the reviewer reads and corrects,
+#                                                                  and the turn in focus)
+#   platform/app/src/features/traces-v2/stores/                   (the session's traces, collected as the queue is walked)
 #   platform/app/src/features/traces-v2/utils/legacyTraceToTurn.ts (a threadless trace read as a single-turn conversation)
 #   platform/app/src/components/AnnotationExpectedOutputs.tsx     (saved suggestions under the output)
 #   platform/app/src/components/AddDatasetRecordDrawer.tsx        (the drawer the hand-off opens)
-#   platform/app/src/server/api/routers/annotation.ts             (queue marks, mark clearing)
 #
 # Motivation: the reviewer's loop is production traces, then correction, then an
 # evaluation dataset. Walking a queue used to end nowhere. The only way to get
 # the traces just reviewed into a dataset was a CSV export of everything
 # followed by a manual import, and the queue bar itself was a row of bare
-# glyphs whose meaning had to be guessed.
+# glyphs whose meaning had to be guessed. And once the queue read whole threads,
+# the page stopped saying which turn the item was actually about, and the
+# celebration fired the moment the counter hit zero, before the dataset
+# hand-off it was supposed to crown.
 #
 # Decisions:
-#   - The mark lives on the queue item in the database rather than in the
-#     browser, so it survives a refresh, is visible to whoever picks the queue
-#     up next, and can still be found after the item is done.
-#   - The hand-off is offered once per set of marks. Dismissing it is an answer,
-#     so it is not offered again until the marks themselves change.
+#   - The session's traces live in the browser for the sitting, not on the queue
+#     item in the database. A reviewer walks a thread and annotates whichever
+#     turns deserve it; which of those go to a dataset is a decision about this
+#     sitting, made at its end. Leaving the queue ends the sitting and clears
+#     the set.
+#   - Annotating a turn counts it into the session automatically, because a
+#     turn worth writing about is a turn worth keeping; the reviewer's own
+#     tick or untick always wins over the automatic one.
+#   - The bar's "Add to dataset at the end" stays a decision, not a display: it
+#     is the on/off switch for the hand-off, and it carries the live count of
+#     the session's traces so the end of the queue is never a surprise.
+#   - The celebration is earned, not automatic. It shows after the dataset add
+#     succeeds, or after the reviewer explicitly confirms ending the session
+#     without one. It never shows under or before the hand-off drawer.
+#   - The turn the item is about announces itself: the conversation scrolls to
+#     it, blinks it once, and keeps a tint on it, because "which turn was I
+#     sent here for" must survive the reviewer scrolling around.
 #   - Correcting a trace happens in the trace drawer opened straight into edit
 #     mode, not in a second editor bolted onto the queue page. The dataset reads
-#     the correction, so what the reviewer fixed is what the dataset gets.
+#     the correction, so what the reviewer fixed is what the dataset gets. The
+#     drawer opens on a tab that adds something: the queue page already shows
+#     the conversation, so the drawer never opens on the conversation tab from
+#     here.
 #   - The queue reads the thread through the same conversation view the trace
 #     drawer uses, so annotating, suggesting, translating and expanding a
 #     message work the same way wherever the reviewer meets the conversation.
@@ -46,7 +65,7 @@ Feature: Walking an annotation queue into a dataset
     @integration
     Scenario: The queue bar labels its navigation and actions in words
       When I open a queue item
-      Then the bar offers "Previous", "Next", "Annotate trace" and "Done"
+      Then the bar offers "Previous", "Next", "Edit trace" and "Done"
       And none of them is an unlabelled icon
 
     @integration
@@ -67,10 +86,19 @@ Feature: Walking an annotation queue into a dataset
   Rule: The trace behind a queue item is corrected in the trace drawer
 
     @integration
-    Scenario: Annotate trace opens the trace drawer already in annotation mode
-      When I choose "Annotate trace" on a queue item
+    Scenario: Edit trace opens the trace drawer already in annotation mode
+      When I choose "Edit trace" on a queue item
       Then the trace drawer opens on that item's trace
       And it is already in annotation mode, so I can correct the trace without a second click
+
+    @integration
+    Scenario: Edit trace falls back from the conversation tab to the summary tab
+      Given the drawer last showed me the conversation tab
+      When I choose "Edit trace" on a queue item
+      Then the drawer opens on the summary tab
+      And the tab I usually get elsewhere is unchanged
+      # The queue page already shows the conversation; opening the drawer onto
+      # a second copy of it says nothing new.
 
     @integration
     Scenario: A reviewer who cannot update annotations is offered no correction
@@ -79,85 +107,100 @@ Feature: Walking an annotation queue into a dataset
       Then the bar offers no way to edit the trace
       And the rest of the bar still works
 
-  Rule: Items are marked for the dataset while the queue is walked
+  Rule: The turn under review is unmistakable
 
     @integration
-    Scenario: Ticking the end-of-queue checkbox marks the open item
-      Given the open queue item is not marked
-      When I tick "Add to dataset at the end"
-      Then the item is marked for the dataset
+    Scenario: Opening a queue item scrolls its turn into view
+      Given the open queue item's thread has more turns than fit on screen
+      When I open that queue item
+      Then the conversation scrolls to the item's own turn
+      And that turn blinks once so my eye lands on it
 
     @integration
-    Scenario: The checkbox answers immediately, before the mark is stored
-      Given the open queue item is not marked
-      When I tick "Add to dataset at the end" and the store has not answered yet
-      Then the checkbox already reads as ticked
+    Scenario: The turn under review keeps a distinct background
+      When I open a queue item and scroll the conversation myself
+      Then the item's own turn still reads with a distinct background tint
+      And no other turn reads that way
 
     @integration
-    Scenario: Unticking the checkbox takes the mark off the item
-      Given the open queue item is marked
-      When I untick "Add to dataset at the end"
-      Then the mark is taken off the item
+    Scenario: Moving to the next item moves the focus
+      Given my queue has two items in the same thread
+      When I move from one to the next
+      Then the conversation scrolls to the next item's turn
+      And the distinct background moves with it
+
+  Rule: The session's traces are collected as the queue is walked
 
     @integration
-    Scenario: A mark made earlier is still ticked when the queue is reopened
-      Given a queue item I marked in an earlier session
-      When I open it again
-      Then "Add to dataset at the end" is already ticked
-
-  Rule: Finishing the queue hands the marked traces to a dataset
+    Scenario: Annotating a turn counts its trace into the session
+      Given no turn is counted into the session yet
+      When I annotate one of the conversation's turns
+      Then that turn's checkbox reads as ticked
+      And the bar's dataset toggle counts one trace
 
     @integration
-    Scenario: Finishing the last item opens the dataset drawer with the marked traces
-      Given the last item of my queue is open and two items are marked
+    Scenario: A turn is counted in or out by hand
+      Given a turn the session does not count yet
+      When I tick that turn's checkbox
+      Then the bar's count goes up by one
+      And unticking a turn I annotated takes it back out, and my untick wins
+
+    @integration
+    Scenario: The dataset toggle carries the live count
+      Given three turns are counted into the session
+      Then the bar reads "Add to dataset at the end (3)"
+
+    @integration
+    Scenario: Session marks belong to the sitting
+      Given two turns are counted into the session
+      When I leave the queue and open it again
+      Then no turn is counted any more
+      # Which traces to keep is a decision about one sitting; a stale set from
+      # last week silently feeding a dataset would be worse than re-ticking.
+
+  Rule: Finishing the queue hands the session's traces to a dataset, then celebrates
+
+    @integration
+    Scenario: Finishing the last item opens the hand-off with the session's traces
+      Given the last item of my queue is open, two traces are counted, and the dataset toggle is on
       When I mark it done
       Then the add-to-dataset drawer opens with those two traces
+      And the celebration is not shown yet
 
     @integration
-    Scenario: Traces marked before they were finished are part of the hand-off
-      Given I marked an item and then finished it earlier in this queue walk
+    Scenario: Traces counted earlier in the walk are part of the hand-off
+      Given I annotated a turn and finished its item earlier in this sitting
       When I finish the last item
       Then the hand-off still includes that trace
 
     @integration
-    Scenario: Finishing the last item with nothing marked skips the hand-off
-      Given nothing in my queue is marked
-      When I finish the last item
-      Then no drawer opens and I land on the finished queue
-
-    @integration
-    Scenario: Opening a finished queue that still has marks offers the hand-off
-      Given every item in my queue is done and two of them are marked
-      When I open my queue
-      Then the add-to-dataset drawer opens with those two traces
-
-    @integration
-    Scenario: Adding the traces to a dataset takes the marks off
-      Given the hand-off drawer is open for two marked items
+    Scenario: The celebration shows once the records are added
+      Given the hand-off drawer is open for the session's traces
       When the records are added to a dataset
-      Then the marks are cleared from those queue items
+      Then I am told all tasks are complete
+      And the session's set is cleared
 
     @integration
-    Scenario: Dismissing the hand-off does not offer it again until the marks change
-      Given I dismissed the hand-off drawer without adding anything
-      When the queue re-renders with the same marks
-      Then the drawer is not opened again
-      And it is offered again once the set of marked items changes
-
-  Rule: What is marked is read apart from the queue itself
+    Scenario: Closing the hand-off without adding asks before ending the session
+      Given the hand-off drawer is open for the session's traces
+      When I close it without adding anything
+      Then I am asked "Are you sure you want to end this annotation session without adding to a dataset?"
+      And confirming shows the celebration
 
     @integration
-    Scenario: Marks outlive being done and are read without their traces
-      Given I marked two items and finished one of them
-      When the marked items are read
-      Then both are listed, each with its trace and when it was marked
-      And nothing else about them is read
+    Scenario: Cancelling the question returns to the queue with the session intact
+      Given I was asked about ending the session without a dataset
+      When I cancel
+      Then the question closes and nothing else does
+      And every counted trace is still counted
+      And I am offered the hand-off again, or to finish without adding
 
     @integration
-    Scenario: A teammate's marks are not part of my hand-off
-      Given a teammate marked an item that is assigned to them alone
-      When the marked items are read
-      Then that item is not among them
+    Scenario: Finishing with the dataset toggle off celebrates directly
+      Given the last item of my queue is open and the dataset toggle is off
+      When I mark it done
+      Then no drawer opens
+      And I am told all tasks are complete
 
   Rule: An item whose trace is gone is walked past, not stared at
 
@@ -200,12 +243,6 @@ Feature: Walking an annotation queue into a dataset
       Given every item I can read is done and one item's trace no longer resolves
       When I open my queue
       Then I am told all tasks are complete
-
-    @integration
-    Scenario: An item whose trace is gone does not hold the dataset hand-off back
-      Given every item I can read is done, two are marked, and one item's trace no longer resolves
-      When I open my queue
-      Then the add-to-dataset drawer opens with those two traces
 
   Rule: The queue reads its trace as a conversation
 

@@ -17,6 +17,9 @@ const mocks = vi.hoisted(() => ({
     id: string;
     expectedOutput: string | null;
     user: { name: string; image: string | null } | null;
+    anchorKind?: string | null;
+    anchorId?: string | null;
+    anchorPath?: string | null;
   }[],
 }));
 
@@ -146,6 +149,46 @@ describe("given a trace that already carries suggestions", () => {
       expect(popover).toHaveAttribute("data-mode", "suggest");
       expect(popover).toHaveAttribute("data-annotation-id", "annotation-1");
       expect(popover).toHaveAttribute("data-trace-id", "trace-1");
+    });
+  });
+});
+
+describe("given suggestions that correct something other than the output", () => {
+  describe("when the suggestions render under the output", () => {
+    it("lists only the ones suggesting what this output should have been", () => {
+      mocks.annotations = [
+        {
+          id: "annotation-1",
+          expectedOutput: "the corrected answer",
+          user: { name: "Reviewer One", image: null },
+          anchorKind: "field",
+          anchorId: "trace-1",
+          anchorPath: "output",
+        },
+        {
+          id: "annotation-2",
+          expectedOutput: "what the user meant to ask",
+          user: { name: "Reviewer Two", image: null },
+          anchorKind: "field",
+          anchorId: "trace-1",
+          anchorPath: "input",
+        },
+        {
+          id: "annotation-3",
+          expectedOutput: "Amsterdam",
+          user: { name: "Reviewer Three", image: null },
+          anchorKind: "field",
+          anchorId: "span-search",
+          anchorPath: "output",
+        },
+      ];
+      renderOutputs();
+
+      expect(screen.getByText("the corrected answer")).toBeInTheDocument();
+      expect(
+        screen.queryByText("what the user meant to ask"),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Amsterdam")).not.toBeInTheDocument();
     });
   });
 });

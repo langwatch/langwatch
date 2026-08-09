@@ -15,9 +15,10 @@ import {
   traceEditOverlayPatchSchema,
 } from "./traceEditOverlay.schemas";
 
-/** The span fields a suggestion can correct: the two that hold a captured value
- *  a reviewer reads and can rewrite as text. */
-export type TraceEditSpanIOField = "input" | "output";
+/** The fields a suggestion can correct, on the trace itself or on one of its
+ *  spans: the two that hold a captured value a reviewer reads and can rewrite
+ *  as text. */
+export type TraceEditIOField = "input" | "output";
 
 export interface TraceEditOverlayDto {
   traceId: string;
@@ -110,47 +111,51 @@ export class TraceEditOverlayService {
   }
 
   /**
-   * Records a corrected trace output without disturbing the rest of the
-   * correction. This is what the "suggest an expected output" flow writes: the
-   * annotation stays the record of who suggested what, and the correction stays
-   * the current corrected truth for the whole trace.
+   * Records a corrected trace input or output without disturbing the rest of
+   * the correction. This is what a suggestion left on the trace's own field
+   * writes: the annotation stays the record of who suggested what, and the
+   * correction stays the current corrected truth for the whole trace.
    */
-  async mergeTraceOutputEdit({
+  async mergeTraceIOEdit({
     projectId,
     traceId,
-    output,
+    field,
+    value,
     userId,
   }: {
     projectId: string;
     traceId: string;
-    output: string;
+    field: TraceEditIOField;
+    value: string;
     userId: string | null;
   }): Promise<TraceEditOverlayDto> {
     const current = await this.currentPatch({ projectId, traceId });
 
     const merged: TraceEditOverlayPatch = {
       ...current,
-      trace: { ...current.trace, output: { value: output } },
+      trace: { ...current.trace, [field]: { value } },
     };
 
     return this.upsert({ projectId, traceId, patch: merged, userId });
   }
 
   /**
-   * Takes the corrected trace output back off, leaving every other edit in
-   * place. This is what clearing a suggestion writes: the reviewer withdrew the
-   * output they proposed, not the span renames or deletions someone made in the
-   * drawer. When the output was the only edit the row goes with it, so a
-   * withdrawn suggestion returns the trace to uncorrected rather than leaving an
-   * inert row behind.
+   * Takes a corrected trace input or output back off, leaving every other edit
+   * in place. This is what clearing a suggestion writes: the reviewer withdrew
+   * the value they proposed, not the other trace fields, nor the span renames
+   * or deletions someone made in the drawer. When that field was the only edit
+   * the row goes with it, so a withdrawn suggestion returns the trace to
+   * uncorrected rather than leaving an inert row behind.
    */
-  async removeTraceOutputEdit({
+  async removeTraceIOEdit({
     projectId,
     traceId,
+    field,
     userId,
   }: {
     projectId: string;
     traceId: string;
+    field: TraceEditIOField;
     userId: string | null;
   }): Promise<TraceEditOverlayDto | null> {
     const existing = await this.repository.findByProjectAndTrace({
@@ -160,9 +165,9 @@ export class TraceEditOverlayService {
     if (!existing) return null;
 
     const current = parseTraceEditOverlayPatch(existing.patch);
-    if (!current?.trace?.output) return null;
+    if (!current?.trace?.[field]) return null;
 
-    const { output: _removed, ...remainingTraceEdits } = current.trace;
+    const { [field]: _removed, ...remainingTraceEdits } = current.trace;
     const hasRemainingTraceEdits = Object.values(remainingTraceEdits).some(
       (value) => value !== undefined,
     );
@@ -203,7 +208,7 @@ export class TraceEditOverlayService {
     projectId: string;
     traceId: string;
     spanId: string;
-    field: TraceEditSpanIOField;
+    field: TraceEditIOField;
     text: string;
     userId: string | null;
   }): Promise<TraceEditOverlayDto> {
@@ -243,7 +248,7 @@ export class TraceEditOverlayService {
     projectId: string;
     traceId: string;
     spanId: string;
-    field: TraceEditSpanIOField;
+    field: TraceEditIOField;
     userId: string | null;
   }): Promise<TraceEditOverlayDto | null> {
     const existing = await this.repository.findByProjectAndTrace({

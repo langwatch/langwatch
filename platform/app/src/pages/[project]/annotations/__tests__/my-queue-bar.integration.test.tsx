@@ -2,12 +2,12 @@
  * @vitest-environment jsdom
  *
  * The annotation queue walk: a bottom bar whose actions are named in words,
- * correcting the trace in the drawer, marking items for the dataset, and the
- * hand-off that opens once the queue is finished.
+ * correcting the trace in the drawer, the traces this sitting counts, and the
+ * hand-off that has to be answered before the queue celebrates.
  * See specs/annotations/annotation-queue-workflow.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -21,28 +21,18 @@ type TestQueueItem = {
   traceMissing?: boolean;
 };
 
-type TestMark = {
-  id: string;
-  traceId: string;
-};
-
 const mocks = vi.hoisted(() => ({
   items: [] as unknown[],
-  marks: [] as unknown[],
   queuesLoading: false,
   canUpdateAnnotations: true,
+  /** Which drawers the URL currently holds open. */
+  openDrawers: [] as string[],
   replace: vi.fn(),
   push: vi.fn(),
   openDrawer: vi.fn(),
-  setFlowCallbacks: vi.fn(),
-  openTrace: vi.fn(),
-  enterTraceEditMode: vi.fn(),
-  markForDataset: vi.fn(),
   markDone: vi.fn(),
-  clearMarks: vi.fn(),
   deleteQueueItems: vi.fn(),
   invalidateQueues: vi.fn(),
-  invalidateMarks: vi.fn(),
 }));
 
 vi.mock("~/hooks/useAnnotationQueues", () => ({
@@ -73,16 +63,10 @@ vi.mock("~/utils/compat/next-router", () => ({
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
     openDrawer: mocks.openDrawer,
-    setFlowCallbacks: mocks.setFlowCallbacks,
+    // Opening a drawer names it in the URL, which is what the page reads back
+    // to tell "the reviewer is answering the hand-off" from "they closed it".
+    drawerOpen: (drawer: string) => mocks.openDrawers.includes(drawer),
   }),
-}));
-
-vi.mock("~/features/traces-v2/stores/drawerStore", () => ({
-  useDrawerStore: { getState: () => ({ openTrace: mocks.openTrace }) },
-}));
-
-vi.mock("~/features/traces-v2/utils/traceEditMode", () => ({
-  enterTraceEditMode: mocks.enterTraceEditMode,
 }));
 
 vi.mock("~/components/DashboardLayout", () => ({
@@ -121,7 +105,6 @@ vi.mock("~/utils/api", () => ({
     useContext: () => ({
       annotation: {
         getOptimizedAnnotationQueues: { invalidate: mocks.invalidateQueues },
-        getMarkedForDatasetItems: { invalidate: mocks.invalidateMarks },
         getPendingItemsCount: { invalidate: vi.fn() },
         getAssignedItemsCount: { invalidate: vi.fn() },
         getQueueItemsCounts: { invalidate: vi.fn() },
@@ -136,17 +119,8 @@ vi.mock("~/utils/api", () => ({
       list: { useQuery: () => ({ data: undefined, isLoading: false }) },
     },
     annotation: {
-      getMarkedForDatasetItems: {
-        useQuery: () => ({ data: mocks.marks, isLoading: false }),
-      },
       markQueueItemDone: {
         useMutation: () => ({ mutate: mocks.markDone, isLoading: false }),
-      },
-      markQueueItemForDataset: {
-        useMutation: () => ({ mutate: mocks.markForDataset, isLoading: false }),
-      },
-      clearDatasetMarks: {
-        useMutation: () => ({ mutate: mocks.clearMarks, isLoading: false }),
       },
       deleteQueueItems: {
         useMutation: () => ({
@@ -158,11 +132,23 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-const { default: MyQueuePage, ROUTE_SETTLE_MS } = await import(
-  "~/pages/[project]/annotations/my-queue"
+// The drawer store is the real one: "Edit trace" leaves the tab it lands on to
+// the shared helper, and what that helper does to the reader's remembered tab
+// is the point of the fallback.
+const { useDrawerStore } = await import(
+  "~/features/traces-v2/stores/drawerStore"
 );
+const { useAnnotationQueueSessionStore } = await import(
+  "~/features/traces-v2/stores/annotationQueueSessionStore"
+);
+const {
+  default: MyQueuePage,
+  END_SESSION_QUESTION,
+  ROUTE_SETTLE_MS,
+} = await import("~/pages/[project]/annotations/my-queue");
 
 const TRACE_STARTED_AT = 1_700_000_000_000;
+const LAST_VIEW_MODE_KEY = "langwatch:traces-v2:drawer-last-mode:v1";
 
 const setItems = (items: TestQueueItem[]) => {
   mocks.items = items.map(({ traceMissing, ...item }) => ({
@@ -182,15 +168,6 @@ const setItems = (items: TestQueueItem[]) => {
   }));
 };
 
-// The marks are read on their own, so they are told apart from the queue: a
-// mark can point at an item that is already done and out of the walk.
-const setMarks = (marks: TestMark[]) => {
-  mocks.marks = marks.map((mark) => ({
-    ...mark,
-    markedForDatasetAt: new Date("2026-08-01T11:00:00Z"),
-  }));
-};
-
 // A fresh element every time: React skips re-rendering an element it is handed
 // by the same reference, which would hide the refreshed queue data.
 const page = () => (
@@ -201,20 +178,71 @@ const page = () => (
 
 const renderPage = () => render(page());
 
-const datasetCheckbox = () =>
-  screen.getByRole("checkbox", { name: "Add to dataset at the end" });
+const datasetCheckbox = (name = "Add to dataset at the end") =>
+  screen.getByRole("checkbox", { name });
 
-// The control's own state, off the root. The hidden input's DOM property is
-// only written when that state changes, so an answer that went up and came back
-// down inside one tick leaves the input reading stale.
-const datasetMarkReadsTicked = () =>
-  datasetCheckbox().closest("label")?.getAttribute("data-state") === "checked";
+const session = () => useAnnotationQueueSessionStore.getState();
+
+/** What the conversation does when a reviewer saves an annotation on a turn. */
+const annotateTurn = (traceId: string) =>
+  act(() => session().noteAnnotationSaved(traceId));
+
+/** What the add-to-dataset drawer does once the records land. */
+const recordsAdded = () => act(() => session().noteHandoffAdded());
+
+const finishesTheLastItem = () => {
+  mocks.markDone.mockImplementation(
+    (
+      input: { queueItemId: string },
+      options?: { onSuccess?: () => Promise<void> | void },
+    ) => {
+      mocks.items = (mocks.items as { id: string }[]).map((item) =>
+        item.id === input.queueItemId
+          ? { ...item, doneAt: new Date("2026-08-02T10:00:00Z") }
+          : item,
+      );
+      void options?.onSuccess?.();
+    },
+  );
+};
+
+/** Walks the queue to its end with the hand-off switched on. */
+const finishQueueWithHandoff = async ({ traceIds }: { traceIds: string[] }) => {
+  const user = userEvent.setup();
+  setItems([{ id: "item-1", traceId: "trace-1", doneAt: null }]);
+  finishesTheLastItem();
+  const view = renderPage();
+
+  await user.click(datasetCheckbox());
+  for (const traceId of traceIds) annotateTurn(traceId);
+  await user.click(screen.getByRole("button", { name: /Done/ }));
+  view.rerender(page());
+
+  await waitFor(() =>
+    expect(mocks.openDrawer).toHaveBeenCalledWith("addDatasetRecord", {
+      selectedTraceIds: traceIds,
+    }),
+  );
+  return { user, view };
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.queuesLoading = false;
   mocks.canUpdateAnnotations = true;
-  setMarks([]);
+  mocks.openDrawers = [];
+  // Asking for the hand-off drawer is what puts it in the URL, so the page can
+  // tell it was opened and, later, that it was closed again.
+  mocks.openDrawer.mockImplementation((drawer: string) => {
+    if (drawer === "addDatasetRecord") mocks.openDrawers = [drawer];
+  });
+  useAnnotationQueueSessionStore.setState({
+    active: false,
+    marks: {},
+    handoff: "idle",
+  });
+  useDrawerStore.setState({ isOpen: false, viewMode: "summary" });
+  localStorage.removeItem(LAST_VIEW_MODE_KEY);
   setItems([
     { id: "item-1", traceId: "trace-1", doneAt: null },
     { id: "item-2", traceId: "trace-2", doneAt: null },
@@ -237,7 +265,7 @@ describe("given a reviewer walking their annotation queue", () => {
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Next/ })).toBeInTheDocument();
       expect(
-        screen.getByRole("button", { name: /Annotate trace/ }),
+        screen.getByRole("button", { name: /Edit trace/ }),
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Done/ })).toBeInTheDocument();
       expect(datasetCheckbox()).toBeInTheDocument();
@@ -261,20 +289,20 @@ describe("given a reviewer walking their annotation queue", () => {
       renderPage();
 
       expect(
-        screen.queryByRole("button", { name: /Annotate trace/ }),
+        screen.queryByRole("button", { name: /Edit trace/ }),
       ).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Done/ })).toBeInTheDocument();
       expect(datasetCheckbox()).toBeInTheDocument();
     });
   });
 
-  describe("when the reviewer chooses Annotate trace", () => {
-    /** @scenario "Annotate trace opens the trace drawer already in annotation mode" */
+  describe("when the reviewer chooses Edit trace", () => {
+    /** @scenario "Edit trace opens the trace drawer already in annotation mode" */
     it("opens the trace drawer on that trace, already editing", async () => {
       const user = userEvent.setup();
       renderPage();
 
-      await user.click(screen.getByRole("button", { name: /Annotate trace/ }));
+      await user.click(screen.getByRole("button", { name: /Edit trace/ }));
 
       expect(mocks.openDrawer).toHaveBeenCalledWith("traceV2Details", {
         traceId: "trace-1",
@@ -283,135 +311,151 @@ describe("given a reviewer walking their annotation queue", () => {
       });
     });
 
-    /** @scenario "Annotate trace opens the trace drawer already in annotation mode" */
+    /** @scenario "Edit trace opens the trace drawer already in annotation mode" */
     it("leaves the drawer state to the link, so the two cannot disagree", async () => {
       const user = userEvent.setup();
       renderPage();
 
-      await user.click(screen.getByRole("button", { name: /Annotate trace/ }));
+      await user.click(screen.getByRole("button", { name: /Edit trace/ }));
 
       // Seeding the store here would mount the drawer a frame before the URL
       // names it, and the drawer's URL hydrator reads that frame as "no drawer
       // in the URL, close it", a fight with the sync writing the URL that
       // never settles.
-      expect(mocks.openTrace).not.toHaveBeenCalled();
-      expect(mocks.enterTraceEditMode).not.toHaveBeenCalled();
+      expect(useDrawerStore.getState().isOpen).toBe(false);
+      expect(useDrawerStore.getState().isEditing).toBe(false);
+    });
+
+    describe("given the drawer last showed the conversation tab", () => {
+      beforeEach(() => {
+        localStorage.setItem(LAST_VIEW_MODE_KEY, "conversation");
+        useDrawerStore.getState().setViewModeTransient("conversation");
+      });
+
+      /** @scenario "Edit trace falls back from the conversation tab to the summary tab" */
+      it("opens the drawer on the summary tab instead", async () => {
+        const user = userEvent.setup();
+        renderPage();
+
+        await user.click(screen.getByRole("button", { name: /Edit trace/ }));
+
+        // The queue page already shows the conversation, so a second copy of
+        // it in the drawer would say nothing new.
+        expect(useDrawerStore.getState().viewMode).toBe("summary");
+      });
+
+      /** @scenario "Edit trace falls back from the conversation tab to the summary tab" */
+      it("leaves the tab the reader gets elsewhere unchanged", async () => {
+        const user = userEvent.setup();
+        renderPage();
+
+        await user.click(screen.getByRole("button", { name: /Edit trace/ }));
+
+        expect(localStorage.getItem(LAST_VIEW_MODE_KEY)).toBe("conversation");
+      });
     });
   });
 
-  describe("when the reviewer ticks the dataset checkbox", () => {
-    /** @scenario "Ticking the end-of-queue checkbox marks the open item" */
-    it("marks the open queue item for the dataset", async () => {
-      const user = userEvent.setup();
+  describe("when turns are counted into the session", () => {
+    /** @scenario "Annotating a turn counts its trace into the session" */
+    it("counts an annotated turn's trace on the bar's dataset toggle", () => {
       renderPage();
+      expect(datasetCheckbox()).toBeInTheDocument();
 
-      await user.click(datasetCheckbox());
+      annotateTurn("trace-1");
 
-      expect(mocks.markForDataset).toHaveBeenCalledWith(
-        { queueItemId: "item-1", projectId: "project-1", marked: true },
-        expect.anything(),
-      );
+      expect(
+        datasetCheckbox("Add to dataset at the end (1)"),
+      ).toBeInTheDocument();
     });
 
-    /** @scenario "The checkbox answers immediately, before the mark is stored" */
-    it("ticks the checkbox before the mark is stored", async () => {
-      const user = userEvent.setup();
-      // The mutation never answers, so anything ticked is the local answer.
-      mocks.markForDataset.mockImplementation(() => undefined);
+    /** @scenario "A turn is counted in or out by hand" */
+    it("counts a turn in by hand, and an untick wins over the annotation", () => {
       renderPage();
 
-      await user.click(datasetCheckbox());
+      act(() => session().toggle("trace-2"));
+      expect(
+        datasetCheckbox("Add to dataset at the end (1)"),
+      ).toBeInTheDocument();
 
-      expect(datasetCheckbox()).toBeChecked();
+      annotateTurn("trace-1");
+      act(() => session().toggle("trace-1"));
+      // The reviewer's own untick outranks the automatic count, so annotating
+      // that turn again does not quietly put it back.
+      annotateTurn("trace-1");
+
+      expect(
+        datasetCheckbox("Add to dataset at the end (1)"),
+      ).toBeInTheDocument();
     });
 
-    /** @scenario "The checkbox answers immediately, before the mark is stored" */
-    it("takes the tick back when the mark cannot be stored", async () => {
-      const user = userEvent.setup();
-      mocks.markForDataset.mockImplementation(
-        (_input: unknown, options?: { onError?: () => void }) =>
-          options?.onError?.(),
-      );
+    /** @scenario "The dataset toggle carries the live count" */
+    it("carries the live count on the toggle", () => {
       renderPage();
 
-      await user.click(datasetCheckbox());
+      annotateTurn("trace-1");
+      annotateTurn("trace-2");
+      annotateTurn("trace-3");
 
-      await waitFor(() => expect(datasetMarkReadsTicked()).toBe(false));
-    });
-  });
-
-  describe("given the open item was already marked", () => {
-    beforeEach(() => {
-      setItems([{ id: "item-1", traceId: "trace-1", doneAt: null }]);
-      setMarks([{ id: "item-1", traceId: "trace-1" }]);
+      expect(
+        datasetCheckbox("Add to dataset at the end (3)"),
+      ).toBeInTheDocument();
     });
 
-    /** @scenario "A mark made earlier is still ticked when the queue is reopened" */
-    it("shows the checkbox already ticked", () => {
-      renderPage();
+    /** @scenario "Session marks belong to the sitting" */
+    it("drops the sitting's count on the way out of the queue", () => {
+      const { unmount } = renderPage();
+      annotateTurn("trace-1");
+      annotateTurn("trace-2");
+      expect(session().marks).toEqual({ "trace-1": "auto", "trace-2": "auto" });
 
-      expect(datasetCheckbox()).toBeChecked();
-    });
+      unmount();
 
-    /** @scenario "Unticking the checkbox takes the mark off the item" */
-    it("takes the mark off the item", async () => {
-      const user = userEvent.setup();
-      renderPage();
-
-      await user.click(datasetCheckbox());
-
-      expect(mocks.markForDataset).toHaveBeenCalledWith(
-        { queueItemId: "item-1", projectId: "project-1", marked: false },
-        expect.anything(),
-      );
+      expect(session().marks).toEqual({});
+      expect(session().active).toBe(false);
     });
   });
 
   describe("when the reviewer finishes the last item", () => {
     beforeEach(() => {
-      mocks.markDone.mockImplementation(
-        (
-          input: { queueItemId: string },
-          options?: { onSuccess?: () => Promise<void> | void },
-        ) => {
-          mocks.items = (mocks.items as { id: string }[]).map((item) =>
-            item.id === input.queueItemId
-              ? { ...item, doneAt: new Date("2026-08-02T10:00:00Z") }
-              : item,
-          );
-          void options?.onSuccess?.();
-        },
-      );
+      finishesTheLastItem();
     });
 
-    /** @scenario "Finishing the last item opens the dataset drawer with the marked traces" */
-    it("opens the dataset drawer with the marked traces", async () => {
+    /** @scenario "Finishing the last item opens the hand-off with the session's traces" */
+    it("opens the hand-off with the session's traces, and does not celebrate yet", async () => {
       const user = userEvent.setup();
       setItems([{ id: "item-1", traceId: "trace-1", doneAt: null }]);
-      setMarks([{ id: "item-1", traceId: "trace-1" }]);
       const { rerender } = renderPage();
+      await user.click(datasetCheckbox());
+      annotateTurn("trace-1");
+      annotateTurn("trace-9");
 
       await user.click(screen.getByRole("button", { name: /Done/ }));
       rerender(page());
 
       await waitFor(() => {
         expect(mocks.openDrawer).toHaveBeenCalledWith("addDatasetRecord", {
-          selectedTraceIds: ["trace-1"],
+          selectedTraceIds: ["trace-1", "trace-9"],
         });
       });
+      expect(screen.queryByTestId("tasks-done")).not.toBeInTheDocument();
     });
 
-    /** @scenario "Traces marked before they were finished are part of the hand-off" */
-    it("includes traces that were marked and then finished earlier", async () => {
+    /** @scenario "Traces counted earlier in the walk are part of the hand-off" */
+    it("includes a trace counted earlier in the walk", async () => {
       const user = userEvent.setup();
-      // The finished item is no longer in the walk, but its mark is still read.
-      setItems([{ id: "item-2", traceId: "trace-2", doneAt: null }]);
-      setMarks([
-        { id: "item-1", traceId: "trace-1" },
-        { id: "item-2", traceId: "trace-2" },
+      setItems([
+        { id: "item-1", traceId: "trace-1", doneAt: null },
+        { id: "item-2", traceId: "trace-2", doneAt: null },
       ]);
       const { rerender } = renderPage();
+      await user.click(datasetCheckbox());
+      annotateTurn("trace-1");
 
+      // The first item is finished and leaves the walk; its trace stays counted.
+      await user.click(screen.getByRole("button", { name: /Done/ }));
+      rerender(page());
+      annotateTurn("trace-2");
       await user.click(screen.getByRole("button", { name: /Done/ }));
       rerender(page());
 
@@ -422,11 +466,12 @@ describe("given a reviewer walking their annotation queue", () => {
       });
     });
 
-    /** @scenario "Finishing the last item with nothing marked skips the hand-off" */
-    it("lands on the finished queue without opening a drawer", async () => {
+    /** @scenario "Finishing with the dataset toggle off celebrates directly" */
+    it("celebrates directly when the dataset toggle is off", async () => {
       const user = userEvent.setup();
       setItems([{ id: "item-1", traceId: "trace-1", doneAt: null }]);
       const { rerender } = renderPage();
+      annotateTurn("trace-1");
 
       await user.click(screen.getByRole("button", { name: /Done/ }));
       rerender(page());
@@ -436,56 +481,86 @@ describe("given a reviewer walking their annotation queue", () => {
     });
   });
 
-  describe("when the reviewer opens a queue that is already finished", () => {
-    beforeEach(() => {
-      setItems([]);
-      setMarks([
-        { id: "item-1", traceId: "trace-1" },
-        { id: "item-2", traceId: "trace-2" },
-      ]);
+  describe("given the hand-off drawer is open for the session's traces", () => {
+    /** @scenario "The celebration shows once the records are added" */
+    it("celebrates once the records are added, and clears the sitting's set", async () => {
+      const { view } = await finishQueueWithHandoff({ traceIds: ["trace-1"] });
+
+      recordsAdded();
+      view.rerender(page());
+
+      expect(await screen.findByTestId("tasks-done")).toBeInTheDocument();
+      expect(session().marks).toEqual({});
     });
 
-    /** @scenario "Opening a finished queue that still has marks offers the hand-off" */
-    it("offers the hand-off for the marks left behind", async () => {
-      renderPage();
+    /** @scenario "Closing the hand-off without adding asks before ending the session" */
+    it("asks before ending the session, and confirming celebrates", async () => {
+      const { user, view } = await finishQueueWithHandoff({
+        traceIds: ["trace-1"],
+      });
 
-      await waitFor(() => {
-        expect(mocks.openDrawer).toHaveBeenCalledWith("addDatasetRecord", {
-          selectedTraceIds: ["trace-1", "trace-2"],
-        });
+      mocks.openDrawers = [];
+      view.rerender(page());
+
+      expect(await screen.findByText(END_SESSION_QUESTION)).toBeInTheDocument();
+      expect(screen.queryByTestId("tasks-done")).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+      expect(await screen.findByTestId("tasks-done")).toBeInTheDocument();
+    });
+
+    /** @scenario "Cancelling the question returns to the queue with the session intact" */
+    it("closes only the question on cancel, keeping every counted trace", async () => {
+      const { user, view } = await finishQueueWithHandoff({
+        traceIds: ["trace-1", "trace-2"],
+      });
+      mocks.openDrawers = [];
+      view.rerender(page());
+      await screen.findByText(END_SESSION_QUESTION);
+
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+      await waitFor(() =>
+        expect(
+          screen.queryByText(END_SESSION_QUESTION),
+        ).not.toBeInTheDocument(),
+      );
+      expect(screen.queryByTestId("tasks-done")).not.toBeInTheDocument();
+      expect(session().marks).toEqual({ "trace-1": "auto", "trace-2": "auto" });
+      // Finishing again is still on offer, so cancelling is not a dead end.
+      expect(
+        screen.getByRole("button", { name: "Add to dataset" }),
+      ).toBeInTheDocument();
+    });
+
+    /** @scenario "Cancelling the question returns to the queue with the session intact" */
+    it("offers the hand-off again after the question was cancelled", async () => {
+      const { user, view } = await finishQueueWithHandoff({
+        traceIds: ["trace-1"],
+      });
+      mocks.openDrawers = [];
+      view.rerender(page());
+      await screen.findByText(END_SESSION_QUESTION);
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+      await user.click(screen.getByRole("button", { name: "Add to dataset" }));
+
+      expect(mocks.openDrawer).toHaveBeenCalledTimes(2);
+      expect(mocks.openDrawer).toHaveBeenLastCalledWith("addDatasetRecord", {
+        selectedTraceIds: ["trace-1"],
       });
     });
+  });
 
-    /** @scenario "Adding the traces to a dataset takes the marks off" */
-    it("clears the marks once the records are added", async () => {
+  describe("when the reviewer opens a queue with nothing left in it", () => {
+    /** @scenario "An item whose trace is gone does not hold the finished queue back" */
+    it("celebrates, since a fresh sitting has counted nothing", async () => {
+      setItems([]);
       renderPage();
 
-      await waitFor(() => expect(mocks.setFlowCallbacks).toHaveBeenCalled());
-      const [drawer, callbacks] = mocks.setFlowCallbacks.mock.calls[0] as [
-        string,
-        { onSuccess: () => void },
-      ];
-      expect(drawer).toBe("addDatasetRecord");
-      callbacks.onSuccess();
-
-      expect(mocks.clearMarks).toHaveBeenCalledWith(
-        { projectId: "project-1", queueItemIds: ["item-1", "item-2"] },
-        expect.anything(),
-      );
-    });
-
-    /** @scenario "Dismissing the hand-off does not offer it again until the marks change" */
-    it("stays quiet until the set of marked items changes", async () => {
-      const { rerender } = renderPage();
-
-      await waitFor(() => expect(mocks.openDrawer).toHaveBeenCalledTimes(1));
-      rerender(page());
-      expect(mocks.openDrawer).toHaveBeenCalledTimes(1);
-
-      setMarks([{ id: "item-1", traceId: "trace-1" }]);
-      rerender(page());
-
-      await waitFor(() => expect(mocks.openDrawer).toHaveBeenCalledTimes(2));
+      expect(await screen.findByTestId("tasks-done")).toBeInTheDocument();
+      expect(mocks.openDrawer).not.toHaveBeenCalled();
     });
   });
 
@@ -529,7 +604,7 @@ describe("given a reviewer walking their annotation queue", () => {
         screen.queryByRole("button", { name: /Done/ }),
       ).not.toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: /Annotate trace/ }),
+        screen.queryByRole("button", { name: /Edit trace/ }),
       ).not.toBeInTheDocument();
       expect(
         screen.queryByRole("checkbox", { name: "Add to dataset at the end" }),
@@ -603,25 +678,10 @@ describe("given a reviewer walking their annotation queue", () => {
     });
 
     /** @scenario "An item whose trace is gone does not hold the finished queue back" */
-    it("reads as a finished queue", () => {
+    it("reads as a finished queue", async () => {
       renderPage();
 
-      expect(screen.getByTestId("tasks-done")).toBeInTheDocument();
-    });
-
-    /** @scenario "An item whose trace is gone does not hold the dataset hand-off back" */
-    it("still offers the dataset hand-off for the marks left behind", async () => {
-      setMarks([
-        { id: "item-8", traceId: "trace-8" },
-        { id: "item-9", traceId: "trace-9" },
-      ]);
-      renderPage();
-
-      await waitFor(() => {
-        expect(mocks.openDrawer).toHaveBeenCalledWith("addDatasetRecord", {
-          selectedTraceIds: ["trace-8", "trace-9"],
-        });
-      });
+      expect(await screen.findByTestId("tasks-done")).toBeInTheDocument();
     });
   });
 

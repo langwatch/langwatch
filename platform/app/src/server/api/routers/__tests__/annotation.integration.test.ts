@@ -804,19 +804,26 @@ describe("Annotation CRUD", () => {
     });
 
     describe("given a trace with one comment about it and three about its spans", () => {
-      const floodTraceId = `${TRACE_ID_PREFIX}-flood`;
+      const commentedTraceId = `${TRACE_ID_PREFIX}-every-comment`;
+      const spanIds = ["span-1", "span-2", "span-3"];
+      const everyComment = [
+        "about span-1",
+        "about span-2",
+        "about span-3",
+        "the whole trace is off",
+      ];
 
       beforeAll(async () => {
         await prisma.annotation.deleteMany({
-          where: { projectId, traceId: floodTraceId },
+          where: { projectId, traceId: commentedTraceId },
         });
         await commentOn({
-          traceId: floodTraceId,
+          traceId: commentedTraceId,
           comment: "the whole trace is off",
         });
-        for (const spanId of ["span-1", "span-2", "span-3"]) {
+        for (const spanId of spanIds) {
           await commentOn({
-            traceId: floodTraceId,
+            traceId: commentedTraceId,
             comment: `about ${spanId}`,
             anchorKind: "span",
             anchorId: spanId,
@@ -824,70 +831,74 @@ describe("Annotation CRUD", () => {
         }
       });
 
-      /** @scenario "The project's annotations list holds only what was said about whole traces" */
+      /** @scenario "The project's annotations list holds every comment with its target named" */
       /** @scenario "Exporting the annotations list exports the rows the list shows" */
-      it("lists and exports the one comment about the trace", async () => {
+      it("lists and exports all four comments, each naming what it is about", async () => {
         const listed = await caller.annotation.getAll({ projectId });
 
-        const forTrace = listed.filter((row) => row.traceId === floodTraceId);
-        expect(forTrace).toHaveLength(1);
-        expect(forTrace[0]!.comment).toBe("the whole trace is off");
+        const forTrace = listed.filter(
+          (row) => row.traceId === commentedTraceId,
+        );
+        expect(forTrace.map((row) => row.comment).sort()).toEqual(everyComment);
         // The export is taken from the rows the list holds, so it carries the
-        // same one row.
+        // same four rows and the same anchors.
         expect(
-          forTrace.map((row) => ({
-            comment: row.comment,
-            traceId: row.traceId,
-          })),
-        ).toEqual([
-          { comment: "the whole trace is off", traceId: floodTraceId },
-        ]);
+          forTrace
+            .filter((row) => row.anchorKind === "span")
+            .map((row) => row.anchorId)
+            .sort(),
+        ).toEqual(spanIds);
       });
 
-      /** @scenario "A dataset column of annotations carries only the trace-level ones" */
-      it("fills a dataset annotations column with the one comment about the trace", async () => {
-        const traceLevel = await caller.annotation.getByTraceIds({
+      /** @scenario "A dataset column of annotations carries every comment, each naming its target" */
+      it("fills a dataset annotations column with all four comments", async () => {
+        const annotations = await caller.annotation.getByTraceIds({
           projectId,
-          traceIds: [floodTraceId],
-          anchor: "trace",
+          traceIds: [commentedTraceId],
         });
 
         const [row] = mapTraceToDatasetEntry(
           {
-            trace_id: floodTraceId,
-            annotations: traceLevel,
+            trace_id: commentedTraceId,
+            annotations,
           } as never,
           {
             trace_id: { source: "trace_id" },
             comments: { source: "annotations", key: "comment" },
+            readable: { source: "annotations", key: "ai_readable" },
           },
           new Set(),
         );
 
-        expect(row).toEqual({
-          trace_id: floodTraceId,
-          comments: JSON.stringify(["the whole trace is off"]),
-        });
+        expect(
+          (JSON.parse(row!.comments as string) as string[]).sort(),
+        ).toEqual(everyComment);
+        const readable = JSON.parse(row!.readable as string) as string[];
+        expect(
+          readable.filter((line) => line.includes("(on Span span-")),
+        ).toHaveLength(3);
       });
 
-      it("reads every comment when the trace's own list asks for them", async () => {
-        const all = await caller.annotation.getByTraceIds({
+      it("still narrows to the trace's own comments when a caller asks", async () => {
+        const traceLevel = await caller.annotation.getByTraceIds({
           projectId,
-          traceIds: [floodTraceId],
+          traceIds: [commentedTraceId],
+          anchor: "trace",
         });
 
-        expect(all).toHaveLength(4);
-        expect(all.filter((row) => row.anchorKind === "span")).toHaveLength(3);
+        expect(traceLevel.map((row) => row.comment)).toEqual([
+          "the whole trace is off",
+        ]);
       });
 
-      /** @scenario "A queue item carries the comments about its trace" */
-      it("carries the one comment about the trace on the queue item", async () => {
+      /** @scenario "A queue item carries every comment about its trace" */
+      it("carries all four comments on the queue item", async () => {
         await prisma.annotationQueueItem.deleteMany({
-          where: { projectId, traceId: floodTraceId },
+          where: { projectId, traceId: commentedTraceId },
         });
         const user = await getTestUser();
         const item = await prisma.annotationQueueItem.create({
-          data: { projectId, traceId: floodTraceId, userId: user.id },
+          data: { projectId, traceId: commentedTraceId, userId: user.id },
         });
 
         const queue = await caller.annotation.getOptimizedAnnotationQueues({
@@ -900,11 +911,14 @@ describe("Annotation CRUD", () => {
         const enriched = queue.assignedQueueItems.find(
           (queueItem) => queueItem.id === item.id,
         );
-        expect(enriched?.annotations.map((row) => row.comment)).toEqual([
-          "the whole trace is off",
-        ]);
+        expect(enriched?.annotations.map((row) => row.comment).sort()).toEqual(
+          everyComment,
+        );
+        expect(
+          enriched?.annotations.filter((row) => row.anchorKind === "span"),
+        ).toHaveLength(3);
         await prisma.annotationQueueItem.deleteMany({
-          where: { projectId, traceId: floodTraceId },
+          where: { projectId, traceId: commentedTraceId },
         });
       });
     });
@@ -1106,6 +1120,123 @@ describe("Annotation CRUD", () => {
         });
 
         expect(await overlayPatchFor(messageTraceId)).toBeUndefined();
+      });
+    });
+
+    describe("given a comment on the trace's own input carrying a suggestion", () => {
+      const inputTraceId = `${TRACE_ID_PREFIX}-trace-input-suggestion`;
+
+      const overlayPatchFor = async (forTraceId: string) => {
+        const row = await prisma.traceEditOverlay.findUnique({
+          where: { projectId_traceId: { projectId, traceId: forTraceId } },
+        });
+        return row?.patch as TraceEditOverlayPatch | undefined;
+      };
+
+      const suggestInput = ({
+        traceId: onTraceId,
+        expectedOutput,
+      }: {
+        traceId: string;
+        expectedOutput: string;
+      }) =>
+        commentOn({
+          traceId: onTraceId,
+          comment: "the user asked something else",
+          anchorKind: "field",
+          anchorId: onTraceId,
+          anchorPath: "input",
+          expectedOutput,
+        });
+
+      /** @scenario "A suggestion on the trace's own input becomes the corrected trace input" */
+      it("records the suggestion and corrects the trace input", async () => {
+        await prisma.traceEditOverlay.deleteMany({
+          where: { projectId, traceId: inputTraceId },
+        });
+
+        const created = await suggestInput({
+          traceId: inputTraceId,
+          expectedOutput: "what is the capital of the Netherlands?",
+        });
+
+        expect(created.expectedOutput).toBe(
+          "what is the capital of the Netherlands?",
+        );
+        const patch = await overlayPatchFor(inputTraceId);
+        expect(patch).toMatchObject({
+          version: 1,
+          trace: {
+            input: { value: "what is the capital of the Netherlands?" },
+          },
+        });
+        expect(patch?.trace?.output).toBeUndefined();
+      });
+
+      it("moves the corrected input when the suggestion is edited", async () => {
+        const editedTraceId = `${TRACE_ID_PREFIX}-trace-input-edited`;
+        await prisma.traceEditOverlay.deleteMany({
+          where: { projectId, traceId: editedTraceId },
+        });
+
+        const created = await suggestInput({
+          traceId: editedTraceId,
+          expectedOutput: "the first question",
+        });
+        await caller.annotation.updateByTraceId({
+          id: created.id,
+          projectId,
+          traceId: editedTraceId,
+          comment: "the user asked something else",
+          expectedOutput: "the second question",
+          scoreOptions: {},
+        });
+
+        expect(await overlayPatchFor(editedTraceId)).toMatchObject({
+          trace: { input: { value: "the second question" } },
+        });
+      });
+
+      it("withdraws only the corrected input when the suggestion is cleared", async () => {
+        const withdrawnTraceId = `${TRACE_ID_PREFIX}-trace-input-withdrawn`;
+        await prisma.traceEditOverlay.deleteMany({
+          where: { projectId, traceId: withdrawnTraceId },
+        });
+        await caller.traceEditOverlay.upsert({
+          projectId,
+          traceId: withdrawnTraceId,
+          patch: {
+            version: 1,
+            trace: { output: { value: "corrected in the drawer" } },
+            spans: [],
+            deletedSpanIds: [],
+          },
+        });
+
+        const created = await suggestInput({
+          traceId: withdrawnTraceId,
+          expectedOutput: "the real question",
+        });
+        expect(await overlayPatchFor(withdrawnTraceId)).toMatchObject({
+          trace: {
+            input: { value: "the real question" },
+            output: { value: "corrected in the drawer" },
+          },
+        });
+
+        await caller.annotation.updateByTraceId({
+          id: created.id,
+          projectId,
+          traceId: withdrawnTraceId,
+          comment: "never mind",
+          expectedOutput: "",
+          scoreOptions: {},
+        });
+
+        const patch = await overlayPatchFor(withdrawnTraceId);
+        expect(patch?.trace).toEqual({
+          output: { value: "corrected in the drawer" },
+        });
       });
     });
   });
@@ -1345,7 +1476,7 @@ describe("Annotation CRUD", () => {
     });
   });
 
-  describe("given queue items marked for the dataset hand-off", () => {
+  describe("given queue items on the reviewer's own queue", () => {
     const queueTracePrefix = "test-trace-annotation-queue-mark";
     let viewerCaller: ReturnType<typeof appRouter.createCaller>;
     let ownerUserId: string;
@@ -1431,204 +1562,6 @@ describe("Annotation CRUD", () => {
         ],
         ["user", { id: viewerUserId }],
       ]);
-    });
-
-    /** @scenario "Marking a queue item for the dataset persists the mark" */
-    it("persists the mark on the queue item", async () => {
-      const item = await createQueueItem("persist");
-
-      await caller.annotation.markQueueItemForDataset({
-        queueItemId: item.id,
-        projectId,
-        marked: true,
-      });
-
-      const persisted = await prisma.annotationQueueItem.findFirst({
-        where: { id: item.id, projectId },
-      });
-      expect(persisted!.markedForDatasetAt).not.toBeNull();
-    });
-
-    /** @scenario "Unmarking a queue item clears the mark" */
-    it("clears the mark when the annotator unmarks it", async () => {
-      const item = await createQueueItem("unmark");
-
-      await caller.annotation.markQueueItemForDataset({
-        queueItemId: item.id,
-        projectId,
-        marked: true,
-      });
-      await caller.annotation.markQueueItemForDataset({
-        queueItemId: item.id,
-        projectId,
-        marked: false,
-      });
-
-      const persisted = await prisma.annotationQueueItem.findFirst({
-        where: { id: item.id, projectId },
-      });
-      expect(persisted!.markedForDatasetAt).toBeNull();
-    });
-
-    /** @scenario "Marks are cleared for a batch of queue items at once" */
-    it("clears the batch and leaves items outside it marked", async () => {
-      const first = await createQueueItem("batch-one");
-      const second = await createQueueItem("batch-two");
-      const untouched = await createQueueItem("batch-untouched");
-
-      for (const item of [first, second, untouched]) {
-        await caller.annotation.markQueueItemForDataset({
-          queueItemId: item.id,
-          projectId,
-          marked: true,
-        });
-      }
-
-      const result = await caller.annotation.clearDatasetMarks({
-        projectId,
-        queueItemIds: [first.id, second.id],
-      });
-
-      expect(result.cleared).toBe(2);
-      const rows = await prisma.annotationQueueItem.findMany({
-        where: { projectId, id: { in: [first.id, second.id, untouched.id] } },
-      });
-      const marked = Object.fromEntries(
-        rows.map((row) => [row.id, row.markedForDatasetAt !== null]),
-      );
-      expect(marked[first.id]).toBe(false);
-      expect(marked[second.id]).toBe(false);
-      expect(marked[untouched.id]).toBe(true);
-    });
-
-    /** @scenario "Marks outlive being done and are read without their traces" */
-    it("lists the marked items with their marks and nothing else", async () => {
-      const finished = await createQueueItem("read-finished");
-      const waiting = await createQueueItem("read-waiting");
-      const unmarked = await createQueueItem("read-unmarked");
-
-      for (const item of [finished, waiting]) {
-        await caller.annotation.markQueueItemForDataset({
-          queueItemId: item.id,
-          projectId,
-          marked: true,
-        });
-      }
-      await caller.annotation.markQueueItemDone({
-        queueItemId: finished.id,
-        projectId,
-      });
-
-      const marked = await caller.annotation.getMarkedForDatasetItems({
-        projectId,
-      });
-
-      const ids = marked.map((item) => item.id);
-      expect(ids).toContain(finished.id);
-      expect(ids).toContain(waiting.id);
-      expect(ids).not.toContain(unmarked.id);
-
-      const row = marked.find((item) => item.id === waiting.id)!;
-      expect(Object.keys(row).sort()).toEqual([
-        "id",
-        "markedForDatasetAt",
-        "traceId",
-      ]);
-      expect(row.traceId).toBe(waiting.traceId);
-      expect(row.markedForDatasetAt).not.toBeNull();
-    });
-
-    /** @scenario "A teammate's marks are not part of my hand-off" */
-    it("leaves out an item marked on someone else's queue", async () => {
-      const mine = await createQueueItem("read-mine");
-      const theirs = await createQueueItem("read-theirs", viewerUserId);
-
-      await caller.annotation.markQueueItemForDataset({
-        queueItemId: mine.id,
-        projectId,
-        marked: true,
-      });
-      // Marking is scoped to the caller's own items, so the teammate's mark is
-      // planted directly rather than through the router.
-      await prisma.annotationQueueItem.updateMany({
-        where: { id: theirs.id, projectId },
-        data: { markedForDatasetAt: new Date() },
-      });
-
-      const marked = await caller.annotation.getMarkedForDatasetItems({
-        projectId,
-      });
-
-      const ids = marked.map((item) => item.id);
-      expect(ids).toContain(mine.id);
-      expect(ids).not.toContain(theirs.id);
-    });
-
-    /** @scenario "Marking a queue item needs permission to update annotations" */
-    it("refuses an annotator who may only view the project", async () => {
-      const item = await createQueueItem("unauthorized");
-
-      await expect(
-        viewerCaller.annotation.markQueueItemForDataset({
-          queueItemId: item.id,
-          projectId,
-          marked: true,
-        }),
-      ).rejects.toThrow();
-
-      const persisted = await prisma.annotationQueueItem.findFirst({
-        where: { id: item.id, projectId },
-      });
-      expect(persisted!.markedForDatasetAt).toBeNull();
-    });
-
-    /** @scenario "Marking a teammate's queue item is refused" */
-    it("refuses to mark an item that belongs to someone else", async () => {
-      const theirs = await createQueueItem("mark-theirs", viewerUserId);
-
-      await expect(
-        caller.annotation.markQueueItemForDataset({
-          queueItemId: theirs.id,
-          projectId,
-          marked: true,
-        }),
-      ).rejects.toThrow();
-
-      const persisted = await prisma.annotationQueueItem.findFirst({
-        where: { id: theirs.id, projectId },
-      });
-      expect(persisted!.markedForDatasetAt).toBeNull();
-    });
-
-    /** @scenario "Clearing marks leaves a teammate's marks alone" */
-    it("clears only the caller's own marks", async () => {
-      const mine = await createQueueItem("clear-mine");
-      const theirs = await createQueueItem("clear-theirs", viewerUserId);
-
-      await caller.annotation.markQueueItemForDataset({
-        queueItemId: mine.id,
-        projectId,
-        marked: true,
-      });
-      await prisma.annotationQueueItem.updateMany({
-        where: { id: theirs.id, projectId },
-        data: { markedForDatasetAt: new Date() },
-      });
-
-      const result = await caller.annotation.clearDatasetMarks({
-        projectId,
-        queueItemIds: [mine.id, theirs.id],
-      });
-
-      expect(result.cleared).toBe(1);
-      const rows = await prisma.annotationQueueItem.findMany({
-        where: { projectId, id: { in: [mine.id, theirs.id] } },
-      });
-      const marked = Object.fromEntries(
-        rows.map((row) => [row.id, row.markedForDatasetAt !== null]),
-      );
-      expect(marked[mine.id]).toBe(false);
-      expect(marked[theirs.id]).toBe(true);
     });
 
     describe("when an item is removed from the queue", () => {

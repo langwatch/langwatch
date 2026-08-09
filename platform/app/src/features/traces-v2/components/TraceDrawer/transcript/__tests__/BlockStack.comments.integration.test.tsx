@@ -168,15 +168,15 @@ describe("given a transcript of several messages inside a trace", () => {
       expect(screen.queryByText("Suggest correction")).not.toBeInTheDocument();
     });
 
-    /** @scenario "A comment on one part of a trace is not offered scores" */
-    it("offers no scores on the comment", async () => {
+    /** @scenario "A comment on one part of a trace is offered the same scores" */
+    it("offers the project's scores on the comment", async () => {
       const user = userEvent.setup();
       renderTranscript();
 
       await user.click(commentActions()[0]!);
 
       await screen.findByPlaceholderText("Optional");
-      expect(screen.queryByText("Scores")).not.toBeInTheDocument();
+      expect(screen.getByText("Scores")).toBeInTheDocument();
     });
   });
 });

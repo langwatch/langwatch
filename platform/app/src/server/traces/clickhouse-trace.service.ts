@@ -6,6 +6,7 @@ import { getLangWatchTracer } from "langwatch";
 import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
 import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
 import { AnnotationService } from "~/server/annotations/annotation.service";
+import { annotationSuggestedOutput } from "~/server/annotations/annotationSuggestedOutput";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
   queryWindowed,
@@ -2317,9 +2318,11 @@ export class ClickHouseTraceService {
    * read path. Fetched scoped to the page's trace IDs (multitenancy: projectId
    * is the first predicate). Mutates each trace's `annotations` in place.
    *
-   * Only the comments about the traces themselves: this one read feeds the trace
-   * table, the export and the dataset columns, each of which answers a question
-   * about a whole trace.
+   * Every comment left on those traces, anchored ones included: this one read
+   * feeds the trace table, the export and the dataset columns, and a comment on
+   * one span of a trace is part of what reviewers said about it. A suggestion
+   * only reads as the trace's expected output when that is what it suggested;
+   * a correction proposed for a span or for the trace's input is not one.
    */
   private async enrichTracesWithAnnotationsForProjection({
     projectId,
@@ -2337,7 +2340,7 @@ export class ClickHouseTraceService {
     // historical scoreOptions still resolve.
     const annotations = AnnotationService.create({ prisma: this.prisma });
     const [rows, scoreDefs] = await Promise.all([
-      annotations.getAllTraceLevelForProjection({ projectId, traceIds }),
+      annotations.getAllForProjection({ projectId, traceIds }),
       this.prisma.annotationScore.findMany({
         where: { projectId },
         select: { id: true, name: true },
@@ -2352,7 +2355,11 @@ export class ClickHouseTraceService {
         id: row.id,
         is_thumbs_up: row.isThumbsUp ?? null,
         comment: row.comment ?? null,
-        expected_output: row.expectedOutput ?? null,
+        expected_output:
+          annotationSuggestedOutput({
+            annotation: row,
+            traceId: row.traceId,
+          }) ?? null,
         scores: remapScoreOptionsToNames(row.scoreOptions, scoreNameById),
         created_at: row.createdAt.getTime(),
       });

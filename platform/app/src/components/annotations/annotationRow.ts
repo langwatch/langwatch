@@ -1,4 +1,6 @@
 import type { Annotation } from "@prisma/client";
+import { readableAnnotationAnchor } from "~/server/annotations/annotationAnchor";
+import { describeAnnotationAnchor } from "~/server/annotations/annotationAnchorLabel";
 import type { Trace } from "~/server/tracer/types";
 
 export type AnnotationWithUser = Annotation & {
@@ -8,6 +10,47 @@ export type AnnotationWithUser = Annotation & {
     image?: string | null;
   } | null;
 };
+
+/**
+ * The part of the trace an annotation was left on, in words, or null when it is
+ * about the trace as a whole. The list reads annotations straight from the feed,
+ * where an anchor kind this build does not recognise is still stored as written,
+ * so the anchor is normalised before it is named: an unreadable kind reads as no
+ * anchor rather than as a part of the trace nobody can point at.
+ */
+export function annotationAnchorLabel({
+  annotation,
+  traceId,
+}: {
+  annotation: Pick<Annotation, "anchorKind" | "anchorId" | "anchorPath">;
+  traceId: string;
+}): string | null {
+  return describeAnnotationAnchor({
+    anchor: readableAnnotationAnchor(annotation),
+    traceId,
+  });
+}
+
+/**
+ * One suggestion as the export writes it: the suggested output, named by the
+ * part of the trace it was left on. Empty when the annotation suggested nothing.
+ */
+export function suggestionExportLine({
+  annotation,
+  traceId,
+}: {
+  annotation: Pick<
+    Annotation,
+    "expectedOutput" | "anchorKind" | "anchorId" | "anchorPath"
+  >;
+  traceId: string;
+}): string {
+  if (!annotation.expectedOutput) return "";
+  const label = annotationAnchorLabel({ annotation, traceId });
+  return label
+    ? `${label}: ${annotation.expectedOutput}`
+    : annotation.expectedOutput;
+}
 
 /**
  * One line of the annotations list, whichever page it is on. A queue page's row

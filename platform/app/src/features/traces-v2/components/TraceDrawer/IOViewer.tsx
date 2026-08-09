@@ -329,12 +329,6 @@ export const IOViewer = memo(function IOViewer({
         : null,
     [traceId, spanId, mode],
   );
-  // A suggestion has to land somewhere in the correction. A span's input and
-  // output are both fields a correction can replace; the trace's own output is
-  // the correction the suggestion flow has always written, and its input is not
-  // something a correction carries.
-  const canSuggestField = spanId != null || mode === "output";
-
   const parsed = useMemo(() => tryParseJSON(content), [content]);
   // Coerce parsed into a chat message array — handles top-level arrays,
   // single message objects, and `{messages: [...]}` / `{input: [...]}`
@@ -600,9 +594,11 @@ export const IOViewer = memo(function IOViewer({
         {!collapsed && traceId && fieldAnchor && (
           <FieldCommentButton traceId={traceId} anchor={fieldAnchor} />
         )}
-        {!collapsed && traceId && fieldAnchor && canSuggestField && (
-          // Corrections must be stored against the REAL output — never the
-          // translated variant the viewer happens to be showing.
+        {!collapsed && traceId && fieldAnchor && (
+          // Every field this viewer shows is one a correction can replace,
+          // the trace's own input included. Corrections must be stored
+          // against the REAL text, never the translated variant the viewer
+          // happens to be showing.
           <SuggestCorrectionButton
             traceId={traceId}
             output={originalContent}

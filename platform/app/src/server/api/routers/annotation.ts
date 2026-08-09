@@ -47,15 +47,15 @@ const enrichQueueItemsWithTracesAndAnnotations = async (
   const traceIds = [...new Set(queueItems.map((item) => item.traceId))];
 
   // Get all annotations for these traces in a single query. A queue item is a
-  // whole trace to review, so it carries the comments about the trace itself;
-  // a comment left on one of its spans is not part of that hand-off.
+  // whole trace to review, so it carries every comment left on that trace,
+  // each one naming the part of it that was commented on.
   const annotations = await ctx.prisma.annotation.findMany({
     where: {
       projectId: projectId,
       traceId: {
         in: traceIds,
       },
-      ...annotationAnchorScopeWhere("trace"),
+      ...annotationAnchorScopeWhere("all"),
     },
     include: {
       user: true,
@@ -128,15 +128,47 @@ const annotatorReferenceSchema = z.string().transform((annotator, ctx) => {
 
 type AnnotatorReference = z.infer<typeof annotatorReferenceSchema>;
 
+/** Writes one suggestion into the trace's correction, or takes it back off when
+ *  the reviewer cleared the text. */
+const writeSuggestionToOverlay = async ({
+  overlay,
+  projectId,
+  traceId,
+  target,
+  text,
+  userId,
+}: {
+  overlay: TraceEditOverlayService;
+  projectId: string;
+  traceId: string;
+  target: NonNullable<ReturnType<typeof resolveAnnotationSuggestionTarget>>;
+  text: string;
+  userId: string;
+}) => {
+  const withdrawn = text.length === 0;
+  if (target.kind === "span") {
+    const span = { projectId, traceId, spanId: target.spanId, userId };
+    await (withdrawn
+      ? overlay.removeSpanFieldEdit({ ...span, field: target.field })
+      : overlay.mergeSpanFieldEdit({ ...span, field: target.field, text }));
+    return;
+  }
+
+  const trace = { projectId, traceId, field: target.field, userId };
+  await (withdrawn
+    ? overlay.removeTraceIOEdit(trace)
+    : overlay.mergeTraceIOEdit({ ...trace, value: text }));
+};
+
 /**
- * Carries a suggested expected output over to the trace's correction. The
- * annotation row stays the record of who suggested what; the correction is the
- * trace's current corrected truth and is what the dataset flow reads.
+ * Carries a suggestion over to the trace's correction. The annotation row stays
+ * the record of who suggested what; the correction is the trace's current
+ * corrected truth and is what the dataset flow reads.
  *
- * Where the suggestion lands is the comment's anchor: a comment about the whole
- * trace, or about the trace's own output, corrects the trace output; a comment
- * on a span's input or output corrects that field of that span. An anchor with
- * nothing for a suggestion to correct (a whole span, an attribute row, a
+ * Where the suggestion lands is the comment's anchor: a comment on a field
+ * corrects that field of what it names, the trace's own input or output or a
+ * span's; a comment about the whole trace corrects the trace output. An anchor
+ * with nothing for a suggestion to correct (a whole span, an attribute row, a
  * message) carries none, which is also what the composer offers there.
  *
  * Only a suggestion that actually CHANGED is carried over, which is what makes
@@ -145,7 +177,7 @@ type AnnotatorReference = z.infer<typeof annotatorReferenceSchema>;
  *   - the same text the annotation already held is not re-asserted, so saving a
  *     comment on an old annotation cannot overwrite a newer correction with the
  *     text the form loaded when it opened;
- *   - clearing the text withdraws the corrected output, leaving every other
+ *   - clearing the text withdraws the corrected field, leaving every other
  *     edit on the trace in place. A save that never held a suggestion has
  *     nothing to withdraw, so an ordinary comment never removes a correction
  *     made elsewhere.
@@ -161,7 +193,7 @@ type AnnotatorReference = z.infer<typeof annotatorReferenceSchema>;
  * costs nothing, while the reverse order would leave a duplicate annotation
  * behind on every retry.
  */
-const carrySuggestedOutputToOverlay = async ({
+const carrySuggestionToOverlay = async ({
   ctx,
   projectId,
   traceId,
@@ -199,37 +231,12 @@ const carrySuggestedOutputToOverlay = async ({
     return;
   }
 
-  const overlay = TraceEditOverlayService.create(ctx.prisma);
-  if (target.kind === "span") {
-    if (next.length === 0) {
-      await overlay.removeSpanFieldEdit({
-        projectId,
-        traceId,
-        spanId: target.spanId,
-        field: target.field,
-        userId,
-      });
-      return;
-    }
-    await overlay.mergeSpanFieldEdit({
-      projectId,
-      traceId,
-      spanId: target.spanId,
-      field: target.field,
-      text: next,
-      userId,
-    });
-    return;
-  }
-
-  if (next.length === 0) {
-    await overlay.removeTraceOutputEdit({ projectId, traceId, userId });
-    return;
-  }
-  await overlay.mergeTraceOutputEdit({
+  await writeSuggestionToOverlay({
+    overlay: TraceEditOverlayService.create(ctx.prisma),
     projectId,
     traceId,
-    output: next,
+    target,
+    text: next,
     userId,
   });
 };
@@ -330,7 +337,7 @@ export const annotationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = AnnotationService.create({ prisma: ctx.prisma });
 
-      await carrySuggestedOutputToOverlay({
+      await carrySuggestionToOverlay({
         ctx,
         projectId: input.projectId,
         traceId: input.traceId,
@@ -410,7 +417,7 @@ export const annotationRouter = createTRPCRouter({
         },
       });
 
-      await carrySuggestedOutputToOverlay({
+      await carrySuggestionToOverlay({
         ctx,
         projectId: input.projectId,
         traceId: input.traceId,
@@ -559,9 +566,9 @@ export const annotationRouter = createTRPCRouter({
     }),
   /**
    * The project's annotations list, and the export taken from it. One row per
-   * comment about a whole trace: the list is read trace by trace, so a reviewer
-   * who marked six spans of one trace must not push six rows into everyone
-   * else's list.
+   * comment, anchored ones included: a reviewer who marked six spans of one
+   * trace said six things, and a list that showed none of them answered with
+   * silence. Each row carries its anchor, which is what keeps them readable.
    */
   getAll: protectedProcedure
     .input(
@@ -580,7 +587,7 @@ export const annotationRouter = createTRPCRouter({
             gte: input.startDate,
             lte: input.endDate,
           },
-          ...annotationAnchorScopeWhere("trace"),
+          ...annotationAnchorScopeWhere("all"),
         },
         orderBy: {
           createdAt: "desc",
@@ -947,114 +954,6 @@ export const annotationRouter = createTRPCRouter({
       return ctx.prisma.annotationQueueItem.findFirstOrThrow({
         where: { id: input.queueItemId, projectId: input.projectId },
       });
-    }),
-  /**
-   * Flags a queue item for the dataset hand-off that runs once the annotator
-   * finishes the queue. Persisted rather than kept in the browser so the
-   * selection survives a refresh and the end-of-queue step can still find items
-   * that were already marked done.
-   *
-   * Scoped to the items the caller is responsible for, the same reach the
-   * hand-off reads back: a mark is one reviewer's note about their own queue,
-   * so marking a teammate's item would put a trace they never chose into a
-   * hand-off they never see.
-   */
-  markQueueItemForDataset: protectedProcedure
-    .input(
-      z.object({
-        queueItemId: z.string(),
-        projectId: z.string(),
-        marked: z.boolean(),
-      }),
-    )
-    .use(checkProjectPermission("annotations:update"))
-    .mutation(async ({ ctx, input }) => {
-      const service = AnnotationService.create({ prisma: ctx.prisma });
-      const organizationId = await service.getProjectOrganizationId({
-        projectId: input.projectId,
-      });
-
-      const result = await ctx.prisma.annotationQueueItem.updateMany({
-        where: {
-          ...callerQueueItemsFilter({
-            projectId: input.projectId,
-            organizationId,
-            userId: ctx.session.user.id,
-          }),
-          id: input.queueItemId,
-        },
-        data: {
-          markedForDatasetAt: input.marked ? new Date() : null,
-        },
-      });
-      if (result.count === 0) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Queue item not found",
-        });
-      }
-      return { marked: input.marked };
-    }),
-  /**
-   * The reviewer's queue items that are waiting for the dataset hand-off,
-   * marks only. A mark outlives the item being done, so the hand-off has to see
-   * the whole review history; reading that history through the queue itself
-   * would resolve every trace behind it, which is a page load a reviewer pays
-   * for on every visit.
-   */
-  getMarkedForDatasetItems: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("annotations:view"))
-    .query(async ({ ctx, input }) => {
-      const service = AnnotationService.create({ prisma: ctx.prisma });
-      const organizationId = await service.getProjectOrganizationId({
-        projectId: input.projectId,
-      });
-
-      return ctx.prisma.annotationQueueItem.findMany({
-        where: {
-          ...callerQueueItemsFilter({
-            projectId: input.projectId,
-            organizationId,
-            userId: ctx.session.user.id,
-          }),
-          markedForDatasetAt: { not: null },
-        },
-        select: { id: true, traceId: true, markedForDatasetAt: true },
-        orderBy: { createdAt: "asc" },
-      });
-    }),
-  /**
-   * Clears the marks after the hand-off, so the next queue walk starts clean.
-   * Same reach as marking and reading them: only the caller's own items.
-   */
-  clearDatasetMarks: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        queueItemIds: z.array(z.string()),
-      }),
-    )
-    .use(checkProjectPermission("annotations:update"))
-    .mutation(async ({ ctx, input }) => {
-      if (input.queueItemIds.length === 0) return { cleared: 0 };
-      const service = AnnotationService.create({ prisma: ctx.prisma });
-      const organizationId = await service.getProjectOrganizationId({
-        projectId: input.projectId,
-      });
-
-      const result = await ctx.prisma.annotationQueueItem.updateMany({
-        where: {
-          ...callerQueueItemsFilter({
-            projectId: input.projectId,
-            organizationId,
-            userId: ctx.session.user.id,
-          }),
-          id: { in: input.queueItemIds },
-        },
-        data: { markedForDatasetAt: null },
-      });
-      return { cleared: result.count };
     }),
   getQueueBySlugOrId: protectedProcedure
     .input(

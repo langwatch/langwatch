@@ -46,7 +46,8 @@ vi.mock("../../../../hooks/useTextTranslation", () => ({
 vi.mock("../../markdownView", () => ({ RenderedMarkdown: () => null }));
 
 vi.mock("../TurnAnnotations", () => ({
-  TurnActionRow: () => null,
+  TurnEditTraceAction: () => null,
+  TurnSessionCheckbox: () => null,
   TurnAnnotationBadges: () => null,
 }));
 

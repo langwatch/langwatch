@@ -172,6 +172,7 @@ describe("where a suggestion left with a comment belongs", () => {
     it("corrects the trace output", () => {
       expect(resolveAnnotationSuggestionTarget({ traceId })).toEqual({
         kind: "trace",
+        field: "output",
       });
     });
   });
@@ -185,7 +186,21 @@ describe("where a suggestion left with a comment belongs", () => {
           anchorId: traceId,
           anchorPath: "output",
         }),
-      ).toEqual({ kind: "trace" });
+      ).toEqual({ kind: "trace", field: "output" });
+    });
+  });
+
+  describe("given a comment on the trace's own input", () => {
+    /** @scenario "A suggestion on the trace's own input becomes the corrected trace input" */
+    it("corrects the trace input", () => {
+      expect(
+        resolveAnnotationSuggestionTarget({
+          traceId,
+          anchorKind: "field",
+          anchorId: traceId,
+          anchorPath: "input",
+        }),
+      ).toEqual({ kind: "trace", field: "input" });
     });
   });
 
@@ -246,7 +261,7 @@ describe("where a suggestion left with a comment belongs", () => {
       ).toBeNull();
     });
 
-    it("carries no correction for a trace field other than the output", () => {
+    it("carries no correction for a trace field other than its input or output", () => {
       expect(
         resolveAnnotationSuggestionTarget({
           traceId,
@@ -266,7 +281,7 @@ describe("where a suggestion left with a comment belongs", () => {
           anchorKind: "gizmo",
           anchorId: "gizmo-1",
         }),
-      ).toEqual({ kind: "trace" });
+      ).toEqual({ kind: "trace", field: "output" });
     });
   });
 });

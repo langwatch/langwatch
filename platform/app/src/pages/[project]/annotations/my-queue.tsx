@@ -14,13 +14,19 @@ import { LuPencil } from "react-icons/lu";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { Checkbox } from "~/components/ui/checkbox";
 import { useColorMode } from "~/components/ui/color-mode";
+import { Dialog } from "~/components/ui/dialog";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { Link } from "~/components/ui/link";
 import { showErrorToast } from "~/features/errors";
 import { ConversationView } from "~/features/traces-v2/components/TraceDrawer/conversationView";
 import { useShikiAdapter } from "~/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter";
 import { useConversationTurns } from "~/features/traces-v2/hooks/useConversationTurns";
+import {
+  sessionTraceIds,
+  useAnnotationQueueSessionStore,
+} from "~/features/traces-v2/stores/annotationQueueSessionStore";
 import { legacyTraceToTurn } from "~/features/traces-v2/utils/legacyTraceToTurn";
+import { openTraceEditorFromConversation } from "~/features/traces-v2/utils/traceEditMode";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -34,6 +40,10 @@ type AssignedQueueItem =
 
 /** How long the queue bar waits after a route change before it reads settled. */
 export const ROUTE_SETTLE_MS = 100;
+
+/** What the reviewer is asked before the session ends with no dataset. */
+export const END_SESSION_QUESTION =
+  "Are you sure you want to end this annotation session without adding to a dataset?";
 
 /** A trace timestamp is only useful to the drawer when it is a real number. */
 const partitionHint = (startedAt: unknown): number | null =>
@@ -53,19 +63,122 @@ const queueItemHref = ({
     ? `/${projectSlug}/annotations/my-queue?queue-item=${queueItemId}`
     : `/${projectSlug}/annotations/my-queue`;
 
+/**
+ * How far the end of the walk has got.
+ *
+ * `walking` is a queue with work left in it. Once there is none, the session's
+ * traces are offered to a dataset (`handoff`), the reviewer is asked before the
+ * session ends without one (`asking`), or the queue waits to be finished off
+ * again after they cancelled (`pending`). Only `done` celebrates.
+ */
+type QueueEnding = "walking" | "handoff" | "asking" | "pending" | "done";
+
+/**
+ * The end of the queue as a state rather than a race.
+ *
+ * The celebration is earned: it shows after the dataset add succeeds, or after
+ * the reviewer confirms ending the session without one, and never under or
+ * before the hand-off drawer.
+ */
+function useQueueEnding({
+  queueFinished,
+  handoffWanted,
+  traceIds,
+  isHandoffDrawerOpen,
+  openHandoffDrawer,
+}: {
+  queueFinished: boolean;
+  /** Whether the bar's dataset toggle is on. */
+  handoffWanted: boolean;
+  /** The traces this sitting counted. */
+  traceIds: string[];
+  isHandoffDrawerOpen: boolean;
+  openHandoffDrawer: (traceIds: string[]) => void;
+}) {
+  const [ending, setEnding] = useState<QueueEnding>("walking");
+  const handoff = useAnnotationQueueSessionStore((state) => state.handoff);
+  const noteHandoffOpened = useAnnotationQueueSessionStore(
+    (state) => state.noteHandoffOpened,
+  );
+  const resetHandoff = useAnnotationQueueSessionStore(
+    (state) => state.resetHandoff,
+  );
+  const setSessionActive = useAnnotationQueueSessionStore(
+    (state) => state.setActive,
+  );
+  // The drawer is dismissed only once it has been seen open: the frame between
+  // asking for it and the URL naming it would otherwise read as a dismissal.
+  const drawerWasSeenOpen = useRef(false);
+
+  const hasSomethingToHandOff = handoffWanted && traceIds.length > 0;
+
+  const offerHandoff = useCallback(() => {
+    if (!handoffWanted || traceIds.length === 0) {
+      setEnding("done");
+      return;
+    }
+    drawerWasSeenOpen.current = false;
+    noteHandoffOpened();
+    openHandoffDrawer(traceIds);
+    setEnding("handoff");
+  }, [handoffWanted, traceIds, noteHandoffOpened, openHandoffDrawer]);
+
+  useEffect(() => {
+    if (!queueFinished) setEnding("walking");
+  }, [queueFinished]);
+
+  useEffect(() => {
+    if (queueFinished && ending === "walking") offerHandoff();
+  }, [queueFinished, ending, offerHandoff]);
+
+  useEffect(() => {
+    if (ending !== "handoff") return;
+    if (handoff === "added") {
+      setEnding("done");
+      // The sitting's set is spent once it has become dataset records.
+      setSessionActive(false);
+      return;
+    }
+    if (isHandoffDrawerOpen) {
+      drawerWasSeenOpen.current = true;
+      return;
+    }
+    if (drawerWasSeenOpen.current) setEnding("asking");
+  }, [ending, handoff, isHandoffDrawerOpen, setSessionActive]);
+
+  return {
+    // A queue that ends with nothing to hand over is finished the moment it
+    // reads as finished, so the reader never sees a frame of the offer before
+    // the effect that skips it.
+    ending:
+      ending === "walking" && queueFinished && !hasSomethingToHandOff
+        ? "done"
+        : ending,
+    offerHandoff,
+    finishWithoutDataset: useCallback(() => {
+      resetHandoff();
+      setEnding("done");
+    }, [resetHandoff]),
+    keepSession: useCallback(() => {
+      resetHandoff();
+      setEnding("pending");
+    }, [resetHandoff]),
+  };
+}
+
 export default function TraceAnnotations() {
   const router = useRouter();
   const { "queue-item": queueItem } = router.query;
   // Only what is still waiting: this read resolves the trace behind every item
   // it returns, so widening it to a whole review history is a page load the
-  // reviewer pays for on every visit. The marks are read separately.
+  // reviewer pays for on every visit.
   const { assignedQueueItems, queuesLoading } = useAnnotationQueues({
     showQueueAndUser: true,
     allQueueItems: true,
   });
   const { project, hasPermission } = useOrganizationTeamProject();
   const queryClient = api.useContext();
-  const { openDrawer, setFlowCallbacks } = useDrawer();
+  const { openDrawer, drawerOpen } = useDrawer();
 
   const pendingQueueItems = useMemo(
     () => (assignedQueueItems ?? []).filter((item) => !item.doneAt),
@@ -97,11 +210,10 @@ export default function TraceAnnotations() {
   }
 
   const refetchQueueItems = useCallback(async () => {
-    // Five independent reads, so they go together: one queue action should not
-    // cost five sequential round trips.
+    // Four independent reads, so they go together: one queue action should not
+    // cost four sequential round trips.
     await Promise.all([
       queryClient.annotation.getOptimizedAnnotationQueues.invalidate(),
-      queryClient.annotation.getMarkedForDatasetItems.invalidate(),
       queryClient.annotation.getPendingItemsCount.invalidate(),
       queryClient.annotation.getAssignedItemsCount.invalidate(),
       queryClient.annotation.getQueueItemsCounts.invalidate(),
@@ -154,7 +266,7 @@ export default function TraceAnnotations() {
   );
 
   // Picking another turn opens it over the queue, the same way the bar's
-  // "Annotate trace" does: the link states the whole intent and the drawer's URL
+  // "Edit trace" does: the link states the whole intent and the drawer's URL
   // hydrator opens it, so the page never writes the drawer's own store.
   const openTurn = useCallback(
     ({ traceId, timestamp }: { traceId: string; timestamp: number }) => {
@@ -172,71 +284,43 @@ export default function TraceAnnotations() {
   // every code block inside it share a single highlighter.
   const shikiAdapter = useShikiAdapter(colorMode);
 
-  // ── End-of-queue dataset hand-off ─────────────────────────────────────
-  // Marked items keep their mark after they are done, so this set spans the
-  // whole queue walk and not only what is still waiting. It carries marks and
-  // trace ids alone, without the traces themselves.
-  const markedItemsQuery = api.annotation.getMarkedForDatasetItems.useQuery(
-    { projectId: project?.id ?? "" },
-    {
-      enabled: !!project?.id,
-      refetchOnWindowFocus: false,
-    },
+  // ── The sitting ───────────────────────────────────────────────────────
+  // Which traces to keep is a decision about this sitting, so the set lives in
+  // the browser for as long as the queue is open and is dropped on the way out.
+  const setSessionActive = useAnnotationQueueSessionStore(
+    (state) => state.setActive,
   );
-  const markedItems = useMemo(
-    () => markedItemsQuery.data ?? [],
-    [markedItemsQuery.data],
+  const sessionMarks = useAnnotationQueueSessionStore((state) => state.marks);
+  const sessionIds = useMemo(
+    () => sessionTraceIds(sessionMarks),
+    [sessionMarks],
   );
-  const markedTraceIds = useMemo(
-    () => Array.from(new Set(markedItems.map((item) => item.traceId))),
-    [markedItems],
-  );
-  const markedItemIds = useMemo(
-    () => markedItems.map((item) => item.id),
-    [markedItems],
-  );
-  // Dismissing the drawer is an answer. The hand-off is offered once per set of
-  // marks, and asking again waits for that set to change.
-  const markSignature = markedItemIds.join(",");
-  const offeredHandoffFor = useRef<string | null>(null);
-  const clearDatasetMarks = api.annotation.clearDatasetMarks.useMutation();
-  const clearMarks = clearDatasetMarks.mutate;
+  // The hand-off is a decision, not a display: off at the start of every
+  // sitting, and answered once for the whole walk rather than per item.
+  const [handoffWanted, setHandoffWanted] = useState(false);
 
-  const projectId = project?.id;
-  // The hand-off waits for a queue that has been read, walked to its end, and
-  // still has marks to answer for.
-  const isHandoffDue =
-    !queuesLoading &&
-    !markedItemsQuery.isLoading &&
-    resolvablePendingItems.length === 0 &&
-    markedTraceIds.length > 0;
+  useEffect(() => () => setSessionActive(false), [setSessionActive]);
+
+  const queueFinished = !queuesLoading && resolvablePendingItems.length === 0;
 
   useEffect(() => {
-    if (!isHandoffDue || !projectId) return;
-    if (offeredHandoffFor.current === markSignature) return;
+    if (!queueFinished) setSessionActive(true);
+  }, [queueFinished, setSessionActive]);
 
-    offeredHandoffFor.current = markSignature;
-    const handedOverItemIds = [...markedItemIds];
-    setFlowCallbacks("addDatasetRecord", {
-      onSuccess: () => {
-        clearMarks(
-          { projectId, queueItemIds: handedOverItemIds },
-          { onSuccess: () => void refetchQueueItems() },
-        );
-      },
+  const openHandoffDrawer = useCallback(
+    (traceIds: string[]) =>
+      openDrawer("addDatasetRecord", { selectedTraceIds: traceIds }),
+    [openDrawer],
+  );
+
+  const { ending, offerHandoff, finishWithoutDataset, keepSession } =
+    useQueueEnding({
+      queueFinished,
+      handoffWanted,
+      traceIds: sessionIds,
+      isHandoffDrawerOpen: drawerOpen("addDatasetRecord"),
+      openHandoffDrawer,
     });
-    openDrawer("addDatasetRecord", { selectedTraceIds: markedTraceIds });
-  }, [
-    isHandoffDue,
-    markSignature,
-    markedTraceIds,
-    markedItemIds,
-    projectId,
-    openDrawer,
-    setFlowCallbacks,
-    clearMarks,
-    refetchQueueItems,
-  ]);
 
   // Where "Skip" and a removal land: the next item still waiting, or the bare
   // queue when there is nothing after this one.
@@ -249,6 +333,7 @@ export default function TraceAnnotations() {
     return pendingQueueItems[index + 1]?.id;
   }, [pendingQueueItems, currentQueueItemId]);
 
+  const projectId = project?.id;
   const projectSlug = project?.slug;
   const advanceToNextItem = useCallback(
     () =>
@@ -288,7 +373,7 @@ export default function TraceAnnotations() {
     return <AnnotationsLayout />;
   }
 
-  if (resolvablePendingItems.length === 0 && !queuesLoading) {
+  if (queueFinished) {
     return (
       <AnnotationsLayout>
         <VStack
@@ -298,12 +383,27 @@ export default function TraceAnnotations() {
           backgroundColor="bg.muted"
           marginTop="-48px"
         >
-          <TasksDone />
-          <Text fontSize="xl" fontWeight="500">
-            All tasks complete
-          </Text>
-          <Text>Nice work!</Text>
+          {ending === "done" ? (
+            <>
+              <TasksDone />
+              <Text fontSize="xl" fontWeight="500">
+                All tasks complete
+              </Text>
+              <Text>Nice work!</Text>
+            </>
+          ) : (
+            <FinishedQueueCard
+              traceCount={sessionIds.length}
+              onAddToDataset={offerHandoff}
+              onFinish={finishWithoutDataset}
+            />
+          )}
         </VStack>
+        <EndSessionDialog
+          open={ending === "asking"}
+          onConfirm={finishWithoutDataset}
+          onCancel={keepSession}
+        />
       </AnnotationsLayout>
     );
   }
@@ -355,6 +455,12 @@ export default function TraceAnnotations() {
                     }
                     conversationId={renderedConversationId}
                     currentTraceId={currentTraceId}
+                    // Which turn the reviewer was sent here for, so it
+                    // announces itself however far they scroll.
+                    focusTraceId={currentTraceId}
+                    // The walk collects traces for the dataset, so each turn
+                    // carries its own way in and out of the sitting's set.
+                    showSessionCheckboxes
                     fallbackTurns={fallbackTurns}
                     onSelectTurn={openTurn}
                     // Reviewers read whole outputs, so nothing arrives folded.
@@ -403,9 +509,11 @@ export default function TraceAnnotations() {
               key={queueItemsKey}
               queueItems={pendingQueueItems}
               currentQueueItem={currentQueueItem}
-              markedItemIds={markedItemIds}
               refetchQueueItems={refetchQueueItems}
               isTraceAvailable={!!currentQueueItem.trace}
+              sessionCount={sessionIds.length}
+              handoffWanted={handoffWanted}
+              onHandoffWantedChange={setHandoffWanted}
             />
           </Box>
         )}
@@ -413,6 +521,77 @@ export default function TraceAnnotations() {
     </DashboardLayout>
   );
 }
+
+/**
+ * The finished queue, before the session has been answered for. It says the
+ * walk is over and offers both ways out, so a reviewer who backed out of the
+ * hand-off can still hand the traces over or finish without them.
+ */
+const FinishedQueueCard = ({
+  traceCount,
+  onAddToDataset,
+  onFinish,
+}: {
+  traceCount: number;
+  onAddToDataset: () => void;
+  onFinish: () => void;
+}) => (
+  <VStack gap={4} paddingX={6} textAlign="center">
+    <Text fontSize="xl" fontWeight="500">
+      Your queue is finished
+    </Text>
+    <Text color="fg.muted">
+      {traceCount === 1
+        ? "1 trace is counted in this session."
+        : `${traceCount} traces are counted in this session.`}
+    </Text>
+    <HStack gap={3}>
+      {traceCount > 0 && (
+        <Button colorPalette="blue" onClick={onAddToDataset}>
+          Add to dataset
+        </Button>
+      )}
+      <Button variant="outline" onClick={onFinish}>
+        Finish without adding
+      </Button>
+    </HStack>
+  </VStack>
+);
+
+/** The question asked before a sitting ends with nothing handed over. */
+const EndSessionDialog = ({
+  open,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) => (
+  <Dialog.Root
+    open={open}
+    placement="center"
+    onOpenChange={({ open: nextOpen }) => {
+      if (!nextOpen) onCancel();
+    }}
+  >
+    <Dialog.Content bg="bg" maxWidth="480px">
+      <Dialog.Header>
+        <Dialog.Title fontSize="md" fontWeight="500">
+          {END_SESSION_QUESTION}
+        </Dialog.Title>
+      </Dialog.Header>
+      <Dialog.Footer>
+        <Button variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button colorPalette="blue" onClick={onConfirm}>
+          Confirm
+        </Button>
+      </Dialog.Footer>
+    </Dialog.Content>
+  </Dialog.Root>
+);
 
 /**
  * What the reviewer meets instead of a conversation when the queued trace does
@@ -456,29 +635,31 @@ const UnavailableTraceCard = ({
 const AnnotationQueuePicker = ({
   queueItems,
   currentQueueItem,
-  markedItemIds,
   refetchQueueItems,
   isTraceAvailable,
+  sessionCount,
+  handoffWanted,
+  onHandoffWantedChange,
 }: {
   queueItems: AssignedQueueItem[];
   currentQueueItem: AssignedQueueItem;
-  markedItemIds: string[];
   refetchQueueItems: () => Promise<void>;
   /**
    * Whether the item's trace resolved. When it did not, the bar keeps its
    * navigation and drops everything that acts on the trace: there is nothing to
-   * correct, mark or finish.
+   * correct, count or finish.
    */
   isTraceAvailable: boolean;
+  /** How many traces the sitting counts right now. */
+  sessionCount: number;
+  handoffWanted: boolean;
+  onHandoffWantedChange: (wanted: boolean) => void;
 }) => {
   const router = useRouter();
   const { project, hasPermission } = useOrganizationTeamProject();
   const canEditTrace = hasPermission("annotations:update");
   const { openDrawer } = useDrawer();
   const [isNavigating, setIsNavigating] = useState(false);
-  // Whichever way the reviewer last answered the checkbox, until the queue is
-  // read back. Keyed by item so moving on never carries an answer along.
-  const [markAnswers, setMarkAnswers] = useState<Record<string, boolean>>({});
 
   const currentQueueItemIndex = queueItems.findIndex(
     (item) => item.id === currentQueueItem.id,
@@ -512,8 +693,6 @@ const AnnotationQueuePicker = ({
   };
 
   const markQueueItemDone = api.annotation.markQueueItemDone.useMutation();
-  const markQueueItemForDataset =
-    api.annotation.markQueueItemForDataset.useMutation();
 
   const markQueueItemDoneMoveToNext = async () => {
     markQueueItemDone.mutate(
@@ -541,54 +720,18 @@ const AnnotationQueuePicker = ({
     );
   };
 
-  const isMarkedForDataset =
-    markAnswers[currentQueueItem.id] ??
-    markedItemIds.includes(currentQueueItem.id);
-
-  const toggleDatasetMark = (marked: boolean) => {
-    setMarkAnswers((answers) => ({
-      ...answers,
-      [currentQueueItem.id]: marked,
-    }));
-    markQueueItemForDataset.mutate(
-      {
-        queueItemId: currentQueueItem.id,
-        projectId: project?.id ?? "",
-        marked,
-      },
-      {
-        onSuccess: () => void refetchQueueItems(),
-        onError: (error) => {
-          setMarkAnswers((answers) => ({
-            ...answers,
-            [currentQueueItem.id]: !marked,
-          }));
-          showErrorToast({
-            error,
-            fallbackTitle: marked
-              ? "Couldn't mark this item for the dataset"
-              : "Couldn't remove the mark from this item",
-          });
-        },
-      },
-    );
-  };
-
   const editTrace = () => {
-    const traceId =
-      currentQueueItem.trace?.trace_id ?? currentQueueItem.traceId;
-    const occurredAtMs = partitionHint(
-      currentQueueItem.trace?.timestamps?.started_at,
-    );
-    // The link states the whole intent (which trace, and that it opens for
-    // editing), and the drawer's URL hydrator opens it. Seeding the drawer
-    // store here instead would mount the drawer a frame before the URL names
-    // it, and the hydrator reads that frame as "the URL has no drawer, close
-    // it", which fights the sync that is writing the URL.
-    openDrawer("traceV2Details", {
-      traceId,
-      ...(occurredAtMs === null ? {} : { t: String(occurredAtMs) }),
-      urlParams: { edit: "1" },
+    // The queue page already shows the conversation, so the drawer opens on a
+    // tab that adds something to it. Everything else is the helper's: the link
+    // states the whole intent (which trace, and that it opens for editing) and
+    // the drawer's URL hydrator opens it, rather than the page seeding the
+    // drawer's own store a frame before the URL names it.
+    openTraceEditorFromConversation({
+      openDrawer,
+      traceId: currentQueueItem.trace?.trace_id ?? currentQueueItem.traceId,
+      occurredAtMs: partitionHint(
+        currentQueueItem.trace?.timestamps?.started_at,
+      ),
     });
   };
 
@@ -652,10 +795,14 @@ const AnnotationQueuePicker = ({
         {isTraceAvailable && (
           <>
             <Checkbox
-              checked={isMarkedForDataset}
-              onCheckedChange={(event) => toggleDatasetMark(!!event.checked)}
+              checked={handoffWanted}
+              onCheckedChange={(event) =>
+                onHandoffWantedChange(!!event.checked)
+              }
             >
-              Add to dataset at the end
+              {sessionCount > 0
+                ? `Add to dataset at the end (${sessionCount})`
+                : "Add to dataset at the end"}
             </Checkbox>
             {canEditTrace && (
               <Button
@@ -663,7 +810,7 @@ const AnnotationQueuePicker = ({
                 disabled={isNavigating}
                 onClick={editTrace}
               >
-                <LuPencil /> Annotate trace
+                <LuPencil /> Edit trace
               </Button>
             )}
             <Button

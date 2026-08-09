@@ -2,8 +2,8 @@
  * @vitest-environment node
  *
  * What the annotations REST endpoints return once a comment can be left on one
- * part of a trace. A caller written before anchors existed keeps receiving the
- * comments about whole traces, and asks for the anchored ones explicitly.
+ * part of a trace: every comment by default, each carrying its anchor, with the
+ * trace-only read available to a caller that asks for it.
  */
 import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
@@ -74,43 +74,43 @@ describe("Annotations REST API", () => {
   });
 
   describe("given a trace with one comment about it and three about its spans", () => {
-    /** @scenario "The annotations API returns what it always returned" */
-    it("returns the one comment about the trace, and all four when asked", async () => {
-      const asBefore = await get(`/api/annotations/trace/${traceId}`);
-      expect(asBefore.status).toBe(200);
-      const { data: traceLevel } = (await asBefore.json()) as {
+    /** @scenario "The annotations API returns every annotation by default" */
+    it("returns all four comments, and the trace-level one when asked", async () => {
+      const byDefault = await get(`/api/annotations/trace/${traceId}`);
+      expect(byDefault.status).toBe(200);
+      const { data: all } = (await byDefault.json()) as {
+        data: { comment: string; anchorKind: string | null }[];
+      };
+      expect(all).toHaveLength(4);
+      expect(all.filter((row) => row.anchorKind === "span")).toHaveLength(3);
+
+      const traceOnly = await get(
+        `/api/annotations/trace/${traceId}?anchor=trace`,
+      );
+      expect(traceOnly.status).toBe(200);
+      const { data: traceLevel } = (await traceOnly.json()) as {
         data: { comment: string }[];
       };
       expect(traceLevel.map((row) => row.comment)).toEqual([
         "the whole trace is off",
       ]);
-
-      const everything = await get(
-        `/api/annotations/trace/${traceId}?anchor=all`,
-      );
-      expect(everything.status).toBe(200);
-      const { data: all } = (await everything.json()) as {
-        data: { comment: string; anchorKind: string | null }[];
-      };
-      expect(all).toHaveLength(4);
-      expect(all.filter((row) => row.anchorKind === "span")).toHaveLength(3);
     });
 
-    it("lists only the comments about whole traces across the project", async () => {
+    it("lists every comment across the project", async () => {
       const response = await get("/api/annotations");
       expect(response.status).toBe(200);
+      const { data } = (await response.json()) as { data: unknown[] };
+      expect(data).toHaveLength(4);
+    });
+
+    it("lists only the comments about whole traces when asked", async () => {
+      const response = await get("/api/annotations?anchor=trace");
       const { data } = (await response.json()) as {
         data: { comment: string }[];
       };
       expect(data.map((row) => row.comment)).toEqual([
         "the whole trace is off",
       ]);
-    });
-
-    it("lists every comment across the project when asked", async () => {
-      const response = await get("/api/annotations?anchor=all");
-      const { data } = (await response.json()) as { data: unknown[] };
-      expect(data).toHaveLength(4);
     });
 
     it("refuses a scope it does not recognise", async () => {

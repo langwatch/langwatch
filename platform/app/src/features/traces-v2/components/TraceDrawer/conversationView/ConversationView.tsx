@@ -42,6 +42,11 @@ import {
 } from "../transcript";
 import { AnnotatedTurnRow } from "./AnnotatedTurnRow";
 import { ConversationExpandContext } from "./expandContext";
+import {
+  FocusedTurnFrame,
+  useFocusedTurnBlink,
+  useScrollFocusedTurnIntoView,
+} from "./FocusedTurn";
 import { SystemPromptBanner } from "./SystemPromptBanner";
 import {
   EMPTY_TURNS,
@@ -96,6 +101,16 @@ interface ConversationViewProps {
   fallbackTurns?: TraceListItem[];
   /** Seeds "Expand all"; the reader can still toggle it. */
   defaultExpandAll?: boolean;
+  /**
+   * The turn under review, which the conversation scrolls to, blinks once, and
+   * keeps tinted for as long as it is the one being reviewed.
+   */
+  focusTraceId?: string;
+  /**
+   * Whether each turn offers to be counted into the annotation session. Only
+   * the queue, which has a session to count into, asks for them.
+   */
+  showSessionCheckboxes?: boolean;
 }
 
 export const ConversationView = memo(function ConversationView({
@@ -104,6 +119,8 @@ export const ConversationView = memo(function ConversationView({
   onSelectTurn,
   fallbackTurns,
   defaultExpandAll = false,
+  focusTraceId,
+  showSessionCheckboxes = false,
 }: ConversationViewProps) {
   const [mode, setMode] = useState<Mode>("thread");
   // "Expand all" seeds every message's local expand state; individual
@@ -254,6 +271,8 @@ export const ConversationView = memo(function ConversationView({
             annotationsByTrace={annotations.byTrace}
             annotationsByAnchor={annotations.byAnchor}
             isRailActive={isRailActive}
+            focusTraceId={focusTraceId}
+            showSessionCheckboxes={showSessionCheckboxes}
           />
         </ConversationExpandContext.Provider>
       ) : (
@@ -262,6 +281,47 @@ export const ConversationView = memo(function ConversationView({
     </VStack>
   );
 });
+
+/**
+ * One turn as the conversation renders it, framed when it is the one under
+ * review. Shared by the virtualized and un-virtualized paths so a turn reads
+ * and measures the same however the list around it is built.
+ */
+const ConversationTurn: React.FC<{
+  layout: TurnLayout;
+  parsed: ParsedTurn;
+  index: number;
+  isCurrent: boolean;
+  isFocused: boolean;
+  isBlinking: boolean;
+  onSelectTurn: (traceId: string) => void;
+  annotationsByTrace: AnnotationsByTrace;
+  annotationsByAnchor: AnnotationsByTrace;
+  isRailActive: boolean;
+  railLayout: RailLayout;
+  showSessionCheckbox: boolean;
+}> = ({
+  parsed,
+  isFocused,
+  isBlinking,
+  annotationsByTrace,
+  annotationsByAnchor,
+  showSessionCheckbox,
+  ...rowProps
+}) => (
+  <FocusedTurnFrame isFocused={isFocused} isBlinking={isBlinking}>
+    <AnnotatedTurnRow
+      parsed={parsed}
+      {...rowProps}
+      {...turnAnnotations({
+        traceId: parsed.turn.traceId,
+        byTrace: annotationsByTrace,
+        byAnchor: annotationsByAnchor,
+      })}
+      showSessionCheckbox={showSessionCheckbox}
+    />
+  </FocusedTurnFrame>
+);
 
 /**
  * What a turn's rail is handed: what was said about the turn, and what was said
@@ -541,6 +601,26 @@ const ConversationHeader: React.FC<{
   );
 };
 
+/**
+ * Where an un-virtualized thread scrolls itself to.
+ *
+ * On open, the reader is dropped at the turn whose trace the drawer is showing
+ * rather than at the top: a long thread otherwise opens scrolled away from the
+ * turn the operator clicked in from. That happens once per mount, so later
+ * navigation never fights the reader. A turn put under review is scrolled to
+ * as well, each time a different one is.
+ */
+function useTurnListScrolling(focusTraceId: string | undefined) {
+  const activeRef = useRef<HTMLDivElement>(null);
+  const focusedRef = useRef<HTMLDivElement>(null);
+  const { layout: railLayout, setScroller } = useRailLayout();
+  const { ref: scrollRef, attachScroller } = useMeasuredScroller(setScroller);
+  useCenterActiveTurnOnce({ scrollRef, activeRef });
+  useScrollFocusedTurnIntoView({ scrollRef, focusedRef, focusTraceId });
+  const isBlinking = useFocusedTurnBlink(focusTraceId);
+  return { activeRef, focusedRef, railLayout, attachScroller, isBlinking };
+}
+
 const TurnsView: React.FC<{
   layout: TurnLayout;
   parsedTurns: ParsedTurn[];
@@ -552,6 +632,8 @@ const TurnsView: React.FC<{
   annotationsByTrace: AnnotationsByTrace;
   annotationsByAnchor: AnnotationsByTrace;
   isRailActive: boolean;
+  focusTraceId: string | undefined;
+  showSessionCheckboxes: boolean;
 }> = ({
   layout,
   parsedTurns,
@@ -562,20 +644,16 @@ const TurnsView: React.FC<{
   annotationsByTrace,
   annotationsByAnchor,
   isRailActive,
+  focusTraceId,
+  showSessionCheckboxes,
 }) => {
   const systemPrompt = useMemo(
     () => extractSystemText(systemPromptInput),
     [systemPromptInput],
   );
 
-  // On open, drop the reader at the turn whose trace the drawer is showing
-  // rather than at the top: a long thread otherwise opens scrolled away
-  // from the turn the operator clicked in from. Centers once per mount; we
-  // don't re-scroll on later navigation so we never fight the user.
-  const activeRef = useRef<HTMLDivElement>(null);
-  const { layout: railLayout, setScroller } = useRailLayout();
-  const { ref: scrollRef, attachScroller } = useMeasuredScroller(setScroller);
-  useCenterActiveTurnOnce({ scrollRef, activeRef });
+  const { activeRef, focusedRef, railLayout, attachScroller, isBlinking } =
+    useTurnListScrolling(focusTraceId);
 
   if (parsedTurns.length >= VIRTUALIZE_AT) {
     return (
@@ -589,6 +667,8 @@ const TurnsView: React.FC<{
         annotationsByTrace={annotationsByTrace}
         annotationsByAnchor={annotationsByAnchor}
         isRailActive={isRailActive}
+        focusTraceId={focusTraceId}
+        showSessionCheckboxes={showSessionCheckboxes}
       />
     );
   }
@@ -613,25 +693,26 @@ const TurnsView: React.FC<{
         {systemPrompt && <SystemPromptBanner text={systemPrompt} />}
         {parsedTurns.map((p, i) => {
           const isCurrent = p.turn.traceId === currentTraceId;
+          const isFocused = p.turn.traceId === focusTraceId;
           return (
             <Box
               key={p.turn.traceId}
-              ref={isCurrent ? activeRef : undefined}
+              ref={isFocused ? focusedRef : isCurrent ? activeRef : undefined}
               width="full"
             >
-              <AnnotatedTurnRow
+              <ConversationTurn
                 layout={layout}
                 parsed={p}
                 index={i + 1}
                 isCurrent={isCurrent}
+                isFocused={isFocused}
+                isBlinking={isBlinking}
                 onSelectTurn={onSelectTurn}
-                {...turnAnnotations({
-                  traceId: p.turn.traceId,
-                  byTrace: annotationsByTrace,
-                  byAnchor: annotationsByAnchor,
-                })}
+                annotationsByTrace={annotationsByTrace}
+                annotationsByAnchor={annotationsByAnchor}
                 isRailActive={isRailActive}
                 railLayout={railLayout}
+                showSessionCheckbox={showSessionCheckboxes}
               />
             </Box>
           );
@@ -673,6 +754,43 @@ function useCenterActiveTurnInVirtualizer({
     hasCentered.current = true;
     virtualizer.scrollToIndex(activeIndex, { align: "center" });
   }, [parsedTurns, currentTraceId, virtualizer]);
+}
+
+/**
+ * Brings the turn under review onto the screen, through the virtualizer rather
+ * than the DOM: a turn that is not on screen has no element to scroll to, and
+ * the index is what the virtualizer needs to put one there.
+ */
+function useScrollFocusedTurnInVirtualizer({
+  virtualizer,
+  parsedTurns,
+  focusTraceId,
+}: {
+  virtualizer: {
+    scrollToIndex: (
+      index: number,
+      options: { align: "center"; behavior: "smooth" },
+    ) => void;
+  };
+  parsedTurns: ParsedTurn[];
+  focusTraceId: string | undefined;
+}) {
+  // Once per turn put under review: the virtualizer is rebuilt on every render,
+  // and scrolling again on each one would fight the reader's own scrolling for
+  // as long as they stay on that turn.
+  const scrolledTo = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusTraceId || scrolledTo.current === focusTraceId) return;
+    const focusedIndex = parsedTurns.findIndex(
+      (p) => p.turn.traceId === focusTraceId,
+    );
+    if (focusedIndex < 0) return;
+    scrolledTo.current = focusTraceId;
+    virtualizer.scrollToIndex(focusedIndex, {
+      align: "center",
+      behavior: "smooth",
+    });
+  }, [focusTraceId, parsedTurns, virtualizer]);
 }
 
 function useMeasuredScroller(setScroller: (node: HTMLElement | null) => void): {
@@ -733,32 +851,19 @@ function useCenterActiveTurnOnce({
 }
 
 /**
- * Virtualized rendering path for long conversations. Mirrors the threshold +
- * shape used by `ConversationTurnsList` so we share a mental model across the
- * codebase. The system-prompt banner stays sticky at the top, outside the
- * virtual range, so it doesn't get measured + remeasured every scroll.
+ * The virtualizer a long thread renders through, and where it scrolls itself
+ * to: the open trace's turn on arrival, and the turn under review each time a
+ * different one is put there.
  */
-const VirtualizedTurnsView: React.FC<{
-  layout: TurnLayout;
-  parsedTurns: ParsedTurn[];
-  systemPrompt: string | null;
-  hasRedactedText: boolean;
-  currentTraceId: string;
-  onSelectTurn: (traceId: string) => void;
-  annotationsByTrace: AnnotationsByTrace;
-  annotationsByAnchor: AnnotationsByTrace;
-  isRailActive: boolean;
-}> = ({
-  layout,
+function useVirtualizedTurnList({
   parsedTurns,
-  systemPrompt,
-  hasRedactedText,
   currentTraceId,
-  onSelectTurn,
-  annotationsByTrace,
-  annotationsByAnchor,
-  isRailActive,
-}) => {
+  focusTraceId,
+}: {
+  parsedTurns: ParsedTurn[];
+  currentTraceId: string;
+  focusTraceId: string | undefined;
+}) {
   const { layout: railLayout, setScroller } = useRailLayout();
   const { ref: scrollerRef, attachScroller } = useMeasuredScroller(setScroller);
   const virtualizer = useVirtualizer({
@@ -775,6 +880,45 @@ const VirtualizedTurnsView: React.FC<{
     parsedTurns,
     currentTraceId,
   });
+  useScrollFocusedTurnInVirtualizer({ virtualizer, parsedTurns, focusTraceId });
+  const isBlinking = useFocusedTurnBlink(focusTraceId);
+
+  return { virtualizer, railLayout, attachScroller, isBlinking };
+}
+
+/**
+ * Virtualized rendering path for long conversations. Mirrors the threshold +
+ * shape used by `ConversationTurnsList` so we share a mental model across the
+ * codebase. The system-prompt banner stays sticky at the top, outside the
+ * virtual range, so it doesn't get measured + remeasured every scroll.
+ */
+const VirtualizedTurnsView: React.FC<{
+  layout: TurnLayout;
+  parsedTurns: ParsedTurn[];
+  systemPrompt: string | null;
+  hasRedactedText: boolean;
+  currentTraceId: string;
+  onSelectTurn: (traceId: string) => void;
+  annotationsByTrace: AnnotationsByTrace;
+  annotationsByAnchor: AnnotationsByTrace;
+  isRailActive: boolean;
+  focusTraceId: string | undefined;
+  showSessionCheckboxes: boolean;
+}> = ({
+  layout,
+  parsedTurns,
+  systemPrompt,
+  hasRedactedText,
+  currentTraceId,
+  onSelectTurn,
+  annotationsByTrace,
+  annotationsByAnchor,
+  isRailActive,
+  focusTraceId,
+  showSessionCheckboxes,
+}) => {
+  const { virtualizer, railLayout, attachScroller, isBlinking } =
+    useVirtualizedTurnList({ parsedTurns, currentTraceId, focusTraceId });
 
   return (
     <Box
@@ -818,19 +962,19 @@ const VirtualizedTurnsView: React.FC<{
                 transform={`translateY(${row.start}px)`}
                 paddingBottom={layout === "thread" ? 2 : 5}
               >
-                <AnnotatedTurnRow
+                <ConversationTurn
                   layout={layout}
                   parsed={p}
                   index={row.index + 1}
                   isCurrent={p.turn.traceId === currentTraceId}
+                  isFocused={p.turn.traceId === focusTraceId}
+                  isBlinking={isBlinking}
                   onSelectTurn={onSelectTurn}
-                  {...turnAnnotations({
-                    traceId: p.turn.traceId,
-                    byTrace: annotationsByTrace,
-                    byAnchor: annotationsByAnchor,
-                  })}
+                  annotationsByTrace={annotationsByTrace}
+                  annotationsByAnchor={annotationsByAnchor}
                   isRailActive={isRailActive}
                   railLayout={railLayout}
+                  showSessionCheckbox={showSessionCheckboxes}
                 />
               </Box>
             );

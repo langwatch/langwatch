@@ -136,10 +136,13 @@ Feature: Editing a trace in the drawer
     about the mode the reviewer is in while doing it.
 
     @integration
-    Scenario: The overflow menu offers to annotate the trace
+    Scenario: The overflow menu offers to edit the trace
       When I open the trace actions menu
-      Then I see an action to annotate the trace
+      Then I see an action reading "Edit trace"
       And it needs the same permission to write annotations as correcting does
+      # "Edit trace" rather than "Annotate trace": annotating now means leaving
+      # an anchored comment right where the reader is, so the mode that also
+      # corrects fields is named after editing.
 
     @integration
     Scenario: The bar names the mode and counts corrections and comments apart

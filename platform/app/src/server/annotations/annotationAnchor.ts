@@ -65,9 +65,11 @@ export function refineAnnotationAnchorColumns(
  * Which comments a read wants: `trace` only the ones about the trace as a
  * whole, `all` every comment including the ones anchored to a part of it.
  *
- * Every surface that answers a question about a whole trace, a queue item or a
- * dataset row reads `trace`. Without that, one reviewer marking six spans
- * changes what all of them say.
+ * Every surface that reads a trace's comments reads `all` and labels each one
+ * with the part it is about: an anchored comment is the primary way a reviewer
+ * speaks, so a list that hid them would answer with silence exactly when
+ * someone had spoken. `trace` is for a caller that wants only what was said
+ * about the trace as a whole.
  */
 export const ANNOTATION_ANCHOR_SCOPES = ["trace", "all"] as const;
 
@@ -136,12 +138,21 @@ export function withReadableAnnotationAnchor<
 }
 
 /**
+ * The fields a suggestion can correct. A trace and a span spell their captured
+ * input and output the same way, so one union names both.
+ */
+export type AnnotationSuggestionField = Extract<
+  TraceEditSpanField,
+  "input" | "output"
+>;
+
+/**
  * Where a suggestion left with a comment belongs in the trace's correction.
  *
- * A comment about the whole trace, and a comment about the trace's own output,
- * both correct the trace output, which is what the suggestion flow has always
- * written. A comment on a span's input or output corrects that field of that
- * span.
+ * A comment on a field corrects that field of what it is anchored to: the
+ * trace's own input or output, or a span's. A comment about the whole trace
+ * names no field, and a suggestion left on it corrects the trace output, which
+ * is the one thing a reviewer with the whole trace in view can be proposing.
  *
  * Everything else returns null and carries no correction: a span with no field
  * named, an attribute row (the correction replaces a span's whole parameter
@@ -160,12 +171,8 @@ export function resolveAnnotationSuggestionTarget({
   anchorId?: string | null;
   anchorPath?: string | null;
 }):
-  | { kind: "trace" }
-  | {
-      kind: "span";
-      spanId: string;
-      field: Extract<TraceEditSpanField, "input" | "output">;
-    }
+  | { kind: "trace"; field: AnnotationSuggestionField }
+  | { kind: "span"; spanId: string; field: AnnotationSuggestionField }
   | null {
   const anchor = readableAnnotationAnchor({
     anchorKind: anchorKind ?? null,
@@ -173,18 +180,13 @@ export function resolveAnnotationSuggestionTarget({
     anchorPath: anchorPath ?? null,
   });
 
-  if (!anchor.anchorKind) return { kind: "trace" };
-  if (anchor.anchorKind !== "field") return null;
+  if (!anchor.anchorKind) return { kind: "trace", field: "output" };
+  if (anchor.anchorKind !== "field" || !anchor.anchorId) return null;
+  if (anchor.anchorPath !== "input" && anchor.anchorPath !== "output") {
+    return null;
+  }
 
-  if (anchor.anchorId === traceId) {
-    return anchor.anchorPath === "output" ? { kind: "trace" } : null;
-  }
-  if (anchor.anchorPath === "input" || anchor.anchorPath === "output") {
-    return {
-      kind: "span",
-      spanId: anchor.anchorId!,
-      field: anchor.anchorPath,
-    };
-  }
-  return null;
+  return anchor.anchorId === traceId
+    ? { kind: "trace", field: anchor.anchorPath }
+    : { kind: "span", spanId: anchor.anchorId, field: anchor.anchorPath };
 }

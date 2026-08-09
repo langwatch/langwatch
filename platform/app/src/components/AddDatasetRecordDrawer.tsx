@@ -7,6 +7,7 @@ import { Button, HStack, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import { createLogger } from "@langwatch/observability";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
+import { useAnnotationQueueSessionStore } from "~/features/traces-v2/stores/annotationQueueSessionStore";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useLocalStorageSelectedDataSetId } from "~/hooks/useLocalStorageSelectedDataSetId";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -186,9 +187,13 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
           trpc.dataset.getAll.invalidate();
           trpc.datasetRecord.getAll.invalidate();
           // Whoever opened the drawer gets told the records landed, so a flow
-          // that led here can finish itself off (the annotation queue clears
-          // the marks it handed over).
+          // that led here can finish itself off.
           props.onSuccess?.();
+          // The annotation queue's hand-off is the one flow whose next step
+          // outlives this drawer: the walk is over, and the celebration it
+          // crowns waits on the records actually landing.
+          const session = useAnnotationQueueSessionStore.getState();
+          if (session.active) session.noteHandoffAdded();
           goBack();
           toaster.create({
             title: "Succesfully added to dataset",

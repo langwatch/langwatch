@@ -127,6 +127,9 @@ const { AddDatasetRecordDrawerV2 } = await import(
   "~/components/AddDatasetRecordDrawer"
 );
 const { clearDrawerStack, useDrawer } = await import("~/hooks/useDrawer");
+const { useAnnotationQueueSessionStore } = await import(
+  "~/features/traces-v2/stores/annotationQueueSessionStore"
+);
 
 /** Opens the trace drawer the way a trace row does, then the dataset drawer. */
 function OpenFromTrace() {
@@ -173,6 +176,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   window.history.replaceState({}, "", harness.PATH);
   clearDrawerStack();
+  useAnnotationQueueSessionStore.setState({
+    active: false,
+    marks: {},
+    handoff: "idle",
+  });
   harness.createRecord.mockImplementation(
     async (
       _input: unknown,
@@ -221,6 +229,38 @@ describe("given the dataset drawer was opened from a trace", () => {
           traceId: "trace-1",
         });
       });
+    });
+  });
+});
+
+describe("given the drawer is the end of an annotation queue walk", () => {
+  const addTheRecords = async () => {
+    const submit = await screen.findByRole("button", { name: /to dataset/i });
+    await act(async () => {
+      fireEvent.click(submit);
+    });
+  };
+
+  describe("when the records are added", () => {
+    /** @scenario "The celebration shows once the records are added" */
+    it("tells the sitting its traces landed", async () => {
+      useAnnotationQueueSessionStore.setState({ active: true });
+      renderDrawer(OpenFromSelection);
+
+      await addTheRecords();
+
+      expect(useAnnotationQueueSessionStore.getState().handoff).toBe("added");
+    });
+  });
+
+  describe("when the records are added outside a queue walk", () => {
+    /** @scenario "The celebration shows once the records are added" */
+    it("says nothing to a sitting that is not happening", async () => {
+      renderDrawer(OpenFromSelection);
+
+      await addTheRecords();
+
+      expect(useAnnotationQueueSessionStore.getState().handoff).toBe("idle");
     });
   });
 });

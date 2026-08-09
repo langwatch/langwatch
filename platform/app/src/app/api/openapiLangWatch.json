@@ -527,7 +527,7 @@
           {
             "name": "anchor",
             "in": "query",
-            "description": "Which comments to return. Omitted returns the comments about whole traces; \"all\" also returns the ones left on a span, a field, an attribute or a message.",
+            "description": "Which comments to return. Omitted returns every comment, including the ones left on a span, a field, an attribute or a message; \"trace\" returns only the comments about whole traces.",
             "required": false,
             "schema": {
               "type": "string",
@@ -581,7 +581,7 @@
           {
             "name": "anchor",
             "in": "query",
-            "description": "Which comments to return. Omitted returns the comments about whole traces; \"all\" also returns the ones left on a span, a field, an attribute or a message.",
+            "description": "Which comments to return. Omitted returns every comment, including the ones left on a span, a field, an attribute or a message; \"trace\" returns only the comments about whole traces.",
             "required": false,
             "schema": {
               "type": "string",

@@ -60,7 +60,6 @@ function makeState(over: Partial<AnnotationFormState>): AnnotationFormState {
     isDeleting: false,
     hasExisting: false,
     isSaveBlocked: false,
-    isAnchored: false,
     handleSave: vi.fn(),
     handleDelete: vi.fn(),
     onCancel: vi.fn(),
