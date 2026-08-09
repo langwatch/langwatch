@@ -1,4 +1,4 @@
-import { Button, HStack, Text, VStack, Wrap } from "@chakra-ui/react";
+import { Badge, Button, HStack, Text, VStack, Wrap } from "@chakra-ui/react";
 import { Building2, Folder, UserLock, Users } from "lucide-react";
 import { useMemo } from "react";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
@@ -300,10 +300,18 @@ export function VirtualKeyOwnershipSection({
  * Read-only ownership for the edit drawer: the scope chips the key
  * already has, plus where its traces land. Ownership is fixed after
  * create so trace attribution never silently shifts.
+ *
+ * The destination is the one stored on the key, not one re-derived from the
+ * scopes, so what is shown here is what the gateway actually does. A key
+ * whose destination was deleted keeps sending its traces there, which is the
+ * one thing a reader cannot tell from anything else on the row, so it is
+ * badged.
  */
 export function VirtualKeyOwnershipReadOnly({
   scopes,
   principal,
+  traceProjectId,
+  traceProjectArchived,
   ctx,
 }: {
   scopes: Array<{
@@ -311,6 +319,9 @@ export function VirtualKeyOwnershipReadOnly({
     scopeId: string;
   }>;
   principal?: { name?: string | null; email?: string | null };
+  /** The key's stored destination. Null only for keys that predate it. */
+  traceProjectId: string | null;
+  traceProjectArchived: boolean;
   ctx: Pick<
     OwnershipContext,
     "organizationName" | "availableTeams" | "availableProjects"
@@ -326,11 +337,12 @@ export function VirtualKeyOwnershipReadOnly({
           ? ctx.availableTeams.find((t) => t.id === s.scopeId)?.name
           : (projectName(s.scopeId, ctx) ?? undefined),
   }));
-  const projectScopes = scopes.filter((s) => s.scopeType === "PROJECT");
-  const destination =
-    projectScopes.length === 1
-      ? projectName(projectScopes[0]!.scopeId, ctx)
-      : null;
+  // A deleted project is not in the picker's list, so its name does not
+  // resolve; the badge next to it is what carries the meaning either way.
+  const destination = traceProjectId
+    ? (projectName(traceProjectId, ctx) ??
+      (traceProjectArchived ? "a deleted project" : traceProjectId))
+    : null;
 
   return (
     <VStack align="start" width="full" gap={1.5}>
@@ -343,10 +355,28 @@ export function VirtualKeyOwnershipReadOnly({
         />
       </HStack>
       <ProviderScopeChips scopes={named} principal={principal} />
-      <Text fontSize="xs" color="fg.muted" data-testid="vk-trace-destination">
-        Traces and costs land in{" "}
-        {destination ?? "the organization's governance inbox"}.
-      </Text>
+      <HStack gap={1.5} alignItems="center">
+        <Text fontSize="xs" color="fg.muted" data-testid="vk-trace-destination">
+          Traces and costs land in{" "}
+          {destination ?? "the organization's governance inbox"}.
+        </Text>
+        {traceProjectArchived && (
+          <Badge
+            size="sm"
+            colorPalette="orange"
+            variant="subtle"
+            data-testid="vk-trace-destination-deleted"
+          >
+            Deleted
+          </Badge>
+        )}
+      </HStack>
+      {traceProjectArchived && (
+        <Text fontSize="xs" color="fg.muted">
+          This key keeps sending its traces and costs there. Restore the project
+          to see them again, or point the key somewhere else.
+        </Text>
+      )}
     </VStack>
   );
 }
