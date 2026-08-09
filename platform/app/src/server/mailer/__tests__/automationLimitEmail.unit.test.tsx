@@ -104,7 +104,7 @@ describe("automationLimitEmail", () => {
     });
   });
 
-  describe("automationLimitEmailSubject", () => {
+  describe("when building an automation-limit email subject", () => {
     it("names the pause for a paused automation", () => {
       expect(automationLimitEmailSubject(pausedProps)).toBe(
         "Automation paused: Failed traces to dataset",
@@ -118,7 +118,7 @@ describe("automationLimitEmail", () => {
     });
   });
 
-  describe("sendAutomationLimitEmail", () => {
+  describe("when sending an automation-limit email", () => {
     describe("when several admins are notified", () => {
       it("sends one mail per recipient with the matching subject", async () => {
         await sendAutomationLimitEmail({

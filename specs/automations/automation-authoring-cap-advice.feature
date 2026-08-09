@@ -38,6 +38,15 @@ Feature: The authoring drawer warns before an automation outruns its daily ceili
       And it names the estimated matches a day and the plan's ceiling
       And it tells the customer to narrow the condition
 
+    # Narrowing is not the only honest answer: the condition may be exactly
+    # what the customer wants, and the ceiling follows the plan.
+    @integration
+    Scenario: The advice offers a way out that is not narrowing
+      Given the drafted action adds matched traces to a dataset
+      And the preview implies more matches a day than the plan's ceiling
+      When the preview settles
+      Then the warning offers a link to the plans page
+
     @integration
     Scenario: A condition within the ceiling shows nothing
       Given the drafted action adds matched traces to a dataset

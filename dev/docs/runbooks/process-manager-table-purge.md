@@ -59,10 +59,20 @@ Record the starting position so the effect is measurable:
 SELECT
   (SELECT count(*) FROM "ProcessManagerOutbox") AS outbox_rows,
   (SELECT count(*) FROM "ProcessManagerOutbox" WHERE "status" = 'dispatched') AS outbox_dispatched,
+  (SELECT count(*) FROM "ProcessManagerOutbox"
+     WHERE "status" = 'dispatched'
+       AND "dispatchedAt" < now() - interval '7 days') AS outbox_eligible,
   (SELECT count(*) FROM "ProcessManagerInbox") AS inbox_rows,
+  (SELECT count(*) FROM "ProcessManagerInbox"
+     WHERE "consumedAt" < now() - interval '7 days') AS inbox_eligible,
   pg_size_pretty(pg_total_relation_size('"ProcessManagerOutbox"')) AS outbox_size,
   pg_size_pretty(pg_total_relation_size('"ProcessManagerInbox"')) AS inbox_size;
 ```
+
+The two `*_eligible` columns count exactly what the purge's predicates will
+delete (adjust the interval if you override `RETENTION_DAYS`), so they should
+match the dry-run's report and read zero after the apply. The totals will not
+drop nearly as far; step 4 explains what they keep.
 
 ### 2. Dry-run the purge
 
@@ -85,6 +95,11 @@ It deletes 10,000 rows per statement, sleeps 200 ms between batches so the purge
 never monopolises the instance, loops until a batch returns 0, and then runs a
 plain `VACUUM (ANALYZE)` on both tables. `RETENTION_DAYS`, `BATCH_SIZE`,
 `SLEEP_MS` and `MAX_BATCHES` are env overrides.
+
+The loop also stops early once a table hits `MAX_BATCHES` (default 10,000
+batches, or 100M rows — far above any expected backlog) and warns rather than
+fails. If that warning appears, eligible rows were left behind: run the script
+again, or raise `MAX_BATCHES`.
 
 Interrupting it is safe. Every batch is its own statement, so a stopped run just
 leaves the rest of the backlog for the next run or for the sweep.
@@ -111,11 +126,17 @@ automations pipeline writes to continuously.
 
 Re-run the baseline query from step 1.
 
-Expect the row counts to drop to roughly one day of traffic and the reported
-**file sizes to stay the same**. That is the intended outcome, not a failed
-purge: a plain `VACUUM` marks pages reusable rather than returning them to the
-filesystem, so Postgres refills them with new rows instead of extending the
-files. The goal is for growth to stop, not for the numbers to shrink.
+Expect both `*_eligible` counts to be **zero**, and the totals to drop to
+roughly the last seven days of traffic: the purge keeps `RETENTION_DAYS` of
+history, and pending and dead outbox rows are never touched. The tighter
+24-hour steady state for dispatched rows arrives later, once the deploy's
+hourly sweep takes over with its own windows.
+
+Expect the reported **file sizes to stay the same**. That is the intended
+outcome, not a failed purge: a plain `VACUUM` marks pages reusable rather than
+returning them to the filesystem, so Postgres refills them with new rows
+instead of extending the files. The goal is for growth to stop, not for the
+numbers to shrink.
 
 To confirm the space really is reusable rather than merely still allocated:
 

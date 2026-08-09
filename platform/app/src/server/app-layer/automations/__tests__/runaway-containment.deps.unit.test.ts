@@ -12,7 +12,8 @@ import type { EmailSuppressionService } from "../emailSuppression.service";
 import { defaultRunawayContainmentDeps } from "../runaway-containment.deps";
 import type { TriggerService } from "../trigger.service";
 
-const resolveOrganizationId = vi.fn<(projectId: string) => Promise<string>>();
+const resolveOrganizationId =
+  vi.fn<(projectId: string) => Promise<string | undefined>>();
 
 vi.mock("~/server/organizations/resolveOrganizationId", () => ({
   resolveOrganizationId: (projectId: string) =>
@@ -115,7 +116,7 @@ describe("defaultRunawayContainmentDeps", () => {
 
     describe("when the project has no organization", () => {
       it("addresses nobody and never reads the suppression list", async () => {
-        resolveOrganizationId.mockResolvedValue(undefined as unknown as string);
+        resolveOrganizationId.mockResolvedValue(undefined);
 
         const to = await makeDeps().notificationRecipients({
           projectId: "project-1",

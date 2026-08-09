@@ -21,12 +21,12 @@ function ratePhrase(perDay: number): string {
 export interface FiringRateInput {
   matchesLast7Days: number;
   cadence: NotificationCadence;
-  batches: boolean;
+  canBatch: boolean;
 }
 
 /** Whether the cadence actually bundles matches for this action. */
-function bundlesMatches({ cadence, batches }: FiringRateInput): boolean {
-  return batches && CADENCE_WINDOW_MS[cadence] > 0;
+function bundlesMatches({ cadence, canBatch }: FiringRateInput): boolean {
+  return canBatch && CADENCE_WINDOW_MS[cadence] > 0;
 }
 
 /**
@@ -36,7 +36,7 @@ function bundlesMatches({ cadence, batches }: FiringRateInput): boolean {
  * *notifies* depends on the cadence: an immediate (or persist-class) automation
  * fires once per match, whereas a digest cadence bundles every match inside its
  * window into a single notification — so the notification rate is capped at one
- * per window. `batches` is false for persist-class actions (dataset / annotation
+ * per window. `canBatch` is false for persist-class actions (dataset / annotation
  * writes), which always fire per match regardless of cadence, which is why for
  * those this is also the matches-per-day estimate the daily ceiling counts.
  */

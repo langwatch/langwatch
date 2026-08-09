@@ -195,6 +195,18 @@ describe("SubjectSection", () => {
 
         expect(screen.getByTestId("daily-cap-advice")).toBeInTheDocument();
       });
+
+      /** @scenario "The advice offers a way out that is not narrowing" */
+      it("links to the plans page, since a bigger plan is the other way out", () => {
+        seedTraceDraft(TriggerAction.ADD_TO_DATASET);
+        previewReturns(OVER_CAP_HITS);
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.getByTestId("daily-cap-advice-upgrade")).toHaveAttribute(
+          "href",
+          "/settings/plans",
+        );
+      });
     });
 
     describe("when the action only notifies", () => {

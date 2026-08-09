@@ -260,7 +260,7 @@ function ReportSubject() {
                 dispatch({ type: "SET_FILTER_QUERY", value })
               }
               cadence={draft.notificationCadence}
-              batches
+              canBatch
               purpose="report"
             />
           </Field.Root>
@@ -372,7 +372,7 @@ function TraceSubject() {
       cadence={draft.notificationCadence}
       // Persist actions (dataset / annotation writes) fire per match; only
       // notify actions batch on the digest cadence.
-      batches={isNotifyAction(draft)}
+      canBatch={isNotifyAction(draft)}
     />
   );
 }
@@ -405,7 +405,7 @@ function TraceQuerySubject({
   query,
   onChange,
   cadence,
-  batches,
+  canBatch,
   /** A report runs on a schedule and sends the traces that matched in the
    *  window, so it reads as "which traces go in the report", and the per-trace
    *  firing-rate estimate ("about 6 times a day") does not apply to it. */
@@ -414,7 +414,7 @@ function TraceQuerySubject({
   query: string;
   onChange: (value: string) => void;
   cadence: NotificationCadence;
-  batches: boolean;
+  canBatch: boolean;
   purpose?: "automation" | "report";
 }) {
   const { project } = useOrganizationTeamProject();
@@ -481,7 +481,7 @@ function TraceQuerySubject({
         ? estimateRatePerDay({
             matchesLast7Days: preview.data.totalHits,
             cadence,
-            batches,
+            canBatch,
           })
         : null,
     cap: capStatus.data?.cap ?? null,
@@ -550,7 +550,7 @@ function TraceQuerySubject({
         totalHits={preview.data?.totalHits ?? null}
         sample={preview.data?.items ?? []}
         cadence={cadence}
-        batches={batches}
+        canBatch={canBatch}
         showFiringRate={purpose === "automation"}
         requireQuery={purpose === "automation"}
         capAdvice={capAdvice}
@@ -635,7 +635,7 @@ function TracePreview({
   totalHits,
   sample,
   cadence,
-  batches,
+  canBatch,
   showFiringRate,
   requireQuery,
   capAdvice,
@@ -648,7 +648,7 @@ function TracePreview({
   totalHits: number | null;
   sample: PreviewTrace[];
   cadence: NotificationCadence;
-  batches: boolean;
+  canBatch: boolean;
   showFiringRate: boolean;
   /** An automation must be scoped — an empty query would act on every trace,
    *  so we say so rather than silently leaving Save disabled. */
@@ -689,7 +689,7 @@ function TracePreview({
   }
   const subtext =
     showFiringRate && totalHits !== null && totalHits > 0
-      ? estimateFiringRate({ matchesLast7Days: totalHits, cadence, batches })
+      ? estimateFiringRate({ matchesLast7Days: totalHits, cadence, canBatch })
       : "in the last 7 days";
   return (
     <Box
@@ -728,7 +728,7 @@ function TracePreview({
       </HStack>
       <DailyCapAdviceAlert
         advice={capAdvice}
-        dividerBelow={sample.length > 0}
+        hasDividerBelow={sample.length > 0}
       />
       {sample.length > 0 ? (
         <VStack
@@ -753,17 +753,17 @@ function TracePreview({
  */
 function DailyCapAdviceAlert({
   advice,
-  dividerBelow,
+  hasDividerBelow,
 }: {
   advice: DailyCapAdvice | null;
-  dividerBelow: boolean;
+  hasDividerBelow: boolean;
 }) {
   if (!advice) return null;
   return (
     <Box
       paddingX={3}
       paddingY={2}
-      borderBottomWidth={dividerBelow ? "1px" : "0"}
+      borderBottomWidth={hasDividerBelow ? "1px" : "0"}
       borderColor="border"
     >
       <Alert.Root
@@ -782,6 +782,17 @@ function DailyCapAdviceAlert({
             the condition so it selects fewer traces.
           </Alert.Description>
         </Alert.Content>
+        <Button
+          asChild
+          size="xs"
+          variant="outline"
+          bg="bg"
+          flexShrink={0}
+          alignSelf="center"
+          data-testid="daily-cap-advice-upgrade"
+        >
+          <a href="/settings/plans">Upgrade Plan</a>
+        </Button>
       </Alert.Root>
     </Box>
   );

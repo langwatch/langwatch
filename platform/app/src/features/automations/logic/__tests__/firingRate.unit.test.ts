@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { estimateFiringRate, estimateRatePerDay } from "../firingRate";
 
 const immediate = (matchesLast7Days: number) =>
-  estimateFiringRate({ matchesLast7Days, cadence: "immediate", batches: true });
+  estimateFiringRate({
+    matchesLast7Days,
+    cadence: "immediate",
+    canBatch: true,
+  });
 
 describe("estimateFiringRate", () => {
   describe("when firing per match (immediate or persist)", () => {
@@ -28,12 +32,12 @@ describe("estimateFiringRate", () => {
     });
 
     it("treats a persist action as per-match even off the immediate cadence", () => {
-      // batches:false → cadence window is ignored, raw per-match rate.
+      // canBatch:false → cadence window is ignored, raw per-match rate.
       expect(
         estimateFiringRate({
           matchesLast7Days: 70,
           cadence: "hourly_digest",
-          batches: false,
+          canBatch: false,
         }),
       ).toBe("About 10 times a day at this rate");
     });
@@ -46,7 +50,7 @@ describe("estimateFiringRate", () => {
         estimateFiringRate({
           matchesLast7Days: 42,
           cadence: "5min_digest",
-          batches: true,
+          canBatch: true,
         }),
       ).toBe("About 6 times a day, batched every 5 minutes");
     });
@@ -57,7 +61,7 @@ describe("estimateFiringRate", () => {
         estimateFiringRate({
           matchesLast7Days: 7000,
           cadence: "hourly_digest",
-          batches: true,
+          canBatch: true,
         }),
       ).toBe("About 1 time an hour, batched every hour");
     });
@@ -72,7 +76,7 @@ describe("estimateRatePerDay", () => {
         estimateRatePerDay({
           matchesLast7Days: 700,
           cadence: "immediate",
-          batches: true,
+          canBatch: true,
         }),
       ).toBe(100);
     });
@@ -82,7 +86,7 @@ describe("estimateRatePerDay", () => {
         estimateRatePerDay({
           matchesLast7Days: 7000,
           cadence: "hourly_digest",
-          batches: false,
+          canBatch: false,
         }),
       ).toBe(1000);
     });
@@ -94,7 +98,7 @@ describe("estimateRatePerDay", () => {
         estimateRatePerDay({
           matchesLast7Days: 7000,
           cadence: "hourly_digest",
-          batches: true,
+          canBatch: true,
         }),
       ).toBe(24);
     });
@@ -104,7 +108,7 @@ describe("estimateRatePerDay", () => {
         estimateRatePerDay({
           matchesLast7Days: 42,
           cadence: "5min_digest",
-          batches: true,
+          canBatch: true,
         }),
       ).toBe(6);
     });
@@ -114,7 +118,7 @@ describe("estimateRatePerDay", () => {
     const input = {
       matchesLast7Days: 700,
       cadence: "immediate" as const,
-      batches: true,
+      canBatch: true,
     };
     expect(estimateFiringRate(input)).toContain(
       String(Math.round(estimateRatePerDay(input) / 24)),
