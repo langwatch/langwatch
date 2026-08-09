@@ -40,7 +40,14 @@ export const getVirtualKeyCommand = async (
         console.log(`${chalk.bold("Principal:")}    ${vk.principal_user_id ?? chalk.gray("—")}`);
         console.log(`${chalk.bold("Scopes:")}       ${vk.scopes.map(formatScope).join(", ") || chalk.gray("—")}`);
         if (vk.trace_project_id) {
-          console.log(`${chalk.bold("Trace proj.:")}  ${vk.trace_project_id}`);
+          // The key keeps tracing into a deleted project on purpose, so the
+          // only way anyone finds out is if the read says so.
+          const deleted = vk.trace_project_archived
+            ? ` ${chalk.yellow("(deleted)")}`
+            : "";
+          console.log(
+            `${chalk.bold("Trace proj.:")}  ${vk.trace_project_id}${deleted}`
+          );
         }
         console.log(`${chalk.bold("Routing mode:")} ${vk.routing_mode}`);
         console.log(`${chalk.bold("Routing pol.:")} ${vk.routing_policy_id ?? chalk.gray("(none)")}`);

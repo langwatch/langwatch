@@ -33,7 +33,7 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    /** @description Which comments to return. Omitted returns the comments about whole traces; "all" also returns the ones left on a span, a field, an attribute or a message. */
+                    /** @description Which comments to return. Omitted returns every comment, including the ones left on a span, a field, an attribute or a message; "trace" returns only the comments about whole traces. */
                     anchor?: "trace" | "all";
                 };
                 header?: never;
@@ -81,7 +81,7 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    /** @description Which comments to return. Omitted returns the comments about whole traces; "all" also returns the ones left on a span, a field, an attribute or a message. */
+                    /** @description Which comments to return. Omitted returns every comment, including the ones left on a span, a field, an attribute or a message; "trace" returns only the comments about whole traces. */
                     anchor?: "trace" | "all";
                 };
                 header?: never;
@@ -1773,7 +1773,7 @@ export interface paths {
         head?: never;
         /**
          * Update virtual key
-         * @description Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.
+         * @description Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope, and does NOT move where the key's traces and costs land: send `trace_project_id` for that, validated the way create validates it. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.
          */
         patch: operations["patchApiGatewayV1Virtual-keysById"];
         trace?: never;
@@ -9010,12 +9010,10 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            /** @description The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination. */
                             trace_project_id: string | null;
-                            /**
-                             * @description Which rule puts this key's traces and costs where they go: `explicit` is the `trace_project_id` on the key, `project_scope` is its single project scope, and `governance_fallback` means the key names no destination and its spend is attributed to the organization's hidden governance project. Only the first two name a project the key itself chose, so a `governance_fallback` key is counted by no project budget a reader would think to look at. New keys can no longer be written in that shape.
-                             * @enum {string}
-                             */
-                            trace_project_source: "explicit" | "project_scope" | "governance_fallback";
+                            /** @description True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone. */
+                            trace_project_archived: boolean;
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -9263,12 +9261,10 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            /** @description The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination. */
                             trace_project_id: string | null;
-                            /**
-                             * @description Which rule puts this key's traces and costs where they go: `explicit` is the `trace_project_id` on the key, `project_scope` is its single project scope, and `governance_fallback` means the key names no destination and its spend is attributed to the organization's hidden governance project. Only the first two name a project the key itself chose, so a `governance_fallback` key is counted by no project budget a reader would think to look at. New keys can no longer be written in that shape.
-                             * @enum {string}
-                             */
-                            trace_project_source: "explicit" | "project_scope" | "governance_fallback";
+                            /** @description True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone. */
+                            trace_project_archived: boolean;
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -9423,12 +9419,10 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            /** @description The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination. */
                             trace_project_id: string | null;
-                            /**
-                             * @description Which rule puts this key's traces and costs where they go: `explicit` is the `trace_project_id` on the key, `project_scope` is its single project scope, and `governance_fallback` means the key names no destination and its spend is attributed to the organization's hidden governance project. Only the first two name a project the key itself chose, so a `governance_fallback` key is counted by no project budget a reader would think to look at. New keys can no longer be written in that shape.
-                             * @enum {string}
-                             */
-                            trace_project_source: "explicit" | "project_scope" | "governance_fallback";
+                            /** @description True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone. */
+                            trace_project_archived: boolean;
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -9688,12 +9682,10 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            /** @description The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination. */
                             trace_project_id: string | null;
-                            /**
-                             * @description Which rule puts this key's traces and costs where they go: `explicit` is the `trace_project_id` on the key, `project_scope` is its single project scope, and `governance_fallback` means the key names no destination and its spend is attributed to the organization's hidden governance project. Only the first two name a project the key itself chose, so a `governance_fallback` key is counted by no project budget a reader would think to look at. New keys can no longer be written in that shape.
-                             * @enum {string}
-                             */
-                            trace_project_source: "explicit" | "project_scope" | "governance_fallback";
+                            /** @description True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone. */
+                            trace_project_archived: boolean;
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -9981,12 +9973,10 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            /** @description The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination. */
                             trace_project_id: string | null;
-                            /**
-                             * @description Which rule puts this key's traces and costs where they go: `explicit` is the `trace_project_id` on the key, `project_scope` is its single project scope, and `governance_fallback` means the key names no destination and its spend is attributed to the organization's hidden governance project. Only the first two name a project the key itself chose, so a `governance_fallback` key is counted by no project budget a reader would think to look at. New keys can no longer be written in that shape.
-                             * @enum {string}
-                             */
-                            trace_project_source: "explicit" | "project_scope" | "governance_fallback";
+                            /** @description True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone. */
+                            trace_project_archived: boolean;
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -10128,12 +10118,10 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            /** @description The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination. */
                             trace_project_id: string | null;
-                            /**
-                             * @description Which rule puts this key's traces and costs where they go: `explicit` is the `trace_project_id` on the key, `project_scope` is its single project scope, and `governance_fallback` means the key names no destination and its spend is attributed to the organization's hidden governance project. Only the first two name a project the key itself chose, so a `governance_fallback` key is counted by no project budget a reader would think to look at. New keys can no longer be written in that shape.
-                             * @enum {string}
-                             */
-                            trace_project_source: "explicit" | "project_scope" | "governance_fallback";
+                            /** @description True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone. */
+                            trace_project_archived: boolean;
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -10267,12 +10255,10 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            /** @description The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination. */
                             trace_project_id: string | null;
-                            /**
-                             * @description Which rule puts this key's traces and costs where they go: `explicit` is the `trace_project_id` on the key, `project_scope` is its single project scope, and `governance_fallback` means the key names no destination and its spend is attributed to the organization's hidden governance project. Only the first two name a project the key itself chose, so a `governance_fallback` key is counted by no project budget a reader would think to look at. New keys can no longer be written in that shape.
-                             * @enum {string}
-                             */
-                            trace_project_source: "explicit" | "project_scope" | "governance_fallback";
+                            /** @description True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone. */
+                            trace_project_archived: boolean;
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
@@ -10406,12 +10392,10 @@ export interface operations {
                             purpose: "user" | "langy";
                             display_prefix: string;
                             principal_user_id: string | null;
+                            /** @description The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination. */
                             trace_project_id: string | null;
-                            /**
-                             * @description Which rule puts this key's traces and costs where they go: `explicit` is the `trace_project_id` on the key, `project_scope` is its single project scope, and `governance_fallback` means the key names no destination and its spend is attributed to the organization's hidden governance project. Only the first two name a project the key itself chose, so a `governance_fallback` key is counted by no project budget a reader would think to look at. New keys can no longer be written in that shape.
-                             * @enum {string}
-                             */
-                            trace_project_source: "explicit" | "project_scope" | "governance_fallback";
+                            /** @description True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone. */
+                            trace_project_archived: boolean;
                             external_id: string | null;
                             metadata: {
                                 [key: string]: string;
