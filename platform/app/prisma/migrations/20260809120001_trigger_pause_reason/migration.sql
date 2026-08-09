@@ -12,7 +12,7 @@
 
 -- AlterTable
 ALTER TABLE "Trigger" ADD COLUMN "pausedReason" TEXT;
-ALTER TABLE "Trigger" ADD COLUMN "pausedAt" TIMESTAMP(3);
+ALTER TABLE "Trigger" ADD COLUMN "pausedAt" TIMESTAMPTZ(3);
 
 -- Down (manual): reverses this migration; run only to roll back.
 --   ALTER TABLE "Trigger" DROP COLUMN "pausedReason";

@@ -710,6 +710,57 @@ describe("automationRouter", () => {
       },
     };
 
+    describe("when a paused automation is switched back on", () => {
+      /** @scenario "Resuming a paused automation clears the pause reason" */
+      it("clears the platform's pause record in the same write", async () => {
+        mockTriggerFindUnique.mockResolvedValueOnce({
+          triggerKind: "TRIGGER",
+          actionParams: {},
+        });
+        mockTriggerUpdate.mockResolvedValueOnce({
+          id: "paused_trig",
+          action: TriggerAction.ADD_TO_DATASET,
+          active: true,
+        });
+
+        await caller.toggleTrigger({
+          projectId: "proj_123",
+          triggerId: "paused_trig",
+          active: true,
+        });
+
+        expect(mockTriggerUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: { active: true, pausedReason: null, pausedAt: null },
+          }),
+        );
+      });
+
+      it("leaves the pause record alone when switching OFF", async () => {
+        // Pausing by hand must not erase why the platform paused it earlier;
+        // only resuming declares the pause over.
+        mockTriggerFindUnique.mockResolvedValueOnce({
+          triggerKind: "TRIGGER",
+          actionParams: {},
+        });
+        mockTriggerUpdate.mockResolvedValueOnce({
+          id: "paused_trig",
+          action: TriggerAction.ADD_TO_DATASET,
+          active: false,
+        });
+
+        await caller.toggleTrigger({
+          projectId: "proj_123",
+          triggerId: "paused_trig",
+          active: false,
+        });
+
+        expect(mockTriggerUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({ data: { active: false } }),
+        );
+      });
+    });
+
     describe("when a REPORT is paused", () => {
       it("retires its scheduler job, so it stops claiming slots it will never send", async () => {
         mockTriggerFindUnique.mockResolvedValueOnce(reportRow);

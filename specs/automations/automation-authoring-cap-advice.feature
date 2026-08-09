@@ -48,7 +48,7 @@ Feature: The authoring drawer warns before an automation outruns its daily ceili
       Then the warning offers a link to the plans page
 
     @integration
-    Scenario: A condition within the ceiling shows nothing
+    Scenario: A condition within the ceiling renders no warning in the drawer
       Given the drafted action adds matched traces to a dataset
       And the preview implies fewer matches a day than the plan's ceiling
       When the preview settles
@@ -62,14 +62,14 @@ Feature: The authoring drawer warns before an automation outruns its daily ceili
       Then no daily-limit warning is shown
 
     @unit
-    Scenario: An over-ceiling condition on a persist action is flagged
+    Scenario: An over-ceiling condition on a persist action resolves to advice
       Given a persist-class action
       And an estimate above the plan's ceiling
       When the advice is resolved
       Then it carries the estimated matches a day and the ceiling
 
     @unit
-    Scenario: A condition within the ceiling says nothing
+    Scenario: A condition within the ceiling resolves to no advice
       Given a persist-class action
       And an estimate at or below the plan's ceiling
       When the advice is resolved

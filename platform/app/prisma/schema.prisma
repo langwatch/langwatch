@@ -833,7 +833,7 @@ model Trigger {
   // automation a customer switched off from one runaway containment stopped,
   // and resuming must clear both. Today the only value is "runaway_volume".
   pausedReason         String?
-  pausedAt             DateTime?
+  pausedAt             DateTime? @db.Timestamptz(3)
   message              String?
   deleted              Boolean                   @default(false)
   alertType            AlertType?

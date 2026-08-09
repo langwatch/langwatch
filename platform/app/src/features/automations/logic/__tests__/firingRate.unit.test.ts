@@ -70,7 +70,7 @@ describe("estimateFiringRate", () => {
 
 describe("estimateRatePerDay", () => {
   describe("when firing per match (immediate or persist)", () => {
-    /** @scenario "An over-ceiling condition on a persist action is flagged" */
+    /** @scenario "An over-ceiling condition on a persist action resolves to advice" */
     it("divides the 7-day count into matches a day", () => {
       expect(
         estimateRatePerDay({

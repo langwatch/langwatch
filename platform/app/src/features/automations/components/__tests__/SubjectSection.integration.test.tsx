@@ -237,7 +237,7 @@ describe("SubjectSection", () => {
   });
 
   describe("given a trace draft whose condition matches less than the plan allows", () => {
-    /** @scenario "A condition within the ceiling shows nothing" */
+    /** @scenario "A condition within the ceiling renders no warning in the drawer" */
     it("says nothing about the daily limit", () => {
       seedTraceDraft(TriggerAction.ADD_TO_DATASET);
       previewReturns(WITHIN_CAP_HITS);

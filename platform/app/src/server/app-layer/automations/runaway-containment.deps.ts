@@ -86,10 +86,10 @@ export function defaultRunawayContainmentDeps({
         query: `
           SELECT toString(count(DISTINCT TraceId)) AS Total
           FROM trace_summaries
-          WHERE TenantId = {projectId:String}
+          WHERE TenantId = {tenantId:String}
             AND OccurredAt >= now() - INTERVAL 24 HOUR
         `,
-        query_params: { projectId },
+        query_params: { tenantId: projectId },
         format: "JSONEachRow",
       });
       const rows = (await result.json()) as Array<{ Total: string }>;

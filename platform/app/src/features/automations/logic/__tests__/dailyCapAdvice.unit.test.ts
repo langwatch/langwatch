@@ -29,7 +29,7 @@ describe("isPersistAction", () => {
 describe("dailyCapAdvice", () => {
   describe("given a persist-class action", () => {
     describe("when the estimate is over the plan ceiling", () => {
-      /** @scenario "An over-ceiling condition on a persist action is flagged" */
+      /** @scenario "An over-ceiling condition on a persist action resolves to advice" */
       it("returns the rounded estimate and the ceiling", () => {
         expect(dailyCapAdvice(overCap)).toEqual({ perDay: 420, cap: 100 });
       });
@@ -51,7 +51,7 @@ describe("dailyCapAdvice", () => {
     });
 
     describe("when the estimate is within the plan ceiling", () => {
-      /** @scenario "A condition within the ceiling says nothing" */
+      /** @scenario "A condition within the ceiling resolves to no advice" */
       it("returns nothing", () => {
         expect(dailyCapAdvice({ ...overCap, matchesPerDay: 12 })).toBeNull();
       });

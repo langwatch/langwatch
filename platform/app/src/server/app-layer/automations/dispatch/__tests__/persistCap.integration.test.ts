@@ -139,7 +139,10 @@ describe("Feature: the automation daily ceiling on Redis", () => {
         await consume({ trigger, traceId: "t1" });
         await connection!.expire(key, 60);
 
-        await consume({ trigger, traceId: "t1" });
+        // A DISTINCT dispatch: it wins its own claim and reaches the INCR and
+        // the TTL guard. A retry of t1 would lose the claim and return at the
+        // GET, never touching EXPIRE, and would pass even with the guard gone.
+        await consume({ trigger, traceId: "t2" });
 
         expect(await connection!.ttl(key)).toBeLessThanOrEqual(60);
       });

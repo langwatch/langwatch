@@ -459,6 +459,7 @@ function AutomationsPage() {
         <VStack gap={1} align="center">
           <Switch
             checked={trigger.active}
+            inputProps={{ "aria-label": `Toggle ${trigger.name}` }}
             onCheckedChange={({ checked }) => {
               handleToggleTrigger(trigger.id, checked);
             }}
