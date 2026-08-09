@@ -348,7 +348,7 @@ export function VirtualKeyOwnershipReadOnly({
       <HStack gap={1} alignItems="center">
         <SmallLabel>Ownership</SmallLabel>
         <FieldInfoTooltip
-          description="Who can see and manage this key, set at creation. The trace destination is stored on the key, so changing scopes never silently moves where traces and costs land. Move either through the management API, or revoke this key and create a new one."
+          description="Scopes control who can see and manage this key. The trace destination is stored on the key, so changing scopes never moves where traces and costs land. Move either through the management API, or revoke this key and create a new one."
           docHref="/ai-gateway/virtual-keys#creating-a-vk"
           testId="vk-ownership-info"
         />
@@ -360,9 +360,9 @@ export function VirtualKeyOwnershipReadOnly({
             <>Traces and costs land in {destination}.</>
           ) : (
             <>
-              This key predates stored destinations, so its traces are not filed
-              into any project. Give it a trace project through the management
-              API.
+              This key has no trace destination, so its traces and costs are not
+              filed into any project. Give it a trace project through the
+              management API.
             </>
           )}
         </Text>
