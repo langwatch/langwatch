@@ -278,6 +278,13 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then nothing is evicted
       And the gateway reports the unhandled kind by name
 
+    @unit
+    Scenario: the evict log names the change kind that caused it
+      Given bundles are cached for an organization
+      When the change feed reports any kind the gateway acts on
+      Then the eviction is logged under that kind's own name
+      And a deletion is never reported as an update
+
     # The control-plane half of the same path: an edit that never reaches
     # the feed can never be polled off it.
     @integration
@@ -331,6 +338,21 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       When the change feed reports a mutation that invalidates it
       Then the entry is still evicted from the node's own tier
       And the failed deletion is reported, since that copy stays stale until the config TTL
+
+    @unit
+    Scenario: a shared-tier batch that fails does not take the rest of the eviction with it
+      Given an organization with more cached bundles than fit in one deletion batch
+      And the shared tier drops one batch and accepts the others
+      When the change feed reports a mutation that invalidates the organization
+      Then the entries in the batches that were accepted are gone from the shared tier
+      And the eviction is reported once with how many entries were left behind
+
+    @unit
+    Scenario: a bundle past its hard cap is never served from the shared tier
+      Given the shared tier hands back a bundle whose hard expiry has passed
+      When a node whose own tier is empty serves a request with that key
+      Then the expired bundle is not served
+      And the request resolves against the control plane instead
 
     @unit
     Scenario: rehydrating from the shared tier keeps the config's real age

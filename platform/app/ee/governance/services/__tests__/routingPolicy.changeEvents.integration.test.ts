@@ -206,7 +206,7 @@ describe("given a routing policy the gateway has already materialised into bundl
       expect(await revisionOf(unrelated)).toBe(before.unrelated);
     });
 
-    describe("and the edit is rejected", () => {
+    describe("given the edit is rejected", () => {
       it("writes neither the policy change nor the event", async () => {
         const policyId = await createPolicy("rejected");
         const key = await createKey({

@@ -16,6 +16,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"strings"
 	"sync"
 	"time"
 
@@ -41,13 +42,15 @@ type CachedBundle struct {
 }
 
 // L2Store is an optional second-level cache (e.g., Redis) shared by every
-// gateway node. Delete is what makes a change-feed eviction reach the other
-// nodes' shared copy; without it an evicted entry is rehydrated from L2 on
-// the very next request, still carrying the config the event invalidated.
+// gateway node. DeleteMany is what makes a change-feed eviction reach the
+// other nodes' shared copy; without it an evicted entry is rehydrated from L2
+// on the very next request, still carrying the config the event invalidated.
+// It takes a batch because an org-wide eviction is thousands of keys, and one
+// round trip per key would spend the whole budget on latency.
 type L2Store interface {
 	Get(ctx context.Context, hash string) (*CachedBundle, error)
 	Set(ctx context.Context, hash string, cached CachedBundle)
-	Delete(ctx context.Context, hash string) error
+	DeleteMany(ctx context.Context, hashes []string) error
 }
 
 // KeyResolver resolves a raw API key into a Bundle via an upstream source.
@@ -115,10 +118,17 @@ const (
 	tierL2Redis = "l2_redis"
 )
 
-// l2DeleteTimeout bounds one change-feed batch of L2 deletions. Generous
-// enough for a slow store, short enough that the poll loop keeps moving when
-// the store is gone.
+// l2DeleteTimeout bounds one chunk of L2 deletions, not the whole batch: a
+// budget shared across an org-wide eviction would expire part way through and
+// abandon every key after that point, which is the opposite of a safeguard.
+// Generous enough for a slow store, short enough that the poll loop keeps
+// moving when the store is gone.
 const l2DeleteTimeout = 5 * time.Second
+
+// l2DeleteChunkSize is how many keys go in one DeleteMany call. Big enough
+// that an org-wide eviction is a handful of round trips, small enough that one
+// command does not block the store's single thread on a huge argument list.
+const l2DeleteChunkSize = 256
 
 type Service struct {
 	l1            *lru.Cache[[64]byte, *entry]
@@ -436,6 +446,16 @@ func (s *Service) serveFromL2(ctx context.Context, h [64]byte) *domain.Bundle {
 		s.recordMiss(tierL2Redis)
 		return nil
 	}
+	// A store is not required to filter what it hands back, and the L1 path
+	// will not serve a bundle past its hard cap either. Same rule at this
+	// boundary: past the cap is a miss, so the request resolves fresh rather
+	// than running on credentials nothing has re-checked in hours. A bundle
+	// merely past its JWT exp rehydrates, and the next hit on it takes L1's
+	// existing refresh-or-serve-stale path.
+	if time.Now().After(cached.Bundle.ExpiresAt.Add(s.hardGrace)) {
+		s.recordMiss(tierL2Redis)
+		return nil
+	}
 	s.recordHit(tierL2Redis)
 	// Rehydrate with the config-fetch time L2 carries, never with now.
 	// Stamping now would restart the ConfigTTL clock on every L2 hit, so an
@@ -717,6 +737,11 @@ func (s *Service) changeFeedLoop(ctx context.Context) {
 // once with a kind-specific predicate and removes matching entries; the
 // next request for those VKs takes a cold miss and re-resolves with the
 // fresh control-plane state.
+//
+// The evict reason is the lowercased change kind, so an operator reading
+// auth_cache_change_evict sees which mutation caused it. Hardcoding one
+// label per branch collapsed distinct kinds onto one word, and a delete
+// that logs "updated" is worse than no label at all.
 func (s *Service) applyChange(organizationID string, ch CacheChange) {
 	switch ch.Kind {
 	case ChangeKindProviderBindingUpdated:
@@ -733,7 +758,7 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 				}
 			}
 			return false
-		}, "model_provider_updated", ch.ModelProviderID)
+		}, evictReason(ch.Kind), ch.ModelProviderID)
 	case ChangeKindBudgetCreated, ChangeKindBudgetUpdated, ChangeKindBudgetDeleted:
 		// Only PROJECT-scoped creates carry project_id. Updates, deletes, and
 		// every other scope omit it, so invalidate the polled organization in
@@ -741,12 +766,12 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 		if ch.ProjectID != "" {
 			s.evictWhere(func(b *domain.Bundle) bool {
 				return b.ProjectID == ch.ProjectID
-			}, "budget_updated", ch.ProjectID)
+			}, evictReason(ch.Kind), ch.ProjectID)
 			return
 		}
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.OrganizationID == organizationID
-		}, "budget_updated", organizationID)
+		}, evictReason(ch.Kind), organizationID)
 	case ChangeKindVirtualKeyConfigUpdate, ChangeKindVirtualKeyRotated, ChangeKindVirtualKeyRevoked,
 		ChangeKindVirtualKeyDisabled, ChangeKindVirtualKeyEnabled:
 		if ch.VirtualKeyID == "" {
@@ -754,7 +779,7 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 		}
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.VirtualKeyID == ch.VirtualKeyID
-		}, "virtual_key_config_updated", ch.VirtualKeyID)
+		}, evictReason(ch.Kind), ch.VirtualKeyID)
 	case ChangeKindRoutingPolicyUpdated, ChangeKindRoutingPolicyDeleted:
 		// A bundle carries the resolved routing mode and chain, not the id
 		// of the policy they came from, so there is nothing finer than the
@@ -762,13 +787,13 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 		// project.
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.OrganizationID == organizationID
-		}, "routing_policy_updated", organizationID)
+		}, evictReason(ch.Kind), organizationID)
 	case ChangeKindCacheRuleCreated, ChangeKindCacheRuleUpdated, ChangeKindCacheRuleDeleted:
 		// Cache rules are org-scoped and baked into every bundle as a
 		// pre-sorted array, with no rule id left on the bundle to join on.
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.OrganizationID == organizationID
-		}, "cache_rule_updated", organizationID)
+		}, evictReason(ch.Kind), organizationID)
 	default:
 		// The kinds above are the ones this build knows how to act on, and
 		// the control plane is free to emit others. Dropping one is often
@@ -782,6 +807,14 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 			zap.String("organization_id", organizationID),
 		)
 	}
+}
+
+// evictReason turns a change kind into the label its eviction is logged
+// under. One transformation in one place, so every kind reads the same way in
+// auth_cache_change_evict and none of them can drift into a hand-written word
+// that no longer matches the event.
+func evictReason(kind string) string {
+	return strings.ToLower(kind)
 }
 
 // evictWhere walks the L1 LRU once and removes every entry whose bundle
@@ -799,7 +832,7 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 // reason refreshConfigBackground uses it.
 func (s *Service) evictWhere(match func(*domain.Bundle) bool, reason, target string) {
 	keys := s.l1.Keys()
-	evicted := make([][64]byte, 0, len(keys))
+	evicted := make([]string, 0, len(keys))
 	for _, h := range keys {
 		e, ok := s.l1.Peek(h)
 		if !ok {
@@ -809,7 +842,7 @@ func (s *Service) evictWhere(match func(*domain.Bundle) bool, reason, target str
 			continue
 		}
 		s.l1.Remove(h)
-		evicted = append(evicted, h)
+		evicted = append(evicted, string(h[:]))
 	}
 	if len(evicted) == 0 {
 		return
@@ -823,26 +856,26 @@ func (s *Service) evictWhere(match func(*domain.Bundle) bool, reason, target str
 }
 
 // deleteL2 drops evicted hashes from the shared store, after the L1 walk so
-// no Redis round trip sits inside it. Best effort: a store that cannot be
-// reached leaves those entries to the ConfigTTL refresh, which is the same
-// bound the gateway had before the change feed existed, so the eviction that
-// already happened in L1 still stands.
+// no store round trip sits inside it. Best effort: keys it cannot delete are
+// left to the ConfigTTL refresh, which is the same bound the gateway had
+// before the change feed existed, and the L1 eviction still stands either way.
 //
 // It runs synchronously in the change-feed loop, which is off the request
-// path, on its own bounded context so a hung store cannot stall the loop and
-// a shutdown mid-delete does not abandon the rest of the batch.
-func (s *Service) deleteL2(hashes [][64]byte, reason, target string) {
+// path. Chunked, because an org-wide eviction is thousands of keys and a
+// failing chunk must not take the rest of the batch down with it: each chunk
+// is one round trip on its own budget, so a slow or dead store costs a bounded
+// wait per chunk instead of silently abandoning every key after the first
+// timeout.
+func (s *Service) deleteL2(hashes []string, reason, target string) {
 	if s.l2 == nil || len(hashes) == 0 {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), l2DeleteTimeout)
-	defer cancel()
-
 	failed := 0
 	var lastErr error
-	for _, h := range hashes {
-		if err := s.l2.Delete(ctx, string(h[:])); err != nil {
-			failed++
+	for start := 0; start < len(hashes); start += l2DeleteChunkSize {
+		end := min(start+l2DeleteChunkSize, len(hashes))
+		if err := s.deleteL2Chunk(hashes[start:end]); err != nil {
+			failed += end - start
 			lastErr = err
 		}
 	}
@@ -855,6 +888,15 @@ func (s *Service) deleteL2(hashes [][64]byte, reason, target string) {
 			zap.Error(lastErr),
 		)
 	}
+}
+
+// deleteL2Chunk is one batch delete on its own timeout. Separate function so
+// each chunk's context is released as soon as that chunk is done, rather than
+// piling up until the whole batch finishes.
+func (s *Service) deleteL2Chunk(hashes []string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), l2DeleteTimeout)
+	defer cancel()
+	return s.l2.DeleteMany(ctx, hashes)
 }
 
 // refreshBackground is the near-soft-expiry proactive refresh: fires

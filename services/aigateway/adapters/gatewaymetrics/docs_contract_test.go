@@ -80,6 +80,9 @@ var notMetrics = map[string]string{
 	// subsystem, but they are values inside a JSON body, not series.
 	"gateway_scope_org_mismatch":          "REST error code",
 	"gateway_budget_cycle_anchor_invalid": "REST error code",
+	"gateway_budget_scope_unreachable":    "REST error code",
+	"gateway_trace_project_ambiguous":     "REST error code",
+	"gateway_trace_project_unknown":       "REST error code",
 
 	// SDK facade names. The python SDK exposes each resource as a
 	// snake_case attribute, so a documented call reads as a

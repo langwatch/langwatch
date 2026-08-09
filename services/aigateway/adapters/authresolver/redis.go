@@ -84,8 +84,16 @@ func (s *RedisStore) Set(ctx context.Context, hash string, cached CachedBundle) 
 	_ = s.client.Set(ctx, keyPrefix+hash, raw, ttl).Err()
 }
 
-// Delete removes a bundle from Redis, so a change-feed eviction reaches the
-// copy every other gateway node shares.
-func (s *RedisStore) Delete(ctx context.Context, hash string) error {
-	return s.client.Del(ctx, keyPrefix+hash).Err()
+// DeleteMany removes bundles from Redis in one DEL, so a change-feed eviction
+// reaches the copy every other gateway node shares without paying a round trip
+// per key.
+func (s *RedisStore) DeleteMany(ctx context.Context, hashes []string) error {
+	if len(hashes) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(hashes))
+	for _, h := range hashes {
+		keys = append(keys, keyPrefix+h)
+	}
+	return s.client.Del(ctx, keys...).Err()
 }

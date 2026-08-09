@@ -62,11 +62,15 @@ func (f *fakeResolver) FetchConfig(_ context.Context, _ string) (domain.BundleCo
 
 // fakeL2 is an in-memory stand-in for the shared cache tier every gateway
 // node reads, so a test can prove an invalidation reaches further than the
-// node that saw the event. delErr makes the store unreachable.
+// node that saw the event. delErr makes the store unreachable; failNthBatch
+// fails one batch (1-based) and lets the others through, which is how a
+// partial outage looks. batches records what each DeleteMany was handed.
 type fakeL2 struct {
-	mu      sync.Mutex
-	entries map[string]CachedBundle
-	delErr  error
+	mu           sync.Mutex
+	entries      map[string]CachedBundle
+	delErr       error
+	failNthBatch int
+	batches      [][]string
 }
 
 func newFakeL2() *fakeL2 {
@@ -89,13 +93,19 @@ func (f *fakeL2) Set(_ context.Context, hash string, cached CachedBundle) {
 	f.entries[hash] = cached
 }
 
-func (f *fakeL2) Delete(_ context.Context, hash string) error {
+func (f *fakeL2) DeleteMany(_ context.Context, hashes []string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.batches = append(f.batches, append([]string(nil), hashes...))
 	if f.delErr != nil {
 		return f.delErr
 	}
-	delete(f.entries, hash)
+	if f.failNthBatch == len(f.batches) {
+		return errors.New("shared cache dropped this batch")
+	}
+	for _, hash := range hashes {
+		delete(f.entries, hash)
+	}
 	return nil
 }
 
@@ -104,6 +114,22 @@ func (f *fakeL2) has(hash string) bool {
 	defer f.mu.Unlock()
 	_, ok := f.entries[hash]
 	return ok
+}
+
+func (f *fakeL2) len() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.entries)
+}
+
+func (f *fakeL2) batchSizes() []int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	sizes := make([]int, 0, len(f.batches))
+	for _, batch := range f.batches {
+		sizes = append(sizes, len(batch))
+	}
+	return sizes
 }
 
 // l2Key is the shared-tier key for a raw virtual key, the one Resolve computes.
@@ -527,6 +553,89 @@ func TestApplyChange_SharedTierUnreachable_StillEvictsLocallyAndReports(t *testi
 	assert.False(t, isPresent, "an unreachable shared tier must not hold up the local eviction")
 	assert.Len(t, logs.FilterMessage("auth_cache_l2_delete_failed").All(), 1,
 		"a shared-tier deletion that failed must be reported, it leaves that copy stale until the config TTL")
+}
+
+/** @scenario "a bundle past its hard cap is never served from the shared tier" */
+func TestResolve_L2Hit_BundlePastHardCapIsAMissNotAServe(t *testing.T) {
+	l2 := newFakeL2()
+	resolver := &fakeResolver{returns: []resolverReturn{
+		{bundle: freshBundle("vk_resolved_fresh", time.Now().Add(1*time.Hour))},
+	}}
+	svc, _ := newService(t, Options{
+		Resolver: resolver, ConfigFetcher: resolver, L2: l2, HardGrace: time.Minute,
+	})
+
+	// The interface promises no expiry filtering, so a store is free to hand
+	// back anything it still holds. This one does, which leaves the guard in
+	// serveFromL2 as the only thing between a long-dead bundle and the caller.
+	rawKey := "vk-lw-shared-tier-hard-expired"
+	dead := freshBundle("vk_dead", time.Now().Add(-2*time.Hour))
+	dead.Credentials = []domain.Credential{{ID: "cred-dead"}}
+	l2.Set(context.Background(), l2Key(rawKey), CachedBundle{Bundle: dead, ConfigFetchedAt: time.Now()})
+
+	got, err := svc.Resolve(context.Background(), rawKey)
+	require.NoError(t, err)
+	assert.Equal(t, "vk_resolved_fresh", got.VirtualKeyID, "a bundle past its hard cap must not be served")
+	assert.Equal(t, int64(1), resolver.calls.Load(), "the request must resolve fresh instead")
+}
+
+/** @scenario "a shared-tier batch that fails does not take the rest of the eviction with it" */
+func TestApplyChange_LargeEviction_ChunksAndContinuesPastAFailedBatch(t *testing.T) {
+	l2 := newFakeL2()
+	l2.failNthBatch = 1
+	resolver := &fakeResolver{}
+	svc, logs := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver, L2: l2})
+
+	const cachedKeys = l2DeleteChunkSize*2 + 40
+	for i := 0; i < cachedKeys; i++ {
+		seedBothTiers(svc, l2, fmt.Sprintf("vk-lw-bulk-%04d", i), &domain.Bundle{OrganizationID: "org-1"})
+	}
+
+	svc.applyChange("org-1", CacheChange{Kind: ChangeKindRoutingPolicyUpdated})
+
+	assert.Equal(t, 0, svc.l1.Len(), "every bundle in the polled organization leaves L1")
+	assert.Equal(t, []int{l2DeleteChunkSize, l2DeleteChunkSize, 40}, l2.batchSizes(),
+		"an org-wide eviction goes out in chunks, one round trip each, not one per key")
+	assert.Equal(t, l2DeleteChunkSize, l2.len(),
+		"only the failed batch survives; a batch that fails must not abandon the batches after it")
+
+	warnings := logs.FilterMessage("auth_cache_l2_delete_failed").All()
+	require.Len(t, warnings, 1, "one warn for the whole eviction, not one per key")
+	assert.Equal(t, int64(l2DeleteChunkSize), warnings[0].ContextMap()["failed"])
+	assert.Equal(t, int64(cachedKeys), warnings[0].ContextMap()["total"])
+}
+
+/** @scenario "the evict log names the change kind that caused it" */
+func TestApplyChange_EvictLogNamesTheChangeKind(t *testing.T) {
+	resolver := &fakeResolver{}
+	for _, tc := range []struct{ kind, reason string }{
+		{ChangeKindRoutingPolicyUpdated, "routing_policy_updated"},
+		{ChangeKindRoutingPolicyDeleted, "routing_policy_deleted"},
+		{ChangeKindCacheRuleCreated, "cache_rule_created"},
+		{ChangeKindCacheRuleDeleted, "cache_rule_deleted"},
+		{ChangeKindBudgetDeleted, "budget_deleted"},
+		{ChangeKindVirtualKeyRevoked, "vk_revoked"},
+	} {
+		t.Run(tc.kind, func(t *testing.T) {
+			// auth_cache_change_evict is an info line, below newService's
+			// default observer level.
+			core, logs := observer.New(zap.InfoLevel)
+			svc, _ := newService(t, Options{
+				Resolver: resolver, ConfigFetcher: resolver, Logger: zap.New(core),
+			})
+			svc.storeL1(hashKey("vk-lw-reason-"+tc.kind), &domain.Bundle{
+				OrganizationID: "org-1",
+				VirtualKeyID:   "vk-reason",
+			})
+
+			svc.applyChange("org-1", CacheChange{Kind: tc.kind, VirtualKeyID: "vk-reason"})
+
+			evictions := logs.FilterMessage("auth_cache_change_evict").All()
+			require.Len(t, evictions, 1, "the eviction must be logged")
+			assert.Equal(t, tc.reason, evictions[0].ContextMap()["reason"],
+				"an operator has to be able to tell a delete from an update")
+		})
+	}
 }
 
 /** @scenario "rehydrating from the shared tier keeps the config's real age" */
