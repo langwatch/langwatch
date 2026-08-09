@@ -100,7 +100,7 @@ The gateway serves `GET /metrics` on its main HTTP port (`5563` by default, the 
 | `gateway_auth_cache_lookups_total` | counter | none | Hits plus misses |
 | `gateway_auth_cache_size` | gauge | `tier` | Entries currently held |
 
-`tier` is `l1` (in-process) or `l2_redis`. Only `l1` is populated in the default deployment, which ships without an L2 Redis tier.
+`tier` is always `l1`: the auth cache is an in-process LRU, private to each pod.
 
 ### Governance
 

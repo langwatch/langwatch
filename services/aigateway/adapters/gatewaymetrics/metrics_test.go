@@ -104,12 +104,10 @@ func TestRecorder_AuthCache(t *testing.T) {
 	r.RecordAuthCacheLookup()
 	r.RecordAuthCacheHit(TierL1)
 	r.RecordAuthCacheMiss(TierL1)
-	r.RecordAuthCacheMiss(TierL2Redis)
 
 	assert.Equal(t, 2.0, testutil.ToFloat64(r.authLookups))
 	assert.Equal(t, 1.0, testutil.ToFloat64(r.authHits.WithLabelValues(TierL1)))
 	assert.Equal(t, 1.0, testutil.ToFloat64(r.authMisses.WithLabelValues(TierL1)))
-	assert.Equal(t, 1.0, testutil.ToFloat64(r.authMisses.WithLabelValues(TierL2Redis)))
 }
 
 func TestRecorder_CacheOutcomeReadsProviderUsage(t *testing.T) {

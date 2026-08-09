@@ -188,7 +188,7 @@ jobs:
 
       - name: helm template (gateway network policy on)
         working-directory: charts/gateway
-        run: helm template gateway . --set networkPolicy.enabled=true --set redis.url=redis://test:6379 --dry-run > /tmp/netpol.yaml
+        run: helm template gateway . --set networkPolicy.enabled=true --dry-run > /tmp/netpol.yaml
 
       - name: Assert NetworkPolicy renders when enabled
         run: |
