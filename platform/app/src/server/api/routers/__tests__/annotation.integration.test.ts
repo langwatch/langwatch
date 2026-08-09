@@ -873,10 +873,15 @@ describe("Annotation CRUD", () => {
         expect(
           (JSON.parse(row!.comments as string) as string[]).sort(),
         ).toEqual(everyComment);
-        const readable = JSON.parse(row!.readable as string) as string[];
+        // The readable column is one text a reader reads straight through, one
+        // review per line with a rule between them, not a list to parse. A
+        // dataset row leaves the product, so each anchored review names its
+        // span by id as well.
+        const readable = (row!.readable as string).split("\n---\n");
+        expect(readable).toHaveLength(everyComment.length);
         expect(
-          readable.filter((line) => line.includes("(on Span span-")),
-        ).toHaveLength(3);
+          readable.filter((line) => line.includes("(on span (span-")),
+        ).toHaveLength(spanIds.length);
       });
 
       it("still narrows to the trace's own comments when a caller asks", async () => {
