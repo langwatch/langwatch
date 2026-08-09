@@ -360,6 +360,18 @@ describe("given a queue being walked", () => {
         ),
       ).toBe(true);
     });
+
+    /** @scenario "A counted turn's separator reads as counted" */
+    it("reads the separator the way the turn under review reads", async () => {
+      renderTurn({ showSessionCheckbox: true });
+      expect(separator()).toHaveAttribute("data-highlighted", "false");
+
+      await userEvent.click(sessionCheckbox());
+      expect(separator()).toHaveAttribute("data-highlighted", "true");
+
+      await userEvent.click(sessionCheckbox());
+      expect(separator()).toHaveAttribute("data-highlighted", "false");
+    });
   });
 
   describe("when the pointer leaves a turn the sitting counts", () => {

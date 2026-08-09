@@ -40,7 +40,6 @@ function renderRow(over: Partial<Parameters<typeof TreeRow>[0]> = {}) {
         isSelected={false}
         isPrompt={false}
         logCount={0}
-        isPinned={false}
         isCollapsed={false}
         hasChildren={false}
         hiddenDescendantCount={0}
@@ -48,7 +47,6 @@ function renderRow(over: Partial<Parameters<typeof TreeRow>[0]> = {}) {
         signals={[]}
         onToggleCollapse={vi.fn()}
         onSelect={vi.fn()}
-        onTogglePin={vi.fn()}
         {...over}
       />
     </ChakraProvider>,

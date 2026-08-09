@@ -82,11 +82,11 @@
 #   - The trace view grows no rail. At the width the drawer opens at, the
 #     waterfall and the span detail already share the space, so a comment there
 #     is a count at its anchor that opens the thread.
-#   - The waterfall row and the attribute row keep their actions inline on hover
-#     rather than folding them behind a three-dot menu. That is a deliberate
+#   - The waterfall row and the attribute row keep their actions one click away on
+#     hover rather than folding them behind a three-dot menu. That is a deliberate
 #     exception to the row-actions rule, which is written for settings tables:
-#     these rows are the reading surface of the drawer, they already carry pin
-#     and delete inline, and a menu would put every one of them a click further
+#     these rows are the reading surface of the drawer, they already carry delete
+#     inline, and a menu would put every one of them a click further
 #     away in the one place a reviewer works fastest. The exception is paid for
 #     rather than assumed: an action with no room for a visible label has to name
 #     the row it acts on, the way the row's delete action already does, so a
@@ -198,7 +198,7 @@ Feature: Commenting on one part of a trace
       Given I am reading a span with attributes
       Then the comment action on a waterfall row names the span it comments on
       And the comment action on an attribute row names that attribute
-      And a row's actions stay where its delete and pin actions already are,
+      And a row's actions stay one click away on the row itself,
       rather than moving behind a menu
       # The waterfall and the attribute table are the reading surface of the
       # drawer, so the actions on them stay one click, and pay for it by naming
@@ -216,8 +216,24 @@ Feature: Commenting on one part of a trace
       Given I am reading a span whose name fills its column
       And my pointer is not on its row
       Then the name runs to the end of the column, not shortened for hidden actions
-      And the pin and comment actions take room only with the pointer on the row
-      And a pinned row or one carrying comments keeps that mark visible and roomed
+      And the comment action takes no room until the pointer is on the row
+      And a row carrying comments keeps that count visible and roomed
+
+    # Over the row, the actions covered the name they belong to and the marks
+    # beside it. Below it, the row reads while they are on screen.
+    @integration
+    Scenario: The actions the pointer asks for read below the span's name
+      Given I am reading a span whose name fills its column
+      When my pointer arrives on its row
+      Then its actions read below the span's name and model
+      And the name, its marks and the row's figures stay where they were
+
+    # Pinning a span makes it a tab, which is a thing only the tab says. On the
+    # row the same icon named nothing a reader could act on.
+    @integration
+    Scenario: A waterfall row neither offers pinning nor reports it
+      Given a span is pinned as a tab
+      Then its waterfall row carries no pin action and no pinned mark
 
   Rule: A comment says what it is about
 

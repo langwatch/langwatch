@@ -31,7 +31,7 @@ const BLINK_KEYFRAMES = `
  * Resting first shows the reviewer they are in a conversation, and the carry is
  * then legible as movement within it.
  */
-export const FOCUS_SCROLL_REST_MS = 1000;
+export const FOCUS_SCROLL_REST_MS = 500;
 
 /**
  * Whether the turn under review should blink right now.

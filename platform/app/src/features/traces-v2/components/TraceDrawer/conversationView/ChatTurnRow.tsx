@@ -27,6 +27,10 @@ import {
   type UseTextTranslationResult,
   useTextTranslation,
 } from "../../../hooks/useTextTranslation";
+import {
+  isSessionMarked,
+  useAnnotationQueueSessionStore,
+} from "../../../stores/annotationQueueSessionStore";
 import type { TraceListItem } from "../../../types/trace";
 import {
   formatCost,
@@ -745,17 +749,18 @@ function Sep() {
 function TurnLedger({
   index,
   turn,
-  isCurrent,
+  isHighlighted,
 }: {
   index: number;
   turn: TraceListItem;
-  isCurrent: boolean;
+  /** True on the turn under review, and on one the sitting counts. */
+  isHighlighted: boolean;
 }) {
   return (
     <HStack gap={1.5} flexShrink={0} flexWrap="wrap" justify="center">
       <Text
         textStyle="2xs"
-        color={isCurrent ? "blue.fg" : "fg.subtle"}
+        color={isHighlighted ? "blue.fg" : "fg.subtle"}
         fontWeight="600"
         textTransform="uppercase"
         letterSpacing="0.06em"
@@ -805,6 +810,13 @@ const TurnSeparator: React.FC<{
   annotationItems,
   showSessionCheckbox,
 }) => {
+  // A turn the sitting counts reads the way the turn under review does: the
+  // tick alone is a small thing to find again on a long conversation, and the
+  // separator is what the eye follows down it.
+  const countsInSession = useAnnotationQueueSessionStore(
+    (s) => showSessionCheckbox && isSessionMarked(s.marks, turn.traceId),
+  );
+  const readsSelected = isCurrent || countsInSession;
   const annotationsOnLeft = assistantSide === "left";
   /*
    * Hover actions float over one end of the separator instead of sitting in
@@ -860,6 +872,9 @@ const TurnSeparator: React.FC<{
       // are one thing.
       className="group"
       role="group"
+      // Says in one place what the lines and the ledger read from: the turn
+      // under review, or one the sitting counts.
+      data-highlighted={readsSelected ? "true" : "false"}
       _hover={{ "& > .turn-line": { bg: "border.emphasized" } }}
     >
       {/* The session's tick leads the separator: ticked state is scanned down
@@ -872,15 +887,15 @@ const TurnSeparator: React.FC<{
         className="turn-line"
         height="1px"
         flex={1}
-        bg={isCurrent ? "blue.solid" : "border.muted"}
+        bg={readsSelected ? "blue.solid" : "border.muted"}
         transition="background 0.12s ease"
       />
-      <TurnLedger index={index} turn={turn} isCurrent={isCurrent} />
+      <TurnLedger index={index} turn={turn} isHighlighted={readsSelected} />
       <Box
         className="turn-line"
         height="1px"
         flex={1}
-        bg={isCurrent ? "blue.solid" : "border.muted"}
+        bg={readsSelected ? "blue.solid" : "border.muted"}
         transition="background 0.12s ease"
       />
       {!annotationsOnLeft && badgesWithActions}

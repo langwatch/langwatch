@@ -606,7 +606,7 @@ const EndSessionDialog = ({
   >
     <Dialog.Content bg="bg" maxWidth="480px">
       <Dialog.Header>
-        <Dialog.Title fontSize="md" fontWeight="500">
+        <Dialog.Title fontSize="sm" fontWeight="500">
           {END_SESSION_QUESTION}
         </Dialog.Title>
       </Dialog.Header>

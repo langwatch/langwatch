@@ -34,7 +34,6 @@ const baseProps = {
   rootDuration: 1000,
   isSelected: false,
   isPrompt: false,
-  isPinned: false,
   isCollapsed: false,
   hasChildren: false,
   hiddenDescendantCount: 0,
@@ -42,7 +41,6 @@ const baseProps = {
   signals: [],
   onToggleCollapse: vi.fn(),
   onSelect: vi.fn(),
-  onTogglePin: vi.fn(),
 };
 
 function renderRow(logCount: number) {

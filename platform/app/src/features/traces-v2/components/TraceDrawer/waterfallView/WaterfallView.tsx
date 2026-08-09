@@ -13,7 +13,6 @@ import { useAnchoredAnnotations } from "../../../hooks/useAnchoredAnnotations";
 import { useSpanLangwatchSignals } from "../../../hooks/useSpanLangwatchSignals";
 import { useSpanLogs } from "../../../hooks/useSpanLogs";
 import { useTraceQueryArgs } from "../../../hooks/useTraceQueryArgs";
-import { useDrawerStore } from "../../../stores/drawerStore";
 import { useSpanPulseStore } from "../../../stores/spanPulseStore";
 import { formatDuration } from "../../../utils/formatters";
 import { GroupRow } from "./GroupRow";
@@ -59,28 +58,6 @@ export const WaterfallView = memo(function WaterfallView({
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [treePct, setTreePct] = useState(DEFAULT_TREE_PCT);
   const [showOnlyLangwatch, setShowOnlyLangwatch] = useState(false);
-
-  // Pin gestures wire straight to the drawer store — `pinnedSpanIds`
-  // doubles as both the SpanTabBar tab list and the row-level "is this
-  // span pinned" check, so a Set lookup per render is cheaper than
-  // recomputing membership inside each row. `pinSpan`/`unpinSpan` are
-  // both no-ops on duplicates / unknowns, so the toggle handler is
-  // safe to call without first checking membership.
-  const pinnedSpanIds = useDrawerStore((s) => s.pinnedSpanIds);
-  const pinSpan = useDrawerStore((s) => s.pinSpan);
-  const unpinSpan = useDrawerStore((s) => s.unpinSpan);
-  const pinnedSet = useMemo(() => new Set(pinnedSpanIds), [pinnedSpanIds]);
-  // Identity-stable: reads pin membership through a ref so memoized rows
-  // don't all re-render whenever the pinned set changes.
-  const pinnedSetRef = useRef(pinnedSet);
-  pinnedSetRef.current = pinnedSet;
-  const handleTogglePin = useCallback(
-    (spanId: string) => {
-      if (pinnedSetRef.current.has(spanId)) unpinSpan(spanId);
-      else pinSpan(spanId);
-    },
-    [pinSpan, unpinSpan],
-  );
 
   const { isEditing, deletedSpanIds, draftNames, toggleSpanDeleted } =
     useWaterfallEditing(spans);
@@ -615,7 +592,6 @@ export const WaterfallView = memo(function WaterfallView({
                     isSelected={node.span.spanId === selectedSpanId}
                     isPrompt={promptSpanIds?.has(node.span.spanId) ?? false}
                     logCount={logsBySpanId.get(node.span.spanId)?.length ?? 0}
-                    isPinned={pinnedSet.has(node.span.spanId)}
                     isCollapsed={collapsedIds.has(node.span.spanId)}
                     hasChildren={node.children.length > 0}
                     hiddenDescendantCount={
@@ -642,7 +618,6 @@ export const WaterfallView = memo(function WaterfallView({
                     onToggleDelete={toggleSpanDeleted}
                     onToggleCollapse={handleToggleCollapse}
                     onSelect={handleSelectSpan}
-                    onTogglePin={handleTogglePin}
                   />
                 </Box>
               );

@@ -212,6 +212,14 @@ Feature: Walking an annotation queue into a dataset
       And unticking a turn I annotated takes it back out, and my untick wins
 
     @integration
+    Scenario: A counted turn's separator reads as counted
+      Given a turn the session does not count yet
+      When I tick that turn's checkbox
+      Then its separator reads the way the turn under review does
+      And unticking it puts the separator back
+      # A tick alone is a small thing to find again on a long conversation.
+
+    @integration
     Scenario: The dataset toggle carries the live count in traces
       Given three turns are counted into the session
       Then the bar reads "Add to dataset at the end (3 traces)"

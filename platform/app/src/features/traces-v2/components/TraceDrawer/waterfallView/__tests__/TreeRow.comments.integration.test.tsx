@@ -108,10 +108,7 @@ function comment(over: Partial<AnnotationByTrace> = {}): AnnotationByTrace {
   } as unknown as AnnotationByTrace;
 }
 
-function renderRow(
-  comments: AnnotationByTrace[],
-  { isPinned = false }: { isPinned?: boolean } = {},
-) {
+function renderRow(comments: AnnotationByTrace[]) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <TreeRow
@@ -121,7 +118,6 @@ function renderRow(
         isSelected={false}
         isPrompt={false}
         logCount={0}
-        isPinned={isPinned}
         isCollapsed={false}
         hasChildren={false}
         hiddenDescendantCount={0}
@@ -131,7 +127,6 @@ function renderRow(
         comments={comments}
         onToggleCollapse={vi.fn()}
         onSelect={vi.fn()}
-        onTogglePin={vi.fn()}
       />
     </ChakraProvider>,
   );
@@ -147,10 +142,13 @@ afterEach(cleanup);
 
 /** The row itself, which is what the pointer arrives on. */
 const rowOf = (container: HTMLElement) =>
-  container.querySelector('[data-testid="waterfall-row-actions"]')
-    ?.parentElement as HTMLElement;
+  container.querySelector('[data-testid="waterfall-row"]') as HTMLElement;
 
-const actionCluster = () => screen.getByTestId("waterfall-row-actions");
+/** What the pointer asks for, which hangs under the span's name. */
+const hoverActions = () => screen.queryByTestId("waterfall-row-actions");
+
+/** What the row says about itself without being asked. */
+const restingMarks = () => screen.queryByTestId("waterfall-row-marks");
 
 describe("given a span that carries two comments", () => {
   const comments = [
@@ -204,15 +202,13 @@ describe("given a span with nothing said about it", () => {
   });
 
   /** @scenario "A comment action with no room for a label names the row it acts on" */
-  it("keeps the action inline on the row rather than behind a menu", () => {
+  it("keeps the action on the row itself rather than behind a menu", () => {
     const { container } = renderRow([]);
 
     const commentAction = container.querySelector(
       '[aria-label="Comment on web_search"]',
     );
-    const pin = container.querySelector('[aria-label="Pin span tab"]');
-    const row = pin?.parentElement;
-    expect(row?.contains(commentAction!)).toBe(true);
+    expect(rowOf(container).contains(commentAction!)).toBe(true);
     expect(
       container.querySelector('[aria-label="Row actions"]'),
     ).not.toBeInTheDocument();
@@ -225,10 +221,7 @@ describe("given a span whose name fills its column", () => {
     it("leaves the name the whole column, with the actions taking none of it", () => {
       const { container } = renderRow([]);
 
-      expect(actionCluster()).toHaveAttribute("data-roomed", "false");
-      expect(
-        container.querySelector('[aria-label="Pin span tab"]'),
-      ).toHaveAttribute("aria-hidden", "true");
+      expect(restingMarks()).not.toBeInTheDocument();
       expect(
         container.querySelector('[aria-label="Comment on web_search"]'),
       ).toHaveAttribute("aria-hidden", "true");
@@ -237,41 +230,68 @@ describe("given a span whose name fills its column", () => {
 
   describe("when the pointer is on its row", () => {
     /** @scenario "A waterfall row's hidden actions take none of the name's room" */
-    it("brings the pin and comment actions on screen", async () => {
+    it("brings the comment action on screen", async () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
       const { container } = renderRow([]);
 
       await user.hover(rowOf(container));
 
       expect(
-        container.querySelector('[aria-label="Pin span tab"]'),
-      ).not.toHaveAttribute("aria-hidden", "true");
-      expect(
         container.querySelector('[aria-label="Comment on web_search"]'),
       ).not.toHaveAttribute("aria-hidden", "true");
+    });
+
+    /** @scenario "The actions the pointer asks for read below the span's name" */
+    it("hangs them under the name rather than over it", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const { container } = renderRow([]);
+
+      await user.hover(rowOf(container));
+
+      const name = screen.getByTitle("web_search");
+      const nameColumn = name.parentElement?.parentElement;
+      expect(nameColumn?.contains(hoverActions())).toBe(true);
+      expect(hoverActions()).toHaveStyle({ top: "100%" });
     });
   });
 });
 
 describe("given a row that carries a mark of its own", () => {
   /** @scenario "A waterfall row's hidden actions take none of the name's room" */
-  it("keeps a pinned span's mark visible and roomed", () => {
-    const { container } = renderRow([], { isPinned: true });
-
-    expect(actionCluster()).toHaveAttribute("data-roomed", "true");
-    expect(
-      container.querySelector('[aria-label="Unpin span tab"]'),
-    ).not.toHaveAttribute("aria-hidden", "true");
-  });
-
-  /** @scenario "A waterfall row's hidden actions take none of the name's room" */
   it("keeps a commented span's count visible and roomed", () => {
     const { container } = renderRow([comment()]);
 
-    expect(actionCluster()).toHaveAttribute("data-roomed", "true");
+    expect(restingMarks()).toBeInTheDocument();
+    expect(restingMarks()?.contains(hoverActions())).toBe(false);
     expect(
       container.querySelector('[aria-label="1 comment on web_search"]'),
     ).not.toHaveAttribute("aria-hidden", "true");
+  });
+
+  /** @scenario "The actions the pointer asks for read below the span's name" */
+  it("does not repeat the count in what the pointer brings", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const { container } = renderRow([comment()]);
+
+    await user.hover(rowOf(container));
+
+    expect(
+      container.querySelectorAll('[aria-label="1 comment on web_search"]'),
+    ).toHaveLength(1);
+  });
+});
+
+describe("given a span that is pinned as a tab", () => {
+  /** @scenario "A waterfall row neither offers pinning nor reports it" */
+  it("offers no pinning on its row and shows no pinned mark", () => {
+    const { container } = renderRow([]);
+
+    expect(
+      container.querySelector('[aria-label="Pin span tab"]'),
+    ).not.toBeInTheDocument();
+    expect(
+      container.querySelector('[aria-label="Unpin span tab"]'),
+    ).not.toBeInTheDocument();
   });
 });
 
