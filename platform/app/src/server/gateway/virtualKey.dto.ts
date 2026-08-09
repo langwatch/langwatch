@@ -32,23 +32,22 @@ export type TraceDestinationFacts = {
   archivedProjectIds: ReadonlySet<string>;
 };
 
-export const NO_ARCHIVED_TRACE_DESTINATIONS: TraceDestinationFacts = {
-  archivedProjectIds: new Set<string>(),
-};
-
 /**
  * Load the flag for a page of keys in one query, whatever the page's size.
  * Passed to the DTO explicitly rather than defaulted, because a caller that
  * forgets it would publish `trace_project_archived: false` for a deleted
  * project, which is the failure this field exists to prevent.
  */
-export async function loadTraceDestinationFacts(
-  client: PrismaClient | Prisma.TransactionClient,
-  vks: { traceProjectId: string | null }[],
-): Promise<TraceDestinationFacts> {
+export async function loadTraceDestinationFacts({
+  client,
+  virtualKeys,
+}: {
+  client: PrismaClient | Prisma.TransactionClient;
+  virtualKeys: { traceProjectId: string | null }[];
+}): Promise<TraceDestinationFacts> {
   const projects = await traceProjectsByIds(
     client,
-    vks.map((vk) => vk.traceProjectId),
+    virtualKeys.map((vk) => vk.traceProjectId),
   );
   const archivedProjectIds = new Set<string>();
   for (const project of projects.values()) {
@@ -174,18 +173,24 @@ function baseVk(
   };
 }
 
-export function toVirtualKeyCamelDto(
-  vk: VirtualKeyWithScopes,
-  facts: TraceDestinationFacts,
-): VirtualKeyCamelDto {
-  return baseVk(vk, facts);
+export function toVirtualKeyCamelDto({
+  virtualKey,
+  facts,
+}: {
+  virtualKey: VirtualKeyWithScopes;
+  facts: TraceDestinationFacts;
+}): VirtualKeyCamelDto {
+  return baseVk(virtualKey, facts);
 }
 
-export function toVirtualKeySnakeDto(
-  vk: VirtualKeyWithScopes,
-  facts: TraceDestinationFacts,
-): VirtualKeySnakeDto {
-  const base = baseVk(vk, facts);
+export function toVirtualKeySnakeDto({
+  virtualKey,
+  facts,
+}: {
+  virtualKey: VirtualKeyWithScopes;
+  facts: TraceDestinationFacts;
+}): VirtualKeySnakeDto {
+  const base = baseVk(virtualKey, facts);
   return {
     id: base.id,
     organization_id: base.organizationId,

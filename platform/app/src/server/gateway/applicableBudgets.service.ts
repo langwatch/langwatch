@@ -20,7 +20,11 @@ import type {
 import { budgetPeriodFloorMs } from "./budgetPeriod";
 import { resolveApplicableBudgets } from "./budgetResolution.service";
 import { resolveProviderLabels } from "./providerLabels";
-import { decideTraceDestination } from "./scopeResolver";
+import {
+  decideTraceDestination,
+  type TraceProject,
+  traceProjectFor,
+} from "./scopeResolver";
 import type { ScopeInput } from "./virtualKey.repository";
 
 export type DraftVirtualKey = {
@@ -69,21 +73,21 @@ export async function resolveApplicableBudgetsForDraftKey(
   draft: DraftVirtualKey,
   chRepo?: GatewayBudgetClickHouseRepository,
 ): Promise<ApplicableBudget[]> {
-  // Where the draft's traces would land, which is what decides whether
-  // team- and project-scoped budgets reach it at all. The same decision the
-  // save will make, so the list cannot preview a destination the key will
-  // not get; a draft the save would refuse previews as no destination at
-  // all, which is the honest answer while the form is still incomplete.
-  const decision = await decideTraceDestination(prisma, {
-    organizationId: draft.organizationId,
-    scopes: draft.scopes.map((s) => ({
-      scopeType: s.scopeType,
-      scopeId: s.scopeId,
-    })),
-    traceProjectId: draft.traceProjectId,
-  });
-  const traceProject =
-    decision.outcome === "resolved" ? decision.project : null;
+  // Where this key's traces land, which is what decides whether team- and
+  // project-scoped budgets reach it at all.
+  //
+  // A key that exists has a stored destination, and the answer has to be the
+  // one the gateway will act on: the same pointer the materialiser follows,
+  // archived or not. Deciding it again here would show an empty list for a
+  // key whose destination the customer deleted, while its project and team
+  // budgets went on enforcing.
+  //
+  // A draft has no key row and no stored destination yet, so the honest
+  // answer is the decision the save is about to make. A draft the save would
+  // refuse previews as no destination, which is what an incomplete form is.
+  const traceProject = draft.virtualKeyId
+    ? await traceProjectFor(prisma, draft.traceProjectId)
+    : await decidedTraceProject(prisma, draft);
 
   const resolved = await resolveApplicableBudgets({
     client: prisma,
@@ -134,6 +138,26 @@ export async function resolveApplicableBudgetsForDraftKey(
     isPerMember: budget.scopeType === "GROUP",
     managedByVirtualKeyId: budget.managedByVirtualKeyId,
   }));
+}
+
+/**
+ * Where a draft's traces would land once it is saved: the same decision the
+ * save will make, so the list cannot preview a destination the key will not
+ * get. A draft the save would refuse has none yet.
+ */
+async function decidedTraceProject(
+  prisma: PrismaClient,
+  draft: DraftVirtualKey,
+): Promise<TraceProject | null> {
+  const decision = await decideTraceDestination(prisma, {
+    organizationId: draft.organizationId,
+    scopes: draft.scopes.map((s) => ({
+      scopeType: s.scopeType,
+      scopeId: s.scopeId,
+    })),
+    traceProjectId: draft.traceProjectId,
+  });
+  return decision.outcome === "resolved" ? decision.project : null;
 }
 
 async function loadSpend(

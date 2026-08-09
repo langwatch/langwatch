@@ -503,12 +503,13 @@ const updateVirtualKeySchema = z.object({
   name: z.string().min(1).max(128).optional(),
   description: z.string().nullable().optional(),
   scopes: z.array(scopeWireSchema).min(1).optional(),
-  /**
-   * Omit it and the key's destination stays exactly where it is, scope
-   * edits included. A value moves it, validated as on create. Null asks for
-   * it to be worked out again from what the key is now.
-   */
-  trace_project_id: z.string().nullable().optional(),
+  trace_project_id: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "Where the key's traces and costs land. Omit it and the destination stays exactly where it is, scope edits included. A value moves it, validated the way create validates it. Explicit null does not clear it: it asks for the destination to be worked out again from what the key is now, under the same rules create uses, so a shared key in an organization with projects to choose from is refused with `gateway_trace_project_ambiguous`.",
+    ),
   routing_policy_id: z.string().nullable().optional(),
   routing_mode: routingModeWireSchema.optional(),
   /** Undefined leaves the key's cap alone; a value upserts it; null archives it. */
@@ -616,18 +617,24 @@ const createBudgetSchema = z.object({
  * caller can read says the destination is gone.
  */
 async function toVkDto(vk: VirtualKeyWithScopes): Promise<VirtualKeySnakeDto> {
-  return toVirtualKeySnakeDto(
-    vk,
-    await loadTraceDestinationFacts(prisma, [vk]),
-  );
+  return toVirtualKeySnakeDto({
+    virtualKey: vk,
+    facts: await loadTraceDestinationFacts({
+      client: prisma,
+      virtualKeys: [vk],
+    }),
+  });
 }
 
 /** `toVkDto` for a page, in one read of the destinations however long it is. */
 async function toVkDtos(
   vks: VirtualKeyWithScopes[],
 ): Promise<VirtualKeySnakeDto[]> {
-  const facts = await loadTraceDestinationFacts(prisma, vks);
-  return vks.map((vk) => toVirtualKeySnakeDto(vk, facts));
+  const facts = await loadTraceDestinationFacts({
+    client: prisma,
+    virtualKeys: vks,
+  });
+  return vks.map((vk) => toVirtualKeySnakeDto({ virtualKey: vk, facts }));
 }
 
 type GatewayContext = Context<{ Variables: AuthMiddlewareVariables }>;
@@ -1209,7 +1216,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
   describeRoute({
     summary: "Update virtual key",
     description:
-      "Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope, and does NOT move where the key's traces and costs land: send `trace_project_id` for that, validated the way create validates it. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.",
+      "Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope, and does NOT move where the key's traces and costs land: send `trace_project_id` for that, validated the way create validates it; explicit null re-resolves it under the create-time rules rather than clearing it. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.",
     tags: ["Virtual Keys"],
     responses: {
       ...canonicalBaseResponses,

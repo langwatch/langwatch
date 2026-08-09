@@ -108,8 +108,11 @@ export const virtualKeysRouter = createTRPCRouter({
       );
       // One read of the destinations for the whole page: a listing must not
       // cost a query per key to say where each one's traffic goes.
-      const facts = await loadTraceDestinationFacts(ctx.prisma, keys);
-      return keys.map((vk) => toVirtualKeyCamelDto(vk, facts));
+      const facts = await loadTraceDestinationFacts({
+        client: ctx.prisma,
+        virtualKeys: keys,
+      });
+      return keys.map((vk) => toVirtualKeyCamelDto({ virtualKey: vk, facts }));
     }),
 
   get: protectedProcedure
@@ -119,10 +122,13 @@ export const virtualKeysRouter = createTRPCRouter({
       // A key the caller can't see is indistinguishable from one that
       // doesn't exist — same NOT_FOUND, no existence leak.
       const vk = await requireVisibleVk(ctx, input.organizationId, input.id);
-      return toVirtualKeyCamelDto(
-        vk,
-        await loadTraceDestinationFacts(ctx.prisma, [vk]),
-      );
+      return toVirtualKeyCamelDto({
+        virtualKey: vk,
+        facts: await loadTraceDestinationFacts({
+          client: ctx.prisma,
+          virtualKeys: [vk],
+        }),
+      });
     }),
 
   /**
@@ -354,10 +360,13 @@ export const virtualKeysRouter = createTRPCRouter({
         actorUserId: ctx.session.user.id,
       });
       return {
-        virtualKey: toVirtualKeyCamelDto(
+        virtualKey: toVirtualKeyCamelDto({
           virtualKey,
-          await loadTraceDestinationFacts(ctx.prisma, [virtualKey]),
-        ),
+          facts: await loadTraceDestinationFacts({
+            client: ctx.prisma,
+            virtualKeys: [virtualKey],
+          }),
+        }),
         secret,
       };
     }),
@@ -462,10 +471,13 @@ export const virtualKeysRouter = createTRPCRouter({
         config: input.config,
         actorUserId: ctx.session.user.id,
       });
-      return toVirtualKeyCamelDto(
-        updated,
-        await loadTraceDestinationFacts(ctx.prisma, [updated]),
-      );
+      return toVirtualKeyCamelDto({
+        virtualKey: updated,
+        facts: await loadTraceDestinationFacts({
+          client: ctx.prisma,
+          virtualKeys: [updated],
+        }),
+      });
     }),
 
   rotate: protectedProcedure
@@ -489,10 +501,13 @@ export const virtualKeysRouter = createTRPCRouter({
         actorUserId: ctx.session.user.id,
       });
       return {
-        virtualKey: toVirtualKeyCamelDto(
+        virtualKey: toVirtualKeyCamelDto({
           virtualKey,
-          await loadTraceDestinationFacts(ctx.prisma, [virtualKey]),
-        ),
+          facts: await loadTraceDestinationFacts({
+            client: ctx.prisma,
+            virtualKeys: [virtualKey],
+          }),
+        }),
         secret,
       };
     }),
@@ -517,10 +532,13 @@ export const virtualKeysRouter = createTRPCRouter({
         organizationId: input.organizationId,
         actorUserId: ctx.session.user.id,
       });
-      return toVirtualKeyCamelDto(
-        updated,
-        await loadTraceDestinationFacts(ctx.prisma, [updated]),
-      );
+      return toVirtualKeyCamelDto({
+        virtualKey: updated,
+        facts: await loadTraceDestinationFacts({
+          client: ctx.prisma,
+          virtualKeys: [updated],
+        }),
+      });
     }),
 
   disable: protectedProcedure
@@ -544,10 +562,13 @@ export const virtualKeysRouter = createTRPCRouter({
         actorUserId: ctx.session.user.id,
         reason: input.reason ?? null,
       });
-      return toVirtualKeyCamelDto(
-        updated,
-        await loadTraceDestinationFacts(ctx.prisma, [updated]),
-      );
+      return toVirtualKeyCamelDto({
+        virtualKey: updated,
+        facts: await loadTraceDestinationFacts({
+          client: ctx.prisma,
+          virtualKeys: [updated],
+        }),
+      });
     }),
 
   enable: protectedProcedure
@@ -570,9 +591,12 @@ export const virtualKeysRouter = createTRPCRouter({
         organizationId: input.organizationId,
         actorUserId: ctx.session.user.id,
       });
-      return toVirtualKeyCamelDto(
-        updated,
-        await loadTraceDestinationFacts(ctx.prisma, [updated]),
-      );
+      return toVirtualKeyCamelDto({
+        virtualKey: updated,
+        facts: await loadTraceDestinationFacts({
+          client: ctx.prisma,
+          virtualKeys: [updated],
+        }),
+      });
     }),
 });

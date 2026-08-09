@@ -1,8 +1,11 @@
 /**
  * READ-ONLY. Reports what the stored-trace-destination backfill would do.
  *
- * This script issues SELECT and COUNT queries only. It performs no INSERT,
- * UPDATE or DELETE, opens no transaction, and is safe to point at production.
+ * This script issues SELECT queries only. It performs no INSERT, UPDATE or
+ * DELETE, opens no transaction, and is safe to point at production: the keys
+ * are walked a page at a time and folded into counters as they arrive, so what
+ * it holds in memory is one page plus the organization's projects, whatever the
+ * size of the instance.
  * Its whole job is to answer, before the migration runs, the one question the
  * backfill cannot answer for itself: are there keys it will leave without a
  * destination, and are there organizations that cannot give it one.
@@ -47,6 +50,10 @@ const RESOLUTIONS: Resolution[] = [
   "null",
 ];
 
+/** Keys read per round trip. Big enough to be few round trips, small enough
+ * that a page is never the thing that runs an operator's laptop out of RAM. */
+const KEY_PAGE_SIZE = 1_000;
+
 type ProjectRow = {
   id: string;
   organizationId: string;
@@ -64,37 +71,61 @@ async function main(): Promise<void> {
     const byId = new Map(projects.map((project) => [project.id, project]));
     const governanceByOrg = oldestLiveGovernanceByOrg(projects);
 
-    const keys = await prisma.virtualKey.findMany({
-      select: {
-        id: true,
-        organizationId: true,
-        traceProjectId: true,
-        scopes: { select: { scopeType: true, scopeId: true } },
-      },
-    });
-
     const counts = new Map<Resolution, number>(
       RESOLUTIONS.map((resolution) => [resolution, 0]),
     );
     const orgsWithKeysNeedingGovernance = new Set<string>();
+    let total = 0;
 
-    for (const key of keys) {
-      const resolution = classify({ key, byId, governanceByOrg });
-      counts.set(resolution, (counts.get(resolution) ?? 0) + 1);
-      if (resolution === "null") {
-        orgsWithKeysNeedingGovernance.add(key.organizationId);
+    // Keyset pagination on the primary key: a full instance's worth of keys
+    // never has to fit in memory at once, and the walk cannot skip or repeat
+    // a row the way an OFFSET walk can under concurrent writes.
+    let cursor: string | null = null;
+    for (;;) {
+      const page: {
+        id: string;
+        organizationId: string;
+        traceProjectId: string | null;
+        scopes: { scopeType: string; scopeId: string }[];
+      }[] = await prisma.virtualKey.findMany({
+        ...(cursor ? { where: { id: { gt: cursor } } } : {}),
+        select: {
+          id: true,
+          organizationId: true,
+          traceProjectId: true,
+          scopes: { select: { scopeType: true, scopeId: true } },
+        },
+        orderBy: { id: "asc" },
+        take: KEY_PAGE_SIZE,
+      });
+      if (page.length === 0) break;
+      for (const key of page) {
+        const resolution = classify({ key, byId, governanceByOrg });
+        counts.set(resolution, (counts.get(resolution) ?? 0) + 1);
+        if (resolution === "null") {
+          orgsWithKeysNeedingGovernance.add(key.organizationId);
+        }
       }
+      total += page.length;
+      cursor = page[page.length - 1]!.id;
+      if (page.length < KEY_PAGE_SIZE) break;
     }
 
-    const orgsMissingGovernance = [
-      ...new Set(projects.map((project) => project.organizationId)),
-    ].filter((organizationId) => !governanceByOrg.has(organizationId));
+    // Read from Organization, not from the projects: an organization with no
+    // projects at all has no governance project either, and counting it off
+    // the project rows would leave it out of the very number it belongs in.
+    const organizations = await prisma.organization.findMany({
+      select: { id: true },
+    });
+    const orgsMissingGovernance = organizations
+      .map((organization) => organization.id)
+      .filter((organizationId) => !governanceByOrg.has(organizationId));
 
     console.log("virtual keys by would-be resolution");
     for (const resolution of RESOLUTIONS) {
       console.log(`  ${resolution.padEnd(18)} ${counts.get(resolution) ?? 0}`);
     }
-    console.log(`  ${"total".padEnd(18)} ${keys.length}`);
+    console.log(`  ${"total".padEnd(18)} ${total}`);
     console.log("");
     console.log(
       `organizations with no live governance project: ${orgsMissingGovernance.length}`,

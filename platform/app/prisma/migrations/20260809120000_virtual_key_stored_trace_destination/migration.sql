@@ -24,10 +24,30 @@
 --
 -- Idempotent: re-running it is a no-op, because every value it writes
 -- satisfies the predicate that would have cleared it.
+--
+-- IRREVERSIBLE: a one-shot backfill with no down step. Once it has run, a key
+-- whose `traceProjectId` was null before cannot be told apart from one this
+-- wrote, and a pointer step 1 cleared is gone. Rolling the code back is safe,
+-- because the chain reads these rows and agrees with them. Rolling the data
+-- back is not, and there is nothing to roll it back to.
+--
+-- No semicolon appears anywhere but at the end of a statement, comments
+-- included: this file is split on it, here and by the runners that replay it.
 
 -- 1. A pointer that no longer names a live project of the key's own
 --    organization is not a destination. Resolution already passed over it,
 --    so clearing it here is what lets the rules below answer for the key.
+--
+--    An archived pointer is cleared for exactly that reason, and it is the
+--    one step worth reading twice. From this migration on, a destination the
+--    customer deletes is followed as it stands and the state is surfaced on
+--    the key. That is not what happens today: today the chain passes over an
+--    archived destination and the key's traces are already landing in the
+--    scope project or the governance inbox. Keeping the archived pointer
+--    would therefore MOVE those keys' traffic on deploy, out of where it is
+--    going and into a project the customer deleted. Clearing it is what
+--    keeps them where they are. This is the last time a deletion moves
+--    anything.
 UPDATE "VirtualKey" vk
 SET "traceProjectId" = NULL
 WHERE vk."traceProjectId" IS NOT NULL

@@ -496,10 +496,13 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
       // And the state is surfaced rather than acted on, which is the only
       // way a reader can tell: the project still answers, and the traces
       // still arrive.
-      const dto = toVirtualKeySnakeDto(
-        vk!,
-        await loadTraceDestinationFacts(prisma, [vk!]),
-      );
+      const dto = toVirtualKeySnakeDto({
+        virtualKey: vk!,
+        facts: await loadTraceDestinationFacts({
+          client: prisma,
+          virtualKeys: [vk!],
+        }),
+      });
       expect(dto.trace_project_id).toBe(ARCH_DOOMED_PROJECT_ID);
       expect(dto.trace_project_archived).toBe(true);
     });
@@ -718,10 +721,13 @@ describe("virtual keys must have a home for their traces (real PG)", () => {
       });
 
       const vk = await repo.findById(virtualKey.id, ORG_CHOICE_ID);
-      const dto = toVirtualKeySnakeDto(
-        vk!,
-        await loadTraceDestinationFacts(prisma, [vk!]),
-      );
+      const dto = toVirtualKeySnakeDto({
+        virtualKey: vk!,
+        facts: await loadTraceDestinationFacts({
+          client: prisma,
+          virtualKeys: [vk!],
+        }),
+      });
       expect(dto.trace_project_id).toBe(CHOICE_PROJECT_A_ID);
       expect(dto.trace_project_archived).toBe(false);
     });

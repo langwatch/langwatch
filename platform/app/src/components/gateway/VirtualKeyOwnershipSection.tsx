@@ -374,7 +374,7 @@ export function VirtualKeyOwnershipReadOnly({
       {traceProjectArchived && (
         <Text fontSize="xs" color="fg.muted">
           This key keeps sending its traces and costs there. Restore the project
-          to see them again, or point the key somewhere else.
+          to see them again.
         </Text>
       )}
     </VStack>

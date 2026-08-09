@@ -332,15 +332,25 @@ describe("the stored trace destination backfill against real PG", () => {
   describe("when the backfill is run a second time", () => {
     /** @scenario "A key already pointing at a live project keeps that destination" */
     it("changes nothing it wrote the first time", async () => {
+      // The key that already points at a live project is the one the second
+      // run is most likely to disturb: it is the only shape step 1 inspects
+      // and decides to leave alone.
+      const alreadyLive = `vk-tdb-idem-live-${suffix}`;
       const soleScope = `vk-tdb-idem-sole-${suffix}`;
       const shared = `vk-tdb-idem-shared-${suffix}`;
       const homeless = `vk-tdb-idem-homeless-${suffix}`;
-      const keyIds = [soleScope, shared, homeless];
+      const keyIds = [alreadyLive, soleScope, shared, homeless];
 
       const rollback = new Error("rollback");
       await expect(
         prisma.$transaction(async (tx) => {
           await seedLegacyKeys(tx, [
+            {
+              id: alreadyLive,
+              organizationId: ORG_ID,
+              traceProjectId: LIVE_A_ID,
+              scopes: [{ scopeType: "PROJECT", scopeId: LIVE_B_ID }],
+            },
             {
               id: soleScope,
               organizationId: ORG_ID,
@@ -367,6 +377,8 @@ describe("the stored trace destination backfill against real PG", () => {
           const afterSecond = await destinationsOf(tx, keyIds);
 
           expect(afterFirst).toEqual({
+            // Kept, not swapped for the project its own scope names.
+            [alreadyLive]: LIVE_A_ID,
             [soleScope]: LIVE_B_ID,
             [shared]: GOV_LIVE_ID,
             [homeless]: null,

@@ -1773,7 +1773,7 @@ export interface paths {
         head?: never;
         /**
          * Update virtual key
-         * @description Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope, and does NOT move where the key's traces and costs land: send `trace_project_id` for that, validated the way create validates it. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.
+         * @description Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope, and does NOT move where the key's traces and costs land: send `trace_project_id` for that, validated the way create validates it; explicit null re-resolves it under the create-time rules rather than clearing it. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.
          */
         patch: operations["patchApiGatewayV1Virtual-keysById"];
         trace?: never;
@@ -9566,6 +9566,7 @@ export interface operations {
                         scope_type: "organization" | "team" | "project";
                         scope_id: string;
                     }[];
+                    /** @description Where the key's traces and costs land. Omit it and the destination stays exactly where it is, scope edits included. A value moves it, validated the way create validates it. Explicit null does not clear it: it asks for the destination to be worked out again from what the key is now, under the same rules create uses, so a shared key in an organization with projects to choose from is refused with `gateway_trace_project_ambiguous`. */
                     trace_project_id?: string | null;
                     routing_policy_id?: string | null;
                     /** @enum {string} */
