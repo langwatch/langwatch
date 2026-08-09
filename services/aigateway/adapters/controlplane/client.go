@@ -153,7 +153,10 @@ func (c *Client) ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle,
 
 // Change is one mutation observed by the control plane that the gateway
 // must react to (cache invalidation, in practice). Mirrors the wire shape
-// emitted by GET /api/internal/gateway/changes.
+// emitted by GET /api/internal/gateway/changes. Kind crosses this boundary
+// as an opaque string; the set the gateway acts on is enumerated by the
+// ChangeKind constants in the authresolver package, which is where the
+// switch over it lives.
 type Change struct {
 	Kind            string
 	VirtualKeyID    string
@@ -162,19 +165,6 @@ type Change struct {
 	ProjectID       string
 	Revision        string
 }
-
-// Change kinds — keep in sync with the control-plane ChangeEventKind enum
-// in langwatch/src/server/gateway/changeEvent.repository.ts.
-const (
-	ChangeKindProviderBindingUpdated = "MODEL_PROVIDER_UPDATED"
-	ChangeKindBudgetCreated          = "BUDGET_CREATED"
-	ChangeKindBudgetUpdated          = "BUDGET_UPDATED"
-	ChangeKindBudgetDeleted          = "BUDGET_DELETED"
-	ChangeKindVirtualKeyCreated      = "VK_CREATED"
-	ChangeKindVirtualKeyConfigUpdate = "VK_CONFIG_UPDATED"
-	ChangeKindVirtualKeyRotated      = "VK_ROTATED"
-	ChangeKindVirtualKeyRevoked      = "VK_REVOKED"
-)
 
 // PollChanges does one /changes long-poll. Returns the events the control
 // plane buffered since `since`, the org's current revision (advance the

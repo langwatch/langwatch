@@ -236,6 +236,173 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And the gateway immediately starts the next poll
       And the gateway never sleeps; the long-poll is the only wait
 
+  Rule: A routing-policy or cache-rule edit propagates through the change feed
+    Routing policies and cache rules are org-scoped artifacts that the
+    materialiser folds into every bundle it builds, and a bundle carries no
+    id to join either of them back on. So the organization is the finest
+    invalidation key available, and both kinds evict every cached bundle in
+    the polled organization, exactly like a budget change that carries no
+    project. Without this the only thing that reaches a running gateway is
+    the config TTL, which is a safety net rather than a propagation path.
+
+    @unit
+    Scenario: an edited routing policy evicts the organization's cached bundles
+      Given bundles for two organizations are cached
+      When the change feed for the first organization reports a routing-policy edit
+      Then every cached bundle belonging to that organization is evicted
+      And the other organization's bundles stay cached
+      And the next request for an evicted key re-resolves against the fresh policy
+
+    @unit
+    Scenario: a deleted routing policy evicts the organization's cached bundles
+      Given bundles for two organizations are cached
+      When the change feed for the first organization reports a routing-policy deletion
+      Then every cached bundle belonging to that organization is evicted
+      And the other organization's bundles stay cached
+
+    @unit
+    Scenario: a cache-rule mutation evicts the organization's cached bundles
+      Given bundles for two organizations are cached
+      When the change feed for the first organization reports a cache rule created, updated, or deleted
+      Then every cached bundle belonging to that organization is evicted
+      And the other organization's bundles stay cached
+
+    @unit
+    Scenario: every kind the control plane can emit is acted on or ignored on purpose
+      Given the kinds the control plane can emit are declared in one place
+      When the change feed reports each of them in turn
+      Then none of them is reported as a kind this build does not recognize
+      And a kind added upstream fails this check rather than becoming a warning in production
+
+    # The control plane may emit a kind this build predates, and doing
+    # nothing about it is usually right. Doing nothing SILENTLY is not:
+    # that is how the cache-rule kinds above stayed unhandled from the day
+    # the control plane started emitting them. A kind this build ignores on
+    # purpose is named in its own case, so a routine event never arrives
+    # looking like an incident.
+    @unit @regression
+    Scenario: A change kind this build does not act on is reported, not dropped
+      Given a bundle is cached
+      When the change feed reports a kind this gateway has no case for
+      Then nothing is evicted
+      And the gateway reports the unhandled kind by name
+
+    @unit
+    Scenario: the evict log names the change kind that caused it
+      Given bundles are cached for an organization
+      When the change feed reports any kind the gateway acts on
+      Then the eviction is logged under that kind's own name
+      And a deletion is never reported as an update
+
+    # The control-plane half of the same path: an edit that never reaches
+    # the feed can never be polled off it.
+    @integration
+    Scenario: editing a routing policy appends one change event and bumps its keys
+      Given a routing policy that two virtual keys reference and one does not
+      When an admin edits the policy
+      Then exactly one ROUTING_POLICY_UPDATED event is appended for the organization
+      And the revision of both referencing keys is bumped
+      And the revision of the unrelated key is unchanged
+      And an edit that is rejected writes neither the policy change nor the event
+
+    @integration
+    Scenario: deleting a routing policy releases the keys that pointed at it
+      Given a routing policy that a virtual key references in policy routing mode
+      When an admin deletes the policy
+      Then exactly one ROUTING_POLICY_DELETED event is appended for the organization
+      And the key no longer points at the deleted policy
+      And the key's routing mode moves off policy routing, so it is never left naming a policy that is gone
+      And the key's revision is bumped
+
+    @integration
+    Scenario: creating a policy or swapping the default emits nothing
+      Given an organization with an existing default routing policy
+      When an admin creates another policy, then makes it the default
+      Then no change event is appended
+      And already-issued keys keep the policy they were issued against
+
+  Rule: Invalidation reaches every cache tier, not just the node that saw the event
+    L1 is one node's own copy; L2 is the copy every node shares. Dropping an
+    entry from L1 alone is undone by the very next request, which finds the
+    invalidated bundle in the shared tier and puts it straight back, so the
+    mutation the event announced does not take effect until the config TTL
+    expires. The rehydrate also has to carry the config's real age: stamping
+    it as freshly fetched restarts the staleness clock, so an entry most of
+    the way through its TTL comes back with a whole new one and staleness can
+    reach twice the TTL. This holds for every change kind, not only the
+    newest ones.
+
+    A bundle rehydrated from the shared tier gets exactly the treatment an
+    entry already in the node's own tier would get in the same state. A node
+    with a cold cache must not be the weaker door: if the bundle is past its
+    JWT expiry, the control plane is asked before anything is served, so a
+    key revoked during the grace window is refused rather than getting one
+    more request through.
+
+    @unit
+    Scenario: a change event drops the entry from the shared cache tier too
+      Given a bundle is cached in both the node's own tier and the shared tier
+      When the change feed reports a mutation that invalidates it
+      Then the bundle is gone from both tiers
+      And the next request for that key re-resolves against the control plane
+      And bundles for other organizations stay in both tiers
+
+    @unit
+    Scenario: a shared tier that cannot be reached does not hold up the local eviction
+      Given a bundle is cached in both tiers
+      And the shared tier is unreachable
+      When the change feed reports a mutation that invalidates it
+      Then the entry is still evicted from the node's own tier
+      And the failed deletion is reported, since that copy stays stale until the config TTL
+
+    @unit
+    Scenario: a shared-tier batch that fails does not take the rest of the eviction with it
+      Given an organization with more cached bundles than fit in one deletion batch
+      And the shared tier drops one batch and accepts the others
+      When the change feed reports a mutation that invalidates the organization
+      Then the entries in the batches that were accepted are gone from the shared tier
+      And the eviction is reported once with how many entries were left behind
+
+    @unit
+    Scenario: the grace window classifies a cached bundle the same way on both tiers
+      Given a cached bundle and a configured grace window
+      When the same request is answered from the node's own tier and from the shared tier in turn
+      Then both tiers reach the same verdict
+      And both consult the control plane exactly as often
+      And a bundle inside its own expiry is still served when the grace window is negative, since that setting moves the cap, not the expiry
+
+    @unit
+    Scenario: a key revoked during the grace window is refused on a node whose own tier is cold
+      Given the shared tier holds a bundle past its JWT expiry but inside the grace window
+      And the key has been revoked since that bundle was cached
+      When a node whose own tier is empty serves a request with that key
+      Then the control plane is asked before anything is served
+      And the request is rejected as revoked
+      And nothing is left cached for that key
+
+    @unit
+    Scenario: a soft-expired shared-tier bundle still serves when the control plane is only unreachable
+      Given the shared tier holds a bundle past its JWT expiry but inside the grace window
+      And the control plane is unreachable
+      When a node whose own tier is empty serves a request with that key
+      Then the cached bundle and its credentials are served
+      And the failed refresh is reported
+
+    @unit
+    Scenario: a bundle past its hard cap is never served from the shared tier
+      Given the shared tier hands back a bundle whose hard expiry has passed
+      When a node whose own tier is empty serves a request with that key
+      Then the expired bundle is not served
+      And the request resolves against the control plane instead
+
+    @unit
+    Scenario: rehydrating from the shared tier keeps the config's real age
+      Given the shared tier holds a bundle whose config was fetched longer ago than the config TTL
+      When a node whose own tier is empty serves a request with that key
+      Then the cached bundle is served
+      And its config is refreshed rather than treated as freshly fetched
+      And a shared entry whose config is still inside the TTL is not refetched
+
   Rule: L2 Redis cache warms new gateway nodes
 
     @integration @unimplemented

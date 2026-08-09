@@ -16,6 +16,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,10 +27,30 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-// L2Store is an optional second-level cache (e.g., Redis).
+// CachedBundle is what an L2 store holds: the bundle plus the moment its
+// config was fetched from the control plane. The timestamp travels with the
+// value because L2 is shared across nodes, and a node rehydrating an entry
+// has to inherit the config's real age. Stamping the rehydrate moment
+// instead would restart the ConfigTTL clock on every L2 hit.
+type CachedBundle struct {
+	// Bundle is the cached resolution result.
+	Bundle *domain.Bundle
+	// ConfigFetchedAt is when the config baked into Bundle was fetched. The
+	// zero value means unknown, which every reader must treat as stale now:
+	// a value we cannot date is one we cannot vouch for.
+	ConfigFetchedAt time.Time
+}
+
+// L2Store is an optional second-level cache (e.g., Redis) shared by every
+// gateway node. DeleteMany is what makes a change-feed eviction reach the
+// other nodes' shared copy; without it an evicted entry is rehydrated from L2
+// on the very next request, still carrying the config the event invalidated.
+// It takes a batch because an org-wide eviction is thousands of keys, and one
+// round trip per key would spend the whole budget on latency.
 type L2Store interface {
-	Get(ctx context.Context, hash string) (*domain.Bundle, error)
-	Set(ctx context.Context, hash string, bundle *domain.Bundle)
+	Get(ctx context.Context, hash string) (*CachedBundle, error)
+	Set(ctx context.Context, hash string, cached CachedBundle)
+	DeleteMany(ctx context.Context, hashes []string) error
 }
 
 // KeyResolver resolves a raw API key into a Bundle via an upstream source.
@@ -56,6 +77,11 @@ const (
 	ChangeKindVirtualKeyRevoked      = "VK_REVOKED"
 	ChangeKindVirtualKeyDisabled     = "VK_DISABLED"
 	ChangeKindVirtualKeyEnabled      = "VK_ENABLED"
+	ChangeKindRoutingPolicyUpdated   = "ROUTING_POLICY_UPDATED"
+	ChangeKindRoutingPolicyDeleted   = "ROUTING_POLICY_DELETED"
+	ChangeKindCacheRuleCreated       = "CACHE_RULE_CREATED"
+	ChangeKindCacheRuleUpdated       = "CACHE_RULE_UPDATED"
+	ChangeKindCacheRuleDeleted       = "CACHE_RULE_DELETED"
 )
 
 // CacheChange is one cache-invalidation hint surfaced by ChangePoller.
@@ -91,6 +117,18 @@ const (
 	tierL1      = "l1"
 	tierL2Redis = "l2_redis"
 )
+
+// l2DeleteTimeout bounds one chunk of L2 deletions, not the whole batch: a
+// budget shared across an org-wide eviction would expire part way through and
+// abandon every key after that point, which is the opposite of a safeguard.
+// Generous enough for a slow store, short enough that the poll loop keeps
+// moving when the store is gone.
+const l2DeleteTimeout = 5 * time.Second
+
+// l2DeleteChunkSize is how many keys go in one DeleteMany call. Big enough
+// that an org-wide eviction is a handful of round trips, small enough that one
+// command does not block the store's single thread on a huge argument list.
+const l2DeleteChunkSize = 256
 
 type Service struct {
 	l1            *lru.Cache[[64]byte, *entry]
@@ -169,6 +207,40 @@ func (e *entry) endConfigRefresh() {
 	defer e.mu.Unlock()
 	e.configRefreshing = false
 	e.configFetchedAt = time.Now()
+}
+
+// entryState is what the cache has decided about an entry it is holding, and
+// it is the same question on every tier: serve it as is, refresh it before
+// serving, or treat it as gone.
+type entryState int
+
+const (
+	// entryFresh is inside its JWT exp and serves without asking anyone.
+	entryFresh entryState = iota
+	// entryStale is past its JWT exp but inside the hard cap, so the control
+	// plane decides: a rejection evicts, a transport failure serves stale.
+	entryStale
+	// entryDead is past the hard cap and is not servable at all.
+	entryDead
+)
+
+// classifyEntry is the one place that decides which of the three an entry is,
+// so a warm tier and a cold one cannot answer differently about the same
+// bundle. The order is load-bearing: soft expiry is checked BEFORE the hard
+// cap, because a negative HardGrace deliberately puts the cap earlier than
+// the JWT exp (the stale-while-error opt-out, LW_GATEWAY_AUTH_CACHE_HARD_
+// GRACE_SECONDS), and a bundle that has not reached its own expiry is
+// servable wherever the cap happens to sit. Testing the cap first would
+// throw away perfectly valid credentials under that configuration.
+func classifyEntry(e *entry) entryState {
+	switch {
+	case !e.softExpired():
+		return entryFresh
+	case !e.hardExpired():
+		return entryStale
+	default:
+		return entryDead
+	}
 }
 
 func (e *entry) softExpired() bool {
@@ -356,9 +428,9 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 
 	// L1: in-memory
 	if e, ok := s.l1.Get(h); ok {
-		switch {
-		case !e.softExpired():
-			// Fresh: serve, maybe trigger background refresh on near-expiry.
+		switch classifyEntry(e) {
+		case entryFresh:
+			// Serve, maybe trigger background refresh on near-expiry.
 			s.recordHit(tierL1)
 			if e.nearSoftExpiry(s.refreshThreshold) {
 				go s.refreshBackground(rawKey, h) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
@@ -367,7 +439,7 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 			}
 			return e.bundle, nil
 
-		case !e.hardExpired():
+		case entryStale:
 			// Soft-expired but within hard grace. A foreground refresh is
 			// needed before the entry can serve, so it counts as a miss
 			// even when stale-while-error ends up serving the old bundle.
@@ -388,18 +460,74 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 	}
 
 	// L2: optional store
-	if s.l2 != nil {
-		hStr := string(h[:])
-		if bundle, err := s.l2.Get(ctx, hStr); err == nil && bundle != nil {
-			s.recordHit(tierL2Redis)
-			s.storeL1(h, bundle)
-			return bundle, nil
-		}
-		s.recordMiss(tierL2Redis)
+	if bundle, l2Err := s.serveFromL2(ctx, rawKey, h); bundle != nil || l2Err != nil {
+		return bundle, l2Err
 	}
 
 	// L3: upstream resolver
 	return s.resolveFresh(ctx, rawKey, h)
+}
+
+// serveFromL2 answers from the shared store when it holds a bundle this node
+// may serve, rehydrating L1 on the way. A miss is (nil, nil), leaving the
+// caller to resolve upstream.
+//
+// A rehydrated entry gets exactly the treatment an L1 entry in the same state
+// would get, because a node with a cold L1 must not be a weaker door than a
+// warm one. That is the whole reason this reaches into the refresh path
+// instead of just returning what the store handed over.
+func (s *Service) serveFromL2(ctx context.Context, rawKey string, h [64]byte) (*domain.Bundle, error) {
+	if s.l2 == nil {
+		return nil, nil
+	}
+	cached, err := s.l2.Get(ctx, string(h[:]))
+	if err != nil {
+		s.recordMiss(tierL2Redis)
+		return nil, nil //nolint:nilerr // a shared cache that cannot answer is a miss, not a failed request: the resolve falls through to the tier that decides whether the key is good
+	}
+	if cached == nil || cached.Bundle == nil {
+		s.recordMiss(tierL2Redis)
+		return nil, nil
+	}
+	// Build the entry before deciding anything, so this tier asks
+	// classifyEntry the same question L1 asks about an entry it already
+	// holds, from the same fields. A store is not required to filter what it
+	// hands back, and the answer must not depend on which tier the bundle
+	// arrived from. The config-fetch time is the one L2 carries, never now:
+	// stamping now would restart the ConfigTTL clock on every hit, so an
+	// entry 50 seconds into a 60 second TTL would come back with a fresh 60.
+	e := s.newEntry(cached.Bundle, cached.ConfigFetchedAt)
+
+	switch classifyEntry(e) {
+	case entryDead:
+		// Past the hard cap and not servable, so it never enters L1: the
+		// request resolves fresh rather than running on credentials nothing
+		// has re-checked in hours.
+		s.recordMiss(tierL2Redis)
+		return nil, nil
+
+	case entryStale:
+		// Past its JWT exp and inside the hard cap: ask the control plane
+		// before serving, exactly as an L1 entry in this state does. A key
+		// revoked during the grace window is rejected here rather than
+		// serving one more request first, and a control plane that is merely
+		// unreachable still gets the stale bundle served. Counted a miss for
+		// the same reason the L1 path counts one: the request paid a
+		// foreground refresh, whatever it ends up being answered with.
+		s.storeL1Entry(h, e)
+		s.recordMiss(tierL2Redis)
+		return s.refreshOrServeStale(ctx, rawKey, h, e)
+
+	default:
+		s.storeL1Entry(h, e)
+		s.recordHit(tierL2Redis)
+		// An entry that arrives already past its config TTL refreshes here
+		// rather than waiting for a second request to notice.
+		if e.configStale(s.configTTL) && e.tryBeginConfigRefresh() {
+			go s.refreshConfigBackground(h, e) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
+		}
+		return cached.Bundle, nil
+	}
 }
 
 // CacheLen reports how many virtual keys L1 is currently holding, so the
@@ -438,9 +566,7 @@ func (s *Service) resolveFresh(ctx context.Context, rawKey string, h [64]byte) (
 		return nil, errConfigUnavailable(ctx, cfgErr)
 	}
 	s.storeL1(h, bundle)
-	if s.l2 != nil {
-		s.l2.Set(ctx, string(h[:]), bundle)
-	}
+	s.setL2(ctx, h, bundle)
 	return bundle, nil
 }
 
@@ -466,9 +592,7 @@ func (s *Service) refreshOrServeStale(ctx context.Context, rawKey string, h [64]
 			return s.serveStaleAfterFailure(ctx, h, stale, staleBundle, vkID, hardExpiresAt, cls, cfgErr)
 		}
 		s.storeL1(h, bundle)
-		if s.l2 != nil {
-			s.l2.Set(ctx, string(h[:]), bundle)
-		}
+		s.setL2(ctx, h, bundle)
 		return bundle, nil
 
 	case classAuthRejection:
@@ -575,21 +699,53 @@ func (s *Service) Stop() {
 
 // --- Internal ---
 
+// storeL1 caches a bundle whose config was just fetched.
 func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle) {
-	s.l1.Add(h, &entry{
+	s.storeL1Fetched(h, bundle, time.Now())
+}
+
+// storeL1Fetched caches a bundle whose config was fetched at a known moment,
+// which is not always now: an L2 rehydrate inherits the age the shared store
+// recorded, so the ConfigTTL clock keeps running across nodes.
+func (s *Service) storeL1Fetched(h [64]byte, bundle *domain.Bundle, configFetchedAt time.Time) *entry {
+	e := s.newEntry(bundle, configFetchedAt)
+	s.storeL1Entry(h, e)
+	return e
+}
+
+// newEntry builds a cache entry without publishing it. Separate from the
+// store so a caller can classify a bundle first and decline to cache one it
+// would refuse to serve.
+func (s *Service) newEntry(bundle *domain.Bundle, configFetchedAt time.Time) *entry {
+	return &entry{
 		bundle:          bundle,
 		softExpiresAt:   bundle.ExpiresAt,
 		hardExpiresAt:   bundle.ExpiresAt.Add(s.hardGrace),
-		configFetchedAt: time.Now(),
-	})
+		configFetchedAt: configFetchedAt,
+	}
+}
+
+// storeL1Entry publishes an entry to L1 and records its org for the change feed.
+func (s *Service) storeL1Entry(h [64]byte, e *entry) {
+	bundle := e.bundle
+	s.l1.Add(h, e)
 	// Record the bundle's org so the change-feed loop knows which orgs
-	// to subscribe to. LoadOrStore is the first-write-wins shape — if
+	// to subscribe to. LoadOrStore is the first-write-wins shape: if
 	// the org's already known, the existing cursor is preserved so we
 	// don't reset to "0" and re-stream the entire history on every new
 	// bundle for an existing org.
 	if bundle.OrganizationID != "" {
 		s.activeOrgs.LoadOrStore(bundle.OrganizationID, &orgCursor{since: "0"})
 	}
+}
+
+// setL2 mirrors a bundle into the shared store. Only called right after a
+// successful config fetch, so now is the config's fetch time.
+func (s *Service) setL2(ctx context.Context, h [64]byte, bundle *domain.Bundle) {
+	if s.l2 == nil {
+		return
+	}
+	s.l2.Set(ctx, string(h[:]), CachedBundle{Bundle: bundle, ConfigFetchedAt: time.Now()})
 }
 
 // changeFeedLoop drives the per-org cache invalidation: long-polls the
@@ -654,6 +810,11 @@ func (s *Service) changeFeedLoop(ctx context.Context) {
 // once with a kind-specific predicate and removes matching entries; the
 // next request for those VKs takes a cold miss and re-resolves with the
 // fresh control-plane state.
+//
+// The evict reason is the lowercased change kind, so an operator reading
+// auth_cache_change_evict sees which mutation caused it. Hardcoding one
+// label per branch collapsed distinct kinds onto one word, and a delete
+// that logs "updated" is worse than no label at all.
 func (s *Service) applyChange(organizationID string, ch CacheChange) {
 	switch ch.Kind {
 	case ChangeKindProviderBindingUpdated:
@@ -670,7 +831,7 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 				}
 			}
 			return false
-		}, "model_provider_updated", ch.ModelProviderID)
+		}, evictReason(ch.Kind), ch.ModelProviderID)
 	case ChangeKindBudgetCreated, ChangeKindBudgetUpdated, ChangeKindBudgetDeleted:
 		// Only PROJECT-scoped creates carry project_id. Updates, deletes, and
 		// every other scope omit it, so invalidate the polled organization in
@@ -678,12 +839,12 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 		if ch.ProjectID != "" {
 			s.evictWhere(func(b *domain.Bundle) bool {
 				return b.ProjectID == ch.ProjectID
-			}, "budget_updated", ch.ProjectID)
+			}, evictReason(ch.Kind), ch.ProjectID)
 			return
 		}
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.OrganizationID == organizationID
-		}, "budget_updated", organizationID)
+		}, evictReason(ch.Kind), organizationID)
 	case ChangeKindVirtualKeyConfigUpdate, ChangeKindVirtualKeyRotated, ChangeKindVirtualKeyRevoked,
 		ChangeKindVirtualKeyDisabled, ChangeKindVirtualKeyEnabled:
 		if ch.VirtualKeyID == "" {
@@ -691,18 +852,67 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 		}
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.VirtualKeyID == ch.VirtualKeyID
-		}, "virtual_key_config_updated", ch.VirtualKeyID)
+		}, evictReason(ch.Kind), ch.VirtualKeyID)
+	case ChangeKindRoutingPolicyUpdated, ChangeKindRoutingPolicyDeleted:
+		// A bundle carries the resolved routing mode and chain, not the id
+		// of the policy they came from, so there is nothing finer than the
+		// organization to key on. Same shape as a budget change with no
+		// project.
+		s.evictWhere(func(b *domain.Bundle) bool {
+			return b.OrganizationID == organizationID
+		}, evictReason(ch.Kind), organizationID)
+	case ChangeKindCacheRuleCreated, ChangeKindCacheRuleUpdated, ChangeKindCacheRuleDeleted:
+		// Cache rules are org-scoped and baked into every bundle as a
+		// pre-sorted array, with no rule id left on the bundle to join on.
+		s.evictWhere(func(b *domain.Bundle) bool {
+			return b.OrganizationID == organizationID
+		}, evictReason(ch.Kind), organizationID)
+	case ChangeKindVirtualKeyCreated:
+		// Nothing to evict: a key nobody has resolved yet is in no cache, on
+		// this node or any other. Named rather than left to the default so a
+		// routine event does not arrive as a warning and bury the kinds an
+		// operator actually needs to see.
+	default:
+		// The cases above are every kind this build knows about, acted on or
+		// deliberately ignored, and the control plane is free to emit others.
+		// Dropping one is often correct, but dropping one silently is how
+		// CACHE_RULE_* went unhandled from the day it shipped: the control
+		// plane emitted it, nothing here named it, and the documented
+		// behavior simply did not happen. Saying so leaves the next one an
+		// hour of log reading rather than a bug report about staleness.
+		s.logger.Warn("auth_cache_change_unhandled",
+			zap.String("kind", ch.Kind),
+			zap.String("organization_id", organizationID),
+		)
 	}
 }
 
+// evictReason turns a change kind into the label its eviction is logged
+// under. One transformation in one place, so every kind reads the same way in
+// auth_cache_change_evict and none of them can drift into a hand-written word
+// that no longer matches the event.
+func evictReason(kind string) string {
+	return strings.ToLower(kind)
+}
+
 // evictWhere walks the L1 LRU once and removes every entry whose bundle
-// matches the predicate. O(N) over LRUSize per call — acceptable for
-// 10k-ish caches and the low frequency of admin mutations.
+// matches the predicate, then drops the same entries from L2. Evicting only
+// L1 would be undone by the next request, which finds the invalidated bundle
+// in the shared store and rehydrates it. O(N) over LRUSize per call:
+// acceptable for 10k-ish caches and the low frequency of admin mutations.
+//
+// Peek, not Get: the scan reads the whole cache, and Get takes the
+// exclusive lock and promotes what it reads. That queues every in-flight
+// request behind the scan once per entry, and it drags keys the
+// scan merely looked at ahead of keys real traffic touched after the
+// Keys() snapshot, so the next size eviction picks the wrong victim. Peek
+// takes the shared lock and leaves recency to the request path, the same
+// reason refreshConfigBackground uses it.
 func (s *Service) evictWhere(match func(*domain.Bundle) bool, reason, target string) {
 	keys := s.l1.Keys()
-	evicted := 0
+	evicted := make([]string, 0, len(keys))
 	for _, h := range keys {
-		e, ok := s.l1.Get(h)
+		e, ok := s.l1.Peek(h)
 		if !ok {
 			continue
 		}
@@ -710,15 +920,61 @@ func (s *Service) evictWhere(match func(*domain.Bundle) bool, reason, target str
 			continue
 		}
 		s.l1.Remove(h)
-		evicted++
+		evicted = append(evicted, string(h[:]))
 	}
-	if evicted > 0 {
-		s.logger.Info("auth_cache_change_evict",
+	if len(evicted) == 0 {
+		return
+	}
+	s.logger.Info("auth_cache_change_evict",
+		zap.String("reason", reason),
+		zap.String("target", target),
+		zap.Int("evicted", len(evicted)),
+	)
+	s.deleteL2(evicted, reason, target)
+}
+
+// deleteL2 drops evicted hashes from the shared store, after the L1 walk so
+// no store round trip sits inside it. Best effort: keys it cannot delete are
+// left to the ConfigTTL refresh, which is the same bound the gateway had
+// before the change feed existed, and the L1 eviction still stands either way.
+//
+// It runs synchronously in the change-feed loop, which is off the request
+// path. Chunked, because an org-wide eviction is thousands of keys and a
+// failing chunk must not take the rest of the batch down with it: each chunk
+// is one round trip on its own budget, so a slow or dead store costs a bounded
+// wait per chunk instead of silently abandoning every key after the first
+// timeout.
+func (s *Service) deleteL2(hashes []string, reason, target string) {
+	if s.l2 == nil || len(hashes) == 0 {
+		return
+	}
+	failed := 0
+	var lastErr error
+	for start := 0; start < len(hashes); start += l2DeleteChunkSize {
+		end := min(start+l2DeleteChunkSize, len(hashes))
+		if err := s.deleteL2Chunk(hashes[start:end]); err != nil {
+			failed += end - start
+			lastErr = err
+		}
+	}
+	if failed > 0 {
+		s.logger.Warn("auth_cache_l2_delete_failed",
 			zap.String("reason", reason),
 			zap.String("target", target),
-			zap.Int("evicted", evicted),
+			zap.Int("failed", failed),
+			zap.Int("total", len(hashes)),
+			zap.Error(lastErr),
 		)
 	}
+}
+
+// deleteL2Chunk is one batch delete on its own timeout. Separate function so
+// each chunk's context is released as soon as that chunk is done, rather than
+// piling up until the whole batch finishes.
+func (s *Service) deleteL2Chunk(hashes []string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), l2DeleteTimeout)
+	defer cancel()
+	return s.l2.DeleteMany(ctx, hashes)
 }
 
 // refreshBackground is the near-soft-expiry proactive refresh: fires
@@ -742,9 +998,7 @@ func (s *Service) refreshBackground(rawKey string, h [64]byte) {
 			return
 		}
 		s.storeL1(h, bundle)
-		if s.l2 != nil {
-			s.l2.Set(ctx, string(h[:]), bundle)
-		}
+		s.setL2(ctx, h, bundle)
 		s.logger.Debug("auth_cache_refresh_success", zap.String("vk_id", bundle.VirtualKeyID))
 
 	case classAuthRejection:
@@ -826,9 +1080,7 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 		return
 	}
 	s.storeL1(h, &fresh)
-	if s.l2 != nil {
-		s.l2.Set(ctx, string(h[:]), &fresh)
-	}
+	s.setL2(ctx, h, &fresh)
 	s.logger.Debug("config_ttl_refresh_success", zap.String("vk_id", stale.VirtualKeyID))
 }
 
