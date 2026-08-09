@@ -13,6 +13,10 @@
  * the gateway never branches on environment, so there is no env field.
  */
 import { metadataFromRow, type ResourceMetadata } from "./resourceMetadata";
+import {
+  type TraceProjectSource,
+  traceProjectSourceFor,
+} from "./scopeResolver";
 import type { VirtualKeyWithScopes } from "./virtualKey.repository";
 import { toWireEnum } from "./wireEnums";
 
@@ -32,6 +36,13 @@ export type VirtualKeyCamelDto = {
   principalUserId: string | null;
   /** Explicit trace destination; grants no access to the key. */
   traceProjectId: string | null;
+  /**
+   * Which rule puts this key's traces and costs where they go. Only
+   * `explicit` and `project_scope` name a project the key itself chose;
+   * `governance_fallback` means nobody did, and every project budget on
+   * the project a reader has in mind counts none of this key's spend.
+   */
+  traceProjectSource: TraceProjectSource;
   principalUser: { name: string | null; email: string | null } | null;
   /** The caller's own id for this key, unique per organization. */
   externalId: string | null;
@@ -58,6 +69,7 @@ export type VirtualKeySnakeDto = {
   display_prefix: string;
   principal_user_id: string | null;
   trace_project_id: string | null;
+  trace_project_source: TraceProjectSource;
   external_id: string | null;
   metadata: ResourceMetadata;
   /**
@@ -97,6 +109,7 @@ function baseVk(vk: VirtualKeyWithScopes): BaseVk {
     displayPrefix: vk.displayPrefix,
     principalUserId: vk.principalUserId,
     traceProjectId: vk.traceProjectId ?? null,
+    traceProjectSource: traceProjectSourceFor(vk),
     principalUser: vk.principalUser
       ? { name: vk.principalUser.name, email: vk.principalUser.email }
       : null,
@@ -137,6 +150,7 @@ export function toVirtualKeySnakeDto(
     display_prefix: base.displayPrefix,
     principal_user_id: base.principalUserId,
     trace_project_id: base.traceProjectId,
+    trace_project_source: base.traceProjectSource,
     external_id: base.externalId,
     metadata: base.metadata,
     scopes: base.scopes.map((s) => ({

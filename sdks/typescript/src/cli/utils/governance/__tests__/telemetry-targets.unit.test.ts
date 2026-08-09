@@ -61,8 +61,16 @@ const origUserprofile = process.env.USERPROFILE;
 const origCodexHome = process.env.CODEX_HOME;
 const origXdgConfigHome = process.env.XDG_CONFIG_HOME;
 
+// The directory the scan treats as "this directory". A scratch one by
+// default: the targets a scan returns can REMOVE real files, and a suite that
+// let that resolve to the checkout it runs in would delete the project pin of
+// any developer who had run `langwatch claude` there.
+let scanCwd: string;
+
+const scan = () => scanTelemetryTargets({ cwd: scanCwd });
+
 const presentLabels = (): string[] =>
-	scanTelemetryTargets()
+	scan()
 		.filter((t) => t.present)
 		.map((t) => t.label);
 
@@ -87,6 +95,8 @@ const seedMarketplace = (repo = OWNED_MARKETPLACE_REPO): void =>
 
 beforeEach(() => {
 	tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "lw-telemetry-targets-"));
+	scanCwd = path.join(tmpHome, "cwd");
+	fs.mkdirSync(scanCwd, { recursive: true });
 	process.env.HOME = tmpHome;
 	process.env.USERPROFILE = tmpHome;
 	spawnSyncMock.mockReset();
@@ -157,7 +167,7 @@ describe("scanTelemetryTargets", () => {
 		});
 
 		it("removes every present target, and a re-scan finds nothing", () => {
-			for (const t of scanTelemetryTargets().filter((t) => t.present)) {
+			for (const t of scan().filter((t) => t.present)) {
 				expect(t.remove()).toBe(true);
 			}
 			expect(presentLabels()).toEqual([]);
@@ -171,7 +181,7 @@ describe("scanTelemetryTargets", () => {
 			settings.model = "claude-sonnet-5";
 			fs.writeFileSync(claude.path, JSON.stringify(settings, null, 2));
 
-			for (const t of scanTelemetryTargets().filter((t) => t.present)) {
+			for (const t of scan().filter((t) => t.present)) {
 				t.remove();
 			}
 
@@ -203,7 +213,7 @@ describe("scanTelemetryTargets", () => {
 				presentLabels().some((l) => l.startsWith("code shell function")),
 			).toBe(true);
 
-			for (const t of scanTelemetryTargets().filter((t) => t.present)) {
+			for (const t of scan().filter((t) => t.present)) {
 				expect(t.remove()).toBe(true);
 			}
 
@@ -230,7 +240,7 @@ describe("scanTelemetryTargets", () => {
 				presentLabels().some((l) => l.startsWith("claude session hooks")),
 			).toBe(true);
 
-			for (const t of scanTelemetryTargets().filter((t) => t.present)) {
+			for (const t of scan().filter((t) => t.present)) {
 				expect(t.remove()).toBe(true);
 			}
 
@@ -257,7 +267,7 @@ describe("scanTelemetryTargets", () => {
 				true,
 			);
 
-			for (const t of scanTelemetryTargets().filter((t) => t.present)) {
+			for (const t of scan().filter((t) => t.present)) {
 				expect(t.remove()).toBe(true);
 			}
 
@@ -275,7 +285,7 @@ describe("scanTelemetryTargets", () => {
 				presentLabels().some((l) => l.startsWith("opencode session plugin")),
 			).toBe(false);
 
-			for (const t of scanTelemetryTargets()) t.remove();
+			for (const t of scan()) t.remove();
 
 			expect(fs.readFileSync(target.path, "utf8")).toBe(
 				"export const Mine = async () => ({});\n",
@@ -301,7 +311,7 @@ describe("scanTelemetryTargets", () => {
 
 		/** @scenario "Logout uninstalls the plugin and removes the marketplace" */
 		it("uninstalls the plugin at user scope and removes the marketplace", () => {
-			for (const t of scanTelemetryTargets().filter((t) => t.present)) {
+			for (const t of scan().filter((t) => t.present)) {
 				expect(t.remove()).toBe(true);
 			}
 
@@ -331,7 +341,7 @@ describe("scanTelemetryTargets", () => {
 					: { status: 0, stdout: "", stderr: "" },
 			);
 
-			const target = scanTelemetryTargets().find((t) =>
+			const target = scan().find((t) =>
 				t.label.startsWith("claude langwatch plugin ("),
 			)!;
 			expect(target.present).toBe(true);
@@ -356,7 +366,7 @@ describe("scanTelemetryTargets", () => {
 				),
 			).toBe(false);
 
-			const target = scanTelemetryTargets().find((t) =>
+			const target = scan().find((t) =>
 				t.label.startsWith("claude langwatch plugin marketplace"),
 			)!;
 			expect(target.remove()).toBe(false);
@@ -375,7 +385,7 @@ describe("scanTelemetryTargets", () => {
 				labels.some((l) => l.startsWith("codex langwatch profile file")),
 			).toBe(true);
 
-			for (const t of scanTelemetryTargets().filter((t) => t.present)) {
+			for (const t of scan().filter((t) => t.present)) {
 				t.remove();
 			}
 			expect(presentLabels()).toEqual([]);
@@ -383,23 +393,14 @@ describe("scanTelemetryTargets", () => {
 	});
 
 	describe("when the working directory carries a claude project pin", () => {
-		let cwdSpy: ReturnType<typeof vi.spyOn>;
-
 		beforeEach(() => {
-			const projectDir = path.join(tmpHome, "project");
-			fs.mkdirSync(projectDir, { recursive: true });
-			cwdSpy = vi
-				.spyOn(process, "cwd")
-				.mockReturnValue(projectDir) as ReturnType<typeof vi.spyOn>;
-			installAppEnv(claudeProjectSettingsTarget(projectDir), {
+			scanCwd = path.join(tmpHome, "project");
+			fs.mkdirSync(scanCwd, { recursive: true });
+			installAppEnv(claudeProjectSettingsTarget(scanCwd), {
 				OTEL_EXPORTER_OTLP_ENDPOINT: "http://app/api/otel",
 				OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer ik-lw-x_y",
 				CLAUDE_CODE_ENABLE_TELEMETRY: "1",
 			});
-		});
-
-		afterEach(() => {
-			cwdSpy.mockRestore();
 		});
 
 		it("reports the pin as present and removes it on logout", () => {
@@ -409,7 +410,7 @@ describe("scanTelemetryTargets", () => {
 				),
 			).toBe(true);
 
-			for (const t of scanTelemetryTargets().filter((t) => t.present)) {
+			for (const t of scan().filter((t) => t.present)) {
 				expect(t.remove()).toBe(true);
 			}
 
@@ -440,7 +441,7 @@ describe("scanTelemetryTargets", () => {
 				presentLabels().some((l) => l.startsWith("claude telemetry env")),
 			).toBe(false);
 
-			const target = scanTelemetryTargets().find((t) =>
+			const target = scan().find((t) =>
 				t.label.startsWith("claude telemetry env"),
 			)!;
 			expect(target.remove()).toBe(false);
@@ -481,7 +482,7 @@ describe("scanTelemetryTargets", () => {
 				),
 			).toBe(false);
 
-			const target = scanTelemetryTargets().find((t) =>
+			const target = scan().find((t) =>
 				t.label.startsWith("claude project telemetry pin"),
 			)!;
 			expect(target.remove()).toBe(false);
@@ -507,7 +508,7 @@ describe("scanTelemetryTargets", () => {
 				),
 			).toBe(false);
 
-			const target = scanTelemetryTargets().find((t) =>
+			const target = scan().find((t) =>
 				t.label.startsWith("codex langwatch profile file"),
 			)!;
 			expect(target.remove()).toBe(false);

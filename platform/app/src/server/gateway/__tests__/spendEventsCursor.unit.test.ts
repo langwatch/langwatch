@@ -48,6 +48,10 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     expect(SPEND_EVENTS_PULL_DESCRIPTION).toContain("13 months");
     expect(SPEND_EVENTS_PULL_DESCRIPTION).toContain("Metronome 34 days");
     expect(SPEND_EVENTS_PULL_DESCRIPTION).toContain("Stripe meters 24h+");
-    expect(END_USER_SPEND_DESCRIPTION).toContain("cap");
+    // Named exactly, because the response field is `caps` and a substring
+    // assertion on "cap" passed happily while the prose described a nullable
+    // singular field the schema has never had.
+    expect(END_USER_SPEND_DESCRIPTION).toContain("`caps`");
+    expect(END_USER_SPEND_DESCRIPTION).toContain("empty array");
   });
 });

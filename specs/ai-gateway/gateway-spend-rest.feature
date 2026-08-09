@@ -55,6 +55,16 @@ Feature: Gateway spend reconciliation REST surface
       When the caller reads the rollup filtered to one key
       Then only that key's spend is summed
 
+  Rule: A window that cannot hold anything is refused, not answered
+
+    @integration
+    Scenario: An inverted window is refused on both reads
+      When the caller asks for spend from a later instant to an earlier one
+      Then the request is refused on the rollups as it already was on the events
+      # An inverted window is an empty window, so answering it hands back a
+      # confident zero. A reconciliation that checksums against that zero
+      # decides the books agree.
+
   Rule: The surface is org-authenticated and enterprise-gated
 
     @integration

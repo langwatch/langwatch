@@ -80,6 +80,66 @@ Feature: Hono API endpoint authorization and tenant isolation
       Then the policy chain runs before the handler for each method
 
   # ============================================================================
+  Rule: Every route says which credential class reaches it
+
+    A project API key and an organization API key are not interchangeable, and
+    the difference is invisible until a call is refused. An organization key
+    reaches organization routes and, with X-Project-Id, project routes too; a
+    valid project key cannot authenticate to an organization route at all, so
+    no permission it holds makes any difference.
+
+    So the credential class is a property of the route, derived from the app it
+    is mounted on rather than declared by hand, and it is what the published
+    API description tells an integrator.
+
+    @unit
+    Scenario: A route publishes the credential class it actually enforces
+      Given routes mounted on the project, organization and service apps
+      When each route's credential class is resolved
+      Then it follows the app the route is mounted on
+      And a handler that authenticates a browser session says so instead
+      # Derived, not declared: a route cannot publish a credential class that
+      # nothing enforces, and one added tomorrow is classified without anyone
+      # remembering to.
+
+    @unit
+    Scenario: Every published operation states its own credential requirement
+      Given the generated API description
+      When an operation under a public REST surface is read
+      Then it names the credential class its route enforces
+      # A document-level default is a claim about every operation that does
+      # not override it, and it claimed the project key for the
+      # organization-scoped spend and webhook routes. An integrator following
+      # the description got a refusal the description said was impossible.
+
+    @unit
+    Scenario: An operation no API client can authenticate is never published
+      Given a route that authenticates a browser session or an internal secret
+      When the API description is generated for it
+      Then generation fails and names the operation
+      # There is no scheme for either credential, because neither is something
+      # a consumer of the public API holds. Publishing an empty requirement
+      # would read as "no credential needed" and every generated client would
+      # then emit an unauthenticated call.
+
+    @integration
+    Scenario: A project key on an organization endpoint is told exactly that
+      Given a valid project API key
+      When it calls an organization-scoped endpoint
+      Then the refusal says the endpoint needs an organization API key
+      And it names both the class required and the class presented
+
+    @integration
+    Scenario: A credential that resolves to nothing is not blamed on its class
+      Given a token that matches no key at all
+      When it calls an organization-scoped endpoint
+      Then the refusal says only that the credential was not accepted
+      # The one message this used to give asserted "project API keys cannot be
+      # used here" at a typo and at a revoked key too, sending people to swap a
+      # credential class that was never the problem. The class is named only
+      # when the token really does resolve as the other class.
+
+  # ============================================================================
   Rule: A caller without the route's permission is forbidden
 
     @integration
