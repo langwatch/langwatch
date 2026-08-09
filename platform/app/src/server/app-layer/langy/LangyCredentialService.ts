@@ -64,9 +64,6 @@ export type LangyMirrorTier = "content" | "structural" | "skip";
  * key live only on the Go manager and cannot name a project id from the TS side,
  * so the self-check compares the turn's `projectId` against an explicit
  * `LANGY_MIRROR_PROJECT_ID` (the mirror project's own id).
- *
- * SHIP-GATE: content-by-default is gated on a customer-facing-terms (DPA)
- * review before it is enabled in production — see ADR-061 §3 and the PR body.
  */
 export function resolveLangyMirrorTier(
   { projectId }: { projectId: string },
