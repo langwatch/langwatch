@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 
+import { RUNAWAY_PAUSE_REASON } from "~/features/automations/logic/pauseReasons";
 import {
   incrementAutomationAutoPausedTotal,
   incrementAutomationCeilingBreachTotal,
@@ -9,7 +10,13 @@ import type { TriggerSummary } from "./repositories/trigger.repository";
 
 const logger = createLogger("langwatch:automations:runaway-containment");
 
-export const RUNAWAY_PAUSE_REASON = "runaway_volume";
+export { RUNAWAY_PAUSE_REASON };
+
+/**
+ * How long a failed pause waits before another breach retries it. Short,
+ * because the whole point of the pause is to stop a runaway quickly.
+ */
+export const PAUSE_ATTEMPT_CLAIM_SECONDS = 60;
 
 /**
  * Share of a project's 24h traces a single automation's CONFIRMED matches have
@@ -46,11 +53,13 @@ export interface RunawayContainmentDeps {
     actionUrl: string;
   }) => Promise<void>;
   /**
-   * Once-per-(trigger, day, kind) gate, SET-NX backed. Returns true only for
-   * the caller that newly claimed it, which is what keeps a breach that
-   * repeats on every trace from mailing the customer on every trace.
+   * Once-only gate, SET-NX backed. Returns true only for the caller that newly
+   * claimed the key, which is what keeps a breach that repeats on every trace
+   * from mailing the customer on every trace. `ttlSeconds` defaults to the
+   * day-long window the mail claims use; the pause attempt passes a short one
+   * so a failed write is retried in a minute rather than tomorrow.
    */
-  claimOnce: (key: string) => Promise<boolean>;
+  claimOnce: (key: string, ttlSeconds?: number) => Promise<boolean>;
   projectName: (projectId: string) => Promise<string>;
   automationUrl: (params: {
     projectId: string;
@@ -165,10 +174,24 @@ async function pauseAndNotify({
   dayBucket: number;
 }): Promise<void> {
   const { trigger, projectId } = breach;
-  // Claimed on the PAUSE, not on the day: pausing is a state transition, so a
-  // second worker racing the same breach must not mail the customer twice, and
-  // a customer who resumes it and runs it away again should hear about that.
-  if (!(await deps.claimOnce(`automation-pause:${trigger.id}:${dayBucket}`))) {
+
+  // TWO CLAIMS, WITH DIFFERENT LIFETIMES, AND THE ORDER MATTERS.
+  //
+  // The pause claim is short and is taken BEFORE the write only to absorb the
+  // storm: thousands of dispatches can already be in flight when the ceiling
+  // breaks, and each would otherwise issue its own update. It deliberately does
+  // NOT carry the day. A day-long claim held before a write that can fail
+  // (Prisma timeout, connection loss) means one lost write leaves the runaway
+  // automation active until the UTC day rolls over, with a single warn line as
+  // the only trace. Pausing is an idempotent write to active/pausedReason/
+  // pausedAt, so doing it twice costs an update; doing it zero times is the
+  // failure this whole file exists to prevent.
+  if (
+    !(await deps.claimOnce(
+      `automation-pause:${trigger.id}`,
+      PAUSE_ATTEMPT_CLAIM_SECONDS,
+    ))
+  ) {
     return;
   }
 
@@ -189,6 +212,15 @@ async function pauseAndNotify({
     "Automation paused for runaway volume: its confirmed matches cover " +
       "essentially all of the project's traffic",
   );
+
+  // The mail is claimed for the day, and only after the pause has actually
+  // landed. A customer who switches it back on and runs it away again the same
+  // day is paused again, quietly, rather than mailed twice.
+  if (
+    !(await deps.claimOnce(`automation-pause-mail:${trigger.id}:${dayBucket}`))
+  ) {
+    return;
+  }
   await notify(deps, breach, "paused");
 }
 

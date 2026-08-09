@@ -89,6 +89,17 @@ Feature: Process-manager inbox and outbox rows are reaped on a schedule
       Then it deletes at most its per-wake budget
       And it leaves the rest for the next wake
 
+    # The batch budget bounds how MANY statements a wake issues, not how long
+    # they take. Against a loaded database that budget can outlast the outbox
+    # lease, and once the lease lapses a second worker starts a concurrent sweep
+    # on the same predicates while the first is still deleting.
+    @unit
+    Scenario: A slow wake stops before its outbox lease expires
+      Given deletes slow enough that the batch budget would outlast the lease
+      When the sweep wakes
+      Then it stops draining at its deadline
+      And it leaves the remaining rows for the next wake
+
     @unit
     Scenario: A family that runs dry ends its drain loop early
       Given fewer expired rows than one batch holds

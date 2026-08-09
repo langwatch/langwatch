@@ -172,6 +172,17 @@ Feature: Runaway automations are contained without punishing the customer
       When the customer re-enables it
       Then the pause reason and pause time are cleared
 
+    # The pause is a database write, so it can fail. The once-only gate that
+    # keeps a storm of breaches from writing the pause thousands of times must
+    # not also turn one failed write into a whole day of running unpaused.
+    @integration
+    Scenario: A failed pause is retried rather than claimed away
+      Given an automation that qualifies for a pause
+      And the pause write fails
+      When another breach arrives after the attempt gate expires
+      Then the pause is attempted again
+      And no pause email is sent for the attempt that never landed
+
   Rule: Our own amplification is never charged to the customer
 
     @unit

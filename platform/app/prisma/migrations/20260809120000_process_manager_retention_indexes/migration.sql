@@ -33,22 +33,59 @@
 -- save nothing.
 --
 -- LOCKING. Both statements take a SHARE lock on their table for the duration
--- of the build, which blocks INSERT while it runs. That is why the one-time
--- purge in dev/docs/runbooks/process-manager-table-purge.md runs FIRST: over a
--- near-empty heap these builds are near-instant, whereas over the pre-purge
--- 2.8M inbox rows the same build would hold the lock long enough to back up
--- automation ingestion. If this migration is ever replayed against a large
--- table, use CREATE INDEX CONCURRENTLY by hand instead, which cannot run
--- inside the migration transaction.
+-- of the build, which blocks INSERT while it runs, on the two highest-volume
+-- insert paths in the system. `CREATE INDEX CONCURRENTLY` would avoid that but
+-- cannot run inside the transaction Prisma applies a migration in, and this
+-- migration is applied automatically on pod start (`prisma migrate deploy`,
+-- unless SKIP_PRISMA_MIGRATE is set), so it cannot assume an operator is
+-- watching.
+--
+-- Each build is therefore wrapped in its own timeout-guarded block:
+--
+--   lock_timeout      caps how long we WAIT for the SHARE lock. Without it, a
+--                     build queued behind one long-running transaction parks in
+--                     the lock queue and every INSERT arriving after it queues
+--                     behind US, which turns a slow query into a write outage.
+--   statement_timeout caps how long we HOLD it. A build over a near-empty heap
+--                     finishes in milliseconds; one over a large backlog aborts
+--                     instead of stalling ingestion.
+--
+-- On timeout the block logs a warning and the deploy continues WITHOUT the
+-- index. That is the correct trade: the sweep still works without it (it just
+-- scans instead of ranging), whereas a blocked deploy stops everything. Finish
+-- the job out of band, which is also the path to take if this migration is ever
+-- replayed against a large table:
+--
+--   1. Run the purge: dev/docs/runbooks/process-manager-table-purge.md
+--   2. CREATE INDEX CONCURRENTLY, same names, from a psql session.
+--
+-- `IF NOT EXISTS` makes both orders work: an index already built by hand is
+-- adopted rather than conflicted with.
 
 -- CreateIndex
-CREATE INDEX "ProcessManagerOutbox_dispatchedAt_idx"
-  ON "ProcessManagerOutbox"("dispatchedAt")
-  WHERE "status" = 'dispatched';
+DO $$
+BEGIN
+  SET LOCAL lock_timeout = '3s';
+  SET LOCAL statement_timeout = '60s';
+  CREATE INDEX IF NOT EXISTS "ProcessManagerOutbox_dispatchedAt_idx"
+    ON "ProcessManagerOutbox"("dispatchedAt")
+    WHERE "status" = 'dispatched';
+EXCEPTION
+  WHEN lock_not_available OR query_canceled THEN
+    RAISE WARNING 'Skipped ProcessManagerOutbox_dispatchedAt_idx: could not build it within the deploy timeout. Purge the backlog, then CREATE INDEX CONCURRENTLY by hand.';
+END $$;
 
 -- CreateIndex
-CREATE INDEX "ProcessManagerInbox_consumedAt_idx"
-  ON "ProcessManagerInbox"("consumedAt");
+DO $$
+BEGIN
+  SET LOCAL lock_timeout = '3s';
+  SET LOCAL statement_timeout = '60s';
+  CREATE INDEX IF NOT EXISTS "ProcessManagerInbox_consumedAt_idx"
+    ON "ProcessManagerInbox"("consumedAt");
+EXCEPTION
+  WHEN lock_not_available OR query_canceled THEN
+    RAISE WARNING 'Skipped ProcessManagerInbox_consumedAt_idx: could not build it within the deploy timeout. Purge the backlog, then CREATE INDEX CONCURRENTLY by hand.';
+END $$;
 
 -- Down (manual): reverses this migration; run only to roll back.
 --   DROP INDEX "ProcessManagerOutbox_dispatchedAt_idx";

@@ -16,6 +16,14 @@ interface StoredMessage extends OutboxMessageRecord {
   leasedUntil: number;
   /** Epoch ms of the successful dispatch; null while pending/dead. */
   dispatchedAt: number | null;
+  /**
+   * Epoch ms of the last write to this row, mirroring the durable store's
+   * `updatedAt` column. The dead-row sweep reaps by this and not by
+   * `nextAttemptAt`: that one is retry scheduling and on a dead row still
+   * carries the backoff the last attempt computed, which can sit arbitrarily
+   * far from the moment the row was actually retired.
+   */
+  updatedAt: number;
 }
 
 function refKey(ref: ProcessRef): string {
@@ -134,6 +142,7 @@ export class InMemoryProcessStore implements ProcessStore {
         createdAt: commit.now,
         leasedUntil: 0,
         dispatchedAt: null,
+        updatedAt: commit.now,
       });
       insertedMessageKeys.push(message.messageKey);
     }
@@ -197,6 +206,7 @@ export class InMemoryProcessStore implements ProcessStore {
     message.leasedUntil = 0;
     message.leaseToken = null;
     message.dispatchedAt = params.now;
+    message.updatedAt = params.now;
   }
 
   async markFailed(params: {
@@ -213,6 +223,7 @@ export class InMemoryProcessStore implements ProcessStore {
     message.nextAttemptAt = params.nextAttemptAt;
     message.leasedUntil = 0;
     message.leaseToken = null;
+    message.updatedAt = params.now;
   }
 
   async findDueWakes(params: {
@@ -276,13 +287,12 @@ export class InMemoryProcessStore implements ProcessStore {
     before: number;
     limit: number;
   }): Promise<number> {
-    // The durable store reaps dead rows by `updatedAt`, stamped by the
-    // markFailed that retired them. This twin has no updatedAt column, and
-    // `nextAttemptAt` is what that same call sets, so it stands in for it.
+    // Reaped by `updatedAt`, the same column the durable store uses, which
+    // the markFailed that retired the row stamped.
     return this.deleteOutboxBatch(
       params,
       (message) =>
-        message.status === "dead" && message.nextAttemptAt < params.before,
+        message.status === "dead" && message.updatedAt < params.before,
     );
   }
 
@@ -330,6 +340,7 @@ export class InMemoryProcessStore implements ProcessStore {
       message.attempts = 0;
       message.nextAttemptAt = params.now;
       message.leaseToken = null;
+      message.updatedAt = params.now;
       requeued++;
     }
     return requeued;

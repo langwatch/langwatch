@@ -41,19 +41,29 @@ import { TriggerService } from "../trigger.service";
 describe("Feature: runaway automation containment", () => {
   const ns = `runaway-${nanoid(8)}`;
 
-  let organization: Organization;
-  let team: Team;
-  let project: Project;
+  // Optional until `beforeAll` has actually created them: a setup failure part
+  // way through must not make teardown throw on an undefined id, because that
+  // TypeError replaces the real setup error in the CI output.
+  let organization: Organization | undefined;
+  let team: Team | undefined;
+  let project: Project | undefined;
   let triggers: TriggerService;
 
   let projectTraces24h = 10_000;
   let sentEmails: Array<{ kind: string; skippedToday: number }>;
   let claimed: Set<string>;
+  /** Set to make `pauseTrigger` throw, standing in for a Prisma timeout. */
+  let pauseFails = false;
+  let pauseAttempts = 0;
+
+  const projectId = () => project!.id;
 
   function deps(): RunawayContainmentDeps {
     return {
       countProjectTraces24h: async () => projectTraces24h,
       pauseTrigger: async ({ triggerId, projectId, reason, at }) => {
+        pauseAttempts++;
+        if (pauseFails) throw new Error("connection terminated");
         await triggers.update({
           triggerId,
           projectId,
@@ -83,7 +93,7 @@ describe("Feature: runaway automation containment", () => {
       data: {
         id: nanoid(),
         name: `Automation ${nanoid(4)}`,
-        projectId: project.id,
+        projectId: projectId(),
         action: TriggerAction.ADD_TO_DATASET,
         actionParams: {},
         filters:
@@ -100,7 +110,7 @@ describe("Feature: runaway automation containment", () => {
   ): TriggerSummary {
     return {
       id: row.id,
-      projectId: project.id,
+      projectId: projectId(),
       name: row.name,
       action: TriggerAction.ADD_TO_DATASET,
       triggerKind: TriggerKind.AUTOMATION,
@@ -124,7 +134,7 @@ describe("Feature: runaway automation containment", () => {
 
   const breach = (trigger: TriggerSummary, count: number) => ({
     trigger,
-    projectId: project.id,
+    projectId: projectId(),
     count,
     cap: 100,
     skipped: count - 100,
@@ -158,15 +168,23 @@ describe("Feature: runaway automation containment", () => {
     projectTraces24h = 10_000;
     sentEmails = [];
     claimed = new Set();
+    pauseFails = false;
+    pauseAttempts = 0;
     vi.clearAllMocks();
   });
 
   afterAll(async () => {
-    if (!organization?.id) return;
-    await prisma.trigger.deleteMany({ where: { projectId: project.id } });
-    await prisma.project.delete({ where: { id: project.id } });
-    await prisma.team.delete({ where: { id: team.id } });
-    await prisma.organization.delete({ where: { id: organization.id } });
+    // Innermost first, and each one guarded on its own: `beforeAll` can fail
+    // between any two creates, and teardown has to clean up what exists
+    // without inventing an error about what does not.
+    if (project) {
+      await prisma.trigger.deleteMany({ where: { projectId: project.id } });
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+    if (team) await prisma.team.delete({ where: { id: team.id } });
+    if (organization) {
+      await prisma.organization.delete({ where: { id: organization.id } });
+    }
   });
 
   describe("when a selective automation passes its ceiling", () => {
@@ -177,7 +195,7 @@ describe("Feature: runaway automation containment", () => {
       await handlePersistCapBreach(deps(), breach(summary(row), 150));
 
       const after = await prisma.trigger.findUniqueOrThrow({
-        where: { id: row.id, projectId: project.id },
+        where: { id: row.id, projectId: projectId() },
       });
       expect(after.active).toBe(true);
       expect(after.pausedReason).toBeNull();
@@ -218,7 +236,7 @@ describe("Feature: runaway automation containment", () => {
       await handlePersistCapBreach(deps(), breach(summary(row), 990));
 
       const after = await prisma.trigger.findUniqueOrThrow({
-        where: { id: row.id, projectId: project.id },
+        where: { id: row.id, projectId: projectId() },
       });
       expect(after.active).toBe(false);
       expect(after.pausedReason).toBe(RUNAWAY_PAUSE_REASON);
@@ -235,7 +253,7 @@ describe("Feature: runaway automation containment", () => {
       await handlePersistCapBreach(deps(), breach(summary(row), 110));
 
       const after = await prisma.trigger.findUniqueOrThrow({
-        where: { id: row.id, projectId: project.id },
+        where: { id: row.id, projectId: projectId() },
       });
       expect(after.active).toBe(true);
     });
@@ -253,7 +271,7 @@ describe("Feature: runaway automation containment", () => {
       );
 
       const after = await prisma.trigger.findUniqueOrThrow({
-        where: { id: row.id, projectId: project.id },
+        where: { id: row.id, projectId: projectId() },
       });
       expect(after.active).toBe(false);
       expect(after.pausedReason).toBe(RUNAWAY_PAUSE_REASON);
@@ -264,7 +282,7 @@ describe("Feature: runaway automation containment", () => {
       const row = await storeTrigger({ filters: "{}" });
       projectTraces24h = 1_000_000;
       expect(
-        (await triggers.getActiveTraceTriggersForProject(project.id)).map(
+        (await triggers.getActiveTraceTriggersForProject(projectId())).map(
           (trigger) => trigger.id,
         ),
       ).toContain(row.id);
@@ -277,10 +295,89 @@ describe("Feature: runaway automation containment", () => {
       // The pause invalidates the cache, so the subscriber stops recording
       // matches immediately rather than after the TTL expires.
       expect(
-        (await triggers.getActiveTraceTriggersForProject(project.id)).map(
+        (await triggers.getActiveTraceTriggersForProject(projectId())).map(
           (trigger) => trigger.id,
         ),
       ).not.toContain(row.id);
+    });
+  });
+
+  describe("given the pause write fails", () => {
+    describe("when a later breach arrives", () => {
+      /** @scenario "A failed pause is retried rather than claimed away" */
+      it("retries the pause instead of standing down for the day", async () => {
+        const row = await storeTrigger({ filters: "{}" });
+        projectTraces24h = 1_000_000;
+        const sharedDeps = deps();
+
+        pauseFails = true;
+        await handlePersistCapBreach(
+          sharedDeps,
+          breach(summary(row, { filters: {} }), 150),
+        );
+        expect(pauseAttempts).toBe(1);
+        expect(
+          await prisma.trigger.findUniqueOrThrow({
+            where: { id: row.id, projectId: projectId() },
+          }),
+        ).toMatchObject({ active: true, pausedReason: null });
+
+        // The claim the first attempt took is short-lived and gates only the
+        // attempt. Expiring it stands in for the minute that passes before the
+        // next breach; a day-long claim taken before the write would leave the
+        // runaway automation active until the UTC day rolled over.
+        claimed.clear();
+        pauseFails = false;
+        await handlePersistCapBreach(
+          sharedDeps,
+          breach(summary(row, { filters: {} }), 200),
+        );
+
+        expect(pauseAttempts).toBe(2);
+        const after = await prisma.trigger.findUniqueOrThrow({
+          where: { id: row.id, projectId: projectId() },
+        });
+        expect(after.active).toBe(false);
+        expect(after.pausedReason).toBe(RUNAWAY_PAUSE_REASON);
+      });
+
+      it("sends no pause email for the attempt that never landed", async () => {
+        const row = await storeTrigger({ filters: "{}" });
+        projectTraces24h = 1_000_000;
+        pauseFails = true;
+
+        await handlePersistCapBreach(
+          deps(),
+          breach(summary(row, { filters: {} }), 150),
+        );
+
+        // Telling a customer we paused something we did not pause is worse
+        // than telling them nothing.
+        expect(sentEmails).toEqual([]);
+      });
+    });
+  });
+
+  describe("given a storm of breaches on one trigger", () => {
+    describe("when each one is handled", () => {
+      it("writes the pause once rather than once per breach", async () => {
+        const row = await storeTrigger({ filters: "{}" });
+        projectTraces24h = 1_000_000;
+        const sharedDeps = deps();
+
+        for (let index = 0; index < 5; index++) {
+          await handlePersistCapBreach(
+            sharedDeps,
+            breach(summary(row, { filters: {} }), 150 + index),
+          );
+        }
+
+        // Thousands of dispatches can already be in flight when the ceiling
+        // breaks; the short claim is what stops each of them issuing its own
+        // update.
+        expect(pauseAttempts).toBe(1);
+        expect(sentEmails.map((email) => email.kind)).toEqual(["paused"]);
+      });
     });
   });
 
@@ -348,12 +445,12 @@ describe("Feature: runaway automation containment", () => {
       // back on.
       await triggers.update({
         triggerId: row.id,
-        projectId: project.id,
+        projectId: projectId(),
         data: { active: true, pausedReason: null, pausedAt: null },
       });
 
       const after = await prisma.trigger.findUniqueOrThrow({
-        where: { id: row.id, projectId: project.id },
+        where: { id: row.id, projectId: projectId() },
       });
       expect(after.active).toBe(true);
       expect(after.pausedReason).toBeNull();

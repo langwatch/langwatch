@@ -54,6 +54,27 @@ export const RETENTION_SWEEP_BATCH_SIZE = 5_000;
  */
 export const RETENTION_SWEEP_MAX_BATCHES_PER_WAKE = 200;
 
+/**
+ * Outbox lease for the sweep intent. Generous because the FIRST tick after
+ * deploy drains whatever backlog the one-time purge left behind, and that run
+ * is far longer than the steady-state one.
+ */
+export const PROCESS_RETENTION_SWEEP_LEASE_MS = 15 * 60 * 1000;
+
+/**
+ * Wall-clock budget for one wake, deliberately well under the lease.
+ *
+ * The batch ceiling alone does not bound TIME: 600 delete statements against a
+ * loaded database can outlast the lease, and once it expires another worker
+ * leases the same row and starts a second sweep while the first is still
+ * deleting. Two sweeps on the same predicates is not a correctness problem —
+ * the deletes are idempotent — but it doubles the write load at exactly the
+ * moment the database is already struggling, which is how a slow sweep becomes
+ * an outage. Stopping early instead just leaves the remainder for the next
+ * hourly tick.
+ */
+export const RETENTION_SWEEP_DEADLINE_MS = 10 * 60 * 1000;
+
 export const processRetentionSweepSchema = z.object({
   scheduledFor: z.number().int(),
 });
@@ -99,20 +120,62 @@ export const processRetentionSweepWake: WakeHandler<
   intents: [ctx.intents.sweep(`sweep:${ctx.at}`, { scheduledFor: ctx.at })],
 });
 
+type DeleteBatch = (params: {
+  before: number;
+  limit: number;
+}) => Promise<number>;
+
+interface FamilyPlan {
+  family: RetentionFamily;
+  deleteBatch: DeleteBatch;
+  /** Rows older than this epoch ms are eligible for this family. */
+  before: number;
+}
+
+/** The three families and the cutoff each one reaps behind, for this wake. */
+function planFamilies(
+  deps: ProcessRetentionSweepDeps,
+  startedAt: number,
+): FamilyPlan[] {
+  return [
+    {
+      family: "dispatched_outbox",
+      deleteBatch: deps.deleteDispatchedOutboxBatch,
+      before: startedAt - DISPATCHED_OUTBOX_RETENTION_MS,
+    },
+    {
+      family: "dead_outbox",
+      deleteBatch: deps.deleteDeadOutboxBatch,
+      before: startedAt - DEAD_OUTBOX_RETENTION_MS,
+    },
+    {
+      family: "inbox",
+      deleteBatch: deps.deleteConsumedInboxBatch,
+      before: startedAt - CONSUMED_INBOX_RETENTION_MS,
+    },
+  ];
+}
+
 /**
- * Drains one family in bounded batches until it runs dry or the wake's budget
- * is spent. A short batch means the family is drained, which is what ends the
- * loop without issuing a delete that would match nothing.
+ * Drains one family in bounded batches until it runs dry, the wake's batch
+ * budget is spent, or the deadline passes. A short batch means the family is
+ * drained, which is what ends the loop without issuing a delete that would
+ * match nothing.
  */
 async function drainFamily({
   deleteBatch,
   before,
+  deadline,
+  now,
 }: {
-  deleteBatch: (params: { before: number; limit: number }) => Promise<number>;
+  deleteBatch: DeleteBatch;
   before: number;
+  deadline: number;
+  now: () => number;
 }): Promise<number> {
   let total = 0;
   for (let batch = 0; batch < RETENTION_SWEEP_MAX_BATCHES_PER_WAKE; batch++) {
+    if (now() >= deadline) break;
     const deleted = await deleteBatch({
       before,
       limit: RETENTION_SWEEP_BATCH_SIZE,
@@ -123,63 +186,55 @@ async function drainFamily({
   return total;
 }
 
+/**
+ * Drains one family and reports it. Never throws: one family's failure must not
+ * cost the others their sweep. The whole point of this process manager is that
+ * the tables cannot grow unbounded, and a shared try/catch would let one bad
+ * statement stop the other two indefinitely.
+ */
+async function sweepFamily(
+  plan: FamilyPlan,
+  { deadline, now }: { deadline: number; now: () => number },
+): Promise<number> {
+  try {
+    const rows = await drainFamily({ ...plan, deadline, now });
+    incrementProcessManagerRetentionSweptRows(plan.family, rows);
+    return rows;
+  } catch (error) {
+    logger.error(
+      { ...toSafeFailureDiagnostic(error), family: plan.family },
+      "Process-manager retention sweep failed for one family",
+    );
+    return 0;
+  }
+}
+
 export function runProcessRetentionSweep(deps: ProcessRetentionSweepDeps) {
   return async (): Promise<void> => {
-    const startedAt = (deps.now ?? Date.now)();
-
-    const families: Array<{
-      family: RetentionFamily;
-      deleteBatch: (params: {
-        before: number;
-        limit: number;
-      }) => Promise<number>;
-      before: number;
-    }> = [
-      {
-        family: "dispatched_outbox",
-        deleteBatch: deps.deleteDispatchedOutboxBatch,
-        before: startedAt - DISPATCHED_OUTBOX_RETENTION_MS,
-      },
-      {
-        family: "dead_outbox",
-        deleteBatch: deps.deleteDeadOutboxBatch,
-        before: startedAt - DEAD_OUTBOX_RETENTION_MS,
-      },
-      {
-        family: "inbox",
-        deleteBatch: deps.deleteConsumedInboxBatch,
-        before: startedAt - CONSUMED_INBOX_RETENTION_MS,
-      },
-    ];
+    const now = deps.now ?? Date.now;
+    const startedAt = now();
+    const deadline = startedAt + RETENTION_SWEEP_DEADLINE_MS;
 
     const swept: Record<RetentionFamily, number> = {
       dispatched_outbox: 0,
       dead_outbox: 0,
       inbox: 0,
     };
-
-    // Per-family isolation: one family's failure must not cost the others their
-    // sweep. The whole point of this process manager is that the tables cannot
-    // grow unbounded, and a shared try/catch would let one bad statement stop
-    // the other two indefinitely.
-    for (const { family, deleteBatch, before } of families) {
-      try {
-        swept[family] = await drainFamily({ deleteBatch, before });
-        incrementProcessManagerRetentionSweptRows(family, swept[family]);
-      } catch (error) {
-        logger.error(
-          { ...toSafeFailureDiagnostic(error), family },
-          "Process-manager retention sweep failed for one family",
-        );
-      }
+    for (const plan of planFamilies(deps, startedAt)) {
+      swept[plan.family] = await sweepFamily(plan, { deadline, now });
     }
 
+    const durationMs = now() - startedAt;
     logger.info(
       {
         dispatchedOutboxRows: swept.dispatched_outbox,
         deadOutboxRows: swept.dead_outbox,
         inboxRows: swept.inbox,
-        durationMs: (deps.now ?? Date.now)() - startedAt,
+        durationMs,
+        // A wake that stops on the deadline leaves work behind on purpose. It
+        // is not an error, but a run of them means the hourly budget is no
+        // longer keeping up with the insert rate.
+        hitDeadline: durationMs >= RETENTION_SWEEP_DEADLINE_MS,
       },
       "Process-manager retention sweep completed",
     );

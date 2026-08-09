@@ -1031,29 +1031,31 @@ describe("automationRouter", () => {
   // What the automations list reads to say "N matches skipped today". Without
   // it, a customer sees an automation switched on and producing nothing, with
   // nothing on the page to explain the gap.
-  describe("getDailyCapStatus", () => {
-    /** @scenario "The automations list shows what was skipped today" */
-    it("reports today's skipped count per automation alongside the ceiling", async () => {
-      _resetMemoryPersistCapStore();
-      const cap = await resolvePersistDailyCap("proj_123");
-      for (let index = 0; index <= cap; index++) {
-        await consumePersistCapSlot({
+  describe("given an automation that passed its ceiling today", () => {
+    describe("when the automations list reads the daily cap status", () => {
+      /** @scenario "The automations list shows what was skipped today" */
+      it("reports today's skipped count per automation alongside the ceiling", async () => {
+        _resetMemoryPersistCapStore();
+        const cap = await resolvePersistDailyCap("proj_123");
+        for (let index = 0; index <= cap; index++) {
+          await consumePersistCapSlot({
+            projectId: "proj_123",
+            triggerId: "trigger_busy",
+            now: new Date(),
+            cap,
+            dedupKey: `proj_123/trigger_busy:persist:trace-${index}`,
+          });
+        }
+
+        const status = await caller.getDailyCapStatus({
           projectId: "proj_123",
-          triggerId: "trigger_busy",
-          now: new Date(),
-          cap,
-          dedupKey: `proj_123/trigger_busy:persist:trace-${index}`,
+          triggerIds: ["trigger_busy", "trigger_quiet"],
         });
-      }
 
-      const status = await caller.getDailyCapStatus({
-        projectId: "proj_123",
-        triggerIds: ["trigger_busy", "trigger_quiet"],
+        expect(status.cap).toBe(cap);
+        expect(status.counts.trigger_busy?.skipped).toBe(1);
+        expect(status.counts.trigger_quiet?.skipped).toBe(0);
       });
-
-      expect(status.cap).toBe(cap);
-      expect(status.counts.trigger_busy?.skipped).toBe(1);
-      expect(status.counts.trigger_quiet?.skipped).toBe(0);
     });
   });
 
@@ -1104,6 +1106,29 @@ describe("automationRouter", () => {
     it("refuses the upsert create and persists nothing", async () => {
       await expect(
         caller.upsert(baseAutomationInput as any),
+      ).rejects.toMatchObject({
+        code: "UNPROCESSABLE_CONTENT",
+        cause: { code: "trigger_filters_required" },
+      });
+
+      expect(mockTriggerCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses a key selector that carries no values", async () => {
+      // A shallow vacuity check counted the outer key as a condition while the
+      // matcher discarded the empty leaf, so this shape saved cleanly and then
+      // fired on every trace. Validator and matcher now share one recursive
+      // check, so it is refused like the empty object.
+      await expect(
+        caller.create({
+          projectId: "proj_123",
+          name: "Vacuous key selector",
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+          filters: { "metadata.labels": { region: [] } } as any,
+          actionParams: {
+            slackWebhook: "https://hooks.slack.com/services/abc",
+          },
+        }),
       ).rejects.toMatchObject({
         code: "UNPROCESSABLE_CONTENT",
         cause: { code: "trigger_filters_required" },

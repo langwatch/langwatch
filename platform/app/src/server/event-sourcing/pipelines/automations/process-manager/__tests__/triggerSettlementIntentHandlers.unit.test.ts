@@ -123,6 +123,9 @@ function context(
   };
 }
 
+/** The ceiling `resolvePersistDailyCap` reports in these fixtures. */
+const PERSIST_DAILY_CAP = 100;
+
 function makeDeps(activeTrigger: TriggerSummary) {
   const folds = new Map([
     ["trace-1", fold("trace-1")],
@@ -164,10 +167,13 @@ function makeDeps(activeTrigger: TriggerSummary) {
       .mockResolvedValue({ allowed: true, count: 1 }),
     tenantDailyCap: 1_000,
     filterSuppressedEmails: vi.fn(async ({ emails }) => emails),
-    resolvePersistDailyCap: vi.fn().mockResolvedValue(100),
-    consumePersistCapSlot: vi
-      .fn()
-      .mockResolvedValue({ allowed: true, count: 1, cap: 100, skipped: 0 }),
+    resolvePersistDailyCap: vi.fn().mockResolvedValue(PERSIST_DAILY_CAP),
+    consumePersistCapSlot: vi.fn().mockResolvedValue({
+      allowed: true,
+      count: 1,
+      cap: PERSIST_DAILY_CAP,
+      skipped: 0,
+    }),
     handlePersistCapBreach: vi.fn().mockResolvedValue(undefined),
   };
   return {
@@ -409,6 +415,11 @@ describe("trigger settlement intent handlers integration", () => {
         expect.objectContaining({
           projectId: "project-1",
           triggerId: "trigger-1",
+          // The RESOLVED cap, not a hardcoded one. Without pinning this, a
+          // wiring bug that passed a stale or default ceiling to the counter
+          // would keep the test green while throttling customers at the wrong
+          // number.
+          cap: PERSIST_DAILY_CAP,
           // The (trigger, trace) pair, so an outbox retry of this dispatch
           // presents the same key and cannot burn a second slot.
           dedupKey: "project-1/trigger-1:persist:trace-1",

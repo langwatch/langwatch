@@ -47,6 +47,7 @@ import {
   SectionHeader,
   TableShell,
 } from "~/features/automations/components/page/AutomationTableCells";
+import { RUNAWAY_PAUSE_REASON } from "~/features/automations/logic/pauseReasons";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
@@ -447,7 +448,7 @@ function AutomationsPage() {
 
   const activeCell = (trigger: EnhancedTrigger) => {
     const skipped = capStatus.data?.counts[trigger.id]?.skipped ?? 0;
-    const pausedForVolume = trigger.pausedReason === "runaway_volume";
+    const pausedForVolume = trigger.pausedReason === RUNAWAY_PAUSE_REASON;
     return (
       <Table.Cell
         textAlign="center"
@@ -464,10 +465,13 @@ function AutomationsPage() {
           />
           {/* An automation that is running but silently dropping matches is
               the confusing case: without this the customer sees it switched
-              on and no records appearing, with nothing to explain the gap. */}
+              on and no records appearing, with nothing to explain the gap.
+              `tabIndex` is what makes the tooltip reachable: Badge renders a
+              plain span, and a span with no tab stop can be hovered but never
+              focused, so the explanation would be mouse-only. */}
           {pausedForVolume ? (
             <Tooltip content="This automation matched almost every trace in the project, so we paused it. Narrow its condition, then switch it back on.">
-              <Badge colorPalette="red" size="sm">
+              <Badge colorPalette="red" size="sm" tabIndex={0}>
                 Paused
               </Badge>
             </Tooltip>
@@ -477,7 +481,7 @@ function AutomationsPage() {
                 capStatus.data?.cap ?? 0
               ).toLocaleString()} matches. It starts again tomorrow.`}
             >
-              <Badge colorPalette="orange" size="sm">
+              <Badge colorPalette="orange" size="sm" tabIndex={0}>
                 {skipped.toLocaleString()} skipped today
               </Badge>
             </Tooltip>

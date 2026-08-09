@@ -61,59 +61,61 @@ function plan(overrides: Record<string, unknown>) {
   });
 }
 
-describe("resolvePersistDailyCap", () => {
+describe("given a project on a plan", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     cacheMock.store.clear();
     _resetMemoryPersistCapStore();
   });
 
-  /** @scenario "A free plan gets the smallest daily ceiling" */
-  it("gives a free plan the free-tier ceiling", async () => {
-    plan({ type: "FREE", free: true });
+  describe("when its daily ceiling is resolved", () => {
+    /** @scenario "A free plan gets the smallest daily ceiling" */
+    it("gives a free plan the free-tier ceiling", async () => {
+      plan({ type: "FREE", free: true });
 
-    expect(await resolvePersistDailyCap(PROJECT_ID)).toBe(
-      env.TRIGGER_PERSIST_DAILY_CAP_FREE,
-    );
-  });
-
-  it("gives the entry paid tier the free-tier ceiling too", async () => {
-    // LAUNCH is a paid plan, but its automation volume is the same shape as a
-    // free account's, so it shares the smaller allowance by design.
-    plan({ type: "LAUNCH" });
-
-    expect(await resolvePersistDailyCap(PROJECT_ID)).toBe(
-      env.TRIGGER_PERSIST_DAILY_CAP_FREE,
-    );
-  });
-
-  /** @scenario "A paid plan gets the standard daily ceiling" */
-  it("gives a paid non-enterprise plan the paid ceiling", async () => {
-    plan({ type: "ACCELERATE" });
-
-    expect(await resolvePersistDailyCap(PROJECT_ID)).toBe(
-      env.TRIGGER_PERSIST_DAILY_CAP_PAID,
-    );
-  });
-
-  /** @scenario "An enterprise plan gets the largest daily ceiling" */
-  it("gives an enterprise plan the enterprise ceiling", async () => {
-    plan({ type: "ENTERPRISE" });
-
-    expect(await resolvePersistDailyCap(PROJECT_ID)).toBe(
-      env.TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE,
-    );
-  });
-
-  /** @scenario "A contract can raise a single customer's ceiling" */
-  it("lets a contract allowance win over the plan tier default", async () => {
-    plan({
-      type: "FREE",
-      free: true,
-      maxTriggerPersistDispatchesPerDay: 50_000,
+      expect(await resolvePersistDailyCap(PROJECT_ID)).toBe(
+        env.TRIGGER_PERSIST_DAILY_CAP_FREE,
+      );
     });
 
-    expect(await resolvePersistDailyCap(PROJECT_ID)).toBe(50_000);
+    it("gives the entry paid tier the free-tier ceiling too", async () => {
+      // LAUNCH is a paid plan, but its automation volume is the same shape as a
+      // free account's, so it shares the smaller allowance by design.
+      plan({ type: "LAUNCH" });
+
+      expect(await resolvePersistDailyCap(PROJECT_ID)).toBe(
+        env.TRIGGER_PERSIST_DAILY_CAP_FREE,
+      );
+    });
+
+    /** @scenario "A paid plan gets the standard daily ceiling" */
+    it("gives a paid non-enterprise plan the paid ceiling", async () => {
+      plan({ type: "ACCELERATE" });
+
+      expect(await resolvePersistDailyCap(PROJECT_ID)).toBe(
+        env.TRIGGER_PERSIST_DAILY_CAP_PAID,
+      );
+    });
+
+    /** @scenario "An enterprise plan gets the largest daily ceiling" */
+    it("gives an enterprise plan the enterprise ceiling", async () => {
+      plan({ type: "ENTERPRISE" });
+
+      expect(await resolvePersistDailyCap(PROJECT_ID)).toBe(
+        env.TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE,
+      );
+    });
+
+    /** @scenario "A contract can raise a single customer's ceiling" */
+    it("lets a contract allowance win over the plan tier default", async () => {
+      plan({
+        type: "FREE",
+        free: true,
+        maxTriggerPersistDispatchesPerDay: 50_000,
+      });
+
+      expect(await resolvePersistDailyCap(PROJECT_ID)).toBe(50_000);
+    });
   });
 
   describe("when the plan cannot be resolved", () => {
@@ -130,7 +132,7 @@ describe("resolvePersistDailyCap", () => {
   });
 });
 
-describe("consumePersistCapSlot", () => {
+describe("given a trigger with a daily ceiling", () => {
   beforeEach(() => {
     _resetMemoryPersistCapStore();
   });
@@ -144,81 +146,91 @@ describe("consumePersistCapSlot", () => {
       dedupKey: `${PROJECT_ID}/${TRIGGER_ID}:persist:${traceId}`,
     });
 
-  it("allows dispatches up to the ceiling", async () => {
-    expect(await consume("trace-1")).toMatchObject({ allowed: true, count: 1 });
-    expect(await consume("trace-2")).toMatchObject({ allowed: true, count: 2 });
-  });
-
-  it("refuses the dispatch that would pass the ceiling", async () => {
-    await consume("trace-1");
-    await consume("trace-2");
-
-    expect(await consume("trace-3")).toMatchObject({
-      allowed: false,
-      count: 3,
+  describe("when confirmed dispatches consume slots", () => {
+    it("allows dispatches up to the ceiling", async () => {
+      expect(await consume("trace-1")).toMatchObject({
+        allowed: true,
+        count: 1,
+      });
+      expect(await consume("trace-2")).toMatchObject({
+        allowed: true,
+        count: 2,
+      });
     });
-  });
 
-  /** @scenario "An outbox retry of the same dispatch does not consume a second slot" */
-  it("re-reads the count when the same dispatch is presented again", async () => {
-    await consume("trace-1");
+    it("refuses the dispatch that would pass the ceiling", async () => {
+      await consume("trace-1");
+      await consume("trace-2");
 
-    const retry = await consume("trace-1");
+      expect(await consume("trace-3")).toMatchObject({
+        allowed: false,
+        count: 3,
+      });
+    });
 
-    expect(retry.count).toBe(1);
-    expect(retry.allowed).toBe(true);
-  });
+    /** @scenario "An outbox retry of the same dispatch does not consume a second slot" */
+    it("re-reads the count when the same dispatch is presented again", async () => {
+      await consume("trace-1");
 
-  /** @scenario "Skipped matches are counted so the customer can see them" */
-  it("keeps counting past the ceiling so the overshoot is measurable", async () => {
-    // Stopping at the cap would make a trigger that overshot by one look
-    // identical to one that overshot by fifty thousand, and the customer-facing
-    // "N matches skipped today" is exactly that difference.
-    for (const traceId of ["t1", "t2", "t3", "t4", "t5"]) {
-      await consume(traceId);
-    }
+      const retry = await consume("trace-1");
 
-    const last = await consume("t6");
-    expect(last.count).toBe(6);
-    expect(last.skipped).toBe(4);
-  });
+      expect(retry.count).toBe(1);
+      expect(retry.allowed).toBe(true);
+    });
 
-  /** @scenario "The ceiling resets at the start of the next UTC day" */
-  it("starts a fresh count on the next UTC day", async () => {
-    await consume("trace-1");
-    await consume("trace-2");
-    expect(await consume("trace-3")).toMatchObject({ allowed: false });
+    /** @scenario "Skipped matches are counted so the customer can see them" */
+    it("keeps counting past the ceiling so the overshoot is measurable", async () => {
+      // Stopping at the cap would make a trigger that overshot by one look
+      // identical to one that overshot by fifty thousand, and the customer-facing
+      // "N matches skipped today" is exactly that difference.
+      for (const traceId of ["t1", "t2", "t3", "t4", "t5"]) {
+        await consume(traceId);
+      }
 
-    const tomorrow = await consume("trace-4", DAY_TWO);
+      const last = await consume("t6");
+      expect(last.count).toBe(6);
+      expect(last.skipped).toBe(4);
+    });
 
-    expect(tomorrow).toMatchObject({ allowed: true, count: 1, skipped: 0 });
+    /** @scenario "The ceiling resets at the start of the next UTC day" */
+    it("starts a fresh count on the next UTC day", async () => {
+      await consume("trace-1");
+      await consume("trace-2");
+      expect(await consume("trace-3")).toMatchObject({ allowed: false });
+
+      const tomorrow = await consume("trace-4", DAY_TWO);
+
+      expect(tomorrow).toMatchObject({ allowed: true, count: 1, skipped: 0 });
+    });
   });
 });
 
-describe("readPersistCapCounts", () => {
+describe("given a project whose triggers have consumed slots today", () => {
   beforeEach(() => {
     _resetMemoryPersistCapStore();
   });
 
-  it("reports today's skipped count per trigger without consuming a slot", async () => {
-    for (const traceId of ["t1", "t2", "t3"]) {
-      await consumePersistCapSlot({
+  describe("when the automations list reads their counts", () => {
+    it("reports today's skipped count per trigger without consuming a slot", async () => {
+      for (const traceId of ["t1", "t2", "t3"]) {
+        await consumePersistCapSlot({
+          projectId: PROJECT_ID,
+          triggerId: TRIGGER_ID,
+          now: DAY_ONE,
+          cap: 2,
+          dedupKey: `${PROJECT_ID}/${TRIGGER_ID}:persist:${traceId}`,
+        });
+      }
+
+      const counts = await readPersistCapCounts({
         projectId: PROJECT_ID,
-        triggerId: TRIGGER_ID,
+        triggerIds: [TRIGGER_ID, "trig-quiet"],
         now: DAY_ONE,
         cap: 2,
-        dedupKey: `${PROJECT_ID}/${TRIGGER_ID}:persist:${traceId}`,
       });
-    }
 
-    const counts = await readPersistCapCounts({
-      projectId: PROJECT_ID,
-      triggerIds: [TRIGGER_ID, "trig-quiet"],
-      now: DAY_ONE,
-      cap: 2,
+      expect(counts[TRIGGER_ID]).toEqual({ count: 3, skipped: 1 });
+      expect(counts["trig-quiet"]).toEqual({ count: 0, skipped: 0 });
     });
-
-    expect(counts[TRIGGER_ID]).toEqual({ count: 3, skipped: 1 });
-    expect(counts["trig-quiet"]).toEqual({ count: 0, skipped: 0 });
   });
 });

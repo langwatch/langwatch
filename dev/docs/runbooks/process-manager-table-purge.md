@@ -42,23 +42,13 @@ rather than a cleanup.
 
 ## Access path
 
-No psql bastion is needed. Run through an app pod, which already has the Prisma
-client and the database credentials, using `$executeRawUnsafe` one statement per
-call:
-
-```bash
-kubectl --context lw-prod -n langwatch exec -it deploy/langwatch-app -- \
-  node -e '<script>'
-```
-
-Use the same access path the investigation used. Nothing here needs a new
-credential or a new network route.
+No psql bastion is needed. `platform/app/scripts/ops/purge-process-manager-tables.mjs`
+runs inside an app pod, which already has the Prisma client and the database
+credentials. Nothing here needs a new credential or a new network route.
 
 ## Procedure
 
-Run off-peak. Each statement below deletes at most 10,000 rows and returns the
-count it actually deleted. Loop until a batch returns 0, sleeping between
-batches so the purge never monopolises the instance.
+Run off-peak.
 
 ### 1. Baseline
 
@@ -73,11 +63,34 @@ SELECT
   pg_size_pretty(pg_total_relation_size('"ProcessManagerInbox"')) AS inbox_size;
 ```
 
-### 2. Purge the dispatched outbox
+### 2. Dry-run the purge
 
-`ctid` batching is what makes this work without an index: the subquery picks
-physical row locations off a sequential scan, so there is no dependency on the
-index the migration has not built yet.
+The script is dry-run by default: it reports how many rows each predicate
+matches and deletes nothing.
+
+```bash
+kubectl --context lw-prod -n langwatch exec -it deploy/langwatch-app -- \
+  node scripts/ops/purge-process-manager-tables.mjs
+```
+
+### 3. Apply
+
+```bash
+kubectl --context lw-prod -n langwatch exec -it deploy/langwatch-app -- \
+  env APPLY=1 node scripts/ops/purge-process-manager-tables.mjs
+```
+
+It deletes 10,000 rows per statement, sleeps 200 ms between batches so the purge
+never monopolises the instance, loops until a batch returns 0, and then runs a
+plain `VACUUM (ANALYZE)` on both tables. `RETENTION_DAYS`, `BATCH_SIZE`,
+`SLEEP_MS` and `MAX_BATCHES` are env overrides.
+
+Interrupting it is safe. Every batch is its own statement, so a stopped run just
+leaves the rest of the backlog for the next run or for the sweep.
+
+The delete it issues is `ctid`-batched, which is what makes this work without an
+index: the subquery picks physical row locations off a sequential scan, so there
+is no dependency on the index the migration has not built yet.
 
 ```sql
 WITH batch AS (
@@ -89,33 +102,11 @@ WITH batch AS (
 DELETE FROM "ProcessManagerOutbox" o USING batch WHERE o.ctid = batch.ctid;
 ```
 
-Repeat until it reports 0 rows deleted. Sleep ~200 ms between batches.
+**Never run `VACUUM FULL` on these tables.** It takes an ACCESS EXCLUSIVE lock
+for the whole rewrite, which blocks every reader and writer of a table the
+automations pipeline writes to continuously.
 
-### 3. Purge the consumed inbox
-
-```sql
-WITH batch AS (
-  SELECT ctid FROM "ProcessManagerInbox"
-  WHERE "consumedAt" < now() - interval '7 days'
-  LIMIT 10000
-)
-DELETE FROM "ProcessManagerInbox" i USING batch WHERE i.ctid = batch.ctid;
-```
-
-Repeat until it reports 0 rows deleted.
-
-### 4. Reclaim
-
-```sql
-VACUUM (VERBOSE, ANALYZE) "ProcessManagerOutbox";
-VACUUM (VERBOSE, ANALYZE) "ProcessManagerInbox";
-```
-
-**Do not run `VACUUM FULL`.** It takes an ACCESS EXCLUSIVE lock for the whole
-rewrite, which blocks every reader and writer of a table the automations
-pipeline writes to continuously.
-
-### 5. Verify
+### 4. Verify
 
 Re-run the baseline query from step 1.
 

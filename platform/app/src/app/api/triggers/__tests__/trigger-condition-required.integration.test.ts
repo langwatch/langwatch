@@ -28,12 +28,17 @@ import { app } from "../[[...route]]/app";
 describe("Feature: a REST-created automation must carry a condition", () => {
   const ns = `triggers-condition-${nanoid(8)}`;
 
-  let organization: Organization;
-  let team: Team;
-  let project: Project;
+  // Optional until `beforeAll` has created them: a setup failure part way
+  // through must not make teardown throw on an undefined id, because that
+  // TypeError replaces the real setup error in the CI output.
+  let organization: Organization | undefined;
+  let team: Team | undefined;
+  let project: Project | undefined;
+
+  const projectId = () => project!.id;
 
   const headers = () => ({
-    "X-Auth-Token": project.apiKey,
+    "X-Auth-Token": project!.apiKey,
     "Content-Type": "application/json",
   });
 
@@ -52,14 +57,14 @@ describe("Feature: a REST-created automation must carry a condition", () => {
       data: {
         name: "Triggers API Team",
         slug: `--test-team-${ns}`,
-        organizationId: organization.id,
+        organizationId: organization!.id,
       },
     });
     project = await prisma.project.create({
       data: {
         name: "Triggers API Project",
         slug: `--test-project-${ns}`,
-        teamId: team.id,
+        teamId: team!.id,
         language: "other",
         framework: "other",
         apiKey: `test-api-key-${ns}`,
@@ -68,11 +73,15 @@ describe("Feature: a REST-created automation must carry a condition", () => {
   });
 
   afterAll(async () => {
-    if (!organization?.id) return;
-    await prisma.trigger.deleteMany({ where: { projectId: project.id } });
-    await prisma.project.delete({ where: { id: project.id } });
-    await prisma.team.delete({ where: { id: team.id } });
-    await prisma.organization.delete({ where: { id: organization.id } });
+    // Innermost first, and each one guarded on its own.
+    if (project) {
+      await prisma.trigger.deleteMany({ where: { projectId: projectId() } });
+      await prisma.project.delete({ where: { id: project.id } });
+    }
+    if (team) await prisma.team.delete({ where: { id: team.id } });
+    if (organization) {
+      await prisma.organization.delete({ where: { id: organization.id } });
+    }
   });
 
   describe("when the create request omits the condition entirely", () => {
@@ -89,7 +98,7 @@ describe("Feature: a REST-created automation must carry a condition", () => {
       expect(body.error).toBe("trigger_filters_required");
       expect(
         await prisma.trigger.count({
-          where: { projectId: project.id, name: "Omitted condition" },
+          where: { projectId: projectId(), name: "Omitted condition" },
         }),
       ).toBe(0);
     });
@@ -121,6 +130,22 @@ describe("Feature: a REST-created automation must carry a condition", () => {
       expect(response.status).toBe(422);
       expect((await response.json()).error).toBe("trigger_filters_required");
     });
+
+    it("refuses a key selector that carries no values", async () => {
+      // The one shape that used to slip through: the outer object has a key,
+      // so a shallow check called it a condition, while the matcher discards
+      // the empty leaf and fires on every trace. Both now share one recursive
+      // vacuity check, so this is refused like the empty object.
+      const response = await createTrigger({
+        name: "Vacuous key selector",
+        action: TriggerAction.ADD_TO_DATASET,
+        actionParams: { datasetId: "dataset_1" },
+        filters: { "metadata.labels": { region: [] } },
+      });
+
+      expect(response.status).toBe(422);
+      expect((await response.json()).error).toBe("trigger_filters_required");
+    });
   });
 
   describe("when the create request carries a real condition", () => {
@@ -135,7 +160,7 @@ describe("Feature: a REST-created automation must carry a condition", () => {
       expect(response.status).toBe(201);
       expect(
         await prisma.trigger.count({
-          where: { projectId: project.id, name: "Real condition" },
+          where: { projectId: projectId(), name: "Real condition" },
         }),
       ).toBe(1);
     });
@@ -147,7 +172,7 @@ describe("Feature: a REST-created automation must carry a condition", () => {
         data: {
           id: nanoid(),
           name: "Patch target",
-          projectId: project.id,
+          projectId: projectId(),
           action: TriggerAction.ADD_TO_DATASET,
           actionParams: {},
           filters: JSON.stringify({ "metadata.labels": ["prod"] }),
@@ -164,7 +189,7 @@ describe("Feature: a REST-created automation must carry a condition", () => {
       expect(response.status).toBe(422);
       expect((await response.json()).error).toBe("trigger_filters_required");
       const after = await prisma.trigger.findUniqueOrThrow({
-        where: { id: stored.id, projectId: project.id },
+        where: { id: stored.id, projectId: projectId() },
       });
       expect(after.filters).toBe(
         JSON.stringify({ "metadata.labels": ["prod"] }),
@@ -176,7 +201,7 @@ describe("Feature: a REST-created automation must carry a condition", () => {
         data: {
           id: nanoid(),
           name: "Query-narrowed",
-          projectId: project.id,
+          projectId: projectId(),
           action: TriggerAction.ADD_TO_DATASET,
           actionParams: {},
           filters: JSON.stringify({ "metadata.labels": ["prod"] }),

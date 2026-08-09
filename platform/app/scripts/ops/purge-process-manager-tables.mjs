@@ -1,0 +1,143 @@
+/**
+ * One-time catch-up purge of the ProcessManager inbox and outbox backlog
+ * (one-shot prod ops tool).
+ *
+ * The hourly `processRetentionSweep` process manager holds these tables at
+ * their steady state, but its bounded batches are sized for an hour of traffic,
+ * not for a multi-million-row historical backlog. This script clears that
+ * backlog in `ctid` batches, which need no index and so can run before the
+ * retention migration builds one.
+ *
+ * DRY-RUN BY DEFAULT: counts what it would delete and stops. Re-run with
+ * APPLY=1 to delete. Safe to re-run and safe to interrupt: every batch is its
+ * own statement, so stopping halfway simply leaves the rest of the backlog for
+ * the next run or for the sweep.
+ *
+ * Pending and dead outbox rows are never touched. Pending rows are work still
+ * owed; dead rows are the operator's failure record.
+ *
+ * Usage (inside an app pod, which already has the Prisma client and the
+ * database credentials):
+ *   kubectl --context <ctx> -n langwatch exec -it deploy/langwatch-app -- \
+ *     node scripts/ops/purge-process-manager-tables.mjs
+ *   kubectl --context <ctx> -n langwatch exec -it deploy/langwatch-app -- \
+ *     env APPLY=1 node scripts/ops/purge-process-manager-tables.mjs
+ *
+ * Env overrides: RETENTION_DAYS (7), BATCH_SIZE (10000), SLEEP_MS (200),
+ * MAX_BATCHES (10000).
+ */
+
+import { PrismaClient } from "@prisma/client";
+
+const APPLY = process.env.APPLY === "1";
+const RETENTION_DAYS = Number(process.env.RETENTION_DAYS ?? 7);
+const BATCH_SIZE = Number(process.env.BATCH_SIZE ?? 10_000);
+const SLEEP_MS = Number(process.env.SLEEP_MS ?? 200);
+const MAX_BATCHES = Number(process.env.MAX_BATCHES ?? 10_000);
+
+const prisma = new PrismaClient();
+
+/** @param {number} ms */
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * The two backlogs, each as the `ctid` batch delete and the matching count.
+ * The predicates are the runbook's, one retention window wider than the
+ * sweep's, so this only ever removes rows the sweep would also remove.
+ *
+ * @type {Array<{ name: string, count: string, delete: string }>}
+ */
+const TARGETS = [
+  {
+    name: "ProcessManagerOutbox (dispatched)",
+    count: `SELECT count(*)::bigint AS n FROM "ProcessManagerOutbox"
+            WHERE "status" = 'dispatched'
+              AND "dispatchedAt" < now() - interval '${RETENTION_DAYS} days'`,
+    delete: `WITH batch AS (
+               SELECT ctid FROM "ProcessManagerOutbox"
+               WHERE "status" = 'dispatched'
+                 AND "dispatchedAt" < now() - interval '${RETENTION_DAYS} days'
+               LIMIT ${BATCH_SIZE}
+             )
+             DELETE FROM "ProcessManagerOutbox" o USING batch WHERE o.ctid = batch.ctid`,
+  },
+  {
+    name: "ProcessManagerInbox (consumed)",
+    count: `SELECT count(*)::bigint AS n FROM "ProcessManagerInbox"
+            WHERE "consumedAt" < now() - interval '${RETENTION_DAYS} days'`,
+    delete: `WITH batch AS (
+               SELECT ctid FROM "ProcessManagerInbox"
+               WHERE "consumedAt" < now() - interval '${RETENTION_DAYS} days'
+               LIMIT ${BATCH_SIZE}
+             )
+             DELETE FROM "ProcessManagerInbox" i USING batch WHERE i.ctid = batch.ctid`,
+  },
+];
+
+/**
+ * @param {string} sql
+ * @returns {Promise<number>}
+ */
+async function countEligible(sql) {
+  const rows = /** @type {Array<{ n: unknown }>} */ (
+    await prisma.$queryRawUnsafe(sql)
+  );
+  return Number(rows[0]?.n ?? 0);
+}
+
+/**
+ * Deletes one target in batches until it runs dry or the batch ceiling hits.
+ *
+ * @param {{ name: string, count: string, delete: string }} target
+ * @returns {Promise<number>}
+ */
+async function purge(target) {
+  let total = 0;
+  for (let batch = 0; batch < MAX_BATCHES; batch++) {
+    const deleted = await prisma.$executeRawUnsafe(target.delete);
+    total += deleted;
+    if (deleted === 0) return total;
+    if (batch % 10 === 0) console.log(`  ... ${total} rows deleted so far`);
+    await sleep(SLEEP_MS);
+  }
+  console.warn(
+    `  WARN: stopped at MAX_BATCHES=${MAX_BATCHES} with rows still eligible. Re-run to continue.`,
+  );
+  return total;
+}
+
+async function main() {
+  console.log(
+    `mode=${APPLY ? "APPLY" : "DRY-RUN"} retention_days=${RETENTION_DAYS} ` +
+      `batch_size=${BATCH_SIZE} sleep_ms=${SLEEP_MS}`,
+  );
+
+  for (const target of TARGETS) {
+    const eligible = await countEligible(target.count);
+    console.log(`${target.name}: ${eligible} eligible rows`);
+    if (!APPLY) continue;
+    const deleted = await purge(target);
+    console.log(`${target.name}: deleted ${deleted} rows`);
+  }
+
+  if (!APPLY) {
+    console.log("DRY-RUN only. Re-run with APPLY=1 to delete.");
+    return;
+  }
+
+  // A plain VACUUM marks the pages reusable so Postgres refills them instead of
+  // extending the files. VACUUM FULL would reclaim the space but takes an
+  // ACCESS EXCLUSIVE lock on tables the automations pipeline writes to
+  // continuously, so it is never the right trade here.
+  console.log("vacuuming (this does not shrink the files, by design) ...");
+  for (const table of ["ProcessManagerOutbox", "ProcessManagerInbox"]) {
+    await prisma.$executeRawUnsafe(`VACUUM (ANALYZE) "${table}"`);
+  }
+  console.log("DONE");
+}
+
+try {
+  await main();
+} finally {
+  await prisma.$disconnect();
+}

@@ -6,6 +6,7 @@ import {
   Histogram,
   register,
 } from "prom-client";
+import type { AutomationPauseReason } from "~/features/automations/logic/pauseReasons";
 
 // Enable default metrics collection (heap, stack, GC, etc.)
 if (!register.getSingleMetric("process_cpu_user_seconds_total")) {
@@ -884,8 +885,9 @@ const automationAutoPausedTotal = new Counter({
   labelNames: ["reason"] as const,
 });
 
-export const incrementAutomationAutoPausedTotal = (reason: string) =>
-  automationAutoPausedTotal.labels(reason).inc();
+export const incrementAutomationAutoPausedTotal = (
+  reason: AutomationPauseReason,
+) => automationAutoPausedTotal.labels(reason).inc();
 
 register.removeSingleMetric("es_process_outbox_total");
 const esProcessOutboxTotal = new Counter({

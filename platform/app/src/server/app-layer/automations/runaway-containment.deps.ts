@@ -14,20 +14,38 @@ const logger = createLogger("langwatch:automations:runaway-containment");
 /** 25h, one hour past the day the claim covers, matching the cap counters. */
 const CLAIM_EXPIRE_SECONDS = 90_000;
 
+/**
+ * The fallback map holds one entry per claim for up to 25h, so during a long
+ * Redis outage it has to be swept or it grows for the whole outage. Sweeping is
+ * time-gated rather than size-gated: a size gate would put a full scan on every
+ * claim once the map crossed its threshold, and mid-outage that scan deletes
+ * nothing because nothing has expired yet.
+ */
+const CLAIM_SWEEP_INTERVAL_MS = 60_000;
+
 const claimMemory = new Map<string, number>();
+let lastClaimSweepAt = 0;
+
+function sweepExpiredClaims(now: number): void {
+  if (now - lastClaimSweepAt < CLAIM_SWEEP_INTERVAL_MS) return;
+  lastClaimSweepAt = now;
+  for (const [key, expiresAt] of claimMemory) {
+    if (expiresAt <= now) claimMemory.delete(key);
+  }
+}
 
 /**
  * Once-only gate across the fleet. Redis SET-NX when it is available; a
  * per-worker Map otherwise, which degrades "one email per day" to "one per
  * worker per day" rather than to none at all.
  */
-async function claimOnce(key: string): Promise<boolean> {
+async function claimOnce(
+  key: string,
+  ttlSeconds: number = CLAIM_EXPIRE_SECONDS,
+): Promise<boolean> {
   if (connection) {
     try {
-      return (
-        (await connection.set(key, "1", "EX", CLAIM_EXPIRE_SECONDS, "NX")) !==
-        null
-      );
+      return (await connection.set(key, "1", "EX", ttlSeconds, "NX")) !== null;
     } catch (error) {
       logger.warn(
         { key, error: error instanceof Error ? error.message : String(error) },
@@ -37,9 +55,10 @@ async function claimOnce(key: string): Promise<boolean> {
     }
   }
   const now = Date.now();
+  sweepExpiredClaims(now);
   const existing = claimMemory.get(key);
   if (existing !== undefined && existing > now) return false;
-  claimMemory.set(key, now + CLAIM_EXPIRE_SECONDS * 1000);
+  claimMemory.set(key, now + ttlSeconds * 1000);
   return true;
 }
 

@@ -258,23 +258,35 @@ describe("trace alert trigger match subscriber", () => {
     });
 
     /** @scenario "Recording a match consumes nothing" */
-    it("consults no customer-facing limit while recording", async () => {
-      // There is deliberately no cap dependency on this path at all. The
-      // handler's deps are the trigger list and the command port, and nothing
-      // else: a limit could not be consulted here even by accident.
-      const triggers = {
-        getActiveTraceTriggersForProject: vi
-          .fn()
-          .mockResolvedValue([trigger({ id: "trigger-1" })]),
+    it("reaches for no dependency beyond the triggers and the command port", async () => {
+      // The claim is about the dependency SURFACE, so the assertion has to be
+      // about the surface. A call count on `send` cannot fail for the reason
+      // this test exists: it would stay green if a cap were consulted. Watching
+      // every property the handler reads can fail, and does the moment someone
+      // wires a limit into this path.
+      const reads = new Set<string>();
+      const deps = {
+        triggers: {
+          getActiveTraceTriggersForProject: vi
+            .fn()
+            .mockResolvedValue([trigger({ id: "trigger-1" })]),
+        },
+        recordTriggerMatch: { send: vi.fn().mockResolvedValue(undefined) },
       };
-      const recordTriggerMatch = { send: vi.fn().mockResolvedValue(undefined) };
+      const watched = new Proxy(deps, {
+        get(target, key) {
+          if (typeof key === "string") reads.add(key);
+          return target[key as keyof typeof deps];
+        },
+      });
 
-      await createTraceAlertTriggerMatchHandler({
-        triggers: triggers as never,
-        recordTriggerMatch,
-      })(event(), context(traceState()));
+      await createTraceAlertTriggerMatchHandler(watched as never)(
+        event(),
+        context(traceState()),
+      );
 
-      expect(recordTriggerMatch.send).toHaveBeenCalledTimes(1);
+      expect([...reads].sort()).toEqual(["recordTriggerMatch", "triggers"]);
+      expect(deps.recordTriggerMatch.send).toHaveBeenCalledTimes(1);
     });
   });
 });

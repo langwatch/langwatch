@@ -71,6 +71,12 @@ export function triggerFiltersReferenceEvents(
  * `{ "metadata.labels": [] }` reads like a filter and matches every trace, the
  * same as `{}`. The server-side mirror of the drawer's `filtersAreSet`, so a
  * shape the browser refuses cannot be saved through an API instead.
+ *
+ * It shares `filterValueHasActionableCondition` with the matcher deliberately.
+ * A validator that counted a key-selector wrapper as a condition while the
+ * matcher discarded it would accept exactly the automations that go on to fire
+ * on every trace: `{ "metadata.attributes": { region: [] } }` has an outer key
+ * but no leaf, and constrains nothing.
  */
 export function hasActionableTriggerFilters(
   // Widened past `TriggerFilters` on purpose: the REST surface validates
@@ -78,13 +84,7 @@ export function hasActionableTriggerFilters(
   // first proving the field names are known ones.
   filters: Record<string, unknown>,
 ): boolean {
-  return Object.values(filters).some((value) =>
-    Array.isArray(value)
-      ? value.length > 0
-      : typeof value === "object" &&
-        value !== null &&
-        Object.keys(value).length > 0,
-  );
+  return Object.values(filters).some(filterValueHasActionableCondition);
 }
 
 /**
@@ -230,25 +230,14 @@ export function matchesTriggerFilters(
  * Whether a filter value carries at least one non-empty (actionable) condition.
  * Empty arrays — at any nesting depth — are vacuous and do not constrain the
  * match, mirroring the ClickHouse builder which emits no SQL for them.
+ *
+ * Recursive rather than depth-limited so it cannot be fooled by a shape one
+ * level deeper than whatever the key selectors happen to nest today.
  */
-function filterValueHasActionableCondition(
-  filterValue: TriggerFilterValue,
-): boolean {
-  if (Array.isArray(filterValue)) {
-    return filterValue.length > 0;
-  }
-
-  for (const subValue of Object.values(filterValue)) {
-    if (Array.isArray(subValue)) {
-      if (subValue.length > 0) return true;
-    } else if (typeof subValue === "object" && subValue !== null) {
-      for (const values of Object.values(subValue)) {
-        if (Array.isArray(values) && values.length > 0) return true;
-      }
-    }
-  }
-
-  return false;
+function filterValueHasActionableCondition(filterValue: unknown): boolean {
+  if (Array.isArray(filterValue)) return filterValue.length > 0;
+  if (typeof filterValue !== "object" || filterValue === null) return false;
+  return Object.values(filterValue).some(filterValueHasActionableCondition);
 }
 
 /**

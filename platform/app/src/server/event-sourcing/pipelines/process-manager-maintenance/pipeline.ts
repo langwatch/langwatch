@@ -2,6 +2,7 @@ import type { Event } from "../../domain/types";
 import { definePipeline } from "../../pipeline/staticBuilder";
 import {
   PROCESS_RETENTION_SWEEP_INTERVAL_MS,
+  PROCESS_RETENTION_SWEEP_LEASE_MS,
   PROCESS_RETENTION_SWEEP_PROCESS_NAME,
   type ProcessRetentionSweepDeps,
   type ProcessRetentionSweepState,
@@ -63,11 +64,14 @@ export function createProcessManagerMaintenancePipeline(
             processRetentionSweepSchema,
             runProcessRetentionSweep(deps.retentionSweep),
           )
-          // The lease is generous because the FIRST tick after deploy drains
-          // whatever backlog the one-time purge left behind, and that run is
-          // far longer than the steady-state one. Three families of up to 200
-          // batches each is the worst case the budget allows.
-          .outbox({ leaseDurationMs: 15 * 60 * 1000, maxAttempts: 3 }),
+          // The sweep stops itself at RETENTION_SWEEP_DEADLINE_MS, which sits
+          // well inside this lease, so a slow run leaves work for the next tick
+          // rather than letting the lease lapse and a second worker start a
+          // concurrent sweep.
+          .outbox({
+            leaseDurationMs: PROCESS_RETENTION_SWEEP_LEASE_MS,
+            maxAttempts: 3,
+          }),
       )
       .build()
   );

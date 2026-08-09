@@ -31,60 +31,109 @@ function trigger(overrides: Partial<TriggerSummary> = {}): TriggerSummary {
 }
 
 describe("isMatchEverythingTrigger", () => {
-  describe("when the automation has no condition at all", () => {
-    it("reports it as matching everything", () => {
-      expect(isMatchEverythingTrigger(trigger())).toBe(true);
-    });
+  describe("given an automation with no condition at all", () => {
+    describe("when the trigger is classified", () => {
+      it("reports it as matching everything", () => {
+        expect(isMatchEverythingTrigger(trigger())).toBe(true);
+      });
 
-    it("reports a filter set whose only field selects nothing the same way", () => {
-      expect(
-        isMatchEverythingTrigger(
-          trigger({ filters: { "metadata.labels": [] } }),
-        ),
-      ).toBe(true);
-    });
-  });
+      it("reports a filter set whose only field selects nothing the same way", () => {
+        expect(
+          isMatchEverythingTrigger(
+            trigger({ filters: { "metadata.labels": [] } }),
+          ),
+        ).toBe(true);
+      });
 
-  describe("when something narrows the automation", () => {
-    it("does not report a structured filter as matching everything", () => {
-      expect(
-        isMatchEverythingTrigger(
-          trigger({ filters: { "metadata.labels": ["prod"] } }),
-        ),
-      ).toBe(false);
-    });
-
-    it("does not report a query as matching everything", () => {
-      expect(
-        isMatchEverythingTrigger(trigger({ filterQuery: "status:error" })),
-      ).toBe(false);
-    });
-
-    it("treats a whitespace-only query as no query at all", () => {
-      expect(isMatchEverythingTrigger(trigger({ filterQuery: "   " }))).toBe(
-        true,
-      );
+      // The write validation and this classifier share one vacuity check, so a
+      // key-selector wrapper with no leaf values has to read as no condition in
+      // both. Counting the wrapper here would hide exactly the automations that
+      // go on to fire on every trace.
+      it("reports a key selector with no values the same way", () => {
+        expect(
+          isMatchEverythingTrigger(
+            trigger({ filters: { "metadata.labels": { region: [] } } }),
+          ),
+        ).toBe(true);
+      });
     });
   });
 
-  describe("when the trigger is not a trace automation", () => {
-    // An alert's condition is its threshold and a report's is its schedule, so
-    // both legitimately persist an empty filter set.
-    it("never reports a graph alert", () => {
-      expect(
-        isMatchEverythingTrigger(
-          trigger({
-            triggerKind: TriggerKind.ALERT,
-            customGraphId: "graph_1",
-          }),
-        ),
-      ).toBe(false);
-    });
+  describe("given something narrows the automation", () => {
+    describe("when the trigger is classified", () => {
+      it("does not report a structured filter as matching everything", () => {
+        expect(
+          isMatchEverythingTrigger(
+            trigger({ filters: { "metadata.labels": ["prod"] } }),
+          ),
+        ).toBe(false);
+      });
 
-    it("never reports a report", () => {
-      expect(
-        isMatchEverythingTrigger(trigger({ triggerKind: TriggerKind.REPORT })),
-      ).toBe(false);
+      it("does not report a populated key selector as matching everything", () => {
+        expect(
+          isMatchEverythingTrigger(
+            trigger({ filters: { "metadata.labels": { region: ["eu"] } } }),
+          ),
+        ).toBe(false);
+      });
+
+      it("does not report a query as matching everything", () => {
+        expect(
+          isMatchEverythingTrigger(trigger({ filterQuery: "status:error" })),
+        ).toBe(false);
+      });
+
+      it("treats a whitespace-only query as no query at all", () => {
+        expect(isMatchEverythingTrigger(trigger({ filterQuery: "   " }))).toBe(
+          true,
+        );
+      });
+    });
+  });
+
+  describe("given the trigger is not a trace automation", () => {
+    describe("when the trigger is classified", () => {
+      // An alert's condition is its threshold and a report's is its schedule,
+      // so both legitimately persist an empty filter set.
+      it("never reports a graph alert", () => {
+        expect(
+          isMatchEverythingTrigger(
+            trigger({
+              triggerKind: TriggerKind.ALERT,
+              customGraphId: "graph_1",
+            }),
+          ),
+        ).toBe(false);
+      });
+
+      it("never reports a report", () => {
+        expect(
+          isMatchEverythingTrigger(
+            trigger({ triggerKind: TriggerKind.REPORT }),
+          ),
+        ).toBe(false);
+      });
+    });
+  });
+
+  describe("given a graph-backed automation with no filters", () => {
+    describe("when the trigger is classified", () => {
+      // Deliberately AUTOMATION-kind, so the kind guard cannot short-circuit
+      // and this pins the customGraphId guard on its own. A graph automation
+      // is driven by its graph, not by its filter set, so an empty `filters`
+      // here is normal and must never make it a pause candidate.
+      it("never reports it as matching everything", () => {
+        expect(
+          isMatchEverythingTrigger(
+            trigger({
+              triggerKind: TriggerKind.AUTOMATION,
+              customGraphId: "graph_1",
+              filters: {},
+              filterQuery: null,
+            }),
+          ),
+        ).toBe(false);
+      });
     });
   });
 });
