@@ -658,9 +658,11 @@ export const TRACE_MAPPINGS = {
         );
       }
 
-      // Everything a reviewer said about the trace, as one text rather than a
-      // list of them: the column exists to be read, and a reader handed
+      // Everything said about the trace, as one text rather than a list of
+      // them: the column exists to be read, and a reader handed
       // `["Ada: too terse","Bo: fine"]` reads JSON before they read the review.
+      // A rule between reviews tells one from the next at a glance, for a
+      // person as much as for a judge; a single review carries none.
       if (key === "ai_readable") {
         return annotations
           .map((annotation) =>
@@ -671,7 +673,7 @@ export const TRACE_MAPPINGS = {
               scoreOptions: data.annotationScoreOptions,
             }),
           )
-          .join("\n");
+          .join("\n---\n");
       }
 
       return annotations.map((annotation) => {

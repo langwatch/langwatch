@@ -378,6 +378,7 @@ describe("mapTraceToDatasetEntry annotations ai_readable column", () => {
       expect(rows).toHaveLength(1);
       expect(rows[0]!.annotations).toBe(
         "Ada (on web_search span (0af31b2c) · Output): too terse [thumbs down] [goodness: mild]\n" +
+          "---\n" +
           "grace@example.com: reads well [thumbs up]",
       );
     });
@@ -408,6 +409,18 @@ describe("mapTraceToDatasetEntry annotations ai_readable column", () => {
         "Ada (on web_search span (0af31b2c) · Output): too terse [thumbs down] [goodness: mild]",
         "grace@example.com: reads well [thumbs up]",
       ]);
+    });
+
+    /** @scenario "Every annotation on the trace gets its own readable line" */
+    it("draws no rule when the row carries one review", () => {
+      const rows = mapTraceToDatasetEntry(
+        reviewedTrace as any,
+        annotationsMapping,
+        new Set(["annotations.id"]) as any,
+        projectScores,
+      );
+
+      expect(rows[0]!.annotations).not.toContain("---");
     });
   });
 

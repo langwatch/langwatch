@@ -96,6 +96,8 @@ Feature: Annotations in a dataset mapping
     Given a trace two reviewers commented on
     When the trace is converted to dataset rows with an ai_readable column
     Then the column holds one text with a line per annotation, not a list of them
+    And a rule between them tells one review from the next at a glance
+    And a row carrying a single review has no rule in it
 
   # ============================================================================
   # The whole annotation, when the column takes all of it
