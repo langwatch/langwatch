@@ -242,7 +242,7 @@ describe("given a span whose name fills its column", () => {
     });
 
     /** @scenario "The actions the pointer asks for read below the span's name" */
-    it("hangs them under the name rather than over it", async () => {
+    it("hangs them under the row, centered, rather than over the name", async () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
       const { container } = renderRow([]);
 
@@ -250,8 +250,9 @@ describe("given a span whose name fills its column", () => {
 
       const name = screen.getByTitle("web_search");
       const nameColumn = name.parentElement?.parentElement;
-      expect(nameColumn?.contains(hoverActions())).toBe(true);
-      expect(hoverActions()).toHaveStyle({ top: "100%" });
+      expect(rowOf(container).contains(hoverActions())).toBe(true);
+      expect(nameColumn?.contains(hoverActions())).toBe(false);
+      expect(hoverActions()).toHaveStyle({ top: "100%", left: "50%" });
     });
   });
 });

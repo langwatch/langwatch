@@ -573,6 +573,12 @@ export const WaterfallView = memo(function WaterfallView({
                   width="full"
                   height={`${virtualRow.size}px`}
                   transform={`translateY(${virtualRow.start}px)`}
+                  // The row's actions hang below it, over the row after it. Its
+                  // own transform makes it a stacking context, so nothing
+                  // inside can paint over a later row: the lift has to happen
+                  // here. In CSS rather than in state, so moving the pointer
+                  // down a long tree re-renders nothing.
+                  _hover={{ zIndex: 2 }}
                 >
                   {showSeparator && (
                     <Box

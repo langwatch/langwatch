@@ -303,9 +303,7 @@ export const TreeRow = memo(function TreeRow({
         boxShadow: "md",
       }}
     >
-      {/* The hovered row's actions hang below it, over the row after it, so the
-          row they belong to paints above its neighbours while they are up. */}
-      <Box position="relative" zIndex={isHovered ? 3 : undefined}>
+      <Box position="relative">
         {/* Pulse layer: a one-shot orange wash that fades over 1.2s when
             a new span arrives via SSE. Sits absolutely above the row's
             existing background so selection / hover state continues to
@@ -389,6 +387,8 @@ export const TreeRow = memo(function TreeRow({
               : "colorPalette.subtle/40",
           }}
           cursor="pointer"
+          // Anchors the hover actions, which hang centered under the row.
+          position="relative"
           data-testid="waterfall-row"
           onClick={handleClick}
           onMouseEnter={handleMouseEnter}
@@ -458,11 +458,6 @@ export const TreeRow = memo(function TreeRow({
             minWidth={0}
             gap={0}
             justify="center"
-            // Anchors the hover actions under the name, at whatever depth the
-            // row sits at. Stretched to the row's height so "below" means below
-            // the row, not below the two lines of text centered inside it.
-            position="relative"
-            alignSelf="stretch"
           >
             <HStack gap={1} minWidth={0}>
               <Text
@@ -576,16 +571,6 @@ export const TreeRow = memo(function TreeRow({
                 </Text>
               </HStack>
             )}
-            <RowHoverActions
-              spanId={span.spanId}
-              displayName={displayName}
-              traceId={traceId}
-              comments={comments}
-              isHovered={isHovered}
-              isEditing={isEditing}
-              isDraftDeleted={isDraftDeleted}
-              onToggleDelete={onToggleDelete}
-            />
           </Flex>
 
           {/* Signal badges — sit on the row, not inside the name column,
@@ -654,6 +639,17 @@ export const TreeRow = memo(function TreeRow({
           >
             {isZeroDuration ? "<1ms" : formatDuration(duration)}
           </Text>
+
+          <RowHoverActions
+            spanId={span.spanId}
+            displayName={displayName}
+            traceId={traceId}
+            comments={comments}
+            isHovered={isHovered}
+            isEditing={isEditing}
+            isDraftDeleted={isDraftDeleted}
+            onToggleDelete={onToggleDelete}
+          />
         </HStack>
       </Box>
     </Tooltip>
@@ -754,16 +750,17 @@ function RowHoverActions({
 
   return (
     <HStack
-      // Anchored to the name column, so it hangs under the name at every depth
-      // without the row measuring anything.
+      // Anchored to the row, so it hangs centered under the span pane whatever
+      // depth the row sits at and however wide the pane is.
       position="absolute"
       top="100%"
-      left={0}
-      // Meets the row's bottom edge, so the pointer crosses into it without
-      // passing over the row beneath, and nothing in the row is covered. It is a
-      // child of the row it belongs to, which is what keeps the row hovered
-      // while the pointer is in here.
-      marginTop="-1px"
+      left="50%"
+      transform="translateX(-50%)"
+      // Sits into the row's bottom edge, so it reads as belonging to the row
+      // above it and the pointer crosses into it without passing over the row
+      // beneath. It is a child of the row it belongs to, which is what keeps
+      // the row hovered while the pointer is in here.
+      marginTop="-8px"
       gap={0}
       paddingRight={1}
       // Opaque and lifted: it hangs over the row below, which must not read
