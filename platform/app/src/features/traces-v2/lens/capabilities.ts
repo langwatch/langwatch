@@ -78,6 +78,9 @@ const TRACE_CAPABILITY: LensCapability = {
     { id: "origin", label: "Origin", section: "Standard" },
     { id: "evaluations", label: "Evals", section: "Evaluations" },
     { id: "events", label: "Events", section: "Events" },
+    // Reviews live in their own store, so this one is laid over the rows
+    // rather than read with them, and only when it is on screen.
+    { id: "annotations", label: "Annotations", section: "Annotations" },
   ],
   defaultColumns: [
     "time",

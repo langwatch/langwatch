@@ -52,6 +52,89 @@ export function suggestionExportLine({
     : annotation.expectedOutput;
 }
 
+/** One score a reviewer gave, named the way the project names it. */
+export interface AnnotationScoreAnswer {
+  /** The score's name, or the id it is stored under when the project dropped it. */
+  name: string;
+  /** What the reviewer answered. A score can take more than one answer. */
+  values: string[];
+  reason: string | null;
+}
+
+/** What a reviewer answered on one score, blanks dropped. A score takes one
+ *  answer or several, and is stored either way. */
+function answeredValues(value: unknown): string[] {
+  const answers = Array.isArray(value) ? value : [value];
+  return answers
+    .filter(
+      (answer) => answer !== null && answer !== undefined && answer !== "",
+    )
+    .map(String);
+}
+
+/** The reason a reviewer wrote for a score, or nothing when they wrote none. */
+function givenReason(reason: unknown): string | null {
+  return typeof reason === "string" && reason ? reason : null;
+}
+
+/**
+ * The scores one reviewer gave, in the order they are stored. A key the
+ * reviewer left blank is not a score they gave, so it is left out entirely.
+ */
+export function annotationScores({
+  annotation,
+  scoreNamesById,
+}: {
+  annotation: Pick<Annotation, "scoreOptions">;
+  /** The project's score names by id. Without it a score reads by its id. */
+  scoreNamesById?: Map<string, string>;
+}): AnnotationScoreAnswer[] {
+  const stored = annotation.scoreOptions as Record<
+    string,
+    { value?: unknown; reason?: unknown } | null
+  > | null;
+  if (!stored || typeof stored !== "object") return [];
+
+  return Object.entries(stored)
+    .map(([scoreId, score]) => ({
+      name: scoreNamesById?.get(scoreId) ?? scoreId,
+      values: answeredValues(score?.value),
+      reason: givenReason(score?.reason),
+    }))
+    .filter((score) => score.values.length > 0);
+}
+
+/** Every score given on the trace, across its reviews. */
+export function countAnnotationScores(
+  annotations: Array<Pick<Annotation, "scoreOptions">>,
+): number {
+  return annotations.reduce(
+    (total, annotation) => total + annotationScores({ annotation }).length,
+    0,
+  );
+}
+
+/**
+ * One reviewer's scores as a single line: what they answered on each score,
+ * with the reason they gave for it. Empty when they scored nothing.
+ */
+export function annotationScoresLine({
+  annotation,
+  scoreNamesById,
+}: {
+  annotation: Pick<Annotation, "scoreOptions">;
+  scoreNamesById?: Map<string, string>;
+}): string | null {
+  const scores = annotationScores({ annotation, scoreNamesById });
+  if (scores.length === 0) return null;
+  return scores
+    .map((score) => {
+      const answered = `${score.name}: ${score.values.join(", ")}`;
+      return score.reason ? `${answered} (${score.reason})` : answered;
+    })
+    .join(" · ");
+}
+
 /**
  * One line of the annotations list, whichever page it is on. A queue page's row
  * is a queue item; the all annotations page's row is a trace with everything

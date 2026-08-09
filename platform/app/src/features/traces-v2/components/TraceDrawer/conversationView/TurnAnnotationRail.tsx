@@ -3,6 +3,7 @@ import { Edit3 } from "lucide-react";
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
+import { useScoreNamesById } from "~/hooks/useScoreNamesById";
 import {
   type AnnotationDraft,
   isTurnRailDraft,
@@ -11,7 +12,6 @@ import {
 } from "../../../stores/annotationDraftStore";
 import { AnnotationCard } from "./AnnotationCard";
 import { AnnotationEditorCard } from "./AnnotationEditorCard";
-import { useScoreNamesById } from "./useScoreNamesById";
 
 interface TurnAnnotationRailProps {
   traceId: string;

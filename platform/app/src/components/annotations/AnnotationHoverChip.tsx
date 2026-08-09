@@ -20,6 +20,7 @@ export function AnnotationHoverChip({
   traceId,
   icon,
   testId,
+  count,
   countLabel,
   textOf,
 }: {
@@ -28,6 +29,11 @@ export function AnnotationHoverChip({
   traceId: string;
   icon: ReactNode;
   testId: string;
+  /**
+   * What the pill counts, when that is not one per entry: a reviewer who gave
+   * three scores is one entry on the hover and three scores on the pill.
+   */
+  count?: number;
   /** What a screen reader hears on the pill, for a given count. */
   countLabel: (count: number) => string;
   /** The writing this chip counts. An annotation without it is left out. */
@@ -35,6 +41,7 @@ export function AnnotationHoverChip({
 }) {
   const [open, setOpen] = useState(false);
   const written = annotations.filter((annotation) => textOf(annotation));
+  const shownCount = count ?? written.length;
 
   if (written.length === 0) return null;
 
@@ -59,11 +66,11 @@ export function AnnotationHoverChip({
           cursor="default"
           width="fit-content"
           data-testid={testId}
-          aria-label={countLabel(written.length)}
+          aria-label={countLabel(shownCount)}
         >
           {icon}
           <Text textStyle="xs" fontWeight="medium">
-            {written.length}
+            {shownCount}
           </Text>
         </HStack>
       </HoverCard.Trigger>
