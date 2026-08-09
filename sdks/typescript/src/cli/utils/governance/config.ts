@@ -93,6 +93,17 @@ export interface GovernanceConfig {
   claude_plugin_last_failure?: number;
 
   /**
+   * Unix epoch (seconds) of the last time a wrapped run checked whether the
+   * installed LangWatch Claude Code plugin is still the published version.
+   * Claude Code leaves auto-update off for third-party marketplaces, so the
+   * wrapper does the checking, and it holds the check to once a day: every run
+   * in between reads this field and stops, which is what keeps a launch from
+   * paying for a repository fetch it almost never needs. Stamped whether the
+   * check found an update or not. Absent = never checked.
+   */
+  claude_plugin_last_update_check?: number;
+
+  /**
    * Per-wrapped-tool routing mode answer.
    *
    *   "gateway"   — Path A: route the tool's HTTP calls through

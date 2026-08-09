@@ -22,6 +22,7 @@ import { getCliBootstrap } from "./cli-api";
 import { createCodexIOStreamer } from "./codex-rollout-otlp";
 import type { GovernanceConfig } from "./config";
 import { isLoggedIn, loadConfig, saveConfig } from "./config";
+import { updateLangwatchClaudePlugin } from "./claude-plugin";
 import {
 	copilotGatewayModelPreflight,
 	copilotPrespawnWarnings,
@@ -564,6 +565,35 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 			tool,
 			vars: modeResult.vars,
 		});
+	}
+
+	// Keep the installed plugin current, whichever tool this run wraps. The
+	// plugin is installed once per machine, not once per tool, so tying its
+	// upkeep to `langwatch claude` would leave it to rot on a machine whose
+	// owner mostly wraps something else. It is stamped to once a day, so nearly
+	// every run reads one config field and moves on, and it runs BEFORE the
+	// spawn so a new version reaches the session this launch is about to start
+	// rather than the one after it. Housekeeping, so it warns and continues.
+	const pluginUpdate = updateLangwatchClaudePlugin({
+		// Said before the work, not after it: the check fetches from a network
+		// that may be slow or half-open, and a launch that pauses without
+		// explanation reads as the wrapper having hung.
+		onCheckStart: () =>
+			process.stderr.write(
+				`${lwTag()} checking whether the LangWatch plugin for Claude Code ` +
+					`is up to date (once a day).\n`,
+			),
+	});
+	if (pluginUpdate.action === "updated") {
+		process.stderr.write(
+			`${lwTag()} updated the LangWatch plugin for Claude Code, ` +
+				`${pluginUpdate.from} to ${pluginUpdate.to}.\n`,
+		);
+	} else if (pluginUpdate.action === "failed") {
+		process.stderr.write(
+			`${lwTag()} couldn't update the LangWatch plugin for Claude Code ` +
+				`(best-effort, continuing): ${pluginUpdate.reason}\n`,
+		);
 	}
 
 	// Scrub conflicting twins from the inherited parent env BEFORE merging

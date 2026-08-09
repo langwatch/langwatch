@@ -180,6 +180,57 @@ describe("readClaudePluginState", () => {
       expect(readClaudePluginState().marketplaceOwnedByLangwatch).toBe(false);
     });
 
+    /** @scenario "A source built to read like ours is not ours" */
+    it("disclaims the addresses built to read like our repository", async () => {
+      // Each of these contains our repository name and belongs to somebody
+      // else. Ownership decides what logout may deregister and what a wrapped
+      // run may pull new plugin code from, so a lookalike that passes here
+      // gets both.
+      const lookalikes = [
+        "https://github.com/langwatch/agent-plugin.evil",
+        "https://evil.example/?repo=langwatch/agent-plugin",
+        "https://evil.example/langwatch/agent-plugin",
+        "https://github.com.evil.example/langwatch/agent-plugin",
+        "https://github.com/langwatch/agent-plugin#/../evil",
+        "/home/someone/checkouts/langwatch/agent-plugin",
+        "file:///home/someone/checkouts/langwatch/agent-plugin",
+        "git@evil.example:langwatch/agent-plugin.git",
+      ];
+
+      for (const url of lookalikes) {
+        writeJson({
+          segments: ["plugins", "known_marketplaces.json"],
+          value: { langwatch: { source: { source: "git", url } } },
+        });
+        const { readClaudePluginState } = await loadModule();
+        expect(
+          readClaudePluginState().marketplaceOwnedByLangwatch,
+          `${url} must not read as ours`,
+        ).toBe(false);
+      }
+    });
+
+    it("claims ownership of the canonical addresses of our repository", async () => {
+      const ours = [
+        "https://github.com/langwatch/agent-plugin",
+        "https://github.com/langwatch/agent-plugin.git",
+        "https://GitHub.com/LangWatch/Agent-Plugin.git",
+        "git@github.com:langwatch/agent-plugin.git",
+      ];
+
+      for (const url of ours) {
+        writeJson({
+          segments: ["plugins", "known_marketplaces.json"],
+          value: { langwatch: { source: { source: "git", url } } },
+        });
+        const { readClaudePluginState } = await loadModule();
+        expect(
+          readClaudePluginState().marketplaceOwnedByLangwatch,
+          `${url} is ours`,
+        ).toBe(true);
+      }
+    });
+
     /** @scenario "A marketplace that only mentions our repository is not ours" */
     it("disclaims a source that only mentions us outside its identifying fields", async () => {
       writeJson({
