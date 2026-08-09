@@ -109,6 +109,17 @@ Feature: Staged automation authoring drawer
       When one of its matches dispatches
       Then the dispatch behaves exactly as before
 
+    # The save-time validation counts any non-empty nested value as a
+    # condition, but the dispatch-time matcher only resolves two levels of
+    # nesting. A shape it cannot evaluate has to fail closed: an automation
+    # whose condition the matcher cannot read must fire on nothing, because
+    # firing on everything is the exact hole this rule closes.
+    @unit
+    Scenario: A condition the matcher cannot evaluate fails closed
+      Given a stored automation whose condition nests deeper than the matcher resolves
+      When a trace is evaluated against it
+      Then the automation does not match
+
   Rule: Notifications configure templates; actions configure destinations
 
     Scenario: An email notification configures recipients and templates

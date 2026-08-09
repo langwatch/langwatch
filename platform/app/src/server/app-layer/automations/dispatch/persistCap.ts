@@ -392,9 +392,13 @@ export async function readPersistCapCounts({
     persistCapKey({ projectId, triggerId, now }),
   );
   let raw: (string | null)[] = keys.map(() => null);
-  if (connection) {
+  const redis = connection;
+  if (redis) {
     try {
-      raw = await connection.mget(...keys);
+      // One GET per key, not one MGET: every trigger's key carries its own
+      // hash tag, so on a Redis Cluster a multi-key read spanning triggers
+      // fails CROSSSLOT, and this catch would render every count as zero.
+      raw = await Promise.all(keys.map((key) => redis.get(key)));
     } catch (error) {
       logger.warn(
         {

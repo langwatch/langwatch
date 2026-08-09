@@ -143,7 +143,17 @@ Feature: Runaway automations are contained without punishing the customer
       Then exactly one breach email is sent for that trigger that day
       And it tells the customer to narrow the condition or raise the plan
 
-    @unit
+    # Every skipped match lands in containment, and the pause decision costs a
+    # ClickHouse distinct-count over 24h of project traffic. The storm is
+    # absorbed by a short claim BEFORE that query: one evaluation per trigger
+    # per window, re-examined through the day as traffic moves.
+    @integration
+    Scenario: A breach storm measures the project's traffic once per window
+      Given a trigger whose matches keep breaching its ceiling
+      When containment handles the storm of breaches
+      Then the project's traffic is measured once for the whole window
+
+    @integration
     Scenario: A breach raises a team metric rather than only a customer email
       Given a trigger that crosses its daily ceiling
       When the breach is handled
@@ -201,7 +211,7 @@ Feature: Runaway automations are contained without punishing the customer
     Scenario: A paused automation stops recording matches
       Given a trigger paused for runaway volume
       When new traces arrive for the project
-      Then the trigger stops recording matches once its cache entry expires
+      Then the trigger stops recording matches immediately, without waiting for its cache entry to expire
 
     @integration
     Scenario: Resuming a paused automation clears the pause reason

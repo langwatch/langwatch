@@ -218,12 +218,41 @@ describe("Feature: runaway automation containment", () => {
       const row = await storeTrigger();
       const sharedDeps = deps();
 
+      // Expiring the evaluation-rate claim between breaches stands in for the
+      // minute between windows: each breach here re-evaluates in full, so the
+      // single mail below is the DAY-long mail claim doing its job, not the
+      // short claim in front of it.
+      const checkClaim = `automation-containment-check:${row.id}`;
       await handlePersistCapBreach(sharedDeps, breach(summary(row), 101));
+      claimed.delete(checkClaim);
       await handlePersistCapBreach(sharedDeps, breach(summary(row), 102));
+      claimed.delete(checkClaim);
       await handlePersistCapBreach(sharedDeps, breach(summary(row), 500));
 
       expect(sentEmails).toHaveLength(1);
       expect(sentEmails[0]).toMatchObject({ kind: "ceiling_reached" });
+    });
+
+    /** @scenario "A breach storm measures the project's traffic once per window" */
+    it("reads the project's traffic once for a whole storm of breaches", async () => {
+      const row = await storeTrigger();
+      const sharedDeps = deps();
+      let trafficReads = 0;
+      sharedDeps.countProjectTraces24h = async () => {
+        trafficReads++;
+        return projectTraces24h;
+      };
+
+      for (let index = 0; index < 5; index++) {
+        await handlePersistCapBreach(
+          sharedDeps,
+          breach(summary(row), 101 + index),
+        );
+      }
+
+      // The pause decision costs a ClickHouse distinct-count over 24h of
+      // traffic. The storm has to be absorbed before that query, not after.
+      expect(trafficReads).toBe(1);
     });
   });
 
@@ -431,30 +460,7 @@ describe("Feature: runaway automation containment", () => {
     });
   });
 
-  describe("when the customer resumes a paused automation", () => {
-    /** @scenario "Resuming a paused automation clears the pause reason" */
-    it("clears both the reason and the pause time", async () => {
-      const row = await storeTrigger({ filters: "{}" });
-      projectTraces24h = 1_000_000;
-      await handlePersistCapBreach(
-        deps(),
-        breach(summary(row, { filters: {} }), 150),
-      );
-
-      // The same write `toggleTrigger` issues when a customer switches it
-      // back on.
-      await triggers.update({
-        triggerId: row.id,
-        projectId: projectId(),
-        data: { active: true, pausedReason: null, pausedAt: null },
-      });
-
-      const after = await prisma.trigger.findUniqueOrThrow({
-        where: { id: row.id, projectId: projectId() },
-      });
-      expect(after.active).toBe(true);
-      expect(after.pausedReason).toBeNull();
-      expect(after.pausedAt).toBeNull();
-    });
-  });
+  // Resuming lives in the tRPC `toggleTrigger` mutation, so the scenario
+  // "Resuming a paused automation clears the pause reason" is bound in the
+  // router suite, where the mutation itself runs.
 });

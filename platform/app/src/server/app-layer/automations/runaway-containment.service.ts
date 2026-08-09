@@ -19,6 +19,14 @@ export { RUNAWAY_PAUSE_REASON };
 export const PAUSE_ATTEMPT_CLAIM_SECONDS = 60;
 
 /**
+ * How long one containment evaluation covers the storm of breaches behind it.
+ * The evaluation includes a ClickHouse count over 24h of project traffic, so
+ * it must not run per skipped match; one minute keeps the pause decision fresh
+ * against moving traffic while capping the query rate per trigger.
+ */
+export const CONTAINMENT_CHECK_CLAIM_SECONDS = 60;
+
+/**
  * Share of a project's 24h traces a single automation's CONFIRMED matches have
  * to cover before we call it misconfigured rather than busy. At 90% the
  * automation is not selecting traces, it is selecting the project.
@@ -121,6 +129,21 @@ export async function handlePersistCapBreach(
       "Automation passed its daily ceiling on confirmed matches; further " +
         "matches are being skipped for the rest of the UTC day",
     );
+
+    // Every skipped match over the ceiling lands here, and a runaway can skip
+    // tens of thousands in a day. The misconfiguration check below costs a
+    // ClickHouse distinct-count over 24h of traffic, so it runs behind a
+    // short claim: at most one evaluation per trigger per minute, which still
+    // re-examines the ratio all day (traffic moves), while the storm's other
+    // thousands of dispatches stop right here at one Redis SET-NX.
+    if (
+      !(await deps.claimOnce(
+        `automation-containment-check:${trigger.id}`,
+        CONTAINMENT_CHECK_CLAIM_SECONDS,
+      ))
+    ) {
+      return;
+    }
 
     const shouldPause = await isMisconfigured(deps, breach);
     if (shouldPause) {

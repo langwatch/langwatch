@@ -278,7 +278,18 @@ function matchField(
     } else if (typeof subValue === "object" && subValue !== null) {
       // Record<string, Record<string, string[]>> — resolve with key + subkey
       for (const [subkey, values] of Object.entries(subValue)) {
-        if (!Array.isArray(values) || values.length === 0) continue;
+        if (!Array.isArray(values)) {
+          // Nesting deeper than key/subkey is a condition this matcher cannot
+          // evaluate. Counting it as actionable makes the field fail closed:
+          // the recursive save-time validation accepts the shape as "a
+          // condition", so treating it as vacuous here would turn it into a
+          // match-everything automation, the exact hole the validation closes.
+          if (filterValueHasActionableCondition(values)) {
+            hasActionableCondition = true;
+          }
+          continue;
+        }
+        if (values.length === 0) continue;
         hasActionableCondition = true;
         if (matchSimpleArray(traceData, field, values, key, subkey)) {
           return true;
