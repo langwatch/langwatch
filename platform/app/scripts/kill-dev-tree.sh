@@ -32,7 +32,7 @@ fi
 # How long the stack gets to go down on its own before SIGKILL.
 GRACE_SECONDS="${KILL_DEV_TREE_GRACE:-5}"
 
-OWN_PGID=$(ps -o pgid= -p $$ 2>/dev/null | tr -d ' ')
+OWN_PGID=$(ps -p $$ -o pgid= 2>/dev/null | tr -d ' ')
 
 if ! command -v lsof >/dev/null 2>&1 && ! command -v ss >/dev/null 2>&1; then
   echo "need lsof or ss to find what is holding ${PORTS}" >&2
@@ -52,7 +52,9 @@ done
 # exits 0 with no output for a port that is genuinely free, so a non-zero status
 # is unambiguously a broken lookup and we stop rather than guess. lsof gets no
 # such treatment: it returns 1 both for "found nothing" and for real errors, so
-# its status carries nothing to act on.
+# its status carries nothing to act on. The flag that would separate the two,
+# `-Q`, is newer than the 4.91 macOS ships, and acting on the status without it
+# would refuse every genuinely free port on a Mac.
 port_busy() {
   local found
   if command -v lsof >/dev/null 2>&1; then
@@ -68,12 +70,54 @@ port_busy() {
 
 # Whatever is listening on those ports. lsof is what the rest of the dev
 # scripts use; ss covers the Linux hosts that ship iproute2 and not lsof.
+# A failing `ss` is reported the same way it is in port_busy: an empty answer
+# from a lookup that broke is not "nobody is listening". It returns that as a
+# status rather than exiting, because every caller reads it through a pipe and
+# an `exit` there would leave only the subshell, with the script carrying on
+# over an answer it just said it did not have.
 listening_pids() {
+  local found
   if command -v lsof >/dev/null 2>&1; then
     lsof -t -a -iTCP:"$PORTS" -sTCP:LISTEN 2>/dev/null
+    # Its own 1 means "found nothing", which is an answer, not a failure.
+    return 0
+  fi
+  if ! found=$(ss -ltnpH "( ${SS_FILTER} )" 2>/dev/null); then
+    echo "ss could not inspect ${PORTS}, refusing to guess whether it is free" >&2
+    return 69
+  fi
+  printf '%s\n' "$found" | grep -o 'pid=[0-9]*' | cut -d= -f2
+  # Likewise for grep: no pids in the output is a result, and under pipefail
+  # its 1 would otherwise come back as a broken lookup.
+  return 0
+}
+
+# What a pid was started as, down to the bare binary name. Linux answers from
+# /proc, which is authoritative and needs no output parsing at all; ps is the
+# fallback for macOS, where `comm` is the same argv[0] spelled as a full path.
+# Reading `comm` as if it were already the bare name is what made this miss node
+# processes it had correctly found, because on macOS it never is.
+lane_binary() {
+  local argv0
+  if [ -r "/proc/$1/cmdline" ]; then
+    argv0=$(tr '\0' '\n' <"/proc/$1/cmdline")
+    argv0=${argv0%%$'\n'*}
+  else
+    argv0=$(ps -p "$1" -o comm= 2>/dev/null)
+  fi
+  echo "${argv0##*/}"
+}
+
+# The whole command line, for saying what we saw rather than only how we
+# classified it. `args` alongside `comm` on macOS because the two disagree:
+# one is the binary, the other is what it was told to run.
+describe_pid() {
+  if [ -r "/proc/$1/cmdline" ]; then
+    tr '\0' ' ' <"/proc/$1/cmdline"
     return
   fi
-  ss -ltnpH "( ${SS_FILTER} )" 2>/dev/null | grep -o 'pid=[0-9]*' | cut -d= -f2
+  ps -p "$1" -o comm= 2>/dev/null
+  ps -p "$1" -o args= 2>/dev/null
 }
 
 # The process groups behind those listeners, node ones only, so a port that
@@ -81,16 +125,31 @@ listening_pids() {
 # Never our own group either: this is usually pasted into the very shell that
 # is about to retry `pnpm dev`, and closing that would be its own surprise.
 listening_groups() {
-  listening_pids | sort -u | while read -r pid; do
-    case "$(ps -o comm= -p "$pid" 2>/dev/null)" in
-      *node*) ;;
+  printf '%s\n' "$LISTENERS" | while read -r pid; do
+    [ -n "$pid" ] || continue
+    # The node binary itself, not a command line with "node" somewhere in it:
+    # node_exporter holds a port, and so does anything running node-config.py,
+    # and neither is a dev lane. The digits cover distros that install node
+    # under its major version, and `nodejs` covers Debian's spelling.
+    case "$(lane_binary "$pid")" in
+      node | nodejs | node[0-9]*) ;;
       *) continue ;;
     esac
-    pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')
+    pgid=$(ps -p "$pid" -o pgid= 2>/dev/null | tr -d ' ')
     [ -n "$pgid" ] || continue
     [ "$pgid" -gt 1 ] 2>/dev/null || continue
     if [ "$pgid" != "$OWN_PGID" ]; then echo "$pgid"; fi
   done | sort -u
+}
+
+# What we saw but did not claim, so "not a node process of ours" is a finding
+# rather than an assertion. Without this the message is the same whether the
+# port really belongs to someone else or we simply failed to identify it.
+describe_listeners() {
+  printf '%s\n' "$LISTENERS" | while read -r pid; do
+    [ -n "$pid" ] || continue
+    echo "${pid}:$(describe_pid "$pid" | tr '\n' ' ' | cut -c1-60)"
+  done | tr '\n' ' '
 }
 
 # Whether any member of the group is still running, asked of the process table
@@ -98,7 +157,7 @@ listening_groups() {
 # Zombies deliberately do not count: they hold no port and no memory, and a
 # leader whose parent has not reaped it yet would otherwise read as alive.
 group_alive() {
-  ps -Ao pgid=,stat= 2>/dev/null |
+  ps -Ao pgid= -o stat= 2>/dev/null |
     awk -v want="$1" '$1 == want && $2 !~ /^Z/ { alive = 1 } END { exit !alive }'
 }
 
@@ -121,13 +180,20 @@ signal_groups() {
   done
 }
 
+# Asked once, so the group we take down and the listeners we name in a failure
+# are the same moment rather than two lookups that can disagree.
+if ! LISTENERS=$(listening_pids); then
+  exit 69
+fi
+LISTENERS=$(printf '%s\n' "$LISTENERS" | sort -u)
+
 targets=$(listening_groups)
 if [ -z "$targets" ]; then
   # Nothing to signal, but that is two different situations and only one of
   # them is good news. Saying "free" over a port we simply could not attribute
   # is how a takedown reports success and leaves the stack running.
   if port_busy; then
-    echo "something is listening on ${PORTS} that is not a node process of ours, leaving it alone" >&2
+    echo "something is listening on ${PORTS} that is not a node process of ours, leaving it alone (saw: $(describe_listeners))" >&2
     exit 1
   fi
   echo "nothing of ours is listening on ${PORTS}"

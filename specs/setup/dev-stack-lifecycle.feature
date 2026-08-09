@@ -159,6 +159,13 @@ Feature: A dev stack does not outlive whoever started it
     Then it says it could not look and fails, rather than reporting them free
 
   @unit
+  Scenario: A listener that cannot be attributed is not blamed on a stranger
+    Given the port lookup can see a listener but not which process holds it
+    When the ports are cleared
+    Then it says it could not look and fails, rather than calling the port someone else's
+    And nothing is stopped
+
+  @unit
   Scenario: A port held by something we did not start is reported, not claimed
     Given one of the ports is held by a process that is not a dev stack of ours
     When the ports are cleared
