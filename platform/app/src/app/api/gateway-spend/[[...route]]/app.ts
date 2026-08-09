@@ -93,12 +93,35 @@ async function requireBillingPlan(c: Context, next: Next): Promise<void> {
   await next();
 }
 
+/**
+ * One end of a read window, in milliseconds.
+ *
+ * The unit is published rather than left to the reader: seconds and
+ * milliseconds are both plausible for a bare integer, and a caller who picks
+ * the wrong one gets a valid-looking response over the wrong window instead of
+ * an error. An epoch in seconds lands in 1970 and reads as empty.
+ *
+ * Bounded by hand rather than with `.safe()`, which publishes a symmetric
+ * minimum of -9007199254740991 and so documents a negative epoch as
+ * acceptable while the server refuses it.
+ */
+const epochMs = z.coerce
+  .number()
+  .int()
+  .positive()
+  .max(Number.MAX_SAFE_INTEGER)
+  .openapi({
+    description:
+      "Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error.",
+    example: 1782864000000,
+  });
+
 const spendEventsQuerySchema = z
   .object({
     // The reconciliation pull is a RANGED read by contract: without bounds
     // the walk sorts the whole 13-month table under FINAL on every page.
-    from: z.coerce.number().int().positive().safe(),
-    to: z.coerce.number().int().positive().safe(),
+    from: epochMs,
+    to: epochMs,
     cursor: z.string().max(500).optional(),
     limit: z.coerce.number().int().positive().max(200).optional().default(50),
     ...spendFilterQueryShape,
@@ -350,8 +373,8 @@ const spendSummariesQuerySchema = z
       .optional()
       .default("UTC"),
     allow_unstable: queryBoolean,
-    from: z.coerce.number().int().positive().safe(),
-    to: z.coerce.number().int().positive().safe(),
+    from: epochMs,
+    to: epochMs,
     cursor: z.string().max(500).optional(),
     limit: z.coerce.number().int().positive().max(1000).optional().default(500),
     ...spendFilterQueryShape,
@@ -391,12 +414,25 @@ secured.access(requires("gatewaySpend:view")).get(
     const organization = c.get("organization") as Organization;
     const query = c.req.valid("query");
     // Same contract as /spend-events: a present-but-garbled cursor is refused
-    // rather than silently restarting the walk from the first key.
-    if (
-      query.cursor !== undefined &&
-      decodeSpendSummariesCursor(query.cursor) === null
-    ) {
-      throw new BadRequestError("Invalid cursor.");
+    // rather than silently restarting the walk from the first key. A cursor
+    // that decodes but names a different number of dimensions is refused for
+    // the same reason: it belongs to a walk over another shape, and carrying
+    // on without it would re-serve the first page under a fresh cursor with
+    // nothing in the response to say the walk had reset. That reaches a
+    // caller who changed `group_by` or `bucket` mid-walk, and a caller
+    // holding a cursor minted before a rollup could group by two dimensions.
+    if (query.cursor !== undefined) {
+      const parts = decodeSpendSummariesCursor(query.cursor);
+      const dimensionCount =
+        query.group_by.length + (query.bucket === "none" ? 0 : 1);
+      if (parts === null) {
+        throw new BadRequestError("Invalid cursor.");
+      }
+      if (parts.length !== dimensionCount) {
+        throw new BadRequestError(
+          "This cursor belongs to a walk over a different grouping. Start a new walk without a cursor.",
+        );
+      }
     }
     assertGroupingIsWalkable({
       keys: query.group_by,

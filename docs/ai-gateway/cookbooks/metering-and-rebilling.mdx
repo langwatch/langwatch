@@ -170,7 +170,7 @@ curl -sS "$LW/api/gateway/v1/spend-summaries?group_by=model,end_user\
   -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY"
 ```
 
-`metadata` is written `key:value` and splits on the first colon, so a value may contain colons of its own. A key may not, and both halves must be non-empty. Repeating a key widens that key: `metadata=tier:gold&metadata=tier:silver` matches either.
+`metadata` is written `key:value` and splits on the first colon, so a value may contain colons of its own. A key may not contain a colon, and both halves must be non-empty. Repeating a key widens that key: `metadata=tier:gold&metadata=tier:silver` matches either.
 
 `group_by` takes one or two dimensions and `bucket=hour|day` adds a time column in the `timezone` you name. `key` stays the first dimension's value, so an integration written against the single-dimension response keeps working; read `group` to tell two dimensions apart.
 

@@ -1163,6 +1163,78 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
       // wrong instead of on a toast that says something failed.
       expect(error.meta?.fields).toEqual(["allow_unstable"]);
     });
+
+    /** @scenario "A cursor from another grouping is refused, not silently restarted" */
+    it("refuses a cursor whose arity belongs to a different grouping", async () => {
+      // Page one under a single dimension, then hand its cursor back asking
+      // for two. Serving that would re-run page one under a fresh cursor with
+      // nothing saying the walk reset, and the checksum would count those
+      // groups twice.
+      const first = await summaries({
+        group_by: "end_user",
+        limit: 1,
+        ...settled(),
+      });
+      expect(first.status).toBe(200);
+      const cursor = ((await first.json()) as { next_cursor: string | null })
+        .next_cursor;
+      expect(cursor).not.toBeNull();
+
+      const res = await summaries({
+        group_by: "end_user,virtual_key",
+        cursor: cursor!,
+        ...settled(),
+      });
+
+      await expectCanonicalError(res, { status: 400 });
+
+      // A bucket adds a dimension too, so the same cursor is equally wrong
+      // against a bucketed walk over the very grouping that minted it.
+      const bucketed = await summaries({
+        group_by: "end_user",
+        bucket: "day",
+        cursor: cursor!,
+        ...settled(),
+      });
+      await expectCanonicalError(bucketed, { status: 400 });
+
+      // The control: the cursor still works for the walk it belongs to.
+      const resumed = await summaries({
+        group_by: "end_user",
+        limit: 1,
+        cursor: cursor!,
+        ...settled(),
+      });
+      expect(resumed.status).toBe(200);
+    });
+
+    /** @scenario "A time zone the store cannot load is refused at the door" */
+    it("refuses a fixed offset in place of a named zone, naming the field", async () => {
+      // The runtime builds a formatter for `+05:00` happily; ClickHouse loads
+      // zones by name only and answers "Cannot load time zone +05:00". Left to
+      // reach the store, a value the caller chose comes back as an unknown
+      // error from somewhere they cannot see.
+      const res = await summaries({
+        group_by: "end_user",
+        bucket: "day",
+        timezone: "+05:00",
+        ...settled(),
+      });
+
+      const error = await expectCanonicalError(res, {
+        status: 400,
+        code: "validation_error",
+      });
+      expect(error.meta?.fields).toEqual(["timezone"]);
+
+      const named = await summaries({
+        group_by: "end_user",
+        bucket: "day",
+        timezone: "Europe/Amsterdam",
+        ...settled(),
+      });
+      expect(named.status).toBe(200);
+    });
   });
 
   // Through both routes, because the contradiction only exists between them:
@@ -1197,10 +1269,13 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
       ]);
     });
 
-    const read = async (
-      path: string,
-      query: Record<string, string | number>,
-    ): Promise<Response> =>
+    const read = async ({
+      path,
+      query,
+    }: {
+      path: string;
+      query: Record<string, string | number>;
+    }): Promise<Response> =>
       await app.request(
         `/api/gateway/v1/${path}?${new URLSearchParams(
           Object.entries({
@@ -1214,7 +1289,10 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
 
     /** @scenario "The rollups refuse a status they can only answer with zero" */
     it("serves the in-flight envelopes on the events read", async () => {
-      const res = await read("spend-events", { status: "admitted" });
+      const res = await read({
+        path: "spend-events",
+        query: { status: "admitted" },
+      });
 
       expect(res.status).toBe(200);
       const body = (await res.json()) as {
@@ -1228,9 +1306,9 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
 
     /** @scenario "The rollups refuse a status they can only answer with zero" */
     it("refuses the identical narrowing on the rollups, naming the field", async () => {
-      const res = await read("spend-summaries", {
-        status: "admitted",
-        group_by: "virtual_key",
+      const res = await read({
+        path: "spend-summaries",
+        query: { status: "admitted", group_by: "virtual_key" },
       });
 
       const error = await expectCanonicalError(res, {
@@ -1244,9 +1322,9 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
 
     /** @scenario "The rollups refuse a status they can only answer with zero" */
     it("still accepts a completed status on the rollups", async () => {
-      const res = await read("spend-summaries", {
-        status: "confirmed",
-        group_by: "virtual_key",
+      const res = await read({
+        path: "spend-summaries",
+        query: { status: "confirmed", group_by: "virtual_key" },
       });
 
       expect(res.status).toBe(200);

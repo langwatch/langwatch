@@ -63,15 +63,24 @@ export const SPEND_BUCKETS = ["none", "hour", "day"] as const;
 export type SpendBucket = (typeof SPEND_BUCKETS)[number];
 
 /**
- * Whether the runtime knows this zone.
+ * Whether this is a named zone the runtime knows.
  *
  * Asked before the query is built so an unknown zone is a 400 naming
  * `timezone`. ClickHouse would otherwise refuse it in `formatDateTime` and the
- * caller would read an unknown error about a value they chose. The check is a
- * construction attempt rather than a list, because the zone database ships
- * with the runtime and any list here would go stale against it.
+ * caller would read an unknown error about a value they chose. Existence is
+ * checked by a construction attempt rather than against a list, because the
+ * zone database ships with the runtime and any list here would go stale
+ * against it.
+ *
+ * A fixed offset is refused even though the runtime accepts it. `Intl` takes
+ * `+05:00`, `+0500` and `-08:00`; ClickHouse loads zones by name only and
+ * answers `Cannot load time zone +05:00`, which would reach the caller as an
+ * unknown error rather than the documented refusal. Every named zone starts
+ * with a letter and no offset spelling does, so the first character settles
+ * it.
  */
 export function isIanaTimeZone(zone: string): boolean {
+  if (!/^[A-Za-z]/.test(zone)) return false;
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: zone });
     return true;

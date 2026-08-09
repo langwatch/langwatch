@@ -1596,7 +1596,7 @@ const presentations = {
       const when = settlesAt
         ? ` Requests in this range finish arriving at ${settlesAt}.`
         : "";
-      return `Recent requests can still change which model or provider they are counted under, so grouping this way now could count some twice and miss others. Ask for an older range, group by key or end user instead, or allow an approximate read if you only need a rough shape.${when}`;
+      return `Recent requests can still change which model or provider they are counted under, and which time bucket they fall in, so grouping this way now could count some twice and miss others. Ask for an older range, group by key or end user instead, or allow an approximate read if you only need a rough shape.${when}`;
     },
   },
   gateway_scope_org_mismatch: {

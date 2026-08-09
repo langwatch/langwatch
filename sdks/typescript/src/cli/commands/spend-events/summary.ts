@@ -66,6 +66,28 @@ const GROUP_LABELS: Record<string, string> = {
 };
 
 /**
+ * What the row count after the walk is a count OF.
+ *
+ * A dimension's own noun is only true when the walk has one dimension and no
+ * time bucket. Add a second dimension or an hour column and each row is a
+ * combination, so calling twelve model-by-hour rows "12 models" states
+ * something the data does not say, on a surface whose whole job is being
+ * exactly right about counts.
+ */
+export function summaryCountNoun({
+  groupBy,
+  bucket,
+}: {
+  groupBy: string[];
+  bucket?: string;
+}): string {
+  const countsOneDimension =
+    groupBy.length === 1 && (bucket === undefined || bucket === "none");
+  if (!countsOneDimension) return "rows";
+  return GROUP_LABELS[groupBy[0] ?? "virtual_key"] ?? "groups";
+}
+
+/**
  * Refuse a value the API does not accept, naming what it does. A typo must
  * not silently become a different report on a billing reconciliation surface,
  * and finding that out from a server 400 is finding it out too late.
@@ -201,8 +223,9 @@ export const spendSummaryCommand = async (options: {
       data.push(row);
     }
     const settled = data.reduce((sum, row) => sum + row.settled_count, 0);
+    const noun = summaryCountNoun({ groupBy, bucket });
     spinner.succeed(
-      `${data.length} ${GROUP_LABELS[groupBy[0] ?? "virtual_key"] ?? "groups"}${settled > 0 ? chalk.yellow(`, ${settled} settled request${settled !== 1 ? "s" : ""} unpriced`) : ""}`,
+      `${data.length} ${noun}${settled > 0 ? chalk.yellow(`, ${settled} settled request${settled !== 1 ? "s" : ""} unpriced`) : ""}`,
     );
     return {
       data,

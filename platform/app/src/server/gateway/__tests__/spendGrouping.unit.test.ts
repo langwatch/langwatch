@@ -7,6 +7,7 @@ import { settlementGraceMs } from "~/server/event-sourcing/pipelines/gateway-spe
 
 import {
   assertGroupingIsWalkable,
+  isIanaTimeZone,
   isMovableGroupBy,
   windowHasSettled,
 } from "../spendGrouping";
@@ -149,6 +150,34 @@ describe("given a spend rollup grouping", () => {
       expect(meta.settles_at).toBe(
         new Date(LIVE_WINDOW_END + GRACE_MS).toISOString(),
       );
+    });
+  });
+
+  describe("when a time zone is named", () => {
+    it("accepts the named zones the store can load", () => {
+      for (const zone of ["UTC", "Europe/Amsterdam", "Etc/GMT+5", "Zulu"]) {
+        expect(isIanaTimeZone(zone), zone).toBe(true);
+      }
+    });
+
+    /** @scenario "A time zone the store cannot load is refused at the door" */
+    it("refuses a fixed offset the runtime would otherwise accept", () => {
+      // Every spelling below builds an Intl formatter without complaint, and
+      // every one makes ClickHouse answer "Cannot load time zone". Accepting
+      // them here turns a value the caller chose into an unknown error thrown
+      // from a place they cannot see.
+      for (const offset of ["+05:00", "+0500", "-08:00", "+05"]) {
+        expect(
+          () => new Intl.DateTimeFormat("en-US", { timeZone: offset }),
+          offset,
+        ).not.toThrow();
+        expect(isIanaTimeZone(offset), offset).toBe(false);
+      }
+    });
+
+    it("still refuses a name no zone database has", () => {
+      expect(isIanaTimeZone("Nowhere/Special")).toBe(false);
+      expect(isIanaTimeZone("")).toBe(false);
     });
   });
 });

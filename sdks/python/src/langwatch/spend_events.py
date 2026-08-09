@@ -74,7 +74,18 @@ def _spend_filter_params(filters: Mapping[str, Any]) -> Dict[str, Any]:
     if metadata:
         pairs = []
         for key, value in metadata.items():
+            # The API splits a pair on its FIRST colon, so a key carrying one
+            # would silently address a different key and report spend for a
+            # filter nobody wrote. The TypeScript SDK and the CLI both refuse
+            # it; refusing here keeps the three clients on one contract.
+            if ":" in key:
+                raise ValueError(f"A metadata key cannot contain a colon: {key}")
             values = value if isinstance(value, (list, tuple)) else [value]
+            # An empty value would send `tier:`, which the server refuses,
+            # because a missing map key reads back as the type default and
+            # would match every request that lacks the key entirely.
+            if any(one == "" for one in values):
+                raise ValueError(f"A metadata value cannot be empty: {key}")
             pairs.extend(f"{key}:{one}" for one in values)
         params["metadata"] = pairs
     status = filters.get("status")

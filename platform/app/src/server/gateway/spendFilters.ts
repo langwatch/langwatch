@@ -60,26 +60,38 @@ export const spendSummaryStatusFilter = spendStatusFilter.exclude([
 export const SPEND_SUMMARY_STATUS_DESCRIPTION =
   "Narrow to one lifecycle status. `admitted` is not accepted here: a rollup sums the cost of requests past admission, and an admitted request is still in flight with no cost of its own yet. Ask /spend-events for those.";
 
-/** Legacy filter vocabulary ("success"/"error") maps onto the lifecycle
- *  statuses so pre-pipeline API clients keep working. */
+/**
+ * The pre-pipeline spellings, and the lifecycle status each one means. A Map
+ * rather than an object literal because the lookup key is caller data, and an
+ * object would answer `constructor` with a function.
+ */
+const LEGACY_STATUS_ALIASES = new Map<string, SpendEventStatus>([
+  ["success", "confirmed"],
+  ["error", "failed"],
+]);
+
+/**
+ * The lifecycle status a filter token names, DERIVED from
+ * {@link SPEND_STATUS_FILTERS} rather than restated. Restating it would let
+ * the boundary accept a status this rejects: a new entry in the tuple would
+ * pass `spendStatusFilter` and then throw here, turning a validated request
+ * into a 500.
+ */
 export function normalizeStatusFilter(
   status: string,
 ): SpendEventStatus | undefined {
-  if (status === "success") return "confirmed";
-  if (status === "error") return "failed";
   if (status === "") return undefined;
-  if (
-    status === "admitted" ||
-    status === "confirmed" ||
-    status === "failed" ||
-    status === "settled"
-  ) {
-    return status;
+  const alias = LEGACY_STATUS_ALIASES.get(status);
+  if (alias !== undefined) return alias;
+  if ((SPEND_STATUS_FILTERS as readonly string[]).includes(status)) {
+    // Everything in the tuple that is not an alias IS a lifecycle status, and
+    // the aliases are answered above.
+    return status as SpendEventStatus;
   }
   // An unknown non-empty token is a caller bug: throwing beats silently
   // dropping the filter on a surface that feeds downstream billers.
   throw new Error(
-    `Unknown spend status filter "${status}"; expected success, error, admitted, confirmed, failed, or settled`,
+    `Unknown spend status filter "${status}"; expected ${SPEND_STATUS_FILTERS.join(", ")}`,
   );
 }
 
@@ -188,6 +200,16 @@ export function parseMetadataFilters(raw: string[]): SpendMetadataFilter[] {
   const byKey = new Map<string, string[]>();
   for (const pair of raw) {
     const separator = pair.indexOf(":");
+    // The same rule {@link metadataPair} enforces, restated for callers that
+    // reach this function without it. Slicing on an absent colon is silently
+    // wrong rather than empty: `"tier"` has `indexOf` -1, so the key becomes
+    // `"tie"` and the value the whole token, and the caller reads spend for a
+    // filter nobody wrote.
+    if (separator <= 0 || separator === pair.length - 1) {
+      throw new Error(
+        `metadata must be written key:value, with both sides non-empty: "${pair}"`,
+      );
+    }
     const key = pair.slice(0, separator);
     const value = pair.slice(separator + 1);
     const existing = byKey.get(key);

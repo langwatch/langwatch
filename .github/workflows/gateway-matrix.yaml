@@ -40,6 +40,11 @@ on:
         type: string
         default: ''
   pull_request:
+    # `ready_for_review` on top of the defaults, because the job below
+    # skips drafts: without it a PR opened as a draft and then marked
+    # ready never runs the matrix until someone happens to push again,
+    # and the gap is invisible.
+    types: [opened, synchronize, reopened, ready_for_review]
     # Only fire when gateway-relevant code or this workflow itself
     # changes — doc-only / unrelated PRs stay free.
     paths:
@@ -73,7 +78,12 @@ concurrency:
   # run time: a run parked here evicts a real PR's queued run even
   # when its own job never executes, so finishing in seconds is no
   # mitigation. Entering the group at all is the harm.
-  group: ${{ (github.event_name == 'pull_request' && (github.event.pull_request.draft || github.event.pull_request.head.repo.fork || startsWith(github.head_ref, 'release-please--') || startsWith(github.head_ref, 'dependabot/'))) && format('gateway-matrix-idle-{0}', github.head_ref) || 'gateway-matrix-shared-vks' }}
+  #
+  # The two automation exemptions take the branch prefix AND the
+  # account that opened the PR, so a human branch that happens to be
+  # named `dependabot/...` keeps its gateway coverage instead of
+  # silently losing it to a name.
+  group: ${{ (github.event_name == 'pull_request' && (github.event.pull_request.draft || github.event.pull_request.head.repo.fork || (startsWith(github.head_ref, 'release-please--') && github.event.pull_request.user.login == 'langwatch-agent') || (startsWith(github.head_ref, 'dependabot/') && github.event.pull_request.user.login == 'dependabot[bot]'))) && format('gateway-matrix-idle-{0}', github.head_ref) || 'gateway-matrix-shared-vks' }}
   cancel-in-progress: false
 
 jobs:
@@ -94,12 +104,20 @@ jobs:
     # Actions one, so the matrix either bills real provider calls for a
     # SHA bump or goes green on empty credentials, and neither answers
     # a question about the gateway.
+    #
+    # Both automation exemptions require the opening account as well as
+    # the branch prefix: a branch name is chosen by whoever pushes it,
+    # so on its own it decides coverage by string rather than by who
+    # actually raised the PR. Requiring both can only ever run the
+    # matrix more often, which is the safe direction to fail in.
     if: |
       github.event_name != 'pull_request' ||
       (github.event.pull_request.draft == false &&
        github.event.pull_request.head.repo.fork == false &&
-       !startsWith(github.head_ref, 'release-please--') &&
-       !startsWith(github.head_ref, 'dependabot/'))
+       !(startsWith(github.head_ref, 'release-please--') &&
+         github.event.pull_request.user.login == 'langwatch-agent') &&
+       !(startsWith(github.head_ref, 'dependabot/') &&
+         github.event.pull_request.user.login == 'dependabot[bot]'))
     env:
       GATEWAY_URL: http://localhost:5563
       LW_BASE_URL: http://localhost:5560

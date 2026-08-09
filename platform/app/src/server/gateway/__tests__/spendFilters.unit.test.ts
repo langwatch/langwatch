@@ -7,7 +7,10 @@ import type { z } from "zod";
 import {
   buildSpendFilterClauses,
   intersectIds,
+  MAX_FILTER_VALUES,
+  normalizeStatusFilter,
   parseMetadataFilters,
+  SPEND_STATUS_FILTERS,
   spendFilterQueryShape,
   spendFiltersSchema,
 } from "../spendFilters";
@@ -74,6 +77,31 @@ describe("given the shared spend filter vocabulary", () => {
 
     it("refuses a pair with no colon at all", () => {
       expect(() => spendFilterQueryShape.metadata.parse("tier")).toThrow();
+    });
+
+    /** @scenario "A metadata pair with no colon is refused, not re-cut" */
+    it("refuses a colon-less pair at the function, not only at the schema", () => {
+      // Slicing on an absent colon is silently wrong rather than empty:
+      // indexOf answers -1, so `tier` would become key `tie` with value
+      // `tier`, and the caller would read spend for a filter nobody wrote.
+      expect(() => parseMetadataFilters(["tier"])).toThrow();
+      expect(() => parseMetadataFilters([":gold"])).toThrow();
+      expect(() => parseMetadataFilters(["tier:"])).toThrow();
+    });
+
+    /** @scenario "One filter may not name unbounded values" */
+    it("refuses more values than one filter may name", () => {
+      // Each value becomes an element of a bound ClickHouse array and each
+      // metadata entry a predicate of its own, so an unbounded repeat is an
+      // unbounded query on a billing read.
+      const tooMany = Array.from(
+        { length: MAX_FILTER_VALUES + 1 },
+        (_, index) => `m${index}`,
+      );
+      expect(() => spendFilterQueryShape.model.parse(tooMany)).toThrow();
+      expect(
+        issuePaths(spendFiltersSchema.safeParse({ models: tooMany })),
+      ).toEqual(["models"]);
     });
   });
 
@@ -171,6 +199,22 @@ describe("given the shared spend filter vocabulary", () => {
         filters: { status: "success" },
       });
       expect(params.status).toBe("confirmed");
+    });
+
+    /** @scenario "Every status the surface publishes can be narrowed on" */
+    it("resolves every published status rather than a hand-copied subset", () => {
+      // The boundary validates against SPEND_STATUS_FILTERS and the SQL
+      // builder resolves through normalizeStatusFilter. Written out
+      // separately, a status added to the published list would pass the door
+      // and then throw inside, turning a validated request into a 500.
+      for (const status of SPEND_STATUS_FILTERS) {
+        expect(() => normalizeStatusFilter(status), status).not.toThrow();
+        expect(normalizeStatusFilter(status), status).toBeDefined();
+      }
+      expect(() => normalizeStatusFilter("pending")).toThrow();
+      // An object lookup would answer this with a function off the prototype
+      // and hand it back as if it were a status.
+      expect(() => normalizeStatusFilter("constructor")).toThrow();
     });
   });
 

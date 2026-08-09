@@ -217,8 +217,13 @@ function summaryDimensions({
  * Tuple comparison over the grouping expressions: the one predicate that
  * advances a multi-dimension walk without serving a boundary group twice.
  *
- * A cursor whose arity no longer matches the grouping is ignored rather than
- * mixed in, since it names a walk over a different shape entirely.
+ * A cursor whose arity does not match the grouping names a walk over a
+ * different shape entirely, and is refused. Dropping the predicate instead
+ * would serve page one again under a fresh cursor, with nothing in the
+ * response to say the walk had reset, and a reconciliation would fold the
+ * same groups into its checksum twice. The REST boundary refuses this by
+ * comparing the two before the read, so anything reaching here is a caller
+ * bug.
  */
 function summariesWalkClause({
   cursor,
@@ -227,7 +232,12 @@ function summariesWalkClause({
   cursor: string[] | null;
   dimensions: SummaryDimension[];
 }): { clause: string; params: Record<string, unknown> } | null {
-  if (cursor === null || cursor.length !== dimensions.length) return null;
+  if (cursor === null) return null;
+  if (cursor.length !== dimensions.length) {
+    throw new Error(
+      `cursor names a walk over ${cursor.length} dimension(s); this request groups by ${dimensions.length}`,
+    );
+  }
   const left = dimensions.map((d) => d.expression).join(", ");
   const right = cursor.map((_, index) => `{cursor${index}:String}`).join(", ");
   const params: Record<string, unknown> = {};

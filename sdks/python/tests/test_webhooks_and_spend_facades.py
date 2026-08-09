@@ -297,6 +297,27 @@ def test_metadata_filters_ride_as_key_colon_value():
     assert sorted(seen) == ["region:eu", "tier:gold", "tier:silver"]
 
 
+def test_a_metadata_key_carrying_a_colon_is_refused_rather_than_sent():
+    """The API splits a pair on its FIRST colon, so `{"a:b": "c"}` would ride
+    as `a:b:c` and be read as key `a`, value `b:c`: spend for a filter the
+    caller never wrote, with no error to say so. The TypeScript SDK and the
+    CLI both refuse it, so this one does too."""
+
+    def handler(request: httpx.Request) -> httpx.Response:  # pragma: no cover
+        raise AssertionError("the request should never have been sent")
+
+    facade = SpendEventsFacade(FakeRestClient(handler))
+
+    with pytest.raises(ValueError, match="colon"):
+        facade.list_page(from_ms=1, to_ms=2, metadata={"a:b": "c"})
+
+    # An empty value is refused for the same class of reason: a missing map
+    # key reads back as the type default, so `tier:` would match every
+    # request that carries no `tier` at all.
+    with pytest.raises(ValueError, match="empty"):
+        facade.list_page(from_ms=1, to_ms=2, metadata={"tier": ""})
+
+
 def test_summaries_page_joins_the_grouping_and_carries_the_bucket():
     """Two dimensions go on the wire comma-separated, and a bucket needs the
     zone its boundaries fall on or a day means something different per
@@ -371,13 +392,22 @@ def test_the_facade_offers_every_filter_the_published_contract_publishes():
     )
     spec = json.loads(spec_path.read_text())
 
-    operation = spec["paths"]["/api/gateway/v1/spend-events"]["get"]
-    published = {p["name"] for p in operation["parameters"] if p["in"] == "query"}
-    # Paging and windowing are not filters.
-    published -= {"from", "to", "cursor", "limit"}
-
     offered = set(_FILTER_PARAMS) | {"metadata", "status"}
-    assert offered == published
+    # Paging and windowing are not filters, and the rollup controls shape a
+    # rollup rather than narrowing one.
+    not_a_filter = {"from", "to", "cursor", "limit"}
+    rollup_only = {"group_by", "bucket", "timezone", "allow_unstable"}
+
+    # Both reads, because the facade sends the same filter parameters to each:
+    # a filter published on the rollups alone would be just as unreachable.
+    for path in (
+        "/api/gateway/v1/spend-events",
+        "/api/gateway/v1/spend-summaries",
+    ):
+        operation = spec["paths"][path]["get"]
+        published = {p["name"] for p in operation["parameters"] if p["in"] == "query"}
+        published -= not_a_filter | rollup_only
+        assert offered == published, path
 
 
 def test_a_movable_grouping_surfaces_the_refusal_code():

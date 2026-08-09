@@ -135,9 +135,18 @@ describe("given the two gateway spend reads", () => {
       // A caller who sends `status=admitted` reads the refusal against this
       // text. Without it the published contract states the narrowing and never
       // states the reason, which reads as an oversight rather than a rule.
+      // Named rather than dereferenced blind: `find` answers undefined, and a
+      // status parameter dropped from the rollups would otherwise fail here
+      // with "cannot read properties of undefined" instead of saying what is
+      // missing. Same rule as `queryParameters` above.
       const parameter = queryParameters(SUMMARIES).find(
         (p) => p.name === "status",
-      ) as { description?: string; schema?: { description?: string } };
+      ) as
+        | { description?: string; schema?: { description?: string } }
+        | undefined;
+      if (parameter === undefined) {
+        throw new Error(`${SUMMARIES} publishes no status parameter`);
+      }
       const description =
         parameter.description ?? parameter.schema?.description ?? "";
 

@@ -191,7 +191,7 @@ import os
 import langwatch
 
 langwatch.setup(api_key=os.environ["LANGWATCH_ORG_API_KEY"])
-from_ms, to_ms = 1782950400000, 1785628800000
+from_ms, to_ms = 1782864000000, 1785542400000  # 2026-07-01 to 2026-08-01 UTC
 
 # Checksums first, one row per key.
 for row in langwatch.spend_events.iter_summaries(group_by="virtual_key", from_ms=from_ms, to_ms=to_ms):
@@ -241,7 +241,7 @@ for row in langwatch.spend_events.iter_summaries(
 
 </CodeGroup>
 
-The full vocabulary and the one grouping that is refused rather than served approximately are in [Narrowing and grouping](/ai-gateway/cookbooks/metering-and-rebilling#narrowing-and-grouping).
+The full vocabulary, and the groupings that are refused rather than served approximately (`model`, `provider`, and time buckets), are in [Narrowing and grouping](/ai-gateway/cookbooks/metering-and-rebilling#narrowing-and-grouping).
 
 ### The settled work queue
 

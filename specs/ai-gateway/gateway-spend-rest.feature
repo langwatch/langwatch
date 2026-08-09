@@ -96,6 +96,22 @@ Feature: Gateway spend reconciliation REST surface
       # absent predicate. Reading as unfiltered here would hand a caller
       # the whole organization's spend under a narrowing they asked for.
 
+    @unit
+    Scenario: One filter may not name unbounded values
+      When the caller repeats a filter more times than the surface allows
+      Then the read is refused, naming that filter
+      # Every value becomes an element of a bound array and every metadata
+      # pair a predicate of its own, so an unbounded repeat is an unbounded
+      # query on a billing read.
+
+    @unit
+    Scenario: Every status the surface publishes can be narrowed on
+      Then each status in the published vocabulary resolves to a lifecycle status
+      # The boundary validates against the published list and the query
+      # builder resolves against its own. If the two are written out
+      # separately, a status added to one is accepted at the door and then
+      # fails inside, turning a valid request into an unknown error.
+
     @unit @integration
     Scenario: The rollups refuse a status they can only answer with zero
       Given requests still in flight alongside completed ones
@@ -125,6 +141,14 @@ Feature: Gateway spend reconciliation REST surface
       # served a default for records written before that column was
       # declared, every historical request would silently drop out of a
       # filtered reconciliation and the books would agree on a subset.
+
+    @unit
+    Scenario: A metadata pair with no colon is refused, not re-cut
+      When a pair arrives without the separator the surface splits on
+      Then it is refused rather than cut at some other point
+      # Cutting an absent separator is silently wrong rather than empty:
+      # the last character becomes the boundary, so the caller reads spend
+      # for a key nobody wrote.
 
   Rule: A grouping whose key can move is refused while the window can still change
 
@@ -174,6 +198,23 @@ Feature: Gateway spend reconciliation REST surface
     Scenario: A spelling the surface does not know is refused by name
       When the caller groups by model over a live window and spells the opt-out in a way the surface does not know
       Then the request is refused and the refusal names the parameter
+
+    @integration
+    Scenario: A cursor from another grouping is refused, not silently restarted
+      Given a rollup walk paged under one grouping
+      When the caller sends that cursor back under a different grouping
+      Then the request is refused and says to start a new walk
+      # Carrying on without the cursor would serve the first page again
+      # under a fresh cursor, with nothing in the response to say the walk
+      # had reset, and the checksum would count those groups twice.
+
+    @unit @integration
+    Scenario: A time zone the store cannot load is refused at the door
+      When the caller names a fixed offset rather than a zone
+      Then the request is refused, naming the timezone parameter
+      # The runtime accepts an offset and the store does not, so passing it
+      # through turns a value the caller chose into an unknown error from
+      # somewhere they cannot see.
 
   Rule: An organization running a project per customer still reads its spend
 
