@@ -33,6 +33,7 @@ import {
   type BudgetScopeReach,
   resolveBudgetScopeReach,
   resolveScopeReach,
+  type ScopeReach,
 } from "./budgetScopeReach";
 import {
   isCyclicWindow,
@@ -894,6 +895,28 @@ export class GatewayBudgetService {
     PROJECT: "project",
     GROUP: "group",
   } as const;
+
+  /**
+   * Whether any active key can produce traffic this scope matches.
+   *
+   * Read separately from the create guard rather than carried out of it,
+   * because the guard only runs for the three scopes it can refuse and a
+   * create response that omitted the field would not equal the row the very
+   * next read returns. Callers do compare those.
+   */
+  async scopeReach({
+    organizationId,
+    scope,
+  }: {
+    organizationId: string;
+    scope: Pick<GatewayBudget, "scopeType" | "scopeId">;
+  }): Promise<ScopeReach> {
+    return await resolveScopeReach({
+      prisma: this.prisma,
+      organizationId,
+      scope,
+    });
+  }
 
   /**
    * Refuse a budget that no active key could ever spend against.
