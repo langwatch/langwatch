@@ -84,16 +84,28 @@ func (s *RedisStore) Set(ctx context.Context, hash string, cached CachedBundle) 
 	_ = s.client.Set(ctx, keyPrefix+hash, raw, ttl).Err()
 }
 
-// DeleteMany removes bundles from Redis in one DEL, so a change-feed eviction
-// reaches the copy every other gateway node shares without paying a round trip
-// per key.
+// DeleteMany removes bundles from Redis, so a change-feed eviction reaches the
+// copy every other gateway node shares without paying a round trip per key.
+//
+// A pipeline of single-key DELs rather than one variadic DEL. The store takes
+// a redis.UniversalClient, which is a cluster client whenever it is built from
+// more than one address, and these keys carry no hash tag, so a multi-key DEL
+// spanning slots is refused outright with CROSSSLOT. A pipeline is routed per
+// key and still costs one round trip per node, so the safe shape and the fast
+// shape are the same shape.
 func (s *RedisStore) DeleteMany(ctx context.Context, hashes []string) error {
 	if len(hashes) == 0 {
 		return nil
 	}
-	keys := make([]string, 0, len(hashes))
+	pipe := s.client.Pipeline()
 	for _, h := range hashes {
-		keys = append(keys, keyPrefix+h)
+		pipe.Del(ctx, keyPrefix+h)
 	}
-	return s.client.Del(ctx, keys...).Err()
+	// DEL answers with a count, never a nil reply, so redis.Nil here would
+	// mean something other than "that key was already gone" and is not
+	// swallowed.
+	if _, err := pipe.Exec(ctx); err != nil {
+		return err
+	}
+	return nil
 }

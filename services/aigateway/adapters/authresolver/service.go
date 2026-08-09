@@ -426,48 +426,68 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 	}
 
 	// L2: optional store
-	if bundle := s.serveFromL2(ctx, h); bundle != nil {
-		return bundle, nil
+	if bundle, l2Err := s.serveFromL2(ctx, rawKey, h); bundle != nil || l2Err != nil {
+		return bundle, l2Err
 	}
 
 	// L3: upstream resolver
 	return s.resolveFresh(ctx, rawKey, h)
 }
 
-// serveFromL2 answers from the shared store when it holds a live bundle,
-// rehydrating L1 on the way. Returns nil when L2 is not configured, misses,
-// or errors, leaving the caller to resolve upstream.
-func (s *Service) serveFromL2(ctx context.Context, h [64]byte) *domain.Bundle {
+// serveFromL2 answers from the shared store when it holds a bundle this node
+// may serve, rehydrating L1 on the way. A miss is (nil, nil), leaving the
+// caller to resolve upstream.
+//
+// A rehydrated entry gets exactly the treatment an L1 entry in the same state
+// would get, because a node with a cold L1 must not be a weaker door than a
+// warm one. That is the whole reason this reaches into the refresh path
+// instead of just returning what the store handed over.
+func (s *Service) serveFromL2(ctx context.Context, rawKey string, h [64]byte) (*domain.Bundle, error) {
 	if s.l2 == nil {
-		return nil
+		return nil, nil
 	}
 	cached, err := s.l2.Get(ctx, string(h[:]))
-	if err != nil || cached == nil || cached.Bundle == nil {
+	if err != nil {
 		s.recordMiss(tierL2Redis)
-		return nil
+		return nil, nil //nolint:nilerr // a shared cache that cannot answer is a miss, not a failed request: the resolve falls through to the tier that decides whether the key is good
+	}
+	if cached == nil || cached.Bundle == nil {
+		s.recordMiss(tierL2Redis)
+		return nil, nil
 	}
 	// A store is not required to filter what it hands back, and the L1 path
 	// will not serve a bundle past its hard cap either. Same rule at this
 	// boundary: past the cap is a miss, so the request resolves fresh rather
-	// than running on credentials nothing has re-checked in hours. A bundle
-	// merely past its JWT exp rehydrates, and the next hit on it takes L1's
-	// existing refresh-or-serve-stale path.
+	// than running on credentials nothing has re-checked in hours.
 	if time.Now().After(cached.Bundle.ExpiresAt.Add(s.hardGrace)) {
 		s.recordMiss(tierL2Redis)
-		return nil
+		return nil, nil
 	}
-	s.recordHit(tierL2Redis)
 	// Rehydrate with the config-fetch time L2 carries, never with now.
 	// Stamping now would restart the ConfigTTL clock on every L2 hit, so an
 	// entry 50 seconds into a 60 second TTL would come back with a fresh 60
-	// and config staleness could reach twice the TTL. An entry that is
-	// already past its TTL refreshes here rather than waiting for a second
-	// request to notice.
+	// and config staleness could reach twice the TTL.
 	e := s.storeL1Fetched(h, cached.Bundle, cached.ConfigFetchedAt)
+
+	if e.softExpired() {
+		// Past its JWT exp and inside the hard cap: ask the control plane
+		// before serving, exactly as an L1 entry in this state does. A key
+		// revoked during the grace window is rejected here rather than
+		// serving one more request first, and a control plane that is merely
+		// unreachable still gets the stale bundle served. Counted a miss for
+		// the same reason the L1 path counts one: the request paid a
+		// foreground refresh, whatever it ends up being answered with.
+		s.recordMiss(tierL2Redis)
+		return s.refreshOrServeStale(ctx, rawKey, h, e)
+	}
+
+	s.recordHit(tierL2Redis)
+	// An entry that arrives already past its config TTL refreshes here rather
+	// than waiting for a second request to notice.
 	if e.configStale(s.configTTL) && e.tryBeginConfigRefresh() {
 		go s.refreshConfigBackground(h, e) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
 	}
-	return cached.Bundle
+	return cached.Bundle, nil
 }
 
 // CacheLen reports how many virtual keys L1 is currently holding, so the
@@ -794,14 +814,19 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.OrganizationID == organizationID
 		}, evictReason(ch.Kind), organizationID)
+	case ChangeKindVirtualKeyCreated:
+		// Nothing to evict: a key nobody has resolved yet is in no cache, on
+		// this node or any other. Named rather than left to the default so a
+		// routine event does not arrive as a warning and bury the kinds an
+		// operator actually needs to see.
 	default:
-		// The kinds above are the ones this build knows how to act on, and
-		// the control plane is free to emit others. Dropping one is often
-		// correct, but dropping one silently is how CACHE_RULE_* went
-		// unhandled from the day it shipped: the control plane emitted it,
-		// nothing here named it, and the documented behavior simply did not
-		// happen. Saying so leaves the next one an hour of log reading rather
-		// than a bug report about staleness.
+		// The cases above are every kind this build knows about, acted on or
+		// deliberately ignored, and the control plane is free to emit others.
+		// Dropping one is often correct, but dropping one silently is how
+		// CACHE_RULE_* went unhandled from the day it shipped: the control
+		// plane emitted it, nothing here named it, and the documented
+		// behavior simply did not happen. Saying so leaves the next one an
+		// hour of log reading rather than a bug report about staleness.
 		s.logger.Warn("auth_cache_change_unhandled",
 			zap.String("kind", ch.Kind),
 			zap.String("organization_id", organizationID),

@@ -267,10 +267,19 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then every cached bundle belonging to that organization is evicted
       And the other organization's bundles stay cached
 
+    @unit
+    Scenario: every kind the control plane can emit is acted on or ignored on purpose
+      Given the kinds the control plane can emit are declared in one place
+      When the change feed reports each of them in turn
+      Then none of them is reported as a kind this build does not recognize
+      And a kind added upstream fails this check rather than becoming a warning in production
+
     # The control plane may emit a kind this build predates, and doing
     # nothing about it is usually right. Doing nothing SILENTLY is not:
     # that is how the cache-rule kinds above stayed unhandled from the day
-    # the control plane started emitting them.
+    # the control plane started emitting them. A kind this build ignores on
+    # purpose is named in its own case, so a routine event never arrives
+    # looking like an incident.
     @unit @regression
     Scenario: A change kind this build does not act on is reported, not dropped
       Given a bundle is cached
@@ -323,6 +332,13 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
     reach twice the TTL. This holds for every change kind, not only the
     newest ones.
 
+    A bundle rehydrated from the shared tier gets exactly the treatment an
+    entry already in the node's own tier would get in the same state. A node
+    with a cold cache must not be the weaker door: if the bundle is past its
+    JWT expiry, the control plane is asked before anything is served, so a
+    key revoked during the grace window is refused rather than getting one
+    more request through.
+
     @unit
     Scenario: a change event drops the entry from the shared cache tier too
       Given a bundle is cached in both the node's own tier and the shared tier
@@ -346,6 +362,23 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       When the change feed reports a mutation that invalidates the organization
       Then the entries in the batches that were accepted are gone from the shared tier
       And the eviction is reported once with how many entries were left behind
+
+    @unit
+    Scenario: a key revoked during the grace window is refused on a node whose own tier is cold
+      Given the shared tier holds a bundle past its JWT expiry but inside the grace window
+      And the key has been revoked since that bundle was cached
+      When a node whose own tier is empty serves a request with that key
+      Then the control plane is asked before anything is served
+      And the request is rejected as revoked
+      And nothing is left cached for that key
+
+    @unit
+    Scenario: a soft-expired shared-tier bundle still serves when the control plane is only unreachable
+      Given the shared tier holds a bundle past its JWT expiry but inside the grace window
+      And the control plane is unreachable
+      When a node whose own tier is empty serves a request with that key
+      Then the cached bundle and its credentials are served
+      And the failed refresh is reported
 
     @unit
     Scenario: a bundle past its hard cap is never served from the shared tier

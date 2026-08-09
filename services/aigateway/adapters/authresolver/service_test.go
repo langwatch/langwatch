@@ -14,6 +14,10 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -130,6 +134,49 @@ func (f *fakeL2) batchSizes() []int {
 		sizes = append(sizes, len(batch))
 	}
 	return sizes
+}
+
+// changeKindEnumRe pulls the body out of the control plane's enum block.
+var changeKindEnumRe = regexp.MustCompile(`(?s)enum GatewayChangeEventKind \{(.*?)\}`)
+
+// repoRoot walks up from the test's directory to the module root, so a test
+// can read a control-plane file without a relative path that breaks the
+// moment either side moves.
+func repoRoot(t *testing.T) string {
+	t.Helper()
+	dir, err := os.Getwd()
+	require.NoError(t, err)
+	for {
+		if _, statErr := os.Stat(filepath.Join(dir, "go.mod")); statErr == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		require.NotEqual(t, dir, parent, "no go.mod above the test directory")
+		dir = parent
+	}
+}
+
+// changeKindsFromSchema reads GatewayChangeEventKind out of the Prisma schema,
+// the only source of truth for what the change feed can emit. Reading the
+// schema rather than restating the list here is what makes a kind added
+// upstream fail a test instead of arriving as a production warning.
+func changeKindsFromSchema(t *testing.T) []string {
+	t.Helper()
+	body, err := os.ReadFile(filepath.Join(repoRoot(t), "platform", "app", "prisma", "schema.prisma"))
+	require.NoError(t, err)
+	block := changeKindEnumRe.FindSubmatch(body)
+	require.NotNil(t, block, "GatewayChangeEventKind is not in schema.prisma; this test is looking in the wrong place")
+
+	var kinds []string
+	for _, line := range strings.Split(string(block[1]), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "//") {
+			continue
+		}
+		kinds = append(kinds, line)
+	}
+	require.NotEmpty(t, kinds, "the enum parsed to nothing")
+	return kinds
 }
 
 // l2Key is the shared-tier key for a raw virtual key, the one Resolve computes.
@@ -553,6 +600,86 @@ func TestApplyChange_SharedTierUnreachable_StillEvictsLocallyAndReports(t *testi
 	assert.False(t, isPresent, "an unreachable shared tier must not hold up the local eviction")
 	assert.Len(t, logs.FilterMessage("auth_cache_l2_delete_failed").All(), 1,
 		"a shared-tier deletion that failed must be reported, it leaves that copy stale until the config TTL")
+}
+
+/** @scenario "a key revoked during the grace window is refused on a node whose own tier is cold" */
+func TestResolve_L2Hit_SoftExpiredBundleRevokedUpstream_IsRefusedNotServed(t *testing.T) {
+	l2 := newFakeL2()
+	resolver := &fakeResolver{returns: []resolverReturn{
+		{err: herr.New(context.Background(), domain.ErrKeyRevoked, nil)},
+	}}
+	svc, _ := newService(t, Options{
+		Resolver: resolver, ConfigFetcher: resolver, L2: l2, HardGrace: time.Hour,
+	})
+
+	// Past its JWT exp but inside the grace window: the state where serving
+	// what the store handed back would let a revoked key keep working on
+	// every node that had not cached it yet.
+	rawKey := "vk-lw-shared-tier-revoked"
+	stale := freshBundle("vk_revoked", time.Now().Add(-30*time.Second))
+	stale.Credentials = []domain.Credential{{ID: "cred-revoked"}}
+	l2.Set(context.Background(), l2Key(rawKey), CachedBundle{Bundle: stale, ConfigFetchedAt: time.Now()})
+
+	got, err := svc.Resolve(context.Background(), rawKey)
+
+	require.ErrorIs(t, err, domain.ErrKeyRevoked)
+	assert.Nil(t, got, "a revoked key must not be served from the shared tier")
+	assert.Equal(t, int64(1), resolver.calls.Load(),
+		"the control plane has to be asked before a soft-expired bundle serves, on this tier as on L1")
+	_, isPresent := svc.l1.Peek(hashKey(rawKey))
+	assert.False(t, isPresent, "the rejected entry must not be left behind in L1")
+}
+
+/** @scenario "a soft-expired shared-tier bundle still serves when the control plane is only unreachable" */
+func TestResolve_L2Hit_SoftExpiredBundleTransportFailure_ServesStale(t *testing.T) {
+	l2 := newFakeL2()
+	resolver := &fakeResolver{returns: []resolverReturn{
+		{err: herr.New(context.Background(), domain.ErrAuthUpstream, nil)},
+	}}
+	svc, logs := newService(t, Options{
+		Resolver: resolver, ConfigFetcher: resolver, L2: l2, HardGrace: time.Hour,
+	})
+
+	rawKey := "vk-lw-shared-tier-stale-serve"
+	stale := freshBundle("vk_stale_serve", time.Now().Add(-30*time.Second))
+	stale.Credentials = []domain.Credential{{ID: "cred-known-good"}}
+	l2.Set(context.Background(), l2Key(rawKey), CachedBundle{Bundle: stale, ConfigFetchedAt: time.Now()})
+
+	got, err := svc.Resolve(context.Background(), rawKey)
+
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, "cred-known-good", got.Credentials[0].ID,
+		"asking the control plane first must not cost a warm-start node its stale-while-error fallback")
+	assert.Equal(t, int64(1), resolver.calls.Load())
+	assert.NotEmpty(t, logs.FilterMessage("auth_cache_refresh_transport_failure").All(),
+		"the failed refresh has to be visible to an operator")
+}
+
+/** @scenario "every kind the control plane can emit is acted on or ignored on purpose" */
+func TestApplyChange_EveryKindTheControlPlaneCanEmitIsAccountedFor(t *testing.T) {
+	for _, kind := range changeKindsFromSchema(t) {
+		t.Run(kind, func(t *testing.T) {
+			core, logs := observer.New(zap.WarnLevel)
+			resolver := &fakeResolver{}
+			svc, _ := newService(t, Options{
+				Resolver: resolver, ConfigFetcher: resolver, Logger: zap.New(core),
+			})
+			svc.storeL1(hashKey("vk-lw-accounted-"+kind), &domain.Bundle{
+				OrganizationID: "org-1",
+				VirtualKeyID:   "vk-accounted",
+			})
+
+			svc.applyChange("org-1", CacheChange{
+				Kind:            kind,
+				VirtualKeyID:    "vk-accounted",
+				ModelProviderID: "model-provider-1",
+			})
+
+			assert.Empty(t, logs.FilterMessage("auth_cache_change_unhandled").All(),
+				"a kind the control plane can emit is either acted on or ignored by name; reaching the unknown-kind warn makes a routine event look like an incident")
+		})
+	}
 }
 
 /** @scenario "a bundle past its hard cap is never served from the shared tier" */
