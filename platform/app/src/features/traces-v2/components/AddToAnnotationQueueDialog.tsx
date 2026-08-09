@@ -98,6 +98,48 @@ function sentDescription({
   return `${sent}. ${reason}`;
 }
 
+/** The success toast, with a way into where the traces landed. */
+function toastQueued({
+  created,
+  skipped,
+  destination,
+  onView,
+}: {
+  created: number;
+  skipped: number;
+  destination: { label: string; href: string };
+  onView: (href: string) => void;
+}) {
+  toaster.create({
+    title: "Added to annotation queue",
+    description: sentDescription({ created, skipped }),
+    type: "success",
+    meta: { closable: true },
+    action: {
+      label: destination.label,
+      onClick: () => onView(destination.href),
+    },
+  });
+}
+
+/** The dialog's words, keyed to what the sender is doing. */
+function QueueDialogHeader({ intent }: { intent: "add" | "move" }) {
+  return (
+    <Dialog.Header paddingBottom={0}>
+      <VStack align="start" gap={1}>
+        <Dialog.Title>
+          {intent === "move" ? "Move to queue" : "Add to annotation queue"}
+        </Dialog.Title>
+        <Dialog.Description color="fg.muted" fontSize="sm">
+          {intent === "move"
+            ? "Change which people or queues these traces are queued for"
+            : "Send the selected traces to people or queues for annotation"}
+        </Dialog.Description>
+      </VStack>
+    </Dialog.Header>
+  );
+}
+
 /**
  * Sends traces to people or annotation queues for review. Shared by every
  * surface that can hand traces over: the trace table's selection bar and the
@@ -152,17 +194,11 @@ export function AddToAnnotationQueueDialog({
       onClose();
       onQueued?.(annotators.map((annotator) => annotator.id));
 
-      toaster.create({
-        title: "Added to annotation queue",
-        description: sentDescription({ created, skipped }),
-        type: "success",
-        meta: { closable: true },
-        action: {
-          label: destination.label,
-          onClick: () => {
-            void router.push(destination.href);
-          },
-        },
+      toastQueued({
+        created,
+        skipped,
+        destination,
+        onView: (href) => void router.push(href),
       });
     },
     onError: (error) =>
@@ -188,20 +224,7 @@ export function AddToAnnotationQueueDialog({
       <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
         <Dialog.Content>
           <Dialog.CloseTrigger />
-          <Dialog.Header paddingBottom={0}>
-            <VStack align="start" gap={1}>
-              <Dialog.Title>
-                {intent === "move"
-                  ? "Move to queue"
-                  : "Add to annotation queue"}
-              </Dialog.Title>
-              <Dialog.Description color="fg.muted" fontSize="sm">
-                {intent === "move"
-                  ? "Change which people or queues these traces are queued for"
-                  : "Send the selected traces to people or queues for annotation"}
-              </Dialog.Description>
-            </VStack>
-          </Dialog.Header>
+          <QueueDialogHeader intent={intent} />
           <Dialog.Body paddingTop={5} paddingBottom={6}>
             <AddParticipants
               annotators={annotators}
