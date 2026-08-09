@@ -72,7 +72,12 @@ function PageSizeField({
   onPageSizeChange: (size: number) => void;
 }) {
   return (
-    <NativeSelect.Root size="xs" width="auto" flexShrink={0} disabled={disabled}>
+    <NativeSelect.Root
+      size="xs"
+      width="auto"
+      flexShrink={0}
+      disabled={disabled}
+    >
       <NativeSelect.Field
         aria-label="Rows per page"
         data-testid="pagination-page-size"
