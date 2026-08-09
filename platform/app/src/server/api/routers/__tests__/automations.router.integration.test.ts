@@ -1042,7 +1042,11 @@ describe("automationRouter", () => {
     const writtenKeys: string[] = [];
 
     afterEach(async () => {
-      if (writtenKeys.length > 0) await connection?.del(...writtenKeys);
+      // One key per DEL: a multi-key DEL fails with CROSSSLOT on a Redis
+      // Cluster connection, and a failed teardown would strand 25h keys.
+      for (const key of writtenKeys) {
+        await connection?.del(key);
+      }
       writtenKeys.length = 0;
     });
 

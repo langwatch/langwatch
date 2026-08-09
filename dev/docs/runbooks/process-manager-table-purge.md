@@ -19,8 +19,10 @@ Once, immediately before the deploy that carries the retention sweep. Running it
 first is deliberate:
 
 - The purge does the bulk work with `ctid` batches, which need no index. The
-  index builds in step 5 then run over a near-empty heap instead of over two
-  million dead rows, so they finish in seconds instead of minutes.
+  index builds in step 5 then have only the few surviving live rows to sort
+  and write, instead of two million dead ones. (The heap files stay their old
+  size, since a plain `VACUUM` only marks pages reusable, but the entries an
+  index build actually processes are the live tuples.)
 - The sweep's first tick after deploy then has only the interim backlog to
   drain, which its bounded batches handle comfortably.
 
@@ -165,8 +167,15 @@ FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
 WHERE NOT i.indisvalid AND c.relname LIKE 'ProcessManager%';
 ```
 
-Drop any invalid index it reports (`DROP INDEX "<name>";`) and run the build
-again.
+Drop any invalid index it reports, concurrently, since a plain `DROP INDEX`
+takes an `ACCESS EXCLUSIVE` lock that blocks reads and writes on these same
+hot tables:
+
+```sql
+DROP INDEX CONCURRENTLY IF EXISTS "<name>";
+```
+
+Run it outside an explicit transaction, then run the build again.
 
 ## After the deploy
 
