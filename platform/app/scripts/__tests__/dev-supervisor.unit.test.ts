@@ -141,7 +141,7 @@ function launchFrom(command: string, env: Record<string, string> = {}): number {
 
 /** Every live pid whose command line carries this test's marker. */
 function stackPids(): number[] {
-  const out = spawnSync("ps", ["-Ao", "pid=,command="], {
+  const out = spawnSync("ps", ["-Ao", "pid=", "-o", "command="], {
     encoding: "utf8",
   }).stdout;
   return out
@@ -289,7 +289,7 @@ describe("dev stack supervisor", () => {
         process.kill(launcher, "SIGKILL");
         await sleep(1500);
 
-        const survivors = spawnSync("ps", ["-Ao", "pid=,command="], {
+        const survivors = spawnSync("ps", ["-Ao", "pid=", "-o", "command="], {
           encoding: "utf8",
         })
           .stdout.split("\n")

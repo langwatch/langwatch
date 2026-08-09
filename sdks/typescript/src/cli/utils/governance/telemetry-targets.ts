@@ -48,6 +48,13 @@ import {
 	removeAppEnvVars,
 } from "./app-settings";
 import {
+	CLAUDE_PLUGIN_MARKETPLACE,
+	CLAUDE_PLUGIN_REF,
+	readClaudePluginState,
+	removeLangwatchClaudeMarketplace,
+	uninstallLangwatchClaudePlugin,
+} from "./claude-plugin";
+import {
 	copilotAppAgentPath,
 	isCopilotAppAgentInstalled,
 	removeCopilotAppAgent,
@@ -134,6 +141,34 @@ export function scanTelemetryTargets(): TelemetryTarget[] {
 			remove: () => removeSessionContextHooks({ tool: "claude_code" }),
 		});
 	}
+
+	// claude, the LangWatch plugin and the marketplace it came from. The
+	// plugin carries the same session context hooks the entries above declare,
+	// so a device that took the plugin has nothing in the settings file to find
+	// and this is the only target that speaks for it.
+	//
+	// Both removers read their own state before they spawn anything, so a
+	// machine that never installed the plugin pays no subprocess to discover
+	// that, and `present` matches the gate `remove()` applies (an absent plugin
+	// and a marketplace somebody else registered both refuse) so the confirm
+	// list can never offer a target whose removal silently no-ops.
+	const pluginState = readClaudePluginState();
+	targets.push({
+		label: `claude langwatch plugin (${CLAUDE_PLUGIN_REF})`,
+		present: pluginState.pluginInstalled || pluginState.enabled,
+		remove: () => {
+			const result = uninstallLangwatchClaudePlugin();
+			return result.action === "uninstalled" || result.action === "disabled";
+		},
+	});
+	// The marketplace name alone is not ownership: anyone may register one
+	// called `langwatch`, and removing theirs would cost them every plugin they
+	// installed from it. Only a registration pointing at our repository counts.
+	targets.push({
+		label: `claude langwatch plugin marketplace (${CLAUDE_PLUGIN_MARKETPLACE})`,
+		present: pluginState.marketplaceOwnedByLangwatch,
+		remove: () => removeLangwatchClaudeMarketplace(),
+	});
 
 	// claude — the project-level pin the wrapper maintains in the working
 	// directory (`$CWD/.claude/settings.local.json`). Logout can only see

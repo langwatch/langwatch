@@ -70,6 +70,11 @@ const DEFAULT_TEST_ROOTS: string[] = [
   "mcp/typescript/src",
   "sdks/typescript/src",
   "sdks/python/src",
+  // The agent plugin is hand-authored manifests plus a bundle, so its only
+  // tests are the ones that read those manifests and spawn that bundle. Without
+  // this root, every scenario describing what the published plugin does could
+  // only be @unimplemented.
+  "plugins",
   // What we SHIP as instructions is behavior too: the skill sources and the
   // assistant's rules are tested here (and nowhere else), so scenarios about
   // what an instruction teaches can only bind from this root.
@@ -250,7 +255,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/cli-402-license-gate.feature",
   "specs/ai-gateway/governance/cli-deep-links.feature",
   "specs/ai-gateway/governance/cli-ingest-debug.feature",
-  "specs/ai-gateway/governance/cli-login.feature",
   "specs/ai-gateway/governance/cli-tool-mode-policy.feature",
   "specs/ai-gateway/governance/compliance-baseline.feature",
   "specs/ai-gateway/governance/event-log-durability.feature",

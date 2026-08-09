@@ -127,7 +127,6 @@ export function installAppEnv(
 	vars: Record<string, string>,
 ): void {
 	const settings = readAppSettingsFileForUpdate(target.path);
-	fs.mkdirSync(path.dirname(target.path), { recursive: true });
 	const existingEnv = settings.env;
 	const nextEnv: Record<string, string> = isPlainObject(existingEnv)
 		? { ...(existingEnv as Record<string, string>) }
@@ -137,7 +136,7 @@ export function installAppEnv(
 	}
 	settings.env = nextEnv;
 
-	fs.writeFileSync(target.path, JSON.stringify(settings, null, 2) + "\n");
+	writeAppSettingsFile({ filePath: target.path, settings });
 }
 
 /**
@@ -186,7 +185,7 @@ export function removeAppEnvVars(
 	} else {
 		settings.env = nextEnv;
 	}
-	fs.writeFileSync(target.path, JSON.stringify(settings, null, 2) + "\n");
+	writeAppSettingsFile({ filePath: target.path, settings });
 	return true;
 }
 
@@ -224,6 +223,25 @@ export function readAppSettingsFileForUpdate(
 		throw unmergeable(filePath, "it does not hold a JSON object");
 	}
 	return { ...parsed };
+}
+
+/**
+ * Write a settings document back, creating parent directories when missing.
+ *
+ * One writer for every caller that edits one of these files, whichever region
+ * of it they own. Indentation, the trailing newline and directory creation are
+ * what the user's own diff shows after we touch their config, so they cannot
+ * depend on which of us wrote it last.
+ */
+export function writeAppSettingsFile({
+	filePath,
+	settings,
+}: {
+	filePath: string;
+	settings: Record<string, unknown>;
+}): void {
+	fs.mkdirSync(path.dirname(filePath), { recursive: true });
+	fs.writeFileSync(filePath, `${JSON.stringify(settings, null, 2)}\n`);
 }
 
 function unmergeable(filePath: string, why: string): Error {

@@ -35,6 +35,7 @@ import {
 	appSettingsTargetFor,
 	readAppSettingsFile,
 	readAppSettingsFileForUpdate,
+	writeAppSettingsFile,
 } from "./app-settings";
 
 /** The agents whose session context rides on a command hook. */
@@ -140,8 +141,7 @@ export function installSessionContextHooks({
 		return { action: "unchanged", ...target };
 	}
 
-	fs.mkdirSync(path.dirname(target.path), { recursive: true });
-	fs.writeFileSync(target.path, JSON.stringify(document, null, 2) + "\n");
+	writeAppSettingsFile({ filePath: target.path, settings: document });
 	return { action: existedBefore ? "updated" : "created", ...target };
 }
 
@@ -213,7 +213,7 @@ export function removeSessionContextHooks({
 	if (Object.keys(hooks).length === 0) delete document.hooks;
 	else document.hooks = hooks;
 
-	fs.writeFileSync(target.path, JSON.stringify(document, null, 2) + "\n");
+	writeAppSettingsFile({ filePath: target.path, settings: document });
 	return true;
 }
 
