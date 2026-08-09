@@ -48,6 +48,10 @@ function sessionRow(
     sessionId: "session-a",
     tenantId: "project-1",
     startedAtMs: NOW - 5 * HOUR,
+    // A session whose fold never recorded a last event, which is the shape
+    // most of these cases care nothing about: recency then falls back to the
+    // start time.
+    lastEventOccurredAtMs: 0,
     inputTokens: 100,
     outputTokens: 50,
     cacheReadTokens: 20,
@@ -70,6 +74,7 @@ function personalSessionRow(
   return {
     sessionId: "session-a",
     startedAtMs: NOW - 5 * HOUR,
+    lastEventOccurredAt: 0,
     agent: "claude_code",
     repositoryHost: "github.com",
     repositoryOwner: "acme",
@@ -697,6 +702,97 @@ describe("PullRequestUsageService", () => {
       expect(usage.unlinked).toHaveLength(1);
       expect(usage.unlinked[0]?.sessionsCount).toBe(1);
       expect(usage.unlinked[0]?.costUsd).toBeCloseTo(1.5);
+    });
+  });
+
+  // "Last update" is the page's own answer rather than GitHub's: when the work
+  // this row prices last ran. It follows the same split as the numbers beside
+  // it, organization-wide for a pull request and personal for a branch.
+  describe("given a pull request whose sessions ran at different times", () => {
+    /** @scenario "A pull request's last update is the latest session across every counted project" */
+    it("takes the last update from the most recent session in any counted project", async () => {
+      const { service } = personalServiceWith({
+        pullRequests: [pullRequestRow()],
+        personalSessions: [personalSessionRow({ sessionId: "mine" })],
+        organizationSessions: [
+          sessionRow({
+            sessionId: "mine",
+            tenantId: "project-1",
+            startedAtMs: NOW - 5 * HOUR,
+          }),
+          sessionRow({
+            sessionId: "theirs",
+            tenantId: "project-2",
+            startedAtMs: NOW - HOUR,
+          }),
+        ],
+      });
+
+      const usage = await service.getForPersonalProject({
+        ...PERSONAL_QUERY,
+        ...BOTH_PROJECTS,
+      });
+
+      expect(usage.rows[0]?.lastActivityAtMs).toBe(NOW - HOUR);
+    });
+
+    /** @scenario "A pull request's last update is the latest session across every counted project" */
+    it("counts a long session by when it last ran rather than when it started", async () => {
+      const { service } = personalServiceWith({
+        pullRequests: [pullRequestRow()],
+        personalSessions: [personalSessionRow({ sessionId: "long" })],
+        organizationSessions: [
+          sessionRow({
+            sessionId: "long",
+            startedAtMs: NOW - 6 * HOUR,
+            lastEventOccurredAtMs: NOW - HOUR / 2,
+          }),
+          sessionRow({ sessionId: "short", startedAtMs: NOW - 2 * HOUR }),
+        ],
+      });
+
+      const usage = await service.getForPersonalProject(PERSONAL_QUERY);
+
+      expect(usage.rows[0]?.lastActivityAtMs).toBe(NOW - HOUR / 2);
+    });
+  });
+
+  describe("given a branch with no pull request whose sessions ran at different times", () => {
+    /** @scenario "A branch's last update is the latest of its own sessions" */
+    it("takes the last update from the viewer's own most recent session on it", async () => {
+      const { service } = personalServiceWith({
+        pullRequests: [],
+        personalSessions: [
+          personalSessionRow({
+            sessionId: "older",
+            gitBranch: "feat/orphan",
+            startedAtMs: NOW - 8 * HOUR,
+          }),
+          personalSessionRow({
+            sessionId: "newer",
+            gitBranch: "feat/orphan",
+            startedAtMs: NOW - 2 * HOUR,
+          }),
+        ],
+        // A teammate working more recently in a project the viewer may read:
+        // the branch rollup is personal, so it must not move the answer.
+        organizationSessions: [
+          sessionRow({
+            sessionId: "theirs",
+            tenantId: "project-2",
+            gitBranch: "feat/orphan",
+            startedAtMs: NOW - HOUR,
+          }),
+        ],
+      });
+
+      const usage = await service.getForPersonalProject({
+        ...PERSONAL_QUERY,
+        ...BOTH_PROJECTS,
+      });
+
+      expect(usage.unlinked).toHaveLength(1);
+      expect(usage.unlinked[0]?.lastActivityAtMs).toBe(NOW - 2 * HOUR);
     });
   });
 

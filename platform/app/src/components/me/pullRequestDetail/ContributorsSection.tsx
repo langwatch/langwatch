@@ -7,6 +7,7 @@ import {
   formatTokens,
 } from "~/features/traces-v2/utils/formatters";
 
+import { AgentLabel } from "../AgentLabel";
 import { ContributorName } from "./ContributorName";
 import { type DetailPayload, MISSING_VALUE } from "./detailPayload";
 import { EmptySection, Section } from "./Section";
@@ -37,7 +38,11 @@ export const ContributorsSection: React.FC<{
               <Table.Row key={`${contributor.projectId} ${contributor.agent}`}>
                 <ContributorName contributor={contributor} />
                 <Table.Cell fontSize="sm" color="fg.muted">
-                  {contributor.agent || MISSING_VALUE}
+                  {contributor.agent ? (
+                    <AgentLabel agent={contributor.agent} />
+                  ) : (
+                    MISSING_VALUE
+                  )}
                 </Table.Cell>
                 <Table.Cell textAlign="end" fontSize="sm">
                   {numeral(contributor.sessionsCount).format("0,0")}

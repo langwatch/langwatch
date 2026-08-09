@@ -6,6 +6,7 @@ import {
   formatTokens,
 } from "~/features/traces-v2/utils/formatters";
 
+import { AgentLabel } from "../AgentLabel";
 import { formatShortDate } from "../shortDate";
 import { ContributorName } from "./ContributorName";
 import { type DetailPayload, MISSING_VALUE } from "./detailPayload";
@@ -49,7 +50,11 @@ export const SessionsSection: React.FC<{
                 </Table.Cell>
                 <ContributorName contributor={session} />
                 <Table.Cell fontSize="sm" color="fg.muted">
-                  {session.agent || MISSING_VALUE}
+                  {session.agent ? (
+                    <AgentLabel agent={session.agent} />
+                  ) : (
+                    MISSING_VALUE
+                  )}
                 </Table.Cell>
                 <Table.Cell textAlign="end" fontSize="sm">
                   {formatTokens(session.totalTokens)}

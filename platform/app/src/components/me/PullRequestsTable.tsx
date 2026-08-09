@@ -1,14 +1,37 @@
-import { Badge, Button, Skeleton, Table, Text, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  HStack,
+  Icon,
+  Skeleton,
+  Table,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { GitPullRequest, MoreVertical } from "lucide-react";
 import numeral from "numeral";
 import type React from "react";
 import { useMemo, useState } from "react";
+import {
+  LuArrowDown,
+  LuArrowUp,
+  LuArrowUpDown,
+  LuEye,
+  LuLink,
+} from "react-icons/lu";
 
+import { GitHub } from "~/components/icons/GitHub";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import {
+  computeRelativeWindow,
+  type Period,
+  type PeriodMode,
+  PeriodSelector,
+} from "~/components/PeriodSelector";
 import { ListTable } from "~/components/ui/ListTable";
 import { Link } from "~/components/ui/link";
 import { Menu } from "~/components/ui/menu";
 import { Pagination } from "~/components/ui/Pagination";
+import { SearchInput } from "~/components/ui/SearchInput";
 import { Tooltip } from "~/components/ui/tooltip";
 import { CostBreakdownTooltipContent } from "~/features/traces-v2/components/shared/CostBreakdownTooltip";
 import {
@@ -19,23 +42,38 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 
+import { formatLastUpdate } from "./lastUpdate";
 import {
   PeerComparisonCell,
   peerComparisonSentence,
 } from "./PeerComparisonCell";
+import { PullRequestStatusBadge } from "./PullRequestStatusBadge";
 import { percentileStats } from "./percentile";
-import { formatShortDate } from "./shortDate";
+import {
+  derivePullRequestStatus,
+  type PullRequestStatus,
+} from "./pullRequestStatus";
+import {
+  type PullRequestSortColumn,
+  type PullRequestSortState,
+  usePullRequestSort,
+} from "./usePullRequestSort";
 
 /**
  * What each pull request cost in assistant usage.
  *
  * Every row covers the pull request's whole lifetime: the sessions that ran on
- * its branch before it was opened count toward it too, and nothing here is
- * scoped to a time window. Which pull requests appear is a personal question
- * (the ones this project's own work touched); what each one cost is answered
- * across every project the viewer may read. Branches whose pull request has
- * not been opened yet are listed underneath rather than dropped, and stay the
- * viewer's own work.
+ * its branch before it was opened count toward it too. Which pull requests
+ * appear is a personal question (the ones this project's own work touched);
+ * what each one cost is answered across every project the viewer may read.
+ * Branches whose pull request has not been opened yet take their place among
+ * the pull requests rather than being listed after them, and stay the viewer's
+ * own work.
+ *
+ * The list opens on the most recently active work and on all time, because the
+ * page prices whole lifetimes and a window would hide the long-lived ones. The
+ * search box and the period narrow it from there, every column sorts, and a
+ * third click on a column hands the order back.
  *
  * Every numeric column reads the same way: the value, and a thin bar under it
  * saying how the row compares to the other rows on this page. Whether the
@@ -59,7 +97,12 @@ const STATUS_STALE_TIME_MS = 60_000;
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 const DEFAULT_PAGE_SIZE = 25;
 
-type PullRequestStatus = "open" | "draft" | "merged" | "closed";
+/**
+ * The window the period control shows while no period has been picked. It is
+ * a placeholder for the control's own inputs; the trigger reads "All time" and
+ * nothing is filtered until the reader chooses a range.
+ */
+const PLACEHOLDER_PERIOD_PRESET = "30d";
 
 interface LiveStatus {
   status: PullRequestStatus;
@@ -86,9 +129,16 @@ type ModelUsage = MappedPullRequestPayload["modelBreakdown"][number];
 type ContributorSummary =
   MappedPullRequestPayload["contributorsSummary"][number];
 
+/** A period the reader picked, and which way they picked it. */
+interface PeriodSelection {
+  period: Period;
+  mode: PeriodMode;
+}
+
 /**
  * One line of the table. A pull request row carries its number, title and
- * lifetime; a branch row is the same work before a pull request exists for it.
+ * stored status; a branch row is the same work before a pull request exists
+ * for it.
  */
 interface PullRequestListRow {
   key: string;
@@ -99,8 +149,11 @@ interface PullRequestListRow {
     number: number;
     title: string;
     htmlUrl: string;
-    openedAtMs: number;
   } | null;
+  /** The status the last read of GitHub stored, or null for a branch row. */
+  snapshotStatus: PullRequestStatus | null;
+  /** When this row's counted work last ran, epoch ms, 0 when unknown. */
+  lastActivityAtMs: number;
   sessionsCount: number;
   totalTokens: number;
   costUsd: number | null;
@@ -111,20 +164,6 @@ interface PullRequestListRow {
   /** Whether the organization's connection reaches this repository. */
   repositoryCovered: boolean;
 }
-
-const STATUS_LABELS: Record<PullRequestStatus, string> = {
-  open: "Open",
-  draft: "Draft",
-  merged: "Merged",
-  closed: "Closed",
-};
-
-const STATUS_PALETTES: Record<PullRequestStatus, string> = {
-  open: "green",
-  draft: "gray",
-  merged: "orange",
-  closed: "red",
-};
 
 /** The placeholder for a value a row does not have. */
 const MISSING_VALUE = "—";
@@ -185,7 +224,7 @@ function useLiveStatuses({
     return map;
   }, [query.data]);
 
-  return { byRef, isLoading: query.isLoading };
+  return { byRef };
 }
 
 export function PullRequestsTable({ projectId }: { projectId: string }) {
@@ -246,36 +285,128 @@ export function PullRequestsTable({ projectId }: { projectId: string }) {
   );
 }
 
-/** The rows themselves, one page at a time, once there are rows to show. */
+/** The rows themselves, narrowed and ordered, one page at a time. */
 const ListedPullRequests: React.FC<{
   projectId: string;
   rows: PullRequestListRow[];
   installUrl: string | null;
   canManageOrganization: boolean;
 }> = ({ projectId, rows, installUrl, canManageOrganization }) => {
-  const { openDrawer } = useDrawer();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
+  const [search, setSearch] = useState("");
+  const [periodSelection, setPeriodSelection] =
+    useState<PeriodSelection | null>(null);
 
-  // A refetch can leave fewer rows than the page the reader is already on, and
-  // the pager clamps only what it prints. Slicing on the stored page would
-  // empty the table under a footer reading "Page 1 of 1", so the slice, the
-  // pager and the next click all work off the clamped page.
-  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const filteredRows = useMemo(
+    () =>
+      rows.filter(
+        (row) =>
+          matchesPullRequestSearch({ row, query: search }) &&
+          isWithinPeriod({
+            lastActivityAtMs: row.lastActivityAtMs,
+            period: periodSelection?.period ?? null,
+          }),
+      ),
+    [rows, search, periodSelection],
+  );
+  const { sorted, sort, onSort } = usePullRequestSort({ rows: filteredRows });
+
+  // A refetch, a search or a narrower period can leave fewer rows than the page
+  // the reader is already on, and the pager clamps only what it prints. Slicing
+  // on the stored page would empty the table under a footer reading "Page 1 of
+  // 1", so the slice, the pager and the next click all work off the clamped
+  // page.
+  const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
   const currentPage = Math.min(page, pageCount);
   const visibleRows = useMemo(
-    () => rows.slice((currentPage - 1) * pageSize, currentPage * pageSize),
-    [rows, currentPage, pageSize],
+    () => sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [sorted, currentPage, pageSize],
   );
-  const statuses = useLiveStatuses({ projectId, rows: visibleRows });
-  const { tokenStats, costStats } = usePageStats(visibleRows);
 
   return (
     <VStack align="stretch" gap={3} width="full">
+      <PullRequestsToolbar
+        search={search}
+        periodSelection={periodSelection}
+        onSearchChange={(value) => {
+          setSearch(value);
+          setPage(1);
+        }}
+        onPeriodChange={(selection) => {
+          setPeriodSelection(selection);
+          setPage(1);
+        }}
+      />
+      {sorted.length === 0 ? (
+        <Text fontSize="sm" color="fg.muted">
+          No pull requests match
+        </Text>
+      ) : (
+        <OnePageOfPullRequests
+          projectId={projectId}
+          rows={visibleRows}
+          totalCount={sorted.length}
+          page={currentPage}
+          pageSize={pageSize}
+          sort={sort}
+          installUrl={installUrl}
+          canManageOrganization={canManageOrganization}
+          onSort={(column) => {
+            onSort(column);
+            setPage(1);
+          }}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
+      )}
+    </VStack>
+  );
+};
+
+/**
+ * The page the reader is looking at, with the two reads that only make sense
+ * for the rows actually on it: what GitHub says about each one right now, and
+ * how each number compares to its peers here.
+ */
+const OnePageOfPullRequests: React.FC<{
+  projectId: string;
+  rows: PullRequestListRow[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  sort: PullRequestSortState;
+  installUrl: string | null;
+  canManageOrganization: boolean;
+  onSort: (column: PullRequestSortColumn) => void;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+}> = ({
+  projectId,
+  rows,
+  totalCount,
+  page,
+  pageSize,
+  sort,
+  installUrl,
+  canManageOrganization,
+  onSort,
+  onPageChange,
+  onPageSizeChange,
+}) => {
+  const { openDrawer } = useDrawer();
+  const statuses = useLiveStatuses({ projectId, rows });
+  const { tokenStats, costStats } = usePageStats(rows);
+
+  return (
+    <>
       <ListTable size="sm">
-        <TableHeaderRow />
+        <TableHeaderRow sort={sort} onSort={onSort} />
         <Table.Body>
-          {visibleRows.map((row) => (
+          {rows.map((row) => (
             <PullRequestRow
               key={row.key}
               row={row}
@@ -284,7 +415,6 @@ const ListedPullRequests: React.FC<{
                   ? statuses.byRef.get(statusKeyOf(row))
                   : undefined
               }
-              isStatusLoading={statuses.isLoading}
               installUrl={installUrl}
               canManageOrganization={canManageOrganization}
               tokenStats={tokenStats}
@@ -295,20 +425,104 @@ const ListedPullRequests: React.FC<{
         </Table.Body>
       </ListTable>
       <Pagination
-        page={currentPage}
+        page={page}
         pageSize={pageSize}
-        totalCount={rows.length}
+        totalCount={totalCount}
         pageSizeOptions={PAGE_SIZE_OPTIONS}
         unitLabel="pull requests"
-        onPageChange={setPage}
-        onPageSizeChange={(size) => {
-          setPageSize(size);
-          setPage(1);
-        }}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
       />
-    </VStack>
+    </>
   );
 };
+
+/**
+ * The two ways the list narrows: a word, and a stretch of time. Both are the
+ * table's own state rather than the address bar's, because the page is one
+ * table rather than a whole surface, and a period the reader never asked for
+ * would hide the long-lived pull requests this page exists to price.
+ */
+const PullRequestsToolbar: React.FC<{
+  search: string;
+  periodSelection: PeriodSelection | null;
+  onSearchChange: (value: string) => void;
+  onPeriodChange: (selection: PeriodSelection | null) => void;
+}> = ({ search, periodSelection, onSearchChange, onPeriodChange }) => (
+  <HStack gap={2} width="full" justify="space-between">
+    <SearchInput
+      value={search}
+      placeholder="Search pull requests"
+      maxWidth="320px"
+      onChange={(event) => onSearchChange(event.target.value)}
+    />
+    <PeriodSelector
+      period={
+        periodSelection?.period ??
+        computeRelativeWindow(PLACEHOLDER_PERIOD_PRESET, new Date())
+      }
+      mode={periodSelection?.mode ?? "relative"}
+      label={periodSelection ? undefined : "All time"}
+      setPeriod={(startDate, endDate) =>
+        onPeriodChange({ period: { startDate, endDate }, mode: "absolute" })
+      }
+      setRelativePeriod={(presetKey) =>
+        onPeriodChange({
+          period: computeRelativeWindow(presetKey, new Date()),
+          mode: "relative",
+        })
+      }
+      clearPeriod={() => onPeriodChange(null)}
+    />
+  </HStack>
+);
+
+/**
+ * Whether a row survives the search box. A query that is a number, with or
+ * without GitHub's leading hash, also matches the pull request number, so
+ * "#4218" and "4218" both find it; a query carrying anything else is not a
+ * number and never matches one.
+ */
+function matchesPullRequestSearch({
+  row,
+  query,
+}: {
+  row: PullRequestListRow;
+  query: string;
+}): boolean {
+  const needle = query.trim().toLowerCase();
+  if (needle === "") return true;
+
+  const digits = needle.startsWith("#") ? needle.slice(1) : needle;
+  if (
+    /^\d+$/.test(digits) &&
+    row.pullRequest !== null &&
+    String(row.pullRequest.number).includes(digits)
+  ) {
+    return true;
+  }
+
+  return [
+    row.pullRequest?.title ?? "",
+    row.headBranch,
+    row.repositoryFullName,
+  ].some((field) => field.toLowerCase().includes(needle));
+}
+
+/** Whether a row's last update falls inside the period, if there is one. */
+function isWithinPeriod({
+  lastActivityAtMs,
+  period,
+}: {
+  lastActivityAtMs: number;
+  period: Period | null;
+}): boolean {
+  if (period === null) return true;
+  return (
+    lastActivityAtMs >= period.startDate.getTime() &&
+    lastActivityAtMs <= period.endDate.getTime()
+  );
+}
 
 /**
  * Where each numeric column's values sit, measured against the page the reader
@@ -358,21 +572,129 @@ function statusKeyOf(row: PullRequestListRow): string {
   });
 }
 
-const TableHeaderRow: React.FC = () => (
+const TableHeaderRow: React.FC<{
+  sort: PullRequestSortState;
+  onSort: (column: PullRequestSortColumn) => void;
+}> = ({ sort, onSort }) => (
   <Table.Header>
     <Table.Row>
-      <Table.ColumnHeader>Pull request</Table.ColumnHeader>
-      <Table.ColumnHeader>Title</Table.ColumnHeader>
-      <Table.ColumnHeader>Status</Table.ColumnHeader>
-      <Table.ColumnHeader>Opened</Table.ColumnHeader>
-      <Table.ColumnHeader textAlign="end">Sessions</Table.ColumnHeader>
-      <Table.ColumnHeader>Models</Table.ColumnHeader>
-      <Table.ColumnHeader textAlign="end">Tokens</Table.ColumnHeader>
-      <Table.ColumnHeader textAlign="end">Token cost</Table.ColumnHeader>
+      <SortableColumnHeader
+        label="Pull request"
+        column="number"
+        sort={sort}
+        onSort={onSort}
+      />
+      <SortableColumnHeader
+        label="Title"
+        column="title"
+        sort={sort}
+        onSort={onSort}
+      />
+      <SortableColumnHeader
+        label="Status"
+        column="status"
+        sort={sort}
+        onSort={onSort}
+      />
+      <SortableColumnHeader
+        label="Last update"
+        column="lastActivity"
+        sort={sort}
+        onSort={onSort}
+      />
+      <SortableColumnHeader
+        label="Sessions"
+        column="sessions"
+        sort={sort}
+        onSort={onSort}
+        align="end"
+      />
+      <SortableColumnHeader
+        label="Models"
+        column="models"
+        sort={sort}
+        onSort={onSort}
+      />
+      <SortableColumnHeader
+        label="Tokens"
+        column="tokens"
+        sort={sort}
+        onSort={onSort}
+        align="end"
+      />
+      <SortableColumnHeader
+        label="Token cost"
+        column="cost"
+        sort={sort}
+        onSort={onSort}
+        align="end"
+      />
       <Table.ColumnHeader width={12} />
     </Table.Row>
   </Table.Header>
 );
+
+/**
+ * A heading that sorts. The arrow says which column the table is ordered by
+ * and which way, and `aria-sort` on the header itself says the same thing to a
+ * reader who cannot see the arrow: without it someone could sort the table by
+ * keyboard and have no way to learn that they had.
+ */
+const SortableColumnHeader: React.FC<{
+  label: string;
+  column: PullRequestSortColumn;
+  sort: PullRequestSortState;
+  onSort: (column: PullRequestSortColumn) => void;
+  align?: "start" | "end";
+}> = ({ label, column, sort, onSort, align = "start" }) => {
+  const active = sort.column === column;
+  const ArrowIcon = !active
+    ? LuArrowUpDown
+    : sort.direction === "asc"
+      ? LuArrowUp
+      : LuArrowDown;
+
+  return (
+    <Table.ColumnHeader
+      aria-sort={
+        active
+          ? sort.direction === "asc"
+            ? "ascending"
+            : "descending"
+          : "none"
+      }
+    >
+      <HStack
+        gap={1}
+        // The right-aligned columns keep their label pinned to the edge, so it
+        // does not shift sideways when the arrow changes width.
+        justify={align === "end" ? "flex-end" : "flex-start"}
+        cursor="pointer"
+        onClick={() => onSort(column)}
+        userSelect="none"
+        role="button"
+        tabIndex={0}
+        aria-label={`Sort by ${label}`}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            // Space scrolls the page by default; a control that responds to it
+            // has to say so.
+            event.preventDefault();
+            onSort(column);
+          }
+        }}
+        _focusVisible={{ outline: "2px solid", outlineColor: "blue.focusRing" }}
+      >
+        <Text>{label}</Text>
+        <Icon
+          as={ArrowIcon}
+          boxSize="12px"
+          color={active ? "fg" : "fg.muted"}
+        />
+      </HStack>
+    </Table.ColumnHeader>
+  );
+};
 
 const NotConnectedState: React.FC<{
   installUrl: string | null;
@@ -398,7 +720,6 @@ const NotConnectedState: React.FC<{
 const PullRequestRow: React.FC<{
   row: PullRequestListRow;
   status: LiveStatus | undefined;
-  isStatusLoading: boolean;
   installUrl: string | null;
   canManageOrganization: boolean;
   tokenStats: { p95: number; hasStats: boolean };
@@ -407,7 +728,6 @@ const PullRequestRow: React.FC<{
 }> = ({
   row,
   status,
-  isStatusLoading,
   installUrl,
   canManageOrganization,
   tokenStats,
@@ -441,38 +761,33 @@ const PullRequestRow: React.FC<{
     </Table.Cell>
     <Table.Cell maxWidth="360px">
       {row.pullRequest ? (
-        <>
-          <Text fontSize="sm" fontWeight="medium" truncate>
-            {row.pullRequest.title || row.headBranch}
-          </Text>
-          <Text fontSize="xs" color="fg.subtle" fontFamily="mono" truncate>
-            {row.repositoryFullName}
-          </Text>
-        </>
+        <Text fontSize="sm" fontWeight="medium" truncate>
+          {row.pullRequest.title || row.headBranch}
+        </Text>
       ) : (
-        <>
-          <Text fontSize="sm" fontFamily="mono" truncate>
-            {row.headBranch}
-          </Text>
-          <Text fontSize="xs" color="fg.muted">
-            No pull request yet
-          </Text>
-          <Text fontSize="xs" color="fg.subtle" fontFamily="mono" truncate>
-            {row.repositoryFullName}
-          </Text>
-        </>
+        <Text fontSize="sm" fontFamily="mono" truncate>
+          {row.headBranch}
+        </Text>
       )}
+      <HStack gap={2} minWidth={0}>
+        <Text fontSize="xs" color="fg.subtle" fontFamily="mono" truncate>
+          {row.repositoryFullName}
+        </Text>
+        {!row.repositoryCovered && installUrl !== null ? (
+          <LinkRepositoryButton
+            installUrl={installUrl}
+            canManageOrganization={canManageOrganization}
+          />
+        ) : null}
+      </HStack>
     </Table.Cell>
     <Table.Cell>
-      <StatusChip
-        status={status}
-        isLoading={isStatusLoading && row.pullRequest !== null}
-      />
+      <StatusCell row={row} status={status} />
     </Table.Cell>
     <Table.Cell fontSize="sm" color="fg.muted" whiteSpace="nowrap">
-      {row.pullRequest
-        ? formatShortDate({ timestampMs: row.pullRequest.openedAtMs })
-        : MISSING_VALUE}
+      {row.lastActivityAtMs === 0
+        ? MISSING_VALUE
+        : formatLastUpdate({ timestampMs: row.lastActivityAtMs })}
     </Table.Cell>
     <Table.Cell textAlign="end" fontSize="sm">
       <SessionsCell row={row} />
@@ -502,6 +817,80 @@ const PullRequestRow: React.FC<{
     </Table.Cell>
   </Table.Row>
 );
+
+/**
+ * The invitation to bring a repository into the connection, offered on the row
+ * where the reader notices it is missing rather than on a settings page two
+ * navigations away.
+ */
+const LinkRepositoryButton: React.FC<{
+  installUrl: string;
+  canManageOrganization: boolean;
+}> = ({ installUrl, canManageOrganization }) => {
+  if (canManageOrganization) {
+    return (
+      <Button asChild size="xs" variant="outline" flexShrink={0}>
+        <a href={installUrl} onClick={(event) => event.stopPropagation()}>
+          <GitHub size={12} />
+          Link this repo
+        </a>
+      </Button>
+    );
+  }
+
+  return (
+    <Tooltip content="Ask an administrator to link this repository.">
+      {/* A disabled button fires no pointer events at all, so the hover would
+          never reach the tooltip and the reason would go unsaid. The span
+          carries the events, and a tab stop so it is reachable without a
+          pointer. */}
+      <span tabIndex={0}>
+        <Button
+          size="xs"
+          variant="outline"
+          disabled
+          flexShrink={0}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <GitHub size={12} />
+          Link this repo
+        </Button>
+      </span>
+    </Tooltip>
+  );
+};
+
+/**
+ * The pull request's state, drawn the way GitHub draws it. The stored snapshot
+ * answers straight away so the column is never blank while GitHub is asked,
+ * and the live answer replaces it the moment it lands.
+ */
+const StatusCell: React.FC<{
+  row: PullRequestListRow;
+  status: LiveStatus | undefined;
+}> = ({ row, status }) => {
+  if (row.snapshotStatus === null) {
+    return (
+      <Text fontSize="sm" color="fg.muted">
+        No PR yet
+      </Text>
+    );
+  }
+
+  if (status) {
+    return (
+      <PullRequestStatusBadge
+        status={status.status}
+        source={status.source}
+        mappedAt={status.mappedAt}
+      />
+    );
+  }
+
+  return (
+    <PullRequestStatusBadge status={row.snapshotStatus} source="payload" />
+  );
+};
 
 /** The session count, with who ran them behind a hover. */
 const SessionsCell: React.FC<{ row: PullRequestListRow }> = ({ row }) => {
@@ -614,63 +1003,6 @@ const TokenCostCell: React.FC<{
   );
 };
 
-/**
- * The pull request's current state. A snapshot answer is drawn back so it never
- * passes for a live one, and says in its tooltip how old it is.
- */
-const StatusChip: React.FC<{
-  status: LiveStatus | undefined;
-  isLoading: boolean;
-}> = ({ status, isLoading }) => {
-  if (isLoading) return <Skeleton height="20px" width="64px" />;
-  if (!status) {
-    return (
-      <Text fontSize="sm" color="fg.subtle">
-        {MISSING_VALUE}
-      </Text>
-    );
-  }
-
-  const label = STATUS_LABELS[status.status];
-  if (status.source === "live") {
-    return (
-      <Badge
-        size="sm"
-        colorPalette={STATUS_PALETTES[status.status]}
-        data-status-source="live"
-      >
-        {label}
-      </Badge>
-    );
-  }
-
-  const asOf = status.mappedAt
-    ? new Date(status.mappedAt).toLocaleDateString()
-    : null;
-  return (
-    <Tooltip
-      content={
-        asOf
-          ? `Last known status, from ${asOf}. GitHub is not answering right now.`
-          : "Last known status. GitHub is not answering right now."
-      }
-    >
-      <Badge
-        size="sm"
-        variant="outline"
-        colorPalette="gray"
-        color="fg.subtle"
-        data-status-source="snapshot"
-        // How stale the answer is only exists in the hover, so it gets a tab
-        // stop too.
-        tabIndex={0}
-      >
-        {label}
-      </Badge>
-    </Tooltip>
-  );
-};
-
 const RowActionsMenu: React.FC<{
   row: PullRequestListRow;
   installUrl: string | null;
@@ -708,18 +1040,23 @@ const RowActionsMenu: React.FC<{
         <Menu.Content>
           {onOpenDetail ? (
             <Menu.Item value="details" onClick={onOpenDetail}>
+              <LuEye />
               View details
             </Menu.Item>
           ) : null}
           <Menu.Item value="open" asChild>
             <a href={githubUrl} target="_blank" rel="noopener noreferrer">
+              <GitHub size={14} />
               Open on GitHub
             </a>
           </Menu.Item>
           {canOfferLinking &&
             (canManageOrganization ? (
               <Menu.Item value="link" asChild>
-                <a href={installUrl}>Link this repository</a>
+                <a href={installUrl}>
+                  <LuLink />
+                  Link this repository
+                </a>
               </Menu.Item>
             ) : (
               <Tooltip
@@ -733,6 +1070,7 @@ const RowActionsMenu: React.FC<{
                   opacity={0.5}
                   cursor="not-allowed"
                 >
+                  <LuLink />
                   Link this repository
                 </Menu.Item>
               </Tooltip>
@@ -753,8 +1091,13 @@ function toMappedListRow(row: MappedPullRequestPayload): PullRequestListRow {
       number: row.prNumber,
       title: row.title,
       htmlUrl: row.htmlUrl,
-      openedAtMs: row.prCreatedAtMs,
     },
+    snapshotStatus: derivePullRequestStatus({
+      state: row.state,
+      isDraft: row.isDraft,
+      prMergedAtMs: row.prMergedAtMs,
+    }),
+    lastActivityAtMs: row.lastActivityAtMs,
     sessionsCount: row.sessionsCount,
     totalTokens: row.totalTokens,
     costUsd: row.costUsd,
@@ -775,6 +1118,8 @@ function toBranchListRow(row: UnlinkedBranchPayload): PullRequestListRow {
     repositoryFullName: row.repositoryFullName,
     headBranch: row.headBranch,
     pullRequest: null,
+    snapshotStatus: null,
+    lastActivityAtMs: row.lastActivityAtMs,
     sessionsCount: row.sessionsCount,
     totalTokens: row.totalTokens,
     costUsd: row.costUsd,
@@ -787,18 +1132,14 @@ function toBranchListRow(row: UnlinkedBranchPayload): PullRequestListRow {
 }
 
 /**
- * Flatten the read into one ordered list: mapped pull requests newest first,
- * then the branches still waiting for one.
+ * Flatten the read into one list. The order is the table's own question, and
+ * a branch takes its place among the pull requests rather than after them.
  */
 function toListRows(data: UsagePayload | undefined): PullRequestListRow[] {
   if (!data) return [];
 
   return [
-    ...[...data.rows]
-      .sort((a, b) => b.prCreatedAtMs - a.prCreatedAtMs)
-      .map(toMappedListRow),
-    ...[...data.unlinked]
-      .sort((a, b) => b.sessionsCount - a.sessionsCount)
-      .map(toBranchListRow),
+    ...data.rows.map(toMappedListRow),
+    ...data.unlinked.map(toBranchListRow),
   ];
 }

@@ -10,6 +10,12 @@ export interface CodingAgentBranchSessionRow {
   sessionId: string;
   tenantId: string;
   startedAtMs: number;
+  /**
+   * When the session last produced an event, epoch ms, 0 when it never did.
+   * A long session's start time says when it began, not when it was last worked
+   * in, so this is what "last activity" is read from.
+   */
+  lastEventOccurredAtMs: number;
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;

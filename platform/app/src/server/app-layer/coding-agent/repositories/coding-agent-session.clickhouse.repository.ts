@@ -175,6 +175,9 @@ function toBranchSessionRow(
     sessionId: String(record.SessionId ?? ""),
     tenantId: String(record.TenantId ?? ""),
     startedAtMs: parseClickHouseDateTimeMs(String(record.StartedAt ?? "")),
+    lastEventOccurredAtMs: parseClickHouseDateTimeMs(
+      String(record.LastEventOccurredAt ?? ""),
+    ),
     inputTokens: asNumber(record.InputTokens),
     outputTokens: asNumber(record.OutputTokens),
     cacheReadTokens: asNumber(record.CacheReadTokens),

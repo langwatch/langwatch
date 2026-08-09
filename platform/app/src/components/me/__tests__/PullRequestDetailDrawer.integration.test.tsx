@@ -214,10 +214,13 @@ describe("the pull request detail drawer", () => {
       ).toBeInTheDocument();
       expect(screen.getByText("#4218")).toBeInTheDocument();
       expect(screen.getByText("acme/widgets")).toBeInTheDocument();
-      expect(screen.getByText("Open on GitHub").closest("a")).toHaveAttribute(
+      const githubLink = screen.getByText("Open on GitHub").closest("a");
+      expect(githubLink).toHaveAttribute(
         "href",
         "https://github.com/acme/widgets/pull/4218",
       );
+      expect(githubLink).toHaveAttribute("target", "_blank");
+      expect(githubLink?.getAttribute("rel")).toContain("noopener");
 
       expect(
         screen.getByRole("heading", { name: "Sessions" }),
@@ -237,11 +240,100 @@ describe("the pull request detail drawer", () => {
     it("lists a session by its facts and never by a title", () => {
       renderDrawer();
 
-      expect(screen.getAllByText("claude_code").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Claude Code").length).toBeGreaterThan(0);
+      expect(
+        document.body.querySelector(
+          'img[src="/images/external-icons/claude-code.svg"]',
+        ),
+      ).not.toBeNull();
       expect(screen.getByText("$5.00")).toBeInTheDocument();
       // Nothing that could be a session's own title reaches the reader: the
       // read carries none, and this drawer renders only what it carries.
       expect(document.body.textContent).not.toContain("session-a");
+    });
+  });
+
+  describe("given a pull request worked on by two different assistants", () => {
+    /** @scenario "The detail names each agent like its product, with its mark" */
+    it("names each assistant the way its own product is named, with its mark", () => {
+      pinDetail(
+        detailPayload({
+          contributors: [
+            contributorRow({ agent: "claude_code" }),
+            contributorRow({ agent: "codex" }),
+            contributorRow({ agent: "mystery_agent" }),
+          ],
+        }),
+      );
+
+      // The drawer is portalled, so the whole document is the container here.
+      renderDrawer();
+
+      expect(screen.getAllByText("Claude Code").length).toBeGreaterThan(0);
+      expect(
+        document.body.querySelector(
+          'img[src="/images/external-icons/claude-code.svg"]',
+        ),
+      ).not.toBeNull();
+      expect(screen.getByText("Codex")).toBeInTheDocument();
+      expect(
+        document.body.querySelector(
+          'img[src="/images/external-icons/codex.svg"]',
+        ),
+      ).not.toBeNull();
+
+      // An assistant this build cannot name keeps the spelling that arrived,
+      // rather than borrowing a mark that would name the wrong product.
+      const unknown = screen.getByText("mystery_agent").closest("td");
+      expect(unknown).not.toBeNull();
+      expect(unknown?.querySelector("img")).toBeNull();
+    });
+  });
+
+  describe("given an open pull request detail", () => {
+    /** @scenario "The detail's GitHub button opens the pull request in a new tab" */
+    it("sends its GitHub button to the pull request in a new tab", () => {
+      pinDetail(detailPayload());
+
+      renderDrawer();
+
+      // A new tab is what leaves the detail where it was, so the target is the
+      // behavior under test rather than a detail of the markup.
+      const link = screen.getByText("Open on GitHub").closest("a");
+      expect(link).toHaveAttribute(
+        "href",
+        "https://github.com/acme/widgets/pull/4218",
+      );
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link?.getAttribute("rel")).toContain("noopener");
+      expect(
+        screen.getByText("Link sessions to pull requests"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("given a pull request that was merged", () => {
+    /** @scenario "The detail tells the same status story as the list" */
+    it("draws the merged badge the table draws, from the same payload", () => {
+      const base = detailPayload();
+      pinDetail(
+        detailPayload({
+          pullRequest: {
+            ...base.pullRequest,
+            state: "closed",
+            prClosedAtMs: Date.parse("2026-07-02T09:00:00Z"),
+            prMergedAtMs: Date.parse("2026-07-02T09:00:00Z"),
+          },
+        }),
+      );
+
+      renderDrawer();
+
+      // Merged wins over the close GitHub records alongside it, and the badge
+      // says where the answer came from so it cannot pass for a live one.
+      const badge = screen.getByText("Merged");
+      expect(badge).toHaveAttribute("data-status", "merged");
+      expect(badge).toHaveAttribute("data-status-source", "payload");
     });
   });
 

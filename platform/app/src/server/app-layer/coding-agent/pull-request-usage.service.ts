@@ -85,6 +85,38 @@ function nowMs(deps: { now?: () => number }): number {
   return deps.now?.() ?? Date.now();
 }
 
+/**
+ * When one session last did anything.
+ *
+ * A session that ran for hours started once and kept working, so its start
+ * time is the wrong answer to "when was this last touched". The last event's
+ * timestamp is the right one, but it is 0 for a session whose fold never
+ * recorded one, and a 0 would drag a row to the bottom of a recency sort, so
+ * the start time is the floor.
+ */
+function sessionActivityAtMs({
+  startedAtMs,
+  lastEventOccurredAtMs,
+}: {
+  startedAtMs: number;
+  lastEventOccurredAtMs: number;
+}): number {
+  return Math.max(startedAtMs, lastEventOccurredAtMs || 0);
+}
+
+/** The latest activity across a set of sessions, 0 when there are none. */
+function latestActivityAtMs(
+  sessions: ReadonlyArray<{
+    startedAtMs: number;
+    lastEventOccurredAtMs: number;
+  }>,
+): number {
+  return sessions.reduce(
+    (latest, session) => Math.max(latest, sessionActivityAtMs(session)),
+    0,
+  );
+}
+
 /** The pull request itself: identity and lifetime, never its body. */
 export interface PullRequestIdentity {
   repositoryHost: string;
@@ -189,6 +221,8 @@ export interface ContributorSummary extends ContributorIdentity {
 export interface PersonalPullRequestRow extends PullRequestIdentity, CostSplit {
   /** The pull request's own GitHub title, from the stored snapshot. */
   title: string;
+  /** When this row's counted work last ran, epoch ms, from our own sessions rather than GitHub. */
+  lastActivityAtMs: number;
   sessionsCount: number;
   inputTokens: number;
   outputTokens: number;
@@ -204,6 +238,8 @@ export interface UnlinkedBranchRollup extends CostSplit {
   repositoryHost: string;
   repositoryFullName: string;
   headBranch: string;
+  /** When this row's counted work last ran, epoch ms, from our own sessions rather than GitHub. */
+  lastActivityAtMs: number;
   sessionsCount: number;
   totalTokens: number;
   /** Whether the organization's connection reaches this repository at all. */
@@ -259,6 +295,8 @@ export interface PersonalSessionLookup {
     Array<{
       sessionId: string;
       startedAtMs: number;
+      /** When the session last produced an event, epoch ms, 0 when it never did. */
+      lastEventOccurredAt: number;
       agent: string;
       repositoryHost: string;
       repositoryOwner: string;
@@ -547,6 +585,7 @@ export class PullRequestUsageService {
       return {
         ...toIdentity(pullRequest),
         title: pullRequest.title,
+        lastActivityAtMs: latestActivityAtMs(attached),
         sessionsCount: totals.sessionsCount,
         inputTokens: totals.inputTokens,
         outputTokens: totals.outputTokens,
@@ -982,6 +1021,7 @@ interface PersonalRepositoryGroup {
   sessions: Array<{
     sessionId: string;
     startedAtMs: number;
+    lastEventOccurredAtMs: number;
     agent: string;
     headBranch: string;
     inputTokens: number;
@@ -1024,6 +1064,7 @@ function groupSessionsByRepository(
     group.sessions.push({
       sessionId: session.sessionId,
       startedAtMs: session.startedAtMs,
+      lastEventOccurredAtMs: session.lastEventOccurredAt,
       agent: session.agent,
       headBranch: session.gitBranch,
       inputTokens: session.inputTokens,
@@ -1058,6 +1099,9 @@ function unlinkedRollupsFor({
     repositoryHost: group.repositoryHost,
     repositoryFullName: group.repositoryFullName,
     headBranch,
+    // The branch rollup stays personal, so its recency is too: only the
+    // viewer's own sessions on this branch can move it.
+    lastActivityAtMs: latestActivityAtMs(branchSessions),
     sessionsCount: branchSessions.length,
     totalTokens: branchSessions.reduce((sum, s) => sum + tokensOf(s), 0),
     costUsd: sumOf(branchSessions, "costUsd"),

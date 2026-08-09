@@ -68,7 +68,7 @@ const isValidDateString = (dateString: string) => {
  * Day-based presets snap the start to start-of-day to match the historical
  * behaviour of the day quick selectors.
  */
-const computeRelativeWindow = (
+export const computeRelativeWindow = (
   presetKey: RelativePresetKey,
   now: Date,
 ): Period => {
