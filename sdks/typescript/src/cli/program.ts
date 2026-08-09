@@ -2266,17 +2266,33 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     spendEventsCmd
       .command("summary")
       .description("Per-key spend rollups, the reconciliation checksum fast path (settled requests counted separately, never in cost sums)")
-      .option("--group-by <key>", "virtual_key (default) or end_user")
+      .option("--group-by <keys>", "One or two of virtual_key, end_user, project, model, provider, principal, request_type (comma separated), default virtual_key")
+      .option("--bucket <size>", "Add a time column: none (default), hour or day")
+      .option("--timezone <zone>", "Zone the time bucket falls on, default UTC")
+      .option("--allow-unstable", "Group by model, provider or time over a range still receiving outcomes, accepting approximate totals")
       .option("--from <instant>", "Range start (ISO or unix ms), default 24h ago")
       .option("--to <instant>", "Range end (ISO or unix ms), default now")
       .option("--project <id>", "Narrow to one project")
-      .option("--limit <n>", "Max rows, default 500")
+      .option("--team <id>", "Narrow to the projects one team owns")
+      .option("--model <name...>", "Narrow to these models")
+      .option("--provider <id...>", "Narrow to these model providers")
+      .option("--end-user <id...>", "Narrow to these end users")
+      .option("--metadata <pair...>", "Narrow by your own request metadata, written key=value")
+      .option("--limit <n>", "Rows fetched per page, default 500. The walk always covers the whole window")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (options: {
       groupBy?: string;
+      bucket?: string;
+      timezone?: string;
+      allowUnstable?: boolean;
       from?: string;
       to?: string;
       project?: string;
+      team?: string;
+      model?: string[];
+      provider?: string[];
+      endUser?: string[];
+      metadata?: string[];
       limit?: string;
     }) => {
       const { spendSummaryCommand: impl } = await import("./commands/spend-events/summary.js");

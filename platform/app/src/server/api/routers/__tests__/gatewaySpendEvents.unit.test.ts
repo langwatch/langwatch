@@ -125,10 +125,15 @@ describe("gatewaySpendEventsRouter", () => {
     const caller = buildCaller();
     await caller.list({
       ...BASE_INPUT,
-      virtualKeyId: "vk_1",
-      endUserId: "enduser-9",
-      model: "gpt-5",
-      status: "error",
+      filters: {
+        virtualKeyIds: ["vk_1"],
+        endUserIds: ["enduser-9"],
+        models: ["gpt-5"],
+        providerKeys: ["pk-openai"],
+        labels: ["billable"],
+        metadata: [{ key: "customer_tier", values: ["gold"] }],
+        status: "error",
+      },
       cursor: { occurredAtMs: 123, gatewayRequestId: "req_0" },
       limit: 25,
     });
@@ -137,9 +142,12 @@ describe("gatewaySpendEventsRouter", () => {
       fromMs: BASE_INPUT.fromMs,
       toMs: BASE_INPUT.toMs,
       filters: {
-        virtualKeyId: "vk_1",
-        endUserId: "enduser-9",
-        model: "gpt-5",
+        virtualKeyIds: ["vk_1"],
+        endUserIds: ["enduser-9"],
+        models: ["gpt-5"],
+        providerKeys: ["pk-openai"],
+        labels: ["billable"],
+        metadata: [{ key: "customer_tier", values: ["gold"] }],
         status: "error",
       },
       cursor: { occurredAtMs: 123, gatewayRequestId: "req_0" },
