@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estimateFiringRate } from "../firingRate";
+import { estimateFiringRate, estimateRatePerDay } from "../firingRate";
 
 const immediate = (matchesLast7Days: number) =>
   estimateFiringRate({ matchesLast7Days, cadence: "immediate", batches: true });
@@ -61,5 +61,63 @@ describe("estimateFiringRate", () => {
         }),
       ).toBe("About 1 time an hour, batched every hour");
     });
+  });
+});
+
+describe("estimateRatePerDay", () => {
+  describe("when firing per match (immediate or persist)", () => {
+    /** @scenario "An over-ceiling condition on a persist action is flagged" */
+    it("divides the 7-day count into matches a day", () => {
+      expect(
+        estimateRatePerDay({
+          matchesLast7Days: 700,
+          cadence: "immediate",
+          batches: true,
+        }),
+      ).toBe(100);
+    });
+
+    it("keeps the raw per-match rate for a persist action on a digest cadence", () => {
+      expect(
+        estimateRatePerDay({
+          matchesLast7Days: 7000,
+          cadence: "hourly_digest",
+          batches: false,
+        }),
+      ).toBe(1000);
+    });
+  });
+
+  describe("when a notify action batches on a digest cadence", () => {
+    it("caps the rate at the digest-window frequency", () => {
+      expect(
+        estimateRatePerDay({
+          matchesLast7Days: 7000,
+          cadence: "hourly_digest",
+          batches: true,
+        }),
+      ).toBe(24);
+    });
+
+    it("keeps the raw rate when matches are sparser than the windows", () => {
+      expect(
+        estimateRatePerDay({
+          matchesLast7Days: 42,
+          cadence: "5min_digest",
+          batches: true,
+        }),
+      ).toBe(6);
+    });
+  });
+
+  it("feeds the phrase it delegates to", () => {
+    const input = {
+      matchesLast7Days: 700,
+      cadence: "immediate" as const,
+      batches: true,
+    };
+    expect(estimateFiringRate(input)).toContain(
+      String(Math.round(estimateRatePerDay(input) / 24)),
+    );
   });
 });
