@@ -186,16 +186,29 @@ export function BudgetCreateDrawer({
     onOpenChange(false);
   };
 
+  /**
+   * The refusal was about the scope that was picked, and the retry beside it
+   * resubmits the form as it stands with `allowUnreachable` set. Left behind
+   * after a different scope is picked, that button would wave through a
+   * scope the server never refused.
+   */
+  const clearRefusal = () => {
+    setSubmitError(null);
+    setScopeUnreachable(false);
+  };
+
   const pickKind = (kind: ScopeKind) => {
     setScopeKind(kind);
-    setSubmitError(null);
-    // The refusal was about the target that was picked; a different one is
-    // a different question, so it must not carry a stale answer.
-    setScopeUnreachable(false);
+    clearRefusal();
     // Seed the target with the current context where one exists.
     if (kind === "TEAM") setTargetId(team?.id ?? "");
     else if (kind === "PROJECT") setTargetId(project?.id ?? "");
     else setTargetId("");
+  };
+
+  const pickTarget = (id: string) => {
+    setTargetId(id);
+    clearRefusal();
   };
 
   const targetOptions: Array<{ id: string; name: string }> | null =
@@ -369,7 +382,7 @@ export function BudgetCreateDrawer({
                     value={targetId}
                     aria-label="Budget target"
                     data-testid="budget-target"
-                    onChange={(e) => setTargetId(e.target.value)}
+                    onChange={(e) => pickTarget(e.target.value)}
                   >
                     <option value="">
                       {targetsLoading
