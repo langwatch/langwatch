@@ -111,9 +111,10 @@ export function PullRequestDetailDrawer({
             {detail ? (
               <Button
                 asChild
-                colorPalette="gray"
-                variant="solid"
                 flexShrink={0}
+                bg={{ base: "gray.900", _dark: "gray.100" }}
+                color={{ base: "white", _dark: "gray.900" }}
+                _hover={{ bg: { base: "gray.800", _dark: "gray.200" } }}
               >
                 <a
                   href={detail.pullRequest.htmlUrl}
