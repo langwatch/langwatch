@@ -79,8 +79,10 @@ Feature: Judge Quality Analysis
 
   Scenario: Metrics trend chart is shown when multiple evaluation runs exist
     Given evaluator "Answer Correctness" has run across 3 different date ranges
+    And some runs used different evaluator versions
     When I open the "Judge Quality" tab
     Then I see a timeseries chart showing Precision, Recall, and F1 over time
+    And each data point is labelled with its evaluator version
     And I can identify whether a recent prompt change improved or degraded reliability
 
   Scenario: No trend chart when only one evaluation run exists
@@ -95,11 +97,11 @@ Feature: Judge Quality Analysis
 
   Scenario: Analysis is scoped to the current project
     Given I am in project "Project A"
-    And project "Project B" has annotations for the same evaluator slug
+    And project "Project B" has annotations for the same evaluator
     When I open the "Judge Quality" tab
     Then I only see annotations from "Project A"
 
   Scenario: Analysis compares judge score pass/fail against annotation thumbs up/down
-    Given a trace where the judge scored 0.8 with a pass threshold of 0.5
+    Given a trace where the judge classified the result as pass
     And the same trace has a human annotation of thumbs down
     Then this trace is counted as a False Positive in the confusion matrix
