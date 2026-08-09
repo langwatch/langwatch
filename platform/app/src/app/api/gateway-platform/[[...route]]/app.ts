@@ -43,7 +43,6 @@ import {
   type BudgetScope,
   GatewayBudgetService,
 } from "~/server/gateway/budget.service";
-import { resolveScopeReach } from "~/server/gateway/budgetScopeReach";
 import type { CacheRuleCursor } from "~/server/gateway/cacheRule.service";
 import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
 import {
@@ -1739,11 +1738,7 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
           });
           const [memberCounts, reach] = await Promise.all([
             groupMemberCounts([row]),
-            // Resolved again rather than carried out of the guard, which
-            // only runs for the three scopes it can refuse. A create
-            // response that omitted the field would not equal the row the
-            // very next read returns, and callers do compare those.
-            resolveScopeReach({ prisma, organizationId, scope: row }),
+            service.scopeReach({ organizationId, scope: row }),
           ]);
           return {
             status: 201,

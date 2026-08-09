@@ -261,6 +261,17 @@ Feature: Gateway budget targeting
     # refusal is a guardrail, not a prohibition.
 
   @integration
+  Scenario: The offer to keep an unreachable budget does not follow the form to another scope
+    Given an admin whose budget was refused as unreachable
+    When they point the form at a different scope
+    Then the offer to keep it anyway is withdrawn
+    And creating it asks the question again for the scope now chosen
+    # "Create it anyway" resubmits the form as it stands. Left on screen
+    # after the scope changes, it would keep a scope the server was never
+    # asked about, which is the guardrail quietly not running on the one
+    # budget the admin had already been warned about.
+
+  @integration
   Scenario: A budget that nothing reaches says so when it is read back
     Given a budget on a project no active key sends traffic to
     When it is read through the API

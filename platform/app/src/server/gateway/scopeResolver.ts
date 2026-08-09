@@ -171,6 +171,10 @@ function parseModelProviderIds(raw: unknown): string[] {
  *     `project_id` / `project_otlp_token` in the bundle and the gateway
  *     skips span export rather than 500-ing.
  *
+ * An archived project answers at none of the three stages. Project deletion
+ * is soft, so without that the destination a customer deleted would go on
+ * receiving their traces and carrying their spend.
+ *
  * Null is a read-path tolerance for keys that already exist, not a shape
  * new writes may take: VirtualKeyService refuses create/update when this
  * resolves null (`trace_project_required`), because dropped traces mean
@@ -208,11 +212,11 @@ export type TraceProjectSource =
  *
  * The paired async resolver returns the rule that DID answer, which needs
  * the database. The two agree except when the destination a key names has
- * since been deleted: this reports `explicit`, because that is what the key
- * says, while resolution falls through to governance. Reporting the key's
- * own claim is the useful answer for a caller auditing configuration, and
- * the deleted project is visible to them as a `trace_project_id` they
- * cannot fetch.
+ * since been deleted or archived: this reports `explicit`, because that is
+ * what the key says, while resolution falls through to the key's scope and
+ * then to governance. Reporting the key's own claim is the useful answer
+ * for a caller auditing configuration, and the gone project is visible to
+ * them as a `trace_project_id` they cannot fetch.
  *
  * Pure on purpose: a key listing renders hundreds of rows and must not
  * resolve a destination per row to describe one.
@@ -342,7 +346,9 @@ function uniqueProjectScopeIds(
 /**
  * Projects named by a key's single access scope. Deliberately not
  * org-pinned, matching the one-key lookup this replaced: a scope row is
- * validated against the organization when it is written.
+ * validated against the organization when it is written. Archived projects
+ * are skipped, so a key scoped to a project the customer deleted falls
+ * through to governance instead of tracing into it.
  */
 async function scopedDestinations(
   client: ProjectClient,
@@ -350,7 +356,10 @@ async function scopedDestinations(
 ): Promise<Map<string, ProjectRow>> {
   if (scopeIdByIndex.size === 0) return new Map();
   const rows = await client.project.findMany({
-    where: { id: { in: [...new Set(scopeIdByIndex.values())] } },
+    where: {
+      id: { in: [...new Set(scopeIdByIndex.values())] },
+      archivedAt: null,
+    },
     select: { id: true, teamId: true, apiKey: true },
   });
   return new Map(rows.map((row) => [row.id, row]));
@@ -367,6 +376,12 @@ async function projectsByOrgAndId(
       where: {
         id: { in: [...new Set(args.ids)] },
         team: { organizationId: { in: args.organizationIds } },
+        // An archived project is a project the customer deleted, so it is
+        // not a place their traces or their spend may go. Constraining the
+        // id and the organization alone let an archived destination answer
+        // as `explicit`, which is the write-path refusal not firing and the
+        // gateway going on exporting into it.
+        archivedAt: null,
       },
       select: {
         id: true,
@@ -383,7 +398,12 @@ async function projectsByOrgAndId(
   );
 }
 
-/** Oldest governance project per organization, matching the one-key rule. */
+/**
+ * Oldest live governance project per organization, matching the one-key
+ * rule. An archived one is passed over for the next, and an organization
+ * whose governance projects are all archived answers as one that never had
+ * one: null, and the gateway skips span export.
+ */
 async function governanceProjectByOrg(
   client: ProjectClient,
   organizationIds: string[],
@@ -393,6 +413,7 @@ async function governanceProjectByOrg(
       where: {
         kind: "internal_governance",
         team: { organizationId: { in: organizationIds } },
+        archivedAt: null,
       },
       select: {
         id: true,
