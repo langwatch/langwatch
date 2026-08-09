@@ -843,15 +843,10 @@ const LinkRepositoryButton: React.FC<{
       {/* A disabled button fires no pointer events at all, so the hover would
           never reach the tooltip and the reason would go unsaid. The span
           carries the events, and a tab stop so it is reachable without a
-          pointer. */}
-      <span tabIndex={0}>
-        <Button
-          size="xs"
-          variant="outline"
-          disabled
-          flexShrink={0}
-          onClick={(event) => event.stopPropagation()}
-        >
+          pointer. It also swallows the click: the button under it is inert,
+          and a click meant for it must not fall through to the row. */}
+      <span tabIndex={0} onClick={(event) => event.stopPropagation()}>
+        <Button size="xs" variant="outline" disabled flexShrink={0}>
           <GitHub size={12} />
           Link this repo
         </Button>

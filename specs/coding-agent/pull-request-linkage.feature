@@ -184,6 +184,7 @@ Rule: The Pull Requests page prices each pull request's lifetime
     When an organization manager reads the row
     Then the invitation to link that repository sits on the row itself
     And a member without that permission finds it disabled, and is told to ask an administrator
+    And choosing the disabled invitation opens nothing
 
   @unit
   Scenario: One repository reported with two host spellings stays one repository

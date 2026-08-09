@@ -702,8 +702,7 @@ describe("given a saved dataset larger than one page", () => {
     renderPaged();
     await screen.findByTestId("pagination-indicator");
 
-    // The size in force is the one the control already shows, so re-picking it
-    // is not on offer as a distinct choice.
+    // The select reports the size currently in force.
     expect(screen.getByTestId("pagination-page-size")).toHaveValue("50");
 
     // Move off page 1 first so the reset-to-page-1 is observable.

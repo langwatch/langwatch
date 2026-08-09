@@ -1,5 +1,6 @@
 import type React from "react";
 import { Pagination as PaginationBar } from "~/components/ui/Pagination";
+import { TRACE_LIST_MAX_OFFSET_ROWS } from "~/shared/traces/listWindow";
 import type { PageCursor } from "../../stores/filterStore";
 import { useFilterStore } from "../../stores/filterStore";
 import { useViewStore } from "../../stores/viewStore";
@@ -131,7 +132,17 @@ export const Pagination: React.FC<PaginationProps> = ({
                 pageCursors,
                 nextCursor,
               })
-          : undefined
+          : // A numbered jump reads by position, and the server refuses
+            // position reads past the window. Deeper pages stay reachable the
+            // way the sessions lens reaches everything: with a cursor.
+            (candidate) =>
+              candidate * effectivePageSize <= TRACE_LIST_MAX_OFFSET_ROWS ||
+              reachableWithCursorsOnly({
+                page: candidate,
+                currentPage,
+                pageCursors,
+                nextCursor,
+              })
       }
       onPageChange={goToPage}
       onPageSizeChange={setPageSize}

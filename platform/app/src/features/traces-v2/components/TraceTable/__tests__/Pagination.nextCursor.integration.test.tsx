@@ -157,6 +157,28 @@ describe("trace table pagination", () => {
     });
   });
 
+  describe("given a flat list far larger than the position window", () => {
+    /** @scenario "Page numbers past the position window are offered but not clickable" */
+    it("greys out numbers past the window but keeps the cursor step open", () => {
+      // Walked to the last page inside the window and beyond it: the batch on
+      // screen carries the cursor into the next one.
+      useFilterStore.setState({
+        page: 2200,
+        pageCursors: { 1: null, 2200: CURSOR_TO_PAGE_2 },
+      });
+      renderPagination({
+        nextCursor: CURSOR_TO_PAGE_3,
+        totalHits: 500_000,
+      });
+
+      // 50 per page puts the window's edge at page 2,000.
+      expect(screen.getByTestId("pagination-page-1")).toBeEnabled();
+      expect(screen.getByTestId("pagination-page-2199")).toBeDisabled();
+      expect(screen.getByTestId("pagination-page-2201")).toBeEnabled();
+      expect(screen.getByTestId("pagination-page-10000")).toBeDisabled();
+    });
+  });
+
   describe("given the sessions lens, whose rows can only be reached in order", () => {
     beforeEach(() => {
       useViewStore.setState({ grouping: "by-conversation" });

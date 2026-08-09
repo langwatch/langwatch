@@ -42,8 +42,9 @@ export interface PaginationProps {
   unitLabel?: string;
   /**
    * Rows actually rendered on this page. Given, the range copy ends where the
-   * data ends rather than where a full page would; omitted, a full page is
-   * assumed and the range is capped by the total.
+   * data ends rather than where a full page would; omitted or zero (a count
+   * nobody has taken yet), a full page is assumed and the range is capped by
+   * the total.
    */
   visibleCount?: number;
   /**
@@ -271,9 +272,9 @@ export function Pagination({
   const currentPage = Math.min(Math.max(1, page), totalPages);
   const rangeStart = (currentPage - 1) * pageSize + 1;
   const rangeEnd =
-    visibleCount === undefined
+    visibleCount === undefined || visibleCount === 0
       ? Math.min(currentPage * pageSize, totalCount)
-      : rangeStart + Math.max(visibleCount - 1, 0);
+      : rangeStart + visibleCount - 1;
   // Nothing to page through once the count is known to be zero.
   if (!isLoading && totalCount === 0) return null;
 

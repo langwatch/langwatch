@@ -349,6 +349,11 @@ describe("the personal Pull Requests table", () => {
           "Ask an administrator to link this repository.",
         ),
       ).toBeInTheDocument();
+
+      // The button is inert, so the click lands on its wrapper; it must stop
+      // there rather than fall through and open whatever the row opens.
+      await user.click(disabled.closest("span[tabindex]") as HTMLElement);
+      expect(mockOpenDrawer).not.toHaveBeenCalled();
     });
   });
 

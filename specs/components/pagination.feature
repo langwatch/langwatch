@@ -53,11 +53,10 @@ Feature: Numbered pagination bar
       And the range showing is still named
 
     @integration
-    Scenario: Changing rows per page reloads from the first page
+    Scenario: Changing rows per page hands the caller the new size
       Given a list of 500 rows read 50 at a time and I am on page 3
       When I change rows per page to 100
-      Then the table is read 100 rows at a time
-      And the reader is returned to the first page
+      Then the table is asked to read 100 rows at a time
 
   Rule: Pages the data source cannot reach are offered but not clickable
 
@@ -90,6 +89,23 @@ Feature: Numbered pagination bar
       Then the reader moves to that page without a cursor
       And the list is read from that page's position
 
+    # Reading by position pays for every skipped row, so its depth is capped
+    # at 100,000 rows; cursor steps are keyset reads and pay nothing, so Next
+    # keeps working past the cap.
+    @unit
+    Scenario: A position read past the window is refused
+      Given a trace list read by position
+      When a page is requested whose rows sit past the first 100,000
+      Then the read is refused
+      And the reader is told to narrow the range or page forward
+
+    @integration
+    Scenario: Page numbers past the position window are offered but not clickable
+      Given a trace list far larger than the position window
+      When the pagination bar is shown
+      Then a page past the window cannot be opened by number
+      And the page after the current one still can, through its cursor
+
   Rule: The bar keeps out of the way when there is nothing to page
 
     @integration
@@ -103,4 +119,4 @@ Feature: Numbered pagination bar
       Given a list whose first page is still loading
       When the pagination bar is shown
       Then a placeholder stands in for the description of the page
-      And the bar does not change height once the rows arrive
+      And the pager keeps rendering with its controls disabled

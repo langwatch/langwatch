@@ -133,8 +133,23 @@ describe("Pagination", () => {
       });
     });
 
+    describe("when the rows have not been counted yet", () => {
+      it("assumes a full page rather than a one-row range", () => {
+        renderPagination({
+          page: 2,
+          totalCount: 7949,
+          unitLabel: "traces",
+          visibleCount: 0,
+        });
+
+        expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
+          "showing 51–100",
+        );
+      });
+    });
+
     describe("when the reader picks a different rows-per-page", () => {
-      /** @scenario "Changing rows per page reloads from the first page" */
+      /** @scenario "Changing rows per page hands the caller the new size" */
       it("hands the new size to the table", () => {
         const onPageSizeChange = vi.fn();
         renderPagination({ page: 3, onPageSizeChange });

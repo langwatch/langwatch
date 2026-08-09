@@ -1,4 +1,7 @@
 /**
+ * @vitest-environment node
+ * @unit
+ *
  * The Pull Requests table's order: what it opens on, what each column does
  * with the first, second and third click, and where a row a column does not
  * apply to ends up.
