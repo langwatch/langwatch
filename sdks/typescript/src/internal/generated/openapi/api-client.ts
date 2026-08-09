@@ -32,7 +32,10 @@ export interface paths {
         /** @description Returns all annotations for project */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Which comments to return. Omitted returns the comments about whole traces; "all" also returns the ones left on a span, a field, an attribute or a message. */
+                    anchor?: "trace" | "all";
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -77,7 +80,10 @@ export interface paths {
         /** @description Returns all annotations for single trace */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Which comments to return. Omitted returns the comments about whole traces; "all" also returns the ones left on a span, a field, an attribute or a message. */
+                    anchor?: "trace" | "all";
+                };
                 header?: never;
                 path: {
                     /** @description ID of trace to fetch */

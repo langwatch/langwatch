@@ -22,6 +22,7 @@ import {
   useForm,
 } from "react-hook-form";
 import { useAnnotationCommentStore } from "~/hooks/useAnnotationCommentStore";
+import { useAnnotationInvalidation } from "~/hooks/useAnnotationInvalidation";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useSession } from "~/utils/auth-client";
@@ -103,6 +104,10 @@ export function AnnotationComment({ key = "" }: { key: string }) {
     }
   }, [getAnnotation.data, action]);
 
+  const invalidateAnnotationReads = useAnnotationInvalidation({
+    traceId: traceId ?? "",
+  });
+
   const onSubmit = (data: Annotation) => {
     const filteredScoreOptions = Object.fromEntries(
       Object.entries(data.scoreOptions ?? {}).filter(
@@ -126,7 +131,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
         },
         {
           onSuccess: () => {
-            void queryClient.annotation.getByTraceId.invalidate();
+            invalidateAnnotationReads();
             void queryClient.annotation.getAll.invalidate();
 
             toaster.create({
@@ -165,7 +170,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
         },
         {
           onSuccess: () => {
-            void queryClient.annotation.getByTraceId.invalidate();
+            invalidateAnnotationReads();
 
             toaster.create({
               title: "Annotation Created",
@@ -202,7 +207,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
       },
       {
         onSuccess: () => {
-          void queryClient.annotation.getByTraceId.invalidate();
+          invalidateAnnotationReads();
 
           toaster.create({
             title: "Annotation Deleted",

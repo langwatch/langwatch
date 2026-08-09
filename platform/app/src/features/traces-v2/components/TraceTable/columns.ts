@@ -228,6 +228,16 @@ const traceColumnDefs = {
     minSize: 140,
     enableSorting: false,
   }),
+  annotations: traceCol.accessor((row) => row.annotations?.length ?? 0, {
+    id: "annotations",
+    header: "Annotations",
+    // Wide enough for the four counts a thoroughly reviewed trace carries on
+    // one line; past that they wrap rather than overflow. The floor fits the
+    // "ANNOTATIONS" header, which is wider than any single chip.
+    size: 240,
+    minSize: 130,
+    enableSorting: false,
+  }),
   status: traceCol.accessor("status", {
     id: "status",
     header: "Status",

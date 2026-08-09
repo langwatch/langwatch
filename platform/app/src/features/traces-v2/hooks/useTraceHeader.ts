@@ -1,4 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
+import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import { applyOverlayToTraceHeader } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import { api } from "~/utils/api";
 import { LIVE_REFETCH_MS } from "../constants/freshness";
 import {
@@ -7,6 +9,7 @@ import {
 } from "../context/SharedTraceContext";
 import { useDrawerStore } from "../stores/drawerStore";
 import { useSseStatusStore } from "../stores/sseStatusStore";
+import { useAppliedTraceEditPatch } from "./useTraceEditOverlay";
 import { useTraceQueryArgs } from "./useTraceQueryArgs";
 
 /** When prompt aggregation is still catching up (containsPrompt=true but
@@ -14,7 +17,11 @@ import { useTraceQueryArgs } from "./useTraceQueryArgs";
  * chips fill in without making the user click around. */
 const PROMPTS_PENDING_REFETCH_MS = 8_000;
 
-export function useTraceHeader() {
+/**
+ * The trace header exactly as captured, before any correction. Read it when
+ * the captured trace is the point: the Original view and the difference view.
+ */
+export function useTraceHeaderCanonical() {
   const shared = useSharedTrace();
   const { isLive, isReady, queryArgs } = useTraceQueryArgs();
   const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
@@ -85,4 +92,33 @@ export function useTraceHeader() {
   if (shared)
     return asSharedQueryResult(shared.header) as unknown as typeof query;
   return query;
+}
+
+/**
+ * The trace header as the reader sees it: corrected when a correction applies,
+ * captured otherwise. The trace's own input and output move, and so does the
+ * span count once the caller hands over the captured spans, so the header
+ * agrees with the waterfall underneath it. Durations and cost describe the run
+ * rather than the corrected content, and never move.
+ */
+export function useTraceHeader({
+  spans,
+}: {
+  /** The spans as captured, for counting the ones a correction removes. */
+  spans?: SpanTreeNode[];
+} = {}) {
+  const query = useTraceHeaderCanonical();
+  const patch = useAppliedTraceEditPatch();
+  const header = query.data;
+
+  const data = useMemo(
+    () =>
+      header ? applyOverlayToTraceHeader({ header, patch, spans }) : header,
+    [header, patch, spans],
+  );
+
+  return useMemo(
+    () => (data === header ? query : { ...query, data }),
+    [query, data, header],
+  );
 }

@@ -31,6 +31,10 @@ import {
 } from "vitest";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import { wrapRawPcmToWav } from "~/shared/audio/pcmToWav";
+import {
+  collectMediaRefs,
+  mediaRefBelongsToSide,
+} from "~/shared/traces/media-refs";
 import type { BlobStore } from "../../app-layer/traces/blob-store.service";
 import {
   maybeExtractSpanMedia,
@@ -176,6 +180,34 @@ function audioMessages(audio: Buffer): unknown[] {
           type: "file",
           mediaType: "audio/pcm16",
           data: audio.toString("base64"),
+        },
+      ],
+    },
+  ];
+}
+
+/** A voice turn as it arrives: the caller's recording and the agent's reply. */
+function voiceTurnMessages(spoken: Buffer, reply: Buffer): unknown[] {
+  return [
+    {
+      role: "user",
+      content: [
+        { type: "text", text: "ACME Freight dispatch, hello?" },
+        {
+          type: "file",
+          mediaType: "audio/pcm16",
+          data: spoken.toString("base64"),
+        },
+      ],
+    },
+    {
+      role: "assistant",
+      content: [
+        { type: "text", text: "Good afternoon, how can I help?" },
+        {
+          type: "file",
+          mediaType: "audio/pcm16",
+          data: reply.toString("base64"),
         },
       ],
     },
@@ -330,6 +362,49 @@ describe("trace media extraction at the ingestion edge", () => {
       );
       expect(stored.equals(wavOf(audio))).toBe(true);
       expect(stored.subarray(44).equals(audio)).toBe(true);
+    });
+  });
+
+  describe("given a voice turn carrying both sides in one span input", () => {
+    /** @scenario "A media ref remembers the role of the message it came from" */
+    it("mints refs the summary can split by role", async () => {
+      const spoken = makeAudioBytes(1024);
+      const reply = makeAudioBytes(2048);
+      const span = makeSpan([
+        {
+          key: "langwatch.input",
+          value: {
+            stringValue: JSON.stringify(voiceTurnMessages(spoken, reply)),
+          },
+        },
+      ]);
+
+      const result = await maybeExtractSpanMedia({
+        data: makeCommandData(span),
+        deps: enabledDeps(),
+        logger: testLogger,
+      });
+
+      // The fold reads the rewritten payload, so this is the same value the
+      // trace summary's reserved media-refs attribute is derived from.
+      const refs = collectMediaRefs(parseAttr(result, "langwatch.input"));
+      expect(refs).toHaveLength(2);
+      expect(refs[0]!.role).toBe("user");
+      expect(refs[1]!.role).toBe("assistant");
+      expect(refs[0]!.url).not.toBe(refs[1]!.url);
+      for (const ref of refs) {
+        expect(ref.kind).toBe("audio");
+        expect(ref.url).toMatch(new RegExp(`^/api/files/${PROJECT}/`));
+      }
+
+      // Which is what keeps the caller's recording off the OUTPUT strip and
+      // the agent's reply off the INPUT one.
+      expect(refs.filter((ref) => mediaRefBelongsToSide(ref, "input"))).toEqual(
+        [refs[0]],
+      );
+      expect(
+        refs.filter((ref) => mediaRefBelongsToSide(ref, "output")),
+      ).toEqual([refs[1]]);
     });
   });
 

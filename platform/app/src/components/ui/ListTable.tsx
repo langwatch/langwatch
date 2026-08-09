@@ -1,4 +1,4 @@
-import { Box, Table } from "@chakra-ui/react";
+import { Box, type BoxProps, Table } from "@chakra-ui/react";
 import type { ComponentProps } from "react";
 
 /**
@@ -17,14 +17,23 @@ import type { ComponentProps } from "react";
  */
 export function ListTable({
   children,
+  containerProps,
   ...props
-}: ComponentProps<typeof Table.Root>) {
+}: ComponentProps<typeof Table.Root> & {
+  /**
+   * Overrides on the bordered container, for a page that needs the card itself
+   * to scroll rather than clip. The border and the radius are the look and are
+   * not meant to be overridden.
+   */
+  containerProps?: BoxProps;
+}) {
   return (
     <Box
       borderWidth="1px"
       borderColor="border.emphasized"
       borderRadius="md"
       overflow="hidden"
+      {...containerProps}
     >
       <Table.Root
         variant="line"

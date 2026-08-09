@@ -41,7 +41,8 @@ vi.mock("../../../../hooks/useTextTranslation", () => ({
 
 // The turn separator pulls annotation data via tRPC; stub the leaf components.
 vi.mock("../TurnAnnotations", () => ({
-  TurnActionRow: () => null,
+  TurnEditTraceAction: () => null,
+  TurnSessionCheckbox: () => null,
   TurnAnnotationBadges: () => null,
 }));
 
