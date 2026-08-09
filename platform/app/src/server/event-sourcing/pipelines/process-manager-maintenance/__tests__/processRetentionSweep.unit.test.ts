@@ -175,6 +175,32 @@ describe("processRetentionSweep", () => {
       };
     }
 
+    describe("when every family is backlogged at once", () => {
+      /** @scenario "A backlogged family cannot starve the ones after it" */
+      it("still hands each family its share of the wake", async () => {
+        // Without per-family windows, the first family would spend the whole
+        // budget and the ones after it would issue zero deletes on every
+        // hourly wake — with inbox last and biggest, that is the incident
+        // regrowing while the sweep reports success.
+        const dispatched = backlog(Number.MAX_SAFE_INTEGER);
+        const dead = backlog(Number.MAX_SAFE_INTEGER);
+        const inbox = backlog(Number.MAX_SAFE_INTEGER);
+
+        await runProcessRetentionSweep(
+          deps({
+            deleteDispatchedOutboxBatch: dispatched,
+            deleteDeadOutboxBatch: dead,
+            deleteConsumedInboxBatch: inbox,
+            now: creepingClock(RETENTION_SWEEP_DEADLINE_MS / 10),
+          }),
+        )();
+
+        expect(dispatched.mock.calls.length).toBeGreaterThan(0);
+        expect(dead.mock.calls.length).toBeGreaterThan(0);
+        expect(inbox.mock.calls.length).toBeGreaterThan(0);
+      });
+    });
+
     describe("when the retention sweep runs", () => {
       /** @scenario "A slow wake stops before its outbox lease expires" */
       it("stops draining at the deadline instead of running past the lease", async () => {

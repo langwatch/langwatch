@@ -220,8 +220,26 @@ export function runProcessRetentionSweep(deps: ProcessRetentionSweepDeps) {
       dead_outbox: 0,
       inbox: 0,
     };
-    for (const plan of planFamilies(deps, startedAt)) {
-      swept[plan.family] = await sweepFamily(plan, { deadline, now });
+    const plans = planFamilies(deps, startedAt);
+    for (const [index, plan] of plans.entries()) {
+      // Each family's window ends at its share of the wake, measured from the
+      // start: family i may not run past (i+1)/N of the budget. A family that
+      // finishes early donates its leftover to the ones after it, but a
+      // backlogged first family can never spend the whole wake and leave the
+      // families behind it starved on every single run — with inbox last and
+      // biggest, that shape would quietly regrow the incident this sweep
+      // exists to prevent.
+      const familyDeadline = Math.min(
+        deadline,
+        startedAt +
+          Math.floor(
+            ((index + 1) * RETENTION_SWEEP_DEADLINE_MS) / plans.length,
+          ),
+      );
+      swept[plan.family] = await sweepFamily(plan, {
+        deadline: familyDeadline,
+        now,
+      });
     }
 
     const durationMs = now() - startedAt;

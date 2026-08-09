@@ -100,6 +100,17 @@ Feature: Process-manager inbox and outbox rows are reaped on a schedule
       Then it stops draining at its deadline
       And it leaves the remaining rows for the next wake
 
+    # The families drain in a fixed order under one shared deadline, and the
+    # inbox — the biggest table of the incident — drains last. One permanently
+    # backlogged family in front of it would otherwise eat the whole budget on
+    # every wake, and the tables behind it would regrow unbounded while the
+    # sweep keeps reporting success.
+    @unit
+    Scenario: A backlogged family cannot starve the ones after it
+      Given every family holds more rows than one wake can drain
+      When the sweep wakes
+      Then each family is handed its share of the wake's budget
+
     @unit
     Scenario: A family that runs dry ends its drain loop early
       Given fewer expired rows than one batch holds
