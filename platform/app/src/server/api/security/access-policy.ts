@@ -73,6 +73,90 @@ export type AccessPolicy =
 export type HandlerCredential = "apiKey" | "session" | "both" | "internal";
 
 /**
+ * Which credential an API consumer presents to reach a route.
+ *
+ * Narrower than {@link HandlerCredential}, and the difference is the point:
+ * this answers "which key do I send", and the two API-key families are not
+ * interchangeable. An organization key reaches organization routes and, with
+ * `X-Project-Id`, project routes too; a project key can never reach an
+ * organization route: `resolveOrgOnly` never resolves one, so authentication
+ * fails before any permission is consulted and no grant on the key makes a
+ * difference. Getting that wrong costs an afternoon, so it is a property of
+ * the route rather than something to infer from the path.
+ *
+ * A route that also accepts a browser session still publishes its key class:
+ * the session is not something an integrator can send.
+ */
+export type CredentialClass =
+  | "project_api_key"
+  | "organization_api_key"
+  | "session"
+  | "internal"
+  | "none";
+
+/**
+ * The credential class a route reaches by, from the app it is mounted on and
+ * the policy it declares.
+ *
+ * Derived rather than declared per route, because the app already decides it
+ * for every route but one kind: a handler-managed route can opt out of its
+ * app's family, and that is the only thing this has to read from the policy.
+ *
+ * The pair worth spelling out is a handler on a **service** app that says it
+ * accepts an API key, which is what the receiver surface is: the collector,
+ * the three OTLP signals, annotations, legacy traces and evaluations all sit
+ * on a service app and resolve `X-Auth-Token` themselves. There are only two
+ * key families, and the organization one exists only where an organization is
+ * resolved, so a handler resolving a key on an app that resolves neither is
+ * resolving a project key. Falling through to the service app's own answer,
+ * `internal`, would say those routes take a shared secret, which is exactly
+ * backwards for the most widely integrated endpoints we have.
+ */
+export function credentialClassFor({
+  scope,
+  policy,
+}: {
+  scope: AppScope;
+  policy: AccessPolicy;
+}): CredentialClass {
+  if (policy.kind === "public") return "none";
+  if (policy.kind === "internal") return "internal";
+  if (policy.kind === "handlerManaged") {
+    return handlerManagedCredentialClass({
+      scope,
+      credential: policy.credential,
+    });
+  }
+  return CLASS_BY_APP_SCOPE[scope];
+}
+
+/** The app families a route can be mounted on. */
+type AppScope = "project" | "organization" | "service" | "session";
+
+/** What each app answers for a route that does not opt out of its family. */
+const CLASS_BY_APP_SCOPE = {
+  project: "project_api_key",
+  organization: "organization_api_key",
+  service: "internal",
+  session: "session",
+} as const satisfies Record<AppScope, CredentialClass>;
+
+/** @see credentialClassFor, which is where the reasoning lives. */
+function handlerManagedCredentialClass({
+  scope,
+  credential,
+}: {
+  scope: AppScope;
+  credential: HandlerCredential;
+}): CredentialClass {
+  if (credential === "internal") return "internal";
+  if (credential === "session") return "session";
+  // apiKey / both, on an app whose scope names no key family of its own.
+  if (scope === "service" || scope === "session") return "project_api_key";
+  return CLASS_BY_APP_SCOPE[scope];
+}
+
+/**
  * Require a specific RBAC permission at the app's scope. The secured app
  * resolves it against the caller's role bindings (project scope) or org role
  * bindings (org scope), exactly like the tRPC `checkProjectPermission` path.

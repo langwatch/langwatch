@@ -134,8 +134,11 @@ describe("the real command tree", () => {
 
       // Launchers and passthroughs: they exec another tool and own its stdio.
       ...(
-        ["claude", "codex", "cursor", "gemini", "opencode", "open"] as const
+        ["claude", "codex", "cursor", "gemini", "opencode", "copilot", "code", "open"] as const
       ).map((n) => [n, "launches another tool and owns its stdio"] as const),
+      // Local machine setup: mints a key and installs an OS login agent;
+      // progress prose, no structured result document.
+      ["copilot-app connect", "interactive install flow: writes an OS login agent"],
       // Agent-only signal: prints the resource id for the relay to intercept;
       // it has no -o json data mode because it returns no platform result.
       ["navigate open", "signal command: prints the resource id, no data payload"],
@@ -158,7 +161,7 @@ describe("the real command tree", () => {
         (n) => [n, "owns its --json"] as const,
       ),
       ...(
-        ["ingest health", "ingest install", "ingest list", "ingest tail"] as const
+        ["ingest codex", "ingest health", "ingest install", "ingest list", "ingest tail"] as const
       ).map((n) => [n, "owns its --json"] as const),
       ["governance status", "owns its --json"],
       ...(

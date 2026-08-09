@@ -1943,7 +1943,10 @@ The management and webhook APIs answer with the same envelope, and their `type` 
 |---|---|---|
 | `validation_error` | `400` | The body or query failed validation. `meta.field_errors` names the offending fields. |
 | `invalid_cursor` | `400` | A paging `cursor` this API did not issue. Restart the walk rather than guessing. |
-| `trace_project_required` | `400` | An organization- or team-scoped virtual key was created without a project for its traces and spend to land in. |
+| `trace_project_required` | `400` | An organization- or team-scoped virtual key was created without a project for its traces and spend to land in, in an organization with no governance project either. |
+| `gateway_trace_project_ambiguous` | `400` | A virtual key was created without saying which project its traces and spend land in, and the organization has projects to choose from. Send `trace_project_id`, or scope the key to exactly one project. |
+| `gateway_trace_project_unknown` | `400` | The `trace_project_id` a virtual key named is not a project of this organization, so its traces could not land there. The id is not echoed back. |
+| `gateway_budget_scope_unreachable` | `400` | A `team`, `project` or `group` budget was created that no active key can produce traffic for, so as things stand it cannot spend or block, and it stays that way until some key reaches it. `meta.reachable_project_ids` names where the traffic goes, capped at the first 10 with `meta.reachable_project_count` giving the real total, so a longer list is never mistaken for the whole set. Send `allow_unreachable` to keep it as written. |
 | `gateway_budget_cycle_anchor_invalid` | `400` | A `cycle_anchor_at` was sent on a `total` or `manual` budget. Those windows do not cycle. |
 | `group_budget_requires_clickhouse` | `400` | A `group` or `attributed_user` budget needs the ClickHouse spend ledger to tell members apart. |
 | `webhook_endpoint_invalid` | `400` | A webhook endpoint's URL broke the [receiver URL policy](/features/webhooks#what-a-receiver-url-must-look-like). The `message` names the rule. |
@@ -2234,6 +2237,7 @@ Response:
       "display_prefix": "vk-lw-01HZX9",
       "principal_user_id": null,
       "trace_project_id": null,
+      "trace_project_source": "project_scope",
       "scopes": [{ "scope_type": "project", "scope_id": "proj_01HZ..." }],
       "routing_policy_id": null,
       "routing_mode": "none",
@@ -2274,7 +2278,8 @@ Body (only `name` is required):
 ```
 
 - `scopes` defaults to the calling project. Team- and org-scoped keys need a scoped API key holding `virtualKeys:manage` at each requested scope; legacy project keys can only mint keys for their own project.
-- An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (requires `virtualKeys:manage` on that project; it is a destination, not a scope, and grants no access to the key), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists.
+- An org- or team-scoped key also needs a place for its traces and spend to land, and has to say where: pass `trace_project_id` (requires `virtualKeys:manage` on that project; it is a destination, not a scope, and grants no access to the key). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`. The same refusal covers a key scoped to several projects at once. An organization whose only project is the hidden governance one is exempt, because there is nothing else to name; one with no governance project either refuses with `trace_project_required`. A `trace_project_id` that names a project this organization does not have refuses with `gateway_trace_project_unknown` rather than quietly resolving to somewhere else.
+- `trace_project_source` on every key says which rule put its traces where they went: `explicit`, `project_scope`, or `governance_fallback`. Keys created before this rule can carry `governance_fallback`, and their spend is attributed to the governance project rather than to any project you would think to budget. Give them a `trace_project_id` to move them.
 - `budget` creates a budget atomically with the key and manages exactly that row on later updates: the key can never exist without the cap you asked for. Windows: `day`, `week`, `month`.
 - `routing_mode` is one of `none` (default: no silent failover), `fallback_all`, or `policy` (requires `routing_policy_id`).
 
@@ -3221,7 +3226,7 @@ The budget is in force immediately; the next request counts against it. Everythi
 | Scope | Applies to |
 |---|---|
 | `organization` | All gateway traffic across every project in the org. |
-| `team` | All gateway traffic in projects belonging to the team. |
+| `team` | All gateway traffic in projects belonging to the team, plus traffic on any key scoped to that team. |
 | `project` | All gateway traffic in this project. |
 | `virtual_key` | This specific VK. |
 | `principal` | This user or service account across any VK they use. |
@@ -3229,6 +3234,17 @@ The budget is in force immediately; the next request counts against it. Everythi
 | `attributed_user` | Each distinct **end user** seen on an anchor (a VK or a project), individually (see below). |
 
 A request is evaluated against **every** budget whose scope applies. A request by Alice in project `demo` of team `platform` in org `acme` with VK `prod-key` is checked against that org's, team's, project's and VK's budgets, Alice's principal budgets, and the per-member budgets of every group Alice belongs to. If any budget hard-blocks, the request is rejected; if any warn threshold is crossed, a warning header is added. Hard-block wins over warn.
+
+### A budget has to reach the traffic it names
+
+Which team and project a request belongs to is decided by the key that served it: the teams the key is scoped to, plus the team of the project its traces land in. So a `team`, `project` or `group` budget can be written, look correct on both sides, and match nothing at all, for instance a `project` budget on a project none of your keys send traffic to.
+
+A budget that could never accrue is refused when you create it, with `gateway_budget_scope_unreachable`. The refusal lists the projects your active keys do reach, in `error.meta.reachable_project_ids`. Two ways forward:
+
+- Point a key at the target: give it a scope on that team or project, or set the key's trace project.
+- Keep the budget as written by sending `allow_unreachable: true`, which is the right answer when you are provisioning ahead of the keys that will use it. In the app, the refusal offers "Create it anyway".
+
+An organization with no active keys is never refused, since budget first and key second is a normal setup order. On reads, `scope_reach` on each budget says `reachable` or `unreachable`, which is the only field that tells a budget nothing can reach apart from one that simply has not been breached.
 
 ### Group budgets are per member
 

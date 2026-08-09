@@ -142,17 +142,25 @@ export const FEATURE_FLAGS = [
     description:
       "Surfaces the AI Gateway menu in the project sidebar. Default flipped to on: operators can hide the surface per project via a PostHog rule or operator-store row.",
   },
-  // Per-project gate for trace blob offload (#4215 / ADR-022). Checked ONCE per
-  // ingestion request (not per span) via the postgres-cached store, so the
-  // hot-path cost is one cached lookup. When on, over-threshold spans get
-  // routed via the transient S3 spool at the edge (ADR-022). Off = today's
-  // behavior — the existing capOversizedAttributes(256 KB) is the only cap.
+  // Per-project gate for the transient S3 spool at the ingestion edge
+  // (#4215 / ADR-022). ON by default, so a deployment with object storage
+  // configured keeps oversized span content intact with no flag setup: a span
+  // whose serialized command exceeds 256 KB is written to the spool and the
+  // queued command carries only a spool ref. Resolved per span against the
+  // postgres-cached store, so the hot-path cost is one cached lookup.
+  //
+  // The flag stays the kill switch and the per-project opt-out: an operator
+  // row in /ops/feature-flags turns the spool off fleet-wide or for a single
+  // project. When the spool cannot run at all (no reachable object storage,
+  // or an Azure-only install where the S3 client refuses to build) the edge
+  // fails open: ingestion proceeds inline and capOversizedAttributes truncates
+  // each attribute value at 256 KB.
   {
     key: "release_trace_blob_offload",
     scope: "PRODUCT",
-    defaultValue: false,
+    defaultValue: true,
     description:
-      "Routes over-threshold OTLP spans via a transient S3 spool at the ingestion edge (ADR-022). Off = current behavior (full value flows through the command queue; capOversizedAttributes(256 KB) is the only cap).",
+      "Routes over-threshold OTLP spans through a transient S3 spool at the ingestion edge so oversized attribute values reach the trace intact (ADR-022). On by default; switch it off fleet-wide or per project to keep spans inline, where the 256 KB per-value cap applies. Deployments with no reachable object storage keep ingesting either way: the edge falls back inline and the same 256 KB cap applies.",
   },
   // Externalizes inline media (base64 audio turns, data-URI images, file
   // attachments) from span attributes into the content-addressed

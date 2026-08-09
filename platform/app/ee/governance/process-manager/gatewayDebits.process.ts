@@ -151,13 +151,16 @@ async function resolveDebitedBudgets(
   payload: WriteGatewayDebitsPayload,
   providerKey: string | null,
 ): Promise<ResolvedBudget[]> {
-  const resolved = await resolveApplicableBudgets(prisma, {
-    organizationId: payload.organization_id,
-    teamId: payload.team_id || null,
-    projectId: payload.project_id,
-    virtualKeyId: payload.virtual_key_id,
-    principalUserId: payload.principal_user_id || null,
-    endUserId: payload.end_user_id || null,
+  const resolved = await resolveApplicableBudgets({
+    client: prisma,
+    target: {
+      organizationId: payload.organization_id,
+      teamId: payload.team_id || null,
+      projectId: payload.project_id,
+      virtualKeyId: payload.virtual_key_id,
+      principalUserId: payload.principal_user_id || null,
+      endUserId: payload.end_user_id || null,
+    },
   });
   return resolved.filter((r) => budgetAppliesToProvider(r.budget, providerKey));
 }

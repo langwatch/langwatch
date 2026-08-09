@@ -1035,7 +1035,7 @@
         {
           "id": "ai-gateway.ingest",
           "name": "Ingestion Sources",
-          "description": "Read-only inspection of OCSF-normalised event ingestion (sources, event tail, health)",
+          "description": "OCSF-normalised event ingestion: inspect sources, tail events, check health, and recover coding-agent conversation content",
           "surfaces": {
             "code": {
               "sdk": {
@@ -1045,7 +1045,8 @@
               "cli": [
                 "ingest list",
                 "ingest tail",
-                "ingest health"
+                "ingest health",
+                "ingest codex"
               ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"

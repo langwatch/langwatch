@@ -2,7 +2,6 @@ import deepmerge from "deepmerge";
 import fs from "fs";
 import { generateSpecs } from "hono-openapi";
 import path from "path";
-
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
 import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
@@ -23,6 +22,13 @@ import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
 import rawCurrentSpec from "../app/api/openapiLangWatch.json";
 import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
+import {
+  allRegisteredRoutes,
+  type CredentialClass,
+  documentedPathOf,
+  isHttpMethod,
+  securityForCredentialClass,
+} from "../server/api/security";
 // The two legacy route files below are wired in for the routes they describe
 // and nothing else: `generateSpecs` skips any handler without `describeRoute`,
 // so the unannotated siblings sharing these files (the stripe webhook, the demo
@@ -253,10 +259,137 @@ export default async function execute() {
     },
   );
 
+  console.log("Stamping per-operation security...");
+  stampSecurityFromRegistry(mergedSpec as SpecShape);
+
   fs.writeFileSync(
     path.join(__dirname, "../app/api/openapiLangWatch.json"),
     JSON.stringify(withoutEmptyPaths(mergedSpec), null, 2),
   );
+}
+
+type SpecShape = {
+  paths?: Record<string, Record<string, unknown>>;
+};
+
+/**
+ * Give every documented operation the security requirement its route actually
+ * enforces.
+ *
+ * The document declares one top-level default, and a default is a claim about
+ * every operation that does not override it. That claim was `project_api_key`
+ * for the whole API, including the organization-scoped spend and webhook
+ * routes a project key can never reach: an integrator following the document
+ * got a 401 the document said was impossible.
+ *
+ * Read from the route registry rather than written per route, so an operation
+ * cannot publish a credential class nothing enforces, and a route added
+ * tomorrow is stamped without anyone remembering to.
+ */
+export function stampSecurityFromRegistry(spec: SpecShape): void {
+  const registry = indexRegistryByOperation();
+
+  for (const { routePath, operationKey, operation } of documentedOperations(
+    spec,
+  )) {
+    const credentialClass =
+      registry.byOperation.get(operationKey) ??
+      registry.byAnyMethodPath.get(routePath);
+    if (!credentialClass) {
+      assertMayInheritTheDefault(operationKey, routePath);
+      continue;
+    }
+    operation.security = securityForCredentialClass({
+      operationKey,
+      credentialClass,
+    });
+  }
+}
+
+/**
+ * Refuse to leave an app-derived operation on the document default.
+ *
+ * Paths under an app prefix are generated from the same Hono apps the registry
+ * walks, so every one of them has a route and a credential class. No match
+ * means the two spellings disagree, and the operation then publishes whatever
+ * the document happens to default to. That was survivable while every affected
+ * route sat on a project app and the default was already right; the first one
+ * on an org app would publish `project_api_key` for a route only an admin key
+ * can reach, which is the precise bug this stamping exists to prevent.
+ *
+ * Hand-maintained entries in the JSON have no route by design and are left
+ * alone.
+ */
+function assertMayInheritTheDefault(
+  operationKey: string,
+  routePath: string,
+): void {
+  if (!isAppDerivedPath(routePath)) return;
+  throw new Error(
+    `${operationKey} is generated from a Hono app but matches no registered route, ` +
+      `so it would inherit the document-wide security default. The documented path and ` +
+      `the route path have to agree — check how the route spells its parameters.`,
+  );
+}
+
+/** Every operation object in the document, with the key the registry uses. */
+function* documentedOperations(spec: SpecShape): Generator<{
+  routePath: string;
+  operationKey: string;
+  operation: { security?: unknown };
+}> {
+  for (const [routePath, item] of Object.entries(spec.paths ?? {})) {
+    for (const [method, operation] of operationsOf(item)) {
+      yield {
+        routePath,
+        operationKey: `${method.toUpperCase()} ${routePath}`,
+        operation,
+      };
+    }
+  }
+}
+
+/**
+ * The operation members of one Path Item.
+ *
+ * Filtered by method name rather than by value shape: a Path Item also holds
+ * `servers` and `parameters`, both arrays, and an array is an object to
+ * `typeof`. Stamping `security` onto `servers` produces a document that no
+ * longer validates.
+ */
+function operationsOf(
+  item: Record<string, unknown>,
+): Array<[string, { security?: unknown }]> {
+  return Object.entries(item).filter(
+    (entry): entry is [string, { security?: unknown }] =>
+      isHttpMethod(entry[0]) && !!entry[1] && typeof entry[1] === "object",
+  );
+}
+
+/**
+ * The route registry keyed the way a document path is spelled.
+ *
+ * Any-method routes are kept in their own index rather than expanded into
+ * verbs, so a specific registration on the same path still wins, and so a
+ * documented verb of an `.all(...)` route is stamped rather than left
+ * inheriting the document default, which is the one outcome the stamping
+ * exists to prevent.
+ */
+function indexRegistryByOperation(): {
+  byOperation: Map<string, CredentialClass>;
+  byAnyMethodPath: Map<string, CredentialClass>;
+} {
+  const byOperation = new Map<string, CredentialClass>();
+  const byAnyMethodPath = new Map<string, CredentialClass>();
+  for (const route of allRegisteredRoutes()) {
+    const documented = documentedPathOf(route.path);
+    if (route.method === "ALL") {
+      byAnyMethodPath.set(documented, route.credentialClass);
+      continue;
+    }
+    byOperation.set(`${route.method} ${documented}`, route.credentialClass);
+  }
+  return { byOperation, byAnyMethodPath };
 }
 
 const OPENAPI_METHODS = [

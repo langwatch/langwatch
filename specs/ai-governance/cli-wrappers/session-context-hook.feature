@@ -13,6 +13,7 @@
 # Related specs:
 #   specs/coding-agent/session-git-context.feature , what the pipeline does with the event
 #   specs/ai-governance/cli-wrappers/shell-rc-persistence.feature , the persist flow that also installs the hooks
+#   specs/ai-governance/cli-wrappers/claude-plugin-install.feature , the Claude Code plugin that carries this hook
 #
 # Motivation: coding agents compute repository identity internally and export
 # none of it over telemetry (verified at the raw wire for Claude Code, Codex and
@@ -22,6 +23,11 @@
 #
 #   - Claude Code: settings hooks. SessionStart and Stop, session id and working
 #     directory on stdin, and on Stop the live trace context in the environment.
+#     A `claude` new enough to take a plugin gets the same two hooks from the
+#     LangWatch plugin instead, which carries its own copy of the command and so
+#     never depends on the version of the CLI that happens to be on PATH. The
+#     entries written straight into the settings file are what a `claude` without
+#     plugin support falls back to, and installing the plugin removes them.
 #   - Codex: config hooks, the same wire shape (session_id, cwd and
 #     hook_event_name on stdin). The id it hands the hook is the thread id its
 #     spans carry. Codex asks the user to review a newly declared hook before it

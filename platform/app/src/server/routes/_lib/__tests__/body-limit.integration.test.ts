@@ -21,6 +21,7 @@
 
 import { getRequestListener } from "@hono/node-server";
 import { Hono } from "hono";
+import { bodyLimit as honoBodyLimit } from "hono/body-limit";
 import { createServer, type Server } from "http";
 import type { AddressInfo } from "net";
 import { afterEach, describe, expect, it } from "vitest";
@@ -67,6 +68,7 @@ describe("the request body cap behind the Node bridge", () => {
 
   describe("given a chunked request carrying no Content-Length", () => {
     describe("when the body fits under the cap", () => {
+      /** @scenario "A sender that declares no length is served" */
       it("hands the whole body to the route and answers 200", async () => {
         server = createEchoServer(1024);
         const port = await listen(server);
@@ -89,6 +91,7 @@ describe("the request body cap behind the Node bridge", () => {
     });
 
     describe("when the body exceeds the cap", () => {
+      /** @scenario "An undeclared body is refused once it passes the cap" */
       it("rejects it with 413", async () => {
         server = createEchoServer(16);
         const port = await listen(server);
@@ -108,6 +111,7 @@ describe("the request body cap behind the Node bridge", () => {
 
   describe("given a request that declares its Content-Length", () => {
     describe("when the body fits under the cap", () => {
+      /** @scenario "A sender that declares its length is served" */
       it("hands the whole body to the route and answers 200", async () => {
         server = createEchoServer(1024);
         const port = await listen(server);
@@ -128,6 +132,7 @@ describe("the request body cap behind the Node bridge", () => {
     });
 
     describe("when the declared length exceeds the cap", () => {
+      /** @scenario "A declared length over the cap is refused before the body is read" */
       it("rejects it with 413 without reading the body", async () => {
         server = createEchoServer(16);
         const port = await listen(server);
@@ -140,6 +145,35 @@ describe("the request body cap behind the Node bridge", () => {
 
         expect(response.status).toBe(413);
       });
+    });
+  });
+
+  // Why this module exists at all, rather than hono's. The two differ on
+  // exactly one request shape, so without this the whole file would keep
+  // passing after someone swapped the import back. If it ever stops failing,
+  // hono has fixed the reconstruction upstream and the local copy can go.
+  describe("given hono's own body-limit on the same wiring", () => {
+    it("answers 500 to the chunked request this module serves", async () => {
+      const app = new Hono();
+      app.post("/echo", honoBodyLimit({ maxSize: 1024 }), async (c) =>
+        c.json({ body: await c.req.text() }),
+      );
+      server = createServer(
+        getRequestListener((request: Request) => app.fetch(request), {
+          overrideGlobalObjects: false,
+        }),
+      );
+      const port = await listen(server);
+
+      const response = await fetch(`http://127.0.0.1:${port}/echo`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: streamed(JSON.stringify({ resourceSpans: [] })),
+        // @ts-expect-error — half-duplex streaming request (undici)
+        duplex: "half",
+      });
+
+      expect(response.status).toBe(500);
     });
   });
 });

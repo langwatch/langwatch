@@ -193,6 +193,24 @@ unset, the limit comes from the machine (one per 6 GiB of RAM, capped at one per
 own threads instead (`RAYON_NUM_THREADS` does work on biome): it spends the same
 CPU over 5x the wall clock. See `specs/setup/check-slots.feature`.
 
+**Going around the scripts does not go around the queue.** `platform/app`'s
+`node_modules/.bin/{tsgo,tsc,biome}` are shims installed by
+`dev/scripts/install-check-shims.mjs` from postinstall, so `pnpm exec tsgo
+--noEmit -p tsconfig.tsgo.json` and `./node_modules/.bin/biome check ./src` take
+a slot too. Only whole-tree runs do: a `-p`/`--project`, a directory argument, or
+no path argument at all. Naming files (`tsgo --noEmit src/foo.ts`) stays instant
+and unqueued, and `--watch` / `--lsp` never queue, since they would hold a slot
+for the session. A run that already holds a slot exports `CHECK_SLOTS=0` to
+everything it spawns, so it can't queue behind itself. The installer stands
+down entirely when `NODE_ENV=production` or `CI` is set to anything but `0` or
+`false`, so an image build or a server install keeps pnpm's own bin entries.
+
+One catch on targeted tsgo runs: with a `tsconfig.json` present, `tsgo --noEmit
+<file>` fails with `TS5112` unless you add `--ignoreConfig`. That error is what
+pushes people to widen the command to `-p tsconfig.tsgo.json`, which is a full
+3 to 4 GiB run. Prefer `pnpm typecheck` for a whole-project check now that it
+queues, and keep `--ignoreConfig` for the single-file case.
+
 When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven status` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `platform/app/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langwatch-service-langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `platform/app/server.log`; grep it as the fallback when the stack is down.
 
 ## Structure
@@ -252,6 +270,7 @@ specs/               # BDD feature specs
 | Using `gh api graphql -f`/`-F` variable parameters for GraphQL queries | Inline the values directly in the query string (replace `OWNER`, `REPO`, `NUMBER` literals). The `-f`/`-F` flags cause escaping issues with multiline queries and special characters |
 | Using gpt-4o or gpt-4.1-mini in tests, scenarios, or fixtures | Always use `gpt-5-mini` — it's the cheapest and most capable model. Default to `openai("gpt-5-mini")` for scenario judges, user simulators, and test fixtures |
 | Only verifying tests parse (CI=1) without running them end-to-end | Always run scenario tests end-to-end locally (`npx vitest run file.test.ts` without CI flag) to verify they actually pass with Claude Code |
+| Dogfooding agent-usage tracking features with `claude -p` or other headless modes | Never. Spin up a sub-tmux session (`tmux new-session -d`, `send-keys`, `capture-pane`) and drive the agent interactively, the way a user runs it: headless mode skips or reorders the session lifecycle (hooks, prompts, settings reads) that these features exist to observe. Verify the captured data landed in the product afterward, not just that the process exited |
 | Returning JSX from hooks | Hooks return state and callbacks, never JSX. If a hook needs to "render" something (dialog, tooltip), return props/state and let the consumer render the component explicitly. Use `.ts` for hooks, `.tsx` for components |
 | Using `form.watch()` in child components that receive `form` as a prop | Use `useWatch({ control: form.control, name: "field" })` instead — `form.watch()` doesn't trigger re-renders in child components (especially inside `useFieldArray` items). Only the form owner component should use `form.watch()` |
 | Relying solely on `gh pr checks` to assess CI status | Use `gh run list --branch <branch>` to see all workflow runs — `gh pr checks` deduplicates by check name and can mask failing runs behind passing ones from earlier commits |

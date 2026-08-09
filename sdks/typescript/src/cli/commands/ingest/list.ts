@@ -1,10 +1,8 @@
 import { setTimeout as wait } from "node:timers/promises";
 import chalk from "chalk";
 import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
-import {
-  listIngestionSources,
-  GovernanceCliError,
-} from "@/cli/utils/governance/cli-api";
+import { listIngestionSources } from "@/cli/utils/governance/cli-api";
+import { reportCommandError } from "@/cli/utils/errorOutput";
 import { normalizeEndpoint } from "@/internal/endpoint";
 
 /**
@@ -31,11 +29,7 @@ export async function ingestListCommand(options: {
   try {
     sources = await listIngestionSources(cfg, { includeArchived: !!options.all });
   } catch (err) {
-    if (err instanceof GovernanceCliError) {
-      process.stderr.write(`Error: ${err.message}\n`);
-    } else {
-      process.stderr.write(`Error: ${String(err)}\n`);
-    }
+    reportCommandError({ error: err, format: options.json ? "json" : undefined });
     process.exit(1);
   }
 
