@@ -52,7 +52,9 @@ done
 # exits 0 with no output for a port that is genuinely free, so a non-zero status
 # is unambiguously a broken lookup and we stop rather than guess. lsof gets no
 # such treatment: it returns 1 both for "found nothing" and for real errors, so
-# its status carries nothing to act on.
+# its status carries nothing to act on. The flag that would separate the two,
+# `-Q`, is newer than the 4.91 macOS ships, and acting on the status without it
+# would refuse every genuinely free port on a Mac.
 port_busy() {
   local found
   if command -v lsof >/dev/null 2>&1; then

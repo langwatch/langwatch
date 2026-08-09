@@ -281,7 +281,13 @@ const strangerReadyFile = (named: string) =>
  * holds a port on plenty of machines and is nobody's dev lane, and it is
  * exactly what a "does the command line mention node" test gets wrong.
  */
-function startStranger(port: number, named = "dev-listener"): number {
+function startStranger({
+  port,
+  named = "dev-listener",
+}: {
+  port: number;
+  named?: string;
+}): number {
   const asAnother = path.join(scratch, named);
   symlinkSync(process.execPath, asAnother);
   return startInOwnGroup(asAnother, [
@@ -416,7 +422,7 @@ describe("clearing the dev ports", () => {
         const theirs = await freePort();
         const stack = startInOwnGroup("bash", [writeRestartingStack(ours)]);
         expect(await laneIsUp()).toBe(true);
-        const stranger = startStranger(theirs);
+        const stranger = startStranger({ port: theirs });
         expect(
           await waitUntil(() => existsSync(strangerReadyFile("dev-listener"))),
         ).toBe(true);
@@ -435,7 +441,10 @@ describe("clearing the dev ports", () => {
       /** @scenario "A port held by something we did not start is reported, not claimed" */
       it("leaves a stranger whose own name contains node where it is", async () => {
         const theirs = await freePort();
-        const stranger = startStranger(theirs, "node_exporter");
+        const stranger = startStranger({
+          port: theirs,
+          named: "node_exporter",
+        });
         expect(
           await waitUntil(() => existsSync(strangerReadyFile("node_exporter"))),
         ).toBe(true);
