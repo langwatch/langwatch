@@ -96,6 +96,18 @@ Feature: Gateway spend reconciliation REST surface
       # absent predicate. Reading as unfiltered here would hand a caller
       # the whole organization's spend under a narrowing they asked for.
 
+    @unit @integration
+    Scenario: The rollups refuse a status they can only answer with zero
+      Given requests still in flight alongside completed ones
+      When the caller asks the events read for the in-flight status
+      Then those envelopes are served
+      But the same narrowing on the rollups is refused, naming the status field
+      And a completed status is still accepted by the rollups
+      # A rollup sums the cost of requests past admission, so an in-flight
+      # request contributes nothing to one. Accepting the narrowing and
+      # answering zero would tell a reconciliation the books agree; the
+      # refusal says where the answer lives instead.
+
   Rule: The caller's own metadata is filterable
 
     @integration

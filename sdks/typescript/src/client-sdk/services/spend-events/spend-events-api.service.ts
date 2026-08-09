@@ -101,6 +101,14 @@ export type SpendEventStatus =
   | "failed"
   | "settled";
 
+/**
+ * The states a ROLLUP can be filtered by. A rollup sums the cost of requests
+ * past admission, so `admitted` is refused there rather than answered with a
+ * zero; list the events to see those. Derived by exclusion so the two stay one
+ * vocabulary.
+ */
+export type SpendSummaryStatus = Exclude<SpendEventStatus, "admitted">;
+
 /** A dimension a rollup can be grouped by. */
 export type SpendGroupBy =
   | "virtual_key"
@@ -199,7 +207,14 @@ function appendSpendFilters({
  * Reconcile closed periods and this never fires. For a live view where an
  * approximate shape is enough, send `allowUnstable`.
  */
-export interface SpendSummariesOptions extends SpendFilterOptions {
+export interface SpendSummariesOptions
+  extends Omit<SpendFilterOptions, "status"> {
+  /**
+   * One lifecycle status, minus `admitted`: a rollup sums the cost of requests
+   * past admission, and an admitted request has none yet. List the events for
+   * those.
+   */
+  status?: SpendSummaryStatus;
   /** One or two dimensions. Two rows can share `key`; read `group`. */
   groupBy: SpendGroupBy | SpendGroupBy[];
   from: number;

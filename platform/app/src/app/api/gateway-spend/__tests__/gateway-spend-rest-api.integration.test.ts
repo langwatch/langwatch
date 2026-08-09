@@ -1164,4 +1164,98 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
       expect(error.meta?.fields).toEqual(["allow_unstable"]);
     });
   });
+
+  // Through both routes, because the contradiction only exists between them:
+  // the rollup query drops in-flight rows with a fixed predicate, so a status
+  // filter naming that status is the intersection of two disjoint sets. Read
+  // one route at a time and everything looks consistent.
+  describe("when the caller narrows to a status the rollups cannot answer", () => {
+    const window = { from: baseTime + 890_000, to: baseTime + 910_000 };
+    const virtualKeyId = `vk-inflight-${ns}`;
+
+    /** One request still in flight, and one that completed and priced. */
+    beforeAll(async () => {
+      await seed([
+        spendRow(`${ns}-inflight`, {
+          status: "admitted" as const,
+          virtualKeyId,
+          // An admitted row carries no quantities and no cost: the fold sets
+          // them only when an outcome lands. That is exactly why a rollup has
+          // nothing to sum for it.
+          tokensInput: 0,
+          tokensOutput: 0,
+          tokensCacheRead: 0,
+          tokensCacheWrite: 0,
+          costUsd: "0.000000",
+          httpStatus: 0,
+          occurredAt: new Date(baseTime + 900_000),
+        }),
+        spendRow(`${ns}-completed`, {
+          virtualKeyId,
+          occurredAt: new Date(baseTime + 901_000),
+        }),
+      ]);
+    });
+
+    const read = async (
+      path: string,
+      query: Record<string, string | number>,
+    ): Promise<Response> =>
+      await app.request(
+        `/api/gateway/v1/${path}?${new URLSearchParams(
+          Object.entries({
+            ...window,
+            virtual_key_id: virtualKeyId,
+            ...query,
+          }).map(([k, v]) => [k, String(v)]),
+        ).toString()}`,
+        { headers: headers() },
+      );
+
+    /** @scenario "The rollups refuse a status they can only answer with zero" */
+    it("serves the in-flight envelopes on the events read", async () => {
+      const res = await read("spend-events", { status: "admitted" });
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        data: Array<{ data: { gateway_request_id: string; status: string } }>;
+      };
+      expect(body.data.map((e) => e.data.gateway_request_id)).toEqual([
+        `${ns}-inflight`,
+      ]);
+      expect(body.data[0]?.data.status).toBe("admitted");
+    });
+
+    /** @scenario "The rollups refuse a status they can only answer with zero" */
+    it("refuses the identical narrowing on the rollups, naming the field", async () => {
+      const res = await read("spend-summaries", {
+        status: "admitted",
+        group_by: "virtual_key",
+      });
+
+      const error = await expectCanonicalError(res, {
+        status: 400,
+        code: "validation_error",
+      });
+      // A 200 with an empty page would be the real bug: a reconciliation that
+      // checksums against that zero decides the books agree.
+      expect(error.meta?.fields).toEqual(["status"]);
+    });
+
+    /** @scenario "The rollups refuse a status they can only answer with zero" */
+    it("still accepts a completed status on the rollups", async () => {
+      const res = await read("spend-summaries", {
+        status: "confirmed",
+        group_by: "virtual_key",
+      });
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        data: Array<{ key: string; event_count: number }>;
+      };
+      expect(body.data).toEqual([
+        expect.objectContaining({ key: virtualKeyId, event_count: 1 }),
+      ]);
+    });
+  });
 });

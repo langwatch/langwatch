@@ -20,7 +20,11 @@ import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseCli
 import type { GatewaySpendState } from "~/server/event-sourcing/pipelines/gateway-spend-processing/projections/gatewaySpend.foldProjection";
 import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import type { SpendFilters } from "./spendFilters";
-import { buildSpendFilterClauses } from "./spendFilters";
+import {
+  buildSpendFilterClauses,
+  normalizeStatusFilter,
+  SPEND_STATUS_IN_FLIGHT,
+} from "./spendFilters";
 import type { SpendBucket, SpendGroupByKey } from "./spendGrouping";
 import { bucketExpression, groupByColumn } from "./spendGrouping";
 import { nanoUsdToDecimalString } from "./wireMoney";
@@ -655,6 +659,18 @@ export class GatewaySpendEventsRepository {
     limit?: number;
     filters?: SpendFilters;
   }): Promise<{ rows: SpendSummaryRow[]; nextCursor: string | null }> {
+    // The fixed predicate below drops in-flight rows, so narrowing to that
+    // status asks for the intersection of two disjoint sets. The REST boundary
+    // refuses it by schema; anything reaching here with it is a caller bug, and
+    // an empty page would be read as "no such spend".
+    if (
+      filters.status !== undefined &&
+      normalizeStatusFilter(filters.status) === SPEND_STATUS_IN_FLIGHT
+    ) {
+      throw new Error(
+        `readSpendSummaries cannot narrow to "${SPEND_STATUS_IN_FLIGHT}": rollups exclude in-flight rows, so the read would always be empty`,
+      );
+    }
     if (tenantIds.length === 0) return { rows: [], nextCursor: null };
     const client = await this.resolveClient(tenantIds[0]!);
 
@@ -696,7 +712,7 @@ export class GatewaySpendEventsRepository {
           sumIf(CostNanoUSD, Status IN ('confirmed', 'failed')) AS CostNanoUSD
         FROM ${TABLE} FINAL
         WHERE TenantId IN {tenantIds:Array(String)}
-          AND Status != 'admitted'
+          AND Status != '${SPEND_STATUS_IN_FLIGHT}'
           AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
           AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})
           ${clauses.join("\n          ")}

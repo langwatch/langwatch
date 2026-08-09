@@ -253,7 +253,13 @@ class SpendEventsFacade:
         they are replaced by the ones that actually served it. A page walk
         over a group that can move counts some requests twice and misses
         others. Reconciling closed periods never meets this; pass
-        ``allow_unstable`` for a live view where the shape is enough."""
+        ``allow_unstable`` for a live view where the shape is enough.
+
+        status: one of "success", "error", "confirmed", "failed" or
+        "settled". "admitted" is REFUSED here, unlike on the events read: a
+        rollup sums the cost of requests past admission, and an admitted
+        request is still in flight with none of its own yet. Call
+        ``list_page`` for those."""
         params: Dict[str, Any] = {
             "group_by": group_by if isinstance(group_by, str) else ",".join(group_by),
             "from": from_ms,
@@ -319,7 +325,10 @@ class SpendEventsFacade:
         The whole-window read a reconciler actually wants, so getting the
         totals right does not depend on remembering to page. Each row
         carries event_count, settled_count, the token classes, and integer
-        nano-USD cost."""
+        nano-USD cost.
+
+        status takes the same values ``summaries_page`` does, so
+        "admitted" is refused here too."""
         rest: Dict[str, Any] = {
             "bucket": bucket,
             "timezone": timezone,

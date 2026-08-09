@@ -188,6 +188,7 @@ export {
   type SpendSummaryRow,
   type SpendSummariesPage,
   type SpendEventStatus,
+  type SpendSummaryStatus,
   type SpendReplayResult,
   type EndUserSpend,
   type EndUserCap,

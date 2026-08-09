@@ -17,6 +17,49 @@ import { z } from "zod";
 
 import type { SpendEventStatus } from "./spendEvents.clickhouse.repository";
 
+/**
+ * The lifecycle status a spend row carries while its outcome has not landed
+ * yet. Named once because two places depend on it meaning the same thing: the
+ * rollup read excludes it from every sum, and the rollup's status filter
+ * refuses it rather than accepting a narrowing that can only answer nothing.
+ */
+export const SPEND_STATUS_IN_FLIGHT = "admitted" as const;
+
+/**
+ * Every status a caller may narrow on. `success` and `error` are the pre-
+ * pipeline spelling of `confirmed` and `failed`, kept so older clients keep
+ * working.
+ */
+export const SPEND_STATUS_FILTERS = [
+  "success",
+  "error",
+  "admitted",
+  "confirmed",
+  "failed",
+  "settled",
+] as const;
+
+/** The events read's status filter: the whole vocabulary. */
+export const spendStatusFilter = z.enum(SPEND_STATUS_FILTERS);
+
+/**
+ * The rollups read's status filter: the same vocabulary minus the in-flight
+ * status, DERIVED by exclusion so a status added to one is added to both.
+ *
+ * A rollup sums the cost of requests past admission, so an admitted request
+ * contributes nothing to it and the read excludes those rows outright.
+ * Accepting the narrowing anyway would answer every such query with a
+ * confident zero, and a reconciliation that checksums against that zero
+ * decides the books agree.
+ */
+export const spendSummaryStatusFilter = spendStatusFilter.exclude([
+  SPEND_STATUS_IN_FLIGHT,
+]);
+
+/** Why the rollups read publishes a narrower `status` than the events read. */
+export const SPEND_SUMMARY_STATUS_DESCRIPTION =
+  "Narrow to one lifecycle status. `admitted` is not accepted here: a rollup sums the cost of requests past admission, and an admitted request is still in flight with no cost of its own yet. Ask /spend-events for those.";
+
 /** Legacy filter vocabulary ("success"/"error") maps onto the lifecycle
  *  statuses so pre-pipeline API clients keep working. */
 export function normalizeStatusFilter(
@@ -126,9 +169,7 @@ export const spendFilterQueryShape = {
   request_type: repeatable(z.string().min(1).max(50)).optional(),
   label: repeatable(z.string().min(1).max(200)).optional(),
   metadata: repeatable(metadataPair).optional(),
-  status: z
-    .enum(["success", "error", "admitted", "confirmed", "failed", "settled"])
-    .optional(),
+  status: spendStatusFilter.optional(),
 } as const;
 
 /** The parsed shape of {@link spendFilterQueryShape}. */
@@ -240,9 +281,9 @@ export const spendFiltersSchema = z.object({
     )
     .max(MAX_FILTER_VALUES)
     .optional(),
-  status: z
-    .enum(["success", "error", "admitted", "confirmed", "failed", "settled"])
-    .optional(),
+  // The whole vocabulary, because this schema backs an EVENTS read. A rollup
+  // caller narrows with {@link spendSummaryStatusFilter} instead.
+  status: spendStatusFilter.optional(),
 }) satisfies z.ZodType<SpendFilters, z.ZodTypeDef, unknown>;
 
 const IN_COLUMNS: ReadonlyArray<readonly [keyof SpendFilters, string]> = [

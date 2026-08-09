@@ -33,8 +33,10 @@ import {
 } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { GatewaySpendEventsService } from "~/server/gateway/spendEvents.service";
 import {
+  SPEND_SUMMARY_STATUS_DESCRIPTION,
   spendFilterQueryShape,
   spendFiltersFromQuery,
+  spendSummaryStatusFilter,
 } from "~/server/gateway/spendFilters";
 import {
   assertGroupingIsWalkable,
@@ -356,6 +358,14 @@ const spendSummariesQuerySchema = z
     cursor: z.string().max(500).optional(),
     limit: z.coerce.number().int().positive().max(1000).optional().default(500),
     ...spendFilterQueryShape,
+    // The one filter this read narrows further than /spend-events does. A
+    // rollup excludes in-flight rows from every sum, so accepting `admitted`
+    // would answer a real question with a confident zero. The refusal names
+    // the parameter, so a caller can act on it, and the events read still
+    // serves those envelopes.
+    status: spendSummaryStatusFilter
+      .optional()
+      .openapi({ description: SPEND_SUMMARY_STATUS_DESCRIPTION }),
   })
   // An inverted window is an empty window, so a caller who swapped the two
   // reads a confident zero and reconciles against it. /spend-events has

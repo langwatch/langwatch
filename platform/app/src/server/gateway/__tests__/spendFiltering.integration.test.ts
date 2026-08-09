@@ -311,6 +311,25 @@ describe("gateway spend filtering (real PG + real CH)", () => {
     });
   });
 
+  describe("when the rollup is narrowed to the in-flight status", () => {
+    /** @scenario "The rollups refuse a status they can only answer with zero" */
+    it("refuses rather than answering the empty intersection", async () => {
+      // The rollup drops in-flight rows with a fixed predicate, so this
+      // narrowing can only ever return nothing. The REST boundary refuses it
+      // by schema; this is the backstop for every other caller, because an
+      // empty page here reads as "no such spend" to whatever asked.
+      await expect(
+        summariseBy(["model"], { filters: { status: "admitted" } }),
+      ).rejects.toThrow(/admitted/);
+    });
+
+    it("still serves a status the rollup can sum", async () => {
+      expect(
+        await summariseBy(["model"], { filters: { status: "confirmed" } }),
+      ).toEqual(["claude-opus-5", "gemini-3-pro", "gpt-5-mini"]);
+    });
+  });
+
   describe("when a filter names more than one value", () => {
     /** @scenario "A filter repeated in the query matches any of the values it names" */
     it("covers those values and no others", async () => {
