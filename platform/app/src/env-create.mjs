@@ -281,6 +281,32 @@ export function createEnvConfig() {
         .int()
         .positive()
         .default(10000),
+      // Per-trigger daily ceiling on CONFIRMED persist dispatches — the dataset
+      // rows and annotation-queue items an automation actually creates. Only
+      // customer-attributable volume is counted: match records, unconfirmed
+      // matches, debounce fan-out and retries are our amplification and are
+      // never charged here.
+      //
+      // The tiers are set against what a human can consume rather than what a
+      // machine can produce: annotation throughput is a few hundred items a day,
+      // and 1,000 matches the existing per-project daily email cap. A single
+      // contract can raise its own ceiling past the tier through
+      // `PlanInfo.maxTriggerPersistDispatchesPerDay`.
+      TRIGGER_PERSIST_DAILY_CAP_FREE: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(100),
+      TRIGGER_PERSIST_DAILY_CAP_PAID: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(1000),
+      TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(10000),
       DEMO_PROJECT_ID: z.string().optional(),
       DEMO_PROJECT_USER_ID: z.string().optional(),
       DEMO_PROJECT_SLUG: z.string().optional(),
@@ -532,6 +558,12 @@ export function createEnvConfig() {
       TRIGGER_EMAIL_HOURLY_CAP: process.env.TRIGGER_EMAIL_HOURLY_CAP,
       TRIGGER_EMAIL_TENANT_DAILY_CAP:
         process.env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
+      TRIGGER_PERSIST_DAILY_CAP_FREE:
+        process.env.TRIGGER_PERSIST_DAILY_CAP_FREE,
+      TRIGGER_PERSIST_DAILY_CAP_PAID:
+        process.env.TRIGGER_PERSIST_DAILY_CAP_PAID,
+      TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE:
+        process.env.TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE,
       DEMO_PROJECT_ID: process.env.DEMO_PROJECT_ID,
       DEMO_PROJECT_USER_ID: process.env.DEMO_PROJECT_USER_ID,
       DEMO_PROJECT_SLUG: process.env.DEMO_PROJECT_SLUG,

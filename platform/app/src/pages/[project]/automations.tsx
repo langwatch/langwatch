@@ -1,4 +1,5 @@
 import {
+  Badge,
   Box,
   Button,
   Code,
@@ -118,6 +119,17 @@ function AutomationsPage() {
   const statsByTriggerId = useMemo(
     () => new Map((triggerStats.data ?? []).map((s) => [s.triggerId, s])),
     [triggerStats.data],
+  );
+
+  // How much each automation has been throttled today. Read separately from
+  // the trigger rows because the counters live in Redis, not Postgres, and a
+  // Redis outage should cost the page these badges rather than the whole list.
+  const capStatus = api.automation.getDailyCapStatus.useQuery(
+    {
+      projectId: project?.id ?? "",
+      triggerIds: (triggers.data ?? []).map((trigger) => trigger.id),
+    },
+    { enabled: !!project?.id && (triggers.data ?? []).length > 0 },
   );
 
   // A report's cron only DESCRIBES its schedule; the scheduler owns the real
@@ -433,21 +445,47 @@ function AutomationsPage() {
     onClick: () => openDrawer("viewAutomation", { automationId: trigger.id }),
   });
 
-  const activeCell = (trigger: EnhancedTrigger) => (
-    <Table.Cell
-      textAlign="center"
-      onClick={(event) => {
-        event.stopPropagation();
-      }}
-    >
-      <Switch
-        checked={trigger.active}
-        onCheckedChange={({ checked }) => {
-          handleToggleTrigger(trigger.id, checked);
+  const activeCell = (trigger: EnhancedTrigger) => {
+    const skipped = capStatus.data?.counts[trigger.id]?.skipped ?? 0;
+    const pausedForVolume = trigger.pausedReason === "runaway_volume";
+    return (
+      <Table.Cell
+        textAlign="center"
+        onClick={(event) => {
+          event.stopPropagation();
         }}
-      />
-    </Table.Cell>
-  );
+      >
+        <VStack gap={1} align="center">
+          <Switch
+            checked={trigger.active}
+            onCheckedChange={({ checked }) => {
+              handleToggleTrigger(trigger.id, checked);
+            }}
+          />
+          {/* An automation that is running but silently dropping matches is
+              the confusing case: without this the customer sees it switched
+              on and no records appearing, with nothing to explain the gap. */}
+          {pausedForVolume ? (
+            <Tooltip content="This automation matched almost every trace in the project, so we paused it. Narrow its condition, then switch it back on.">
+              <Badge colorPalette="red" size="sm">
+                Paused
+              </Badge>
+            </Tooltip>
+          ) : skipped > 0 ? (
+            <Tooltip
+              content={`This automation passed its daily limit of ${(
+                capStatus.data?.cap ?? 0
+              ).toLocaleString()} matches. It starts again tomorrow.`}
+            >
+              <Badge colorPalette="orange" size="sm">
+                {skipped.toLocaleString()} skipped today
+              </Badge>
+            </Tooltip>
+          ) : null}
+        </VStack>
+      </Table.Cell>
+    );
+  };
 
   const isLoading = triggers.isLoading;
 

@@ -13,6 +13,10 @@ import {
   consumeTenantEmailCapSlot,
 } from "~/server/app-layer/automations/dispatch/emailCaps";
 import { dispatchGraphAlertAction } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
+import {
+  consumePersistCapSlot,
+  resolvePersistDailyCap,
+} from "~/server/app-layer/automations/dispatch/persistCap";
 import type { EmailSuppressionService } from "~/server/app-layer/automations/emailSuppression.service";
 import {
   evaluateGraphTrigger,
@@ -26,6 +30,8 @@ import {
   type GraphTriggerSweepCandidate,
 } from "~/server/app-layer/automations/graph-trigger-heartbeat";
 import { PrismaGraphTriggerSentRepository } from "~/server/app-layer/automations/repositories/trigger.prisma.repository";
+import { defaultRunawayContainmentDeps } from "~/server/app-layer/automations/runaway-containment.deps";
+import { handlePersistCapBreach } from "~/server/app-layer/automations/runaway-containment.service";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import { WebhookDeliveryService } from "~/server/app-layer/automations/webhook-delivery.service";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
@@ -277,6 +283,19 @@ export function buildAutomationDispatchPorts({
       await createManyDatasetRecords(params);
     },
     recordWebhookDelivery,
+    resolvePersistDailyCap: (projectId) => resolvePersistDailyCap(projectId),
+    consumePersistCapSlot: (params) => consumePersistCapSlot(params),
+    handlePersistCapBreach: (breach) =>
+      handlePersistCapBreach(
+        defaultRunawayContainmentDeps({
+          prisma,
+          triggers,
+          projects,
+          baseHost,
+          resolveClickHouseClient,
+        }),
+        breach,
+      ),
   };
 
   return {

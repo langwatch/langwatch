@@ -24,6 +24,7 @@ import {
   decryptWebhookHeaders,
   decryptWebhookSigningSecrets,
 } from "~/server/app-layer/automations/providers/webhook/server";
+import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
@@ -40,6 +41,7 @@ import {
   sendRenderedTriggerEmail,
   sendTriggerEmail,
 } from "~/server/mailer/triggerEmail";
+import { incrementAutomationOverflowFlushTotal } from "~/server/metrics";
 import type { Trace } from "~/server/tracer/types";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 
@@ -63,6 +65,10 @@ const logger = createLogger("langwatch:triggers:settlement-dispatch");
  *  batching kicks in. */
 export function createLogOverflowHandler(): IntentExecutor<LogOverflowIntent> {
   return async (payload, context) => {
+    // Overflow is OUR amplification, not the customer's: it happens because
+    // matches are recorded before filters are evaluated. It is counted for the
+    // team and never charged against a customer's ceiling.
+    incrementAutomationOverflowFlushTotal(payload.flushed);
     logger.warn(
       {
         projectId: context.projectId,
@@ -147,6 +153,28 @@ export interface TriggerSettlementDispatchDeps extends ConfirmSettledMatchDeps {
     triggerId: string;
     emails: string[];
   }) => Promise<string[]>;
+  /** Plan-tiered daily ceiling on confirmed persist dispatches. */
+  resolvePersistDailyCap: (projectId: string) => Promise<number>;
+  consumePersistCapSlot: (args: {
+    projectId: string;
+    triggerId: string;
+    now: Date;
+    cap: number;
+    dedupKey: string;
+  }) => Promise<{
+    allowed: boolean;
+    count: number;
+    cap: number;
+    skipped: number;
+  }>;
+  /** Emails, pauses and counts a breach. Must never throw. */
+  handlePersistCapBreach: (args: {
+    trigger: TriggerSummary;
+    projectId: string;
+    count: number;
+    cap: number;
+    skipped: number;
+  }) => Promise<void>;
 }
 
 /**
@@ -724,6 +752,70 @@ async function dispatchPersistMatch({
       foldState,
     }))
   ) {
+    return;
+  }
+
+  // THE CEILING SITS EXACTLY HERE, and the position is the policy.
+  //
+  // After `confirmSettledMatch`, so only CUSTOMER-ATTRIBUTABLE volume counts: a
+  // match that no longer passes its filters returned above and consumed
+  // nothing. Before `dispatchTriggerAction`, so passing the ceiling costs the
+  // customer the action, not a half-written one.
+  //
+  // Match RECORDING is deliberately not capped. Our pipeline records a match
+  // for every active trigger on every trace and only evaluates filters later,
+  // so that volume is our amplification and pressing the customer about it
+  // would be charging them for our design.
+  const cap = await deps.resolvePersistDailyCap(projectId);
+  const slot = await deps.consumePersistCapSlot({
+    projectId,
+    triggerId,
+    // The (trigger, trace) pair is this dispatch's identity, so an outbox
+    // retry of the same dispatch presents the same key and re-reads the count
+    // instead of burning a second slot.
+    dedupKey: `${projectId}/${triggerId}:persist:${traceId}`,
+    now: new Date(),
+    cap,
+  });
+  if (!slot.allowed) {
+    // Terminal drop, not a throw: retrying would not get a slot and the outbox
+    // would churn. The trigger stays ACTIVE and works again tomorrow, unless
+    // containment decides the shape is misconfigured rather than merely busy.
+    logger.warn(
+      { projectId, triggerId, traceId, count: slot.count, cap: slot.cap },
+      "Automation passed its daily match ceiling — skipping this match for " +
+        "the rest of the UTC day",
+    );
+    // Containment is bookkeeping ABOUT a match that has already been dropped.
+    // Letting it throw would send the whole dispatch back through the outbox's
+    // retry ladder, and every one of those attempts would reach this same
+    // point and drop the match again. The failure is recorded and the dispatch
+    // still completes.
+    try {
+      await deps.handlePersistCapBreach({
+        trigger,
+        projectId,
+        count: slot.count,
+        cap: slot.cap,
+        skipped: slot.skipped,
+      });
+    } catch (containmentError) {
+      logger.error(
+        {
+          projectId,
+          triggerId,
+          error:
+            containmentError instanceof Error
+              ? containmentError.message
+              : String(containmentError),
+        },
+        "Runaway containment threw while handling a ceiling breach — the " +
+          "match stays dropped and the dispatch is not retried",
+      );
+      captureException(toError(containmentError), {
+        extra: { projectId, triggerId, phase: "persist-cap-breach" },
+      });
+    }
     return;
   }
 

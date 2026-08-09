@@ -83,6 +83,11 @@ vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 
+import {
+  _resetMemoryPersistCapStore,
+  consumePersistCapSlot,
+  resolvePersistDailyCap,
+} from "../../../app-layer/automations/dispatch/persistCap";
 import { PrismaTriggerRepository } from "../../../app-layer/automations/repositories/trigger.prisma.repository";
 import { TriggerService } from "../../../app-layer/automations/trigger.service";
 import { automationRouter } from "../automations";
@@ -1020,6 +1025,35 @@ describe("automationRouter", () => {
 
         expect(mockTriggerUpdate).not.toHaveBeenCalled();
       });
+    });
+  });
+
+  // What the automations list reads to say "N matches skipped today". Without
+  // it, a customer sees an automation switched on and producing nothing, with
+  // nothing on the page to explain the gap.
+  describe("getDailyCapStatus", () => {
+    /** @scenario "The automations list shows what was skipped today" */
+    it("reports today's skipped count per automation alongside the ceiling", async () => {
+      _resetMemoryPersistCapStore();
+      const cap = await resolvePersistDailyCap("proj_123");
+      for (let index = 0; index <= cap; index++) {
+        await consumePersistCapSlot({
+          projectId: "proj_123",
+          triggerId: "trigger_busy",
+          now: new Date(),
+          cap,
+          dedupKey: `proj_123/trigger_busy:persist:trace-${index}`,
+        });
+      }
+
+      const status = await caller.getDailyCapStatus({
+        projectId: "proj_123",
+        triggerIds: ["trigger_busy", "trigger_quiet"],
+      });
+
+      expect(status.cap).toBe(cap);
+      expect(status.counts.trigger_busy?.skipped).toBe(1);
+      expect(status.counts.trigger_quiet?.skipped).toBe(0);
     });
   });
 

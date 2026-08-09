@@ -137,7 +137,6 @@ import { createGovernanceEventsPipeline } from "./pipelines/governance-events/pi
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
 import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
 import { createLangyMaintenancePipeline } from "./pipelines/langy-maintenance/pipeline";
-import { createProcessManagerMaintenancePipeline } from "./pipelines/process-manager-maintenance/pipeline";
 import { resolveLogCommandShardCount as resolveCanonicalLogCommandShardCount } from "./pipelines/log-processing/canonicalLog";
 import { createLogProcessingPipeline } from "./pipelines/log-processing/pipeline";
 import { CanonicalLogAppendStore } from "./pipelines/log-processing/projections/stores";
@@ -148,6 +147,7 @@ import {
   MetricSeriesCatalogAppendStore,
   MetricTimeRollupAppendStore,
 } from "./pipelines/metric-processing/projections/stores";
+import { createProcessManagerMaintenancePipeline } from "./pipelines/process-manager-maintenance/pipeline";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,

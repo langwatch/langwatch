@@ -21,6 +21,10 @@ import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
 import { listSlackChannels } from "~/server/app-layer/automations/delivery/slackWebApi";
+import {
+  readPersistCapCounts,
+  resolvePersistDailyCap,
+} from "~/server/app-layer/automations/dispatch/persistCap";
 import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
 import {
   InvalidEmailRecipientError,
@@ -29,7 +33,6 @@ import {
   ProjectNotFoundError,
   TriggerFiltersRequiredError,
 } from "~/server/app-layer/automations/errors";
-import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import {
   buildGraphAlertTriggerData,
   type GraphAlertActionParams,
@@ -62,6 +65,7 @@ import { MonitorService } from "~/server/app-layer/monitors/monitor.service";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { featureFlagService } from "~/server/featureFlag";
+import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   sanitizeTriggerFilters,
@@ -463,6 +467,31 @@ export const automationRouter = createTRPCRouter({
 
       return enhancedTriggers;
     }),
+  /**
+   * Today's confirmed-match count and skipped count per automation, so the
+   * list can say "N matches skipped today" instead of leaving the customer to
+   * wonder why an automation they can see running produced nothing. One Redis
+   * MGET for the whole list; a Redis outage degrades to showing no skips
+   * rather than failing the page.
+   */
+  getDailyCapStatus: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        triggerIds: z.array(z.string()).max(500),
+      }),
+    )
+    .use(checkProjectPermission("triggers:view"))
+    .query(async ({ input }) => {
+      const cap = await resolvePersistDailyCap(input.projectId);
+      const counts = await readPersistCapCounts({
+        projectId: input.projectId,
+        triggerIds: input.triggerIds,
+        now: new Date(),
+        cap,
+      });
+      return { cap, counts };
+    }),
   getTriggerStats: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("triggers:view"))
@@ -581,6 +610,11 @@ export const automationRouter = createTRPCRouter({
         projectId: input.projectId,
         data: {
           active: input.active,
+          // Resuming clears the platform's pause record. Leaving it behind
+          // would make a running automation keep claiming it was paused for
+          // runaway volume, and the next genuine pause would be
+          // indistinguishable from the stale one.
+          ...(input.active ? { pausedReason: null, pausedAt: null } : {}),
         },
       });
 

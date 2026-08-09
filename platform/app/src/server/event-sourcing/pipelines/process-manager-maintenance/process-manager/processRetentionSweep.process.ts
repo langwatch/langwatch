@@ -1,12 +1,11 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-
-import { incrementProcessManagerRetentionSweptRows } from "~/server/metrics";
-import { toSafeFailureDiagnostic } from "~/server/event-sourcing/process-manager/failureDiagnostic";
 import type {
   IntentSpec,
   WakeHandler,
 } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import { toSafeFailureDiagnostic } from "~/server/event-sourcing/process-manager/failureDiagnostic";
+import { incrementProcessManagerRetentionSweptRows } from "~/server/metrics";
 
 const logger = createLogger("langwatch:process-manager:retention-sweep");
 

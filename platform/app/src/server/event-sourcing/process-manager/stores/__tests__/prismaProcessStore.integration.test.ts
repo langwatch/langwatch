@@ -1009,7 +1009,10 @@ describe("PrismaProcessStore", () => {
       );
 
       expect(
-        await store.deleteDispatchedOutboxBatch({ before: cutoff, limit: 5_000 }),
+        await store.deleteDispatchedOutboxBatch({
+          before: cutoff,
+          limit: 5_000,
+        }),
       ).toBe(0);
       expect(
         await store.deleteDeadOutboxBatch({ before: cutoff, limit: 5_000 }),
@@ -1056,7 +1059,10 @@ describe("PrismaProcessStore", () => {
       // The dispatched family must not touch it, and neither must a dead sweep
       // whose cutoff it still predates.
       expect(
-        await store.deleteDispatchedOutboxBatch({ before: cutoff, limit: 5_000 }),
+        await store.deleteDispatchedOutboxBatch({
+          before: cutoff,
+          limit: 5_000,
+        }),
       ).toBe(0);
       expect(
         await store.deleteDeadOutboxBatch({ before: deadAt, limit: 5_000 }),

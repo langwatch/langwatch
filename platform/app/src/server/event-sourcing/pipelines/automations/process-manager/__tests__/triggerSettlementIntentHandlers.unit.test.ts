@@ -164,6 +164,11 @@ function makeDeps(activeTrigger: TriggerSummary) {
       .mockResolvedValue({ allowed: true, count: 1 }),
     tenantDailyCap: 1_000,
     filterSuppressedEmails: vi.fn(async ({ emails }) => emails),
+    resolvePersistDailyCap: vi.fn().mockResolvedValue(100),
+    consumePersistCapSlot: vi
+      .fn()
+      .mockResolvedValue({ allowed: true, count: 1, cap: 100, skipped: 0 }),
+    handlePersistCapBreach: vi.fn().mockResolvedValue(undefined),
   };
   return {
     deps: deps as unknown as TriggerSettlementDispatchDeps,
@@ -374,6 +379,114 @@ describe("trigger settlement intent handlers integration", () => {
         traceId: "trace-1",
         projectId: "project-1",
       });
+    });
+  });
+
+  // The ceiling only ever counts CUSTOMER-ATTRIBUTABLE volume: a confirmed
+  // match that was about to create a dataset row or an annotation item. Where
+  // it sits in the dispatch is what makes that true, so these pin the position
+  // rather than the arithmetic (which persistCap.unit.test.ts owns).
+  describe("given the daily match ceiling", () => {
+    const datasetTrigger = () =>
+      trigger(TriggerAction.ADD_TO_DATASET, {
+        actionParams: {
+          datasetId: "dataset-1",
+          datasetMapping: { mapping: {}, expansions: [] },
+        },
+      });
+
+    /** @scenario "A confirmed persist dispatch consumes a ceiling slot" */
+    it("consumes one slot for a match that is about to create a record", async () => {
+      const { deps, raw } = makeDeps(datasetTrigger());
+
+      await createPersistMatchHandler(deps)(
+        { triggerId: "trigger-1", traceId: "trace-1" },
+        context("process:trigger-1:persist:trace-1"),
+      );
+
+      expect(raw.consumePersistCapSlot).toHaveBeenCalledTimes(1);
+      expect(raw.consumePersistCapSlot).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: "project-1",
+          triggerId: "trigger-1",
+          // The (trigger, trace) pair, so an outbox retry of this dispatch
+          // presents the same key and cannot burn a second slot.
+          dedupKey: "project-1/trigger-1:persist:trace-1",
+        }),
+      );
+      expect(raw.addToDataset).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A match that fails its filters at dispatch consumes nothing" */
+    it("consumes nothing when the filters no longer pass", async () => {
+      const activeTrigger = trigger(TriggerAction.ADD_TO_DATASET, {
+        actionParams: {
+          datasetId: "dataset-1",
+          datasetMapping: { mapping: {}, expansions: [] },
+        },
+        filters: { "traces.origin": ["application"] },
+      });
+      const { deps, folds, raw } = makeDeps(activeTrigger);
+      folds.set(
+        "trace-1",
+        fold("trace-1", { attributes: { "langwatch.origin": "evaluation" } }),
+      );
+
+      await createPersistMatchHandler(deps)(
+        { triggerId: "trigger-1", traceId: "trace-1" },
+        context("process:trigger-1:persist:trace-1"),
+      );
+
+      expect(raw.consumePersistCapSlot).not.toHaveBeenCalled();
+      expect(raw.addToDataset).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A dispatch over the ceiling is dropped without an error" */
+    it("drops the match terminally instead of throwing for a retry", async () => {
+      const { deps, raw, triggers } = makeDeps(datasetTrigger());
+      raw.consumePersistCapSlot.mockResolvedValue({
+        allowed: false,
+        count: 101,
+        cap: 100,
+        skipped: 1,
+      });
+
+      await expect(
+        createPersistMatchHandler(deps)(
+          { triggerId: "trigger-1", traceId: "trace-1" },
+          context("process:trigger-1:persist:trace-1"),
+        ),
+      ).resolves.toBeUndefined();
+
+      expect(raw.addToDataset).not.toHaveBeenCalled();
+      // No claim either: the match was never acted on, so nothing happened
+      // that a future dispatch of the same pair should be suppressed against.
+      expect(triggers.claimSend).not.toHaveBeenCalled();
+      expect(raw.handlePersistCapBreach).toHaveBeenCalledWith(
+        expect.objectContaining({ count: 101, cap: 100, skipped: 1 }),
+      );
+    });
+
+    /** @scenario "A containment failure never breaks the dispatch it was watching" */
+    it("does not retry the dispatch when containment itself fails", async () => {
+      // Containment is bookkeeping about a match that was already dropped.
+      // Letting it throw would make the outbox replay a dispatch whose only
+      // remaining work is the bookkeeping that just failed.
+      const { deps, raw } = makeDeps(datasetTrigger());
+      raw.consumePersistCapSlot.mockResolvedValue({
+        allowed: false,
+        count: 101,
+        cap: 100,
+        skipped: 1,
+      });
+      raw.handlePersistCapBreach.mockRejectedValue(new Error("mailer down"));
+
+      await expect(
+        createPersistMatchHandler(deps)(
+          { triggerId: "trigger-1", traceId: "trace-1" },
+          context("process:trigger-1:persist:trace-1"),
+        ),
+      ).resolves.toBeUndefined();
     });
   });
 

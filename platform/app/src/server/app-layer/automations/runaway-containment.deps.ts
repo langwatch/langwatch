@@ -1,0 +1,113 @@
+import { createLogger } from "@langwatch/observability";
+import { OrganizationUserRole, type PrismaClient } from "@prisma/client";
+
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { sendAutomationLimitEmail } from "~/server/mailer/automationLimitEmail";
+import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
+import { connection } from "~/server/redis";
+import type { ProjectService } from "../projects/project.service";
+import type { RunawayContainmentDeps } from "./runaway-containment.service";
+import type { TriggerService } from "./trigger.service";
+
+const logger = createLogger("langwatch:automations:runaway-containment");
+
+/** 25h, one hour past the day the claim covers, matching the cap counters. */
+const CLAIM_EXPIRE_SECONDS = 90_000;
+
+const claimMemory = new Map<string, number>();
+
+/**
+ * Once-only gate across the fleet. Redis SET-NX when it is available; a
+ * per-worker Map otherwise, which degrades "one email per day" to "one per
+ * worker per day" rather than to none at all.
+ */
+async function claimOnce(key: string): Promise<boolean> {
+  if (connection) {
+    try {
+      return (
+        (await connection.set(key, "1", "EX", CLAIM_EXPIRE_SECONDS, "NX")) !==
+        null
+      );
+    } catch (error) {
+      logger.warn(
+        { key, error: error instanceof Error ? error.message : String(error) },
+        "Redis error claiming an automation containment notification — " +
+          "falling back to a per-worker claim",
+      );
+    }
+  }
+  const now = Date.now();
+  const existing = claimMemory.get(key);
+  if (existing !== undefined && existing > now) return false;
+  claimMemory.set(key, now + CLAIM_EXPIRE_SECONDS * 1000);
+  return true;
+}
+
+export function defaultRunawayContainmentDeps({
+  prisma,
+  triggers,
+  projects,
+  baseHost,
+  resolveClickHouseClient,
+}: {
+  prisma: PrismaClient;
+  triggers: TriggerService;
+  projects: ProjectService;
+  baseHost: string;
+  resolveClickHouseClient: ClickHouseClientResolver;
+}): RunawayContainmentDeps {
+  return {
+    countProjectTraces24h: async (projectId) => {
+      const client = await resolveClickHouseClient(projectId);
+      if (!client) return 0;
+      const result = await client.query({
+        query: `
+          SELECT toString(count(DISTINCT TraceId)) AS Total
+          FROM trace_summaries
+          WHERE TenantId = {projectId:String}
+            AND OccurredAt >= now() - INTERVAL 24 HOUR
+        `,
+        query_params: { projectId },
+        format: "JSONEachRow",
+      });
+      const rows = (await result.json()) as Array<{ Total: string }>;
+      return parseInt(rows[0]?.Total ?? "0", 10);
+    },
+
+    pauseTrigger: async ({ triggerId, projectId, reason, at }) => {
+      await triggers.update({
+        triggerId,
+        projectId,
+        data: { active: false, pausedReason: reason, pausedAt: at },
+      });
+      // Without this the match subscriber keeps recording matches for up to
+      // the cache TTL, which is the whole window the pause exists to close.
+      await triggers.invalidate(projectId);
+    },
+
+    notificationRecipients: async (projectId) => {
+      const organizationId = await resolveOrganizationId(projectId);
+      if (!organizationId) return [];
+      const admins = await prisma.organizationUser.findMany({
+        where: { organizationId, role: OrganizationUserRole.ADMIN },
+        select: { user: { select: { email: true } } },
+      });
+      return admins.flatMap((admin) =>
+        admin.user.email ? [admin.user.email] : [],
+      );
+    },
+
+    sendLimitEmail: (params) => sendAutomationLimitEmail(params),
+
+    claimOnce,
+
+    projectName: async (projectId) =>
+      (await projects.getById(projectId))?.name ?? "your project",
+
+    automationUrl: async ({ projectId, triggerId }) => {
+      const project = await projects.getById(projectId);
+      const slug = project?.slug ?? "";
+      return `${baseHost}/${slug}/automations?drawer.open=editAutomationFilter&drawer.automationId=${triggerId}`;
+    },
+  };
+}

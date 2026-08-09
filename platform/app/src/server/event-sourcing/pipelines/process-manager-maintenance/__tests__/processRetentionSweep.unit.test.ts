@@ -8,9 +8,9 @@ import {
   DEAD_OUTBOX_RETENTION_MS,
   DISPATCHED_OUTBOX_RETENTION_MS,
   type ProcessRetentionSweepDeps,
+  processRetentionSweepWake,
   RETENTION_SWEEP_BATCH_SIZE,
   RETENTION_SWEEP_MAX_BATCHES_PER_WAKE,
-  processRetentionSweepWake,
   runProcessRetentionSweep,
 } from "../process-manager/processRetentionSweep.process";
 
@@ -75,7 +75,9 @@ describe("processRetentionSweep", () => {
       )();
 
       expect(dispatched).toHaveBeenCalledWith(
-        expect.objectContaining({ before: NOW - DISPATCHED_OUTBOX_RETENTION_MS }),
+        expect.objectContaining({
+          before: NOW - DISPATCHED_OUTBOX_RETENTION_MS,
+        }),
       );
       expect(dead).toHaveBeenCalledWith(
         expect.objectContaining({ before: NOW - DEAD_OUTBOX_RETENTION_MS }),
@@ -87,7 +89,8 @@ describe("processRetentionSweep", () => {
 
     /** @scenario "A wake stops at its batch budget" */
     it("deletes at most the per-wake budget and leaves the rest", async () => {
-      const budget = RETENTION_SWEEP_BATCH_SIZE * RETENTION_SWEEP_MAX_BATCHES_PER_WAKE;
+      const budget =
+        RETENTION_SWEEP_BATCH_SIZE * RETENTION_SWEEP_MAX_BATCHES_PER_WAKE;
       const dispatched = backlog(budget + RETENTION_SWEEP_BATCH_SIZE);
 
       await runProcessRetentionSweep(
@@ -97,8 +100,9 @@ describe("processRetentionSweep", () => {
       expect(dispatched).toHaveBeenCalledTimes(
         RETENTION_SWEEP_MAX_BATCHES_PER_WAKE,
       );
-      const deleted = (await Promise.all(dispatched.mock.results.map((r) => r.value)))
-        .reduce((sum: number, count: number) => sum + count, 0);
+      const deleted = (
+        await Promise.all(dispatched.mock.results.map((r) => r.value))
+      ).reduce((sum: number, count: number) => sum + count, 0);
       expect(deleted).toBe(budget);
     });
 
@@ -166,8 +170,9 @@ describe("processRetentionSweep", () => {
       )();
 
       const after = await familyCounts(counter);
-      expect((after.dispatched_outbox ?? 0) - (before.dispatched_outbox ?? 0))
-        .toBe(3);
+      expect(
+        (after.dispatched_outbox ?? 0) - (before.dispatched_outbox ?? 0),
+      ).toBe(3);
       expect((after.inbox ?? 0) - (before.inbox ?? 0)).toBe(7);
     });
   });

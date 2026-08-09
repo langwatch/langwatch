@@ -836,6 +836,57 @@ export const incrementProcessManagerRetentionSweptRows = (
   if (rows > 0) processManagerRetentionSweptRows.labels(family).inc(rows);
 };
 
+// --- Automation volume and containment ---
+//
+// The split these carry IS the policy. `automation_match_records_total` is OUR
+// amplification: our pipeline records a match for every active trigger on every
+// trace and only evaluates filters later, so this number is a multiplier we
+// chose and it is never charged to a customer. The ceiling and pause counters
+// below are customer-attributable volume: confirmed matches that were about to
+// create a dataset row or an annotation item.
+//
+// No project or trigger labels on any of them. These are fleet health, and a
+// per-tenant breakdown here would be unbounded cardinality for a question the
+// logs already answer with more detail.
+register.removeSingleMetric("automation_match_records_total");
+const automationMatchRecordsTotal = new Counter({
+  name: "automation_match_records_total",
+  help: "Trigger match records written before any filter is evaluated",
+});
+
+export const incrementAutomationMatchRecordsTotal = (records: number) => {
+  if (records > 0) automationMatchRecordsTotal.inc(records);
+};
+
+register.removeSingleMetric("automation_overflow_flush_total");
+const automationOverflowFlushTotal = new Counter({
+  name: "automation_overflow_flush_total",
+  help: "Matches flushed early because a settlement process hit its pending bound",
+});
+
+export const incrementAutomationOverflowFlushTotal = (flushed: number) => {
+  if (flushed > 0) automationOverflowFlushTotal.inc(flushed);
+};
+
+register.removeSingleMetric("automation_ceiling_breach_total");
+const automationCeilingBreachTotal = new Counter({
+  name: "automation_ceiling_breach_total",
+  help: "Confirmed automation matches dropped for passing their daily ceiling",
+});
+
+export const incrementAutomationCeilingBreachTotal = () =>
+  automationCeilingBreachTotal.inc();
+
+register.removeSingleMetric("automation_auto_paused_total");
+const automationAutoPausedTotal = new Counter({
+  name: "automation_auto_paused_total",
+  help: "Automations the platform paused, by reason",
+  labelNames: ["reason"] as const,
+});
+
+export const incrementAutomationAutoPausedTotal = (reason: string) =>
+  automationAutoPausedTotal.labels(reason).inc();
+
 register.removeSingleMetric("es_process_outbox_total");
 const esProcessOutboxTotal = new Counter({
   name: "es_process_outbox_total",
