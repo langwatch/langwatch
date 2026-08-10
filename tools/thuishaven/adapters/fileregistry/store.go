@@ -336,6 +336,11 @@ const HeavyRunClaimTTL = 6 * time.Hour
 // or parsed has not expired: the pid check already said something is alive
 // there, and inventing an expiry from an unreadable file would free a slot that
 // is genuinely in use.
+//
+// A timestamp in the FUTURE is expired, not fresh. Its age is negative, so it
+// would otherwise sit under the TTL until that date arrived — a clock rollback
+// or one corrupt record holding machine-wide capacity for as long as it likes.
+// The same rule as domain.LiveSpawns, for the same reason.
 func (s *Store) heavyRunExpired(path string) bool {
 	b, err := os.ReadFile(path) // #nosec G304 -- path is built from haven's own home dir
 	if err != nil {
@@ -347,7 +352,8 @@ func (s *Store) heavyRunExpired(path string) bool {
 	if json.Unmarshal(b, &rec) != nil || rec.At.IsZero() {
 		return false
 	}
-	return time.Since(rec.At) > HeavyRunClaimTTL
+	age := time.Since(rec.At)
+	return age < 0 || age > HeavyRunClaimTTL
 }
 
 // ClaimHeavyRun records this process as holding a heavy slot.

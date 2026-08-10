@@ -20,7 +20,8 @@ import (
 // Settings is the filesystem-backed implementation of app.ClaudeSettings.
 type Settings struct{}
 
-// New returns a Settings.
+// New builds the writer. It holds no state: every call is handed the repo root
+// it should write in, so one instance serves every worktree on the machine.
 func New() Settings { return Settings{} }
 
 // EnsureHook registers command as a PreToolUse hook in this checkout's
@@ -52,11 +53,11 @@ func (Settings) EnsureHook(repoRoot, command string) (bool, error) {
 		return false, fmt.Errorf("cannot read %s; leaving it alone: %w", path, readErr)
 	}
 
-	changed, err := mergeHook(settings, command)
+	isChanged, err := mergeHook(settings, command)
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", path, err)
 	}
-	if !changed {
+	if !isChanged {
 		return false, nil
 	}
 
@@ -86,29 +87,32 @@ func (Settings) EnsureHook(repoRoot, command string) (bool, error) {
 // its PreToolUse list holding something other than the object and array they are
 // supposed to be means the file is not ours to rewrite.
 func mergeHook(settings map[string]any, command string) (bool, error) {
-	hooks, ok := settings["hooks"].(map[string]any)
-	if !ok && settings["hooks"] != nil {
+	hooks, isObject := settings["hooks"].(map[string]any)
+	if !isObject && settings["hooks"] != nil {
 		return false, errors.New(`"hooks" is not an object`)
 	}
 	if hooks == nil {
 		hooks = map[string]any{}
 	}
-	entries, ok := hooks["PreToolUse"].([]any)
-	if !ok && hooks["PreToolUse"] != nil {
+	entries, isArray := hooks["PreToolUse"].([]any)
+	if !isArray && hooks["PreToolUse"] != nil {
 		return false, errors.New(`"hooks.PreToolUse" is not an array`)
 	}
 
-	for i, e := range entries {
-		existing, isGate := gateHookCommand(e)
-		if !isGate {
+	for _, entry := range entries {
+		hook := findGateHook(entry)
+		if hook == nil {
 			continue
 		}
-		if existing == command {
+		if hook["command"] == command {
 			return false, nil
 		}
-		entries[i] = claudeHookEntry(command)
-		settings["hooks"] = hooks
+		// The nested hook's own command, not the entry around it: an entry may
+		// hold several hooks, and replacing the whole block to update one of them
+		// would delete the developer's siblings.
+		hook["command"] = command
 		hooks["PreToolUse"] = entries
+		settings["hooks"] = hooks
 		return true, nil
 	}
 
@@ -117,33 +121,54 @@ func mergeHook(settings map[string]any, command string) (bool, error) {
 	return true, nil
 }
 
-// gateHookCommand reads the command out of one PreToolUse entry and reports
-// whether it is a haven gate.
-//
-// The test is the ` gate` SUFFIX rather than a substring: `gate` appears inside
-// plenty of unrelated words — a hook running `run gateway-lint` contains it and
-// is nobody's gate — and a substring match there would make setup report success
-// while installing nothing.
-func gateHookCommand(entry any) (string, bool) {
-	block, ok := entry.(map[string]any)
-	if !ok {
-		return "", false
+// findGateHook returns the nested hook inside one PreToolUse entry that runs
+// haven's gate, or nil.
+func findGateHook(entry any) map[string]any {
+	block, isObject := entry.(map[string]any)
+	if !isObject {
+		return nil
 	}
-	inner, ok := block["hooks"].([]any)
-	if !ok {
-		return "", false
+	inner, isArray := block["hooks"].([]any)
+	if !isArray {
+		return nil
 	}
 	for _, h := range inner {
-		hook, ok := h.(map[string]any)
-		if !ok {
+		hook, isObject := h.(map[string]any)
+		if !isObject {
 			continue
 		}
-		if cmd, ok := hook["command"].(string); ok && strings.HasSuffix(cmd, " gate") {
-			return cmd, true
+		if command, isString := hook["command"].(string); isString && isHavenGate(command) {
+			return hook
 		}
 	}
-	return "", false
+	return nil
 }
+
+// isHavenGate reports whether a hook command is haven's own gate.
+//
+// It identifies the EXECUTABLE, not the word: `gate` is a perfectly ordinary
+// thing to call something, and a hook running `run quality gate` or
+// `run gateway-lint` belongs to whoever wrote it. Matching either of those
+// would make `haven setup` report success having written nothing — or, worse,
+// rewrite a stranger's hook.
+//
+// The command haven installs is its own absolute path (shell-quoted, since a
+// checkout can live under a directory with a space) followed by the subcommand,
+// so the test is: last word is the subcommand, and the first word names a file
+// called haven.
+func isHavenGate(command string) bool {
+	fields := strings.Fields(command)
+	if len(fields) < 2 || fields[len(fields)-1] != gateSubcommand {
+		return false
+	}
+	executable := strings.Trim(fields[0], `'"`)
+	return filepath.Base(executable) == havenBinary
+}
+
+const (
+	gateSubcommand = "gate"
+	havenBinary    = "haven"
+)
 
 // claudeHookEntry is the PreToolUse block haven installs.
 func claudeHookEntry(command string) map[string]any {

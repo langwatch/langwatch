@@ -4,12 +4,21 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
-// settingsPath is where the hook is written inside a checkout.
 func settingsPath(root string) string {
 	return filepath.Join(root, ".claude", "settings.local.json")
+}
+
+func mustRead(t *testing.T, root string) []byte {
+	t.Helper()
+	b, err := os.ReadFile(settingsPath(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
 }
 
 func writeSettings(t *testing.T, root, body string) {
@@ -38,12 +47,12 @@ func readSettings(t *testing.T, root string) map[string]any {
 // preToolUse pulls the hook list out of a settings map, or fails.
 func preToolUse(t *testing.T, settings map[string]any) []any {
 	t.Helper()
-	hooks, ok := settings["hooks"].(map[string]any)
-	if !ok {
+	hooks, isObject := settings["hooks"].(map[string]any)
+	if !isObject {
 		t.Fatalf("expected a hooks object, got %T", settings["hooks"])
 	}
-	entries, ok := hooks["PreToolUse"].([]any)
-	if !ok {
+	entries, isArray := hooks["PreToolUse"].([]any)
+	if !isArray {
 		t.Fatalf("expected a PreToolUse array, got %T", hooks["PreToolUse"])
 	}
 	return entries
@@ -55,9 +64,9 @@ func TestEnsureHookInstallsIntoTheWorktree(t *testing.T) {
 		root := t.TempDir()
 
 		t.Run("when the hook is installed", func(t *testing.T) {
-			installed, err := New().EnsureHook(root, "/opt/haven gate")
-			if err != nil || !installed {
-				t.Fatalf("expected an install, got installed=%v err=%v", installed, err)
+			isInstalled, err := New().EnsureHook(root, "/opt/haven gate")
+			if err != nil || !isInstalled {
+				t.Fatalf("expected an install, got installed=%v err=%v", isInstalled, err)
 			}
 
 			t.Run("the entry lands in the untracked settings file", func(t *testing.T) {
@@ -67,11 +76,11 @@ func TestEnsureHookInstallsIntoTheWorktree(t *testing.T) {
 			})
 
 			t.Run("and installing it again changes nothing", func(t *testing.T) {
-				installed, err := New().EnsureHook(root, "/opt/haven gate")
+				isInstalled, err := New().EnsureHook(root, "/opt/haven gate")
 				if err != nil {
 					t.Fatal(err)
 				}
-				if installed {
+				if isInstalled {
 					t.Fatal("a second setup must be a no-op, not a duplicate hook")
 				}
 			})
@@ -86,10 +95,10 @@ func TestEnsureHookRefusesToOverwriteWhatItCannotRead(t *testing.T) {
 		writeSettings(t, root, "{ this is not json")
 
 		t.Run("when the hook is installed", func(t *testing.T) {
-			installed, err := New().EnsureHook(root, "/opt/haven gate")
+			isInstalled, err := New().EnsureHook(root, "/opt/haven gate")
 
 			t.Run("it refuses, and the file is left exactly as it was", func(t *testing.T) {
-				if err == nil || installed {
+				if err == nil || isInstalled {
 					t.Fatal("someone else's file must not be replaced with our own idea of it")
 				}
 				b, readErr := os.ReadFile(settingsPath(root))
@@ -110,10 +119,10 @@ func TestEnsureHookRefusesToOverwriteWhatItCannotRead(t *testing.T) {
 		}
 
 		t.Run("when the hook is installed", func(t *testing.T) {
-			installed, err := New().EnsureHook(root, "/opt/haven gate")
+			isInstalled, err := New().EnsureHook(root, "/opt/haven gate")
 
 			t.Run("it refuses rather than writing over it", func(t *testing.T) {
-				if err == nil || installed {
+				if err == nil || isInstalled {
 					t.Fatal("an unreadable file is still a file; refusing beats replacing")
 				}
 			})
@@ -125,10 +134,10 @@ func TestEnsureHookRefusesToOverwriteWhatItCannotRead(t *testing.T) {
 		writeSettings(t, root, `{"hooks": {"PreToolUse": "not-an-array"}}`)
 
 		t.Run("when the hook is installed", func(t *testing.T) {
-			installed, err := New().EnsureHook(root, "/opt/haven gate")
+			isInstalled, err := New().EnsureHook(root, "/opt/haven gate")
 
 			t.Run("it refuses rather than replacing the developer's value", func(t *testing.T) {
-				if err == nil || installed {
+				if err == nil || isInstalled {
 					t.Fatal("a shape we do not understand is not ours to rewrite")
 				}
 			})
@@ -138,28 +147,38 @@ func TestEnsureHookRefusesToOverwriteWhatItCannotRead(t *testing.T) {
 
 // @scenario "An unrelated hook whose command merely contains the word is not mistaken for the gate"
 func TestEnsureHookMatchesTheGateAndNotMerelyTheWord(t *testing.T) {
-	t.Run("given a pre-existing hook running a gateway linter", func(t *testing.T) {
-		root := t.TempDir()
-		writeSettings(t, root, `{"hooks": {"PreToolUse": [
-			{"matcher": "Bash", "hooks": [{"type": "command", "command": "run gateway-lint"}]}
-		]}}`)
+	// Both of these contain the word and neither is haven's: one has it inside a
+	// longer word, the other as its own final word. Identity is the executable.
+	for _, unrelated := range []string{"run gateway-lint", "run quality gate"} {
+		t.Run("given a pre-existing hook running "+unrelated, func(t *testing.T) {
+			root := t.TempDir()
+			writeSettings(t, root, `{"hooks": {"PreToolUse": [
+				{"matcher": "Bash", "hooks": [{"type": "command", "command": "`+unrelated+`"}]}
+			]}}`)
 
-		t.Run("when the gate is installed", func(t *testing.T) {
-			installed, err := New().EnsureHook(root, "/opt/haven gate")
-			if err != nil {
-				t.Fatal(err)
-			}
+			t.Run("when the gate is installed", func(t *testing.T) {
+				isInstalled, err := New().EnsureHook(root, "/opt/haven gate")
+				if err != nil {
+					t.Fatal(err)
+				}
 
-			t.Run("it is actually installed, rather than mistaken for already present", func(t *testing.T) {
-				if !installed {
-					t.Fatal("`gateway` is not a gate; reporting success without writing is the worst outcome")
-				}
-				if got := len(preToolUse(t, readSettings(t, root))); got != 2 {
-					t.Fatalf("expected the existing hook kept alongside the new one, got %d", got)
-				}
+				t.Run("it is actually installed, rather than mistaken for already present", func(t *testing.T) {
+					if !isInstalled {
+						t.Fatal("reporting success without writing is the worst outcome")
+					}
+					if got := len(preToolUse(t, readSettings(t, root))); got != 2 {
+						t.Fatalf("expected the existing hook kept alongside the new one, got %d", got)
+					}
+				})
+
+				t.Run("and the stranger's command is left untouched", func(t *testing.T) {
+					if !strings.Contains(string(mustRead(t, root)), unrelated) {
+						t.Fatalf("haven rewrote a hook that was not its own: %s", mustRead(t, root))
+					}
+				})
 			})
 		})
-	})
+	}
 
 	t.Run("given a haven gate installed from a path that has since moved", func(t *testing.T) {
 		root := t.TempDir()
@@ -168,18 +187,49 @@ func TestEnsureHookMatchesTheGateAndNotMerelyTheWord(t *testing.T) {
 		]}}`)
 
 		t.Run("when the gate is installed from its new path", func(t *testing.T) {
-			installed, err := New().EnsureHook(root, "/new/haven gate")
+			isInstalled, err := New().EnsureHook(root, "/new/haven gate")
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			t.Run("the stale entry is replaced rather than joined by a second one", func(t *testing.T) {
-				if !installed {
+				if !isInstalled {
 					t.Fatal("a moved path is a change worth writing")
 				}
 				entries := preToolUse(t, readSettings(t, root))
 				if len(entries) != 1 {
 					t.Fatalf("a duplicate gates every tool call twice; got %d entries", len(entries))
+				}
+			})
+		})
+	})
+
+	t.Run("given a moved gate sharing its entry with another hook", func(t *testing.T) {
+		root := t.TempDir()
+		writeSettings(t, root, `{"hooks": {"PreToolUse": [
+			{"matcher": "Bash", "hooks": [
+				{"type": "command", "command": "/old/haven gate"},
+				{"type": "command", "command": "notify-me"}
+			]}
+		]}}`)
+
+		t.Run("when the gate is updated", func(t *testing.T) {
+			if _, err := New().EnsureHook(root, "/new/haven gate"); err != nil {
+				t.Fatal(err)
+			}
+			written := string(mustRead(t, root))
+
+			t.Run("only haven's own command changes", func(t *testing.T) {
+				if !strings.Contains(written, "/new/haven gate") || strings.Contains(written, "/old/haven gate") {
+					t.Fatalf("the gate was not updated in place: %s", written)
+				}
+			})
+
+			t.Run("and the hook sharing the entry survives", func(t *testing.T) {
+				// Replacing the whole entry to update one hook inside it takes the
+				// developer's siblings with it.
+				if !strings.Contains(written, "notify-me") {
+					t.Fatalf("a sibling hook was deleted: %s", written)
 				}
 			})
 		})

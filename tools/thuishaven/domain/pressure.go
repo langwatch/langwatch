@@ -167,9 +167,10 @@ func (c CallerKind) WaitCeiling() time.Duration {
 // An absent agent id IS the main-session signal, so there is no third state to
 // resolve: a caller that cannot be identified is indistinguishable from a main
 // session and gets the long failsafe. Defaulting the other way would be the
-// tighter ceiling but the wrong one far more often — every main-session run
-// would be narrowed and backgrounded on the strength of a field that is empty
-// by design.
+// tighter ceiling but the wrong one far more often — every main session would
+// be handed a sub-agent's cache floor and wait ceiling on the strength of a
+// field that is empty by design, so the runs that queue would narrow and
+// background under conditions where they had no need to.
 func CallerFromAgentID(agentID string, interactive bool) CallerKind {
 	switch {
 	case interactive:

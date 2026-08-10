@@ -157,7 +157,7 @@ func (System) Getpid() int    { return os.Getpid() }
 // (the launcher spawns its children with Setpgid, so the group is the stack).
 // Returns 0 when the group can't be read.
 func (System) GroupRSS(pid int) uint64 {
-	out, err := exec.Command("ps", "-o", "pgid=", "-p", strconv.Itoa(pid)).Output()
+	out, err := probe("ps", "-o", "pgid=", "-p", strconv.Itoa(pid))
 	if err != nil {
 		return 0
 	}
@@ -165,7 +165,7 @@ func (System) GroupRSS(pid int) uint64 {
 	if pgid == "" {
 		return 0
 	}
-	all, err := exec.Command("ps", "-ax", "-o", "pgid=,rss=").Output()
+	all, err := probe("ps", "-ax", "-o", "pgid=,rss=")
 	if err != nil {
 		return 0
 	}
@@ -187,7 +187,7 @@ func (System) GroupRSS(pid int) uint64 {
 func (System) TotalMemory() uint64 {
 	switch runtime.GOOS {
 	case "darwin":
-		out, err := exec.Command("sysctl", "-n", "hw.memsize").Output()
+		out, err := probe("sysctl", "-n", "hw.memsize")
 		if err != nil {
 			return 0
 		}

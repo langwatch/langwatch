@@ -67,7 +67,8 @@ func TestGateRewriteCarriesWhatItDecided(t *testing.T) {
 
 			t.Run("and it carries the agent id, which picks the wait ceiling", func(t *testing.T) {
 				// Without it `haven run` resolves an empty id as a main session and
-				// hands a sub-agent the one-hour ceiling.
+				// holds a sub-agent on the thirty-minute failsafe, six times its
+				// own five-minute cache floor.
 				if !strings.Contains(command, "--agent-id 'agent_7'") {
 					t.Fatalf("the caller was dropped on the way through: %q", command)
 				}

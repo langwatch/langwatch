@@ -80,9 +80,10 @@ const havenRunMarker = "run --class heavy"
 // WrapOptions carries what the gate already decided into the wrapped command.
 //
 // Without it `haven run` re-derives its behaviour from nothing and the decision
-// is silently discarded: an unnamed caller resolves to a main session and takes
-// the one-hour ceiling that the sub-agent ceiling exists to avoid, and a
-// narrowed run is indistinguishable from a queued one.
+// is silently discarded: an unnamed caller resolves to a main session and waits
+// on the thirty-minute failsafe rather than the four-minute ceiling its
+// five-minute cache needs, and a narrowed run is indistinguishable from a
+// queued one.
 type WrapOptions struct {
 	// AgentID is the caller's agent id, which picks the wait ceiling because it
 	// picks the prompt-cache floor.
