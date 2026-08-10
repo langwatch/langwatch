@@ -471,9 +471,6 @@ export class InviteService {
   async createAdminInviteRecord(
     input: CreateAdminInviteInput,
   ): Promise<{ invite: OrganizationInvite; organization: Organization }> {
-    this.assertAssignmentsWithinInvitedSeat(input);
-    const inviteCode = nanoid();
-
     const organization = await this.prisma.organization.findFirst({
       where: { id: input.organizationId },
     });
