@@ -22,7 +22,13 @@ vi.mock("~/server/auth", () => ({
 vi.mock("~/server/db", () => ({ prisma: {} }));
 vi.mock("~/server/app-layer/app", async (importOriginal) => {
   const actual = await importOriginal<typeof AppLayerApp>();
-  return { ...actual, getApp: () => ({ redis: null }) };
+  // misc.ts reads its connection through tryGetApp; pin both so the no-Redis
+  // path is chosen explicitly rather than by whatever the real one returns.
+  return {
+    ...actual,
+    getApp: () => ({ redis: null }),
+    tryGetApp: () => ({ redis: null }),
+  };
 });
 vi.mock("~/utils/encryption", () => ({
   encrypt: (text: string) => `encrypted:${text}`,
