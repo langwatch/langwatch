@@ -11,6 +11,15 @@ import {
 const redact = (text: string, customPatterns?: readonly RegExp[]) =>
   redactSecretsInText({ text, customPatterns });
 
+/**
+ * Fixture bodies, assembled into tokens at runtime so no complete
+ * credential-shaped literal ever exists in this file. The shapes have to stay
+ * realistic to be worth testing, and a literal one trips every secret scanner
+ * that reads the repository, GitHub push protection included.
+ */
+const BODY = "aB3dEf7gHi2jKlMnOpQrStUvWx0123456789xYzAbCdEfGh";
+const HEX = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
+
 describe("redactSecretsInText", () => {
   describe("given a built-in provider or cloud key", () => {
     // Provider keys use realistic base64url bodies (`_` and `-`, no inner word
@@ -131,6 +140,339 @@ describe("redactSecretsInText", () => {
   });
 });
 
+/**
+ * Synthetic credentials only. Every value below was invented for this file: the
+ * shapes are real, the bodies are not, so a scanner that finds one here has
+ * found nothing.
+ */
+describe("redactSecretsInText, beyond the known-vendor list", () => {
+  describe("given a key from a vendor with no built-in rule", () => {
+    /** @scenario "A key from a vendor with no built-in rule is redacted on shape alone" */
+    it("redacts it and keeps the sentence around it", () => {
+      const prompt =
+        "I had to kill the other exploring agent, key now: " +
+        "zyq_8fK2mQ7pXvL4nR9sT1wZ3yB6cD0eG5hJ2kM4pQ7rS9t";
+      const { text, redactedCount } = redact(prompt);
+
+      expect(text).toBe(
+        "I had to kill the other exploring agent, key now: [SECRET]",
+      );
+      expect(redactedCount).toBe(1);
+    });
+
+    it("redacts it with no surrounding context at all", () => {
+      const { text } = redact(
+        "zyq_8fK2mQ7pXvL4nR9sT1wZ3yB6cD0eG5hJ2kM4pQ7rS9t",
+      );
+      expect(text).toBe("[SECRET]");
+    });
+  });
+
+  describe("given credentials from widely used developer services", () => {
+    const vendorKeys: Array<[string, string]> = [
+      ["GitLab", `GITLAB_TOKEN=glpat-${BODY.slice(0, 21)}`],
+      ["npm", `npm_${BODY.slice(0, 36)}`],
+      ["Docker Hub", `dckr_pat_${BODY.slice(0, 28)}`],
+      ["Shopify", `shpat_${HEX}`],
+      ["SendGrid", `SG.${BODY.slice(0, 22)}.${BODY.slice(0, 43)}`],
+      ["Hugging Face", `hf_${BODY.slice(0, 34)}`],
+      ["Groq", `gsk_${BODY.slice(0, 47)}`],
+      ["Perplexity", `pplx-${BODY.slice(0, 40)}`],
+      ["Replicate", `r8_${BODY.slice(0, 37)}`],
+      ["xAI", `xai-${BODY.slice(0, 47)}`],
+      ["Notion", `ntn_${BODY.slice(0, 40)}`],
+      ["DigitalOcean", `dop_v1_${HEX}${HEX}`],
+      ["Figma", `figd_${BODY.slice(0, 36)}`],
+      ["Square", `sq0atp-${BODY.slice(0, 22)}`],
+      ["Mailgun", `key-${HEX}`],
+      ["Resend", `re_${BODY.slice(0, 24)}`],
+      ["PostHog", `phx_${BODY.slice(0, 36)}`],
+      ["Linear", `lin_api_${BODY.slice(0, 40)}`],
+      ["Google OAuth", `ya29.${BODY.slice(0, 28)}`],
+      ["Supabase", `sbp_${HEX}${HEX.slice(0, 8)}`],
+      ["Telegram", `123456789:AA${BODY.slice(0, 33)}`],
+      ["Airtable", `pat${BODY.slice(0, 14)}.${HEX}${HEX}`],
+    ];
+
+    /** @scenario "Widely used vendor credentials are redacted" */
+    it("redacts every one of them", () => {
+      const survived = vendorKeys.filter(
+        ([, key]) => redact(key).redactedCount === 0,
+      );
+      expect(survived.map(([vendor]) => vendor)).toEqual([]);
+    });
+  });
+
+  describe("given a credential named in prose and then given a value", () => {
+    /** @scenario "A credential introduced by name in free text is redacted" */
+    it("redacts the value and leaves the words that introduce it", () => {
+      const { text } = redact("my api key is h9Kd2Lm4Nq7Pr1Ts5Vw8Xz3");
+      expect(text).toBe("my api key is [SECRET]");
+    });
+
+    it("redacts a value whose shape alone gives nothing away", () => {
+      // Bare lowercase hex: an MD5 digest and a Twilio auth token are the same
+      // shape, so only the keyword can tell them apart.
+      const { text } = redact(
+        "TWILIO_AUTH_TOKEN=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+      );
+      expect(text).toBe("TWILIO_AUTH_TOKEN=[SECRET]");
+    });
+
+    it("redacts a credential field inside a JSON body", () => {
+      const { text } = redact('{"client_secret":"h9Kd2Lm4Nq7Pr1Ts5Vw8Xz3"}');
+      expect(text).toBe('{"client_secret":"[SECRET]"}');
+    });
+
+    it("redacts basic authorization credentials", () => {
+      const { text } = redact(
+        "Authorization: Basic dXNlcjpzdXBlcnNlY3JldDEyMw==",
+      );
+      expect(text).toBe("Authorization: Basic [SECRET]");
+    });
+  });
+});
+
+/**
+ * The limit on all of the above. Over-redaction is a bug of the same severity
+ * as a leak: a terminal replay full of `[SECRET]` where the commit hashes and
+ * file paths used to be is not a usable trace. Every string here is the kind of
+ * thing that genuinely shows up in a coding-agent transcript.
+ */
+describe("redactSecretsInText, given text that only looks like secrets", () => {
+  const leaveAlone: Array<[string, string]> = [
+    ["a commit hash", "fix in commit 51d07b547d0a8f3e2c1b9d4a6e7f8091a2b3c4d5"],
+    ["short commit hashes", "reverted 5ebf89d6f4 and f05d495818"],
+    ["a UUID", "id 550e8400-e29b-41d4-a716-446655440000 done"],
+    ["an uppercase UUID", "ID 550E8400-E29B-41D4-A716-446655440000 done"],
+    [
+      "trace and span ids",
+      "traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+    ],
+    ["ISO timestamps", "started 2026-08-10T14:32:11.482Z ended 14:32:19.005Z"],
+    [
+      "a source path",
+      "see platform/app/src/server/app-layer/traces/log-request-collection.service.ts",
+    ],
+    ["a path with a line number", "packages/redaction/src/secrets.ts:142"],
+    [
+      "a URL with query parameters",
+      "https://app.langwatch.ai/project/my-project/traces?spanId=abc123",
+    ],
+    [
+      "a base64 data URI",
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    ],
+    [
+      "model names",
+      "compared claude-opus-5 with gpt-5-mini and claude-3-5-sonnet-20241022",
+    ],
+    ["a bedrock model id", "us.anthropic.claude-opus-4-20250514-v1:0"],
+    ["semver bumps", "bumped langwatch from 1.2.1 to 2.6.0 and web to 3.9.0"],
+    [
+      "a subresource integrity hash",
+      "integrity sha512-4Zj6ZL6qF9pQwEr7tYu2Io1pAsDfGh3JkL5mNb8Vc9X",
+    ],
+    [
+      "a docker image digest",
+      "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    ],
+    ["a content-hashed asset", "dist/assets/index-DxK9mQ2p.js 1,234.56 kB"],
+    ["a kubernetes pod name", "pod/langwatch-app-7d9f8c6b5d-x2mnq restarted"],
+    ["an AWS ARN", "arn:aws:iam::123456789012:role/langwatch-app-runtime-role"],
+    ["a snake_case identifier", "const user_id_1234567890abcdef = row.id;"],
+    [
+      "reading an environment variable",
+      "const apiKey = process.env.OPENAI_API_KEY;",
+    ],
+    ["a property access chain", "const token = config.auth.accessToken.value;"],
+    [
+      "a path following a credential keyword",
+      "token: src/server/app-layer/traces/log-request-collection.service.ts",
+    ],
+    ["an absolute path", "secret = /etc/langwatch/credentials.yaml"],
+    ["an environment variable reference", "export ACME_API_KEY=$ACME_API_KEY"],
+    ["a documented placeholder", "OPENAI_API_KEY=your-api-key-here"],
+    ["a masked value", "api_key: xxxxxxxxxxxxxxxxxxxx"],
+    [
+      "a documented header",
+      "Send the Authorization: Basic <base64-credentials> header.",
+    ],
+    ["a sentence about basic auth", "This uses Basic authentication over TLS."],
+    [
+      "a documented bearer header",
+      "Send the Authorization: Bearer <your-token> header.",
+    ],
+    [
+      "prose using the word key",
+      "The key insight is that the token budget was the bottleneck.",
+    ],
+    [
+      "advice about a key",
+      "Set the api key in your .env file before running the tests",
+    ],
+    [
+      "an API version field",
+      '{"api_version": "2024-10-21", "model": "claude-opus-5"}',
+    ],
+    [
+      "a request id header",
+      "X-Request-Id: 7f3a9b2c-1d4e-5f6a-8b9c-0d1e2f3a4b5c",
+    ],
+    [
+      "usage attributes",
+      "gen_ai.usage.input_tokens=15234 gen_ai.usage.output_tokens=892",
+    ],
+    [
+      "a branch name",
+      "feat/coding-agent-session-events and issue6124/red-team-native",
+    ],
+    ["already-redacted text", "key now: [SECRET] and token: [SECRET]"],
+    [
+      "an ordinary agent sentence",
+      "I had to kill the other exploring agent because it was burning tokens on the same files.",
+    ],
+  ];
+
+  /** @scenario "Ordinary identifiers are never mistaken for secrets" */
+  it("leaves every one of them exactly as written", () => {
+    const mangled = leaveAlone
+      .filter(([, input]) => redact(input).text !== input)
+      .map(([label, input]) => `${label}: ${redact(input).text}`);
+    expect(mangled).toEqual([]);
+  });
+
+  /** @scenario "A placeholder standing in for a credential stays readable" */
+  it("leaves a placeholder and an environment variable reference readable", () => {
+    expect(redact("OPENAI_API_KEY=your-api-key-here").text).toBe(
+      "OPENAI_API_KEY=your-api-key-here",
+    );
+    expect(redact("export ACME_API_KEY=$ACME_API_KEY").text).toBe(
+      "export ACME_API_KEY=$ACME_API_KEY",
+    );
+  });
+});
+
+describe("redactSecretsInText, given a payload the size of the scan budget", () => {
+  /** @scenario "A large payload is scanned within the ingestion budget" */
+  it("completes well inside the ingestion budget", () => {
+    const chunk =
+      "The agent read platform/app/src/server/traces/trace.service.ts at " +
+      "2026-08-10T14:32:11.482Z, commit 51d07b547d0a8f3e2c1b9d4a6e7f8091a2b3c4d5, " +
+      'model claude-opus-5, {"input_tokens":15234,"cost_usd":0.0412}\n';
+    const payload = chunk.repeat(Math.ceil(200_000 / chunk.length));
+
+    const startedAt = performance.now();
+    const { redactedCount } = redact(payload.slice(0, 200_000));
+    const elapsedMs = performance.now() - startedAt;
+
+    expect(redactedCount).toBe(0);
+    expect(elapsedMs).toBeLessThan(2_000);
+  });
+
+  describe("when the input is shaped to stall a careless pattern", () => {
+    const adversarial: Array<[string, string]> = [
+      ["a long underscore run", "a_".repeat(50_000)],
+      ["a long hyphen run", "a-".repeat(50_000)],
+      ["a keyword followed by filler", `api_key: ${"a".repeat(100_000)}`],
+      ["repeated keywords", "password=".repeat(20_000)],
+      ["repeated open quotes", `${'api_key:"'.repeat(20_000)}x`],
+    ];
+
+    for (const [label, input] of adversarial) {
+      it(`stays linear on ${label}`, () => {
+        const startedAt = performance.now();
+        redact(input.slice(0, 250_000));
+        expect(performance.now() - startedAt).toBeLessThan(2_000);
+      });
+    }
+  });
+});
+
+/**
+ * A customer wrote `sk-.*` because the built-in rules did not cover their
+ * provider, and it shredded their own transcripts: it fired inside "task-" and
+ * then ran to the end of the line. These pin both halves of the fix, and the
+ * last one pins that the pattern still does the job it was written for.
+ */
+describe("redactSecretsInText, given a hand-written custom pattern", () => {
+  const userPattern = () => compileSecretPatterns(["sk-.*"]);
+
+  describe("when ordinary words merely contain the pattern's literal", () => {
+    const transcriptText = [
+      "<task-notification>",
+      "</task-notification>",
+      "<task-notification>agent finished</task-notification> and then it stopped",
+      "<system-reminder>The user has not replied yet.</system-reminder>",
+      "TaskCreate returned a new agent id",
+      "we took a risk-based approach to the migration",
+      "disk-usage is at 84% on the clickhouse node",
+      "ask-follow-up was disabled for this run",
+      "the mask-sensitive-fields flag is on",
+      "flask-restful is not a dependency here",
+      "moved the desk-check to the review step",
+    ];
+
+    /** @scenario "A custom pattern does not fire inside an ordinary word" */
+    it("leaves every one of them exactly as written", () => {
+      const custom = userPattern();
+      const mangled = transcriptText.filter(
+        (line) => redact(line, custom).text !== line,
+      );
+      expect(mangled).toEqual([]);
+    });
+
+    it("leaves them alone under the built-in rules too", () => {
+      const mangled = transcriptText.filter(
+        (line) => redact(line).text !== line,
+      );
+      expect(mangled).toEqual([]);
+    });
+  });
+
+  describe("when the pattern ends in a wildcard", () => {
+    /** @scenario "A custom pattern does not swallow the rest of the line" */
+    it("replaces the credential and leaves the words after it", () => {
+      const { text } = redact(
+        "the key is sk-proj-abc123def456 and the model is gpt-5-mini",
+        userPattern(),
+      );
+      expect(text).toBe("the key is [SECRET] and the model is gpt-5-mini");
+    });
+
+    it("stops at the closing quote inside a JSON body", () => {
+      const { text, redactedCount } = redact(
+        '{"api_key":"sk-proj-abc123def456","model":"gpt-5-mini"}',
+        userPattern(),
+      );
+      expect(text).toBe('{"api_key":"[SECRET]","model":"gpt-5-mini"}');
+      expect(redactedCount).toBe(1);
+    });
+  });
+
+  describe("when the credential the pattern was written for shows up", () => {
+    /** @scenario "A custom pattern still redacts the credential it was written for" */
+    it("redacts it", () => {
+      const { text } = redact(
+        "sk-notarealprovider-abc123def456",
+        userPattern(),
+      );
+      expect(text).toBe("[SECRET]");
+    });
+  });
+
+  describe("when the author anchored the pattern themselves", () => {
+    it("compiles it exactly as written", () => {
+      // A leading \b means the author already said where it may start, so the
+      // guard must not be added on top and change what they asked for.
+      const custom = compileSecretPatterns([String.raw`\bacme_[a-z0-9]{8,}`]);
+      expect(redact("token acme_abcd1234 end", custom).text).toBe(
+        "token [SECRET] end",
+      );
+    });
+  });
+});
+
 describe("compileSecretPatterns", () => {
   describe("given an uncompilable pattern", () => {
     it("skips it without throwing", () => {
@@ -173,6 +515,13 @@ describe("BUILTIN_SECRET_RULES", () => {
   it("exposes one entry per built-in value rule for the UI", () => {
     expect(BUILTIN_SECRET_RULES.length).toBeGreaterThanOrEqual(8);
     expect(BUILTIN_SECRET_RULES.every((r) => r.id && r.description)).toBe(true);
+  });
+
+  it("lists the rules that catch a vendor nobody added and a named value", () => {
+    const ids = BUILTIN_SECRET_RULES.map((rule) => rule.id);
+    expect(ids).toContain("vendor_api_key");
+    expect(ids).toContain("shaped_api_key");
+    expect(ids).toContain("sensitive_assignment");
   });
 });
 
@@ -221,6 +570,39 @@ describe("detectSecretsInText", () => {
       expect(detectSecretsInText({ text: "authorization: [SECRET]" })).toEqual(
         [],
       );
+    });
+  });
+
+  describe("given one credential that several rules all recognise", () => {
+    /** @scenario "One credential is reported as one leak" */
+    it("reports it once, under the most specific rule", () => {
+      // Named in prose, vendor-recognisable, and key-shaped all at once.
+      const matches = detectSecretsInText({
+        text: "api_key: sk-proj-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789xY",
+      });
+
+      expect(matches).toHaveLength(1);
+      expect(matches[0]!.ruleId).toBe("provider_api_key");
+    });
+
+    it("reports an unknown vendor's key once", () => {
+      const matches = detectSecretsInText({
+        text: "key now: zyq_8fK2mQ7pXvL4nR9sT1wZ3yB6cD0eG5hJ2kM4pQ7rS9t",
+      });
+
+      expect(matches).toHaveLength(1);
+      expect(matches[0]!.ruleId).toBe("shaped_api_key");
+    });
+
+    it("still reports two distinct credentials separately", () => {
+      const matches = detectSecretsInText({
+        text: `aws AKIAIOSFODNN7EXAMPLE and gitlab glpat-${BODY.slice(0, 21)}`,
+      });
+
+      expect(matches.map((match) => match.ruleId).sort()).toEqual([
+        "aws_access_key_id",
+        "vendor_api_key",
+      ]);
     });
   });
 });

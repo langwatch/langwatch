@@ -4,10 +4,26 @@
  * Scrubs credentials (cloud + provider API keys, JWTs, private-key blocks,
  * database-URL passwords, bearer tokens) out of free text, plus a key-name pass
  * for obviously-sensitive attribute names. Runs in-process: no external
- * service, no entropy scanning (too noisy), all patterns precompiled and
- * linear-time. Detected secrets are replaced with the typed `[SECRET]` marker,
- * which the trace view reads back and which keeps the secrets evaluator able to
- * flag a credential that was already scrubbed at ingestion.
+ * service, all patterns precompiled and linear-time. Detected secrets are
+ * replaced with the typed `[SECRET]` marker, which the trace view reads back
+ * and which keeps the secrets evaluator able to flag a credential that was
+ * already scrubbed at ingestion.
+ *
+ * Matching works in three layers, because a list of known vendors alone cannot
+ * keep up with the number of services that mint API keys:
+ *
+ *  1. Known shapes. Exact prefixes for cloud and developer-service credentials,
+ *     the highest-precision layer and the one that names the vendor.
+ *  2. Shape alone. A vendor-style prefix followed by a high-entropy body catches
+ *     a key from a service nobody has ever added to the list.
+ *  3. Context. A credential named in prose and then given a value is redacted
+ *     even when the value has no recognisable shape at all.
+ *
+ * Layers 2 and 3 are gated on Shannon entropy and character-class mix, because
+ * over-redaction is a bug of the same severity as a leak: the terminal replay
+ * and the trace explorer are worth nothing if identifiers, hashes and model
+ * names come back as placeholders. `__tests__/secrets.unit.test.ts` carries an
+ * adversarial negative corpus that pins that limit.
  *
  * Shared across the platform: the ingestion pipeline redacts every span with
  * these rules, and the `langwatch` CLI ships a verbatim mirror (see
@@ -31,6 +47,255 @@ interface ValueRule {
    *  let a rule keep the non-secret context (scheme/user/host, the `Bearer `
    *  prefix). */
   render?: (...groups: string[]) => string;
+  /**
+   * Second-stage test for rules whose regex is deliberately loose, taking the
+   * match and its capture groups. A match that fails it is left verbatim and
+   * not counted, which is what lets the entropy and context rules describe a
+   * broad shape in the pattern and then decide on the candidate itself.
+   */
+  accept?: (groups: string[]) => boolean;
+  /**
+   * Cheap whole-string guard run before the regex. Skips the scan entirely when
+   * the input cannot contain a match, which keeps the broad rules off the bill
+   * for the many strings that are ordinary prose.
+   */
+  precondition?: (text: string) => boolean;
+}
+
+/**
+ * Entropy is measured over at most this many leading characters. A greedy match
+ * can span a whole log line, and scoring the sample rather than the line keeps
+ * the cost per candidate constant without changing the verdict: key material is
+ * uniformly random, so its first 256 characters score like all of it.
+ */
+const ENTROPY_SAMPLE_LENGTH = 256;
+
+/** Shannon entropy of `value` in bits per character, over a bounded sample. */
+function shannonEntropyBits(value: string): number {
+  const sample =
+    value.length > ENTROPY_SAMPLE_LENGTH
+      ? value.slice(0, ENTROPY_SAMPLE_LENGTH)
+      : value;
+  const counts = new Map<string, number>();
+  for (const char of sample) {
+    counts.set(char, (counts.get(char) ?? 0) + 1);
+  }
+  let entropy = 0;
+  for (const count of counts.values()) {
+    const probability = count / sample.length;
+    entropy -= probability * Math.log2(probability);
+  }
+  return entropy;
+}
+
+interface CharClassCounts {
+  lower: number;
+  upper: number;
+  digit: number;
+}
+
+function countCharClasses(value: string): CharClassCounts {
+  let lower = 0;
+  let upper = 0;
+  let digit = 0;
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index);
+    if (code >= 97 && code <= 122) lower++;
+    else if (code >= 65 && code <= 90) upper++;
+    else if (code >= 48 && code <= 57) digit++;
+  }
+  return { lower, upper, digit };
+}
+
+/** Neither side of a credential token may continue into a longer identifier. */
+const TOKEN_START = String.raw`(?<![A-Za-z0-9_-])`;
+const TOKEN_END = String.raw`(?![A-Za-z0-9_-])`;
+
+/**
+ * Prefixes minted by developer services whose keys turn up in coding-agent
+ * transcripts. Kept as one alternation compiled once, so the whole known-vendor
+ * layer costs a single pass rather than one pass per vendor.
+ *
+ * Two deliberate omissions. Twilio's `AC…` and `SK…` SIDs are public account
+ * identifiers, and its actual auth token is bare 32-hex, indistinguishable from
+ * an MD5 digest, so matching it on shape would redact every hash in a trace;
+ * the context rule covers `TWILIO_AUTH_TOKEN=…` instead. PostHog's `phc_` is a
+ * client-side project key that ships inside published web bundles by design,
+ * and blanking it would hide legitimate telemetry configuration, so only the
+ * personal `phx_` key is matched.
+ */
+const VENDOR_KEY_PATTERNS = [
+  // GitLab personal, project, deploy, runner and agent tokens.
+  String.raw`gl(?:pat|rt|dt|soat|ptt|cbt|imt|agent|ffct)-[A-Za-z0-9_-]{20,}`,
+  String.raw`npm_[A-Za-z0-9]{36}`,
+  String.raw`dckr_pat_[A-Za-z0-9_-]{20,}`,
+  // Shopify admin, storefront, custom and private app tokens.
+  String.raw`shp(?:at|ss|ca|pa)_[0-9a-fA-F]{32}`,
+  String.raw`SG\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}`,
+  String.raw`hf_[A-Za-z0-9]{30,}`,
+  String.raw`gsk_[A-Za-z0-9]{40,}`,
+  String.raw`pplx-[A-Za-z0-9]{30,}`,
+  String.raw`nvapi-[A-Za-z0-9_-]{40,}`,
+  String.raw`r8_[A-Za-z0-9]{30,}`,
+  String.raw`xai-[A-Za-z0-9]{40,}`,
+  // Notion integration tokens, current and legacy.
+  String.raw`ntn_[A-Za-z0-9]{30,}`,
+  String.raw`secret_[A-Za-z0-9]{40,}`,
+  String.raw`dop_v1_[0-9a-f]{64}`,
+  String.raw`figd_[A-Za-z0-9_-]{30,}`,
+  String.raw`ATATT[A-Za-z0-9_=-]{100,}`,
+  String.raw`sq0(?:atp|csp)-[A-Za-z0-9_-]{20,}`,
+  String.raw`EAAG[A-Za-z0-9]{60,}`,
+  String.raw`key-[0-9a-f]{32}`,
+  String.raw`re_[A-Za-z0-9_-]{20,}`,
+  String.raw`phx_[A-Za-z0-9]{30,}`,
+  String.raw`lin_api_[A-Za-z0-9]{30,}`,
+  String.raw`sl\.[A-Za-z0-9_-]{60,}`,
+  String.raw`ya29\.[A-Za-z0-9_-]{20,}`,
+  String.raw`sbp_[0-9a-f]{40,}`,
+  String.raw`sntry(?:s|u)_[A-Za-z0-9_.-]{30,}`,
+  String.raw`fw_[A-Za-z0-9]{20,}`,
+  String.raw`gl(?:c|sa)_[A-Za-z0-9]{30,}`,
+  String.raw`NRAK-[A-Za-z0-9]{20,}`,
+  String.raw`PMAK-[A-Za-z0-9]{20,}-[A-Za-z0-9]{20,}`,
+  String.raw`dp\.(?:pt|st|ct|sa)\.[A-Za-z0-9_-]{20,}`,
+  // Airtable personal access token: patXXXXXXXXXXXXXX.<64 hex>.
+  String.raw`pat[A-Za-z0-9]{14}\.[0-9a-f]{64}`,
+  // Telegram bot token: <numeric bot id>:AA<35-char body>.
+  String.raw`[0-9]{8,10}:AA[A-Za-z0-9_-]{33}`,
+] as const;
+
+const VENDOR_KEY_REGEX = new RegExp(
+  `${TOKEN_START}(?:${VENDOR_KEY_PATTERNS.join("|")})${TOKEN_END}`,
+  "g",
+);
+
+/**
+ * Bounds for the shape-only rule. The floor keeps short identifiers out; the
+ * ceiling keeps a long encoded payload (an embedded image, a serialised blob)
+ * from being swallowed whole, since no credential is that long.
+ */
+const SHAPED_TOKEN_MIN_BODY = 26;
+const SHAPED_TOKEN_MAX_BODY = 120;
+const SHAPED_TOKEN_MIN_ENTROPY = 3.9;
+
+/**
+ * Does this token body look like key material rather than an identifier?
+ *
+ * Requiring two characters of each class is what separates a random body from
+ * the things that surround it in a trace: a git SHA and a lowercase UUID carry
+ * no uppercase, a screaming-snake-case constant carries no lowercase, and a
+ * camelCase identifier carries no digits. A genuinely random base64url body of
+ * this length clears all three with room to spare.
+ */
+function isKeyShapedBody(body: string): boolean {
+  if (
+    body.length < SHAPED_TOKEN_MIN_BODY ||
+    body.length > SHAPED_TOKEN_MAX_BODY
+  ) {
+    return false;
+  }
+  const { lower, upper, digit } = countCharClasses(body);
+  if (lower < 2 || upper < 2 || digit < 2) return false;
+  return shannonEntropyBits(body) >= SHAPED_TOKEN_MIN_ENTROPY;
+}
+
+/**
+ * Prefixes that announce a digest or an encoding rather than a vendor. A
+ * content hash has exactly the entropy of key material and none of the
+ * sensitivity, and it is written in the same `prefix-body` form: `sha512-…` in
+ * a lockfile, `blake3-…` in a build manifest. Redacting those would turn a
+ * dependency diff into placeholders for no gain.
+ */
+const DIGEST_PREFIXES = new Set([
+  "sha1",
+  "sha224",
+  "sha256",
+  "sha384",
+  "sha512",
+  "sha3",
+  "md4",
+  "md5",
+  "blake2b",
+  "blake2s",
+  "blake3",
+  "crc32",
+  "xxh3",
+  "xxh64",
+  "base32",
+  "base58",
+  "base64",
+  "hex",
+  "uuid",
+  "urn",
+  "cid",
+  "etag",
+  "hash",
+  "digest",
+  "checksum",
+  "integrity",
+]);
+
+/**
+ * Words that stand in for a credential in documentation and templates. The
+ * trailing class is a flat `*` rather than a repeated group, so a long
+ * non-matching value costs one linear scan instead of backtracking.
+ */
+const PLACEHOLDER_VALUE_REGEX =
+  /^(?:x+|\*+|\.+|-+|_+|0+|(?:your|my|our|insert|replace|example|sample|dummy|fake|placeholder|changeme|redacted|removed|hidden|none|null|nil|undefined|todo|tbd|fixme)[a-z0-9_\- ]*)$/i;
+
+/**
+ * A reference to a credential rather than the credential: an explicit `$VAR`,
+ * or a SCREAMING_SNAKE name. The underscore is required on the bare form so an
+ * all-uppercase secret (a base32 TOTP seed, say) is not mistaken for a name.
+ */
+const ENV_REFERENCE_REGEX =
+  /^(?:\$[A-Za-z_][A-Za-z0-9_]*|[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)$/;
+
+/** `process.env.OPENAI_API_KEY`, `config.auth.token`: code, not key material. */
+const CODE_EXPRESSION_REGEX = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+$/;
+
+/** A filesystem path, which follows a credential keyword often enough to matter. */
+const PATH_LIKE_REGEX = /^[~.]{0,2}\/|\/[^/\s]*\.[a-z]{1,5}$/;
+
+const CONTEXT_VALUE_MIN_LENGTH = 16;
+const CONTEXT_VALUE_MIN_ENTROPY = 2.9;
+
+/**
+ * Does this value, already introduced by a word like "api key" or "password",
+ * carry an actual credential?
+ *
+ * The keyword has done most of the work, so this stage is looser than the
+ * shape-only one: it accepts bare hex and bare base32, which the shape rule
+ * rejects. It rejects the three things that follow a credential keyword and are
+ * not credentials: a placeholder, an environment-variable reference, and a URL.
+ */
+function isCredentialValue(value: string): boolean {
+  if (value.length < CONTEXT_VALUE_MIN_LENGTH) return false;
+  if (PLACEHOLDER_VALUE_REGEX.test(value)) return false;
+  if (ENV_REFERENCE_REGEX.test(value)) return false;
+  if (CODE_EXPRESSION_REGEX.test(value)) return false;
+  if (PATH_LIKE_REGEX.test(value)) return false;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) return false;
+  if (value.includes(SECRETS_REDACTION_MARKER)) return false;
+  return shannonEntropyBits(value) >= CONTEXT_VALUE_MIN_ENTROPY;
+}
+
+/**
+ * Words that introduce a credential, allowing the compound spellings that show
+ * up in prose, environment files and JSON alike (`api key`, `API_KEY`,
+ * `x-api-key`, `client_secret`).
+ */
+const CREDENTIAL_KEYWORD = String.raw`(?:x[_.\- ]?)?(?:api|access|auth|client|private|refresh|session|personal|service)?[_.\- ]?(?:api[_.\- ]?)?(?:key|token|secret|password|passwd|pwd|credentials?|authorization|cookie)`;
+
+/**
+ * A base64 payload after `Basic `, as opposed to the English word that follows
+ * "Basic" in a sentence about basic authentication.
+ */
+function isBasicAuthPayload(value: string): boolean {
+  if (value.endsWith("=")) return true;
+  const { lower, upper, digit } = countCharClasses(value);
+  return digit > 0 || (lower > 0 && upper > 0);
 }
 
 /**
@@ -38,6 +303,10 @@ interface ValueRule {
  * only through `String.prototype.replace` (never `.test`/`.exec`, which carry
  * `lastIndex` state on global regexes). Patterns use anchors/boundaries so a
  * secret-shaped substring inside a longer identifier does not fire.
+ *
+ * Order matters: the precise vendor rules run before the broad shape and
+ * context rules, so a recognised credential is reported under the vendor that
+ * minted it rather than as a generic match.
  */
 const VALUE_RULES: ValueRule[] = [
   {
@@ -82,6 +351,12 @@ const VALUE_RULES: ValueRule[] = [
     regex: /\bAIza[0-9A-Za-z_-]{35}\b/g,
   },
   {
+    id: "vendor_api_key",
+    description:
+      "Developer-service API key (GitLab, npm, Docker Hub, Shopify, SendGrid, Hugging Face, Groq, Notion, Atlassian and others)",
+    regex: VENDOR_KEY_REGEX,
+  },
+  {
     id: "jwt",
     description: "JSON Web Token",
     regex: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g,
@@ -101,6 +376,52 @@ const VALUE_RULES: ValueRule[] = [
     description: "Bearer authorization token",
     regex: /\b(Bearer\s+)[A-Za-z0-9._~+/-]{10,}=*/gi,
     render: (_m, prefix) => `${prefix}${REPLACEMENT}`,
+  },
+  {
+    id: "basic_auth_credentials",
+    description: "Basic authorization credentials",
+    regex: /\b(Basic\s+)([A-Za-z0-9+/]{16,}={0,2})(?![A-Za-z0-9+/=])/g,
+    accept: (groups) => isBasicAuthPayload(groups[2] ?? ""),
+    render: (_m, prefix) => `${prefix}${REPLACEMENT}`,
+  },
+  {
+    // The layer that catches a vendor nobody has heard of. A short lowercase
+    // prefix, a separator and a high-entropy body is the shape almost every
+    // modern key is minted in, and it needs no vendor knowledge at all.
+    //
+    // A declined match consumes the text it spanned, so in principle a benign
+    // outer match could hide a secret further inside the same unbroken token.
+    // It cannot in practice: a body containing key material inherits that
+    // material's entropy and character mix, so the outer match is accepted and
+    // the secret is redacted along with its prefix.
+    id: "shaped_api_key",
+    description: "High-entropy API key with a vendor-style prefix",
+    regex: new RegExp(
+      `${TOKEN_START}([a-z][a-z0-9]{1,11})[_-]([A-Za-z0-9_-]{${SHAPED_TOKEN_MIN_BODY},})${TOKEN_END}`,
+      "g",
+    ),
+    accept: (groups) =>
+      !DIGEST_PREFIXES.has(groups[1] ?? "") && isKeyShapedBody(groups[2] ?? ""),
+    precondition: (text) => text.includes("_") || text.includes("-"),
+  },
+  {
+    // The layer that needs no shape at all: the text says what the value is.
+    // Up to two filler words are tolerated between the keyword and the
+    // separator, because people write "key now:" and "token here =" as often as
+    // they write "key:".
+    id: "sensitive_assignment",
+    description: "Value assigned to a credential-named field",
+    // One capture for everything that introduces the value, one for the value
+    // itself, so the replacement puts the sentence back and swaps only the
+    // credential.
+    regex: new RegExp(
+      `((?:^|[\\W_])(?:${CREDENTIAL_KEYWORD})(?:\\s+[A-Za-z]{1,8}){0,2}["'\`]?` +
+        `(?:\\s*[:=]{1,2}\\s*|\\s+(?:is|was)\\s+)["'\`]?)` +
+        `([^\\s"'\`,;<>(){}\\[\\]]{${CONTEXT_VALUE_MIN_LENGTH},})`,
+      "gi",
+    ),
+    accept: (groups) => isCredentialValue(groups[2] ?? ""),
+    render: (_m, introduction) => `${introduction}${REPLACEMENT}`,
   },
 ];
 
@@ -123,15 +444,38 @@ export function isSensitiveAttributeKey(key: string): boolean {
 }
 
 /**
+ * A pattern that already states where it may start is compiled exactly as
+ * written: the author has said what they meant, so nothing is added.
+ */
+const SELF_ANCHORED_PATTERN = /^(?:\^|\\b|\\B|\(\?<)/;
+
+/**
+ * Give a hand-written pattern the word boundary it almost certainly meant.
+ *
+ * A pattern like `sk-.*` reads as "a key starting with sk-", but as a regex it
+ * also matches the `sk-` inside `task-notification`, and everything a customer
+ * types is applied to every string the pipeline stores. Adding the boundary
+ * makes the pattern mean what it looks like it means. The alternation is
+ * wrapped too, so `a|b` gets the guard on both branches rather than on `a`
+ * alone, and the group is non-capturing so the author's own groups keep their
+ * numbers.
+ */
+function guardCustomPattern(pattern: string): string {
+  if (SELF_ANCHORED_PATTERN.test(pattern)) return pattern;
+  return `(?<![A-Za-z0-9_])(?:${pattern})`;
+}
+
+/**
  * Compile user-supplied pattern strings into case-insensitive global regexes,
  * silently dropping any that fail to compile (the service validates them with
  * `isSafeRegex` before they are ever stored, so this is a last-resort guard).
+ * Each is given a leading word boundary unless it already carries one.
  */
 export function compileSecretPatterns(patterns: readonly string[]): RegExp[] {
   const compiled: RegExp[] = [];
   for (const pattern of patterns) {
     try {
-      compiled.push(new RegExp(pattern, "gi"));
+      compiled.push(new RegExp(guardCustomPattern(pattern), "gi"));
     } catch {
       // Skip an uncompilable pattern rather than throwing in the hot path.
     }
@@ -157,9 +501,39 @@ function keptLengthAtBoundary(match: string): number {
   return index === -1 ? match.length : index;
 }
 
+/**
+ * The same clamp for a hand-written pattern, widened to whitespace and angle
+ * brackets. A trailing `.*` is the commonest thing in a custom pattern and it
+ * runs to the end of the line, so without this a single credential match takes
+ * the rest of the log line, the rest of the XML tag, and the sentence after it
+ * with it. A credential never contains a space or a bracket, so stopping there
+ * costs nothing and bounds the blast radius of a pattern written in haste.
+ */
+const CUSTOM_VALUE_BOUNDARY = /[\s"'`<>]/;
+
+function keptLengthForCustomPattern(match: string): number {
+  const index = match.search(CUSTOM_VALUE_BOUNDARY);
+  return index === -1 ? match.length : index;
+}
+
 export interface SecretsRedactionResult {
   text: string;
   redactedCount: number;
+}
+
+/**
+ * What one matched rule leaves behind, or `null` to decline the match and put
+ * the text back exactly as it was found. A broad rule gets the final say on its
+ * own candidate here; rules that keep surrounding context (url password, bearer
+ * prefix) are tightly bounded already, so they render without the clamp.
+ */
+function replacementFor(rule: ValueRule, args: string[]): string | null {
+  const full = args[0] ?? "";
+  if (rule.accept && !rule.accept(args)) return null;
+  if (rule.render) return rule.render(...args);
+  const kept = keptLengthAtBoundary(full);
+  if (kept === 0) return null;
+  return REPLACEMENT + full.slice(kept);
 }
 
 /**
@@ -186,25 +560,19 @@ export function redactSecretsInText({
   let result = text;
 
   for (const rule of VALUE_RULES) {
+    if (rule.precondition && !rule.precondition(result)) continue;
     result = result.replace(rule.regex, (...args: string[]) => {
-      // Rules that keep surrounding context (url password, bearer prefix) are
-      // tightly bounded already, so they render verbatim without the clamp.
-      if (rule.render) {
-        redactedCount++;
-        return rule.render(...args);
-      }
-      const full = args[0] ?? "";
-      const kept = keptLengthAtBoundary(full);
-      if (kept === 0) return full;
+      const replacement = replacementFor(rule, args);
+      if (replacement === null) return args[0] ?? "";
       redactedCount++;
-      return REPLACEMENT + full.slice(kept);
+      return replacement;
     });
   }
 
   for (const pattern of customPatterns) {
     result = result.replace(pattern, (...args: string[]) => {
       const full = args[0] ?? "";
-      const kept = keptLengthAtBoundary(full);
+      const kept = keptLengthForCustomPattern(full);
       if (kept === 0) return full;
       redactedCount++;
       return REPLACEMENT + full.slice(kept);
@@ -231,9 +599,9 @@ export interface SecretMatch {
  *
  * Uses `matchAll`, which clones the regex internally, so the module-level global
  * rules keep `lastIndex === 0` just like the `.replace` path. Detection scans
- * the original text (redaction rewrites the string between rules), so on rare
- * overlapping matches the count can differ slightly from `redactedCount` — fine
- * for scoring a pass/fail.
+ * the original text while redaction rewrites the string between rules, so
+ * matches that cover the same credential are collapsed here to keep one leak
+ * counted once.
  */
 export function detectSecretsInText({
   text,
@@ -251,36 +619,78 @@ export function detectSecretsInText({
   }
 
   const matches: SecretMatch[] = [];
-
   for (const rule of VALUE_RULES) {
-    for (const match of text.matchAll(rule.regex)) {
-      const start = match.index ?? 0;
-      const kept = rule.render
-        ? match[0].length
-        : keptLengthAtBoundary(match[0]);
-      if (kept === 0) continue;
-      matches.push({
-        ruleId: rule.id,
-        description: rule.description,
-        start,
-        end: start + kept,
-      });
-    }
+    matches.push(...matchesOfRule(rule, text));
   }
-
   for (const pattern of customPatterns) {
-    for (const match of text.matchAll(pattern)) {
-      const start = match.index ?? 0;
-      const kept = keptLengthAtBoundary(match[0]);
-      if (kept === 0) continue;
-      matches.push({
-        ruleId: "custom_pattern",
-        description: "Custom secret pattern",
-        start,
-        end: start + kept,
-      });
-    }
+    matches.push(...matchesOfCustomPattern(pattern, text));
   }
+  return withoutOverlaps(matches);
+}
 
-  return matches;
+/** Every span one built-in rule claims in `text`, after its own accept test. */
+function matchesOfRule(rule: ValueRule, text: string): SecretMatch[] {
+  if (rule.precondition && !rule.precondition(text)) return [];
+  const found: SecretMatch[] = [];
+  for (const match of text.matchAll(rule.regex)) {
+    if (ruleDeclines(rule, match)) continue;
+    const kept = claimedLength(rule, match);
+    if (kept === 0) continue;
+    const start = match.index ?? 0;
+    found.push({
+      ruleId: rule.id,
+      description: rule.description,
+      start,
+      end: start + kept,
+    });
+  }
+  return found;
+}
+
+/** Whether a rule's second-stage test rejects this candidate. */
+function ruleDeclines(rule: ValueRule, match: RegExpMatchArray): boolean {
+  return (
+    rule.accept !== undefined && !rule.accept(match as unknown as string[])
+  );
+}
+
+/** How much of a match the rule claims: all of it, or up to the value boundary. */
+function claimedLength(rule: ValueRule, match: RegExpMatchArray): number {
+  return rule.render ? match[0].length : keptLengthAtBoundary(match[0]);
+}
+
+/** Every span one caller-supplied pattern claims in `text`. */
+function matchesOfCustomPattern(pattern: RegExp, text: string): SecretMatch[] {
+  const found: SecretMatch[] = [];
+  for (const match of text.matchAll(pattern)) {
+    const start = match.index ?? 0;
+    const kept = keptLengthForCustomPattern(match[0]);
+    if (kept === 0) continue;
+    found.push({
+      ruleId: "custom_pattern",
+      description: "Custom secret pattern",
+      start,
+      end: start + kept,
+    });
+  }
+  return found;
+}
+
+/**
+ * Collapse matches covering the same credential. The layers overlap by design:
+ * `api_key: sk-proj-...` is at once a provider key, a vendor-shaped token and a
+ * named assignment. The evaluator scores by match count, so reporting one
+ * credential three times would claim three leaks. Rules are visited
+ * most-specific first, so the vendor that minted the key wins over the generic
+ * shape and the surrounding context.
+ */
+function withoutOverlaps(matches: SecretMatch[]): SecretMatch[] {
+  const kept: SecretMatch[] = [];
+  for (const match of matches) {
+    const overlaps = kept.some(
+      (other) => match.start < other.end && other.start < match.end,
+    );
+    if (!overlaps) kept.push(match);
+  }
+  return kept.sort((a, b) => a.start - b.start);
 }
