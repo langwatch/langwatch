@@ -5184,6 +5184,7 @@ export interface operations {
                             cacheCreationTokens: number;
                             totalTokens: number;
                             costUsd: number | null;
+                            tokensKnown: boolean;
                         }[];
                     };
                 };
