@@ -129,12 +129,14 @@ async function pullThroughTheRealPipeline(params: {
 function decodeCursor(cursor: string | null): {
   sinceMs: number;
   spaceId: string | null;
+  conversationId: string | null;
   sweepStartedAtMs: number | null;
 } {
   if (!cursor) throw new Error("expected a cursor");
   return JSON.parse(cursor) as {
     sinceMs: number;
     spaceId: string | null;
+    conversationId: string | null;
     sweepStartedAtMs: number | null;
   };
 }
@@ -1206,6 +1208,146 @@ describe("given a sweep too large for one run's budget", () => {
         await fixture.close();
       }
     }, 60_000);
+  });
+});
+
+/**
+ * One space bigger than a whole run's budget.
+ *
+ * Space-granular resume alone cannot finish this: every run would restart the
+ * space at its first conversation, run out at roughly the same place, and the
+ * sweep would never advance past it — so nothing behind it would ever be swept
+ * either. Sub-space resume is what turns that stall into progress.
+ */
+describe("given one space too large for a single run's budget", () => {
+  const BIG_CONVERSATIONS = [1, 2, 3, 4, 5];
+
+  /** A space with several conversations, and one more space behind it. */
+  function createOversizedWorkspace() {
+    const alphaMs = Date.UTC(2026, 0, 5, 9, 0, 0);
+    const conversations: Record<
+      string,
+      Array<{
+        conversation_id: string;
+        title: string;
+        created_timestamp: number;
+      }>
+    > = {
+      "space-big": BIG_CONVERSATIONS.map((n) => ({
+        conversation_id: `conv-big-${n}`,
+        title: `Big question ${n}`,
+        created_timestamp: alphaMs,
+      })),
+      "space-tail": [
+        {
+          conversation_id: "conv-tail-1",
+          title: "Behind the big one",
+          created_timestamp: alphaMs,
+        },
+      ],
+    };
+
+    const messages: Record<string, Array<ReturnType<typeof message>>> = {
+      "conv-tail-1": [
+        message({
+          id: "msg-tail-1",
+          conversationId: "conv-tail-1",
+          spaceId: "space-tail",
+          userId: 700_000_000_000_002,
+          content: "The question nobody reached",
+          createdMs: alphaMs,
+          sql: "SELECT 1",
+        }),
+      ],
+    };
+    for (const n of BIG_CONVERSATIONS) {
+      messages[`conv-big-${n}`] = [
+        message({
+          id: `msg-big-${n}`,
+          conversationId: `conv-big-${n}`,
+          spaceId: "space-big",
+          userId: 700_000_000_000_001,
+          content: `Big question ${n}`,
+          createdMs: alphaMs + n,
+          sql: "SELECT 1",
+        }),
+      ];
+    }
+
+    return { conversations, messages, alphaMs, betaMs: alphaMs };
+  }
+
+  describe("when it is swept across several runs", () => {
+    /** @scenario "A sweep cut short by its budget resumes where it stopped" */
+    it("drains the oversized space and still reaches the space behind it", async () => {
+      const workspace = createOversizedWorkspace();
+      // Only message reads are slow, so the conversation LISTING always
+      // completes inside a run. That matters: a truncated listing forfeits
+      // sub-space resume by design, and this test is about the resume working.
+      const fixture = await startFixtureServer({
+        workspace,
+        onMessages: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        },
+      });
+
+      try {
+        const adapter = new DatabricksGeniePuller();
+        const config = adapter.validateConfig({
+          adapter: DATABRICKS_GENIE_ADAPTER_ID,
+          workspaceUrl: fixture.baseUrl,
+          spaceIds: ["space-big", "space-tail"],
+          startingAt: "2020-01-01T00:00:00.000Z",
+          schedule: "*/15 * * * *",
+        });
+        const credentials = { token: "fixture-token" };
+
+        const emitted = new Set<string>();
+        // Comfortably more runs than convergence needs, so this fails as
+        // "never finished" rather than hanging.
+        const MAX_RUNS = 20;
+        let cursor: string | null = null;
+        let runs = 0;
+        let converged = false;
+
+        while (runs < MAX_RUNS && !converged) {
+          const result = await adapter.runOnce(
+            { cursor, credentials, deadlineMs: Date.now() + 350 },
+            config,
+          );
+          runs += 1;
+          for (const event of result.events) {
+            emitted.add(event.source_event_id);
+          }
+          cursor = result.cursor;
+          converged = decodeCursor(cursor).spaceId === null;
+        }
+
+        // The assertion that bites. With space-granular resume only, the sweep
+        // restarts space-big every run, never drains it, and this stays false
+        // until MAX_RUNS is spent.
+        expect(converged).toBe(true);
+
+        // Nothing in the oversized space was skipped on the way through...
+        for (const n of BIG_CONVERSATIONS) {
+          expect(emitted).toContain(`msg-big-${n}`);
+        }
+        // ...and the space behind it was actually reached, which is the part
+        // the old behaviour starved indefinitely.
+        expect(emitted).toContain("msg-tail-1");
+
+        const final = decodeCursor(cursor);
+        expect(final.spaceId).toBeNull();
+        expect(final.conversationId).toBeNull();
+        expect(final.sweepStartedAtMs).toBeNull();
+        // A drained sweep is a complete sweep, so the window finally moves.
+        expect(final.sinceMs).toBeGreaterThan(
+          Date.parse("2020-01-01T00:00:00.000Z"),
+        );
+      } finally {
+        await fixture.close();
+      }
+    }, 120_000);
   });
 });
 

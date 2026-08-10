@@ -114,6 +114,18 @@ const cursorSchema = z.object({
   sinceMs: z.number().int().nonnegative(),
   spaceId: z.string().nullable().default(null),
   /**
+   * Where inside `spaceId` to resume, or null to start that space from the top.
+   *
+   * Space granularity alone is not enough. A space whose walk costs more than
+   * one run's entire request budget could never be finished: every run would
+   * restart it from the first conversation, run out at roughly the same place,
+   * and the sweep would never advance past it — so no space ordered after it
+   * would be swept either. Nothing was lost (the watermark is held), but
+   * nothing arrived. This carries the position inside the space so each run
+   * picks up where the last one stopped.
+   */
+  conversationId: z.string().nullable().default(null),
+  /**
    * When the sweep currently IN FLIGHT began, or null when none is.
    *
    * A sweep is not a run. The budget can cut one short and `spaceId` carries
@@ -182,6 +194,7 @@ function parseCursor(
   return {
     sinceMs: Number.isFinite(sinceMs) ? sinceMs : defaultSinceMs(),
     spaceId: null,
+    conversationId: null,
     sweepStartedAtMs: null,
   };
 }
@@ -351,12 +364,29 @@ interface SweepResult {
   complete: boolean;
   /** Which space to start at next run, when the budget cut this one short. */
   resumeSpaceId: string | null;
+  /** Where inside that space to start, or null to take it from the top. */
+  resumeConversationId: string | null;
 }
 
 /** One page of a Databricks list endpoint, and whether more were left unread. */
 interface PagedRead<T> {
   items: T[];
   complete: boolean;
+}
+
+/** What one space's walk read, and where to pick it up if it was cut short. */
+interface SpaceRead {
+  items: NormalizedPullEvent[];
+  complete: boolean;
+  /**
+   * The conversation to restart this space at, or null for "from the top".
+   *
+   * Null does not mean "finished" — read it together with `complete`. A space
+   * whose conversation LISTING was itself cut short reports `complete: false`
+   * with a null resume point, because a partial list has no trustworthy
+   * position in it to resume from.
+   */
+  resumeConversationId: string | null;
 }
 
 /**
@@ -447,6 +477,11 @@ export class DatabricksGeniePuller
           complete: sweep.complete,
         }),
         spaceId: sweep.resumeSpaceId,
+        // Meaningless without a space to resume into, so it is cleared with it
+        // rather than left behind to be matched against some later sweep's
+        // space by accident.
+        conversationId:
+          sweep.resumeSpaceId === null ? null : sweep.resumeConversationId,
         // Held only while the sweep is still in flight. Cleared the moment it
         // stops resuming, so the next run stamps a fresh anchor rather than
         // inheriting a stale one and re-reading from it forever.
@@ -503,10 +538,23 @@ export class DatabricksGeniePuller
 
     for (let i = Math.max(resumeAt, 0); i < spaces.items.length; i += 1) {
       const space = spaces.items[i]!;
+      // Only the space the cursor actually stopped in inherits the conversation
+      // resume point. Every space after it is taken from the top.
+      const resumeConversationId =
+        space.space_id === cursor.spaceId ? cursor.conversationId : null;
+
       if (budget.exhausted()) {
         // Everything read so far is kept, the watermark is held, and the next
-        // run starts at this space rather than crawling from the top.
-        return { events, complete: false, resumeSpaceId: space.space_id };
+        // run starts at this space rather than crawling from the top. The
+        // conversation position is handed straight back rather than dropped, so
+        // a run that ends before it could touch this space does not undo the
+        // progress an earlier run already made inside it.
+        return {
+          events,
+          complete: false,
+          resumeSpaceId: space.space_id,
+          resumeConversationId,
+        };
       }
 
       const read = await this.spaceMessages({
@@ -517,6 +565,7 @@ export class DatabricksGeniePuller
         space,
         sinceMs: cursor.sinceMs,
         identities,
+        resumeConversationId,
       });
       events.push(...read.items);
       if (!read.complete) complete = false;
@@ -527,30 +576,59 @@ export class DatabricksGeniePuller
       // space i+1, skipping this space's tail — and then a later complete sweep
       // would advance the watermark past those never-fetched messages: silent,
       // permanent loss on exactly the large workspaces this resume path exists
-      // for. Re-reading the whole space next run is safe: the watermark is held
-      // and both sinks dedup on the message id.
+      // for. Re-reading is safe either way: the watermark is held and both
+      // sinks dedup on the message id.
+      //
+      // `read.resumeConversationId` narrows that re-read from the whole space
+      // to the conversation it stopped on, which is what lets a space bigger
+      // than one run's entire budget finish across several runs instead of
+      // restarting forever and starving every space behind it.
       //
       // Gated on `budget.exhausted()`, not on `!read.complete` alone: an
       // isolated 403/429/cycle on one conversation also sets `complete: false`
       // but must NOT stop the sweep — the held watermark plus a full re-sweep
       // next run already makes that case lossless, and bailing here would wedge
       // the sweep on a permanently-unreadable space and never reach the rest.
-      //
-      // Accepted limitation: a single space whose walk exceeds one run's whole
-      // budget now pins the resume here and starves every LATER space until it
-      // fits — nothing after it is swept in the meantime. That is loud (the
-      // watermark visibly stalls) and lossless; the pre-fix path reached those
-      // later spaces only by dropping this one's tail. Sub-space resume would
-      // remove the limitation and is out of scope here.
       if (!read.complete && budget.exhausted()) {
-        return { events, complete: false, resumeSpaceId: space.space_id };
+        return {
+          events,
+          complete: false,
+          resumeSpaceId: space.space_id,
+          resumeConversationId: read.resumeConversationId,
+        };
       }
     }
 
-    return { events, complete, resumeSpaceId: null };
+    return {
+      events,
+      complete,
+      resumeSpaceId: null,
+      resumeConversationId: null,
+    };
   }
 
-  /** Every new message across one space's conversations. */
+  /**
+   * Every new message across one space's conversations, resumable partway.
+   *
+   * The conversation list is walked in a DETERMINISTIC order this method
+   * imposes itself — sorted by `conversation_id` — rather than in whatever
+   * order the workspace happened to return it. That sort is what makes
+   * `resumeConversationId` safe.
+   *
+   * Resuming means skipping every conversation before the resume point, and
+   * that is only sound if a conversation cannot MOVE across it between runs.
+   * Databricks documents no ordering guarantee for this endpoint, so without a
+   * sort of our own a conversation that existed when the sweep began could sit
+   * after the resume point on one run and before it on the next, get skipped
+   * for the rest of the sweep, and then be filtered out for good once the
+   * completed sweep advanced the watermark past its messages. Sorting on an
+   * immutable key removes the dependency on the API's ordering entirely.
+   *
+   * A conversation CREATED while the sweep is in flight may still sort before
+   * the resume point and be skipped — and that is fine, because every message
+   * in it is necessarily newer than `sweepStartedAtMs`, which is where the
+   * watermark lands. The next sweep picks it up.
+   */
   private async spaceMessages({
     config,
     token,
@@ -559,6 +637,7 @@ export class DatabricksGeniePuller
     space,
     sinceMs,
     identities,
+    resumeConversationId,
   }: {
     config: DatabricksGeniePullConfig;
     token: string;
@@ -567,7 +646,8 @@ export class DatabricksGeniePuller
     space: z.infer<typeof spaceSchema>;
     sinceMs: number;
     identities: Map<number, GenieIdentity>;
-  }): Promise<PagedRead<NormalizedPullEvent>> {
+    resumeConversationId: string | null;
+  }): Promise<SpaceRead> {
     const conversations = await this.isolate({
       what: "conversations",
       context: { spaceId: space.space_id },
@@ -588,12 +668,51 @@ export class DatabricksGeniePuller
           },
         }),
     });
-    if (!conversations) return { items: [], complete: false };
+    if (!conversations)
+      return { items: [], complete: false, resumeConversationId: null };
 
     const events: NormalizedPullEvent[] = [];
     let complete = conversations.complete;
 
-    for (const conversation of conversations.items) {
+    const ordered = [...conversations.items].sort((a, b) =>
+      a.conversation_id < b.conversation_id
+        ? -1
+        : a.conversation_id > b.conversation_id
+          ? 1
+          : 0,
+    );
+
+    // A listing that was itself cut short is only a PREFIX of the space's
+    // conversations, so a position inside it means nothing — the conversations
+    // that would have sorted earlier may be sitting on a page we never read.
+    // Resuming into it would skip them permanently once the sweep completed.
+    // So a truncated listing forfeits sub-space resume and the space restarts
+    // from the top, which is slower and still lossless.
+    const resumable = conversations.complete;
+
+    // An id that is no longer in the list means the conversation was deleted
+    // since the last run. Starting the space over is the safe answer: the
+    // watermark did not move, so nothing is skipped.
+    const startAt =
+      resumable && resumeConversationId
+        ? Math.max(
+            ordered.findIndex(
+              (c) => c.conversation_id === resumeConversationId,
+            ),
+            0,
+          )
+        : 0;
+
+    for (let i = startAt; i < ordered.length; i += 1) {
+      const conversation = ordered[i]!;
+      if (budget.exhausted()) {
+        return {
+          items: events,
+          complete: false,
+          resumeConversationId: resumable ? conversation.conversation_id : null,
+        };
+      }
+
       const read = await this.isolate({
         what: "messages",
         context: {
@@ -613,14 +732,27 @@ export class DatabricksGeniePuller
           }),
       });
       if (!read) {
+        // Isolated failure on one conversation. Keep going — the held
+        // watermark plus a full re-sweep already covers it, and stopping here
+        // would wedge the space on a permanently-broken conversation.
         complete = false;
         continue;
       }
       events.push(...read.items);
       if (!read.complete) complete = false;
+
+      // This conversation's own message pages ran out of budget partway.
+      // Resume ON it rather than after it, so its unread tail is re-read.
+      if (!read.complete && budget.exhausted()) {
+        return {
+          items: events,
+          complete: false,
+          resumeConversationId: resumable ? conversation.conversation_id : null,
+        };
+      }
     }
 
-    return { items: events, complete };
+    return { items: events, complete, resumeConversationId: null };
   }
 
   /** The configured spaces, or every space the credential can see. */
