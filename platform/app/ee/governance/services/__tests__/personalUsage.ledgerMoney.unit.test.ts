@@ -14,7 +14,9 @@
  * asserted. The service keeps one test of its own: a ledger read that refuses
  * to answer must still leave the trace-summary side of the dashboard standing.
  */
+import type { ClickHouseClient } from "@clickhouse/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PersonalUsageClickHouseRepository } from "../personalUsage.clickhouse.repository";
 import { PersonalUsageService } from "../personalUsage.service";
 
@@ -36,11 +38,9 @@ function createRepository(nanoRows: Record<string, unknown>[]) {
       return { json: vi.fn().mockResolvedValue(rows) };
     }),
   };
-  return new PersonalUsageClickHouseRepository(
-    (async () => client) as unknown as ConstructorParameters<
-      typeof PersonalUsageClickHouseRepository
-    >[0],
-  );
+  const resolveClient: ClickHouseClientResolver = async () =>
+    client as unknown as ClickHouseClient;
+  return new PersonalUsageClickHouseRepository(resolveClient);
 }
 
 /** The queries that read the ledger, which is where the money rule applies. */
