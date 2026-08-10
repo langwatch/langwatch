@@ -16,7 +16,7 @@ Each mechanism was individually sound: the payloads genuinely need `type`/`versi
 
 ## Decision
 
-Two nouns, four consumers, one rule.
+Two nouns, three consumers, one rule.
 
 **Event** — a durable fact appended to `event_log`. Immutable, replayable, the input to every fold. The only thing that extends `EventSchema`.
 
@@ -50,4 +50,3 @@ A staged payload is the courier between two durable records, and replayability n
 - `platform/app/src/server/event-sourcing/pipelines/trace-processing/schemas/events.ts` — the re-typed claim-check payload and its wire-contract fixture.
 - `platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/commands/contributeSpanFactsCommand.ts` — the durable record the courier feeds.
 - PR #6621 — the application of this rule.
-- ADR numbering note: 087 is currently claimed by two open PRs; this ADR takes 089 because 088 is claimed by an open PR as well.
