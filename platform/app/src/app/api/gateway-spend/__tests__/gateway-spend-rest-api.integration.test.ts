@@ -43,6 +43,8 @@ const resolveTestClickHouseClient = async () => chClient;
 // too, so standing in for the store means standing in for all of it.
 let planHasWebhookEndpoints = true;
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     planProvider: {
       getActivePlan: async () => ({
