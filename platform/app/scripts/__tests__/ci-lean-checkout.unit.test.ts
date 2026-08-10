@@ -1,13 +1,19 @@
 /**
  * @vitest-environment node
  *
- * Every checkout in the heavy workflows leaves docs/ and assets/ on the server.
+ * Every checkout in the heavy workflows leaves the marketing media behind.
  *
- * Those two directories are the largest in the repository and hold none of
- * CI's inputs — 138 MB and 37 MB of .gif and .mp4 marketing media against
- * 81 MB for platform/. Naming a sparse-checkout makes actions/checkout fetch
- * with `--filter=blob:none`, so the blobs never transfer: a depth-1 clone goes
- * from 180 MB to 39 MB of .git and from 78s to 15s.
+ * docs/media, docs/images and assets/ are 165 MB of .gif and .mp4 against
+ * 81 MB for platform/, the thing CI builds. Naming a sparse-checkout makes
+ * actions/checkout fetch with `--filter=blob:none`, so those blobs never
+ * transfer: a depth-1 clone goes from 180 MB to 42 MB of .git.
+ *
+ * The list below is the MEDIA directories, not docs/ wholesale, and that
+ * distinction is why this file names them individually.
+ * error-remediation.unit.test.ts resolves the repo's docs/ and asserts every
+ * remediation link maps to a real .mdx; excluding all of docs/ failed three
+ * test-unit shards. The .mdx tree is ~10 MB of docs/'s 138 and CI reads it;
+ * the media is the other 128 and nothing reads it.
  *
  * This is an invariant rather than a list of the jobs that currently have one,
  * because the failure mode is a new job added without it. Nothing breaks; CI
@@ -28,7 +34,11 @@ const REPO_ROOT = path.resolve(__dirname, "../../../..");
 /** Workflows whose jobs check out the working tree to build or test the app. */
 const WORKFLOWS = ["langwatch-app-ci.yml", "e2e-ci.yml"];
 
-const EXCLUDED = ["docs", "assets"];
+/**
+ * Root-anchored, so `!/assets/` never touches
+ * services/langyagent/internal/assets, which a unit test does read.
+ */
+const EXCLUDED = ["docs/media", "docs/images", "assets"];
 
 interface Step {
   name?: string;
@@ -87,7 +97,7 @@ describe("given the workflows that check out the tree to build or test the app",
         for (const directory of EXCLUDED) {
           expect(
             step.sparse,
-            `${where(step)} checks out ${directory}/, which no job here reads — see specs/ci/lean-checkout.feature`,
+            `${where(step)} checks out ${directory}/, which is media no job here reads — see specs/ci/lean-checkout.feature`,
           ).toContain(`!/${directory}/`);
         }
       }
@@ -100,6 +110,31 @@ describe("given the workflows that check out the tree to build or test the app",
           step.coneMode,
           `${where(step)} negates paths under cone mode, where negation is not honoured`,
         ).toBe(false);
+      }
+    });
+
+    /** @scenario "Prose under docs/ is kept, because CI reads it" */
+    it("keeps the .mdx tree, dropping only the media beneath it", () => {
+      for (const step of ALL.filter((s) => !isGateOnly(s))) {
+        expect(
+          step.sparse.split("\n").map((line) => line.trim()),
+          `${where(step)} drops docs/ wholesale, which fails error-remediation.unit.test.ts`,
+        ).not.toContain("!/docs/");
+      }
+    });
+
+    /** @scenario "The exclusions are root-anchored" */
+    it("anchors each exclusion at the root, sparing nested directories of the same name", () => {
+      for (const step of ALL.filter((s) => !isGateOnly(s))) {
+        for (const line of step.sparse
+          .split("\n")
+          .map((l) => l.trim())
+          .filter((l) => l.startsWith("!"))) {
+          expect(
+            line,
+            `${where(step)} has an unanchored exclusion "${line}", which would also drop services/langyagent/internal/assets`,
+          ).toMatch(/^!\//);
+        }
       }
     });
   });
