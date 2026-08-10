@@ -293,3 +293,41 @@ describe("given a handled-error envelope whose message is just the code", () => 
     });
   });
 });
+
+describe("given the older envelope, which carries the code in `error`", () => {
+  describe("when it also carries prose", () => {
+    it("prints the prose without the code in front of it", () => {
+      const body = {
+        error: "invalid_credentials",
+        message: "That is not this instance's administrator credential",
+      };
+
+      expect(formatApiErrorMessage({ error: body })).toBe(
+        "That is not this instance's administrator credential",
+      );
+    });
+  });
+
+  describe("when the prose is missing", () => {
+    it("renders the client's copy for the code", () => {
+      const body = { error: "enterprise_plan_required" };
+
+      expect(formatApiErrorMessage({ error: body })).toBe(
+        "This capability needs the Enterprise plan",
+      );
+    });
+  });
+
+  describe("when the field holds a reason phrase rather than a code", () => {
+    it("keeps prefixing, because the phrase is prose the message does not repeat", () => {
+      const body = {
+        error: "Conflict",
+        message: "A role with that name already exists",
+      };
+
+      expect(formatApiErrorMessage({ error: body })).toBe(
+        "Conflict: A role with that name already exists",
+      );
+    });
+  });
+});

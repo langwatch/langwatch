@@ -93,3 +93,13 @@ export const isCodeAsMessage = ({
 /** The sentence to show for a code the API named. */
 export const sentenceForCode = (code: string): string =>
   SENTENCE_BY_CODE[code] ?? humanizeCode(code);
+
+/**
+ * True for a value shaped like one of our error codes: lower case throughout,
+ * words joined by underscores. That is what separates `invalid_credentials`
+ * and `unauthorized` from the reason phrases, class names and free text that
+ * share the same envelope fields ("Conflict", "NotFoundError", "UNEXPECTED",
+ * "connection refused"), which are prose, and prose is not a code.
+ */
+export const looksLikeErrorCode = (value: unknown): value is string =>
+  typeof value === "string" && /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/.test(value);
