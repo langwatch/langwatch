@@ -148,8 +148,11 @@ function createNonSpanEvent(): TraceProcessingEvent {
 function createContext(
   foldState: TraceSummaryData,
 ): ReactorContext<TraceSummaryData> {
+  // Deliberately NOT the event's `tenant-1`: the reactor must record against
+  // the context's tenant, and identical fixtures would let a reactor reading
+  // `event.tenantId` pass just as happily.
   return {
-    tenantId: "tenant-1",
+    tenantId: "context-tenant-1",
     aggregateId: "trace-1",
     foldState,
   };
@@ -353,7 +356,7 @@ describe("trackedEventSync reactor", () => {
 
       expect(deps.recordTrackedEvent).toHaveBeenCalledTimes(1);
       const call = vi.mocked(deps.recordTrackedEvent).mock.calls[0]![0];
-      expect(call.tenantId).toBe("tenant-1");
+      expect(call.tenantId).toBe("context-tenant-1");
       expect(call.body.trace_id).toBe("trace-1");
       expect(call.body.event_type).toBe("thumbs_up_down");
       expect(call.body.metrics).toEqual({ vote: 1 });

@@ -185,3 +185,64 @@ func TestMergeUsage_ExclusiveCachedSplit(t *testing.T) {
 	require.NotNil(t, dst.TotalTokens)
 	assert.Equal(t, 1020, *dst.TotalTokens)
 }
+
+// TestMergeUsage_SecondChunkReplacesPromptSide pins the prompt side as a merged
+// unit across chunks. A first usage chunk without a cache split records the
+// whole prompt as non-cached input; a second chunk that reports the same prompt
+// total WITH the split must replace it, not sit beside it. Merging the two
+// fields independently leaves InputTokens=1000 next to CachedInputTokens=1000
+// and, because the backend prices input and cache-read additively, bills the
+// cached tokens twice.
+func TestMergeUsage_SecondChunkReplacesPromptSide(t *testing.T) {
+	t.Run("when a later chunk adds a full cache split", func(t *testing.T) {
+		dst := langwatch.GenAIUsage{}
+
+		first := &usagePayload{PromptTokens: 1000, CompletionTokens: 10, TotalTokens: 1010}
+		mergeUsage(&dst, first)
+		require.NotNil(t, dst.InputTokens)
+		assert.Equal(t, 1000, *dst.InputTokens)
+		assert.Nil(t, dst.CachedInputTokens)
+
+		second := &usagePayload{PromptTokens: 1000, CompletionTokens: 20, TotalTokens: 1020}
+		second.PromptTokensDetails.CachedTokens = 1000
+		mergeUsage(&dst, second)
+
+		assert.Nil(t, dst.InputTokens, "a fully cached prompt records no non-cached input")
+		require.NotNil(t, dst.CachedInputTokens)
+		assert.Equal(t, 1000, *dst.CachedInputTokens)
+		require.NotNil(t, dst.OutputTokens)
+		assert.Equal(t, 20, *dst.OutputTokens)
+	})
+
+	t.Run("when a later chunk adds a partial cache split", func(t *testing.T) {
+		dst := langwatch.GenAIUsage{}
+
+		mergeUsage(&dst, &usagePayload{PromptTokens: 1000, TotalTokens: 1000})
+
+		second := &usagePayload{PromptTokens: 1000, TotalTokens: 1000}
+		second.PromptTokensDetails.CachedTokens = 800
+		mergeUsage(&dst, second)
+
+		require.NotNil(t, dst.InputTokens)
+		assert.Equal(t, 200, *dst.InputTokens, "input is the non-cached remainder, not the stale total")
+		require.NotNil(t, dst.CachedInputTokens)
+		assert.Equal(t, 800, *dst.CachedInputTokens)
+	})
+
+	t.Run("when a later chunk carries no prompt side the split is left alone", func(t *testing.T) {
+		dst := langwatch.GenAIUsage{}
+
+		first := &usagePayload{PromptTokens: 1000, TotalTokens: 1000}
+		first.PromptTokensDetails.CachedTokens = 800
+		mergeUsage(&dst, first)
+
+		mergeUsage(&dst, &usagePayload{CompletionTokens: 42})
+
+		require.NotNil(t, dst.InputTokens)
+		assert.Equal(t, 200, *dst.InputTokens)
+		require.NotNil(t, dst.CachedInputTokens)
+		assert.Equal(t, 800, *dst.CachedInputTokens)
+		require.NotNil(t, dst.OutputTokens)
+		assert.Equal(t, 42, *dst.OutputTokens)
+	})
+}

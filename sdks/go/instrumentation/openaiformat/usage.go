@@ -65,19 +65,26 @@ func recordUsage(span *langwatch.Span, u *usagePayload) {
 
 // mergeUsage folds a streamed usage chunk into an accumulating GenAIUsage,
 // overwriting each field when the chunk carries a non-zero value.
+//
+// The prompt side is merged as a UNIT rather than field by field, because
+// InputTokens is derived: toGenAIUsage subtracts the cached subset out of
+// prompt_tokens to produce the exclusive split LangWatch costs additively. A
+// later chunk that reports the same prompt total WITH a cache split must
+// therefore be able to lower — or clear — the InputTokens an earlier,
+// split-less chunk set. Merging the two fields independently would leave the
+// stale pre-split value standing beside the cache read and bill the cached
+// tokens twice, which is exactly the double-bill the exclusive split removes.
 func mergeUsage(dst *langwatch.GenAIUsage, u *usagePayload) {
 	src := u.toGenAIUsage()
-	if src.InputTokens != nil {
+	if u != nil && (u.PromptTokens > 0 || u.PromptTokensDetails.CachedTokens > 0) {
 		dst.InputTokens = src.InputTokens
+		dst.CachedInputTokens = src.CachedInputTokens
 	}
 	if src.OutputTokens != nil {
 		dst.OutputTokens = src.OutputTokens
 	}
 	if src.TotalTokens != nil {
 		dst.TotalTokens = src.TotalTokens
-	}
-	if src.CachedInputTokens != nil {
-		dst.CachedInputTokens = src.CachedInputTokens
 	}
 	if src.ReasoningTokens != nil {
 		dst.ReasoningTokens = src.ReasoningTokens

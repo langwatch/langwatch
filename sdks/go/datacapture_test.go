@@ -187,6 +187,49 @@ func TestDataCaptureStripsRAGContexts(t *testing.T) {
 	})
 }
 
+func TestDataCaptureStripsRequestContent(t *testing.T) {
+	// Content the extractors record BEFORE any capture decision: the customer's
+	// own tool schemas, their compiled prompt variables and an arbitrary
+	// caller-supplied params map. Every one is input content.
+	contentKeys := []attribute.Key{
+		AttributeGenAIRequestTools,
+		AttributeLangWatchPromptVariables,
+		AttributeLangWatchParams,
+	}
+	stub := func() tracetest.SpanStub {
+		return tracetest.SpanStub{
+			Name: "op",
+			Attributes: []attribute.KeyValue{
+				AttributeGenAIRequestTools.String(`[{"function":{"name":"charge_card","description":"charges the customer's card"}}]`),
+				AttributeLangWatchPromptVariables.String(`{"type":"json","value":{"ssn":"123-45-6789"}}`),
+				AttributeLangWatchParams.String(`{"type":"json","value":{"tenant":"acme"}}`),
+				AttributeGenAIRequestToolChoice.String("auto"),
+				AttributeLangWatchSpanType.String("llm"),
+			},
+		}
+	}
+
+	for _, mode := range []DataCaptureMode{DataCaptureNone, DataCaptureOutput} {
+		t.Run("when input capture is off in mode "+string(mode), func(t *testing.T) {
+			keys := keySet(applyDataCapture(stub().Snapshot(), mode).Attributes())
+			for _, key := range contentKeys {
+				assert.NotContains(t, keys, key, "%s carries request content and must be stripped", key)
+			}
+			assert.Contains(t, keys, AttributeGenAIRequestToolChoice, "tool_choice is a control directive, deliberately kept")
+			assert.Contains(t, keys, AttributeLangWatchSpanType, "structure is preserved")
+		})
+	}
+
+	for _, mode := range []DataCaptureMode{DataCaptureAll, DataCaptureInput} {
+		t.Run("when input capture is on in mode "+string(mode), func(t *testing.T) {
+			keys := keySet(applyDataCapture(stub().Snapshot(), mode).Attributes())
+			for _, key := range contentKeys {
+				assert.Contains(t, keys, key, "%s must survive when input is captured", key)
+			}
+		})
+	}
+}
+
 func TestDataCaptureStripsEventContent(t *testing.T) {
 	eventStub := func() tracetest.SpanStub {
 		return tracetest.SpanStub{

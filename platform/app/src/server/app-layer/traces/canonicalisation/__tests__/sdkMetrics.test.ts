@@ -269,8 +269,18 @@ describe("CanonicalizeSpanAttributesService — cache-read token canonicalisatio
         promptTokens: 510 + 37127,
         completionTokens: 12,
       });
+      // The baseline that discriminates: the same span costed with NO cache
+      // attribute at all. Cache buckets are additive on top of the non-cached
+      // input count, so a canonicalisation that dropped the flat alias would
+      // land exactly here. Asserting only `< fullInputCost` passes either way.
+      const uncountedCacheCost = computeSpanCost({
+        attrs: { [ATTR_KEYS.GEN_AI_REQUEST_MODEL]: "claude-opus-4-7" },
+        promptTokens: 510,
+        completionTokens: 12,
+      });
 
-      expect(cachedCost).toBeGreaterThan(0);
+      expect(uncountedCacheCost).toBeGreaterThan(0);
+      expect(cachedCost).toBeGreaterThan(uncountedCacheCost);
       expect(cachedCost).toBeLessThan(fullInputCost);
     });
   });

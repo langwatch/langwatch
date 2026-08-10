@@ -74,10 +74,13 @@ jobs:
       # provider's instrumentation must never pull in another's SDK. A single
       # `go test ./...` in the core therefore covers none of them, so walk
       # every go.mod instead — test-all.sh vets, tests and gofmt-checks each
-      # module independently.
+      # module independently. It forwards its arguments to `go test`, so -race
+      # runs the detector: the SDK's span processing, streaming accumulators and
+      # exporters all run on the caller's goroutines, where a data race is a
+      # customer-visible corruption rather than a test-only artefact.
       - name: Run tests for every module
         working-directory: ./sdks/go
-        run: ./test-all.sh
+        run: ./test-all.sh -race
 
       - name: Install examples dependencies
         working-directory: ./sdks/go/examples

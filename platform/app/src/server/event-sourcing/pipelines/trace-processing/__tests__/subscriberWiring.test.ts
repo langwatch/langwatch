@@ -4,6 +4,7 @@ import {
   createTraceProcessingPipeline,
   type TraceProcessingPipelineDeps,
 } from "../pipeline";
+import { createTrackedEventSyncReactor } from "../reactors/trackedEventSync.reactor";
 import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
@@ -126,6 +127,40 @@ describe("trace-processing pipeline subscriber wiring", () => {
         aggregateId: "t-2",
         state: foldState,
       });
+    });
+  });
+
+  describe("given the trackedEventSync reactor", () => {
+    const trackedEventSyncReactor = createTrackedEventSyncReactor({
+      recordTrackedEvent: vi.fn().mockResolvedValue(undefined),
+    });
+    const definition = createTraceProcessingPipeline(
+      buildTraceDeps({ trackedEventSyncReactor }),
+    );
+    const trackedEventSync = definition.foldReactors.get("trackedEventSync");
+
+    it("attaches to the traceSummary fold", () => {
+      expect(trackedEventSync).toBeDefined();
+      expect(trackedEventSync!.projectionName).toBe("traceSummary");
+      expect(trackedEventSync!.definition).toBe(trackedEventSyncReactor);
+    });
+
+    it("carries the 5s delay and 30s dedup ttl through the registration", () => {
+      expect(trackedEventSync!.definition.options?.delay).toBe(5_000);
+      expect(trackedEventSync!.definition.options?.ttl).toBe(30_000);
+    });
+
+    it("derives the job id from tenant + aggregate + event id", () => {
+      const makeJobId = trackedEventSync!.definition.options?.makeJobId;
+      expect(makeJobId).toBeDefined();
+      const event = fakeEvent({
+        id: "ev-9",
+        tenantId: "project-9",
+        aggregateId: "t-9",
+      });
+      expect(makeJobId!({ event, foldState: undefined } as never)).toBe(
+        "tracked-event-sync:project-9:t-9:ev-9",
+      );
     });
   });
 

@@ -71,11 +71,21 @@ type DataCapturePredicate func(DataCaptureContext) DataCaptureMode
 //
 // RAG contexts count as input: langwatch.rag.contexts carries the text of the
 // retrieved documents that were fed to the model, not just their identifiers.
+// So do the request's tool definitions (gen_ai.request.tools carries the
+// customer's function names, descriptions and parameter schemas), the compiled
+// prompt variables and langwatch.params, an arbitrary caller-supplied map.
+//
+// gen_ai.request.tool_choice is deliberately NOT stripped: it is a control
+// directive that at most names a tool whose schema is already redacted, and
+// keeping it makes a redacted span still debuggable.
 var (
 	dataCaptureInputKeys = map[attribute.Key]struct{}{
 		AttributeLangWatchInput:            {},
 		AttributeLangWatchInstructions:     {},
 		AttributeLangWatchRAGContexts:      {},
+		AttributeLangWatchParams:           {},
+		AttributeLangWatchPromptVariables:  {},
+		AttributeGenAIRequestTools:         {},
 		semconv.GenAIInputMessagesKey:      {},
 		attribute.Key("gen_ai.prompt"):     {},
 		semconv.GenAISystemInstructionsKey: {},
