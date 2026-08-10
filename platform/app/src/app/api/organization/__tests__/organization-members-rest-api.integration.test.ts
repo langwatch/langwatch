@@ -43,6 +43,7 @@ import {
   seedOrgMember,
 } from "~/test-utils/managementApiOrg";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import type * as EnvModule from "../../../../env.mjs";
 
 // Invite creation attempts email delivery; the suite is about the API, so the
 // provider call is stubbed out and delivery reporting stays observable.
@@ -55,7 +56,7 @@ vi.mock("~/server/mailer/inviteEmail", () => ({
 // configured, so without this the flag reports the runner's environment rather
 // than the outcome of the send.
 vi.mock("../../../../env.mjs", async (importOriginal) => {
-  const original = await importOriginal<typeof import("../../../../env.mjs")>();
+  const original = await importOriginal<typeof EnvModule>();
   return {
     ...original,
     env: { ...original.env, SENDGRID_API_KEY: "test-sendgrid-key" },
