@@ -64,6 +64,10 @@ import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
 } from "~/test-utils/clickhouseTestApp";
+import {
+  decryptCredentials,
+  encryptParserConfigCredentials,
+} from "../../activity-monitor/ingestionCredentials";
 import { ensureHiddenGovernanceProject } from "../../governanceProject.service";
 import {
   DATABRICKS_GENIE_ADAPTER_ID,
@@ -491,6 +495,12 @@ async function startFixtureServer(params: {
    * WHILE the sweep is inside a space rather than cleanly between two.
    */
   onMessages?: (conversationId: string) => Promise<void> | void;
+  /**
+   * An HTTP status to force on a SCIM lookup, or undefined to answer normally.
+   * The directory-outage test uses it to fail one lookup TRANSIENTLY and then
+   * recover, which is the difference the adapter's cache has to respect.
+   */
+  onScim?: (userId: string) => number | undefined;
 }): Promise<{
   baseUrl: string;
   conversationRequests: string[];
@@ -598,6 +608,12 @@ async function startFixtureServer(params: {
       url.pathname,
     );
     if (scim) {
+      const forced = params.onScim?.(scim[1]!);
+      if (forced !== undefined) {
+        res.statusCode = forced;
+        send({ error: `forced ${forced}` });
+        return;
+      }
       const user = USERS[scim[1]!];
       if (!user) {
         res.statusCode = 404;
@@ -1204,6 +1220,127 @@ describe("given a sweep too large for one run's budget", () => {
         // Only now that everything was read does the sweep finish and release.
         expect(secondCursor.spaceId).toBeNull();
         expect(secondCursor.sweepStartedAtMs).toBeNull();
+      } finally {
+        await fixture.close();
+      }
+    }, 60_000);
+  });
+});
+
+/**
+ * The workspace token at rest.
+ *
+ * Real crypto, real row. The helper's own unit test mocks `~/utils/encryption`
+ * with a reversible stand-in whose output CONTAINS the plaintext, which is
+ * fine for testing envelope tagging and round-tripping but proves nothing
+ * about readability — so the "never stored in plain text" claim is made here,
+ * against what actually lands in Postgres.
+ */
+describe("given an admin saves a Genie source carrying a workspace token", () => {
+  describe("when the source is persisted", () => {
+    /** @scenario "The workspace token is never stored in plain text" */
+    it("stores the token encrypted and unreadable from the source's configuration", async () => {
+      const token = `dapi-${nanoid(24)}`;
+      // The pullConfig shape the governance form produces for Genie: the
+      // secret travels only inside `credentials`, never as a top-level key.
+      const pullConfig = {
+        adapter: DATABRICKS_GENIE_ADAPTER_ID,
+        workspaceUrl: "https://adb-1234567890123456.7.azuredatabricks.net",
+        spaceIds: [],
+        schedule: "*/15 * * * *",
+        credentials: { token },
+      };
+
+      const seeded = await seedSource({
+        slug: `enc-${ns}`,
+        pullConfig: encryptParserConfigCredentials(
+          pullConfig,
+        ) as Prisma.InputJsonObject,
+      });
+
+      try {
+        const row = await prisma.ingestionSource.findUniqueOrThrow({
+          where: { id: seeded.sourceId },
+        });
+        const stored = row.parserConfig as Record<string, unknown>;
+
+        // The assertion that bites: the secret is not recoverable by reading
+        // the row, anywhere in it, at any nesting depth.
+        expect(JSON.stringify(stored)).not.toContain(token);
+
+        expect(typeof stored.credentials).toBe("string");
+        expect(stored.credentials as string).toMatch(/^enc:v1:/);
+
+        // Encrypted is not the same as lost — the puller still resolves it.
+        expect(decryptCredentials(stored.credentials)).toEqual({ token });
+      } finally {
+        await cleanupOrg(seeded.organizationId);
+      }
+    }, 60_000);
+  });
+});
+
+/**
+ * A directory that fails for a moment, not for good.
+ *
+ * The adapter caches a 404 — a deleted account is a permanent answer — but
+ * must NOT cache anything else. Caching a 503 would take one unlucky instant
+ * and strip the author off every remaining message in the run, which reads as
+ * a workspace full of anonymous questions with nothing reporting a failure.
+ */
+describe("given the directory fails while the sweep is running", () => {
+  describe("when a later message has the same author", () => {
+    /** @scenario "A directory outage does not strip authors off the rest of the run" */
+    it("asks the directory again rather than reusing the failure", async () => {
+      const workspace = createFixtureWorkspace();
+      const flakyUserId = "700000000000001";
+      let lookups = 0;
+
+      const fixture = await startFixtureServer({
+        workspace,
+        onScim: (userId) => {
+          if (userId !== flakyUserId) return undefined;
+          lookups += 1;
+          // Only the FIRST lookup fails, and it fails transiently.
+          return lookups === 1 ? 503 : undefined;
+        },
+      });
+
+      try {
+        const adapter = new DatabricksGeniePuller();
+        const config = adapter.validateConfig({
+          adapter: DATABRICKS_GENIE_ADAPTER_ID,
+          workspaceUrl: fixture.baseUrl,
+          spaceIds: ["space-alpha"],
+          startingAt: "2020-01-01T00:00:00.000Z",
+          schedule: "*/15 * * * *",
+        });
+
+        const result = await adapter.runOnce(
+          { cursor: null, credentials: { token: "fixture-token" } },
+          config,
+        );
+
+        const byId = new Map(
+          result.events.map((event) => [event.source_event_id, event]),
+        );
+        const duringOutage = byId.get("msg-alpha-1");
+        const afterOutage = byId.get("msg-alpha-2");
+        expect(duringOutage).toBeDefined();
+        expect(afterOutage).toBeDefined();
+
+        // The assertion that bites: a second lookup happened at all. Cache the
+        // transient failure and this stays at 1.
+        expect(lookups).toBeGreaterThanOrEqual(2);
+
+        // The message caught by the outage still lands, just unattributed —
+        // an anonymous question is worth recording.
+        expect(String(duringOutage?.extra?.actorEmail ?? "")).toBe("");
+        // And the next message by the SAME author is attributed properly,
+        // which is the half a cached failure would have destroyed.
+        expect(String(afterOutage?.extra?.actorEmail ?? "")).toBe(
+          "dana.hoffman@acme.test",
+        );
       } finally {
         await fixture.close();
       }

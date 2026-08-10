@@ -59,7 +59,7 @@ Feature: Databricks AI/BI Genie puller
     Then the directory is asked about that author only once
     And every message is still recorded, unattributed
 
-  @integration @unimplemented
+  @integration
   Scenario: A directory outage does not strip authors off the rest of the run
     Given the directory fails temporarily while resolving one author
     When the puller reads a later message by the same author
@@ -119,7 +119,7 @@ Feature: Databricks AI/BI Genie puller
     Then it appears once in the activity records
     And it moves no money
 
-  @integration @unimplemented
+  @integration
   Scenario: The workspace token is never stored in plain text
     Given an admin configures a Genie source through the governance UI
     When the source is saved
