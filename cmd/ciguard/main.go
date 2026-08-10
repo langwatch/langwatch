@@ -41,10 +41,11 @@ func main() {
 
 	guards := []guard{
 		{name: "lean-checkout", run: ciguard.LeanCheckout},
+		{name: "go-version", run: ciguard.GoVersion},
 	}
 
 	if failed := runAll(guards, repoRoot); failed {
-		fmt.Fprintln(os.Stderr, "\nSee specs/ci/lean-checkout.feature")
+		fmt.Fprintln(os.Stderr, "\nSee specs/ci/lean-checkout.feature and specs/ci/go-version-consistency.feature")
 		os.Exit(1)
 	}
 }

@@ -66,8 +66,15 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.25'
-          cache: true
+          # Read the floor from the module instead of restating it. The SDK
+          # deliberately targets an older Go than the rest of the repo — it
+          # must build standalone at its declared directive, which is why
+          # these jobs run with GOWORK=off — and a literal here is a second
+          # copy of that decision, free to drift from the first. It already
+          # had: go.mod said 1.25.0 while three other workflows said "1.25",
+          # "1.26" and go.mod's 1.26.5.
+          go-version-file: sdks/go/go.mod
+          cache-dependency-path: sdks/go/go.sum
 
       - name: Install dependencies
         working-directory: ./sdks/go
@@ -133,8 +140,15 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.25'
-          cache: true
+          # Read the floor from the module instead of restating it. The SDK
+          # deliberately targets an older Go than the rest of the repo — it
+          # must build standalone at its declared directive, which is why
+          # these jobs run with GOWORK=off — and a literal here is a second
+          # copy of that decision, free to drift from the first. It already
+          # had: go.mod said 1.25.0 while three other workflows said "1.25",
+          # "1.26" and go.mod's 1.26.5.
+          go-version-file: sdks/go/go.mod
+          cache-dependency-path: sdks/go/go.sum
 
       - name: Install dependencies
         working-directory: ./sdks/go
