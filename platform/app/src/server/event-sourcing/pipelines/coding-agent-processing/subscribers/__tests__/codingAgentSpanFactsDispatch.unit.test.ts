@@ -465,15 +465,19 @@ describe("codingAgentSpanFactsDispatch", () => {
           spanId: "tool-dedup",
           attributes: { tool_name: "Bash" },
         });
-        const makeId = subscriber.options?.deduplication?.makeId;
-        // Without this the assertion below compares undefined to undefined and
-        // passes even if the subscriber stopped declaring a dedup strategy.
-        expect(makeId).toBeDefined();
+        // `deduplication` is the `"aggregate" | DeduplicationConfig` union;
+        // this subscriber uses the custom-key form. Narrowing here also stops
+        // the comparison below degrading into undefined === undefined, which
+        // would pass even if the subscriber stopped declaring a strategy.
+        const dedup = subscriber.options?.deduplication;
+        if (dedup === undefined || dedup === "aggregate") {
+          throw new Error("expected a custom deduplication config");
+        }
 
-        const liftedId = makeId!(
+        const liftedId = dedup.makeId(
           staged(subscriber.options?.enqueue?.stage?.(event)),
         );
-        const referencedId = makeId!(
+        const referencedId = dedup.makeId(
           staged(makeSpanReferencedPayload(event as SpanReceivedEvent)),
         );
 
