@@ -35,7 +35,7 @@ type RedisLike = Redis | Cluster;
  * `auth-cli.ts:347-348`.
  */
 export class CliTokenRevocationService {
-  constructor(private readonly injectedRedis?: RedisLike | undefined) {}
+  constructor(private readonly injectedRedis?: RedisLike | null) {}
 
   /**
    * Builds the service. Takes a connection when the caller has one; otherwise
@@ -43,7 +43,7 @@ export class CliTokenRevocationService {
    * constructing this must stay free, because `UserService` builds one as a
    * default parameter and would otherwise demand an App just to exist.
    */
-  static create(redis?: RedisLike | undefined): CliTokenRevocationService {
+  static create(redis?: RedisLike | null): CliTokenRevocationService {
     return new CliTokenRevocationService(redis);
   }
 

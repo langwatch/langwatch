@@ -74,14 +74,14 @@ interface AccessOrRefreshRecord {
 }
 
 export class CliSessionInventoryService {
-  constructor(private readonly injectedRedis?: RedisLike | undefined) {}
+  constructor(private readonly injectedRedis?: RedisLike | null) {}
 
   /**
    * Builds the service. Takes a connection when the caller has one; otherwise
    * the App's is resolved when a read actually runs, so constructing this
    * never demands an App (ADR-090).
    */
-  static create(redis?: RedisLike | undefined): CliSessionInventoryService {
+  static create(redis?: RedisLike | null): CliSessionInventoryService {
     return new CliSessionInventoryService(redis);
   }
 

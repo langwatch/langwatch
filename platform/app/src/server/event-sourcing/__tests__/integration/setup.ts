@@ -87,8 +87,8 @@ export async function setup(): Promise<void> {
 async function unrefAppRedisSingleton(): Promise<void> {
   unrefRedisSockets();
   try {
-    const redisMod = await import("../../../redis");
-    const conn = redisMod.connection as
+    const { tryGetApp } = await import("../../../app-layer/app");
+    const conn = tryGetApp()?.redis as
       | {
           on?: (event: string, cb: () => void) => void;
         }
@@ -164,8 +164,8 @@ async function closeAppRuntimeSingletons(): Promise<void> {
     // No prisma client ever constructed, or already disconnected.
   }
   try {
-    const redisMod = await import("../../../redis");
-    const conn = redisMod.connection;
+    const { tryGetApp } = await import("../../../app-layer/app");
+    const conn = tryGetApp()?.redis;
     if (conn) {
       await Promise.race([
         Promise.resolve(conn.quit()).catch(() => undefined),

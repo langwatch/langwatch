@@ -1,8 +1,9 @@
-import IORedis, { Cluster } from "ioredis";
+import IORedis, { Cluster, type Redis } from "ioredis";
 import {
   resolveRedisConfig,
   type RedisConfigResolution,
   type RedisEnvironment,
+  type RedisStandaloneConfig,
 } from "./config";
 import type { RedisConnection, RedisLogger } from "./types";
 
@@ -70,6 +71,22 @@ export function connectRedis(
     return connection;
   }
 
+  return connectStandalone(config, logger);
+}
+
+/**
+ * Builds a standalone connection, typed as one.
+ *
+ * Some callers need a standalone client specifically rather than "whatever this
+ * environment configured" — replay and the Redis-cached fold store both run
+ * multi-key operations that Redis Cluster rejects with CROSSSLOT. Taking a URL
+ * rather than a full environment is what makes the return type `Redis`: there
+ * is no cluster branch to widen it.
+ */
+export function connectStandalone(
+  config: RedisStandaloneConfig,
+  logger?: RedisLogger,
+): Redis {
   const connection = new IORedis(config.url, {
     ...SHARED_OPTIONS,
     db: config.db,
@@ -82,6 +99,34 @@ export function connectRedis(
     });
   }
   return connection;
+}
+
+/**
+ * Creates a standalone connection from a URL. `null` when no URL is supplied.
+ *
+ * The narrow counterpart to {@link createRedisConnection}, for the callers
+ * documented on {@link connectStandalone}.
+ */
+export function createStandaloneRedisConnection({
+  url,
+  dbIndex,
+  logger,
+}: {
+  url?: string | undefined;
+  dbIndex?: string | number | undefined;
+  logger?: RedisLogger | undefined;
+}): Redis | null {
+  if (!url) return null;
+  const config = resolveRedisConfig({ url, dbIndex });
+  // `resolveRedisConfig` with a url and no cluster endpoints always resolves
+  // standalone; the guard is here so a future change to that function fails
+  // loudly rather than silently handing back a cluster client.
+  if (!config.configured || config.mode !== "standalone") {
+    throw new Error(
+      "Expected a standalone Redis configuration from a plain URL.",
+    );
+  }
+  return connectStandalone(config, logger);
 }
 
 /**

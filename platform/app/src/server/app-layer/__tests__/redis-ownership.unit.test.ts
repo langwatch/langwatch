@@ -36,17 +36,28 @@ const SKIP_DIRECTORIES = new Set([
   "coverage",
 ]);
 
+function shouldDescend(entry: fs.Dirent): boolean {
+  return (
+    entry.isDirectory() &&
+    !entry.name.startsWith(".") &&
+    !SKIP_DIRECTORIES.has(entry.name)
+  );
+}
+
+function isSourceFile(entry: fs.Dirent): boolean {
+  return (
+    entry.isFile() &&
+    !entry.name.startsWith(".") &&
+    SOURCE_EXTENSIONS.has(path.extname(entry.name))
+  );
+}
+
 function* walkSourceFiles(root: string): Generator<string> {
   if (!fs.existsSync(root)) return;
   for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
-    if (entry.name.startsWith(".") && entry.name !== ".") continue;
     const full = path.join(root, entry.name);
-    if (entry.isDirectory()) {
-      if (SKIP_DIRECTORIES.has(entry.name)) continue;
-      yield* walkSourceFiles(full);
-    } else if (SOURCE_EXTENSIONS.has(path.extname(entry.name))) {
-      yield full;
-    }
+    if (shouldDescend(entry)) yield* walkSourceFiles(full);
+    else if (isSourceFile(entry)) yield full;
   }
 }
 

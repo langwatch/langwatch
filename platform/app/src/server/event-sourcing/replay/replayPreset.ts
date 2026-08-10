@@ -1,4 +1,4 @@
-import { createRedisConnection } from "@langwatch/redis-client";
+import { createStandaloneRedisConnection } from "@langwatch/redis-client";
 import { getApp } from "../../app-layer/app";
 import { EvaluationRunClickHouseRepository } from "../../app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
 import { TraceSummaryClickHouseRepository } from "../../app-layer/traces/repositories/trace-summary.clickhouse.repository";
@@ -63,7 +63,10 @@ export function createReplayRuntime(config: {
   // rebuild should not share a socket with live traffic. It is still built by
   // the client package, so a `rediss://` target gets TLS and the dev database
   // index applies — building it by hand here silently dropped both (ADR-090).
-  const redis = createRedisConnection({ env: { url: config.redisUrl } });
+  //
+  // Standalone specifically: ReplayService runs multi-key operations that a
+  // Redis Cluster rejects with CROSSSLOT.
+  const redis = createStandaloneRedisConnection({ url: config.redisUrl });
   if (!redis) {
     throw new Error(
       "Replay requires a Redis URL — none was resolved from the supplied config.",

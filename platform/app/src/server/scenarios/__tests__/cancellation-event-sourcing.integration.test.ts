@@ -371,9 +371,10 @@ describe("Event-sourcing cancellation (real Redis)", () => {
         },
       };
 
-      // Use the REAL startScenarioProcessor with the test Redis
-      // We need to mock the connection module to use test Redis
-      const { connection: testConnection } = await import("../../redis");
+      // Use the REAL startScenarioProcessor with the test Redis, which the
+      // `tryGetApp` mock at the top of this file serves.
+      const { tryGetApp } = await import("../../app-layer/app");
+      const testConnection = tryGetApp()?.redis;
 
       // If no Redis in test env, skip (testContainers provides it)
       if (!testConnection) {
