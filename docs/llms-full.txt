@@ -14248,7 +14248,7 @@ sidebarTitle: Anomaly rules
 
 <Info>**Pairs with:** [AI Gateway → Budgets](/ai-gateway/budgets). Budgets enforce hard spend limits; anomaly rules detect patterns *before* a budget breach (spend-spike, geo-mismatch, off-hours).</Info>
 
-<Note>**Available on Enterprise plans.** Non-enterprise organizations see an upgrade card on `/settings/governance/anomaly-rules` instead of the composer. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
+<Note>**Available on Enterprise plans.** Non-enterprise organizations see an upgrade card on `/settings/governance/anomaly-rules` instead of the composer. See [Open-core licensing](/ai-governance/open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
 Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3--audit-log-ingest). The composer at `/settings/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing detector](/ai-gateway/governance/activity-monitor-event-sourcing) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
 
@@ -15038,7 +15038,7 @@ sidebarTitle: Compliance architecture
 
 <Info>**Pairs with:** [AI Gateway → Audit](/ai-gateway/audit). The gateway emits the spans; governance processing folds them into OCSF-mapped events for SIEM export.</Info>
 
-<Note>**Available on Enterprise plans.** The OCSF/SIEM export, configurable retention, and tamper-evidence (post-GA follow-up) covered on this page require an Enterprise license. The Apache 2.0 floor still gives you a single trace store at the platform default retention window and an append-only event_log; the compliance underwriting documented below is the Enterprise extension. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
+<Note>**Available on Enterprise plans.** The OCSF/SIEM export, configurable retention, and tamper-evidence (post-GA follow-up) covered on this page require an Enterprise license. The Apache 2.0 floor still gives you a single trace store at the platform default retention window and an append-only event_log; the compliance underwriting documented below is the Enterprise extension. See [Open-core licensing](/ai-governance/open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
 LangWatch AI Gateway governance is built on a **unified observability substrate**: every audit event, OTel span, webhook delivery, and S3 replay row lands in the same trace store that powers the rest of the platform. That single store is what underwrites the compliance posture below: one source of truth, one append-only event log, one set of retention controls, one set of access controls.
 
@@ -16614,7 +16614,7 @@ sidebarTitle: Ingestion sources
 
 <Info>**Pairs with:** [AI Gateway → Observability](/ai-gateway/observability). The gateway is itself an ingestion source (its spans land in the same trace store); IngestionSources extend that substrate to platforms whose API key path you don't own (Workato, Copilot Studio, OpenAI/Anthropic compliance APIs). Also pairs with [Audit log](/ai-governance/audit-log): S3 audit log feeds (Workato, Copilot Studio, Anthropic Compliance) become OTel-shaped events through this same pipeline, so a single audit log query at `/settings/audit-log` covers in-platform mutations and third-party-tool activity uniformly.</Info>
 
-<Note>**One `otel_generic` source is Apache 2.0 floor; multiple sources and configurable retention require Enterprise.** Self-hosted Apache 2.0 deployments can wire one OTel receiver at the platform default retention window; the additional source types on this page (Workato, S3, Copilot Studio, OpenAI, Anthropic compliance APIs) and [retention policies](/platform/data-retention) ship under the Enterprise license. Non-enterprise organizations see an upgrade card on `/settings/governance/ingestion-sources`. See [Open-core licensing](/ai-governance/overview#open-core-licensing) for the full split.</Note>
+<Note>**One `otel_generic` source is Apache 2.0 floor; multiple sources and configurable retention require Enterprise.** Self-hosted Apache 2.0 deployments can wire one OTel receiver at the platform default retention window; the additional source types on this page (Workato, S3, Copilot Studio, OpenAI, Anthropic compliance APIs) and [retention policies](/platform/data-retention) ship under the Enterprise license. Non-enterprise organizations see an upgrade card on `/settings/governance/ingestion-sources`. See [Open-core licensing](/ai-governance/open-core-licensing) for the full split.</Note>
 
 LangWatch governance ingest accepts events from upstream agent and audit-log platforms and lands them in the **same `recorded_spans` + `log_records` tables** that power the rest of LangWatch, distinguished by `langwatch.origin.kind = "ingestion_source"` origin metadata stamped at the receiver edge. Same trace viewer, same compliance + RBAC + retention machinery, surfaced in the [governance dashboard](/ai-governance/control-plane), the per-source detail page, and the [`langwatch ingest tail`](/ai-governance/cli-debug) CLI.
 
@@ -18754,7 +18754,7 @@ parsing + cursor-based resume.
 
 <Info>**Pairs with:** [Ingestion sources](/ai-governance/ingestion-sources/index) (the broader substrate that pull-mode lands events into) and [CLI debugging](/ai-governance/cli-debug) (`langwatch ingest tail` shows pulled events alongside pushed ones).</Info>
 
-<Warning>**Available on Enterprise plans.** Pull-mode connectors ship as part of the Enterprise multi-source governance ingestion stack. Apache 2.0 deployments use single-source `otel_generic` push only. See [Open-core licensing](/ai-governance/overview#open-core-licensing).</Warning>
+<Warning>**Available on Enterprise plans.** Pull-mode connectors ship as part of the Enterprise multi-source governance ingestion stack. Apache 2.0 deployments use single-source `otel_generic` push only. See [Open-core licensing](/ai-governance/open-core-licensing).</Warning>
 
 Inspired by Singer Tap, Airbyte CDK, Apache Camel, Kafka Connect (pull
 side). The goal is the same: **one declarative config → one universal
@@ -25079,13 +25079,13 @@ The LangWatch library integrates your TypeScript application with LangWatch. The
 
 ## Basic Concepts
 
-- Each message triggering your LLM pipeline as a whole is captured with a [Trace](/concepts#traces).
-- A [Trace](/concepts#traces) contains multiple [Spans](/concepts#spans), which are the steps inside your pipeline.
+- Each message triggering your LLM pipeline as a whole is captured with a [Trace](/concepts#traces-one-task-end-to-end).
+- A [Trace](/concepts#traces-one-task-end-to-end) contains multiple [Spans](/concepts#spans-the-building-blocks), which are the steps inside your pipeline.
   - A span can be an LLM call, a database query for a RAG retrieval, or a simple function transformation.
-  - Different types of [Spans](/concepts#spans) capture different parameters.
-  - [Spans](/concepts#spans) can be nested to capture the pipeline structure.
-- [Traces](/concepts#traces) can be grouped together on LangWatch Dashboard by having the same [`thread_id`](/concepts#threads) in their metadata, making the individual messages become part of a conversation.
-  - It is also recommended to provide the [`user_id`](/concepts#user-id) metadata to track user analytics.
+  - Different types of [Spans](/concepts#spans-the-building-blocks) capture different parameters.
+  - [Spans](/concepts#spans-the-building-blocks) can be nested to capture the pipeline structure.
+- [Traces](/concepts#traces-one-task-end-to-end) can be grouped together on LangWatch Dashboard by having the same [`thread_id`](/concepts#threads-the-whole-conversation) in their metadata, making the individual messages become part of a conversation.
+  - It is also recommended to provide the [`user_id`](/concepts#user-id-whos-using-the-app) metadata to track user analytics.
 
 
 ## Integration
@@ -25547,13 +25547,13 @@ The LangWatch library integrates your TypeScript application with LangWatch. The
 
 ## Basic Concepts
 
-- Each message triggering your LLM pipeline as a whole is captured with a [Trace](/concepts#traces).
-- A [Trace](/concepts#traces) contains multiple [Spans](/concepts#spans), which are the steps inside your pipeline.
+- Each message triggering your LLM pipeline as a whole is captured with a [Trace](/concepts#traces-one-task-end-to-end).
+- A [Trace](/concepts#traces-one-task-end-to-end) contains multiple [Spans](/concepts#spans-the-building-blocks), which are the steps inside your pipeline.
   - A span can be an LLM call, a database query for a RAG retrieval, or a simple function transformation.
-  - Different types of [Spans](/concepts#spans) capture different parameters.
-  - [Spans](/concepts#spans) can be nested to capture the pipeline structure.
-- [Traces](/concepts#traces) can be grouped together on LangWatch Dashboard by having the same [`thread_id`](/concepts#threads) in their metadata, making the individual messages become part of a conversation.
-  - It is also recommended to provide the [`user_id`](/concepts#user-id) metadata to track user analytics.
+  - Different types of [Spans](/concepts#spans-the-building-blocks) capture different parameters.
+  - [Spans](/concepts#spans-the-building-blocks) can be nested to capture the pipeline structure.
+- [Traces](/concepts#traces-one-task-end-to-end) can be grouped together on LangWatch Dashboard by having the same [`thread_id`](/concepts#threads-the-whole-conversation) in their metadata, making the individual messages become part of a conversation.
+  - It is also recommended to provide the [`user_id`](/concepts#user-id-whos-using-the-app) metadata to track user analytics.
 
 
 ## Installation
@@ -25688,13 +25688,13 @@ The LangWatch library integrates your TypeScript application with LangWatch. The
 
 ## Basic Concepts
 
-- Each message triggering your LLM pipeline as a whole is captured with a [Trace](/concepts#traces).
-- A [Trace](/concepts#traces) contains multiple [Spans](/concepts#spans), which are the steps inside your pipeline.
+- Each message triggering your LLM pipeline as a whole is captured with a [Trace](/concepts#traces-one-task-end-to-end).
+- A [Trace](/concepts#traces-one-task-end-to-end) contains multiple [Spans](/concepts#spans-the-building-blocks), which are the steps inside your pipeline.
   - A span can be an LLM call, a database query for a RAG retrieval, or a simple function transformation.
-  - Different types of [Spans](/concepts#spans) capture different parameters.
-  - [Spans](/concepts#spans) can be nested to capture the pipeline structure.
-- [Traces](/concepts#traces) can be grouped together on LangWatch Dashboard by having the same [`thread_id`](/concepts#threads) in their metadata, making the individual messages become part of a conversation.
-  - It is also recommended to provide the [`user_id`](/concepts#user-id) metadata to track user analytics.
+  - Different types of [Spans](/concepts#spans-the-building-blocks) capture different parameters.
+  - [Spans](/concepts#spans-the-building-blocks) can be nested to capture the pipeline structure.
+- [Traces](/concepts#traces-one-task-end-to-end) can be grouped together on LangWatch Dashboard by having the same [`thread_id`](/concepts#threads-the-whole-conversation) in their metadata, making the individual messages become part of a conversation.
+  - It is also recommended to provide the [`user_id`](/concepts#user-id-whos-using-the-app) metadata to track user analytics.
 
 
 ## Installation
@@ -37612,7 +37612,7 @@ If you want to add an annotation to a queue, you can do so by clicking on the ad
 
 To create an annotation, follow these steps:
 
-1) Click the message you want to annotate on and a [Trace](/concepts#traces) details drawer will open.
+1) Click the message you want to annotate on and a [Trace](/concepts#traces-one-task-end-to-end) details drawer will open.
 2) On the top right, click the annotation button.
 3) Here you will be able to add a comment, a link or any other information that you want to add to the message.
 
@@ -56221,7 +56221,7 @@ deployment plan.
 | Tamper-evidence (Merkle-root publication) | ❌ | Enterprise (post-GA follow-up) |
 
 The split is enforced at three layers, see
-[Open-core licensing](/ai-governance/overview#open-core-licensing) for
+[Open-core licensing](/ai-governance/open-core-licensing) for
 the layered enforcement (UI gating + tRPC middleware + service-layer
 defense-in-depth + CLI 402 envelope), and
 [Per-file license headers](/ai-governance/overview#per-file-license-headers)
@@ -56361,7 +56361,7 @@ queryable; gated surfaces re-gate.
 ## Where to next
 
 - [AI Governance → Compliance architecture](/ai-governance/compliance-architecture): substrate mechanisms underlying the table above
-- [AI Governance → Open-core licensing](/ai-governance/overview#open-core-licensing): the layered enforcement (UI, tRPC, service, CLI)
+- [AI Governance → Open-core licensing](/ai-governance/open-core-licensing): the layered enforcement (UI, tRPC, service, CLI)
 - [Self-hosting → Security](/self-hosting/security): TLS, env secrets, network boundaries
 - [Self-hosting → Configuration → SSO](/self-hosting/configuration/sso): Okta, Auth0, Azure AD, AWS Cognito and OneLogin wiring
 
