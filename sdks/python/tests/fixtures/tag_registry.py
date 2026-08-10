@@ -35,10 +35,19 @@ class SessionTagRegistry:
         self.pending.append(name)
 
     def mark_cleaned(self, name: str) -> None:
-        """Record that ``name`` is confirmed gone, so the sweep can skip it."""
+        """
+        Record that ``name`` is confirmed gone, so the sweep can skip it.
+
+        Counts only a name that was actually outstanding. Cleaning the same tag
+        twice is a no-op rather than a second point, so a duplicate or late
+        callback cannot push ``cleaned`` past ``created`` and report a negative
+        leak. A ledger that can go negative would understate a real leak by
+        exactly the number of double-counts.
+        """
+        if name not in self.pending:
+            return
+        self.pending.remove(name)
         self.cleaned += 1
-        if name in self.pending:
-            self.pending.remove(name)
 
     def sweep(self, delete: Callable[[str, str], bool], context: str) -> None:
         """

@@ -98,6 +98,26 @@ class TestSessionTagRegistry:
         # wrong ledger reports a leak as clean.
         assert registry.leaked == len(registry.pending)
 
+    def test_cleaning_the_same_tag_twice_does_not_report_a_negative_leak(self):
+        registry = SessionTagRegistry()
+        registry.track("e2e-tag-a")
+
+        registry.mark_cleaned("e2e-tag-a")
+        # A duplicate or late callback for a tag already accounted for. Counting
+        # it again would push cleaned past created, and a leak of -1 reads as
+        # cleaner than clean while hiding a real one somewhere else.
+        registry.mark_cleaned("e2e-tag-a")
+
+        assert (registry.created, registry.cleaned, registry.leaked) == (1, 1, 0)
+        assert registry.pending == []
+
+    def test_ignores_a_cleanup_for_a_tag_it_never_created(self):
+        registry = SessionTagRegistry()
+
+        registry.mark_cleaned("e2e-tag-nobody-tracked")
+
+        assert (registry.created, registry.cleaned, registry.leaked) == (0, 0, 0)
+
     def test_sweeping_twice_does_not_double_count_a_recovered_tag(self):
         registry = SessionTagRegistry()
         registry.track("e2e-tag-a")
