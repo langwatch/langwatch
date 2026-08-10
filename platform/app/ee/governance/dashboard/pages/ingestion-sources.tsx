@@ -165,7 +165,7 @@ const STATUS_META: Record<
   disabled: { icon: CircleX, label: "Disabled", color: "fg.muted" },
 };
 
-interface ComposerState {
+export interface ComposerState {
   sourceType: SourceType;
   name: string;
   description: string;
@@ -960,9 +960,18 @@ interface FieldDef {
   placeholder: string;
   hint?: string;
   required?: boolean;
+  /**
+   * True when this field's value is a secret: something that must be
+   * masked as the admin types it AND kept out of the plaintext
+   * `parserConfig` JSONB (it belongs only inside the encrypted
+   * `credentials` subtree). This is the single declaration both of those
+   * decisions are driven from - see `isSecretFieldKey` below for why
+   * that matters.
+   */
+  secret?: boolean;
 }
 
-const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
+export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
   // No parser-config fields for generic OTel sources today - the
   // receiver accepts any well-formed OTLP/HTTP body. (Earlier copy
   // referenced a `LangWatchSourceType` attribute filter that the
@@ -1010,6 +1019,7 @@ const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "(value pasted from Azure portal)",
       hint: "We hash this server-side; only the hash is persisted.",
       required: true,
+      secret: true,
     },
     {
       key: "pollEverySec",
@@ -1051,6 +1061,7 @@ const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "sk-ant-admin-...",
       hint: "Generate under Anthropic Admin Console → Compliance → Workspace API Keys. We hash this server-side.",
       required: true,
+      secret: true,
     },
     {
       key: "pollEverySec",
@@ -1075,6 +1086,7 @@ const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "dapi...",
       hint: "A personal access token or OAuth token for a service principal that can read every Genie space you want covered. We encrypt this server-side.",
       required: true,
+      secret: true,
     },
     {
       key: "spaceIds",
@@ -1142,6 +1154,7 @@ const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "(value pasted from the upstream admin console)",
       hint: "Persisted server-side; only the value is held in IngestionSource.pullConfig.credentials. Substituted into the header template at request time.",
       required: true,
+      secret: true,
     },
     {
       key: "eventsJsonPath",
@@ -1173,6 +1186,37 @@ const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
     },
   ],
 };
+
+const SECRET_FIELD_KEYS = new Set(
+  Object.values(PARSER_FIELDS)
+    .flat()
+    .filter((f) => f.secret)
+    .map((f) => f.key),
+);
+
+/**
+ * "Is this field a secret" used to be answered two different ways in this
+ * file: an exact-match allowlist decided whether the input rendered masked,
+ * and a separate `key.startsWith("credentials")` check in `parserFieldValue`
+ * decided whether the value was routed into the encrypted `credentials`
+ * subtree instead of the plaintext `parserConfig`. They happened to agree on
+ * every field that existed at the time, but nothing forced them to keep
+ * agreeing - a future field could satisfy one rule and not the other, and
+ * the two ways that can go wrong are both bad: a genuinely secret value
+ * rendered in plaintext on screen, or a plausibly-secret-looking value
+ * persisted to Postgres unencrypted because it missed the `credentials*`
+ * naming convention.
+ *
+ * This is now the ONE place that decision gets made. Both the input-masking
+ * render and the parserConfig storage routing call this function, driven
+ * first by the explicit `secret: true` declaration on the `FieldDef` (the
+ * source of truth - see the doc comment on `FieldDef.secret`), with the
+ * `credentials` prefix kept only as a belt-and-braces fallback so an
+ * undeclared `credentials*` field still can't slip through and leak.
+ */
+export function isSecretFieldKey(key: string): boolean {
+  return SECRET_FIELD_KEYS.has(key) || key.startsWith("credentials");
+}
 
 /**
  * Build the full `HttpPollingConfig`-shaped pullConfig for the
@@ -1313,13 +1357,7 @@ function ParserConfigFields({
             <Input
               size="sm"
               backgroundColor="white"
-              type={
-                f.key === "credentialsToken" ||
-                f.key === "clientSecret" ||
-                f.key === "workspaceApiKey"
-                  ? "password"
-                  : "text"
-              }
+              type={isSecretFieldKey(f.key) ? "password" : "text"}
               value={values[f.key] ?? ""}
               onChange={(e) => onChange({ ...values, [f.key]: e.target.value })}
               placeholder={f.placeholder}
@@ -1400,9 +1438,13 @@ function parserFieldValue(
   if (value == null || value === "") return DROP_PARSER_FIELD;
   // Secrets travel in exactly one place: `pullConfig.credentials`, which is
   // the only subtree `encryptParserConfigCredentials` wraps before the row
-  // reaches Postgres. A `credentials*` field copied to the top level of
-  // parserConfig would be persisted as plaintext JSONB — so it never is.
-  if (key.startsWith("credentials")) return DROP_PARSER_FIELD;
+  // reaches Postgres. A secret field copied to the top level of parserConfig
+  // would be persisted as plaintext JSONB — so it never is. `isSecretFieldKey`
+  // is the single source of truth for "is this a secret" (see its doc
+  // comment) — this must not go back to an inline
+  // `key.startsWith("credentials")` check here, or the storage-routing rule
+  // can drift from the input-masking rule again.
+  if (isSecretFieldKey(key)) return DROP_PARSER_FIELD;
   if (key === "pollEverySec") {
     const n = Number(value);
     return Number.isNaN(n) ? DROP_PARSER_FIELD : n;
@@ -1410,7 +1452,7 @@ function parserFieldValue(
   return value;
 }
 
-function buildParserConfig(c: ComposerState): Record<string, unknown> {
+export function buildParserConfig(c: ComposerState): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   const adapterOwned = new Set(PULL_CONFIG_OWNED_FIELDS[c.sourceType] ?? []);
   for (const [k, v] of Object.entries(c.parserConfig)) {
