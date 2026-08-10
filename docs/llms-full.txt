@@ -61166,6 +61166,20 @@ Bindings can target three scope levels:
 
 Available roles: `ADMIN`, `MEMBER`, `VIEWER`, `CUSTOM` (requires `customRoleId`).
 
+## Errors
+
+| Code | Status | Meaning |
+|------|--------|---------|
+| `group_not_found` | 404 | No such group in this organization |
+| `scim_managed_group` | 409 | The group is provisioned over SCIM, so its name and members change in the directory |
+| `user_not_in_organization` | 422 | The user is not a member here |
+| `group_member_already_added` | 409 | They are already in the group |
+| `scope_not_in_organization` | 422 | The team or project belongs to another organization |
+| `custom_role_id_required` | 422 | Role is `CUSTOM` with no `customRoleId` |
+| `custom_role_not_assignable` | 422 | That custom role cannot be granted here |
+| `role_binding_not_found` | 404 | No such binding on this group |
+| `personal_workspace_not_managed_here` | 403 | The scope is somebody's personal workspace |
+
 ---
 
 # FILE: ./api-reference/groups/remove-binding.mdx

@@ -890,6 +890,22 @@ const presentations = {
     title: "That group isn't in this organization",
     describe: () => "Pick a group that belongs to this organization.",
   },
+  group_not_found: {
+    title: "Group not found",
+    describe: () =>
+      "It may have been deleted, or the id may belong to another organization.",
+  },
+  group_member_already_added: {
+    title: "They're already in this group",
+    describe: () => "Nothing to do: the group already grants them its access.",
+  },
+  scim_managed_group: {
+    // The name and the membership come from the directory on every sync, so a
+    // change made here is not merely refused, it would be undone.
+    title: "Your identity provider manages this group",
+    describe: () =>
+      "Change its name or its members in the directory that provisions it; changes made here would be overwritten on the next sync.",
+  },
   api_key_not_in_organization: {
     title: "That API key isn't in this organization",
     describe: () => "Pick an API key that belongs to this organization.",

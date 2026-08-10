@@ -9,24 +9,13 @@ import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import {
   BindingNotFoundError,
-  CustomRoleRequiredError,
-  DuplicateMemberError,
   GroupNotFoundError,
-  type GroupRestService,
-  ScimManagedGroupError,
-  ScopeNotInOrganizationError,
-  UserNotInOrganizationError,
-} from "~/server/app-layer/groups/group.service";
-import { RoleNotAssignableError } from "~/server/role/errors";
+} from "~/server/app-layer/groups/errors";
+import type { GroupRestService } from "~/server/app-layer/groups/group.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { requireEnterprisePlanRest } from "../../middleware/enterprise-gate";
 import type { GroupServiceMiddlewareVariables } from "../../middleware/group-service";
 import { groupServiceMiddleware } from "../../middleware/group-service";
-import {
-  BadRequestError,
-  NotFoundError,
-  UnprocessableEntityError,
-} from "../../shared/errors";
 import { handleGroupError } from "./error-handler";
 
 patchZodOpenapi();
@@ -140,33 +129,23 @@ secured
       const body = c.req.valid("json");
       const service = c.get("groupService") as GroupRestService;
 
-      try {
-        const group = await service.create({
-          organizationId: organization.id,
-          name: body.name,
-          bindings: body.bindings,
-          memberIds: body.memberIds,
-        });
+      const group = await service.create({
+        organizationId: organization.id,
+        name: body.name,
+        bindings: body.bindings,
+        memberIds: body.memberIds,
+      });
 
-        return c.json(
-          {
-            id: group.id,
-            name: group.name,
-            slug: group.slug,
-            organizationId: group.organizationId,
-            createdAt: group.createdAt,
-          },
-          201,
-        );
-      } catch (error) {
-        if (
-          error instanceof RoleNotAssignableError ||
-          error instanceof CustomRoleRequiredError
-        ) {
-          throw new UnprocessableEntityError(error.message);
-        }
-        throw error;
-      }
+      return c.json(
+        {
+          id: group.id,
+          name: group.name,
+          slug: group.slug,
+          organizationId: group.organizationId,
+          createdAt: group.createdAt,
+        },
+        201,
+      );
     },
   );
 
@@ -188,7 +167,7 @@ secured
         id,
         organizationId: organization.id,
       });
-      if (!group) throw new NotFoundError("Group not found");
+      if (!group) throw new GroupNotFoundError(id);
 
       return c.json({
         id: group.id,
@@ -229,26 +208,16 @@ secured
       const body = c.req.valid("json");
       const service = c.get("groupService") as GroupRestService;
 
-      try {
-        const group = await service.rename({
-          id,
-          organizationId: organization.id,
-          name: body.name,
-        });
-        return c.json({
-          id: group.id,
-          name: group.name,
-          slug: group.slug,
-        });
-      } catch (error) {
-        if (error instanceof GroupNotFoundError) {
-          throw new NotFoundError(error.message);
-        }
-        if (error instanceof ScimManagedGroupError) {
-          throw new BadRequestError(error.message);
-        }
-        throw error;
-      }
+      const group = await service.rename({
+        id,
+        organizationId: organization.id,
+        name: body.name,
+      });
+      return c.json({
+        id: group.id,
+        name: group.name,
+        slug: group.slug,
+      });
     },
   );
 
@@ -266,14 +235,7 @@ secured
       const organization = c.get("organization") as Organization;
       const service = c.get("groupService") as GroupRestService;
 
-      try {
-        await service.delete({ id, organizationId: organization.id });
-      } catch (error) {
-        if (error instanceof GroupNotFoundError) {
-          throw new NotFoundError(error.message);
-        }
-        throw error;
-      }
+      await service.delete({ id, organizationId: organization.id });
 
       return c.json({ success: true });
     },
@@ -297,7 +259,7 @@ secured
         id,
         organizationId: organization.id,
       });
-      if (!group) throw new NotFoundError("Group not found");
+      if (!group) throw new GroupNotFoundError(id);
 
       const members = await service.getMembers({ groupId: id });
       return c.json({
@@ -324,25 +286,11 @@ secured
       const body = c.req.valid("json");
       const service = c.get("groupService") as GroupRestService;
 
-      try {
-        await service.addMember({
-          groupId: id,
-          organizationId: organization.id,
-          userId: body.userId,
-        });
-      } catch (error) {
-        if (error instanceof GroupNotFoundError) {
-          throw new NotFoundError(error.message);
-        }
-        if (
-          error instanceof ScimManagedGroupError ||
-          error instanceof UserNotInOrganizationError ||
-          error instanceof DuplicateMemberError
-        ) {
-          throw new BadRequestError(error.message);
-        }
-        throw error;
-      }
+      await service.addMember({
+        groupId: id,
+        organizationId: organization.id,
+        userId: body.userId,
+      });
 
       return c.json({ success: true }, 201);
     },
@@ -360,21 +308,11 @@ secured
       const organization = c.get("organization") as Organization;
       const service = c.get("groupService") as GroupRestService;
 
-      try {
-        await service.removeMember({
-          groupId: id,
-          organizationId: organization.id,
-          userId,
-        });
-      } catch (error) {
-        if (error instanceof GroupNotFoundError) {
-          throw new NotFoundError(error.message);
-        }
-        if (error instanceof ScimManagedGroupError) {
-          throw new BadRequestError(error.message);
-        }
-        throw error;
-      }
+      await service.removeMember({
+        groupId: id,
+        organizationId: organization.id,
+        userId,
+      });
 
       return c.json({ success: true });
     },
@@ -398,7 +336,7 @@ secured
         id,
         organizationId: organization.id,
       });
-      if (!group) throw new NotFoundError("Group not found");
+      if (!group) throw new GroupNotFoundError(id);
 
       const bindings = await service.getBindings({ groupId: id });
       return c.json({
@@ -428,39 +366,23 @@ secured
       const body = c.req.valid("json");
       const service = c.get("groupService") as GroupRestService;
 
-      try {
-        const binding = await service.addBinding({
-          groupId: id,
-          organizationId: organization.id,
-          role: body.role,
-          customRoleId: body.customRoleId,
-          scopeType: body.scopeType,
-          scopeId: body.scopeId,
-        });
-        return c.json(
-          {
-            id: binding.id,
-            role: binding.role,
-            scopeType: binding.scopeType,
-            scopeId: binding.scopeId,
-          },
-          201,
-        );
-      } catch (error) {
-        if (error instanceof GroupNotFoundError) {
-          throw new NotFoundError(error.message);
-        }
-        if (error instanceof ScopeNotInOrganizationError) {
-          throw new BadRequestError(error.message);
-        }
-        if (
-          error instanceof RoleNotAssignableError ||
-          error instanceof CustomRoleRequiredError
-        ) {
-          throw new UnprocessableEntityError(error.message);
-        }
-        throw error;
-      }
+      const binding = await service.addBinding({
+        groupId: id,
+        organizationId: organization.id,
+        role: body.role,
+        customRoleId: body.customRoleId,
+        scopeType: body.scopeType,
+        scopeId: body.scopeId,
+      });
+      return c.json(
+        {
+          id: binding.id,
+          role: binding.role,
+          scopeType: binding.scopeType,
+          scopeId: binding.scopeId,
+        },
+        201,
+      );
     },
   );
 
@@ -480,26 +402,19 @@ secured
         id,
         organizationId: organization.id,
       });
-      if (!group) throw new NotFoundError("Group not found");
+      if (!group) throw new GroupNotFoundError(id);
 
       const bindingBelongsToGroup = group.roleBindings.some(
         (b) => b.id === bindingId,
       );
       if (!bindingBelongsToGroup) {
-        throw new NotFoundError("Binding not found on this group");
+        throw new BindingNotFoundError(bindingId);
       }
 
-      try {
-        await service.removeBinding({
-          bindingId,
-          organizationId: organization.id,
-        });
-      } catch (error) {
-        if (error instanceof BindingNotFoundError) {
-          throw new NotFoundError(error.message);
-        }
-        throw error;
-      }
+      await service.removeBinding({
+        bindingId,
+        organizationId: organization.id,
+      });
 
       return c.json({ success: true });
     },

@@ -8,42 +8,25 @@ import type {
 } from "@prisma/client";
 import { PersonalWorkspaceNotManagedHereError } from "~/server/app-layer/teams/team.service";
 import type { RoleService } from "~/server/role";
+import { RoleNotAssignableError } from "~/server/role/errors";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
+import {
+  BindingNotFoundError,
+  CustomRoleRequiredError,
+  DuplicateMemberError,
+  GroupNotFoundError,
+  GroupRoleNotAssignableError,
+  ScimManagedGroupError,
+  ScopeNotInOrganizationError,
+  UserNotInOrganizationError,
+} from "./errors";
 import type {
   GroupRepository,
   GroupWithDetails,
   GroupWithMembers,
   PaginatedResult,
 } from "./repositories/group.repository";
-
-export class GroupNotFoundError extends Error {
-  name = "GroupNotFoundError" as const;
-}
-
-export class ScimManagedGroupError extends Error {
-  name = "ScimManagedGroupError" as const;
-}
-
-export class UserNotInOrganizationError extends Error {
-  name = "UserNotInOrganizationError" as const;
-}
-
-export class BindingNotFoundError extends Error {
-  name = "BindingNotFoundError" as const;
-}
-
-export class DuplicateMemberError extends Error {
-  name = "DuplicateMemberError" as const;
-}
-
-export class ScopeNotInOrganizationError extends Error {
-  name = "ScopeNotInOrganizationError" as const;
-}
-
-export class CustomRoleRequiredError extends Error {
-  name = "CustomRoleRequiredError" as const;
-}
 
 export class GroupRestService {
   readonly repo: GroupRepository;
@@ -89,19 +72,29 @@ export class GroupRestService {
     if (customBindings.length === 0) return;
 
     if (customBindings.some((binding) => !binding.customRoleId)) {
-      throw new CustomRoleRequiredError(
-        "A CUSTOM binding requires a customRoleId",
-      );
+      throw new CustomRoleRequiredError();
     }
 
-    await this.roleService.validateRolesAssignable({
-      roleIds: [
-        ...new Set(
-          customBindings.map((binding) => binding.customRoleId as string),
-        ),
-      ],
-      organizationId,
-    });
+    const customRoleIds = [
+      ...new Set(
+        customBindings.map((binding) => binding.customRoleId as string),
+      ),
+    ];
+    try {
+      await this.roleService.validateRolesAssignable({
+        roleIds: customRoleIds,
+        organizationId,
+      });
+    } catch (error) {
+      // `RoleService` is shared with surfaces that predate the code contract,
+      // so it still refuses with a plain error. Named here rather than there,
+      // so this family answers with a code without changing what the others
+      // already publish.
+      if (error instanceof RoleNotAssignableError) {
+        throw new GroupRoleNotAssignableError(customRoleIds[0]);
+      }
+      throw error;
+    }
     await this.roleService.assertNoOrgExclusivePermissionsBelowOrgScope({
       organizationId,
       customBindings: customBindings.map((binding) => ({
@@ -168,9 +161,7 @@ export class GroupRestService {
       userIds: uniqueMemberIds,
     });
     if (!allMembersInOrganization) {
-      throw new UserNotInOrganizationError(
-        "All users must belong to the organization before joining a group",
-      );
+      throw new UserNotInOrganizationError();
     }
     await this.assertCustomRolesAssignable({
       organizationId,
@@ -206,9 +197,7 @@ export class GroupRestService {
         scopeId: binding.scopeId,
       });
       if (!scopeValid) {
-        throw new ScopeNotInOrganizationError(
-          "Scope does not belong to this organization",
-        );
+        throw new ScopeNotInOrganizationError(binding.scopeType);
       }
     }
     await this.assertNoPersonalTeamScope(bindingInputs);
@@ -230,9 +219,9 @@ export class GroupRestService {
     name: string;
   }): Promise<Group> {
     const group = await this.repo.findGroupOnly({ id, organizationId });
-    if (!group) throw new GroupNotFoundError("Group not found");
+    if (!group) throw new GroupNotFoundError();
     if (group.scimSource) {
-      throw new ScimManagedGroupError("Cannot rename a SCIM-managed group");
+      throw new ScimManagedGroupError(id);
     }
 
     const baseSlug = slugify(name, { lower: true, strict: true });
@@ -243,7 +232,7 @@ export class GroupRestService {
     });
 
     const renamed = await this.repo.rename({ id, organizationId, name, slug });
-    if (!renamed) throw new GroupNotFoundError("Group not found");
+    if (!renamed) throw new GroupNotFoundError();
     return renamed;
   }
 
@@ -255,7 +244,7 @@ export class GroupRestService {
     organizationId: string;
   }): Promise<void> {
     const group = await this.repo.findGroupOnly({ id, organizationId });
-    if (!group) throw new GroupNotFoundError("Group not found");
+    if (!group) throw new GroupNotFoundError();
 
     await this.repo.deleteAllMemberships({ groupId: id });
     await this.repo.deleteAllBindings({ groupId: id });
@@ -279,11 +268,9 @@ export class GroupRestService {
       id: groupId,
       organizationId,
     });
-    if (!group) throw new GroupNotFoundError("Group not found");
+    if (!group) throw new GroupNotFoundError();
     if (group.scimSource) {
-      throw new ScimManagedGroupError(
-        "Cannot manually add members to a SCIM-managed group",
-      );
+      throw new ScimManagedGroupError(groupId);
     }
 
     const isOrgMember = await this.repo.isUserInOrganization({
@@ -291,9 +278,7 @@ export class GroupRestService {
       organizationId,
     });
     if (!isOrgMember) {
-      throw new UserNotInOrganizationError(
-        "User must belong to the organization before joining a group",
-      );
+      throw new UserNotInOrganizationError(userId);
     }
 
     try {
@@ -304,9 +289,7 @@ export class GroupRestService {
         "code" in error &&
         (error as { code: string }).code === "P2002"
       ) {
-        throw new DuplicateMemberError(
-          "User is already a member of this group",
-        );
+        throw new DuplicateMemberError(userId);
       }
       throw error;
     }
@@ -325,7 +308,7 @@ export class GroupRestService {
       id: groupId,
       organizationId,
     });
-    if (!group) throw new GroupNotFoundError("Group not found");
+    if (!group) throw new GroupNotFoundError();
     if (group.scimSource) {
       throw new ScimManagedGroupError(
         "Cannot manually remove members from a SCIM-managed group",
@@ -358,7 +341,7 @@ export class GroupRestService {
       id: groupId,
       organizationId,
     });
-    if (!group) throw new GroupNotFoundError("Group not found");
+    if (!group) throw new GroupNotFoundError();
 
     const scopeValid = await this.repo.validateScopeInOrganization({
       organizationId,
@@ -400,7 +383,7 @@ export class GroupRestService {
       id: bindingId,
       organizationId,
     });
-    if (!binding) throw new BindingNotFoundError("Binding not found");
+    if (!binding) throw new BindingNotFoundError();
     await this.assertNoPersonalTeamScope([binding]);
 
     await this.repo.deleteBinding({ id: bindingId });

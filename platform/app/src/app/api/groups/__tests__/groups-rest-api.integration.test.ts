@@ -305,7 +305,10 @@ describe("Feature: Groups REST API", () => {
       const res = await api.patch(`/api/groups/${group.id}`, {
         name: "New Name",
       });
-      expect(res.status).toBe(400);
+      // A conflict with the directory that owns the group, not a malformed
+      // request: the name would come back on the next sync.
+      expect(res.status).toBe(409);
+      expect((await res.json()).error).toBe("scim_managed_group");
     });
   });
 
@@ -398,7 +401,8 @@ describe("Feature: Groups REST API", () => {
       const res = await api.post(`/api/groups/${scimGroup.id}/members`, {
         userId: secondUserId,
       });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(409);
+      expect((await res.json()).error).toBe("scim_managed_group");
     });
 
     /** @scenario POST /api/groups/:id/members rejects non-org user */
@@ -410,7 +414,10 @@ describe("Feature: Groups REST API", () => {
       const res = await api.post(`/api/groups/${memberGroupId}/members`, {
         userId: outsider.id,
       });
-      expect(res.status).toBe(400);
+      // Well-formed, but names somebody this organization does not have: the
+      // same answer the role-bindings family gives for the same mistake.
+      expect(res.status).toBe(422);
+      expect((await res.json()).error).toBe("user_not_in_organization");
 
       await prisma.user.delete({ where: { id: outsider.id } }).catch(() => {});
     });
@@ -430,7 +437,8 @@ describe("Feature: Groups REST API", () => {
       const res = await api.delete(
         `/api/groups/${scimGroup.id}/members/${userId}`,
       );
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(409);
+      expect((await res.json()).error).toBe("scim_managed_group");
     });
   });
 
