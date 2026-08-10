@@ -13,6 +13,11 @@ import (
 var LeanCheckoutWorkflows = []string{
 	".github/workflows/langwatch-app-ci.yml",
 	".github/workflows/e2e-ci.yml",
+	// migration-order earns its place by having been broken by the media: it
+	// runs under timeout-minutes: 5 and 9 of its last 34 runs were killed by
+	// that timeout mid-clone, at 297-298s in checkout against a 22.8s average
+	// for the runs that finished.
+	".github/workflows/migration-order.yml",
 }
 
 // RequiredExclusions are the repository's marketing media: 165 MB of .gif and

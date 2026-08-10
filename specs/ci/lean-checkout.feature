@@ -22,8 +22,13 @@ Feature: CI checkouts leave the marketing media on the server
   # of the jobs that have one, because the failure mode is a new job added
   # without it: nothing breaks, CI just quietly gets slower again.
 
+  # migration-order is in the guarded set because the media broke it, not in
+  # theory: it runs under timeout-minutes: 5 and 9 of its last 34 runs were
+  # killed by that timeout DURING the clone, sitting at 297-298s in checkout
+  # against a 22.8s average for the runs that finished.
+
   Background:
-    Given a workflow whose jobs build or test the application
+    Given a workflow whose jobs check out this repository to do real work
     And a checkout step in one of its jobs
 
   @unit
