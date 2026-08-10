@@ -1886,11 +1886,10 @@ describe("given a message still being answered when the sweep reads it", () => {
 
       // The assertion that bites. The sweep read every space and every
       // conversation, so on the old code it is "complete" and the watermark
-      // moves past this message for good. (The flag itself is not asserted:
-      // it is scoped to the sweep in flight and a drained sweep clears it, so
-      // the watermark is the only durable evidence the hold happened.)
+      // moves past this message for good. It must stop just short of it
+      // instead — far enough back that the next sweep reads it again.
       const held = decodeCursor(first.cursor);
-      expect(held.sinceMs).toBe(Date.parse("2020-01-01T00:00:00.000Z"));
+      expect(held.sinceMs).toBeLessThan(workspace.betaMs);
 
       // Databricks finishes the answer between the two runs.
       const settled = workspace.messages["conv-beta-1"]![0]!;
@@ -1917,6 +1916,80 @@ describe("given a message still being answered when the sweep reads it", () => {
       expect(done.sinceMs).toBeGreaterThan(
         Date.parse("2020-01-01T00:00:00.000Z"),
       );
+    }, 60_000);
+  });
+
+  describe("when a DIFFERENT message is in flight on every sweep", () => {
+    /**
+     * The liveness half, and the reason holding the watermark cannot be a
+     * boolean. A workspace with real traffic has something mid-answer almost
+     * every time the sweep looks. If any unsettled message froze the whole
+     * window, `sinceMs` would never advance on such a workspace: the re-read
+     * window would grow by one interval every interval, without bound, until a
+     * sweep could no longer finish inside its request budget.
+     *
+     * The window must hang back at the OLDEST thing still unsettled, not stop.
+     */
+    it("moves the window up to the oldest message still unsettled", async () => {
+      const local = createFixtureWorkspace();
+      const inFlight = local.messages["conv-beta-1"]![0]!;
+      inFlight.status = "EXECUTING_QUERY";
+      inFlight.attachments = [];
+      const server = await startFixtureServer({ workspace: local });
+
+      try {
+        const adapter = new DatabricksGeniePuller();
+        const config = adapter.validateConfig({
+          adapter: DATABRICKS_GENIE_ADAPTER_ID,
+          workspaceUrl: server.baseUrl,
+          spaceIds: ["space-beta"],
+          startingAt: "2020-01-01T00:00:00.000Z",
+          schedule: "*/15 * * * *",
+        });
+        const credentials = { token: "fixture-token" };
+
+        const first = await adapter.runOnce(
+          { cursor: null, credentials },
+          config,
+        );
+
+        // That one settles, and a newer question is asked and is still being
+        // answered when the next sweep arrives. This is steady state, not an
+        // edge case.
+        inFlight.status = "COMPLETED";
+        inFlight.attachments = [sqlAttachment("late-1", "SELECT 1", 1)];
+        const secondMessageMs = Date.now();
+        local.messages["conv-beta-1"]!.push({
+          ...message({
+            id: "msg-beta-2",
+            conversationId: "conv-beta-1",
+            spaceId: "space-beta",
+            userId: 700_000_000_000_002,
+            content: "And by drop-off zip?",
+            createdMs: secondMessageMs,
+            sql: "",
+          }),
+          status: "EXECUTING_QUERY",
+          attachments: [],
+        });
+
+        const second = await adapter.runOnce(
+          { cursor: first.cursor, credentials },
+          config,
+        );
+        const after = decodeCursor(second.cursor);
+
+        // The assertion that bites. A boolean hold leaves this at the
+        // configured start forever, because there is always something in
+        // flight; the window then grows without bound.
+        expect(after.sinceMs).toBeGreaterThan(local.betaMs);
+
+        // ...but not so far that the message still being answered falls out of
+        // it, or its generated SQL is lost exactly as before.
+        expect(after.sinceMs).toBeLessThan(secondMessageMs);
+      } finally {
+        await server.close();
+      }
     }, 60_000);
   });
 });

@@ -41,7 +41,11 @@
  *   `EXECUTING_QUERY` can carry the question without the generated SQL. The
  *   record is keyed on the message id and both sinks replace on it, so a later
  *   read overwrites rather than duplicating — but only if a later read happens,
- *   which is why an unsettled message holds the watermark (`isSettling`).
+ *   which is why the watermark stops just short of the oldest message that
+ *   could still change (`isSettling`, `nextWatermark`) rather than moving to
+ *   the sweep's start. Stopping altogether would be the easy version and the
+ *   wrong one: a busy workspace always has something mid-answer, so the window
+ *   would never advance at all.
  *
  *   The dimensions are the coordinates of the message itself and nothing about
  *   the author, so an identity that resolves differently on a later pull (a
@@ -174,6 +178,21 @@ function isSettling(status: string | null, createdMs: number): boolean {
 }
 
 /**
+ * The earlier of two watermark ceilings, treating null as "no ceiling".
+ *
+ * An unsettled message must not FREEZE the window, only hold it back to just
+ * before itself. A workspace with real traffic has something mid-answer nearly
+ * every time the sweep looks, so a boolean hold would stop `sinceMs` advancing
+ * on exactly the workspaces that matter: the re-read window would grow by one
+ * interval every interval until a sweep no longer fit in its request budget.
+ */
+function earliest(a: number | null, b: number | null): number | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return Math.min(a, b);
+}
+
+/**
  * The durable cursor.
  *
  * `sinceMs` is the watermark: a message is new when it was created after it.
@@ -231,6 +250,12 @@ const cursorSchema = z.object({
    */
   spaceSetFingerprint: z.string().nullable().default(null),
   /**
+   * The oldest message the sweep in flight saw that could still change, or
+   * null. Carried across the sweep's runs so a message read on run one still
+   * holds the window when run four finishes the sweep.
+   */
+  sweepOldestPendingMs: z.number().int().nonnegative().nullable().default(null),
+  /**
    * When the sweep currently IN FLIGHT began, or null when none is.
    *
    * A sweep is not a run. The budget can cut one short and `spaceId` carries
@@ -270,13 +295,27 @@ function nextWatermark({
   previousMs,
   sweepStartedAtMs,
   complete,
+  oldestPendingMs,
 }: {
   previousMs: number;
   sweepStartedAtMs: number;
   complete: boolean;
+  /**
+   * The oldest message that may still change. The window stops just short of
+   * it so it is read again, rather than stopping altogether — a busy workspace
+   * always has something in flight, and freezing on that would grow the
+   * re-read window without bound.
+   */
+  oldestPendingMs: number | null;
 }): number {
   if (!complete) return previousMs;
-  return Math.max(previousMs, sweepStartedAtMs - WATERMARK_LAG_MS);
+  const swept = sweepStartedAtMs - WATERMARK_LAG_MS;
+  const capped =
+    oldestPendingMs === null ? swept : Math.min(swept, oldestPendingMs - 1);
+  // Never backwards. An unsettled message always sits above the previous
+  // watermark (it passed that filter to be read at all), so this only guards
+  // the arithmetic, but a watermark that could move back would re-read forever.
+  return Math.max(previousMs, capped);
 }
 
 /**
@@ -307,6 +346,10 @@ function withoutOrphanedResume(cursor: GenieCursor): GenieCursor {
     conversationId: null,
     sweepHadGap: false,
     spaceSetFingerprint: null,
+    // Safe to drop with the sweep it belonged to: `sinceMs` is untouched, so
+    // the unsettled message is still inside the window the restart will read,
+    // and the restarted sweep derives its own ceiling from it.
+    sweepOldestPendingMs: null,
   };
 }
 
@@ -333,6 +376,7 @@ function parseCursor(
     conversationId: null,
     sweepHadGap: false,
     spaceSetFingerprint: null,
+    sweepOldestPendingMs: null,
     sweepStartedAtMs: null,
   };
 }
@@ -525,6 +569,12 @@ interface SweepResult {
    * `cursorSchema.sweepHadGap`.
    */
   hadGap: boolean;
+  /**
+   * The oldest message this sweep saw that may still change, or null.
+   *
+   * A CEILING on the next watermark rather than a veto on it — see `earliest`.
+   */
+  oldestPendingMs: number | null;
   /** The space set this sweep is walking, for the next run to compare against. */
   spaceSetFingerprint: string;
 }
@@ -644,12 +694,14 @@ function sweptUpTo({
   space,
   at,
   hadGap,
+  oldestPendingMs,
   spacePlan,
 }: {
   events: NormalizedPullEvent[];
   space: z.infer<typeof spaceSchema>;
   at: string | null;
   hadGap: boolean;
+  oldestPendingMs: number | null;
   spacePlan: { resumable: boolean; fingerprint: string };
 }): SweepResult {
   return {
@@ -658,6 +710,7 @@ function sweptUpTo({
     resumeSpaceId: spacePlan.resumable ? space.space_id : null,
     resumeConversationId: spacePlan.resumable ? at : null,
     hadGap,
+    oldestPendingMs,
     spaceSetFingerprint: spacePlan.fingerprint,
   };
 }
@@ -673,11 +726,13 @@ function stoppedAt({
   items,
   conversation,
   hadGap,
+  oldestPendingMs,
   conversationPlan,
 }: {
   items: NormalizedPullEvent[];
   conversation: z.infer<typeof conversationSchema>;
   hadGap: boolean;
+  oldestPendingMs: number | null;
   conversationPlan: { resumable: boolean };
 }): SpaceRead {
   return {
@@ -687,6 +742,7 @@ function stoppedAt({
       ? conversation.conversation_id
       : null,
     hadGap,
+    oldestPendingMs,
   };
 }
 
@@ -707,6 +763,8 @@ interface SpaceRead {
    */
   resumeConversationId: string | null;
   hadGap: boolean;
+  /** The oldest message in this space that may still change, or null. */
+  oldestPendingMs: number | null;
 }
 
 /**
@@ -861,6 +919,8 @@ export class DatabricksGeniePuller
     // forward so the rest of the workspace still gets swept; this is what stops
     // the watermark once the sweep finally finishes.
     let hadGap = cursor.sweepHadGap;
+    // Seeded from the sweep in flight for the same reason as `hadGap`.
+    let oldestPendingMs: number | null = cursor.sweepOldestPendingMs;
 
     for (let i = spacePlan.startAt; i < spacePlan.ordered.length; i += 1) {
       const space = spacePlan.ordered[i]!;
@@ -879,6 +939,7 @@ export class DatabricksGeniePuller
           space,
           at: resumeConversationId,
           hadGap,
+          oldestPendingMs,
           spacePlan,
         });
       }
@@ -898,6 +959,7 @@ export class DatabricksGeniePuller
       // A gap inside the space, or this whole space unreadable. Either way the
       // sweep is about to move past something it never saw.
       hadGap = hadGap || read.hadGap;
+      oldestPendingMs = earliest(oldestPendingMs, read.oldestPendingMs);
 
       // Out of budget with this space unfinished — resume ON it, so its tail is
       // re-read rather than half-skipped. `read.resumeConversationId` narrows
@@ -909,6 +971,7 @@ export class DatabricksGeniePuller
           space,
           at: read.resumeConversationId,
           hadGap,
+          oldestPendingMs,
           spacePlan,
         });
       }
@@ -920,6 +983,7 @@ export class DatabricksGeniePuller
       resumeSpaceId: null,
       resumeConversationId: null,
       hadGap,
+      oldestPendingMs,
       spaceSetFingerprint: spacePlan.fingerprint,
     };
   }
@@ -980,6 +1044,9 @@ export class DatabricksGeniePuller
         complete: false,
         resumeConversationId: null,
         hadGap: true,
+        // Nothing was read, so nothing here is waiting to settle. `hadGap`
+        // already holds the watermark for this space on its own.
+        oldestPendingMs: null,
       };
 
     const conversationPlan = conversationWalkPlan({
@@ -1037,6 +1104,7 @@ export class DatabricksGeniePuller
     let complete = true;
     // Set when the walk carries on past a conversation it could not read.
     let hadGap = false;
+    let oldestPendingMs: number | null = null;
 
     for (
       let i = conversationPlan.startAt;
@@ -1049,6 +1117,7 @@ export class DatabricksGeniePuller
           items: events,
           conversation,
           hadGap,
+          oldestPendingMs,
           conversationPlan,
         });
       }
@@ -1066,9 +1135,10 @@ export class DatabricksGeniePuller
 
       events.push(...step.events);
       complete = complete && !step.unfinished;
-      // Both hold the watermark, for opposite reasons: `failed` is something we
-      // could not read, `pending` is something we read too early.
-      hadGap = hadGap || step.failed || step.pending;
+      hadGap = hadGap || step.failed;
+      // Not a gap: nothing was skipped. It only keeps the watermark behind this
+      // message so the sweep comes back once the warehouse has answered.
+      oldestPendingMs = earliest(oldestPendingMs, step.oldestPendingMs);
 
       // Out of budget with this conversation unfinished — resume ON it so its
       // tail is re-read. An isolated failure with budget still left falls
@@ -1079,12 +1149,19 @@ export class DatabricksGeniePuller
           items: events,
           conversation,
           hadGap,
+          oldestPendingMs,
           conversationPlan,
         });
       }
     }
 
-    return { items: events, complete, resumeConversationId: null, hadGap };
+    return {
+      items: events,
+      complete,
+      resumeConversationId: null,
+      hadGap,
+      oldestPendingMs,
+    };
   }
 
   /**
@@ -1118,8 +1195,11 @@ export class DatabricksGeniePuller
     events: NormalizedPullEvent[];
     unfinished: boolean;
     failed: boolean;
-    /** It was read whole, but something in it may still change. */
-    pending: boolean;
+    /**
+     * The oldest message in it that may still change, or null if none can.
+     * A ceiling on the watermark, not a veto on it.
+     */
+    oldestPendingMs: number | null;
   }> {
     const read = await this.isolate({
       what: "messages",
@@ -1143,7 +1223,7 @@ export class DatabricksGeniePuller
       events: read?.items ?? [],
       unfinished: read === null || !read.complete,
       failed: read === null,
-      pending: read?.pending ?? false,
+      oldestPendingMs: read?.oldestPendingMs ?? null,
     };
   }
 
@@ -1276,7 +1356,9 @@ export class DatabricksGeniePuller
     conversation: z.infer<typeof conversationSchema>;
     sinceMs: number;
     identities: Map<number, GenieIdentity>;
-  }): Promise<PagedRead<NormalizedPullEvent> & { pending: boolean }> {
+  }): Promise<
+    PagedRead<NormalizedPullEvent> & { oldestPendingMs: number | null }
+  > {
     const messages = await this.paginate({
       config,
       token,
@@ -1290,7 +1372,7 @@ export class DatabricksGeniePuller
     });
 
     const events: NormalizedPullEvent[] = [];
-    let pending = false;
+    let oldestPendingMs: number | null = null;
     for (const message of messages.items) {
       const raw = message.created_timestamp;
       // A message with no timestamp cannot be placed against the watermark, and
@@ -1309,9 +1391,12 @@ export class DatabricksGeniePuller
 
       // Emitted either way — a question asked is a governance fact the moment
       // it is asked, and the OCSF sink replaces on message id, so the settled
-      // version overwrites this one. What `pending` buys is the guarantee that
-      // there IS a next look: it holds the watermark so the sweep comes back.
-      pending = pending || isSettling(message.status, createdMs);
+      // version overwrites this one. What this buys is the guarantee that there
+      // IS a next look: the watermark is kept behind the oldest message that
+      // could still change, so the sweep comes back for it.
+      if (isSettling(message.status, createdMs)) {
+        oldestPendingMs = earliest(oldestPendingMs, createdMs);
+      }
 
       events.push(
         this.messageEvent({
@@ -1330,7 +1415,7 @@ export class DatabricksGeniePuller
         }),
       );
     }
-    return { items: events, complete: messages.complete, pending };
+    return { items: events, complete: messages.complete, oldestPendingMs };
   }
 
   /**
@@ -1654,6 +1739,7 @@ function nextCursor({
       previousMs: previous.sinceMs,
       sweepStartedAtMs,
       complete: sweep.complete && !sweep.hadGap,
+      oldestPendingMs: sweep.oldestPendingMs,
     }),
     spaceId: sweep.resumeSpaceId,
     // Meaningless without a space to resume into, so it is cleared with it
@@ -1665,6 +1751,9 @@ function nextCursor({
     sweepHadGap: stillSweeping ? sweep.hadGap : false,
     // Pinned to the position; a finished sweep starts the next one clean.
     spaceSetFingerprint: stillSweeping ? sweep.spaceSetFingerprint : null,
+    // Carried only while the sweep is in flight. Once it finishes, the ceiling
+    // has already been folded into `sinceMs` above and must not be re-applied.
+    sweepOldestPendingMs: stillSweeping ? sweep.oldestPendingMs : null,
     // Held only while the sweep is still in flight, so the next run stamps a
     // fresh anchor rather than inheriting a stale one and re-reading forever.
     sweepStartedAtMs: stillSweeping ? sweepStartedAtMs : null,
