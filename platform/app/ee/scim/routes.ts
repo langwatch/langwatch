@@ -54,14 +54,14 @@ type ScimEnv = { Variables: { scimOrganizationId: string } };
 
 /**
  * Discovery carries no credential, and the policy has to say so. RFC 7644
- * section 2 puts these three endpoints outside authentication precisely so an
- * identity provider can read the capabilities before anyone has minted a
- * token for it, and the builder matches that: a `public` policy applies no
- * enforcement chain, so `scimAuth` never runs on them. They answer the same
- * bytes to anyone who asks.
+ * section 4 allows these three endpoints to answer without authentication, so
+ * that an identity provider can read the capabilities before anyone has
+ * minted a token for it, and this deployment takes that option: a `public`
+ * policy applies no enforcement chain, so `scimAuth` never runs on them. They
+ * answer the same bytes to anyone who asks.
  */
 const SCIM_DISCOVERY_POLICY = publicEndpoint(
-  "SCIM discovery metadata is unauthenticated per RFC 7644 so identity providers can negotiate capabilities before a token exists",
+  "SCIM discovery metadata is served without a credential so identity providers can negotiate capabilities before a token exists",
 );
 
 // ── helpers ──────────────────────────────────────────────────────────

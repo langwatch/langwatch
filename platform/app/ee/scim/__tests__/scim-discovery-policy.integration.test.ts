@@ -43,7 +43,7 @@ describe("Feature: SCIM 2.0 is published in the API reference", () => {
       expect(policy, `${path} must declare an access policy`).toBeDefined();
       expect(policy?.kind).toBe("public");
       expect(policy?.kind === "public" ? policy.reason : "").toBe(
-        "SCIM discovery metadata is unauthenticated per RFC 7644 so identity providers can negotiate capabilities before a token exists",
+        "SCIM discovery metadata is served without a credential so identity providers can negotiate capabilities before a token exists",
       );
     });
 

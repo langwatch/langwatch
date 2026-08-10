@@ -74,10 +74,11 @@ const DESCRIBE_ROUTE_MARKER = /describeRoute\(/;
 /**
  * What documents a `@langwatch/api` endpoint. Those services never write
  * `describeRoute` themselves: the framework emits it from the endpoint config,
- * and only when the config gives it something to say. So on that family these
- * two keys are the same precondition, spelled the framework's way.
+ * and only when the config gives it something to say. Any one of these three
+ * keys is enough for it to publish, so any one of them is the framework's
+ * spelling of the same precondition.
  */
-const ENDPOINT_DOC_MARKERS = [/\boutput:/, /\bdescription:/];
+const ENDPOINT_DOC_MARKERS = [/\boutput:/, /\bdescription:/, /\bdocs:/];
 
 /**
  * Whether a file declares its routes through the `@langwatch/api` framework.

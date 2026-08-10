@@ -241,6 +241,21 @@ describe("collectRouteRegistrations", () => {
 
       expect(registrations.map((r) => r.described)).toEqual([true, false]);
     });
+
+    it("counts a docs block alone as describing the endpoint", () => {
+      // The framework publishes on `docs` with nothing else set, so an
+      // endpoint carrying only an operation id and its tags does reach the
+      // document. Read as undescribed, its hint would send a reader hunting
+      // for an annotation that is already there.
+      const registrations = collectRouteRegistrations(
+        [
+          FRAMEWORK_IMPORT,
+          'v.delete("/roles/:id", { docs: { operationId: "deleteRole" } }, remove);',
+        ].join("\n"),
+      );
+
+      expect(registrations.map((r) => r.described)).toEqual([true]);
+    });
   });
 
   describe("when the file has nothing to do with @langwatch/api", () => {
