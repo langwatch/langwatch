@@ -21,14 +21,13 @@ import {
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { ENTERPRISE_TEST_PLAN } from "~/test-utils/managementApiOrg";
 import { FREE_PLAN } from "../../licensing/constants";
 import { app } from "../routes";
 import { ScimTokenService } from "../scim-token.service";
 
 const SCIM_ERROR_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:Error";
 const CORE_USER_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:User";
-
-const enterprisePlan = { ...FREE_PLAN, type: "ENTERPRISE", free: false };
 
 describe("Feature: SCIM entitlement is checked on every call", () => {
   const ns = `scim-lapse-${nanoid(8)}`;
@@ -39,7 +38,7 @@ describe("Feature: SCIM entitlement is checked on every call", () => {
 
   beforeAll(async () => {
     await resetApp();
-    mockGetActivePlan = vi.fn().mockResolvedValue(enterprisePlan);
+    mockGetActivePlan = vi.fn().mockResolvedValue(ENTERPRISE_TEST_PLAN);
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
@@ -123,7 +122,7 @@ describe("Feature: SCIM entitlement is checked on every call", () => {
     });
 
     it("keeps answering 401 for a token that never existed", async () => {
-      mockGetActivePlan.mockResolvedValue(enterprisePlan);
+      mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
 
       const res = await app.request("/api/scim/v2/Users", {
         headers: { Authorization: "Bearer not-a-real-token" },

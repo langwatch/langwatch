@@ -9,7 +9,7 @@ function createMockPrisma() {
       create: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
-      update: vi.fn(),
+      updateMany: vi.fn(),
       deleteMany: vi.fn(),
     },
   } as unknown as Parameters<typeof ScimTokenService.create>[0];
@@ -99,9 +99,9 @@ describe("ScimTokenService", () => {
           organizationId: "org-1",
           hashedToken,
         });
-        (prisma.scimToken.update as ReturnType<typeof vi.fn>).mockResolvedValue(
-          {},
-        );
+        (
+          prisma.scimToken.updateMany as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({});
         getActivePlan.mockResolvedValue({ type: "ENTERPRISE" });
 
         const result = await service.verifyEntitled({ token: "valid-token" });
@@ -122,9 +122,9 @@ describe("ScimTokenService", () => {
           organizationId: "org-1",
           hashedToken,
         });
-        (prisma.scimToken.update as ReturnType<typeof vi.fn>).mockResolvedValue(
-          {},
-        );
+        (
+          prisma.scimToken.updateMany as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({});
         getActivePlan.mockResolvedValue({ type: "FREE" });
 
         const result = await service.verifyEntitled({ token: "valid-token" });
@@ -133,7 +133,7 @@ describe("ScimTokenService", () => {
           status: "plan_not_entitled",
           organizationId: "org-1",
         });
-        expect(prisma.scimToken.update).not.toHaveBeenCalled();
+        expect(prisma.scimToken.updateMany).not.toHaveBeenCalled();
       });
     });
   });
@@ -206,9 +206,9 @@ describe("ScimTokenService", () => {
           organizationId: "org-1",
           hashedToken,
         });
-        (prisma.scimToken.update as ReturnType<typeof vi.fn>).mockResolvedValue(
-          {},
-        );
+        (
+          prisma.scimToken.updateMany as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({});
 
         const result = await service.verify({ token: "valid-token" });
 
@@ -216,10 +216,35 @@ describe("ScimTokenService", () => {
         expect(prisma.scimToken.findFirst).toHaveBeenCalledWith({
           where: { hashedToken },
         });
-        expect(prisma.scimToken.update).toHaveBeenCalledWith({
+        expect(prisma.scimToken.updateMany).toHaveBeenCalledWith({
           where: { id: "token-1" },
           data: { lastUsedAt: expect.any(Date) },
         });
+      });
+    });
+
+    describe("given an administrator revokes the token mid-verification", () => {
+      it("still answers the caller instead of failing on the vanished row", async () => {
+        (
+          prisma.scimToken.findFirst as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({
+          id: "token-1",
+          organizationId: "org-1",
+          hashedToken: crypto
+            .createHash("sha256")
+            .update("valid-token")
+            .digest("hex"),
+        });
+        // What the revoke leaves behind: the row is gone by the time the use
+        // is recorded, so the write matches nothing. A single-row `update`
+        // would raise P2025 here and turn the race into a 500.
+        (
+          prisma.scimToken.updateMany as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({ count: 0 });
+
+        await expect(service.verify({ token: "valid-token" })).resolves.toEqual(
+          { organizationId: "org-1" },
+        );
       });
     });
 
@@ -232,7 +257,7 @@ describe("ScimTokenService", () => {
         const result = await service.verify({ token: "invalid-token" });
 
         expect(result).toBeNull();
-        expect(prisma.scimToken.update).not.toHaveBeenCalled();
+        expect(prisma.scimToken.updateMany).not.toHaveBeenCalled();
       });
     });
   });

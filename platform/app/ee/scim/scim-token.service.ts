@@ -181,8 +181,16 @@ export class ScimTokenService {
     });
   }
 
+  /**
+   * `updateMany`, for the same reason {@link revoke} uses `deleteMany`: an
+   * administrator revoking a token while the identity provider is mid-sync
+   * deletes the row between {@link findByToken} and this write, and `update`
+   * would turn that ordinary race into a P2025 the SCIM boundary can only
+   * answer as a 500. A missing row updates nothing and the call carries on to
+   * the refusal the credential has already earned.
+   */
   private async recordUse(tokenId: string): Promise<void> {
-    await this.prisma.scimToken.update({
+    await this.prisma.scimToken.updateMany({
       where: { id: tokenId },
       data: { lastUsedAt: new Date() },
     });

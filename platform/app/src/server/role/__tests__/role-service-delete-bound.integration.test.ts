@@ -20,6 +20,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { RoleService } from "~/server/role";
 import { RoleInUseError } from "~/server/role/errors";
+import { RoleRepository } from "~/server/role/repositories/role.repository";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
@@ -105,6 +106,32 @@ describe("RoleService.deleteRole, given a role referenced by role bindings", () 
       },
     });
     expect(binding).not.toBeNull();
+  });
+
+  it("refuses at the storage layer even with the in-use check skipped", async () => {
+    // What a binding written after the service's in-use check runs into: the
+    // condition rides on the delete statement, so the role survives instead of
+    // having its grant silently unhooked.
+    const repository = new RoleRepository(prisma);
+
+    await expect(
+      repository.deleteIfUnused({
+        roleId: boundRoleId,
+        organizationId: testOrganization.id,
+      }),
+    ).resolves.toBe(false);
+
+    expect(
+      await prisma.customRole.findUnique({ where: { id: boundRoleId } }),
+    ).not.toBeNull();
+    expect(
+      await prisma.roleBinding.findFirst({
+        where: {
+          organizationId: testOrganization.id,
+          customRoleId: boundRoleId,
+        },
+      }),
+    ).not.toBeNull();
   });
 
   it("still deletes a role nothing references", async () => {

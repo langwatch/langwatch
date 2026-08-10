@@ -363,8 +363,6 @@ export class InviteService {
   async createAdminInviteRecord(
     input: CreateAdminInviteInput,
   ): Promise<{ invite: OrganizationInvite; organization: Organization }> {
-    const inviteCode = nanoid();
-
     const organization = await this.prisma.organization.findFirst({
       where: { id: input.organizationId },
     });
@@ -373,10 +371,24 @@ export class InviteService {
       throw new OrganizationNotFoundError();
     }
 
-    const savedInvite = await this.prisma.organizationInvite.create({
+    return { invite: await this.createInviteRow(input), organization };
+  }
+
+  /**
+   * The pending invite row itself, with no organization lookup attached.
+   *
+   * Split out so a batch that has already loaded the organization writes each
+   * row without re-reading it: {@link persistInvites} runs inside an
+   * interactive transaction holding one connection, where fifty invites meant
+   * fifty redundant reads of a row the caller was already holding.
+   */
+  private async createInviteRow(
+    input: CreateAdminInviteInput,
+  ): Promise<OrganizationInvite> {
+    return this.prisma.organizationInvite.create({
       data: {
         email: input.email,
-        inviteCode,
+        inviteCode: nanoid(),
         expiration: new Date(Date.now() + INVITE_EXPIRATION_MS),
         organizationId: input.organizationId,
         teamIds: input.teamIds,
@@ -388,8 +400,6 @@ export class InviteService {
         status: "PENDING",
       },
     });
-
-    return { invite: savedInvite, organization };
   }
 
   /**
@@ -501,7 +511,12 @@ export class InviteService {
 
     // Phase 1: DB operations in a transaction, no side effects.
     const createdRecords = await prisma.$transaction((tx) =>
-      this.persistInvites({ tx, invites: validInvites, isStrict }),
+      this.persistInvites({
+        tx,
+        invites: validInvites,
+        organization,
+        isStrict,
+      }),
     );
 
     // Phase 2: emails outside the transaction, so a provider failure can
@@ -528,14 +543,20 @@ export class InviteService {
    * connection, so a parallel fan-out would not run in parallel anyway, and it
    * would let two invites for the same address in one batch both read "no
    * duplicate" and both be written.
+   *
+   * `organization` is the row the caller already loaded, paired with every
+   * invite for the email phase, so a fifty-invite batch does not re-read it
+   * fifty times on the transaction's one connection.
    */
   private async persistInvites({
     tx,
     invites,
+    organization,
     isStrict,
   }: {
     tx: Prisma.TransactionClient;
     invites: CreateAdminInviteInput[];
+    organization: Organization;
     isStrict: boolean;
   }): Promise<
     Array<{ invite: OrganizationInvite; organization: Organization }>
@@ -561,7 +582,10 @@ export class InviteService {
         continue;
       }
 
-      records.push(await txInviteService.createAdminInviteRecord(invite));
+      records.push({
+        invite: await txInviteService.createInviteRow(invite),
+        organization,
+      });
     }
 
     return records;

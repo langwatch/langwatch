@@ -325,7 +325,10 @@ export function createOrgAuthMiddleware({
 
     if (!outcome.ok) {
       if (refusals === "throw") raiseOrgAuthRefusal(outcome.refusal);
-      return c.json(refusal(outcome.refusal), outcome.refusal.status as 401);
+      return c.json(
+        refusal(outcome.refusal),
+        outcome.refusal.status as 401 | 500,
+      );
     }
 
     const { organization, resolved } = outcome;
@@ -452,13 +455,63 @@ async function resolveOrgPrincipal({
     };
   }
 
-  const organization = await prisma.organization.findUnique({
-    where: { id: resolved.organizationId },
+  const loaded = await loadOrganization({
+    prisma,
+    organizationId: resolved.organizationId,
+    orgLogger,
+    diag,
   });
+  if (!loaded.ok) return loaded;
+
+  return { ok: true, organization: loaded.organization, resolved };
+}
+
+/**
+ * The organization a resolved credential belongs to, or the refusal that
+ * stands in for it.
+ *
+ * The two ways this can fail are not the same failure: an organization that is
+ * genuinely gone is the credential's problem, while a database that cannot
+ * answer is ours. Both are described here as data, so the responding mode
+ * still answers in the family's shape and the throwing mode still re-raises
+ * the infrastructure failure as it arrived (ADR-045).
+ */
+async function loadOrganization({
+  prisma,
+  organizationId,
+  orgLogger,
+  diag,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  orgLogger: ReturnType<typeof createLogger>;
+  diag: AuthDiagnostics;
+}): Promise<
+  { ok: true; organization: Organization } | { ok: false; refusal: AuthRefusal }
+> {
+  let organization: Organization | null;
+  try {
+    organization = await prisma.organization.findUnique({
+      where: { id: organizationId },
+    });
+  } catch (error) {
+    orgLogger.error({ ...diag, error }, "Database error during org auth");
+    return {
+      ok: false,
+      refusal: {
+        status: 500,
+        code: "internal_error",
+        legacyError: "Internal Server Error",
+        message: "Authentication service error",
+        isInfrastructureFailure: true,
+        cause: error,
+      },
+    };
+  }
 
   if (!organization) {
     orgLogger.warn(
-      { ...diag, organizationId: resolved.organizationId },
+      { ...diag, organizationId },
       "Org auth failed: organization not found",
     );
     return {
@@ -472,7 +525,7 @@ async function resolveOrgPrincipal({
     };
   }
 
-  return { ok: true, organization, resolved };
+  return { ok: true, organization };
 }
 
 /**

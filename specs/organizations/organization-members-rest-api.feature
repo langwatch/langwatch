@@ -84,6 +84,16 @@ Feature: Organization members and invites REST API
     Then the request is refused with code cannot_remove_last_admin and status 400
     And that admin is still in the organization
 
+  # Two provisioning runs offboarding in parallel is the ordinary case, not an
+  # exotic one, and an organization with no administrator cannot be recovered
+  # from inside the product.
+  @integration
+  Scenario: Two admins removed at the same time cannot both succeed
+    Given the organization has exactly two active admins
+    When both of them are removed at the same time
+    Then one removal is refused with code cannot_remove_last_admin
+    And the organization still has an active admin
+
   @integration
   Scenario: A member's access breakdown spans teams and projects
     Given a member with an organization role, a team binding and a project binding

@@ -48,6 +48,16 @@ Feature: Organization provisioning REST API for self-hosted deployments
     And no organization with that slug remains
     And retrying the same slug with a valid key name succeeds
 
+  # Every step after the organization row commits owes the same cleanup, not
+  # only the bootstrap key: a slug left behind answers every retry with a 409,
+  # and only direct database access can clear it.
+  @integration
+  Scenario: Provisioning that fails while setting the organization up leaves nothing behind
+    When I create an organization whose initial setup cannot be completed
+    Then the request fails
+    And no organization or team with that slug remains
+    And provisioning the same slug afterwards succeeds
+
   # ============================================================================
   # Read
   # ============================================================================

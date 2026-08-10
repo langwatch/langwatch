@@ -40,6 +40,13 @@ function buildPrisma(organization: object | null): PrismaClient {
   } as unknown as PrismaClient;
 }
 
+/** A client whose organization lookup is down, not one that finds nothing. */
+function buildUnreachablePrisma(error: Error): PrismaClient {
+  return {
+    organization: { findUnique: vi.fn().mockRejectedValue(error) },
+  } as unknown as PrismaClient;
+}
+
 type TestEnv = {
   Variables: {
     organization: { id: string };
@@ -171,6 +178,48 @@ describe("createOrgAuthMiddleware", () => {
       expect(caught).toHaveLength(1);
       expect((caught[0] as HandledError).code).toBe("organization_not_found");
       expect((caught[0] as HandledError).httpStatus).toBe(401);
+    });
+  });
+
+  describe("given the organization lookup fails on the database", () => {
+    const infraFailure = new Error("connection reset by peer");
+
+    beforeEach(() => {
+      resolveOrgOnly.mockResolvedValue(RESOLVED_TOKEN);
+    });
+
+    /** @scenario A database failure loading the organization answers the family's server error */
+    it("responds 500 with the legacy body in the default mode", async () => {
+      const { app, caught } = buildApp({
+        prisma: buildUnreachablePrisma(infraFailure),
+      });
+
+      const res = await app.request("/probe", {
+        headers: { Authorization: "Bearer sk-lw-valid" },
+      });
+
+      expect(res.status).toBe(500);
+      expect(await res.json()).toEqual({
+        error: "Internal Server Error",
+        message: "Authentication service error",
+      });
+      expect(caught).toEqual([]);
+    });
+
+    /** @scenario A database failure loading the organization is re-raised unchanged */
+    it("rethrows the original error plain in throw mode, never a handled one", async () => {
+      const { app, caught } = buildApp({
+        prisma: buildUnreachablePrisma(infraFailure),
+        refusals: "throw",
+      });
+
+      await app.request("/probe", {
+        headers: { Authorization: "Bearer sk-lw-valid" },
+      });
+
+      expect(caught).toHaveLength(1);
+      expect(caught[0]).toBe(infraFailure);
+      expect(HandledError.isHandled(caught[0])).toBe(false);
     });
   });
 

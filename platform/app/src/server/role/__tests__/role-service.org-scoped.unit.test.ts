@@ -17,14 +17,19 @@ function buildMockPrisma() {
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
-      delete: vi.fn(),
     },
     roleBinding: {
+      count: vi.fn(),
+    },
+    teamUser: {
       count: vi.fn(),
     },
     team: {
       findUnique: vi.fn(),
     },
+    // The delete carries its in-use condition, so it is a single statement
+    // rather than a Prisma model call.
+    $executeRaw: vi.fn(),
   };
 }
 
@@ -138,7 +143,7 @@ describe("RoleService org-scoped variants", () => {
         service.deleteRoleForOrg({ roleId: "cr_1", organizationId: "org_2" }),
       ).rejects.toMatchObject({ code: "custom_role_not_found" });
 
-      expect(prisma.customRole.delete).not.toHaveBeenCalled();
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
     });
 
     it("refuses to delete a role that role bindings still reference", async () => {
@@ -152,12 +157,13 @@ describe("RoleService org-scoped variants", () => {
         meta: expect.objectContaining({ bindingCount: 2 }),
       });
 
-      expect(prisma.customRole.delete).not.toHaveBeenCalled();
+      expect(prisma.$executeRaw).not.toHaveBeenCalled();
     });
 
     it("deletes an unreferenced role", async () => {
       prisma.customRole.findFirst.mockResolvedValue(storedRole);
       prisma.roleBinding.count.mockResolvedValue(0);
+      prisma.$executeRaw.mockResolvedValue(1);
 
       const result = await service.deleteRoleForOrg({
         roleId: "cr_1",
@@ -165,8 +171,29 @@ describe("RoleService org-scoped variants", () => {
       });
 
       expect(result).toEqual({ success: true });
-      expect(prisma.customRole.delete).toHaveBeenCalledWith({
-        where: { id: "cr_1" },
+      const [, ...parameters] = prisma.$executeRaw.mock.calls[0]!;
+      expect(parameters).toContain("cr_1");
+      expect(parameters).toContain("org_1");
+    });
+
+    describe("when a binding is written between the check and the delete", () => {
+      it("leaves the role standing and refuses with the fresh counts", async () => {
+        prisma.customRole.findFirst.mockResolvedValue(storedRole);
+        // The pre-check sees nothing; the re-read after the delete finds the
+        // binding that arrived in between.
+        prisma.roleBinding.count
+          .mockResolvedValueOnce(0)
+          .mockResolvedValueOnce(1);
+        prisma.teamUser.count.mockResolvedValue(0);
+        // The condition rode with the statement, so nothing was deleted.
+        prisma.$executeRaw.mockResolvedValue(0);
+
+        await expect(
+          service.deleteRoleForOrg({ roleId: "cr_1", organizationId: "org_1" }),
+        ).rejects.toMatchObject({
+          code: "custom_role_in_use",
+          meta: expect.objectContaining({ bindingCount: 1 }),
+        });
       });
     });
   });

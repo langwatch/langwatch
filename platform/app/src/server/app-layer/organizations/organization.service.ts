@@ -22,6 +22,7 @@ import {
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { decrypt } from "~/utils/encryption";
 import type { TeamRoleValue } from "~/utils/memberRoleConstraints";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
 import {
   assertEnterprisePlanType,
@@ -366,6 +367,13 @@ export class OrganizationService {
    * the organization by a natural key it chose; a missing slug is derived from
    * the name with an id suffix, exactly like sign-up. A taken slug raises
    * `organization_slug_taken` (409) from the repository.
+   *
+   * All of it or none of it: the repository commits the organization and its
+   * team before the prompt tags are seeded, and until this method returns the
+   * caller has no id to compensate with. A failure after that commit would
+   * leave an organization with no bootstrap key, unreachable, holding a slug
+   * that answers every retry with a 409 until somebody reaches the database
+   * directly, so the seeding step undoes the commit before it rethrows.
    */
   async createForProvisioning(params: {
     name: string;
@@ -393,9 +401,20 @@ export class OrganizationService {
       pricingModel: PricingModel.SEAT_EVENT,
     });
 
-    await this.promptTagRepo.seedForOrg({
-      organizationId: result.organization.id,
-    });
+    try {
+      await this.promptTagRepo.seedForOrg({
+        organizationId: result.organization.id,
+      });
+    } catch (error) {
+      // The caller has to see what actually went wrong, so a compensation
+      // that fails too is reported rather than raised over the top of it.
+      try {
+        await this.repo.deleteProvisionedOrganization(result.organization.id);
+      } catch (compensationError) {
+        captureException(toError(compensationError));
+      }
+      throw error;
+    }
 
     return result;
   }

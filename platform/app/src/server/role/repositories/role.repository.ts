@@ -127,6 +127,46 @@ export class RoleRepository {
     });
   }
 
+  /** The legacy `TeamUser.assignedRoleId` holders of a role. */
+  async countAssignedUsers(roleId: string): Promise<number> {
+    return this.prisma.teamUser.count({ where: { assignedRoleId: roleId } });
+  }
+
+  /**
+   * Deletes the role only if nothing references it, and reports whether it
+   * went.
+   *
+   * The condition rides on the delete rather than sitting in a separate read
+   * before it: a binding written in between would otherwise be silently
+   * unhooked from the role that grants it, because the relation is emulated in
+   * the client (`relationMode = "prisma"`), so deleting the parent nulls the
+   * reference instead of refusing. One statement leaves nothing to interleave
+   * with, and a delete that finds a holder leaves the role standing for the
+   * caller to refuse over.
+   */
+  async deleteIfUnused({
+    roleId,
+    organizationId,
+  }: {
+    roleId: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const deleted = await this.prisma.$executeRaw`
+      DELETE FROM "CustomRole"
+      WHERE "id" = ${roleId}
+        AND "organizationId" = ${organizationId}
+        AND NOT EXISTS (
+          SELECT 1 FROM "RoleBinding"
+          WHERE "customRoleId" = ${roleId}
+            AND "organizationId" = ${organizationId}
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM "TeamUser" WHERE "assignedRoleId" = ${roleId}
+        )
+    `;
+    return deleted > 0;
+  }
+
   async findByNameAndOrganization(name: string, organizationId: string) {
     return this.prisma.customRole.findUnique({
       where: {
@@ -158,12 +198,6 @@ export class RoleRepository {
         description: params.description,
         permissions: params.permissions as Prisma.InputJsonValue | undefined,
       },
-    });
-  }
-
-  async delete(roleId: string) {
-    await this.prisma.customRole.delete({
-      where: { id: roleId },
     });
   }
 

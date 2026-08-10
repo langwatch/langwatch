@@ -75,6 +75,40 @@ async function teamNameFor({
   return team?.name ?? null;
 }
 
+/**
+ * The organization's active administrators, locked for the rest of the
+ * transaction.
+ *
+ * A plain count is a read-then-write race: two transactions each removing a
+ * DIFFERENT admin both count two, both pass their guard, and both commit,
+ * leaving an organization nobody can sign in to and no way back from inside
+ * the product. `FOR UPDATE` makes the second caller wait for the first to
+ * commit and then re-read the set, so it sees the single remaining admin and
+ * refuses.
+ */
+async function lockActiveAdmins({
+  tx,
+  organizationId,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+}): Promise<Array<{ userId: string }>> {
+  // `role::text` rather than a cast to the enum type: the type name would have
+  // to be schema-qualified to be safe, and the comparison runs over one
+  // organization's memberships either way.
+  // `ORDER BY` fixes the order rows are locked in, so two callers racing over
+  // the same set queue behind each other instead of deadlocking on a
+  // half-acquired one.
+  return tx.$queryRaw<Array<{ userId: string }>>`
+    SELECT "userId" FROM "OrganizationUser"
+    WHERE "organizationId" = ${organizationId}
+      AND "role"::text = ${OrganizationUserRole.ADMIN}
+      AND "disabledAt" IS NULL
+    ORDER BY "userId"
+    FOR UPDATE
+  `;
+}
+
 /** A credential-bearing settings value encrypted at rest; cleared values store null. */
 function encryptedOrNull(value: string | null): string | null {
   return value ? encrypt(value) : null;
@@ -837,15 +871,9 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         member.role === OrganizationUserRole.ADMIN &&
         member.disabledAt === null
       ) {
-        const activeAdmins = await tx.organizationUser.count({
-          where: {
-            organizationId,
-            role: OrganizationUserRole.ADMIN,
-            disabledAt: null,
-          },
-        });
+        const activeAdmins = await lockActiveAdmins({ tx, organizationId });
 
-        if (activeAdmins <= 1) {
+        if (activeAdmins.length <= 1) {
           throw new CannotRemoveLastAdminError();
         }
       }
@@ -910,17 +938,13 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       }
 
       // Same guard as demoting the last admin: an organization with no admin
-      // who can sign in cannot be recovered from inside the product.
+      // who can sign in cannot be recovered from inside the product. Locked
+      // for the same reason the removal guard locks: a disable and a removal
+      // aimed at the two remaining admins would otherwise both pass.
       if (disabled && member.role === OrganizationUserRole.ADMIN) {
-        const activeAdmins = await tx.organizationUser.count({
-          where: {
-            organizationId,
-            role: OrganizationUserRole.ADMIN,
-            disabledAt: null,
-          },
-        });
+        const activeAdmins = await lockActiveAdmins({ tx, organizationId });
 
-        if (activeAdmins <= 1) {
+        if (activeAdmins.length <= 1) {
           // Handled rather than a TRPCError: the tRPC boundary maps a 400
           // HandledError to BAD_REQUEST anyway, and the REST surface answers
           // the stable code instead of flattening this refusal to an unknown

@@ -166,6 +166,37 @@ export class RoleService {
   }
 
   /**
+   * The delete itself, with the in-use condition carried on the statement as
+   * the backstop the pre-check cannot be: a grant written between the check
+   * and the delete would otherwise be unhooked from the role behind it, and a
+   * dangling reference falls back to the built-in permission bag rather than
+   * failing, so nobody would see it happen.
+   *
+   * Nothing deleted means something took a reference in between. The role is
+   * still standing, and the counts are re-read so the refusal names what holds
+   * it rather than what held it a moment ago.
+   */
+  private async deleteRoleRow({
+    roleId,
+    organizationId,
+  }: {
+    roleId: string;
+    organizationId: string;
+  }) {
+    const deleted = await this.repository.deleteIfUnused({
+      roleId,
+      organizationId,
+    });
+    if (deleted) return;
+
+    const [userCount, bindingCount] = await Promise.all([
+      this.repository.countAssignedUsers(roleId),
+      this.repository.countRoleBindings({ roleId, organizationId }),
+    ]);
+    throw new RoleInUseError(userCount, bindingCount);
+  }
+
+  /**
    * Org-scoped delete, keeping the RoleBinding-aware in-use check: deleting
    * a role that anything still references would leave those grants dangling.
    */
@@ -185,8 +216,8 @@ export class RoleService {
     }
 
     await this.assertRoleNotInUse(role);
+    await this.deleteRoleRow({ roleId, organizationId });
 
-    await this.repository.delete(roleId);
     return { success: true };
   }
 
@@ -244,8 +275,11 @@ export class RoleService {
     }
 
     await this.assertRoleNotInUse(role);
+    await this.deleteRoleRow({
+      roleId,
+      organizationId: role.organizationId,
+    });
 
-    await this.repository.delete(roleId);
     return { success: true };
   }
 

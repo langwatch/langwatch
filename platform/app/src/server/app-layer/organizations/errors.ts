@@ -148,11 +148,19 @@ export class CannotRemoveSelfError extends HandledError {
  * beyond the allowance. 403, not 402: the plan exists and the credential is
  * fine, the allowance is simply used up, and freeing a seat fixes it without
  * a purchase.
+ *
+ * `meta` is typed to the three fields the client presentation registry and the
+ * upgrade modal read, so a construction that omits them or misspells one is a
+ * compile error rather than an allowance rendered as "undefined of undefined".
  */
 export class MemberSeatLimitReachedError extends HandledError {
   declare readonly code: "member_seat_limit_reached";
 
-  constructor(options: { meta?: Record<string, unknown> } = {}) {
+  constructor(
+    options: {
+      meta?: { limitType: string; current: number; max: number };
+    } = {},
+  ) {
     super(
       "member_seat_limit_reached",
       "The plan's member seats are all in use",
