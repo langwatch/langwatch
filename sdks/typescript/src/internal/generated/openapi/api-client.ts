@@ -4218,14 +4218,14 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Requested binding exceeds the creator's own permissions, the scope does not belong to this organization, or a service key / key for another member was requested without organization admin rights */
+            /** @description Requested binding exceeds the creator's own permissions, or the scope does not belong to this organization (api_key_scope_violation); a service key or a key for another member was requested without organization admin rights (insufficient_permissions) */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description Validation error (missing name, empty bindings, etc.) */
+            /** @description Validation error, for example a missing name or empty bindings (validation_error), or a name LangWatch reserves for its own keys (api_key_reserved_name) */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -4344,21 +4344,21 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Not authorized to revoke this API key (owned by another user) */
+            /** @description Not authorized to revoke this API key, which belongs to another member (api_key_not_owned) */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description API key not found */
+            /** @description API key not found (api_key_not_found) */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description API key is already revoked */
+            /** @description API key is already revoked (api_key_already_revoked) */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -18356,7 +18356,7 @@ export interface operations {
                 filter?: string;
                 /** @description 1-based index of the first resource to return. Anything that does not parse as a positive integer is read as 1. */
                 startIndex?: number;
-                /** @description How many resources to return. Anything that does not parse as a positive integer is read as 100. */
+                /** @description How many resources to return, capped at 100 (the `filter.maxResults` ServiceProviderConfig publishes). Anything that does not parse as a positive integer is read as 100, and anything above 100 is served as 100. */
                 count?: number;
             };
             header?: never;
@@ -18946,7 +18946,7 @@ export interface operations {
                 filter?: string;
                 /** @description 1-based index of the first resource to return. Anything that does not parse as a positive integer is read as 1. */
                 startIndex?: number;
-                /** @description How many resources to return. Anything that does not parse as a positive integer is read as 100. */
+                /** @description How many resources to return, capped at 100 (the `filter.maxResults` ServiceProviderConfig publishes). Anything that does not parse as a positive integer is read as 100, and anything above 100 is served as 100. */
                 count?: number;
                 /** @description Comma-separated attribute names to leave out of the response. Only `members` is honoured, and it is what lets a directory page through groups without pulling every membership. */
                 excludedAttributes?: string;

@@ -21,6 +21,7 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -60,6 +61,12 @@ describe("Feature: API keys management REST API", () => {
       method: "POST",
       headers: headersFor(token),
       body: JSON.stringify(body),
+    });
+
+  const del = (token: string, id: string) =>
+    app.request(`/api/api-keys/${id}`, {
+      method: "DELETE",
+      headers: headersFor(token),
     });
 
   type Binding = {
@@ -621,6 +628,56 @@ describe("Feature: API keys management REST API", () => {
         expect(readBack.bindings).toEqual([
           { role: "CUSTOM", scopeType: "PROJECT", scopeId: testProject.id },
         ]);
+      });
+    });
+  });
+
+  describe("given a key that has already been revoked", () => {
+    describe("when it is revoked again", () => {
+      /** @scenario Revoking a key that is already revoked names the code */
+      it("names the code rather than the HTTP reason phrase", async () => {
+        const { apiKey } = await createKey({
+          userId: adminUserId,
+          name: `double-revoke-${ns}`,
+          bindings: [
+            {
+              role: "ADMIN",
+              scopeType: RoleBindingScopeType.ORGANIZATION,
+              scopeId: testOrganization.id,
+            },
+          ],
+        });
+
+        expect((await del(adminToken, apiKey.id)).status).toBe(200);
+
+        const response = await del(adminToken, apiKey.id);
+        const body = await response.json();
+
+        expect(response.status).toBe(409);
+        expect(body.error).toBe("api_key_already_revoked");
+      });
+    });
+  });
+
+  describe("given a name LangWatch reserves for its own keys", () => {
+    describe("when a caller creates a key under it", () => {
+      /** @scenario Creating a key with a reserved name names the code */
+      it("names the code rather than the HTTP reason phrase", async () => {
+        const response = await post(adminToken, {
+          name: LANGY_SESSION_API_KEY_NAME,
+          keyType: "service",
+          bindings: [
+            {
+              role: "ADMIN",
+              scopeType: RoleBindingScopeType.ORGANIZATION,
+              scopeId: testOrganization.id,
+            },
+          ],
+        });
+        const body = await response.json();
+
+        expect(response.status).toBe(422);
+        expect(body.error).toBe("api_key_reserved_name");
       });
     });
   });

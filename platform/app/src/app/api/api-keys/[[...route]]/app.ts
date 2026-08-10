@@ -10,11 +10,8 @@ import type {
   ApiKeyService,
 } from "~/server/api-key/api-key.service";
 import {
-  ApiKeyAlreadyRevokedError,
   ApiKeyNotFoundError,
   ApiKeyNotOwnedError,
-  ApiKeyReservedNameError,
-  ApiKeyScopeViolationError,
 } from "~/server/api-key/errors";
 import {
   API_KEY_PERMISSION_MODES,
@@ -416,50 +413,37 @@ secured
       });
       if (mintRefusal) return mintRefusal;
 
-      try {
-        const result = await service.create({
-          name: body.name,
-          description: body.description,
-          userId: resolveKeyOwner({
-            isService,
-            assignedToUserId: body.assignedToUserId,
-            callerUserId,
-          }),
-          createdByUserId: callerUserId,
-          organizationId: organization.id,
-          expiresAt: body.expiresAt,
-          permissionMode: body.permissionMode,
-          permissions: body.permissions,
-          bindings: requestedBindings({
-            isService,
-            bindings: body.bindings,
-            projectIds: body.projectIds,
-          }),
-        });
+      const result = await service.create({
+        name: body.name,
+        description: body.description,
+        userId: resolveKeyOwner({
+          isService,
+          assignedToUserId: body.assignedToUserId,
+          callerUserId,
+        }),
+        createdByUserId: callerUserId,
+        organizationId: organization.id,
+        expiresAt: body.expiresAt,
+        permissionMode: body.permissionMode,
+        permissions: body.permissions,
+        bindings: requestedBindings({
+          isService,
+          bindings: body.bindings,
+          projectIds: body.projectIds,
+        }),
+      });
 
-        return c.json(
-          {
-            token: result.token,
-            apiKey: {
-              id: result.apiKey.id,
-              name: result.apiKey.name,
-              createdAt: result.apiKey.createdAt,
-            },
+      return c.json(
+        {
+          token: result.token,
+          apiKey: {
+            id: result.apiKey.id,
+            name: result.apiKey.name,
+            createdAt: result.apiKey.createdAt,
           },
-          201,
-        );
-      } catch (error) {
-        if (error instanceof ApiKeyScopeViolationError) {
-          return c.json({ error: "Forbidden", message: error.message }, 403);
-        }
-        if (error instanceof ApiKeyReservedNameError) {
-          return c.json(
-            { error: "Unprocessable Entity", message: error.message },
-            422,
-          );
-        }
-        throw error;
-      }
+        },
+        201,
+      );
     },
   );
 
@@ -586,28 +570,12 @@ secured
         apiKeyId: c.get("apiKeyId") as string,
       });
 
-      try {
-        await service.revoke({
-          id,
-          callerUserId: userId,
-          callerIsAdmin,
-          organizationId: organization.id,
-        });
-      } catch (error) {
-        if (error instanceof ApiKeyNotFoundError) {
-          return c.json(
-            { error: "Not Found", message: "API key not found" },
-            404,
-          );
-        }
-        if (error instanceof ApiKeyNotOwnedError) {
-          return c.json({ error: "Forbidden", message: error.message }, 403);
-        }
-        if (error instanceof ApiKeyAlreadyRevokedError) {
-          return c.json({ error: "Conflict", message: error.message }, 409);
-        }
-        throw error;
-      }
+      await service.revoke({
+        id,
+        callerUserId: userId,
+        callerIsAdmin,
+        organizationId: organization.id,
+      });
 
       return c.json({ success: true });
     },

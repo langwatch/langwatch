@@ -124,3 +124,18 @@ Feature: API keys management REST API
     When I replace its bindings with an admin binding on that project
     Then the request is refused with code api_key_scope_violation and status 403
     And the key keeps its viewer binding
+
+  # Every refusal this family can name answers with its code rather than an
+  # HTTP reason phrase, so a provisioning tool branches on one vocabulary
+  # across the whole management surface.
+  @integration
+  Scenario: Revoking a key that is already revoked names the code
+    Given a key exists in the organization
+    And it has been revoked
+    When I revoke it again
+    Then the request is refused with code api_key_already_revoked and status 409
+
+  @integration
+  Scenario: Creating a key with a reserved name names the code
+    When I create a key under a name LangWatch reserves for itself
+    Then the request is refused with code api_key_reserved_name and status 422

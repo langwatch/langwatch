@@ -191,10 +191,11 @@ export const CREATE_API_KEY: DescribeRouteOptions = {
     },
     "403": {
       description:
-        "Requested binding exceeds the creator's own permissions, the scope does not belong to this organization, or a service key / key for another member was requested without organization admin rights",
+        "Requested binding exceeds the creator's own permissions, or the scope does not belong to this organization (api_key_scope_violation); a service key or a key for another member was requested without organization admin rights (insufficient_permissions)",
     },
     "422": {
-      description: "Validation error (missing name, empty bindings, etc.)",
+      description:
+        "Validation error, for example a missing name or empty bindings (validation_error), or a name LangWatch reserves for its own keys (api_key_reserved_name)",
     },
   },
 };
@@ -278,13 +279,13 @@ export const REVOKE_API_KEY: DescribeRouteOptions = {
     },
     "403": {
       description:
-        "Not authorized to revoke this API key (owned by another user)",
+        "Not authorized to revoke this API key, which belongs to another member (api_key_not_owned)",
     },
     "404": {
-      description: "API key not found",
+      description: "API key not found (api_key_not_found)",
     },
     "409": {
-      description: "API key is already revoked",
+      description: "API key is already revoked (api_key_already_revoked)",
     },
   },
 };
