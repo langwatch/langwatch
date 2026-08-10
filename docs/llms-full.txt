@@ -37141,6 +37141,13 @@ Create new prompts with templates and variables:
   approach to avoid errors.
 </Warning>
 
+<Note>
+  The two SDKs do not take the same fields. `model`, `temperature` and
+  `maxTokens` go through the TypeScript SDK and the REST API; the Python SDK's
+  `create` and `update` do not accept them yet, so set them from the UI or over
+  REST. See the [REST reference](/api-reference/prompts/overview).
+</Note>
+
 
   ### TypeScript SDK
 
@@ -37148,9 +37155,9 @@ Create new prompts with templates and variables:
          // Create a new prompt with a system prompt
      const prompt = await langwatch.prompts.create({
        handle: "customer-support-bot",                    // Required
-       scope: "PROJECT",                                  // Required
-       prompt: "You are a helpful customer support agent. Help with: {{input}}", // Required
-       model: "openai/gpt-5-mini",                       // Required
+       scope: "PROJECT",                                  // Optional: defaults to "PROJECT"
+       prompt: "You are a helpful customer support agent. Help with: {{input}}", // Optional
+       model: "openai/gpt-5-mini",                       // Optional
 
        // Optional fields:
        maxTokens: 1000,                                   // Optional: Maximum tokens to generate
@@ -37169,14 +37176,12 @@ Create new prompts with templates and variables:
          # Create a new prompt
      prompt = langwatch.prompts.create(
          handle="customer-support-bot",                    # Required
-         scope="PROJECT",                                  # Required
-         prompt="You are a helpful customer support agent. Help with: {{input}}", # Required
-         model="openai/gpt-5-mini",                       # Required
+         scope="PROJECT",                                  # Optional: defaults to "PROJECT"
+         prompt="You are a helpful customer support agent. Help with: {{input}}", # Optional
 
          # Optional fields:
-         max_tokens=1000,                                  # Optional: Maximum tokens to generate
-         # temperature=0.7,                                # Optional, but the GPT-5 family rejects it
          # messages=[...],                                 # Optional: Messages array in OpenAI format { role: "system" | "user" | "assistant", content: "..." }
+         # tags=["production"],                            # Optional: tags for the initial version
      )
 
          print(f"Created prompt with handle: {prompt.handle}")
@@ -37224,11 +37229,11 @@ You must include at least one field to update the prompt.
          # Update prompt content (creates new version automatically)
      updated_prompt = langwatch.prompts.update(
          "customer-support-bot",
-         # All fields are optional for updates - only specify what you want to change
+         scope="PROJECT",                                  # Required
+         # Everything below is optional - only specify what you want to change
          prompt="You are an expert customer support agent. Help with: {{input}}",
-         model="openai/gpt-5.5",                           # Optional: Change the model
-         max_tokens=2000,                                  # Optional: Change max tokens
          # messages=[...],                                 # Optional: Messages array in OpenAI format { role: "system" | "user" | "assistant", content: "..." }
+         # tags=["production"],                            # Optional: retag the new version
      )
 
          print(f"Updated prompt: {updated_prompt.handle}, New version: {updated_prompt.version}")

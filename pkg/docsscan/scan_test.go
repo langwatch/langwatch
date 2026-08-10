@@ -210,6 +210,20 @@ func TestUnrelatedVersionsAreNotFound(t *testing.T) {
 	}
 }
 
+// @scenario "A pinned release for another project's chart is left alone"
+func TestOtherProjectsChartVersionIsLeftAlone(t *testing.T) {
+	// `--version`, `tag:` and `targetRevision:` are generic on their own. If the
+	// rule fired on them regardless of context, it would tell an author to
+	// change cert-manager's version to the LangWatch release.
+	refs := docsscan.FindVersionRefs(
+		"docs/page.mdx",
+		"helm install cert-manager jetstack/cert-manager \\\n  --version 1.14.5 \\\n",
+	)
+	if len(refs) != 0 {
+		t.Errorf("found %d versions, want none — no LangWatch chart is named nearby", len(refs))
+	}
+}
+
 // @scenario "A placeholder tag cannot drift"
 func TestPlaceholderTagIsNotFound(t *testing.T) {
 	refs := docsscan.FindVersionRefs(
@@ -233,18 +247,19 @@ func TestFindVersionRefs(t *testing.T) {
 			want:     []string{"3.12.0"},
 		},
 		{
-			name:     "finds a Helm values image tag",
-			contents: "images:\n  app:\n    tag: \"3.12.0\"\n",
-			want:     []string{"3.12.0"},
+			name: "finds a Helm values image tag",
+			contents: "images:\n  app:\n    repository: registry.example.com/langwatch/langwatch\n" +
+				"    tag: \"3.12.0\"\n",
+			want: []string{"3.12.0"},
 		},
 		{
 			name:     "finds the version a shell example sets",
-			contents: "VERSION=3.12.0\n",
+			contents: "VERSION=3.12.0\ndocker pull \"langwatch/langwatch:$VERSION\"\n",
 			want:     []string{"3.12.0"},
 		},
 		{
 			name:     "finds every version in a file, in order",
-			contents: "intro\nVERSION=1.2.3\nmore\ntag: \"4.5.6\"\n",
+			contents: "langwatch/langwatch chart\nVERSION=1.2.3\nmore\ntag: \"4.5.6\"\n",
 			want:     []string{"1.2.3", "4.5.6"},
 		},
 		{
@@ -255,6 +270,31 @@ func TestFindVersionRefs(t *testing.T) {
 		{
 			name:     "finds the chart revision an ArgoCD Application tracks",
 			contents: "    chart: langwatch\n    targetRevision: 3.12.0\n",
+			want:     []string{"3.12.0"},
+		},
+		{
+			// Otherwise the remedy would tell an author to change another
+			// project's version to the LangWatch release, corrupting the page.
+			name:     "ignores a pinned release for someone else's chart",
+			contents: "helm install cert-manager jetstack/cert-manager \\\n  --version 1.14.5 \\\n",
+			want:     nil,
+		},
+		{
+			name:     "ignores an ArgoCD Application tracking another chart",
+			contents: "    chart: prometheus\n    targetRevision: 25.8.0\n",
+			want:     nil,
+		},
+		{
+			name:     "ignores a tag in an unrelated values block",
+			contents: "image:\n  repository: jetstack/cert-manager\n  tag: \"1.14.5\"\n",
+			want:     nil,
+		},
+		{
+			// The context may sit either side: a helm command precedes its
+			// `--version` continuation, while `VERSION=` precedes the loop that
+			// names the images.
+			name:     "finds a version whose chart reference comes after it",
+			contents: "VERSION=3.12.0\nfor i in a; do\n  docker pull \"langwatch/langwatch:$VERSION\"\ndone\n",
 			want:     []string{"3.12.0"},
 		},
 		{
@@ -297,7 +337,10 @@ func TestFindVersionRefs(t *testing.T) {
 }
 
 func TestFindVersionRefsReportsFileAndLine(t *testing.T) {
-	refs := docsscan.FindVersionRefs("docs/page.mdx", "a\nb\nVERSION=9.9.9\n")
+	refs := docsscan.FindVersionRefs(
+		"docs/page.mdx",
+		"a\nlangwatch/langwatch\nVERSION=9.9.9\n",
+	)
 	if len(refs) != 1 {
 		t.Fatalf("found %d refs, want 1", len(refs))
 	}
