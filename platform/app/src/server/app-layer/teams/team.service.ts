@@ -252,7 +252,7 @@ export class TeamRestService {
     data: { name?: string };
   }): Promise<Team> {
     const team = await this.repo.update({ id, organizationId, data });
-    if (!team) throw new TeamNotFoundError("Team not found");
+    if (!team) throw new TeamNotFoundError(id);
     return team;
   }
 
@@ -279,7 +279,7 @@ export class TeamRestService {
     }
 
     const team = await this.repo.archive({ id, organizationId });
-    if (!team) throw new TeamNotFoundError("Team not found");
+    if (!team) throw new TeamNotFoundError(id);
     return team;
   }
 }
