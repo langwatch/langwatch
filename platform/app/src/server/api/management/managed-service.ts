@@ -23,6 +23,7 @@ import type { EnterpriseFeature } from "~/server/api/enterprise";
 import type { Permission } from "~/server/api/rbac";
 import {
   type AccessPolicy,
+  credentialClassFor,
   familyFromBasePath,
   publicEndpoint,
   registerRoutePolicy,
@@ -83,15 +84,20 @@ export function createManagementService({
     auth: createOrgAuthMiddleware({ prisma, refusals: "throw" }),
     onRouteMounted: (route) => {
       if (route.isNamespaceGuard) {
+        const policy = publicEndpoint(
+          "version-namespace guard: answers 404 for unknown version segments " +
+            "so they cannot fall through to a dynamic unversioned route; " +
+            "reads no data and takes no credential",
+        );
         registerRoutePolicy({
           method: route.method,
           path: route.path,
-          policy: publicEndpoint(
-            "version-namespace guard: answers 404 for unknown version segments " +
-              "so they cannot fall through to a dynamic unversioned route; " +
-              "reads no data and takes no credential",
-          ),
+          policy,
           family,
+          credentialClass: credentialClassFor({
+            scope: "organization",
+            policy,
+          }),
         });
         return;
       }
@@ -109,6 +115,12 @@ export function createManagementService({
         path: route.path,
         policy: meta.policy,
         family,
+        // The whole family authenticates with an organization-scoped key, so
+        // the class is the one a SecuredApp on the organization scope derives.
+        credentialClass: credentialClassFor({
+          scope: "organization",
+          policy: meta.policy,
+        }),
       });
     },
   });

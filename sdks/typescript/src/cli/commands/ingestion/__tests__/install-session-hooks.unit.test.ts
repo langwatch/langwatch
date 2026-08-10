@@ -7,9 +7,14 @@
  * LANGWATCH_CLI_CONFIG, and the files the command merges into or writes are
  * real files in a temp directory.
  *
+ * `claude` here is one without plugin support, so claude_code lands on the hook
+ * entries rather than the LangWatch plugin. What the plugin path reports lives
+ * in install-claude-plugin.unit.test.ts.
+ *
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
+import type * as ChildProcessModule from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -37,6 +42,18 @@ vi.mock("@/cli/utils/governance/cli-api", async () => {
   return { ...actual, mintIngestionKey: mintIngestionKeyMock };
 });
 
+// No test may reach a real `claude`. A non-zero `plugin --help` is exactly what
+// a release without the subcommand answers, so the install falls back to the
+// hook entries these scenarios are about.
+const { spawnSyncMock } = vi.hoisted(() => ({
+  spawnSyncMock: vi.fn(() => ({ status: 1, stdout: "", stderr: "unknown" })),
+}));
+vi.mock("node:child_process", async () => {
+  const actual =
+    await vi.importActual<typeof ChildProcessModule>("node:child_process");
+  return { ...actual, spawnSync: spawnSyncMock };
+});
+
 const entryFor = (tool: "claude_code" | "codex") => ({
   hooks: [
     { type: "command", command: sessionContextHookCommand(tool), timeout: 10 },
@@ -56,6 +73,8 @@ let codexConfigPath: string;
 let opencodePluginDir: string;
 let stdoutSpy: ReturnType<typeof vi.spyOn>;
 const origConfig = process.env.LANGWATCH_CLI_CONFIG;
+const origHome = process.env.HOME;
+const origUserprofile = process.env.USERPROFILE;
 
 const readJson = (file = settingsPath): Record<string, any> =>
   JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, any>;
@@ -80,6 +99,11 @@ const stdout = (): string =>
 
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lw-install-hooks-"));
+  // The claude plugin state lives under the home directory, so point HOME at
+  // the temp directory too: what the developer running these tests happens to
+  // have installed must never decide which seam the install picks.
+  process.env.HOME = tmpDir;
+  process.env.USERPROFILE = tmpDir;
   settingsPath = path.join(tmpDir, ".claude", "settings.json");
   codexHooksPath = path.join(tmpDir, ".codex", "hooks.json");
   codexConfigPath = path.join(tmpDir, ".codex", "config.toml");
@@ -109,6 +133,10 @@ afterEach(() => {
   stdoutSpy.mockRestore();
   if (origConfig === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
   else process.env.LANGWATCH_CLI_CONFIG = origConfig;
+  if (origHome === undefined) delete process.env.HOME;
+  else process.env.HOME = origHome;
+  if (origUserprofile === undefined) delete process.env.USERPROFILE;
+  else process.env.USERPROFILE = origUserprofile;
   fs.rmSync(tmpDir, { recursive: true, force: true });
   vi.clearAllMocks();
 });

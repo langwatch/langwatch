@@ -1955,7 +1955,11 @@ The management and webhook APIs answer with the same envelope, and their `type` 
 |---|---|---|
 | `validation_error` | `400` | The body or query failed validation. `meta.field_errors` names the offending fields. |
 | `invalid_cursor` | `400` | A paging `cursor` this API did not issue. Restart the walk rather than guessing. |
-| `trace_project_required` | `400` | An organization- or team-scoped virtual key was created without a project for its traces and spend to land in. |
+| `trace_project_required` | `400` | An organization- or team-scoped virtual key was created without a project for its traces and spend to land in, in an organization with no governance project either. |
+| `gateway_trace_project_ambiguous` | `400` | A virtual key was created without saying which project its traces and spend land in, and the organization has projects to choose from. Send `trace_project_id`, or scope the key to exactly one project. |
+| `gateway_trace_project_unknown` | `400` | The `trace_project_id` a virtual key named is not a project of this organization, so its traces could not land there. The id is not echoed back. |
+| `gateway_budget_scope_unreachable` | `400` | A `team`, `project` or `group` budget was created that no active key can produce traffic for, so as things stand it cannot spend or block, and it stays that way until some key reaches it. `meta.reachable_project_ids` names where the traffic goes, capped at the first 10 with `meta.reachable_project_count` giving the real total, so a longer list is never mistaken for the whole set. Send `allow_unreachable` to keep it as written. |
+| `gateway_spend_group_by_unstable` | `400` | A spend rollup was grouped by `model` or `provider`, or into time buckets, over a window recent enough that outcomes can still arrive. Until a request settles, the model and provider recorded against it are the ones that were asked for, and they are replaced by the ones that actually served it, so a page walk over such a group counts some requests twice and misses others. `meta.group_by` names the dimensions that move and `meta.settles_at` is when the requested window becomes safe. Reconcile closed periods, or send `allow_unstable` when an approximate shape is enough. |
 | `gateway_budget_cycle_anchor_invalid` | `400` | A `cycle_anchor_at` was sent on a `total` or `manual` budget. Those windows do not cycle. |
 | `group_budget_requires_clickhouse` | `400` | A `group` or `attributed_user` budget needs the ClickHouse spend ledger to tell members apart. |
 | `webhook_endpoint_invalid` | `400` | A webhook endpoint's URL broke the [receiver URL policy](/features/webhooks#what-a-receiver-url-must-look-like). The `message` names the rule. |
@@ -2245,7 +2249,8 @@ Response:
       "purpose": "user",
       "display_prefix": "vk-lw-01HZX9",
       "principal_user_id": null,
-      "trace_project_id": null,
+      "trace_project_id": "proj_01HZ...",
+      "trace_project_archived": false,
       "scopes": [{ "scope_type": "project", "scope_id": "proj_01HZ..." }],
       "routing_policy_id": null,
       "routing_mode": "none",
@@ -2286,7 +2291,9 @@ Body (only `name` is required):
 ```
 
 - `scopes` defaults to the calling project. Team- and org-scoped keys need a scoped API key holding `virtualKeys:manage` at each requested scope; legacy project keys can only mint keys for their own project.
-- An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (requires `virtualKeys:manage` on that project; it is a destination, not a scope, and grants no access to the key), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists.
+- An org- or team-scoped key also needs a place for its traces and spend to land, and has to say where: pass `trace_project_id` (requires `virtualKeys:manage` on that project; it is a destination, not a scope, and grants no access to the key). Without it, and without exactly one project scope naming a live project to take it from, creation refuses with `gateway_trace_project_ambiguous`. The same refusal covers a key scoped to several projects at once. An organization with no other live projects is exempt and the key gets its oldest live governance project, because there is nothing else to name; one with no governance project either refuses with `trace_project_required`. A `trace_project_id` that names a project this organization does not have refuses with `gateway_trace_project_unknown` rather than quietly resolving to somewhere else.
+- `trace_project_id` is decided once, when the key is written, and stored on it. Changing what the key is scoped to therefore never moves where its traces and spend land; send `trace_project_id` on the update to move it, validated the same way create validates it. Sending it as explicit `null` does not clear it: it asks for the destination to be worked out again from what the key is now, under the same rules create uses, so it lands on the key's single project scope when exactly one names a live project, falls back to the organization's oldest live governance project when there are no other live projects to choose from, and is refused with `gateway_trace_project_ambiguous` when nothing selects a destination and the organization has live projects that could have been named. A key written before this was stored, in an organization that had no governance project to give it, can carry `null`: its traces are dropped and no budget counts its spend, so give it a `trace_project_id`.
+- `trace_project_archived` says the project the key traces into has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Point the key somewhere else if that is not what you want.
 - `budget` creates a budget atomically with the key and manages exactly that row on later updates: the key can never exist without the cap you asked for. Windows: `day`, `week`, `month`.
 - `routing_mode` is one of `none` (default: no silent failover), `fallback_all`, or `policy` (requires `routing_policy_id`).
 
@@ -2331,13 +2338,14 @@ Body (all fields optional):
 {
   "name": "new-name",
   "scopes": [{ "scope_type": "team", "scope_id": "team_..." }],
+  "trace_project_id": "proj_01HZ...", // or null to re-resolve it
   "routing_mode": "fallback_all",
   "budget": { "limit_usd": "50", "window": "month" },
   "config": { /* partial, merges with existing */ }
 }
 ```
 
-`scopes` replaces the whole visibility set and requires `virtualKeys:manage` at every NEW scope. `budget: null` archives the key's own cap (spend history is retained); omitting `budget` leaves it alone.
+`scopes` replaces the whole visibility set and requires `virtualKeys:manage` at every NEW scope, and does not move where the key's traces and spend land. `trace_project_id` does: omitting it leaves the destination alone, a value moves it, and explicit `null` re-resolves it under the create-time rules rather than clearing it. `budget: null` archives the key's own cap (spend history is retained); omitting `budget` leaves it alone.
 
 ### Rotate, disable, enable, revoke
 
@@ -3044,7 +3052,7 @@ GET /api/gateway/v1/spend-events?from=1751328000000&to=1753920000000&cursor=...
 
 - `from` and `to` (unix milliseconds) are **required**, must be safe integers, and `from <= to`; the walk is a ranged read by contract.
 - Pages are **stable under live writes**: rows are served in insert order, so a row folded late is picked up by a later page of the same walk instead of being skipped. Offset pagination cannot promise that; cursors can.
-- Filters: `virtual_key_id`, `end_user_id`, `project_id`, `model`, and `status` (`success`, `error`, `admitted`, `confirmed`, `failed`, `settled`). `limit` defaults to 50, max 200.
+- Filters: `project_id`, `team_id`, `external_id`, `virtual_key_id`, `end_user_id`, `principal_user_id`, `model`, `provider_key`, `request_type`, `label`, `metadata`, and `status` (`success`, `error`, `admitted`, `confirmed`, `failed`, `settled`). The same twelve narrow the summaries, with one exception: `status=admitted` is refused there, because a rollup sums the cost of requests past admission and an in-flight request has none to contribute. `limit` defaults to 50, max 200.
 - Rows come back as the same canonical envelopes the webhooks deliver, plus `next_cursor`. Diff by `gateway_request_id`.
 - A garbled `cursor` is refused with `400` rather than silently restarting the walk.
 - In-flight requests appear with `status=admitted` and null quantities (typed `gateway.request.admitted` on this surface only; they are never pushed). Treat them as not yet billable.
@@ -3079,7 +3087,7 @@ import os
 import langwatch
 
 langwatch.setup(api_key=os.environ["LANGWATCH_ORG_API_KEY"])
-from_ms, to_ms = 1782950400000, 1785628800000
+from_ms, to_ms = 1782864000000, 1785542400000  # 2026-07-01 to 2026-08-01 UTC
 
 # Checksums first, one row per key.
 for row in langwatch.spend_events.iter_summaries(group_by="virtual_key", from_ms=from_ms, to_ms=to_ms):
@@ -3093,6 +3101,43 @@ for event in langwatch.spend_events.iterate(from_ms=from_ms, to_ms=to_ms, virtua
 </CodeGroup>
 
 `iterSummaries` / `iter_summaries` and `iterate` stream rows and fetch pages behind you. Use `summariesPage` / `summaries_page` and `listPage` / `list_page` when you want to hold the cursor yourself, for example to checkpoint a long reconciliation across runs.
+
+Both grains take the same filters, so a divergence can be walked on exactly the narrowing that produced it. Pass an array to widen a filter and name two filters to narrow. The one filter the summaries take differently is `status`, which does not accept `admitted` there: list the events for in-flight requests.
+
+The window below is the closed month declared above, which matters: grouping by `model` or `provider`, or into time buckets, is refused on a window recent enough that outcomes can still arrive. Reconcile closed periods and you never meet it; for a live view, opt out and read the result as approximate: `allow_unstable=true` over REST, `allowUnstable` from the TypeScript SDK, `allow_unstable` from Python.
+
+
+<CodeGroup>
+
+```typescript TypeScript
+for await (const row of langwatch.spendEvents.iterSummaries({
+  groupBy: ["model", "end_user"],
+  bucket: "day",
+  timezone: "Europe/Amsterdam",
+  from, to,
+  model: ["gpt-5-mini", "claude-opus-5"],
+  metadata: { customer_tier: "gold" },
+})) {
+  bill(row.group, row.bucket_start, row.cost.nano_usd);
+}
+```
+
+```python Python
+for row in langwatch.spend_events.iter_summaries(
+    group_by=["model", "end_user"],
+    bucket="day",
+    timezone="Europe/Amsterdam",
+    from_ms=from_ms,
+    to_ms=to_ms,
+    model=["gpt-5-mini", "claude-opus-5"],
+    metadata={"customer_tier": "gold"},
+):
+    bill(row["group"], row["bucket_start"], row["cost"]["nano_usd"])
+```
+
+</CodeGroup>
+
+The full vocabulary, and the groupings that are refused rather than served approximately (`model`, `provider`, and time buckets), are in [Narrowing and grouping](/ai-gateway/cookbooks/metering-and-rebilling#narrowing-and-grouping).
 
 ### The settled work queue
 
@@ -3233,7 +3278,7 @@ The budget is in force immediately; the next request counts against it. Everythi
 | Scope | Applies to |
 |---|---|
 | `organization` | All gateway traffic across every project in the org. |
-| `team` | All gateway traffic in projects belonging to the team. |
+| `team` | All gateway traffic in projects belonging to the team, plus traffic on any key scoped to that team. |
 | `project` | All gateway traffic in this project. |
 | `virtual_key` | This specific VK. |
 | `principal` | This user or service account across any VK they use. |
@@ -3241,6 +3286,17 @@ The budget is in force immediately; the next request counts against it. Everythi
 | `attributed_user` | Each distinct **end user** seen on an anchor (a VK or a project), individually (see below). |
 
 A request is evaluated against **every** budget whose scope applies. A request by Alice in project `demo` of team `platform` in org `acme` with VK `prod-key` is checked against that org's, team's, project's and VK's budgets, Alice's principal budgets, and the per-member budgets of every group Alice belongs to. If any budget hard-blocks, the request is rejected; if any warn threshold is crossed, a warning header is added. Hard-block wins over warn.
+
+### A budget has to reach the traffic it names
+
+Which team and project a request belongs to is decided by the key that served it: the teams the key is scoped to, plus the team of the project its traces land in. So a `team`, `project` or `group` budget can be written, look correct on both sides, and match nothing at all, for instance a `project` budget on a project none of your keys send traffic to.
+
+A budget that could never accrue is refused when you create it, with `gateway_budget_scope_unreachable`. The refusal lists the projects your active keys do reach, in `error.meta.reachable_project_ids`. Two ways forward:
+
+- Point a key at the target: give it a scope on that team or project, or set the key's trace project.
+- Keep the budget as written by sending `allow_unreachable: true`, which is the right answer when you are provisioning ahead of the keys that will use it. In the app, the refusal offers "Create it anyway".
+
+An organization with no active keys is never refused, since budget first and key second is a normal setup order. On reads, `scope_reach` on each budget says `reachable` or `unreachable`, which is the only field that tells a budget nothing can reach apart from one that simply has not been breached.
 
 ### Group budgets are per member
 
@@ -3507,7 +3563,9 @@ The `/internal/gateway/budget/debit` call forwards all three so budget ledgers r
 
 **Simple match/action rules that let operators set cache behavior for groups of requests without touching client code.** Deliberately narrower than Cloudflare Page Rules, enough to demonstrate enterprise cache governance (force 5-min cache on prod internal-api, disable cache for benchmark VKs, etc.) without the matcher combinatorics that would slow the hot path.
 
-Latency budget: rules are resolved **once per VK bundle refresh** (every 30 s on `/changes`) and baked into the bundle as a pre-sorted array. At request time, the gateway walks the sorted array until a match fires, for the expected low single-digit rule count per VK, this is sub-microsecond. Hot-path total overhead stays at ~700 ns.
+Latency budget: rules are resolved **once per VK bundle refresh** and baked into the bundle as a pre-sorted array. At request time, the gateway walks the sorted array until a match fires, for the expected low single-digit rule count per VK, this is sub-microsecond. Hot-path total overhead stays at ~700 ns.
+
+Editing a rule triggers that refresh rather than waiting for one. Every create, edit and delete appends a change event in the same transaction as the write; the gateway's `/changes` long-poll returns it on the next cycle and drops the organization's cached bundles, so the following request rebuilds against the new rules.
 
 ### Shape
 
@@ -3551,7 +3609,7 @@ Each matcher is optional; all non-null matchers must match for the rule to apply
 ### Evaluation
 
 - **First-match wins**, sorted by `priority` descending.
-- Rules evaluated once per request, AT auth-resolve time (bundled with VK config), so zero additional upstream latency.
+- Rules are resolved once per VK bundle refresh, not once per request, and baked into the bundle as a pre-sorted array. A request only walks that array to find its match, so evaluation costs no upstream call.
 - Rule hits exposed in observability via `langwatch.cache.rule_id` span attribute + `gateway_cache_rule_hits_total{rule_id, mode_applied}` counter.
 
 ### Concrete example: "force 5-min cache on all prod internal-api calls"
@@ -5326,7 +5384,7 @@ Eight rows, top to bottom:
 |---|---|---|
 | Request health | rate, p50/p95/p99, error % | primary SLI row; everything else is causal |
 | Provider health | circuit state, upstream latency, fallback count | which provider is degrading and how often we're saved by fallback |
-| Auth cache | L1 hit rate, L2 hit rate, resolve-key RPS | cache degradation = spike in control-plane load |
+| Auth cache | hit rate, resolve-key RPS | cache degradation = spike in control-plane load |
 | Budgets | blocks by scope | which scope is actually rejecting traffic |
 | Guardrails | verdicts by direction, blocks by direction | catches both legit policy enforcement and regressions |
 | Streaming | active streams, usage-warning rate | streams that never reported usage = cost blind spot |
@@ -5475,12 +5533,11 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards �
     },
     {
       "type": "timeseries",
-      "title": "L1 + L2 hit rate",
+      "title": "Auth cache hit rate",
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 23, "w": 12, "h": 7 },
       "targets": [
-        { "expr": "sum(rate(gateway_auth_cache_hits_total{namespace=\"$namespace\", tier=\"l1\"}[$__rate_interval])) / sum(rate(gateway_auth_cache_lookups_total{namespace=\"$namespace\"}[$__rate_interval]))", "legendFormat": "L1 hit rate" },
-        { "expr": "sum(rate(gateway_auth_cache_hits_total{namespace=\"$namespace\", tier=\"l2_redis\"}[$__rate_interval])) / sum(rate(gateway_auth_cache_lookups_total{namespace=\"$namespace\"}[$__rate_interval]))", "legendFormat": "L2 hit rate" }
+        { "expr": "sum(rate(gateway_auth_cache_hits_total{namespace=\"$namespace\", tier=\"l1\"}[$__rate_interval])) / sum(rate(gateway_auth_cache_lookups_total{namespace=\"$namespace\"}[$__rate_interval]))", "legendFormat": "hit rate" }
       ],
       "fieldConfig": { "defaults": { "unit": "percentunit" } }
     },
@@ -5693,7 +5750,7 @@ When a page fires, the engineer lands on the dashboard, narrows the cause to a r
 
 ## Skipping panels you don't have metrics for
 
-The default deployment ships without an L2 Redis tier, so the L2 hit-rate line sits flat at zero, harmless. If you haven't enabled `networkPolicy`, the provider egress row doesn't need a custom panel since flow is unchanged. The JSON uses `label_values(...)` so missing labels degrade gracefully rather than breaking the dashboard.
+If you haven't enabled `networkPolicy`, the provider egress row doesn't need a custom panel since flow is unchanged. The JSON uses `label_values(...)` so missing labels degrade gracefully rather than breaking the dashboard.
 
 ## See also
 
@@ -5861,7 +5918,31 @@ curl -sS "$LW/api/gateway/v1/spend-summaries?group_by=virtual_key&from=$FROM_MS&
 # compare event_count and cost.nano_usd per key against your ledger
 ```
 
-Matching checksums end it. On divergence, walk `spend-events` for that key and window by cursor and diff by `gateway_request_id`; the missing or duplicated ids are your fix list. For a delivery gap (receiver outage, endpoint auto-disabled), [replay](/ai-gateway/billing-events#replay) the gap window to your endpoint, honoring your downstream biller's dedup window.
+Matching totals mean no aggregate divergence. They are not proof that both systems hold the same `gateway_request_id` set, since a different set can sum the same, so a biller that needs request-level certainty walks the events regardless. On divergence, walk `spend-events` for that key and window by cursor and compare `gateway_request_id` counts per id rather than set membership: one request dropped and another booked twice leaves the id sets looking close and the money wrong. The ids whose counts disagree are your drops and duplicates. If every count agrees and the totals still differ, no request is missing and the same request is priced differently on each side, so compare `cost.nano_usd` per id rather than its presence. Both reads take the same filters, so you can narrow the walk to exactly what the checksum covered. For a delivery gap (receiver outage, endpoint auto-disabled), [replay](/ai-gateway/billing-events#replay) the gap window to your endpoint, honoring your downstream biller's dedup window.
+
+### Narrowing and grouping
+
+Repeat a filter to widen it and name two filters to narrow. Both reads accept `project_id`, `team_id`, `external_id`, `virtual_key_id`, `end_user_id`, `principal_user_id`, `model`, `provider_key`, `request_type`, `label`, `metadata` and `status`. Only `status=admitted` differs: the summaries refuse it, because a rollup sums the cost of requests past admission and an in-flight request has none. Ask `spend-events` for those.
+
+```bash
+# Two models, one customer tier, one team, in one call
+curl -sS "$LW/api/gateway/v1/spend-summaries?group_by=model,end_user\
+&from=$FROM_MS&to=$TO_MS\
+&model=gpt-5-mini&model=claude-opus-5\
+&metadata=customer_tier:gold\
+&team_id=$TEAM_ID" \
+  -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY"
+```
+
+`metadata` is written `key:value` and splits on the first colon, so a value may contain colons of its own. A key may not contain a colon, and both halves must be non-empty. Repeating a key widens that key: `metadata=tier:gold&metadata=tier:silver` matches either.
+
+`group_by` takes one or two dimensions and `bucket=hour|day` adds a time column in the `timezone` you name. `key` stays the first dimension's value, so an integration written against the single-dimension response keeps working; read `group` to tell two dimensions apart.
+
+<Warning>
+Grouping by `model` or `provider`, or into time buckets, is refused with `gateway_spend_group_by_unstable` on a window recent enough that outcomes can still arrive. Until a request settles, the model and provider recorded against it are the ones that were **asked for**, and they are replaced by the ones that actually served it. A page walk over a group that can move counts some requests twice and misses others, which is the one failure a reconciliation cannot detect on its own.
+
+Reconcile closed periods and this never fires. For a live dashboard where an approximate shape is enough, send `allow_unstable=true`. The refusal carries `meta.settles_at`, so a scheduler can wait rather than guess.
+</Warning>
 
 ## 6. Breach handling and period close
 
@@ -6793,7 +6874,7 @@ The three log lines form a ladder operators read in order:
 **Customer-facing behaviour during the grace window:**
 
 - Requests against any VK that resolved successfully **before** the outage continue to work transparently.
-- Requests against any VK **never seen by this pod** (cold) still fail, the gateway has no bundle to fall back to. Today's mitigation is Redis L2 (`GATEWAY_REDIS_URL`): HPA-scaled pods inherit the warm set from L2 even while the control plane is unreachable. (`GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` is a planned v1.1 enhancement to also pre-warm L1 from a `/bootstrap` snapshot on startup; the flag is reserved in env wiring but has no Go-side implementation today, so setting it is currently a no-op.)
+- Requests against any VK **never seen by this pod** (cold) still fail, the gateway has no bundle to fall back to. The cache is per pod, so a pod added during the outage starts cold. (`GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` is a planned enhancement to pre-warm the cache from a `/bootstrap` snapshot on startup; the flag is reserved in env wiring but has no Go-side implementation today, so setting it is currently a no-op.)
 - Requests against any VK whose JWT was **revoked just before the outage** but the revocation `/changes` event hadn't propagated yet, these stay served until the cache entry crosses its hard cap. Acceptable trade-off for the grace; auth rejections from a healthy CP still evict instantly via `auth_cache_hard_evict reason=auth_rejection`.
 
 **Tune:**
@@ -6823,10 +6904,9 @@ The gateway is a cache of the control plane, so a surprising amount continues to
 
 | Component down | Customer impact | How long gateway stays up | Notes |
 |---|---|---|---|
-| LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default 21600, 6 h) of stale-while-error; Redis L2 extends coverage to cold-for-pod VKs | Spend accounting is unaffected: cost rides the spend commands the gateway spools, and the ledger catches up once the control plane returns. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
+| LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default 21600, 6 h) of stale-while-error; a VK the pod has never resolved is not covered | Spend accounting is unaffected: cost rides the spend commands the gateway spools, and the ledger catches up once the control plane returns. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
 | One upstream provider | None for VKs with fallback; 502/504 for VKs without | Indefinite, circuit breaker + fallback chain absorb it | `gateway_circuit_state{credential_id}` shows which provider is down |
-| Redis L2 cache | +~30 ms on cold-for-pod VKs | Indefinite, L1 + `/resolve-key` cover the miss | Fail-open by design (poison entries `DEL`, network errors log and miss) |
-| Gateway pod (crash, eviction) | None, HPA replaces, PDB holds ≥ 2 replicas | N/A | Stateless; new pod warms from Redis L2 + `/bootstrap` |
+| Gateway pod (crash, eviction) | Streams in flight on that pod are cut; other requests retry onto a surviving replica | N/A | Stateless; the replacement pod warms from the control plane on its first request per key. The PDB (`minAvailable: 1` by default, against 2 replicas) only bounds voluntary disruptions like a drain, so it does not apply to a crash |
 
 For multi-region deployments with shared control plane: a gateway region down is handled by Route53 latency-based failover. See [Scaling → Regional placement](/ai-gateway/self-hosting/scaling#regional-placement).
 
@@ -8890,7 +8970,7 @@ The gateway serves `GET /metrics` on its main HTTP port (`5563` by default, the 
 | `gateway_auth_cache_lookups_total` | counter | none | Hits plus misses |
 | `gateway_auth_cache_size` | gauge | `tier` | Entries currently held |
 
-`tier` is `l1` (in-process) or `l2_redis`. Only `l1` is populated in the default deployment, which ships without an L2 Redis tier.
+`tier` is always `l1`: the auth cache is an in-process LRU, private to each pod.
 
 ### Governance
 
@@ -9109,7 +9189,7 @@ The LangWatch AI Gateway replaces every direct provider call with a single call 
                                                                      ▼
                                                 ┌───────────────────────────────────┐
                                                 │   LangWatch AI Gateway (Go)       │
-                                                │   - auth / JWT cache (L1+L2)      │
+                                                │   - auth / JWT cache (in-process) │
                                                 │   - virtual-key resolution        │
                                                 │   - budget pre-check              │
                                                 │   - guardrail pre-call            │
@@ -11137,7 +11217,7 @@ Signature verification happens **before** the timestamp check to avoid a secret-
 
 Once a VK is resolved, the gateway caches a short-lived JWT (15 min TTL) containing the minimum claims needed to authorize: `{vk_id, project_id, team_id, org_id, principal_id, revision, iat, exp, iss, aud}`. The full VK config is fetched separately with ETag revalidation so cache entries are invalidated atomically on any edit.
 
-**Never** persisted to disk. Every replica's L1 cache is in memory; the optional L2 Redis is also in-memory.
+**Never** persisted to disk, and never shared: the cache is in memory, private to each replica.
 
 ## Tenant isolation
 
@@ -11216,7 +11296,7 @@ ClickHouse:
 
 In a self-hosted deployment, the gateway and control plane both run in your infrastructure. Data never leaves your cluster except on outbound calls to LLM providers. You own every secret, every KMS key, every audit log, and every trace.
 
-The gateway Helm chart ships a deny-by-default `NetworkPolicy` (opt-in) that locks lateral traffic, only `ingress-nginx` and Prometheus can reach the pod, and egress is limited to DNS, the control plane, Redis (if configured), OTLP (if configured), and provider upstream IPs. The operator debug surface (pprof) is loopback-bound by default and unreachable over any Service; deployments that need direct access can bind non-loopback with a required bearer token, the gateway refuses to start in the bind-public-without-token configuration. See [Self-Hosting → Helm → NetworkPolicy](/ai-gateway/self-hosting/helm#networkpolicy) and [Self-Hosting → Helm → Admin listener](/ai-gateway/self-hosting/helm#admin-listener).
+The gateway Helm chart ships a deny-by-default `NetworkPolicy` (opt-in) that locks lateral traffic, only `ingress-nginx` and Prometheus can reach the pod, and egress is limited to DNS, the control plane, OTLP (if configured), and provider upstream IPs. There is no operator debug surface to lock down: the gateway binary exposes no admin or pprof listener, and the chart's `gateway.admin.*` keys are forward-compat surface that nothing reads. The planned listener is loopback-bound by default, with a required bearer token and a startup refusal for the bind-public-without-token configuration. See [Self-Hosting → Helm → NetworkPolicy](/ai-gateway/self-hosting/helm#networkpolicy) and [Self-Hosting → Helm → Admin listener](/ai-gateway/self-hosting/helm#admin-listener).
 
 See [Self-Hosting → Helm](/ai-gateway/self-hosting/helm) for the deployment topology.
 
@@ -11288,7 +11368,9 @@ All three are a plain count of seconds, not a duration string: `300`, not `5m`.
 |----------------------------------------------|----------------|----------------------------------------------------------------------------------------------|
 | `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`    | `300` (5m)     | Per-failure soft-expiry extension during a control-plane outage.                             |
 | `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`   | `21600` (6h)   | Outage cap measured from JWT exp. A negative value disables stale-while-error.                |
-| `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS`   | `60`           | How stale a cached key's config (credentials, base URLs, routing) can get before a background re-fetch. A negative value disables the refresh. |
+| `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS`   | `60`           | How stale a cached key's config (credentials, base URLs, routing) can get before a background revalidation. A negative value disables the refresh. |
+
+The config refresh is conditional whenever the gateway has a version token to offer: it sends back the token the control plane stamped on the config it holds, and a key nobody changed is confirmed with a 304 instead of materialized and sent again. A key that did change still answers 200 with the whole bundle, which is the point of the refresh, so the saving is on the keys nobody edited. Since most keys are not edited in any given interval, lowering the TTL mostly buys revision lookups rather than bundles. The exception is a config the gateway holds no token for, which is what a response that arrived without an `ETag` leaves behind: that one is refreshed unconditionally and costs a full bundle every interval, so a proxy that strips `ETag` gives the saving up entirely.
 
 See [Auth Cache Architecture](/ai-gateway/observability#auth-cache-architecture) for the design and the [Production runbook → Control-plane outage](/ai-gateway/cookbooks/production-runbook#recipe-8--control-plane-outage--stale-while-error) for the operator playbook.
 
@@ -11372,7 +11454,7 @@ Canonical names always win when both are set. The aliases are scheduled for remo
 
 ## Forward-compat values.yaml knobs (v1.1)
 
-Several knobs are exposed in `charts/gateway/values.yaml` but the v1 gateway code does not yet read them. Setting them today is a no-op, they are documented in `values.yaml` so operator runbooks built ahead of v1.1 don't need rewriting. See [Scaling, Future tunables](/ai-gateway/self-hosting/scaling#future-tunables-forward-compat-in-valuesyaml) for the full list (cache LRU sizing, Redis L2, Bifrost pool sizing, admin, pprof listener, guardrail timeouts, startup netcheck).
+Several knobs are exposed in `charts/gateway/values.yaml` but the v1 gateway code does not yet read them. Setting them today is a no-op, they are documented in `values.yaml` so operator runbooks built ahead of v1.1 don't need rewriting. See [Scaling, Future tunables](/ai-gateway/self-hosting/scaling#future-tunables-forward-compat-in-valuesyaml) for the full list (cache LRU sizing, Bifrost pool sizing, admin, pprof listener, guardrail timeouts, startup netcheck).
 
 ---
 
@@ -11747,7 +11829,7 @@ readinessProbe:
 
 - **Per-provider live health.** If OpenAI is rate-limiting, the gateway still serves and falls back per the VK's configured chain. Reporting `not_ready` for one upstream would amplify the incident.
 - **The control plane.** A control-plane blip is a degradation the auth cache is built to absorb: warm keys keep serving from the in-process cache. Failing readiness on it would drop every replica from the load balancer at once and turn that degradation into a total outage. Control-plane reachability is reported on `/health` instead, where it informs a status page rather than gating traffic.
-- **Redis L2.** The current gateway has no Redis client; the auth cache is in-process LRU.
+- **Any shared cache.** The gateway has no Redis client; the auth cache is an in-process LRU, private to the pod.
 - **PostgreSQL.** The gateway never talks to Postgres directly; the control plane mediates persistence.
 
 The blast-radius of readiness is specifically: "is this pod still meant to serve traffic?", and the only condition today is `MarkDraining`.
@@ -11973,7 +12055,7 @@ helm upgrade --install langwatch langwatch/langwatch \
 
 ## Env vars wired by the chart
 
-Source of truth: `charts/gateway/templates/configmap.yaml` (commit `d14576b1e`) and `charts/gateway/templates/deployment.yaml`. The chart wires only the env vars the Go gateway actually reads, knobs in `values.yaml` that don't appear here are forward-compat surface for v1.1 (e.g. `cache.bootstrapAllKeys`, `admin.*`, `redis.url`) and are silently ignored by the running binary. The canonical names are derived by `services/aigateway/config.go` `pkg/config.Hydrate`, which walks the Config struct's `env:"…"` tags and joins parent/child with `_`.
+Source of truth: `charts/gateway/templates/configmap.yaml` (commit `d14576b1e`) and `charts/gateway/templates/deployment.yaml`. The chart wires only the env vars the Go gateway actually reads, knobs in `values.yaml` that don't appear here are forward-compat surface for v1.1 (e.g. `cache.bootstrapAllKeys`, `admin.*`) and are silently ignored by the running binary. The canonical names are derived by `services/aigateway/config.go` `pkg/config.Hydrate`, which walks the Config struct's `env:"…"` tags and joins parent/child with `_`.
 
 | Env var | Source | Purpose |
 |---|---|---|
@@ -11986,7 +12068,7 @@ Source of truth: `charts/gateway/templates/configmap.yaml` (commit `d14576b1e`) 
 | `LW_GATEWAY_JWT_SECRET` | Secret `secrets.existingSecretName` | HS256 for resolve-key JWT |
 | `LW_GATEWAY_JWT_SECRET_PREVIOUS` | Secret (only when `secrets.jwtSecretPreviousKey` is set) | Retired key during rotation overlap |
 
-The deployment template intentionally does not inject `GATEWAY_REDIS_URL`, `GATEWAY_ADMIN_AUTH_TOKEN`, or `GATEWAY_OTEL_DEFAULT_AUTH_TOKEN`, the v1 gateway has no Redis client, admin/pprof listener, or OTLP auth-token field on its config struct, and silently dropping them at the env-var layer would mislead operators. OTLP authentication for self-hosters is delivered via `OTEL_OTLP_HEADERS` (e.g. `Authorization=Bearer …`) on the OTel config struct in `pkg/config/otel.go`. See `charts/gateway/templates/deployment.yaml` for the rationale comment.
+The deployment template intentionally does not inject `GATEWAY_ADMIN_AUTH_TOKEN` or `GATEWAY_OTEL_DEFAULT_AUTH_TOKEN`, the gateway has no admin/pprof listener and no OTLP auth-token field on its config struct, and silently dropping them at the env-var layer would mislead operators. OTLP authentication for self-hosters is delivered via `OTEL_OTLP_HEADERS` (e.g. `Authorization=Bearer …`) on the OTel config struct in `pkg/config/otel.go`. See `charts/gateway/templates/deployment.yaml` for the rationale comment.
 
 ## Secret rotation
 
@@ -12041,13 +12123,13 @@ Clients reach the gateway via the Ingress (`gateway.your-corp.com`) on port 443.
 
 ## Scaling
 
-See [Scaling](/ai-gateway/self-hosting/scaling) for HPA configuration, replica sizing, and Redis L2 cache guidance. Quick summary: the gateway is stateless and horizontally scalable; the chart's HPA defaults to 2-10 replicas at 70% CPU plus a custom `lw_gateway_rps` metric (requires Prometheus-adapter). In-flight streaming requests pin to a single replica, so HPA should scale on smoothed signals rather than chasing spikes.
+See [Scaling](/ai-gateway/self-hosting/scaling) for HPA configuration and replica sizing. Quick summary: the gateway is stateless and horizontally scalable; the chart's HPA defaults to 2-10 replicas at 70% CPU plus a custom `lw_gateway_rps` metric (requires Prometheus-adapter). In-flight streaming requests pin to a single replica, so HPA should scale on smoothed signals rather than chasing spikes.
 
 ## High availability
 
 - Run ≥2 replicas with a PodDisruptionBudget (chart default `minAvailable: 1`) so rolling updates don't remove every pod simultaneously.
 - The auth-cache stale-while-error grace window (`LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`, `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`) keeps replicas serving with cached VK bundles when the control plane is briefly offline. See [Auth-cache stale-while-error](/ai-gateway/self-hosting/config#auth-cache) for the soft/hard-grace knobs.
-- The Redis L2 cache (`gateway.redis.url`) is **forward-compat surface today**: the v1 gateway has no Redis client, so this knob is a no-op. v1.1 will wire it for replica-warm-up on HPA scale-out. Don't rely on it for cold-start coverage in v1; the auth-cache grace window is the only operational backstop.
+- The auth cache is per pod. A replica added by HPA scale-out warms from the control plane on its first request per key, the same first-request cost every replica pays after a rolling deploy, and the grace window above is the operational backstop for a control plane that is unreachable.
 
 ## Monitoring
 
@@ -12204,13 +12286,12 @@ gateway:
 - `ingress-nginx` namespace → port `5563` (customer traffic via your Ingress).
 - `monitoring` namespace Prometheus pod → port `5563` `/metrics`.
 
-Everything else is rejected, including traffic from other namespaces, lateral pod-to-pod dials, and direct NodePort hits. The pprof admin listener is loopback-bound on `127.0.0.1:6060` and is unaffected by `NetworkPolicy` because `kubectl port-forward` tunnels through the Kubernetes API server, not the pod network.
+Everything else is rejected, including traffic from other namespaces, lateral pod-to-pod dials, and direct NodePort hits. The v1 binary opens no admin or pprof listener at all, so there is nothing extra on the pod to reach; the planned listener binds `127.0.0.1:6060` and would be unaffected by `NetworkPolicy` anyway, because `kubectl port-forward` tunnels through the Kubernetes API server rather than the pod network.
 
 **Egress**:
 
 - DNS to `kube-system` on TCP+UDP `:53` (ordering matters, DNS rule MUST come first or other rules fail to resolve hostnames).
 - Control plane (`langwatch-app` label selector) on port `5560` for `/resolve-key`, `/config`, `/changes`, `/budget`, `/guardrail`. Matches the langwatch chart's `langwatch-app` Service (app=5560, nlp=5561, langevals=5562, gateway=5563).
-- Redis on `:6379`, only rendered when `gateway.redis.url` is set.
 - OTLP `:4318`, only rendered when `gateway.networkPolicy.egressToOTLP` is non-empty.
 - Provider upstreams on `:443`, default `any IP EXCEPT RFC1918` (10/8, 172.16/12, 192.168/16). Teams with explicit compliance posture should override `egressToProviders` with a concrete CIDR allowlist.
 
@@ -12335,14 +12416,14 @@ Notable omissions:
 - **`writeTimeout` is NOT exposed.** It would bound the whole response, which terminates long SSE streams (reasoning models, Claude thinking traces) at the cap. Per-chunk streaming deadlines live in the dispatcher, not here. If you're behind an ingress that enforces its own `proxy_read_timeout`, match it there instead.
 - **`idleTimeout` MUST exceed your nginx-ingress `keepalive_timeout`** (typical 75 s). If the gateway closes first, nginx's pool has dead sockets and a request fails mid-flight. The chart default 120 s is safe under the typical 75 s nginx value; if you run a custom ingress with a longer keepalive, bump this value proportionally.
 
-All three timeouts apply to the public listener and the admin listener identically.
+All three timeouts apply to the public listener, which is the only listener the v1 binary opens. They will cover the [admin listener](#admin-listener) identically once it ships.
 
 ## Chart and data-plane CI
 
 The upstream repo runs a dedicated `gateway-ci` workflow against every PR that touches `services/gateway/**` or `charts/gateway/**` (paths-filter gated so unrelated PRs don't trigger it). What it guarantees on the chart you're installing:
 
 - **Go data plane**: `go mod verify`, `go vet`, `go build`, `go test -count=1 -race ./...` across all 14 internal packages. Benchmarks compile under `-run=^$ -benchtime=1x` so Go API drift fails fast without adding benchmark noise to PR logs.
-- **Helm chart**: `helm lint` + two `helm template` renders, one with defaults (must render zero `NetworkPolicy` objects), one with `networkPolicy.enabled=true` + `redis.url=redis://…` (must render exactly one). Both invariants are asserted explicitly; violating either fails the job.
+- **Helm chart**: `helm lint` + two `helm template` renders, one with defaults (must render zero `NetworkPolicy` objects), one with `networkPolicy.enabled=true` (must render exactly one). Both invariants are asserted explicitly; violating either fails the job.
 
 Jobs are timeout-capped (15 m, 10 m) and use concurrency cancellation on force-push, so a runaway test can't burn runner minutes.
 
@@ -12355,7 +12436,7 @@ Gateway and control plane are versioned in **lockstep**: release-please bumps bo
 1. `helm diff upgrade langwatch langwatch/langwatch -f values.yaml --version <new>` to preview the change set.
 2. `helm upgrade langwatch langwatch/langwatch -f values.yaml --version <new>`. The umbrella's `langwatch-app` and gateway Deployments roll concurrently, both use Kubernetes' standard `RollingUpdate` strategy and the chart does not enforce ordering. Safety during the overlap window is handled by the dual-key signature contract documented under [Secret rotation](#secret-rotation): the new control-plane image accepts both old and new signatures, so a brief window where gateway pods on the new image talk to control-plane pods still on the old image (or vice versa) does not break authentication. If you want to enforce ordering for an extra-cautious rollout, run `helm upgrade ... --set gateway.enabled=false` first to roll the app alone, then re-enable the gateway in a second `helm upgrade`, but for the standard upgrade path the dual-key contract is what makes the concurrent roll safe.
 3. Monitor `gateway_provider_duration_seconds` and `gateway_http_requests_total{status=~"5.."}` for ~30 min.
-4. Roll back via `helm rollback langwatch <revision>` if anomalies appear, the gateway's cache survives restarts and requests resume immediately. Both sub-charts roll back together.
+4. Roll back via `helm rollback langwatch <revision>` if anomalies appear. Each replaced gateway pod starts with an empty auth cache and warms from the control plane on its first request per key, the same cost every rolling update pays. Both sub-charts roll back together.
 
 ---
 
@@ -12586,7 +12667,7 @@ There are no current `LW_GATEWAY_UPSTREAM_*` env vars to tune the transport dire
 
 There is no boot-time cache warm-up in the current gateway. The `auth_cache_warm` readiness probe was removed because it created a chicken-and-egg with `/startupz` (the warm-up itself called the control plane, which couldn't accept traffic until *its* startup gate flipped). Instead the resolver warms organically on the first request per VK; an unwarmed gateway adds at most one extra ~50–200 ms control-plane round-trip on cold-cache requests. Subsequent requests hit the in-process cache and skip the round-trip entirely until the cache entry's soft-expiry passes.
 
-The cache is in-process and per-replica. Replicas warm independently; there is no cross-replica L2 cache in the current gateway. A Bootstrap-pull design that pre-loads keys before flipping `/startupz` to 200 is tracked under `specs/ai-gateway/auth-cache.feature` for v1.1+ when tenant key counts make the first-request tax visible at scale.
+The cache is in-process and per-replica. Replicas warm independently; there is no cross-replica cache, by design. A Bootstrap-pull design that pre-loads keys before flipping `/startupz` to 200 is tracked under `specs/ai-gateway/auth-cache.feature` for v1.1+ when tenant key counts make the first-request tax visible at scale.
 
 ## Blue-green, canary
 
@@ -12666,7 +12747,6 @@ Several knobs are exposed in `charts/gateway/values.yaml` that the v1 gateway co
 - `cache.lruSize`, explicit auth-cache LRU bound (default 50,000)
 - `cache.refreshInterval`, `cache.jwtRefreshThreshold`, proactive auth-cache refresh cadence
 - `cache.bootstrapAllKeys`, full prefetch on boot (enterprise tier; control plane must support the bulk endpoint)
-- `redis.url`, `redis.existingSecretName`, L2 auth cache shared across replicas
 - `bifrost.poolSize`, `bifrost.streamBufferSize`, Bifrost-side connection sizing
 - `admin.addr`, `admin.existingAuthSecretName`, operator pprof, debug listener
 - `guardrails.preTimeout`, `guardrails.postTimeout`, `guardrails.streamChunkWindow`, guardrail evaluation budgets
@@ -13236,7 +13316,7 @@ kubectl logs -n langwatch "$POD" | grep -E 'dns resolution failed|tcp dial faile
 **Root cause:** cold start + auth cache miss. New replica's L1 cache is empty; first unknown-VK request triggers a `/resolve-key` round-trip.
 
 **Fix:**
-- Enable Redis L2 (`GATEWAY_REDIS_URL`), new replicas warm from Redis instead of control plane.
+- Expect it. The auth cache is per pod, so a new replica warms from the control plane on its first request for each key, exactly as every replica does after a rolling deploy.
 - Ensure pod readiness probe waits for the long-poll loop to be running (`/readyz` handles this correctly by default).
 - `GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` is a planned v1.1 enhancement that would pre-warm the L1 LRU with every active VK on startup; the flag is reserved in env wiring but currently has no Go-side implementation, so setting it does not help today.
 
@@ -13578,7 +13658,7 @@ The first time the gateway sees a presented VK:
 
 1. Calls `/internal/gateway/resolve-key` on the LangWatch control-plane → receives a signed JWT (15-minute TTL) with identity claims (`vk_id`, `project_id`, `principal_id`, etc.) plus a `revision` number.
 2. Calls `/internal/gateway/config/:vk_id` (with `If-None-Match: <revision>` on subsequent fetches) → receives the fat config (providers, fallback, guardrails, budgets).
-3. Caches both in-memory (L1 LRU) and optionally in Redis (L2, shared across gateway pods).
+3. Caches both in an in-memory LRU, private to that gateway pod.
 4. Subscribes to `/internal/gateway/changes?since=<revision>` long-poll, on any mutation to any VK, the gateway invalidates and re-fetches.
 
 Subsequent requests with the same VK are served entirely from cache. JWT verification is local (HS256 shared secret); no control-plane round-trip on the hot path.

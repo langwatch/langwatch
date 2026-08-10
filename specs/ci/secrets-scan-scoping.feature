@@ -67,6 +67,22 @@ Feature: The secrets gate only fails a pull request for what that pull request a
       Then the scan fails
       And the failure says the scan reached no commits
 
+  Rule: A match that cannot be a credential here is not a finding
+
+    # The false positive that exposed the scoping bug above was TruffleHog's
+    # Lob detector: it matches `test_` plus exactly 35 characters, and its
+    # verifier accepts the match, so an ordinary shell function arrives as a
+    # VERIFIED finding that --only-verified cannot filter. Our chart tests are
+    # written entirely in `test_*` functions, so this recurs by construction,
+    # and nothing in the repository integrates Lob for the finding to ever be
+    # real. The detector is excluded by name, not the files by path, so a
+    # genuine credential in those same files is still caught.
+    @unit @regression
+    Scenario: A shell function name is not a credential
+      Given the pull request adds a shell function whose name has the shape of a Lob key
+      When the secrets scan runs
+      Then the scan passes
+
   Rule: Both scanners are scoped the same way
 
     @unit @regression

@@ -120,6 +120,7 @@ import { InviteService } from "../invites/invite.service";
 import { resolveOrganizationId } from "../organizations/resolveOrganizationId";
 import { OrganizationRepository } from "../repositories/organization.repository";
 import { getLicenseHandler } from "../subscriptionHandler";
+import { TraceEditOverlayService } from "../traces/edit-overlay/traceEditOverlay.service";
 import { EventUsageService } from "../traces/event-usage.service";
 import { TraceService } from "../traces/trace.service";
 import { TraceUsageService } from "../traces/trace-usage.service";
@@ -1273,15 +1274,19 @@ export function initializeDefaultApp(options?: {
     new TraceRequestCollectionService({
       dedup: spanDedup,
       recordSpan: commands.traces.recordSpan,
-      // ADR-022: Edge size-check + transient S3 spool, flag-gated per project.
-      // projectId === tenantId (routes/otel.ts passes project.id). processCommandData
-      // runs PER SPAN (not once per OTLP request/batch); the flag is read per span and
-      // the 5s-cached flag store keeps that per-span read cheap.
+      // ADR-022: Edge size-check + transient S3 spool, on by default and
+      // switchable off per project. projectId === tenantId (routes/otel.ts
+      // passes project.id). processCommandData runs PER SPAN (not once per OTLP
+      // request/batch); the flag is resolved per span against the operator
+      // store, falling back to the registry default rather than PostHog, and
+      // the 5s-cached store keeps that per-span read cheap.
       //
       // FAIL-OPEN: any error from the flag store (Postgres/network blip) or
       // from maybeSpool (S3 outage, BlobStore.putSpool throws) is caught here.
       // We log at warn level and return the original commandData unchanged so
-      // that ingestion is never blocked by the spool path. ADR-022.
+      // that ingestion is never blocked by the spool path. The span then takes
+      // the inline route, where capOversizedAttributes bounds each attribute
+      // value at 256 KB. ADR-022.
       processCommandData: async (data) => {
         // Media extraction runs FIRST: externalizing inline media parts to
         // the content-addressed stored-objects store usually brings the
@@ -1298,11 +1303,11 @@ export function initializeDefaultApp(options?: {
         // reason label (flag_store vs spool/S3) for alerting (GtVrL).
         let stage: "flag_store" | "spool" = "flag_store";
         try {
-          const enabled = await getFeatureFlagStore().get(
+          const enabled = await getFeatureFlagStore().getOrRegistryDefault(
             "release_trace_blob_offload",
             { projectId: data.tenantId },
           );
-          if (enabled !== true) return data;
+          if (!enabled) return data;
           stage = "spool";
           return await maybeSpool({
             data,
@@ -1319,7 +1324,7 @@ export function initializeDefaultApp(options?: {
               reason: stage,
               error: err instanceof Error ? err.message : String(err),
             },
-            "Edge spool failed — falling back to unmodified command data (fail-open)",
+            "Edge spool unavailable, ingesting this oversized span inline (fail-open). Attribute values above 256 KB will be truncated on this span; configure S3-compatible object storage to keep them intact.",
           );
           return data;
         }
@@ -1436,6 +1441,7 @@ export function initializeDefaultApp(options?: {
     collection: traceCollection,
     logCollection,
     metricCollection,
+    editOverlay: TraceEditOverlayService.create(prisma),
   };
 
   // Collect closeables for graceful shutdown
@@ -1803,6 +1809,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           }),
           "MetricRequestCollectionService",
         ),
+        editOverlay: TraceEditOverlayService.create(testPrisma),
       };
     })(),
     evaluations: {

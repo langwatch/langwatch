@@ -722,6 +722,53 @@ export const checkProjectPermission =
   };
 
 /**
+ * Permit when the caller holds ANY ONE of `permissions` on the project.
+ *
+ * For resources a caller can legitimately reach from more than one feature.
+ * Stored objects are the case in point: the same object is trace media for one
+ * viewer and scenario media for another, `traces:view` and `scenarios:view`
+ * are separate categories a custom role can hold one of, and the file route
+ * itself already accepts either. A single-permission gate on a sibling
+ * surface (the existence probe) refuses viewers the bytes are served to.
+ *
+ * The refusal names the FIRST permission, so list the one the surface is
+ * primarily reached through first: granting it resolves the denial whichever
+ * feature the caller came from.
+ */
+export const checkProjectPermissionAny =
+  (...permissions: [Permission, ...Permission[]]) =>
+  async ({
+    ctx,
+    input,
+    next,
+  }: PermissionMiddlewareParams<{ projectId: string }>) => {
+    const { permitted, organizationRole } = await resolveProjectPermissionAny(
+      ctx,
+      input.projectId,
+      permissions,
+    );
+    if (permitted) {
+      ctx.organizationRole = organizationRole;
+      ctx.permissionChecked = true;
+      return next();
+    }
+
+    const named = permissions[0];
+    if (organizationRole === OrganizationUserRole.EXTERNAL) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "This feature is not available for your account",
+        cause: new LiteMemberRestrictedError(named.split(":")[0] ?? "unknown"),
+      });
+    }
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "You do not have permission to access this project resource",
+      cause: new ProjectPermissionDeniedError(named),
+    });
+  };
+
+/**
  * Check if user has permission for a team
  */
 export const checkTeamPermission =
@@ -990,6 +1037,70 @@ async function getCurrentOrganizationRole({
 }
 
 /**
+ * Where a project sits and where the caller stands in it: everything a
+ * permission check needs before it looks at a single binding. Null when the
+ * answer is already a denial, either because the project has no team or
+ * organization or because the caller is not a member of that organization.
+ *
+ * Resolved on its own so a gate that tests several permissions pays for it
+ * once: only the binding check below differs from permission to permission.
+ */
+async function resolveProjectPermissionContext(
+  ctx: { prisma: PrismaClient; session: Session | null },
+  projectId: string,
+): Promise<{
+  userId: string;
+  teamId: string;
+  organizationId: string;
+  organizationRole: OrganizationUserRole;
+} | null> {
+  const userId = ctx.session?.user?.id;
+  if (!userId) return null;
+
+  const projectTeam = await ctx.prisma.project.findUnique?.({
+    where: { id: projectId },
+    select: { team: { select: { id: true, organizationId: true } } },
+  });
+
+  const teamId = projectTeam?.team.id;
+  const organizationId = projectTeam?.team.organizationId;
+
+  if (!teamId || !organizationId) return null;
+
+  const organizationRole = await getCurrentOrganizationRole({
+    prisma: ctx.prisma,
+    userId,
+    organizationId,
+  });
+
+  // Fail closed on current organization membership. A user who is not an
+  // OrganizationUser of the owning org is denied outright, even if a stale
+  // RoleBinding (created through a since-closed cross-org path) still names them
+  // at this project/team scope. The membership check — not the binding row — is
+  // the authoritative tenancy boundary. See the same gate in resolveTeamPermission
+  // and batchScopePermissions, and the direct-binding predicate below.
+  if (organizationRole === null) return null;
+
+  return { userId, teamId, organizationId, organizationRole };
+}
+
+function projectPermissionScopes({
+  projectId,
+  teamId,
+  organizationId,
+}: {
+  projectId: string;
+  teamId: string;
+  organizationId: string;
+}) {
+  return [
+    { scopeType: RoleBindingScopeType.PROJECT, scopeId: projectId },
+    { scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
+    { scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: organizationId },
+  ];
+}
+
+/**
  * Resolve a project permission check, returning the permission decision
  * along with the user's organization role.
  */
@@ -1007,48 +1118,69 @@ export async function resolveProjectPermission(
     return { permitted: true, organizationRole: null };
   }
 
-  const projectTeam = await ctx.prisma.project.findUnique?.({
-    where: { id: projectId },
-    select: { team: { select: { id: true, organizationId: true } } },
-  });
-
-  const teamId = projectTeam?.team.id;
-  const organizationId = projectTeam?.team.organizationId;
-
-  if (!teamId || !organizationId) {
-    return { permitted: false, organizationRole: null };
-  }
-
-  const organizationRole = await getCurrentOrganizationRole({
-    prisma: ctx.prisma,
-    userId: ctx.session.user.id,
-    organizationId,
-  });
-
-  // Fail closed on current organization membership. A user who is not an
-  // OrganizationUser of the owning org is denied outright, even if a stale
-  // RoleBinding (created through a since-closed cross-org path) still names them
-  // at this project/team scope. The membership check — not the binding row — is
-  // the authoritative tenancy boundary. See the same gate in resolveTeamPermission
-  // and batchScopePermissions, and the direct-binding predicate below.
-  if (organizationRole === null) {
-    return { permitted: false, organizationRole: null };
-  }
+  const context = await resolveProjectPermissionContext(ctx, projectId);
+  if (!context) return { permitted: false, organizationRole: null };
 
   const permitted = await checkPermissionFromBindings({
     prisma: ctx.prisma,
-    userId: ctx.session.user.id,
-    organizationId,
-    scopes: [
-      { scopeType: RoleBindingScopeType.PROJECT, scopeId: projectId },
-      { scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
-      { scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: organizationId },
-    ],
-    organizationRole,
+    userId: context.userId,
+    organizationId: context.organizationId,
+    scopes: projectPermissionScopes({
+      projectId,
+      teamId: context.teamId,
+      organizationId: context.organizationId,
+    }),
+    organizationRole: context.organizationRole,
     permission,
   });
 
-  return { permitted, organizationRole };
+  return { permitted, organizationRole: context.organizationRole };
+}
+
+/**
+ * Resolve a check that any one of `permissions` is enough, in the order given.
+ * The project, the team, the organization and the caller's role in it are the
+ * same for every permission, so they are read once and only the binding check
+ * repeats.
+ */
+async function resolveProjectPermissionAny(
+  ctx: { prisma: PrismaClient; session: Session | null },
+  projectId: string,
+  permissions: readonly Permission[],
+): Promise<PermissionResult> {
+  if (!ctx.session?.user) {
+    return { permitted: false, organizationRole: null };
+  }
+
+  // The demo project grants its view permissions to everyone, so one of them
+  // being enough settles the question before anything is read.
+  if (permissions.some((permission) => isDemoProject(projectId, permission))) {
+    return { permitted: true, organizationRole: null };
+  }
+
+  const context = await resolveProjectPermissionContext(ctx, projectId);
+  if (!context) return { permitted: false, organizationRole: null };
+
+  const scopes = projectPermissionScopes({
+    projectId,
+    teamId: context.teamId,
+    organizationId: context.organizationId,
+  });
+  for (const permission of permissions) {
+    const permitted = await checkPermissionFromBindings({
+      prisma: ctx.prisma,
+      userId: context.userId,
+      organizationId: context.organizationId,
+      scopes,
+      organizationRole: context.organizationRole,
+      permission,
+    });
+    if (permitted) {
+      return { permitted: true, organizationRole: context.organizationRole };
+    }
+  }
+
+  return { permitted: false, organizationRole: context.organizationRole };
 }
 
 /**

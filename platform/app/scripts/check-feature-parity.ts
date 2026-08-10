@@ -70,6 +70,11 @@ const DEFAULT_TEST_ROOTS: string[] = [
   "mcp/typescript/src",
   "sdks/typescript/src",
   "sdks/python/src",
+  // The agent plugin is hand-authored manifests plus a bundle, so its only
+  // tests are the ones that read those manifests and spawn that bundle. Without
+  // this root, every scenario describing what the published plugin does could
+  // only be @unimplemented.
+  "plugins",
   // What we SHIP as instructions is behavior too: the skill sources and the
   // assistant's rules are tested here (and nowhere else), so scenarios about
   // what an instruction teaches can only bind from this root.
@@ -250,7 +255,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/cli-402-license-gate.feature",
   "specs/ai-gateway/governance/cli-deep-links.feature",
   "specs/ai-gateway/governance/cli-ingest-debug.feature",
-  "specs/ai-gateway/governance/cli-login.feature",
   "specs/ai-gateway/governance/cli-tool-mode-policy.feature",
   "specs/ai-gateway/governance/compliance-baseline.feature",
   "specs/ai-gateway/governance/event-log-durability.feature",
@@ -307,7 +311,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-governance/cli-wrappers/latest-login-wins.feature",
   "specs/ai-governance/cli-wrappers/logout.feature",
   "specs/ai-governance/cli-wrappers/request-increase.feature",
-  "specs/ai-governance/cli-wrappers/shell-rc-persistence.feature",
   "specs/ai-governance/cli-wrappers/wrap-login-routing.feature",
   "specs/ai-governance/dogfood-seed/scope-runner.feature",
   "specs/ai-governance/ingestion-sources/claude-code-otlp.feature",
@@ -585,15 +588,11 @@ const LEGACY_INERT: string[] = [
   "specs/trace-processing/oversized-trace-lighter-processing.feature",
   "specs/trace-processing/sdk-timing-and-metrics-canonicalisation.feature",
   "specs/traces-v2/accessibility.feature",
-  "specs/traces-v2/annotations.feature",
   "specs/traces-v2/attribute-value-readability.feature",
-  "specs/traces-v2/bulk-actions.feature",
   "specs/traces-v2/column-configuration.feature",
   "specs/traces-v2/conditional-formatting.feature",
   "specs/traces-v2/conversation-context-turn-counts.feature",
   "specs/traces-v2/conversation-message-expand.feature",
-  "specs/traces-v2/conversation-turn-ledger.feature",
-  "specs/traces-v2/data-layer.feature",
   "specs/traces-v2/editable-trace-name-alignment.feature",
   "specs/traces-v2/facet-perspectives.feature",
   "specs/traces-v2/flame-graph.feature",
@@ -602,7 +601,6 @@ const LEGACY_INERT: string[] = [
   "specs/traces-v2/lens-preset-groups.feature",
   "specs/traces-v2/light-mode-contrast.feature",
   "specs/traces-v2/live-tail.feature",
-  "specs/traces-v2/message-translation.feature",
   "specs/traces-v2/metadata-facet.feature",
   "specs/traces-v2/metrics.feature",
   "specs/traces-v2/model-chip-interactive-card.feature",

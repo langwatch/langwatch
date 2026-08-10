@@ -15,7 +15,7 @@
  * `index.ts` — this was a move, not a rewrite.
  */
 
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import {
   REDACTION_AUDIT_URL,
   SESSION_REDACTION_SUMMARY,
@@ -297,6 +297,63 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     });
 
   program
+    .command("copilot", { hidden: true })
+    .description("Run `copilot` (GitHub Copilot CLI) with LangWatch telemetry (direct OTLP by default; gateway via --tool-mode=gateway).")
+    .allowUnknownOption(true)
+    .allowExcessArguments(true)
+    .helpOption(false)
+    .action(async (_opts, cmd: { args?: string[] }) => {
+      try {
+        const { wrapCopilot } = await import("./commands/wrap.js");
+        await wrapCopilot(cmd.args ?? []);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+
+  program
+    .command("code", { hidden: true })
+    .description("Run `code` (VS Code) with LangWatch telemetry for GitHub Copilot Chat (direct OTLP).")
+    .allowUnknownOption(true)
+    .allowExcessArguments(true)
+    .helpOption(false)
+    .action(async (_opts, cmd: { args?: string[] }) => {
+      try {
+        const { wrapCode } = await import("./commands/wrap.js");
+        await wrapCode(cmd.args ?? []);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+
+  const copilotAppCmd = program
+    .command("copilot-app")
+    .description(
+      "Manage LangWatch capture for the standalone GitHub Copilot app (ADR-039).",
+    );
+
+  copilotAppCmd
+    .command("connect")
+    .description(
+      "Connect the GitHub Copilot app: mint an ingest key and install a login agent that captures every session automatically.",
+    )
+    .option("--tokens-only", "Capture usage without prompt/response content")
+    .action(async (options: { tokensOnly?: boolean }) => {
+      try {
+        const { copilotAppConnectCommand } = await import("./commands/copilot-app.js");
+        await copilotAppConnectCommand(options);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+
+  program
     .command("cursor", { hidden: true })
     .description("Run `cursor` routed through the LangWatch gateway.")
     .allowUnknownOption(true)
@@ -356,6 +413,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       "Coding assistants:",
       "  claude          Run `claude` (Claude Code) routed through the gateway",
       "  codex           Run `codex` (OpenAI Codex CLI) routed through the gateway",
+      "  copilot         Run `copilot` (GitHub Copilot CLI) with LangWatch telemetry",
+      "  code            Run `code` (VS Code) with LangWatch telemetry for GitHub Copilot Chat",
       "  cursor          Run `cursor` routed through the gateway",
       "  gemini          Run `gemini` (Gemini CLI) routed through the gateway",
       "  opencode        Run `opencode` (multi-provider) routed through the gateway",
@@ -463,7 +522,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   program
     .command("logout")
-    .description("Log out: revoke + clear the device session AND remove the telemetry wiring `langwatch <tool>` installed (claude settings.json, codex config.toml, gemini/opencode shell functions). Only langwatch-authored blocks are removed; the project API key in .env is left alone. Idempotent.")
+    .description("Log out: revoke + clear the device session AND remove the telemetry wiring `langwatch <tool>` installed (claude settings.json, codex config.toml, gemini/opencode/copilot shell functions). Only langwatch-authored blocks are removed; the project API key in .env is left alone. Idempotent.")
     .option("-y, --yes", "skip the confirmation prompt")
     .option("--keep-credentials", "remove the telemetry wiring but stay logged in")
     .action(async (options: { yes?: boolean; keepCredentials?: boolean }) => {
@@ -546,6 +605,57 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+
+  // `langwatch ingest codex` — recover codex conversation content. Codex
+  // itself runs this after every completed turn (via its `notify` setting,
+  // wired up when capture is enabled); the no-flag form backfills sessions
+  // that ran before that.
+  ingestCmd
+    .command("codex")
+    .description(
+      "Recover conversation content (prompt, tool calls, reply) from codex session transcripts onto their traces. Codex exports none of it itself.",
+    )
+    .option("--since <hours>", "how far back to look for sessions (default: 24)")
+    .option("--all", "recover every session on disk, not just recent ones")
+    .option("--json", "emit machine-readable JSON")
+    // Codex passes these; a human never does, so they stay out of the help.
+    .addOption(
+      new Option(
+        "--chain <argv>",
+        "JSON argv of a turn-completion program to run after this one",
+      ).hideHelp(),
+    )
+    .addOption(
+      new Option(
+        "--notify <payload>",
+        "the turn payload codex appends after a completed turn",
+      ).hideHelp(),
+    )
+    .action(
+      async (options: {
+        since?: string;
+        all?: boolean;
+        json?: boolean;
+        chain?: string;
+        notify?: string;
+      }) => {
+        try {
+          const { ingestCodexCommand } = await import(
+            "./commands/ingest/codex.js"
+          );
+          await ingestCodexCommand(options);
+        } catch (error) {
+          // The turn-completion path must never fail a coding session, and it
+          // is the only caller that passes these two flags.
+          if (options.notify !== undefined || options.chain !== undefined) {
+            return;
+          }
+          const { reportCommandError } = await import("./utils/errorOutput.js");
+          reportCommandError({ error });
+          process.exit(1);
+        }
+      },
+    );
 
   // `langwatch ingest install <tool>` — hidden primitive used by CI /
   // devcontainer / scripted setups. The user surface is
@@ -2156,17 +2266,33 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     spendEventsCmd
       .command("summary")
       .description("Per-key spend rollups, the reconciliation checksum fast path (settled requests counted separately, never in cost sums)")
-      .option("--group-by <key>", "virtual_key (default) or end_user")
+      .option("--group-by <keys>", "One or two of virtual_key, end_user, project, model, provider, principal, request_type (comma separated), default virtual_key")
+      .option("--bucket <size>", "Add a time column: none (default), hour or day")
+      .option("--timezone <zone>", "Zone the time bucket falls on, default UTC")
+      .option("--allow-unstable", "Group by model, provider or time over a range still receiving outcomes, accepting approximate totals")
       .option("--from <instant>", "Range start (ISO or unix ms), default 24h ago")
       .option("--to <instant>", "Range end (ISO or unix ms), default now")
       .option("--project <id>", "Narrow to one project")
-      .option("--limit <n>", "Max rows, default 500")
+      .option("--team <id>", "Narrow to the projects one team owns")
+      .option("--model <name...>", "Narrow to these models")
+      .option("--provider <id...>", "Narrow to these model providers")
+      .option("--end-user <id...>", "Narrow to these end users")
+      .option("--metadata <pair...>", "Narrow by your own request metadata, written key=value")
+      .option("--limit <n>", "Rows fetched per page, default 500. The walk always covers the whole window")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (options: {
       groupBy?: string;
+      bucket?: string;
+      timezone?: string;
+      allowUnstable?: boolean;
       from?: string;
       to?: string;
       project?: string;
+      team?: string;
+      model?: string[];
+      provider?: string[];
+      endUser?: string[];
+      metadata?: string[];
       limit?: string;
     }) => {
       const { spendSummaryCommand: impl } = await import("./commands/spend-events/summary.js");

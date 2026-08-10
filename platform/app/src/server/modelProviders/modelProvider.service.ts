@@ -3,12 +3,15 @@ import { z } from "zod";
 import { env } from "~/env.mjs";
 import type { Session } from "~/server/auth";
 import { isManagedProvider } from "../../../ee/managed-providers/managedBedrockConfig";
-import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
+import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
+import { getSchemaShape } from "../../utils/modelProviderHelpers";
 import { rateLimit } from "../rateLimit";
+import { isSecretCredential, mergeStoredCustomKeys } from "./credentialMerge";
 import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
 import {
   ModelProviderAnchorRequiredError,
+  ModelProviderCredentialsWouldBeDroppedError,
   ModelProviderDeprecatedError,
   ModelProviderNotFoundError,
   ModelProviderScopesRequiredError,
@@ -1133,7 +1136,9 @@ export class ModelProviderService {
   }
 
   /** Mask key-bearing fields of a row's customKeys for frontend display,
-   * leaving URLs and other non-secret values visible. */
+   * leaving URLs and other non-secret values visible. The same test decides
+   * what `mergeStoredCustomKeys` keeps on a write that leaves a field out:
+   * what we never show back is what a caller cannot resend. */
   private maskRowCustomKeys(
     customKeys: unknown,
   ): MaybeStoredModelProvider["customKeys"] {
@@ -1142,9 +1147,7 @@ export class ModelProviderService {
       Object.entries(customKeys as Record<string, unknown>).map(
         ([key, value]) => [
           key,
-          KEY_CHECK.some((k) => key.includes(k))
-            ? MASKED_KEY_PLACEHOLDER
-            : value,
+          isSecretCredential(key) ? MASKED_KEY_PLACEHOLDER : value,
         ],
       ),
     ) as MaybeStoredModelProvider["customKeys"];
@@ -1479,10 +1482,19 @@ export class ModelProviderService {
     let customKeysToSave: Record<string, unknown> | undefined;
 
     if (customKeysProvided) {
-      customKeysToSave = this.mergeCustomKeys(
+      const existingKeys = existingProvider.customKeys as Record<
+        string,
+        unknown
+      > | null;
+      this.assertKeepsStoredCredentials({
+        provider: data.provider,
         validatedKeys,
-        existingProvider.customKeys as Record<string, unknown> | null,
-      );
+        existingKeys,
+      });
+      customKeysToSave = mergeStoredCustomKeys({
+        incoming: validatedKeys,
+        stored: existingKeys,
+      });
     }
 
     return await this.repository.update(
@@ -1543,32 +1555,60 @@ export class ModelProviderService {
   }
 
   /**
-   * Smart merging: preserves original keys when masked placeholder is sent.
+   * Refuses a write whose credential payload names none of the provider's
+   * credential fields.
    *
-   * Business rules:
-   * - Start with new validated keys
-   * - For any key with MASKED_KEY_PLACEHOLDER value, use existing value
+   * Such a payload cannot be a credential edit — it would replace the whole
+   * bag with something that is not a credential — and it is how a UI slip
+   * arrived here: a header-only object, which Azure's loose schema
+   * (`.passthrough()`, every field optional) accepted without a murmur.
+   * `mergeStoredCustomKeys` keeps the secrets it leaves out, so what is left
+   * to lose is the visible configuration, and losing that silently is still
+   * not something to do on a write that asked for nothing.
+   *
+   * Omission is the signal this reads, not emptiness: clearing a credential on
+   * purpose sends the field with an empty value, and that still goes through.
+   * `MANAGED` rows carry their own single key rather than the schema's, so they
+   * are recognised too.
    */
-  private mergeCustomKeys(
-    validatedKeys: Record<string, unknown> | null,
-    existingKeys: Record<string, unknown> | null,
-  ): Record<string, unknown> {
-    if (!validatedKeys) return {};
+  private assertKeepsStoredCredentials({
+    provider,
+    validatedKeys,
+    existingKeys,
+  }: {
+    provider: string;
+    validatedKeys: Record<string, unknown> | null;
+    existingKeys: Record<string, unknown> | null;
+  }): void {
+    if (!existingKeys) return;
 
-    if (!existingKeys) return validatedKeys;
+    const definition =
+      modelProviders[provider as keyof typeof modelProviders] ?? undefined;
+    const schemaKeys = new Set([
+      ...Object.keys(getSchemaShape(definition?.keysSchema)),
+      "MANAGED",
+    ]);
+    if (schemaKeys.size === 1) return; // unknown provider: nothing to judge against
 
-    return {
-      ...validatedKeys,
-      ...Object.fromEntries(
-        Object.entries(existingKeys)
-          .filter(([key]) => validatedKeys[key] === MASKED_KEY_PLACEHOLDER)
-          .map(([key, value]) => [key, value]),
-      ),
-    };
+    // Only a credential that actually holds something is worth protecting. A
+    // field already sitting empty has nothing to lose, and counting it would
+    // block the save right after a customer cleared one on purpose.
+    const storedCredentials = Object.entries(existingKeys).filter(
+      ([key, value]) =>
+        schemaKeys.has(key) && typeof value === "string" && value !== "",
+    );
+    if (storedCredentials.length === 0) return;
+
+    const incomingCredentials = Object.keys(validatedKeys ?? {}).filter((key) =>
+      schemaKeys.has(key),
+    );
+    if (incomingCredentials.length > 0) return;
+
+    throw new ModelProviderCredentialsWouldBeDroppedError({ provider });
   }
 
   /**
-   * Header counterpart of `mergeCustomKeys`: the frontend receives header
+   * Header counterpart of `mergeStoredCustomKeys`: the frontend receives header
    * values as the masked placeholder, so an untouched header comes back
    * masked on save and must be restored from the stored row. Restore by
    * header key first; when the key was renamed in place, fall back to the

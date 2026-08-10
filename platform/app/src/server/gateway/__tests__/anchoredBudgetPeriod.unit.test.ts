@@ -186,8 +186,16 @@ describe("GatewayBudgetService.create with a cycle anchor", () => {
     return {
       organizationUser: { findFirst: vi.fn().mockResolvedValue(null) },
       team: { findFirst: vi.fn().mockResolvedValue(null) },
-      project: { findFirst: vi.fn().mockResolvedValue({ id: "project_1" }) },
+      project: {
+        findFirst: vi.fn().mockResolvedValue({ id: "project_1" }),
+        findMany: vi.fn().mockResolvedValue([]),
+      },
       modelProvider: { findFirst: vi.fn().mockResolvedValue(null) },
+      // No active keys, the one shape the reach guard always allows, so
+      // these tests keep answering the anchor question rather than being
+      // answered by a later guard.
+      virtualKey: { findMany: vi.fn().mockResolvedValue([]) },
+      groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
       // Reaching here means the anchor was accepted.
       $transaction: vi.fn().mockRejectedValue(new Error(REACHED_TRANSACTION)),
     } as unknown as PrismaClient;

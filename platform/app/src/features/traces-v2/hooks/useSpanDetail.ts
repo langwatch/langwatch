@@ -1,12 +1,20 @@
+import { useMemo } from "react";
+import { applyOverlayToSpanDetail } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import { api } from "~/utils/api";
 import {
   asSharedQueryResult,
   useSharedTrace,
 } from "../context/SharedTraceContext";
 import { useDrawerStore } from "../stores/drawerStore";
+import { useAppliedTraceEditPatch } from "./useTraceEditOverlay";
 import { useTraceQueryArgs } from "./useTraceQueryArgs";
 
-export function useSpanDetail() {
+/**
+ * The selected span exactly as captured, before any correction. Read it when
+ * the captured value is the point: the hover-original marks and the difference
+ * view.
+ */
+export function useSpanDetailCanonical() {
   const shared = useSharedTrace();
   const { isReady, queryArgs } = useTraceQueryArgs();
   const spanId = useDrawerStore((s) => s.selectedSpanId);
@@ -31,4 +39,24 @@ export function useSpanDetail() {
     return asSharedQueryResult(detail) as unknown as typeof query;
   }
   return query;
+}
+
+/**
+ * The selected span as the reader sees it: corrected when a correction applies,
+ * captured otherwise.
+ */
+export function useSpanDetail() {
+  const query = useSpanDetailCanonical();
+  const patch = useAppliedTraceEditPatch();
+  const detail = query.data;
+
+  const data = useMemo(
+    () => (detail ? applyOverlayToSpanDetail({ detail, patch }) : detail),
+    [detail, patch],
+  );
+
+  return useMemo(
+    () => (data === detail ? query : { ...query, data }),
+    [query, data, detail],
+  );
 }

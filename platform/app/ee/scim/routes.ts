@@ -130,6 +130,11 @@ const scimAuth: MiddlewareHandler<ScimEnv> = async (c, next) => {
 const secured = createServiceApp<ScimEnv>({
   basePath: "/api/scim/v2",
   verifySecret: scimAuth,
+  // The bearer token belongs to the identity provider, not to us, so the
+  // published document names the scheme it can present. Discovery keeps its
+  // own `public` classification: the override renames the app's secret, and
+  // discovery is reached without it.
+  credentialClass: "scim_token",
 });
 
 const SCIM_POLICY = internalSecret(

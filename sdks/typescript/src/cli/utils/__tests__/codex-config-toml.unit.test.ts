@@ -154,6 +154,39 @@ describe("writeCodexOtelBlock", () => {
       const result = writeCodexOtelBlock(inputs, { filePath });
       expect(result.action).toBe("unchanged");
     });
+
+    /**
+     * `$&`, ``$` `` and `$'` are replacement directives to
+     * `String.prototype.replace`, and the replacement here is built from the
+     * caller's own values. Expanded rather than written out, they splice the
+     * surrounding config back into the block and codex stops parsing the file.
+     */
+    it("writes a dollar sign in the environment label out literally", () => {
+      const filePath = path.join(tmp, "config.toml");
+      const environment = "team$&build$`ci";
+      writeCodexOtelBlock(
+        {
+          endpoint: "https://app.langwatch.ai/api/otel",
+          ingestionToken: "ik-lw-zzz",
+          environment: "first",
+        },
+        { filePath },
+      );
+
+      writeCodexOtelBlock(
+        {
+          endpoint: "https://app.langwatch.ai/api/otel",
+          ingestionToken: "ik-lw-zzz",
+          environment,
+        },
+        { filePath },
+      );
+
+      const contents = fs.readFileSync(filePath, "utf8");
+      expect(contents).toContain('environment = "team$&build$`ci"');
+      expect(contents.match(/langwatch otel begin/g)).toHaveLength(1);
+      expect(contents.match(/^\[otel\]$/gm)).toHaveLength(1);
+    });
   });
 
   describe("when persistAuthHeader is true", () => {

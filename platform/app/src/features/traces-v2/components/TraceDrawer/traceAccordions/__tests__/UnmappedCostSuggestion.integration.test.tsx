@@ -34,10 +34,31 @@ vi.mock("../../../../hooks/useSpanDetail", () => ({
     data: mockDetailState.current,
     isLoading: false,
   }),
+  useSpanDetailCanonical: () => ({
+    data: mockDetailState.current,
+    isLoading: false,
+  }),
+}));
+
+// SpanAccordions marks the fields a stored correction changed; this test
+// renders without a tRPC provider and no correction is in play here.
+vi.mock("../../../../hooks/useTraceEditOverlay", () => ({
+  useTraceEditOverlay: () => ({ data: null }),
+  useAppliedTraceEditPatch: () => null,
 }));
 
 vi.mock("../../../../hooks/useTraceResources", () => ({
   useTraceResources: () => ({ bySpanId: {}, isLoading: false }),
+}));
+
+// SpanAccordions reads the trace's comments to count them on each section;
+// this test renders without a tRPC provider and no comment is in play here.
+vi.mock("../../../../hooks/useAnchoredAnnotations", () => ({
+  useAnchoredAnnotations: () => ({
+    commentsAt: () => [],
+    all: [],
+    isLoading: false,
+  }),
 }));
 
 // SpanAccordions joins log content onto spans via a tRPC query; this test

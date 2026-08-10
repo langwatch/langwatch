@@ -32,16 +32,15 @@ fail() {
   failures=$((failures + 1))
 }
 
-# Renders the chart once per flag set, caches the result, and prints the PATH
-# to the rendered manifest. Every assertion otherwise pays for a full render,
-# and they mostly ask about the same one.
+# Renders the chart once per flag set and caches the result, printing the PATH
+# to the cached manifest rather than its contents. Every assertion otherwise
+# pays for a full render, and they mostly ask about the same one.
 #
-# Consumers read the file instead of a pipe on purpose: several of the awk
-# programs below `exit` at their first match, and under `set -o pipefail` that
-# early exit SIGPIPEs whatever is still writing into the pipe once the render
-# outgrows the pipe buffer, killing the whole suite with nothing but
-# "cat: write error: Broken pipe". Reading the file directly leaves awk free
-# to exit whenever it likes.
+# A path, not a pipe: the readers below stop at the first thing they were
+# looking for, and a `cat` whose reader has already exited takes SIGPIPE, which
+# `set -o pipefail` turns into a failed run reported against whichever
+# assertion happened to be reading. Handing over a file lets each reader open
+# it and stop whenever it likes.
 #
 # A failed render yields an empty manifest rather than killing the run under
 # `set -e`, so a chart that stops rendering is reported as the assertion it

@@ -91,6 +91,13 @@ function textFromContent(content: unknown): string {
 
 function outputToText(output: unknown): string {
   if (typeof output === "string") return output;
+  // `custom_tool_call_output` hands the result back as content blocks rather
+  // than a string. Serialising those verbatim would put a JSON array where the
+  // reader expects the command's output.
+  if (Array.isArray(output)) {
+    const text = textFromContent(output);
+    if (text) return text;
+  }
   if (output && typeof output === "object") {
     // codex wraps exec output as { output: "...", metadata: {...} } sometimes
     const inner = (output as { output?: unknown }).output;
@@ -255,9 +262,17 @@ class CodexTurnAccumulator {
     switch (payload.type) {
       case "message":
         return this.onMessage(payload);
+      // Codex spells a tool call several ways depending on how the model was
+      // asked to call it, and which spelling shows up changes between releases
+      // (0.146 uses `custom_tool_call` for the shell where 0.137 used
+      // `function_call`). Handling only one of them silently drops every tool
+      // call from the recovered conversation, so all of them route here.
       case "function_call":
+      case "custom_tool_call":
+      case "local_shell_call":
         return this.onFunctionCall(payload);
       case "function_call_output":
+      case "custom_tool_call_output":
         return this.onFunctionCallOutput(payload);
     }
   }
@@ -289,11 +304,14 @@ class CodexTurnAccumulator {
       this.pendingToolCallIds.push(callId);
     }
     const name = typeof payload.name === "string" ? payload.name : "tool";
+    // `function_call` names the argument blob `arguments`; `custom_tool_call`
+    // and `local_shell_call` name it `input` / `action`.
+    const rawArgs = payload.arguments ?? payload.input ?? payload.action;
     const args =
-      typeof payload.arguments === "string"
-        ? payload.arguments
-        : payload.arguments != null
-          ? JSON.stringify(payload.arguments)
+      typeof rawArgs === "string"
+        ? rawArgs
+        : rawArgs != null
+          ? JSON.stringify(rawArgs)
           : "";
     this.history.push({
       role: "assistant",

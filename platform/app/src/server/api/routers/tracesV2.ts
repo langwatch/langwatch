@@ -11,12 +11,15 @@ import {
   generateTraceQueryFromPrompt,
 } from "~/server/app-layer/traces/ai-query";
 import {
-  contentAttrKeys,
   enrichCodingAgentSpansFromLogs,
   enrichSingleSpanWithClaudeLogContent,
   isCodingAgentShapedSpan,
   mapSummaryRowsToClaudeRefs,
 } from "~/server/app-layer/traces/claude-code-log-enrichment";
+import {
+  type LogContentCategory,
+  logContentKeys,
+} from "~/server/app-layer/traces/coding-agent-log-content";
 
 const logger = createLogger("langwatch:api:traces-v2");
 
@@ -62,7 +65,11 @@ import {
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import type { Span, SpanInputOutput } from "~/server/tracer/types";
+import {
+  buildDisplayInput,
+  stringifySpanIO,
+} from "~/server/tracer/spanIOStringify";
+import type { Span } from "~/server/tracer/types";
 import {
   findPromptReferenceInAncestors,
   flattenParamsToPromptAttributes,
@@ -299,77 +306,6 @@ export function mapSpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNode {
     cacheCreationTokens: row.cacheCreationTokens,
     updatedAtMs: row.updatedAtMs,
   };
-}
-
-/**
- * The OTel gen_ai semconv (and our canonicaliser, see `_extraction.ts`) split
- * the system prompt out of `gen_ai.input.messages` into the separate
- * `gen_ai.system_instructions` attribute. Reads it back, tolerating both the
- * flat-dotted (`"gen_ai.system_instructions"`) and nested
- * (`{ gen_ai: { system_instructions } }`) param shapes.
- */
-function readSystemInstructions(
-  params: Record<string, unknown> | null | undefined,
-): string | null {
-  if (!params) return null;
-  const flat = params["gen_ai.system_instructions"];
-  if (typeof flat === "string" && flat.trim().length > 0) return flat;
-  const genAi = params.gen_ai;
-  if (genAi && typeof genAi === "object" && !Array.isArray(genAi)) {
-    const nested = (genAi as Record<string, unknown>).system_instructions;
-    if (typeof nested === "string" && nested.trim().length > 0) return nested;
-  }
-  return null;
-}
-
-/**
- * Build the display string for a span's input. The canonicaliser strips the
- * system prompt out of the chat transcript into `gen_ai.system_instructions`,
- * so a faithfully-rendered Input panel would silently drop it — the
- * conversation reads as if nothing steered the model. For display we
- * recombine them: when the input is a chat transcript with no system message
- * of its own and the span carries system instructions, prepend them as a
- * leading `system` message. Doing it here (not in the canonicaliser) keeps
- * the stored attribute split semconv-correct while every view mode (pretty /
- * text / json / copy) stays consistent. All other shapes fall through.
- */
-export function buildDisplayInput(
-  span: Pick<Span, "input" | "params">,
-): string | null {
-  const io = span.input;
-  if (io && io.type === "chat_messages" && Array.isArray(io.value)) {
-    const system = readSystemInstructions(span.params ?? null);
-    const alreadyHasSystem = io.value.some(
-      (m) => !!m && typeof m === "object" && "role" in m && m.role === "system",
-    );
-    if (system && !alreadyHasSystem) {
-      return JSON.stringify([{ role: "system", content: system }, ...io.value]);
-    }
-  }
-  return stringifySpanIO(io);
-}
-
-function stringifySpanIO(
-  io: SpanInputOutput | null | undefined,
-): string | null {
-  if (!io) return null;
-  switch (io.type) {
-    case "text":
-      return String(io.value);
-    case "chat_messages":
-      return JSON.stringify(io.value);
-    case "json":
-      return JSON.stringify(io.value);
-    case "raw":
-      return String(io.value);
-    case "guardrail_result":
-    case "evaluation_result":
-      return JSON.stringify(io.value);
-    case "list":
-      return io.value.map((v) => stringifySpanIO(v)).join("\n");
-    default:
-      return null;
-  }
 }
 
 function mapSpanToDetail(
@@ -1029,9 +965,9 @@ async function loadSpansFullWithProtections({
     ...occurredAtFromInput(input),
   });
   // Claude Code's real `llm_request` spans carry tokens + `request_id` but NO
-  // message content and NO cost — both live in the trace's OTLP log records.
-  // Join them on BEFORE protections run, so the joined content goes through the
-  // same redaction pass as any other span content rather than bypassing it.
+  // message content, which lives in the trace's OTLP log records. Join it on
+  // BEFORE protections run, so the joined content goes through the same
+  // redaction pass as any other span content rather than bypassing it.
   const spans = await enrichCodingAgentSpansFromLogs({
     logRecords: app.traces.logRecords,
     tenantId: input.projectId,
@@ -2226,49 +2162,30 @@ export interface TraceLogRecordDto {
 const LOG_EVENT_NAME_ATTR = "event.name";
 
 /**
- * Log `event.name` values whose content payload is captured INPUT — the user's
- * prompt or the model-call request payload. Gated behind captured-input
- * visibility. Mirrors the input events the read-path Claude enrichment joins.
- */
-const LOG_INPUT_CONTENT_EVENTS: ReadonlySet<string> = new Set([
-  "user_prompt",
-  "api_request_body",
-]);
-
-/**
- * Log `event.name` values whose content payload is captured OUTPUT — the
- * assistant's reply or the model-call response payload. Gated behind
- * captured-output visibility.
- */
-const LOG_OUTPUT_CONTENT_EVENTS: ReadonlySet<string> = new Set([
-  "assistant_response",
-  "api_response_body",
-]);
-
-/**
  * Enforce captured-content visibility on one trace-correlated log record before
- * it leaves the API. The raw log records carry prompt / response content under
- * PER-EVENT attribute keys — `prompt` for `user_prompt`, `response` for
- * `assistant_response`, `body` for the raw `api_*_body` payloads — plus the
- * top-level OTLP body for content-of-record emitters. This procedure must
- * withhold every one of those keys behind the SAME `canSeeCapturedInput` /
- * `canSeeCapturedOutput` visibility the sibling span endpoints enforce, so the
- * key list comes from {@link contentAttrKeys}, the very mapping the read-path
- * enrichment and transcript derivation surface content from — a key stripped
- * from one list but not the other is a policy bypass.
+ * it leaves the API. The raw log records carry their content under PER-EVENT
+ * attribute keys — `prompt` for a user prompt, `response` / `response_text` for
+ * a reply, `arguments` / `tool_input` and `output` for a tool run — plus the
+ * top-level OTLP body for content-of-record emitters. Every one of those keys
+ * is withheld behind the SAME `canSeeCapturedInput` / `canSeeCapturedOutput`
+ * visibility the sibling span endpoints enforce, from {@link logContentKeys},
+ * the one table the read-path enrichment surfaces content from — a key
+ * surfaced by one and missed by the other is a policy bypass.
+ *
+ * Gating is per KEY, not per record: a codex `tool_result` carries the call's
+ * `arguments` (input) and its `output` (output) together, so one verdict for
+ * the whole record could only ever be right in one direction.
  *
  * Ingest also stamps DERIVED content onto the attributes
  * (`langwatch.gen_ai.output.text`, `…output.tool_calls`, …input counts): the
- * same captured content re-shaped, so it is stripped by prefix alongside the
- * raw keys.
+ * same captured content re-shaped, so each is stripped behind the category it
+ * was computed from.
  *
- * Input-category events gate on input visibility, output-category events on
- * output visibility, and any UNCLASSIFIED record that still carries a content
- * body fails closed (both visibilities required). Only content is withheld:
- * event name, `request_id`, `cost_usd`, `query_source` and every other
- * metadata attribute (and cost, governed by its own permission) pass through
- * untouched, so a structural record like the `api_request` cost anchor is
- * returned intact.
+ * A key whose category the table does not know fails closed and needs BOTH
+ * visibilities. Only content is withheld: event name, `request_id`,
+ * `cost_usd`, `query_source` and every other metadata attribute (and cost,
+ * governed by its own permission) pass through untouched, so a structural
+ * record like the `api_request` cost anchor is returned intact.
  */
 export function redactTraceLogContent(
   row: TraceLogRecordDto,
@@ -2280,59 +2197,78 @@ export function redactTraceLogContent(
   },
 ): TraceLogRecordDto {
   const eventName = row.attributes[LOG_EVENT_NAME_ATTR] ?? "";
-  const presentContentKeys = contentAttrKeys(eventName).filter((key) => {
-    const value = row.attributes[key];
-    return typeof value === "string" && value.length > 0;
+  const canSeeInput = protections.canSeeCapturedInput === true;
+  const canSeeOutput = protections.canSeeCapturedOutput === true;
+  const canSee = (category: LogContentCategory): boolean =>
+    category === "input"
+      ? canSeeInput
+      : category === "output"
+        ? canSeeOutput
+        : canSeeInput && canSeeOutput;
+
+  const contentKeys = logContentKeys(eventName);
+  const hiddenKeys = contentKeys.filter((entry) => {
+    const value = row.attributes[entry.key];
+    return (
+      typeof value === "string" && value.length > 0 && !canSee(entry.category)
+    );
   });
-  const derivedContentKeys = Object.keys(row.attributes).filter(
-    (key) =>
-      key.startsWith(DERIVED_INPUT_ATTR_PREFIX) ||
-      key.startsWith(DERIVED_OUTPUT_ATTR_PREFIX),
-  );
+  const hiddenDerivedKeys = Object.keys(row.attributes).filter((key) => {
+    if (key.startsWith(DERIVED_INPUT_ATTR_PREFIX)) return !canSeeInput;
+    if (key.startsWith(DERIVED_OUTPUT_ATTR_PREFIX)) return !canSeeOutput;
+    return false;
+  });
   // The top-level OTLP body is content only when it is NOT merely echoing the
   // event-name marker (claude_code stamps the marker there; a generic
-  // content-of-record emitter puts the record's content there).
-  const topBodyIsContent = row.body.length > 0 && row.body !== eventName;
+  // content-of-record emitter puts the record's content there). It follows the
+  // event's own `body` category, or fails closed when the event is unknown.
+  const bodyCategory: LogContentCategory =
+    contentKeys.find((entry) => entry.key === "body")?.category ?? "both";
+  const shouldHideBody =
+    row.body.length > 0 && row.body !== eventName && !canSee(bodyCategory);
+
   if (
-    presentContentKeys.length === 0 &&
-    derivedContentKeys.length === 0 &&
-    !topBodyIsContent
+    hiddenKeys.length === 0 &&
+    hiddenDerivedKeys.length === 0 &&
+    !shouldHideBody
   ) {
     return row;
   }
 
-  const isInput = LOG_INPUT_CONTENT_EVENTS.has(eventName);
-  const isOutput = LOG_OUTPUT_CONTENT_EVENTS.has(eventName);
-  const canSeeInput = protections.canSeeCapturedInput === true;
-  const canSeeOutput = protections.canSeeCapturedOutput === true;
-  const hidden = isInput
-    ? !canSeeInput
-    : isOutput
-      ? !canSeeOutput
-      : // Unclassified content record — reveal only to a viewer allowed BOTH.
-        !(canSeeInput && canSeeOutput);
-  if (!hidden) return row;
-
   const attributes = { ...row.attributes };
-  for (const key of presentContentKeys) delete attributes[key];
-  // Derived attrs are stripped by the category they were computed from; an
-  // unclassified hidden record sheds both, mirroring its fail-closed gate.
-  for (const key of derivedContentKeys) {
-    const isDerivedInput = key.startsWith(DERIVED_INPUT_ATTR_PREFIX);
-    if (isInput ? isDerivedInput : isOutput ? !isDerivedInput : true) {
-      delete attributes[key];
-    }
-  }
+  for (const entry of hiddenKeys) delete attributes[entry.key];
+  for (const key of hiddenDerivedKeys) delete attributes[key];
+
+  // The audience label only means something when ONE category was withheld:
+  // a record that shed both sides has no single audience to name.
+  const hiddenCategories = new Set<LogContentCategory>([
+    ...hiddenKeys.map((entry) => entry.category),
+    ...(shouldHideBody ? [bodyCategory] : []),
+    ...(hiddenDerivedKeys.some((key) =>
+      key.startsWith(DERIVED_INPUT_ATTR_PREFIX),
+    )
+      ? (["input"] as const)
+      : []),
+    ...(hiddenDerivedKeys.some((key) =>
+      key.startsWith(DERIVED_OUTPUT_ATTR_PREFIX),
+    )
+      ? (["output"] as const)
+      : []),
+  ]);
+  const onlyHidden =
+    hiddenCategories.size === 1 ? [...hiddenCategories][0] : null;
+
   return {
     ...row,
-    body: topBodyIsContent ? "" : row.body,
+    body: shouldHideBody ? "" : row.body,
     attributes,
     bodyRedacted: true,
-    bodyVisibleTo: isInput
-      ? (protections.capturedInputVisibleTo ?? null)
-      : isOutput
-        ? (protections.capturedOutputVisibleTo ?? null)
-        : null,
+    bodyVisibleTo:
+      onlyHidden === "input"
+        ? (protections.capturedInputVisibleTo ?? null)
+        : onlyHidden === "output"
+          ? (protections.capturedOutputVisibleTo ?? null)
+          : null,
   };
 }
 

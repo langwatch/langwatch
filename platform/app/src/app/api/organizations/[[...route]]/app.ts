@@ -109,6 +109,13 @@ const organizationService = () =>
 const secured = createServiceApp({
   basePath: "/api/organizations",
   verifySecret: verifyInstanceAdminKey,
+  // Enforced as a shared secret, published as a credential: the operator who
+  // sets LANGWATCH_INSTANCE_ADMIN_API_KEY is the caller, and the document
+  // declares `instance_admin_key` for exactly that. Left at the service app's
+  // default the family would classify as `internal`, which the spec generator
+  // refuses to advertise, and rightly so for a secret nobody outside the
+  // deployment holds.
+  credentialClass: "instance_admin_api_key",
 });
 
 const instanceAdminPolicy = () =>

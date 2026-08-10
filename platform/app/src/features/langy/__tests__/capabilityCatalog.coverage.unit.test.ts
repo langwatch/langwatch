@@ -61,12 +61,19 @@ const EXCLUDED_COMMANDS = new Set([
   // machine the CLI runs on, not a platform resource a card could deep-link.
   "skills",
   // Gateway tool wrappers: they exec another AI tool (claude/codex/cursor/
-  // gemini/opencode) rather than returning a LangWatch result.
+  // gemini/opencode/copilot) rather than returning a LangWatch result.
   "claude",
   "codex",
   "cursor",
   "gemini",
   "opencode",
+  "copilot",
+  // VS Code launcher: `code` execs VS Code with Copilot Chat telemetry env,
+  // returning no LangWatch result. ADR-039 §Extension #2.
+  "code",
+  // Local capture setup for the standalone GitHub Copilot app: installs an
+  // OS login agent on the user's machine, not a platform resource.
+  "copilot-app",
   // Sends a support report to the LangWatch team; the confirmation is a
   // message and an opaque id, not a platform resource a card could open.
   "report",

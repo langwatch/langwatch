@@ -28,6 +28,15 @@
  * therefore orders deterministically so that even if a concurrent write
  * briefly leaves two defaults at a scope, resolution always returns the
  * most recently set one rather than an arbitrary row.
+ *
+ * Propagation: a policy's contents are folded into every bundle the
+ * materialiser builds for a VK that references it, so an edit has to
+ * reach the running gateway. `update` and `delete` append a
+ * GatewayChangeEvent in the same transaction as the write; the gateway's
+ * /changes long-poll picks it up and evicts the organization's cached
+ * bundles, which re-materialise against the new policy on the next
+ * request. `Options.ConfigTTL` on the gateway is the safety net behind
+ * that, not the path.
  */
 import {
   Prisma,
@@ -37,6 +46,8 @@ import {
   RoutingPolicyScopeType,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+
+import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 
 export type RoutingPolicyScope = "organization" | "team" | "project";
 
@@ -116,7 +127,10 @@ export interface UpdateRoutingPolicyInput {
 }
 
 export class RoutingPolicyService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly changeEvents = new ChangeEventRepository(prisma),
+  ) {}
 
   /**
    * List policies in an org, optionally filtered to those selectable
@@ -159,6 +173,12 @@ export class RoutingPolicyService {
     });
   }
 
+  /**
+   * No change event: a policy nothing references yet cannot appear in any
+   * bundle, and `isDefault` is consulted at VK issuance, never by the
+   * materialiser, so the isDefault clearing below cannot change an
+   * already-issued key's bundle either.
+   */
   async create(
     input: CreateRoutingPolicyInput,
   ): Promise<RoutingPolicyWithScopes> {
@@ -216,6 +236,16 @@ export class RoutingPolicyService {
     });
   }
 
+  /**
+   * Edit a policy and tell the gateway about it.
+   *
+   * The event is unconditional rather than gated on which field moved.
+   * Every stored field except `isDefault` reaches a bundle through the
+   * materialiser (the provider chain, the allowlist, the aliases, the
+   * policy rules), and a gate that has to stay in step with that list is
+   * a gate that will one day drop an edit silently. An event costs one
+   * insert and one cold re-materialise per key.
+   */
   async update(
     input: UpdateRoutingPolicyInput,
   ): Promise<RoutingPolicyWithScopes> {
@@ -247,10 +277,34 @@ export class RoutingPolicyService {
     if (input.policyRules !== undefined)
       data.policyRules = input.policyRules as Prisma.InputJsonValue;
 
-    return await this.prisma.routingPolicy.update({
-      where: { id: existing.id },
-      data,
-      include: { scopes: true },
+    return await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.routingPolicy.update({
+        where: { id: existing.id },
+        data,
+        include: { scopes: true },
+      });
+      // The gateway reads a VK's revision only as an ETag today, and it
+      // never sends If-None-Match, so nothing consumes this bump yet. It
+      // still has to happen: /internal/gateway/config already answers 304
+      // to a matching If-None-Match, so the day the gateway starts sending
+      // one, a policy edit that left the revision alone would strand every
+      // referencing key on a 304 forever.
+      await tx.virtualKey.updateMany({
+        where: {
+          organizationId: input.organizationId,
+          routingPolicyId: existing.id,
+        },
+        data: { revision: { increment: 1n } },
+      });
+      await this.changeEvents.append(
+        {
+          organizationId: input.organizationId,
+          kind: "ROUTING_POLICY_UPDATED",
+          payload: { routingPolicyId: updated.id },
+        },
+        tx,
+      );
+      return updated;
     });
   }
 
@@ -258,6 +312,12 @@ export class RoutingPolicyService {
    * Make `id` the default for its scope tier. Atomic swap: clears the
    * existing default in the same transaction across every scope row
    * the target policy carries.
+   *
+   * No change event: `isDefault` is read by `list` ordering and by
+   * `resolveDefaultForUser` at VK issuance, and by nothing the
+   * materialiser touches. A key already holds the policy id it was issued
+   * against, so swapping which policy is default cannot change any cached
+   * bundle, and evicting the organization for it would be pure churn.
    */
   async setDefault({
     id,
@@ -292,6 +352,19 @@ export class RoutingPolicyService {
     });
   }
 
+  /**
+   * Delete a policy and release the keys that pointed at it.
+   *
+   * The pointer is cleared explicitly rather than left to Prisma's
+   * `onDelete: SetNull`: `relationMode = "prisma"` means the referential
+   * action is emulated by the client with no SQL foreign key behind it,
+   * and it would only reach `routingPolicyId` anyway. `routingMode` has
+   * to move in the same statement, because POLICY without a policy id is
+   * a state the schema says cannot exist and the materialiser has no
+   * chain to build from. Released keys land on FALLBACK_ALL, the mode
+   * whose behaviour is closest to the multi-provider chain the policy was
+   * already giving them; NONE would silently strip their failover.
+   */
   async delete({
     id,
     organizationId,
@@ -300,7 +373,25 @@ export class RoutingPolicyService {
     organizationId: string;
   }): Promise<void> {
     await this.requireOwn(id, organizationId);
-    await this.prisma.routingPolicy.delete({ where: { id } });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.virtualKey.updateMany({
+        where: { organizationId, routingPolicyId: id },
+        data: {
+          routingPolicyId: null,
+          routingMode: "FALLBACK_ALL",
+          revision: { increment: 1n },
+        },
+      });
+      await tx.routingPolicy.delete({ where: { id } });
+      await this.changeEvents.append(
+        {
+          organizationId,
+          kind: "ROUTING_POLICY_DELETED",
+          payload: { routingPolicyId: id },
+        },
+        tx,
+      );
+    });
   }
 
   /**
