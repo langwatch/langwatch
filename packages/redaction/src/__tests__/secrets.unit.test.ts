@@ -20,6 +20,13 @@ const redact = (text: string, customPatterns?: readonly RegExp[]) =>
  */
 const BODY = "aB3dEf7gHi2jKlMnOpQrStUvWx0123456789xYzAbCdEfGh";
 const HEX = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
+/**
+ * Mirrors MAX_SCAN_LENGTH in the module under test, which is not exported.
+ * Derived rather than written inline at each use so a change to the budget
+ * moves every boundary case with it, instead of leaving them passing while
+ * testing nothing near the boundary.
+ */
+const SCAN_BUDGET = 250_000;
 
 describe("redactSecretsInText", () => {
   describe("given a built-in provider or cloud key", () => {
@@ -102,7 +109,7 @@ describe("redactSecretsInText", () => {
     // limit was a reliable way to carry a live key through ingestion unscanned.
     /** @scenario "A payload past the scan budget is still scanned" */
     it("slices it and still redacts the key inside", () => {
-      const input = "AKIAIOSFODNN7EXAMPLE " + "x".repeat(250_001);
+      const input = `AKIAIOSFODNN7EXAMPLE ${"x".repeat(SCAN_BUDGET + 1)}`;
       const { text, redactedCount } = redact(input);
       expect(text).not.toContain("AKIAIOSFODNN7EXAMPLE");
       expect(redactedCount).toBe(1);
@@ -110,7 +117,7 @@ describe("redactSecretsInText", () => {
     });
 
     it("finds a key that sits past the first slice boundary", () => {
-      const input = "x".repeat(260_000) + " AKIAIOSFODNN7EXAMPLE tail";
+      const input = `${"x".repeat(SCAN_BUDGET + 10_000)} AKIAIOSFODNN7EXAMPLE tail`;
       const { text, redactedCount } = redact(input);
       expect(text).not.toContain("AKIAIOSFODNN7EXAMPLE");
       expect(redactedCount).toBe(1);
@@ -124,7 +131,7 @@ describe("redactSecretsInText", () => {
     /** @scenario "A credential straddling a slice boundary is still redacted" */
     it("never splits a credential across two slices", () => {
       const results = [-40, -20, -1, 0, 1, 20, 40].map((offset) => {
-        const filler = "x ".repeat((250_000 + offset) / 2);
+        const filler = "x ".repeat((SCAN_BUDGET + offset) / 2);
         const { text, redactedCount } = redact(
           `${filler}AKIAIOSFODNN7EXAMPLE tail`,
         );
@@ -152,7 +159,7 @@ describe("redactSecretsInText", () => {
         "-----BEGIN PRIVATE KEY-----\n" +
         "MIIEvQIBADANBgkqh\n".repeat(40) +
         "-----END PRIVATE KEY-----";
-      const input = `${"z ".repeat(124_995)}${pem} tail`;
+      const input = `${"z ".repeat(SCAN_BUDGET / 2 - 5)}${pem} tail`;
       const { text, redactedCount } = redact(input);
       expect(text).not.toContain("MIIEvQIBADANBgkqh");
       expect(redactedCount).toBe(1);
@@ -866,9 +873,17 @@ describe("redactSecretsInText, given a whitespace separator", () => {
     // past the `$VAR` and code-expression guards.
     /** @scenario "A JSON-escaped newline does not extend a credential value" */
     it("stops the value at the escape, as it does at a real newline", () => {
-      const escaped = String.raw`api_key = $OPENAI_API_KEY
-next line here`;
+      const escaped = "api_key = $OPENAI_API_KEY\\nnext line here";
+      // The fixture must carry the two characters a backslash and an n, not a
+      // real newline: a real one already terminated the value before the fix,
+      // so a test built on one passes without exercising anything.
+      expect(escaped).toContain("\\n");
+      expect(escaped.includes("\u000a")).toBe(false);
       expect(redact(escaped).text).toBe(escaped);
+
+      const withRealNewline = "api_key = $OPENAI_API_KEY\nnext line here";
+      expect(redact(withRealNewline).text).toBe(withRealNewline);
+
       const terraform =
         "github_token_secret = local.github_token_secret_name";
       expect(redact(terraform).text).toBe(terraform);

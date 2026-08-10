@@ -581,38 +581,44 @@ describe("OtlpSpanPiiRedactionService, given path-keyed log attributes", () => {
     },
   });
 
-  /** @scenario "A credential-named log attribute is redacted by name" */
-  it("applies the sensitive-name rule to the attribute's real name", async () => {
-    const { service } = makeService(mkPolicy({}));
-    const log = pathKeyed();
-    await service.redactLog(log, "ESSENTIAL", TENANT);
-    expect(log.attributes["log.1.value.stringValue"]).toBe("[SECRET]");
+  describe("when redactLog runs", () => {
+    /** @scenario "A credential-named log attribute is redacted by name" */
+    it("applies the sensitive-name rule to the attribute's real name", async () => {
+      const { service } = makeService(mkPolicy({}));
+      const log = pathKeyed();
+      await service.redactLog(log, "ESSENTIAL", TENANT);
+      expect(log.attributes["log.1.value.stringValue"]).toBe("[SECRET]");
+    });
+
+    /** @scenario "The receiver-written API key id survives redaction on the log path" */
+    it("keeps the receiver-written key id readable, as on the span path", async () => {
+      const { service } = makeService(mkPolicy({}));
+      const log = pathKeyed();
+      await service.redactLog(log, "ESSENTIAL", TENANT);
+      expect(log.attributes["log.0.value.stringValue"]).toBe(
+        "key_abc123def456",
+      );
+    });
+
+    it("leaves an ordinary attribute alone", async () => {
+      const { service } = makeService(mkPolicy({}));
+      const log = pathKeyed();
+      await service.redactLog(log, "ESSENTIAL", TENANT);
+      expect(log.attributes["log.2.value.stringValue"]).toBe("api_request");
+    });
   });
 
-  /** @scenario "The receiver-written API key id survives redaction on the log path" */
-  it("keeps the receiver-written key id readable, as on the span path", async () => {
-    const { service } = makeService(mkPolicy({}));
-    const log = pathKeyed();
-    await service.redactLog(log, "ESSENTIAL", TENANT);
-    expect(log.attributes["log.0.value.stringValue"]).toBe("key_abc123def456");
-  });
-
-  it("leaves an ordinary attribute alone", async () => {
-    const { service } = makeService(mkPolicy({}));
-    const log = pathKeyed();
-    await service.redactLog(log, "ESSENTIAL", TENANT);
-    expect(log.attributes["log.2.value.stringValue"]).toBe("api_request");
-  });
-
-  it("falls back to the key when no name is carried", async () => {
-    const { service } = makeService(mkPolicy({}));
-    const log = {
-      body: "",
-      attributes: { authorization: "plain text value" },
-      resourceAttributes: {},
-    };
-    await service.redactLog(log, "ESSENTIAL", TENANT);
-    expect(log.attributes.authorization).toBe("[SECRET]");
+  describe("when no name is carried for a key", () => {
+    it("falls back to the key itself", async () => {
+      const { service } = makeService(mkPolicy({}));
+      const log = {
+        body: "",
+        attributes: { authorization: "plain text value" },
+        resourceAttributes: {},
+      };
+      await service.redactLog(log, "ESSENTIAL", TENANT);
+      expect(log.attributes.authorization).toBe("[SECRET]");
+    });
   });
 });
 
