@@ -369,7 +369,12 @@ describe("check queue", () => {
       // reads as the queue having serialized the two runs.
       const holder = startRun("holder", { holdMs: 60_000 });
       await waitForHolder();
+      // The impatient run has to stay inside the command long enough for the
+      // overlap to have a width. Holding for zero puts its start and its end
+      // in the same millisecond, where the scan settles ends before starts and
+      // reads the pair as having been serialized after all.
       const impatient = startRun("impatient", {
+        holdMs: 250,
         env: { CHECK_QUEUE_MAX_WAIT_MS: "200" },
       });
 
