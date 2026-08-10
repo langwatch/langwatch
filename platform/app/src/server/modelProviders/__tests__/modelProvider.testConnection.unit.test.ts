@@ -385,6 +385,29 @@ describe("testConnection", () => {
       });
     });
 
+    it("lets a team admin check a credential for their own organization", async () => {
+      // The no-project path exists for scopes below the organization: a team
+      // admin sets up a team-scoped credential and never holds
+      // organization:manage. Requiring it to charge the budget would refuse
+      // them a control the route had already authorized.
+      hasOrganizationPermissionMock.mockImplementation(
+        (_ctx: unknown, _id: string, permission: string) =>
+          Promise.resolve(permission === "organization:view"),
+      );
+      hasTeamPermissionMock.mockResolvedValue(true);
+
+      const result = await service().validateCredential({
+        input: {
+          organizationId: ORGANIZATION_ID,
+          provider: "openai",
+          customKeys: { OPENAI_API_KEY: "sk-typed-just-now" },
+        },
+        ctx,
+      });
+
+      expect(result.outcome).toBe("verified");
+    });
+
     it("refuses to spend the budget of an organization the caller cannot manage", async () => {
       // The organization handle is a value the caller chose, and it is the
       // rate-limit key. Unchecked, naming someone else's organization spends

@@ -14,6 +14,7 @@ import {
   ModelProviderCredentialsWouldBeDroppedError,
   ModelProviderDeprecatedError,
   ModelProviderNotFoundError,
+  ModelProviderScopeForbiddenError,
   ModelProviderScopesRequiredError,
   ModelProviderTestRateLimitedError,
 } from "./errors";
@@ -1002,10 +1003,24 @@ export class ModelProviderService {
 
     // Only the caller-supplied path needs the check: an anchor derived from a
     // project came through the route's project permission gate to get here.
+    //
+    // Membership, not authority. Charging an organization's budget is not an
+    // act of administration — the whole point of this path is scopes below the
+    // organization, where a team admin sets up a team-scoped credential and
+    // never holds organization:manage. Demanding it would refuse them a check
+    // the route had already authorized. Being able to see the organization at
+    // all is what a stranger cannot fake, and that is exactly the line this
+    // has to draw.
     if (!input.projectId) {
-      await assertCanManageAllScopes(ctx, [
+      const belongs = await canReadAnyScope(ctx, [
         { scopeType: "ORGANIZATION", scopeId: anchor },
       ]);
+      if (!belongs) {
+        throw new ModelProviderScopeForbiddenError({
+          scopeType: "ORGANIZATION",
+          requiredPermission: "organization:view",
+        });
+      }
     }
 
     await assertTestConnectionWithinBudget(anchor);
