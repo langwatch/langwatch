@@ -91,6 +91,7 @@ import {
 import { shutdownPostHog } from "./server/posthog";
 import { verifyRedisReady } from "./server/redis";
 import { buildSecurityHeaders } from "./server/securityHeaders";
+import { SHUTDOWN_BUDGET } from "./server/shutdown/budget";
 import { installShutdownHandlers } from "./server/shutdown/runGracefulShutdown";
 import { serveStaticOrFallback } from "./server/static-handler";
 import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
@@ -398,10 +399,23 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
       },
       {
         name: "http-server",
-        run: () => {
-          server.close();
-          if ("closeAllConnections" in server) server.closeAllConnections();
+        run: async () => {
+          // Stop accepting, then let requests already in flight finish.
+          // closeAllConnections() destroys active sockets, so calling it
+          // outright turned every rolling deploy into a burst of 502s for
+          // whatever was mid-request. Idle connections go immediately; the
+          // rest get the phase's budget and are only destroyed if they
+          // outlast it.
+          const closed = new Promise<void>((resolve) =>
+            server.close(() => resolve()),
+          );
+          if ("closeIdleConnections" in server) server.closeIdleConnections();
           mcpHandler.closeAllSessions();
+          try {
+            await closed;
+          } finally {
+            if ("closeAllConnections" in server) server.closeAllConnections();
+          }
         },
       },
       // Drain in-process workers (if any) before closing the shared App below,
@@ -411,7 +425,14 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
         name: "in-process-workers",
         run: async () => await workerHandle?.shutdown(),
       },
-      { name: "app", run: async () => await getApp().close() },
+      // Carries the queue drain when this process hosts the worker stack, so
+      // it gets the whole budget rather than the default per-phase ceiling;
+      // App.close bounds it from the inside.
+      {
+        name: "app",
+        timeoutMs: SHUTDOWN_BUDGET.processDeadlineMs,
+        run: async () => await getApp().close(),
+      },
       { name: "posthog", run: async () => await shutdownPostHog() },
     ],
   }));

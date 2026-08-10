@@ -54,36 +54,38 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
 
   @unit @shutdown-budget
   Scenario: Every shutdown clock nests inside the one outside it
-    Given any drain budget
+    Given any configured drain budget
     When the shutdown clocks are derived from it
-    Then the queue drain is shorter than the App.close backstop
-    And the App.close backstop is shorter than the process deadline
-    And the process deadline is shorter than the required grace period
+    Then each clock finishes inside the one outside it
+    So that no outer clock can fire while the work it protects is still running
 
   @unit @shutdown-budget
   Scenario: Raising the drain budget widens every clock above it
-    Given the drain budget is raised
+    Given an operator raises the drain budget
     When the shutdown clocks are derived
-    Then the App.close backstop, the process deadline and the required grace period all move with it
+    Then every clock above it widens by the same amount
+    So that granting a longer drain never needs a second edit to stay consistent
 
   @unit @shutdown-budget
   Scenario: The required grace period matches what the chart guard enforces
     Given the derived shutdown budget
-    Then the required grace period is the drain plus thirty seconds
-    And that is the same margin the Helm guard validates against
+    When it is compared with the margin the chart and its test suite apply
+    Then all three agree
+    So that retuning one alone cannot admit a release the kubelet kills mid-drain
 
   @unit @shutdown-budget
   Scenario: The drain budget defaults to 25s in production and 5s in dev
-    Given no SHUTDOWN_DRAIN_TIMEOUT_MS override
+    Given no configured override
     When the shutdown budget is resolved
-    Then production gets 25 seconds
-    And a development or local environment gets 5 seconds
+    Then production drains for 25 seconds
+    And a development or local environment drains for 5 seconds
 
   @unit @shutdown-budget
-  Scenario: A malformed drain override is refused, not silently defaulted
-    Given SHUTDOWN_DRAIN_TIMEOUT_MS is set to something that is not a positive number
+  Scenario: A malformed drain override is reported and falls back, never fatal
+    Given the configured drain budget is not a positive number of milliseconds
     When the shutdown budget is resolved
-    Then resolution fails with an error naming the variable
+    Then the process reports the bad value and keeps a working budget
+    So that one mistyped character cannot crashloop a whole fleet
 
   # One shutdown implementation, shared by both entrypoints
 
@@ -106,6 +108,23 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
     Given a shutdown phase that never finishes
     When the deadline passes
     Then the process exits non-zero with a log line explaining the overrun
+
+  # A phase that never settles takes the whole shutdown with it, including the
+  # drain that is the point of the exercise. The live example: closing the
+  # websocket server resolves only once every client has gone, and one
+  # suspended laptop tab holds that open indefinitely.
+  @unit @shutdown-runner
+  Scenario: A phase that hangs is abandoned so the rest still run
+    Given a shutdown whose first phase never finishes
+    When that phase outlasts its own budget
+    Then it is abandoned and logged
+    And the later phases, including the queue drain, still run
+
+  @unit @shutdown-runner
+  Scenario: A second signal during shutdown does not start a second teardown
+    Given a shutdown already running from SIGTERM
+    When an operator adds a Ctrl-C on top
+    Then the sequence still runs exactly once
 
   # Telemetry participates in the shutdown; it does not own it
   #
@@ -156,7 +175,8 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
     Given an App whose event-sourcing consumer never finishes draining
     When the App is closed
     Then the close gives up on the drain after a bounded wait
-    And the ClickHouse, Redis and Prisma connections are still closed
+    But it leaves the connections alone, because that drain is still running
+    So that giving up never becomes the severing it exists to prevent
 
   # Error classification — the shutdown abort must be retryable
 
@@ -233,6 +253,20 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
     Given workers.terminationGracePeriodSeconds is set below the drain budget plus thirty
     When the chart is rendered
     Then the render fails naming both the granted and the required value
+
+  @regression @helm-grace-period
+  Scenario: A drain budget that is not a positive whole number refuses to render
+    Given a drain budget that is fractional, non-numeric, zero or negative
+    When the chart is rendered
+    Then it refuses, naming the value
+    So that a silently zeroed budget cannot ship a crashlooping release
+
+  @regression @helm-grace-period
+  Scenario: The drain budget cannot be overridden behind the pod's back
+    Given extraEnvs setting the drain budget directly
+    When the chart is rendered
+    Then it refuses and points at shutdownDrainSeconds
+    So that the process budget and the pod's grace period cannot disagree
 
   @regression @helm-grace-period
   Scenario: Raising the drain budget alone refuses to render

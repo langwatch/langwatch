@@ -11,21 +11,33 @@ import type {
 
 const logger = createLogger("langwatch:app");
 
-async function withTimeout(
+type SettleOutcome =
+  | { status: "done" }
+  | { status: "failed"; error: unknown }
+  | { status: "timeout" };
+
+/**
+ * Runs `run` under a deadline, reporting WHICH way it ended.
+ *
+ * The distinction is the whole point: a task that rejected has finished and
+ * its resources are free, while a task that timed out is still running. Both
+ * arriving as a thrown error is what made the caller treat them alike.
+ */
+async function settleWithTimeout(
   run: () => Promise<void>,
   timeoutMs: number,
-  label: string,
-): Promise<void> {
+): Promise<SettleOutcome> {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<SettleOutcome>((resolve) => {
+    timer = setTimeout(() => resolve({ status: "timeout" }), timeoutMs);
+  });
   try {
-    await Promise.race([
-      run(),
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error(`${label} timed out after ${timeoutMs}ms`)),
-          timeoutMs,
-        );
-      }),
+    return await Promise.race([
+      run().then(
+        (): SettleOutcome => ({ status: "done" }),
+        (error): SettleOutcome => ({ status: "failed", error }),
+      ),
+      timeout,
     ]);
   } finally {
     if (timer) clearTimeout(timer);
@@ -176,14 +188,29 @@ export class App {
   async close(): Promise<void> {
     if (this._eventSourcing) {
       const eventSourcing = this._eventSourcing;
-      try {
-        await withTimeout(
-          () => eventSourcing.close(),
-          SHUTDOWN_BUDGET.appCloseMs,
-          "EventSourcing drain",
+      const outcome = await settleWithTimeout(
+        () => eventSourcing.close(),
+        SHUTDOWN_BUDGET.appCloseMs,
+      );
+
+      if (outcome.status === "timeout") {
+        // Still running. Closing the transports now would sever exactly the
+        // in-flight statements this method exists to protect, reproducing the
+        // incident on the timeout path. Leave them to process teardown: the
+        // watchdog and then the kubelet end this pod within seconds either
+        // way, and sockets die with the process regardless. Returning here
+        // makes that a deliberate choice rather than a race we lose quietly.
+        logger.error(
+          { timeoutMs: SHUTDOWN_BUDGET.appCloseMs },
+          "EventSourcing drain did not finish in time; leaving connections to process exit rather than severing in-flight work",
         );
-      } catch (error) {
-        logger.error({ error }, "Failed to close EventSourcing");
+        return;
+      }
+
+      if (outcome.status === "failed") {
+        // Finished, badly. Nothing is still writing, so the connections are
+        // safe — and genuinely worth closing — unlike the timeout above.
+        logger.error({ error: outcome.error }, "Failed to close EventSourcing");
       }
     }
 

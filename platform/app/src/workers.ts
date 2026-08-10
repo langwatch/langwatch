@@ -16,6 +16,7 @@ import "./instrumentation.node";
 import "./server/handled-error-wiring";
 import { setEnvironment } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import { SHUTDOWN_BUDGET } from "./server/shutdown/budget";
 import { installShutdownHandlers } from "./server/shutdown/runGracefulShutdown";
 import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
 
@@ -40,6 +41,9 @@ installShutdownHandlers((signal) => ({
   logger,
   phases: [
     { name: "workers", run: async () => await workerHandle?.shutdown() },
+    // The app phase carries the queue drain, so it gets the whole budget
+    // rather than the default per-phase ceiling; App.close bounds it from
+    // the inside.
     // The App (ClickHouse / Redis / Prisma) closes last, after the workers
     // above have stopped accepting jobs. App.close drains the queue consumer
     // BEFORE dropping those connections — closing them alongside a running
@@ -47,6 +51,7 @@ installShutdownHandlers((signal) => ({
     // See specs/event-sourcing/worker-graceful-shutdown.feature.
     {
       name: "app",
+      timeoutMs: SHUTDOWN_BUDGET.processDeadlineMs,
       run: async () => {
         const { getApp } = await import("./server/app-layer/app");
         await getApp().close();

@@ -1237,16 +1237,54 @@ here, once, by name, so both consuming templates agree.
      pod was not sized for is exactly the drift this pair exists to prevent:
      the kubelet SIGKILLs a drain the process still believes it has time for.
      One value in values.yaml now drives both. */}}
+{{/* Reads a whole-second count, refusing anything that is not one.
+
+     `int` is the trap this exists for: it silently yields 0 for a value Helm
+     kept as a string, which `--set-string x=abc` and `--set x=25.9` both
+     produce. A zero drain then renders SHUTDOWN_DRAIN_TIMEOUT_MS="0" — which
+     the app rejects at boot, crashlooping every pod — while ALSO collapsing
+     the required grace period to the bare margin, so the guard below happily
+     passes and the release installs looking correct. A silent 0 is the worst
+     of both: the render says fine and the fleet does not come up. */}}
+{{- define "langwatch.positiveSeconds" -}}
+{{/* Presence, not truthiness. Helm's `default` treats 0 as empty, so a
+     deliberate `shutdownDrainSeconds: 0` would be silently rewritten to the
+     default — an operator asking for immediate kills would instead get the
+     full wait on every delete, with nothing to tell them why. Only an ABSENT
+     (nil) value falls back; an explicit 0 reaches the check below and is
+     refused. */}}
+{{- $raw := .value -}}
+{{- if kindIs "invalid" $raw -}}
+{{- $raw = .fallback -}}
+{{- end -}}
+{{- $s := toString $raw -}}
+{{- if not (regexMatch "^[1-9][0-9]*$" $s) -}}
+{{- fail (printf "%s must be a whole number of seconds greater than zero, got %q. Helm keeps a quoted or fractional value as a string and `int` turns it into 0, which would render a zero shutdown budget and crashloop the pod." .name $s) -}}
+{{- end -}}
+{{- $s -}}
+{{- end -}}
+
 {{- define "langwatch.shutdownEnv" -}}
+{{- $drain := include "langwatch.positiveSeconds" (dict "name" (printf "%s.shutdownDrainSeconds" .name) "value" .component.shutdownDrainSeconds "fallback" 25) -}}
+{{/* extraEnvs renders after this block, and the kubelet takes the LAST
+     duplicate — so setting SHUTDOWN_DRAIN_TIMEOUT_MS there silently wins over
+     the value the pod was sized for, which is the exact drift the pair exists
+     to prevent, and invisible because the grace period still looks right. Set
+     shutdownDrainSeconds instead; it moves both. */}}
+{{- range (default (list) .component.extraEnvs) -}}
+{{- if eq .name "SHUTDOWN_DRAIN_TIMEOUT_MS" -}}
+{{- fail (printf "SHUTDOWN_DRAIN_TIMEOUT_MS must not be set through extraEnvs — it would override the drain budget the pod's terminationGracePeriodSeconds was sized for, and the kubelet would SIGKILL a drain the process still thinks it has time for. Set shutdownDrainSeconds instead, which moves both.") -}}
+{{- end -}}
+{{- end -}}
 - name: SHUTDOWN_DRAIN_TIMEOUT_MS
-  value: {{ mul (int (default 25 .component.shutdownDrainSeconds)) 1000 | quote }}
+  value: {{ mul (int $drain) 1000 | quote }}
 {{- end -}}
 
 {{- define "langwatch.terminationGracePeriod" -}}
 {{- $component := .component -}}
-{{- $drain := int (default 25 $component.shutdownDrainSeconds) -}}
+{{- $drain := int (include "langwatch.positiveSeconds" (dict "name" (printf "%s.shutdownDrainSeconds" .name) "value" $component.shutdownDrainSeconds "fallback" 25)) -}}
 {{- $required := add $drain 30 -}}
-{{- $granted := int (default $required $component.terminationGracePeriodSeconds) -}}
+{{- $granted := int (include "langwatch.positiveSeconds" (dict "name" (printf "%s.terminationGracePeriodSeconds" .name) "value" $component.terminationGracePeriodSeconds "fallback" $required)) -}}
 {{- if lt $granted $required -}}
 {{- fail (printf "%s.terminationGracePeriodSeconds is %d, too short for a %ds shutdown drain: App.close adds 5s, process teardown 15s and the kubelet 10s of slack, so it needs at least %d. Raise it to %d or more, or lower %s.shutdownDrainSeconds." .name $granted $drain $required $required .name) -}}
 {{- end -}}

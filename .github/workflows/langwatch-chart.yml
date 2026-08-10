@@ -9,6 +9,12 @@ on:
       - "charts/langyagent/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
+      # The shutdown budget is the one place where a code constant and a
+      # chart value must agree: the pod's terminationGracePeriodSeconds is
+      # sized from the same numbers budget.ts derives. Without this path a
+      # change to those constants never runs the workers-shutdown job, and
+      # the chart would keep asserting a margin the code no longer uses.
+      - "platform/app/src/server/shutdown/**"
       # This job is the only thing in CI that builds the app image and runs a
       # stack against it — publish-docker-app fires on `release: published`, so
       # on a pull request nothing else touches the Dockerfile at all. Without
@@ -32,6 +38,12 @@ on:
       - "charts/langyagent/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
+      # The shutdown budget is the one place where a code constant and a
+      # chart value must agree: the pod's terminationGracePeriodSeconds is
+      # sized from the same numbers budget.ts derives. Without this path a
+      # change to those constants never runs the workers-shutdown job, and
+      # the chart would keep asserting a margin the code no longer uses.
+      - "platform/app/src/server/shutdown/**"
       # This job is the only thing in CI that builds the app image and runs a
       # stack against it — publish-docker-app fires on `release: published`, so
       # on a pull request nothing else touches the Dockerfile at all. Without

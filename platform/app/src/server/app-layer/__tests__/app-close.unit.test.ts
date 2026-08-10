@@ -48,10 +48,12 @@ describe("App.close", () => {
           closeables: ["clickhouse", "redis", "prisma"].map((name) => ({
             name,
             close: async () => {
-              // The assertion that matters: a connection must never be torn
-              // down while the drain is still issuing statements over it.
-              expect(drainFinished).toBe(true);
-              order.push(name);
+              // Recorded, NOT asserted here. App.close wraps every closeable in
+              // a try/catch that logs, so an expect() throwing inside this
+              // callback is swallowed and the test would pass anyway. Stamping
+              // the observation into `order` and asserting outside is what
+              // makes the drain-before-close guarantee actually enforceable.
+              order.push(`${name}:drained=${drainFinished}`);
             },
           })),
         });
@@ -61,9 +63,9 @@ describe("App.close", () => {
         expect(order).toEqual([
           "drain:start",
           "drain:end",
-          "clickhouse",
-          "redis",
-          "prisma",
+          "clickhouse:drained=true",
+          "redis:drained=true",
+          "prisma:drained=true",
         ]);
       });
     });
@@ -123,8 +125,13 @@ describe("App.close", () => {
 
   describe("given a drain that never finishes", () => {
     describe("when the App is closed", () => {
+      // A timed-out drain is STILL RUNNING. Closing ClickHouse under it is
+      // precisely the severing this method exists to prevent — the incident,
+      // reproduced on the timeout path — so the connections are deliberately
+      // left to process teardown. A drain that merely threw is different: it
+      // has finished, and the case above proves those connections still close.
       /** @scenario A hung drain cannot hold the process open forever */
-      it("gives up on the drain and releases the connections", async () => {
+      it("stops waiting without severing the still-running drain", async () => {
         vi.useFakeTimers();
         try {
           const closed: string[] = [];
@@ -141,15 +148,12 @@ describe("App.close", () => {
           });
 
           const closing = app.close();
-          // A hung drain must not outlive the pod's termination grace period;
-          // Kubernetes answers that with SIGKILL, which is the ungraceful
-          // shutdown the ordering above exists to avoid. Advancing by the
-          // shared budget rather than a literal keeps this test honest if the
-          // drain budget is ever retuned.
+          // Advancing by the shared budget rather than a literal keeps this
+          // honest if the drain budget is ever retuned.
           await vi.advanceTimersByTimeAsync(SHUTDOWN_BUDGET.appCloseMs);
-          await closing;
+          await expect(closing).resolves.toBeUndefined();
 
-          expect(closed).toEqual(["clickhouse"]);
+          expect(closed).toEqual([]);
         } finally {
           vi.useRealTimers();
         }

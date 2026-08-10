@@ -75,7 +75,7 @@ spec:
       # their ClickHouse writes. The helper refuses to render when this is too
       # short for workers.shutdownDrainSeconds, because a missed grace period
       # is a SIGKILL — the abrupt shutdown that severs in-flight statements.
-      terminationGracePeriodSeconds: {{ include "langwatch.terminationGracePeriod" (dict "ctx" . "component" .Values.workers "name" "workers") }}
+      terminationGracePeriodSeconds: {{ include "langwatch.terminationGracePeriod" (dict "component" .Values.workers "name" "workers") }}
       securityContext:
         {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.workers) | nindent 8 }}
 
@@ -129,7 +129,7 @@ spec:
           args: ['run', 'start:workers']
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
-            {{- include "langwatch.shutdownEnv" (dict "component" .Values.workers) | nindent 12 }}
+            {{- include "langwatch.shutdownEnv" (dict "component" .Values.workers "name" "workers") | nindent 12 }}
 
             # See the app deployment — named per role so worker telemetry is
             # separable from the app's.

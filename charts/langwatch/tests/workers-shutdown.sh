@@ -77,10 +77,15 @@ expect_covers_drain() {
     return
   fi
   got=$(grace_period_of "$block")
-  if [ -z "$got" ]; then
-    fail "$label" "terminationGracePeriodSeconds did not render at all"
-    return
-  fi
+  # Guard the extraction, not just its emptiness: `[ "$got" -lt N ]` on a
+  # non-numeric value exits 2, which reads as "not less than" inside `if` and
+  # would print ok for a garbled render.
+  case "$got" in
+    '' | *[!0-9]*)
+      fail "$label" "terminationGracePeriodSeconds did not render as a number (got '${got:-<absent>}')"
+      return
+      ;;
+  esac
   if [ "$got" -lt "$required" ]; then
     fail "$label" \
       "terminationGracePeriodSeconds is ${got}s, below the ${required}s a ${DRAIN_SECONDS}s drain needs"
@@ -167,9 +172,37 @@ test_grace_period_is_overridable() {
 
 # @scenario "A grace period too short for the drain refuses to render"
 test_short_grace_period_refuses_to_render() {
+  # Names the component, not just the number: an app-side failure would
+  # otherwise satisfy a workers-side assertion.
   expect_render_refused "short grace period" \
     "--set workers.terminationGracePeriodSeconds=30" \
-    "it needs at least 55"
+    "workers.terminationGracePeriodSeconds is 30"
+}
+
+# A value Helm keeps as a string renders `int` 0 — a zero drain the app rejects
+# at boot, while the required grace period collapses to the bare margin so the
+# guard passes. The render must refuse instead of shipping a crashloop.
+# @scenario "A drain budget that is not a positive whole number refuses to render"
+test_junk_drain_refuses_to_render() {
+  expect_render_refused "junk drain (fraction)" \
+    "--set-string workers.shutdownDrainSeconds=25.9" \
+    "must be a whole number of seconds greater than zero"
+  expect_render_refused "junk drain (text)" \
+    "--set-string workers.shutdownDrainSeconds=abc" \
+    "must be a whole number of seconds greater than zero"
+  expect_render_refused "junk drain (zero)" \
+    "--set workers.shutdownDrainSeconds=0" \
+    "must be a whole number of seconds greater than zero"
+  expect_render_refused "junk drain (negative)" \
+    "--set workers.shutdownDrainSeconds=-5" \
+    "must be a whole number of seconds greater than zero"
+}
+
+# @scenario "The drain budget cannot be overridden behind the pod's back"
+test_extra_envs_cannot_override_the_drain() {
+  expect_render_refused "extraEnvs override" \
+    "--set workers.extraEnvs[0].name=SHUTDOWN_DRAIN_TIMEOUT_MS --set-string workers.extraEnvs[0].value=120000" \
+    "must not be set through extraEnvs"
 }
 
 # @scenario "Raising the drain budget alone refuses to render"
@@ -198,6 +231,8 @@ test_drain_env_matches_the_pod
 test_grace_period_is_overridable
 test_short_grace_period_refuses_to_render
 test_raised_drain_alone_refuses_to_render
+test_junk_drain_refuses_to_render
+test_extra_envs_cannot_override_the_drain
 test_raising_both_together_renders
 
 if [ "$failures" -gt 0 ]; then

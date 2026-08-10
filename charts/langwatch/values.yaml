@@ -838,10 +838,13 @@ workers:
   #
   # terminationGracePeriodSeconds is the kubelet's SIGKILL clock and must cover
   # the drain plus 5s for App.close, 15s for process teardown and 10s of
-  # kubelet slack — so at least shutdownDrainSeconds + 30. Left unset it is
-  # derived; set explicitly it is validated, and the chart refuses to render
-  # when it falls short rather than installing a release the kubelet kills
-  # mid-drain. See: https://kubespec.dev/v1/Pod#spec.terminationGracePeriodSeconds
+  # kubelet slack — so at least shutdownDrainSeconds + 30. Because it is set
+  # here, raising shutdownDrainSeconds alone always fails the render: raise
+  # both together. The chart refuses rather than installing a release the
+  # kubelet kills mid-drain. Both must be whole numbers of seconds greater
+  # than zero — a quoted or fractional value is rejected, because Helm's `int`
+  # would silently turn it into a zero budget.
+  # See: https://kubespec.dev/v1/Pod#spec.terminationGracePeriodSeconds
   ## @param workers.shutdownDrainSeconds [default: 25] Seconds the queue may spend draining in-flight jobs on shutdown.
   shutdownDrainSeconds: 25
   ## @param workers.terminationGracePeriodSeconds [default: 55] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.

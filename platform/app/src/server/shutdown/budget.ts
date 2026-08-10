@@ -63,20 +63,24 @@ function isDevelopment(): boolean {
  * otherwise).
  */
 function resolveDrainMs(): number {
+  const fallback = isDevelopment() ? DEV_DRAIN_MS : DEFAULT_DRAIN_MS;
   const raw = process.env.SHUTDOWN_DRAIN_TIMEOUT_MS;
-  if (raw !== void 0 && raw !== "") {
-    const parsed = Number(raw);
-    // Silently falling back on a typo'd override would hand back the default
-    // budget under a name that promises otherwise, which is the failure this
-    // module exists to prevent. Fail where the value is set instead.
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      throw new Error(
-        `SHUTDOWN_DRAIN_TIMEOUT_MS must be a positive number of milliseconds, got "${raw}"`,
-      );
-    }
-    return parsed;
-  }
-  return isDevelopment() ? DEV_DRAIN_MS : DEFAULT_DRAIN_MS;
+  if (raw === void 0 || raw === "") return fallback;
+
+  const parsed = Number(raw);
+  if (Number.isFinite(parsed) && parsed > 0) return parsed;
+
+  // Loud, but NOT fatal. This module is evaluated on the boot path of every
+  // process, so throwing here would turn one bad character in a value that
+  // only matters during shutdown into a crashloop across the whole fleet —
+  // trading a healthy running system for a misconfigured death budget. The
+  // chart refuses to render such a value in the first place
+  // (langwatch.positiveSeconds), so reaching this branch means the variable
+  // was set by hand; carry on with a budget that works and say so.
+  console.error(
+    `[shutdown] SHUTDOWN_DRAIN_TIMEOUT_MS must be a positive number of milliseconds, got "${raw}" — falling back to ${fallback}ms. The pod's terminationGracePeriodSeconds may not match this budget.`,
+  );
+  return fallback;
 }
 
 export interface ShutdownBudget {

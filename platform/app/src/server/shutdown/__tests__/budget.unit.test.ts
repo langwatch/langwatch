@@ -1,12 +1,14 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { KUBELET_SLACK_MS, resolveShutdownBudget } from "../budget";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { resolveShutdownBudget } from "../budget";
 
-const ORIGINAL = process.env.SHUTDOWN_DRAIN_TIMEOUT_MS;
+// vitest runs with isolate:false, so raw process.env mutation leaks across
+// files. stubEnv is scoped and unwound by unstubAllEnvs below.
+afterEach(() => vi.unstubAllEnvs());
 
-afterEach(() => {
-  if (ORIGINAL === void 0) delete process.env.SHUTDOWN_DRAIN_TIMEOUT_MS;
-  else process.env.SHUTDOWN_DRAIN_TIMEOUT_MS = ORIGINAL;
-});
+/** platform/app/src/server/shutdown/__tests__ -> repo root */
+const REPO_ROOT = resolve(__dirname, "../../../../../..");
 
 describe("resolveShutdownBudget", () => {
   describe("given any drain budget", () => {
@@ -17,7 +19,7 @@ describe("resolveShutdownBudget", () => {
       /** @scenario Every shutdown clock nests inside the one outside it */
       it("orders them strictly innermost to outermost", () => {
         for (const drain of ["1000", "20000", "60000", "600000"]) {
-          process.env.SHUTDOWN_DRAIN_TIMEOUT_MS = drain;
+          vi.stubEnv("SHUTDOWN_DRAIN_TIMEOUT_MS", drain);
           const b = resolveShutdownBudget();
 
           expect(b.queueDrainMs).toBeLessThan(b.appCloseMs);
@@ -30,9 +32,9 @@ describe("resolveShutdownBudget", () => {
 
       /** @scenario Raising the drain budget widens every clock above it */
       it("moves the outer clocks with the drain", () => {
-        process.env.SHUTDOWN_DRAIN_TIMEOUT_MS = "20000";
+        vi.stubEnv("SHUTDOWN_DRAIN_TIMEOUT_MS", "20000");
         const base = resolveShutdownBudget();
-        process.env.SHUTDOWN_DRAIN_TIMEOUT_MS = "120000";
+        vi.stubEnv("SHUTDOWN_DRAIN_TIMEOUT_MS", "120000");
         const raised = resolveShutdownBudget();
 
         expect(raised.appCloseMs - base.appCloseMs).toBe(100_000);
@@ -42,18 +44,39 @@ describe("resolveShutdownBudget", () => {
         ).toBe(100);
       });
 
-      // The chart's guard adds the same 30s (5 + 15 + 10) on top of the drain.
-      // If these two ever disagree the chart admits a release the kubelet
-      // kills mid-drain, which is the failure the guard exists to catch.
+      // The margin over the drain is written down in three places that no
+      // types connect: this module, the Helm guard's `add $drain 30`, and the
+      // chart suite's REQUIRED_MARGIN_SECONDS. Asserting the module against
+      // itself would be a tautology — it is true for any constants — so this
+      // reads the other two out of their own files. If any one is retuned
+      // alone, the chart admits a release the kubelet kills mid-drain, which
+      // is the exact failure the guard exists to catch.
       /** @scenario The required grace period matches what the chart guard enforces */
-      it("requires drain + 30s, the same margin the chart validates", () => {
-        process.env.SHUTDOWN_DRAIN_TIMEOUT_MS = "20000";
+      it("requires drain + 30s, the same margin the chart and its suite use", () => {
+        vi.stubEnv("SHUTDOWN_DRAIN_TIMEOUT_MS", "20000");
         const b = resolveShutdownBudget();
-
         expect(b.requiredGracePeriodSeconds).toBe(50);
-        expect(b.processDeadlineMs + KUBELET_SLACK_MS).toBe(
-          b.requiredGracePeriodSeconds * 1000,
+
+        const marginSeconds =
+          b.requiredGracePeriodSeconds - b.queueDrainMs / 1000;
+
+        const helpers = readFileSync(
+          resolve(REPO_ROOT, "charts/langwatch/templates/_helpers.tpl"),
+          "utf8",
         );
+        const helperMargin = helpers.match(
+          /\$required\s*:=\s*add\s+\$drain\s+(\d+)/,
+        );
+        expect(helperMargin?.[1]).toBeDefined();
+        expect(Number(helperMargin?.[1])).toBe(marginSeconds);
+
+        const suite = readFileSync(
+          resolve(REPO_ROOT, "charts/langwatch/tests/workers-shutdown.sh"),
+          "utf8",
+        );
+        const suiteMargin = suite.match(/REQUIRED_MARGIN_SECONDS=(\d+)/);
+        expect(suiteMargin?.[1]).toBeDefined();
+        expect(Number(suiteMargin?.[1])).toBe(marginSeconds);
       });
     });
   });
@@ -65,39 +88,43 @@ describe("resolveShutdownBudget", () => {
       // job on a local queue.
       /** @scenario The drain budget defaults to 25s in production and 5s in dev */
       it("defaults to 25s, and 5s under a development environment", () => {
-        delete process.env.SHUTDOWN_DRAIN_TIMEOUT_MS;
-        const prevNodeEnv = process.env.NODE_ENV;
-        const prevEnvironment = process.env.ENVIRONMENT;
-        try {
-          process.env.NODE_ENV = "production";
-          delete process.env.ENVIRONMENT;
-          expect(resolveShutdownBudget().queueDrainMs).toBe(25_000);
+        vi.stubEnv("SHUTDOWN_DRAIN_TIMEOUT_MS", "");
 
-          process.env.NODE_ENV = "development";
-          expect(resolveShutdownBudget().queueDrainMs).toBe(5_000);
+        vi.stubEnv("NODE_ENV", "production");
+        vi.stubEnv("ENVIRONMENT", "");
+        expect(resolveShutdownBudget().queueDrainMs).toBe(25_000);
 
-          process.env.NODE_ENV = "production";
-          process.env.ENVIRONMENT = "local";
-          expect(resolveShutdownBudget().queueDrainMs).toBe(5_000);
-        } finally {
-          if (prevNodeEnv === void 0) delete process.env.NODE_ENV;
-          else process.env.NODE_ENV = prevNodeEnv;
-          if (prevEnvironment === void 0) delete process.env.ENVIRONMENT;
-          else process.env.ENVIRONMENT = prevEnvironment;
-        }
+        vi.stubEnv("NODE_ENV", "development");
+        expect(resolveShutdownBudget().queueDrainMs).toBe(5_000);
+
+        vi.stubEnv("NODE_ENV", "production");
+        vi.stubEnv("ENVIRONMENT", "local");
+        expect(resolveShutdownBudget().queueDrainMs).toBe(5_000);
       });
     });
   });
 
   describe("given a malformed override", () => {
     describe("when the budget is resolved", () => {
-      /** @scenario A malformed drain override is refused, not silently defaulted */
-      it("throws rather than falling back to the default", () => {
-        for (const bad of ["nonsense", "0", "-5"]) {
-          process.env.SHUTDOWN_DRAIN_TIMEOUT_MS = bad;
-          expect(() => resolveShutdownBudget()).toThrow(
-            /SHUTDOWN_DRAIN_TIMEOUT_MS/,
-          );
+      // Throwing here would be fail-fast in the wrong place: budget.ts is on
+      // the boot path of every process, so one bad character in a value that
+      // only matters at shutdown would crashloop the whole fleet. The chart
+      // refuses to render such a value, so this branch means a hand-set env.
+      /** @scenario A malformed drain override is reported and falls back, never fatal */
+      it("keeps booting on a bad value and says so", () => {
+        const err = vi.spyOn(console, "error").mockImplementation(() => {});
+        try {
+          for (const bad of ["nonsense", "0", "-5"]) {
+            vi.stubEnv("SHUTDOWN_DRAIN_TIMEOUT_MS", bad);
+            expect(() => resolveShutdownBudget()).not.toThrow();
+            expect(resolveShutdownBudget().queueDrainMs).toBeGreaterThan(0);
+            expect(err).toHaveBeenCalledWith(
+              expect.stringContaining("SHUTDOWN_DRAIN_TIMEOUT_MS"),
+            );
+            err.mockClear();
+          }
+        } finally {
+          err.mockRestore();
         }
       });
     });
