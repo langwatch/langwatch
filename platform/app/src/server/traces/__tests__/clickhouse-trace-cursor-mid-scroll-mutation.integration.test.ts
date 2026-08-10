@@ -59,6 +59,9 @@ const now = Date.now();
 // write. They behave differently and each gets its own tenant.
 const liveTenant = `test-mid-scroll-live-${nanoid()}`;
 const backdatedTenant = `test-mid-scroll-backdated-${nanoid()}`;
+// Cursor-tampering scenarios: never mutated after seeding, so page 1 is stable
+// no matter when the assertions run.
+const tamperTenant = `test-mid-scroll-tamper-${nanoid()}`;
 
 const mkTraceIds = () => ({
   a: `trace-a-${nanoid()}`,
@@ -71,6 +74,7 @@ const mkTraceIds = () => ({
 
 const live = mkTraceIds();
 const backdated = mkTraceIds();
+const tampered = mkTraceIds();
 
 const initialOffsets = { a: -10, b: -20, c: -30, d: -40 } as const;
 
@@ -199,13 +203,18 @@ beforeAll(async () => {
         backdated[key],
         now + initialOffsets[key] * SECOND,
       ),
+      makeTraceSummaryRow(
+        tamperTenant,
+        tampered[key],
+        now + initialOffsets[key] * SECOND,
+      ),
     ]),
   ]);
 }, 60_000);
 
 afterAll(async () => {
   if (ch) {
-    for (const t of [liveTenant, backdatedTenant]) {
+    for (const t of [liveTenant, backdatedTenant, tamperTenant]) {
       await ch.exec({
         query:
           "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
@@ -279,5 +288,42 @@ describe("updated-axis scroll when a trace is modified mid-pagination", () => {
         expect(seen).not.toContain(backdated.d);
       });
     });
+  });
+
+  // scrollId is client-supplied, so scrollStart is attacker-controlled and
+  // binds as {scrollStart:UInt64}. A non-numeric value must not reach the
+  // query — it would fail the whole request rather than degrade.
+  describe("given a cursor whose scrollStart has been tampered with", () => {
+    const tamper = (scrollId: string, scrollStart: unknown) => {
+      const cursor = JSON.parse(
+        Buffer.from(scrollId, "base64").toString("utf-8"),
+      );
+      return Buffer.from(JSON.stringify({ ...cursor, scrollStart })).toString(
+        "base64",
+      );
+    };
+
+    for (const [label, value] of [
+      ["a string", "not-a-number"],
+      ["null", null],
+      ["a negative number", -1],
+    ] as const) {
+      describe(`when scrollStart is ${label}`, () => {
+        it("restarts the scroll instead of failing the query", async () => {
+          const page1 = await fetchPage(tamperTenant);
+          expect(traceIdsOf(page1)).toEqual([tampered.a, tampered.b]);
+          expect(page1.scrollId).toBeTruthy();
+
+          // Must not throw: a rejected cursor degrades to a fresh first page,
+          // the same way every other cursor mismatch in that block behaves.
+          const page = await fetchPage(
+            tamperTenant,
+            tamper(page1.scrollId as string, value),
+          );
+
+          expect(traceIdsOf(page)).toEqual([tampered.a, tampered.b]);
+        });
+      });
+    }
   });
 });
