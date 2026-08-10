@@ -152,8 +152,8 @@ export function buildAutomationDispatchPorts({
     loadCustomGraph: async ({ customGraphId, projectId }) =>
       customGraphs.getById({ customGraphId, projectId }),
     loadProject: async (projectId) => projects.getById(projectId),
-    getTimeseries: async (input) =>
-      getApp().analytics.service.getTimeseries(input),
+    getTimeseries: async (input, options) =>
+      getApp().analytics.service.getTimeseries(input, options),
     triggerSent: graphTriggerSentRepo,
     updateLastRunAt: async ({ triggerId, projectId }) =>
       triggers.updateLastRunAt(triggerId, projectId),

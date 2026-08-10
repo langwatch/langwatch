@@ -1046,8 +1046,8 @@ export function initializeDefaultApp(options?: {
                       where: { dashboardId, projectId },
                       orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
                     }),
-                  getTimeseries: (input) =>
-                    analyticsService.getTimeseries(input),
+                  getTimeseries: (input, options) =>
+                    analyticsService.getTimeseries(input, options),
                 },
                 source,
                 projectId,
