@@ -178,6 +178,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # docs/ (138 MB) and assets/ (37 MB) are marketing .gif/.mp4 that the
+          # e2e stack never reads. Naming a sparse-checkout makes checkout fetch
+          # with --filter=blob:none, so they never transfer: 180 MB -> 39 MB of
+          # .git and 78s -> 15s on a depth-1 clone. Non-cone mode so a new
+          # top-level directory arrives by default instead of going missing.
+          sparse-checkout: |
+            /*
+            !/docs/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10

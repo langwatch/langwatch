@@ -2,6 +2,26 @@
 # Branch protection requires `langwatch-app-complete`. Upstream jobs
 # skip when paths don't match, and `alls-green` reports the final
 # consolidated status — no per-step `if:` guards needed.
+#
+# LEAN CHECKOUT
+# Every checkout below excludes `docs/` and `assets/`. They are the two
+# largest directories in the tree and hold none of this workflow's inputs:
+# docs/ is 138 MB and assets/ 37 MB, almost entirely .gif and .mp4 marketing
+# media (a single 26 MB mp4, three gifs of 20/16/10 MB), against 81 MB for
+# platform/ — the thing we actually build. Naming a sparse-checkout makes
+# actions/checkout fetch with `--filter=blob:none`, so those blobs never
+# cross the wire at all. Measured on a depth-1 clone: 180 MB -> 39 MB of
+# .git, 490 MB -> 175 MB on disk, 78s -> 15s.
+#
+# That is per checkout, and this workflow runs a dozen of them. It also
+# compresses the tail, which is what actually sets wall clock: in run
+# 31396568900 the six integration shards spent 9s, 9s, 10s, 19s, 151s and
+# 185s in checkout, and the job totals tracked it (599s vs 891s).
+#
+# Non-cone mode is deliberate. Cone mode only accepts an include list, so
+# every new top-level directory would silently go missing from CI until
+# someone noticed; the negation form says what we are dropping and lets
+# everything else through by default.
 name: langwatch-app-ci
 
 on:
@@ -149,6 +169,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
@@ -214,6 +241,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
@@ -380,6 +414,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
@@ -527,6 +568,15 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          # `--no-renames` is not ours to set here, so keep in mind that a PR
+          # which does touch docs/ will lazily fetch just those blobs when the
+          # diff below reads them — correct, and rare.
+          sparse-checkout: |
+            /*
+            !/docs/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
@@ -718,8 +768,17 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          # `--no-renames` is not ours to set here, so keep in mind that a PR
+          # which does touch docs/ will lazily fetch just those blobs when the
+          # diff below reads them — correct, and rare.
+          sparse-checkout: |
+            /*
+            !/docs/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
 
@@ -759,6 +818,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
@@ -785,6 +851,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
@@ -823,6 +896,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
@@ -931,6 +1011,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
       - name: Test extract-failures.sh
         run: bash .github/scripts/__tests__/extract-failures.test.sh
@@ -945,6 +1032,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
+          sparse-checkout: |
+            /*
+            !/docs/
+            !/assets/
+          sparse-checkout-cone-mode: false
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
