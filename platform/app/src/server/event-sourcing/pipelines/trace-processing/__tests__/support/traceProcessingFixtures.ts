@@ -81,7 +81,7 @@ function hashId(index: number): string {
   return (index + 1).toString(16).padStart(64, "0");
 }
 
-/** A schema-valid recordLogContribution payload for one of a trace's logs. */
+/** `index` varies recordId, spanId and time; the trace is fixed, as the group is. */
 export function logContributionPayload({
   index,
 }: {
@@ -107,7 +107,7 @@ export function logContributionPayload({
   };
 }
 
-/** A schema-valid recordMetricCorrelation payload for one of a trace's exemplars. */
+/** seriesId is offset off pointId so the two 64-hex ids can never collide. */
 export function metricCorrelationPayload({
   index,
 }: {

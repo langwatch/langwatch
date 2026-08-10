@@ -255,6 +255,71 @@ describe("trace correlation append coalescing", () => {
         );
       });
 
+      // "The batch completes only after the insert is durably acknowledged" —
+      // the clause that makes a coalesced batch safe to ack as one unit. If the
+      // batch resolved before the append settled, the queue would drop 256
+      // items' worth of work on a store that had not committed.
+      /** @scenario 'coalescing preserves every item' */
+      it("does not complete until the append has settled", async () => {
+        let releaseStore: (() => void) | undefined;
+        const settled = new Promise<void>((resolve) => {
+          releaseStore = resolve;
+        });
+        const storeEventsFn = vi.fn().mockReturnValue(settled);
+        let completed = false;
+
+        const running = processCommandBatch(
+          logBatchParamsFor({
+            payloads: [0, 1].map((index) => logContributionPayload({ index })),
+            storeEventsFn,
+          }),
+        ).then(() => {
+          completed = true;
+        });
+
+        await vi.waitFor(() => {
+          expect(storeEventsFn).toHaveBeenCalledTimes(1);
+        });
+        // The append is in flight. Give the batch every chance to finish early;
+        // it must not, because nothing has acknowledged the insert yet.
+        for (let tick = 0; tick < 10; tick++) {
+          await Promise.resolve();
+        }
+        expect(completed).toBe(false);
+
+        releaseStore?.();
+        await running;
+        expect(completed).toBe(true);
+      });
+
+      // "A retry of the batch neither duplicates nor drops events" — at this
+      // layer that reduces to the keys being a pure function of the payloads,
+      // so a redelivered batch presents the SAME identities to the event log's
+      // dedup rather than a fresh set. (The log's own collapsing of a repeated
+      // key is covered by recordSpanCommand.dedup.integration.test.ts.)
+      /** @scenario 'coalescing preserves every item' */
+      it("presents identical event identities when the same batch is retried", async () => {
+        const keysFor = async () => {
+          const storeEventsFn = vi.fn().mockResolvedValue(undefined);
+          await processCommandBatch(
+            logBatchParamsFor({
+              payloads: [0, 1, 2].map((index) =>
+                logContributionPayload({ index }),
+              ),
+              storeEventsFn,
+            }),
+          );
+          const [events] = storeEventsFn.mock.calls[0]!;
+          return (events as Event[]).map((event) => event.idempotencyKey);
+        };
+
+        const first = await keysFor();
+        const second = await keysFor();
+
+        expect(second).toEqual(first);
+        expect(new Set(first).size).toBe(first.length);
+      });
+
       // The whole point of leaving the group key alone: the folds keyed on the
       // trace must still see one aggregate, however the appends were batched.
       /** @scenario 'many items for one aggregate become one insert' */
