@@ -87,11 +87,15 @@ type Credential struct {
 // forwards it as Extra["deployment"] and that wins. Non-mapped providers
 // (OpenAI, ...) and an empty bareModel are returned unchanged.
 //
-// Every dispatch path shares this so Azure resolves its deployment identically
-// regardless of entry point: dispatcheradapter (Studio / workflows /
-// runSignature) and the gatewayproxy /go/proxy path (scenario User Simulator,
-// playground). The /go/proxy path previously skipped it, so Azure calls that
-// got past the endpoint check then failed deployment resolution (#5760).
+// Inside the gateway the sole caller is the dispatch chokepoint
+// (adapters/providers/bifrost.go dispatchCredential), which every lane passes
+// through. It is needed there because the control-plane/VK path builds its
+// credentials from the bundle wire (adapters/controlplane/config_wire.go), and
+// that wire carries no deployment map for a provider whose models have no
+// explicit mapping — so an Azure request on that path would otherwise reach
+// Bifrost with a nil map and be rejected before dialling. nlpgo's
+// dispatcheradapter and gatewayproxy call it on their own credentials too;
+// re-applying it is a no-op, since an entry already present wins.
 func WithDeploymentSelfMap(cred Credential, bareModel string) Credential {
 	if bareModel == "" {
 		return cred

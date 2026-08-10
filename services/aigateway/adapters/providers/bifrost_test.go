@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"testing"
 
@@ -253,18 +254,24 @@ func TestErrFromBifrost_StatusWithoutRawBody(t *testing.T) {
 	}
 }
 
-// A zero status means no upstream HTTP response (transport failure / timeout):
-// keep the existing classification (provider_timeout), not a forwarded status.
+// A zero status means no upstream HTTP response, so there is no status to
+// forward: the error must go to classifyBifrostError rather than become an
+// UpstreamError. A transport failure wraps the Go error it failed on, which is
+// what keeps it on the retryable provider code instead of being read as the
+// provider row being unusable.
 func TestErrFromBifrost_NoStatusFallsBackToClassify(t *testing.T) {
 	berr := &bfschemas.BifrostError{
-		Error: &bfschemas.ErrorField{Message: "dial tcp: timeout"},
+		Error: &bfschemas.ErrorField{
+			Message: "dial tcp: timeout",
+			Error:   errors.New("dial tcp 10.0.0.1:443: i/o timeout"),
+		},
 	}
 	err := errFromBifrost(context.Background(), berr, nil)
 	if _, ok := err.(*domain.UpstreamError); ok {
 		t.Fatalf("transport failure must not become an UpstreamError")
 	}
-	if !herr.IsCode(err, domain.ErrProviderTimeout) {
-		t.Fatalf("expected provider_timeout, got %v", err)
+	if !herr.IsCode(err, domain.ErrProviderError) {
+		t.Fatalf("expected provider_error, got %v", err)
 	}
 }
 

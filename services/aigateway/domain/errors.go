@@ -74,7 +74,16 @@ const (
 	ErrChainExhausted  = herr.Code("chain_exhausted")
 	ErrCircuitOpen     = herr.Code("circuit_open")
 	ErrProviderTimeout = herr.Code("provider_timeout")
-	ErrKeyRevoked      = herr.Code("virtual_key_revoked")
+	// ErrProviderMisconfigured means the provider row itself is unusable, so
+	// the request was rejected before any call was attempted: an Azure slot
+	// with no endpoint, a key config that never arrived. Separate from
+	// ErrProviderError because it is permanent and operator-fixable — the
+	// same rejection is waiting on every retry, so it must classify as
+	// non-retryable and stop the credential fallback chain instead of
+	// burning it. Reported as a bad gateway, never as a timeout: no upstream
+	// was contacted, so there was nothing to time out.
+	ErrProviderMisconfigured = herr.Code("provider_misconfigured")
+	ErrKeyRevoked            = herr.Code("virtual_key_revoked")
 	// ErrKeyDisabled is the REVERSIBLE stop: the key material is intact and
 	// an administrator can re-enable it. Distinct from revoked (one-way)
 	// so tenant tooling can branch on which one it is.

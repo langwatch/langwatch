@@ -308,6 +308,19 @@ export const goErrorCodes = {
    */
   provider_error: { service: "aigateway", httpStatus: 502 },
   /**
+   * ErrProviderMisconfigured — means the provider row itself is unusable, so
+   * the request was rejected before any call was attempted: an Azure slot with
+   * no endpoint, a key config that never arrived. Separate from
+   * ErrProviderError because it is permanent and operator-fixable — the same
+   * rejection is waiting on every retry, so it must classify as non-retryable
+   * and stop the credential fallback chain instead of burning it. Reported as
+   * a bad gateway, never as a timeout: no upstream was contacted, so there was
+   * nothing to time out.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  provider_misconfigured: { service: "aigateway", httpStatus: 502 },
+  /**
    * ErrProviderTimeout
    *
    * @source services/aigateway/domain/errors.go

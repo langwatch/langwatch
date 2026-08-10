@@ -1216,6 +1216,11 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrModelNotAllowed, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrProviderError, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrProviderTimeout, http.StatusGatewayTimeout)
+	// 502 like ErrProviderError, and deliberately NOT 504: the provider row
+	// was rejected before it was dialled, so a gateway timeout would tell the
+	// client to wait out a stall that never happened and tell the retry
+	// engine the chain is worth walking.
+	herr.RegisterStatus(domain.ErrProviderMisconfigured, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrBadRequest, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrMissingModel, http.StatusBadRequest)
 	// Fail-closed attribution: the request is missing a required field

@@ -174,6 +174,27 @@ func (r *BifrostRouter) validateCredentialEndpoints(ctx context.Context, cred do
 	return nil
 }
 
+// dispatchCredential resolves the credential every lane below dispatches
+// with, and is the gateway's single call site for
+// domain.WithDeploymentSelfMap.
+//
+// Azure / Bedrock / Vertex route on deployment name, and the control-plane/VK
+// path materialises credentials straight off the bundle wire
+// (adapters/controlplane/config_wire.go), which carries no deployment map at
+// all — so without this the provider is handed a nil map and rejects the
+// dispatch before dialling. Resolving at the two dispatch entry points rather
+// than per lane is what stops the next lane added from forgetting it, and it
+// lands before Bifrost's key SELECTION stage (GetKeysForProvider reads the
+// credential off the context), which filters out keys whose deployment map
+// does not cover the model — a stage that runs earlier than the key-config
+// validation the symptom names.
+//
+// model must be the same string the request carries to Bifrost, since that is
+// the key the provider looks the deployment up under.
+func dispatchCredential(cred domain.Credential, model string) domain.Credential {
+	return domain.WithDeploymentSelfMap(cred, model)
+}
+
 // Dispatch sends a non-streaming request through bifrost.
 //
 // For /v1/chat/completions (RequestTypeChat) the inbound body is
@@ -197,6 +218,7 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
 	}
+	cred = dispatchCredential(cred, model)
 
 	// Voyage is not a Bifrost ModelProvider (its enum doesn't include
 	// Voyage). The gateway proxies directly to api.voyageai.com — wire
@@ -582,6 +604,7 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
 	}
+	cred = dispatchCredential(cred, model)
 
 	// Codex bypasses Bifrost entirely: a direct SSE proxy to OpenAI's codex
 	// backend with OAuth + one-shot token refresh. See codex.go. Its backend
@@ -1561,14 +1584,40 @@ func classifyBifrostError(ctx context.Context, berr *bfschemas.BifrostError) err
 	switch status {
 	case http.StatusTooManyRequests:
 		code = domain.ErrRateLimited
-	case http.StatusGatewayTimeout, 0:
+	case http.StatusGatewayTimeout:
 		code = domain.ErrProviderTimeout
+	case 0:
+		code = statuslessBifrostCode(berr)
 	}
 
 	return herr.New(ctx, code, herr.M{
 		"status":  status,
 		"message": bfErrorMsg(berr),
 	})
+}
+
+// statuslessBifrostCode classifies a Bifrost error that carries no HTTP status
+// at all, which means no upstream response was ever received.
+//
+// Status 0 used to share the 504 branch, so a provider row Bifrost refuses to
+// dial ("endpoint not set", "deployments not set") reached the client as a
+// gateway timeout — transient-looking, and retryable, so the retry engine
+// walked the whole credential chain on a fault no credential could satisfy.
+//
+// The discriminator is the vendor's error shape rather than its message,
+// because the messages are open-ended: every status-less shape raised from an
+// attempted call carries the Go error it failed on (transport, DNS, body
+// marshalling, response read), and an unsupported request type carries the
+// vendor's own error code. A rejection with neither was raised before
+// anything was attempted — the provider row itself is unusable.
+func statuslessBifrostCode(berr *bfschemas.BifrostError) herr.Code {
+	if berr.Error != nil && berr.Error.Error == nil && berr.Error.Code == nil {
+		return domain.ErrProviderMisconfigured
+	}
+	// Everything else stays retryable: an attempt that failed short of a
+	// response, and a request type this provider does not serve, can both be
+	// answered by the next credential in the chain.
+	return domain.ErrProviderError
 }
 
 func bfErrorMsg(e *bfschemas.BifrostError) string {

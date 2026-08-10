@@ -1671,6 +1671,14 @@ const presentations = {
     title: "The model provider timed out",
     describe: () => "Try again in a moment.",
   },
+  provider_misconfigured: {
+    // Nothing was ever sent, and retrying changes nothing — the copy must
+    // send the customer to the provider's settings rather than tell them to
+    // wait it out like the two entries above.
+    title: "This provider isn't fully set up",
+    describe: () =>
+      "Finish configuring the provider in your settings, then try again.",
+  },
   chain_exhausted: {
     title: "Every provider failed",
     describe: () => "Check your provider settings, then try again.",
