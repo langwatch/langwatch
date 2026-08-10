@@ -22,9 +22,21 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import type { FlattenAnalyticsMetricsEnum } from "../../registry";
-import { buildTimeseriesQuery } from "../aggregation-builder";
+import {
+  buildTimeseriesQuery,
+  TRACE_ATTRIBUTE_METRIC_COLUMNS,
+} from "../aggregation-builder";
+import { fieldMappings } from "../field-mappings";
 import { resetParamCounter } from "../filter-translator";
 
+/**
+ * Every `metadata.*` metric the analytics registry actually exposes whose
+ * mapping resolves to the `Attributes` map. `metadata.labels` and
+ * `metadata.prompt_ids` map to `Attributes` too but are group-by / filter
+ * fields, not metrics, so they can never reach the outer aggregation this
+ * suite is about — the hoist table still covers them, and the invariant below
+ * is what keeps that true.
+ */
 const ATTRIBUTE_METRICS = [
   "metadata.thread_id",
   "metadata.user_id",
@@ -92,6 +104,37 @@ describe("buildTimeseriesQuery()", () => {
 
         expect(sql).not.toContain("AS trace_attr_customer_id");
         expect(sql).not.toContain("AS trace_attr_prompt_ids");
+      });
+    });
+  });
+
+  // The defect this suite exists for was not a wrong expression — it was a
+  // mapping nobody added to the hoist table. Enumerating the registry rather
+  // than a hand-written list is what stops the next `Attributes`-backed field
+  // reintroducing it: add a mapping without a hoist and this fails, instead of
+  // ClickHouse rejecting the query in production.
+  describe("given the trace-level Attributes field mappings", () => {
+    describe("when the hoist table is compared against them", () => {
+      it("covers every Attributes-backed trace_summaries mapping", () => {
+        const mapped = Object.values(fieldMappings)
+          .filter(
+            (mapping) =>
+              mapping.table === "trace_summaries" &&
+              mapping.column.startsWith("Attributes["),
+          )
+          .map((mapping) => {
+            const key = mapping.column.match(/Attributes\['([^']+)'\]/);
+            return key?.[1] ?? mapping.column;
+          });
+
+        const hoisted = TRACE_ATTRIBUTE_METRIC_COLUMNS.map(
+          ({ attributeKey }) => attributeKey,
+        );
+
+        expect(mapped.length).toBeGreaterThan(0);
+        expect([...new Set(mapped)].sort()).toEqual(
+          [...new Set(hoisted)].sort(),
+        );
       });
     });
   });

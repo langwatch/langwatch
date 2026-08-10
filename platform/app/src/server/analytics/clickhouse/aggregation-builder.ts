@@ -2561,7 +2561,7 @@ function buildPipelineMetricCTE(
  * query with "Unknown expression or function identifier `ts.Attributes`".
  * Observed in production 2026-08-10 on a thread-id count grouped by label.
  */
-const TRACE_ATTRIBUTE_METRIC_COLUMNS = [
+export const TRACE_ATTRIBUTE_METRIC_COLUMNS = [
   { attributeKey: "langwatch.user_id", cteColumn: "trace_attr_user_id" },
   { attributeKey: "gen_ai.conversation.id", cteColumn: "trace_attr_thread_id" },
   {
