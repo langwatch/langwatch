@@ -794,7 +794,7 @@ describe("AnnotationsTable columns and row actions", () => {
       // 25 rows plus the header row.
       expect(screen.getAllByRole("row")).toHaveLength(26);
       expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "Page 1 of 2",
+        "30 rows · showing 1–25 · per page",
       );
 
       mocks.query = { pageOffset: "25" };

@@ -233,6 +233,11 @@ const presentations = {
     title: "Time range is too wide",
     describe: () => "Pick a shorter range and try again.",
   },
+  page_too_deep: {
+    title: "That page is too deep to open by number",
+    describe: () =>
+      "Narrow the time range or filters, or step forward with Next.",
+  },
   filter_parse_error: {
     title: "This filter isn't valid",
     describe: () => "Check the syntax and try again.",

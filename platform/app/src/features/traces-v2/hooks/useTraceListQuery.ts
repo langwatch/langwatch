@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useSamplePreview } from "../onboarding";
@@ -78,7 +78,6 @@ export function useTraceListQuery(): TraceListQueryResult {
   const page = useFilterStore((s) => s.page);
   const pageSize = useFilterStore((s) => s.pageSize);
   const pageCursor = useFilterStore((s) => s.pageCursors[s.page]);
-  const setPage = useFilterStore((s) => s.setPage);
   const queryText = useFilterStore((s) => s.debouncedQueryText);
   const sort = useViewStore((s) => s.sort);
   const grouping = useViewStore((s) => s.grouping);
@@ -96,17 +95,14 @@ export function useTraceListQuery(): TraceListQueryResult {
   // active because FindBar reads its rows, so it asks for its own default
   // order rather than the session's.
   const listSort = ownsPagination ? sort : DEFAULT_SORT;
+  // `tracesV2.list` reads by position when no cursor comes with the page, so a
+  // page nobody has walked to (a jump straight to page 12, a reloaded
+  // `#?page=N` link, or a page number the sessions lens left behind with a
+  // string cursor this lens cannot read) is answered by offset rather than
+  // snapped back to the first batch.
   const traceCursor =
     pageCursor && typeof pageCursor === "object" ? pageCursor : undefined;
   const effectivePage = ownsPagination ? page : 1;
-
-  // Offset page numbers cannot be restored honestly after a reload because a
-  // keyset cursor is intentionally opaque session state. Old `#?page=N` links
-  // therefore fall back to the first batch instead of issuing an offset read.
-  // A string cursor left behind by the sessions lens is equally unusable here.
-  useEffect(() => {
-    if (ownsPagination && page > 1 && traceCursor === undefined) setPage(1);
-  }, [ownsPagination, page, traceCursor, setPage]);
 
   // Skip the tRPC request entirely while sample preview is active —
   // saves a roundtrip per page nav for users who're going to see
@@ -122,10 +118,7 @@ export function useTraceListQuery(): TraceListQueryResult {
       queryText,
     }),
     {
-      enabled:
-        !!project?.id &&
-        samplePreview === null &&
-        (effectivePage === 1 || traceCursor !== undefined),
+      enabled: !!project?.id && samplePreview === null,
       staleTime: 60_000,
       keepPreviousData: true,
     },

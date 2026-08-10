@@ -874,6 +874,7 @@ function branchSession({
     SessionId: sessionId,
     StartedAt: chTime(WINDOW_FROM),
     UpdatedAt: chTime(WINDOW_FROM),
+    LastEventOccurredAt: chTime(WINDOW_FROM + 60_000),
     CostUsd: costUsd,
     Agent: "claude_code",
     Models: ["claude-fable-5"],
@@ -921,6 +922,10 @@ describe("CodingAgentSessionClickHouseRepository branch-list routing", () => {
           "session-b",
         ]);
         expect(listed.map((row) => row.costUsd)).toEqual([3, 4]);
+        expect(listed.map((row) => row.lastEventOccurredAtMs)).toEqual([
+          WINDOW_FROM + 60_000,
+          WINDOW_FROM + 60_000,
+        ]);
       });
     });
   });

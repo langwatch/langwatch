@@ -85,6 +85,38 @@ function nowMs(deps: { now?: () => number }): number {
   return deps.now?.() ?? Date.now();
 }
 
+/**
+ * When one session last did anything.
+ *
+ * A session that ran for hours started once and kept working, so its start
+ * time is the wrong answer to "when was this last touched". The last event's
+ * timestamp is the right one, but it is 0 for a session whose fold never
+ * recorded one, and a 0 would drag a row to the bottom of a recency sort, so
+ * the start time is the floor.
+ */
+function sessionActivityAtMs({
+  startedAtMs,
+  lastEventOccurredAtMs,
+}: {
+  startedAtMs: number;
+  lastEventOccurredAtMs: number;
+}): number {
+  return Math.max(startedAtMs, lastEventOccurredAtMs || 0);
+}
+
+/** The latest activity across a set of sessions, 0 when there are none. */
+function latestActivityAtMs(
+  sessions: ReadonlyArray<{
+    startedAtMs: number;
+    lastEventOccurredAtMs: number;
+  }>,
+): number {
+  return sessions.reduce(
+    (latest, session) => Math.max(latest, sessionActivityAtMs(session)),
+    0,
+  );
+}
+
 /** The pull request itself: identity and lifetime, never its body. */
 export interface PullRequestIdentity {
   repositoryHost: string;
@@ -117,7 +149,13 @@ export interface CostSplit {
   nonBilledCostUsd: number | null;
 }
 
-/** What one model consumed and cost, within one pull request. */
+/**
+ * What one model consumed and cost, within one pull request.
+ *
+ * `tokensKnown` is false when all we know is that the model ran. The totals are
+ * then zero and mean nothing, so a reader must not print them. See
+ * {@link modelsFor} for when that happens.
+ */
 export interface ModelUsage {
   model: string;
   inputTokens: number;
@@ -127,6 +165,8 @@ export interface ModelUsage {
   totalTokens: number;
   /** Null when no project contributing this model may be priced. */
   costUsd: number | null;
+  /** Whether the totals on this entry are real. */
+  tokensKnown: boolean;
 }
 
 /** How one project is named when it appears as a contributor. */
@@ -189,6 +229,8 @@ export interface ContributorSummary extends ContributorIdentity {
 export interface PersonalPullRequestRow extends PullRequestIdentity, CostSplit {
   /** The pull request's own GitHub title, from the stored snapshot. */
   title: string;
+  /** When this row's counted work last ran, epoch ms, from our own sessions rather than GitHub. */
+  lastActivityAtMs: number;
   sessionsCount: number;
   inputTokens: number;
   outputTokens: number;
@@ -204,8 +246,16 @@ export interface UnlinkedBranchRollup extends CostSplit {
   repositoryHost: string;
   repositoryFullName: string;
   headBranch: string;
+  /** When this row's counted work last ran, epoch ms, from our own sessions rather than GitHub. */
+  lastActivityAtMs: number;
   sessionsCount: number;
   totalTokens: number;
+  /**
+   * Which models ran. A branch row carries names only: the per-call totals are
+   * read for the mapped pull requests, and asking for them again per unlinked
+   * branch would be a second query for an answer this page never shows.
+   */
+  modelBreakdown: ModelUsage[];
   /** Whether the organization's connection reaches this repository at all. */
   repoCovered: boolean;
 }
@@ -259,6 +309,8 @@ export interface PersonalSessionLookup {
     Array<{
       sessionId: string;
       startedAtMs: number;
+      /** When the session last produced an event, epoch ms, 0 when it never did. */
+      lastEventOccurredAt: number;
       agent: string;
       repositoryHost: string;
       repositoryOwner: string;
@@ -269,6 +321,8 @@ export interface PersonalSessionLookup {
       cacheReadTokens: number;
       cacheCreationTokens: number;
       costUsd: number;
+      /** The models the session's own rollup recorded. */
+      models: string[];
     }>
   >;
 }
@@ -547,6 +601,7 @@ export class PullRequestUsageService {
       return {
         ...toIdentity(pullRequest),
         title: pullRequest.title,
+        lastActivityAtMs: latestActivityAtMs(attached),
         sessionsCount: totals.sessionsCount,
         inputTokens: totals.inputTokens,
         outputTokens: totals.outputTokens,
@@ -556,7 +611,7 @@ export class PullRequestUsageService {
         costUsd: totals.costUsd,
         billedCostUsd: totals.billedCostUsd,
         nonBilledCostUsd: totals.nonBilledCostUsd,
-        modelBreakdown: modelBreakdownFor({
+        modelBreakdown: modelsFor({
           sessions: attached,
           modelTotals,
           costProjects,
@@ -641,7 +696,7 @@ export class PullRequestUsageService {
         nonBillableAgents,
         projects: query.projects,
       }),
-      modelBreakdown: modelBreakdownFor({
+      modelBreakdown: modelsFor({
         sessions: attached,
         modelTotals,
         costProjects,
@@ -893,16 +948,48 @@ function emptyTotals(): PullRequestUsageTotals {
 }
 
 /**
- * Roll the per-call model totals up to the pull request, over the sessions the
- * tenure rule attached to it. Cost is summed only across the projects the
- * caller may price, and stays null when none of them is.
+ * Which models ran, and what each consumed where we know it.
+ *
+ * THE one answer to that question: every caller uses this, and nothing
+ * downstream picks between sources. Two of them exist and they are not
+ * interchangeable.
+ *
+ * The per-call fact table has the tokens, so it wins whenever it answers. It
+ * is written from the `api_request` LOG alone, deliberately, because that is
+ * the one carrier holding tokens, cost and duration together and consuming
+ * only it makes double-counting against `llm_request` spans impossible. An
+ * agent reporting usage on spans or metrics instead therefore contributes no
+ * rows to it at all.
+ *
+ * The session's own row is the fallback, because the fold behind it consumes
+ * all three carriers and records which models ran regardless. It holds a SET
+ * of names with no per-model split, so those entries carry `tokensKnown:
+ * false` and totals that mean nothing. That is strictly better than the
+ * alternative, which is a row reporting millions of tokens and no model.
+ *
+ * Both come from reads the caller already made, so the fallback costs no
+ * query. When neither answers, the list is empty and the reader says so.
  */
-function modelBreakdownFor({
+function modelsFor({
   sessions,
   modelTotals,
   costProjects,
 }: {
-  sessions: CodingAgentBranchSessionRow[];
+  sessions: Array<{ tenantId?: string; sessionId?: string; models: string[] }>;
+  modelTotals: SessionModelTotalsRow[];
+  costProjects: ReadonlySet<string>;
+}): ModelUsage[] {
+  const perCall = perCallModelsFor({ sessions, modelTotals, costProjects });
+  return perCall.length > 0 ? perCall : namedModelsFor(sessions);
+}
+
+/** The per-call totals, over the sessions the tenure rule attached. */
+function perCallModelsFor({
+  sessions,
+  modelTotals,
+  costProjects,
+}: {
+  sessions: Array<{ tenantId?: string; sessionId?: string; models: string[] }>;
   modelTotals: SessionModelTotalsRow[];
   costProjects: ReadonlySet<string>;
 }): ModelUsage[] {
@@ -923,6 +1010,7 @@ function modelBreakdownFor({
       cacheCreationTokens: 0,
       totalTokens: 0,
       costUsd: null,
+      tokensKnown: true,
     };
     usage.inputTokens += row.inputTokens;
     usage.outputTokens += row.outputTokens;
@@ -934,6 +1022,26 @@ function modelBreakdownFor({
   }
 
   return [...byModel.values()].sort((a, b) => b.totalTokens - a.totalTokens);
+}
+
+/** The names alone, from the sessions' own rows. Alphabetical: nothing ranks them. */
+function namedModelsFor(sessions: Array<{ models: string[] }>): ModelUsage[] {
+  const names = new Set<string>();
+  for (const session of sessions) {
+    for (const model of session.models) {
+      if (model !== "") names.add(model);
+    }
+  }
+  return [...names].sort().map((model) => ({
+    model,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    totalTokens: 0,
+    costUsd: null,
+    tokensKnown: false,
+  }));
 }
 
 /** Who worked on a pull request, largest contribution first. */
@@ -982,6 +1090,7 @@ interface PersonalRepositoryGroup {
   sessions: Array<{
     sessionId: string;
     startedAtMs: number;
+    lastEventOccurredAtMs: number;
     agent: string;
     headBranch: string;
     inputTokens: number;
@@ -989,6 +1098,7 @@ interface PersonalRepositoryGroup {
     cacheReadTokens: number;
     cacheCreationTokens: number;
     costUsd: number;
+    models: string[];
   }>;
 }
 
@@ -1024,6 +1134,7 @@ function groupSessionsByRepository(
     group.sessions.push({
       sessionId: session.sessionId,
       startedAtMs: session.startedAtMs,
+      lastEventOccurredAtMs: session.lastEventOccurredAt,
       agent: session.agent,
       headBranch: session.gitBranch,
       inputTokens: session.inputTokens,
@@ -1031,6 +1142,7 @@ function groupSessionsByRepository(
       cacheReadTokens: session.cacheReadTokens,
       cacheCreationTokens: session.cacheCreationTokens,
       costUsd: session.costUsd,
+      models: session.models,
     });
     groups.set(key, group);
   }
@@ -1058,8 +1170,12 @@ function unlinkedRollupsFor({
     repositoryHost: group.repositoryHost,
     repositoryFullName: group.repositoryFullName,
     headBranch,
+    // The branch rollup stays personal, so its recency is too: only the
+    // viewer's own sessions on this branch can move it.
+    lastActivityAtMs: latestActivityAtMs(branchSessions),
     sessionsCount: branchSessions.length,
     totalTokens: branchSessions.reduce((sum, s) => sum + tokensOf(s), 0),
+    modelBreakdown: namedModelsFor(branchSessions),
     costUsd: sumOf(branchSessions, "costUsd"),
     billedCostUsd: branchSessions
       .filter((session) => !nonBillableAgents.has(session.agent))

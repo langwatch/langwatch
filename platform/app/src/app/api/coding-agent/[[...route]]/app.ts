@@ -299,6 +299,8 @@ const modelUsageSchema = z.object({
   cacheCreationTokens: z.number(),
   totalTokens: z.number(),
   costUsd: z.number().nullable(),
+  /** False when only the model's name is known: the totals above are not real. */
+  tokensKnown: z.boolean(),
 });
 
 const pullRequestUsageResponseSchema = z.object({

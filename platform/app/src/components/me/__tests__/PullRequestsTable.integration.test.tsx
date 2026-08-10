@@ -2,7 +2,8 @@
  * @vitest-environment jsdom
  *
  * The personal Pull Requests table: what a viewer is told when GitHub is not
- * connected, and what a repository the connection does not cover is offered.
+ * connected, what a repository the connection does not cover is offered, how a
+ * status is drawn, and how the list narrows by search, period and sort.
  *
  * The tRPC surface is a proxy that answers every query empty unless a test
  * pins it, so the table's two reads (the usage rollup and the live status)
@@ -11,7 +12,7 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -75,6 +76,11 @@ import { PullRequestsTable } from "../PullRequestsTable";
 
 const INSTALL_URL = "/api/github/install?organizationId=org-1";
 
+/** A fixed moment the fixtures hang off, well outside any relative preset. */
+const LONG_AGO = Date.parse("2026-07-01T09:00:00Z");
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 function pinUsage(data: unknown) {
   queryImpls["codingAgents.pullRequestUsage"] = () => ({
     data,
@@ -90,6 +96,16 @@ function pinStatuses(statuses: unknown[]) {
     isLoading: false,
     isError: false,
     isFetched: true,
+  });
+}
+
+/** GitHub has been asked and has not answered yet. */
+function pinStatusesPending() {
+  queryImpls["github.pullRequestLiveStatus"] = () => ({
+    data: undefined,
+    isLoading: true,
+    isError: false,
+    isFetched: false,
   });
 }
 
@@ -129,7 +145,8 @@ function renderTable() {
  * Tab until the element holds focus, the way a keyboard reader reaches it, or
  * give up once the whole order has been walked. Walking the real focus order is
  * the point: calling `focus()` would prove the element accepts focus without
- * proving anything can get to it.
+ * proving anything can get to it. The budget covers the toolbar and every
+ * sortable heading, which all come before the first row.
  */
 async function tabTo({
   user,
@@ -138,10 +155,22 @@ async function tabTo({
   user: ReturnType<typeof userEvent.setup>;
   element: HTMLElement;
 }) {
-  for (let step = 0; step < 30 && document.activeElement !== element; step++) {
+  for (let step = 0; step < 60 && document.activeElement !== element; step++) {
     await user.tab();
   }
 }
+
+/** The pull request numbers the table is currently drawing, top to bottom. */
+const listedNumbers = () =>
+  Array.from(document.querySelectorAll("tbody tr")).map(
+    (row) => row.querySelector("td")?.textContent ?? "",
+  );
+
+/** The heading cell a sortable column announces its state on. */
+const headingFor = (label: string) =>
+  screen
+    .getByRole("button", { name: `Sort by ${label}` })
+    .closest("th") as HTMLElement;
 
 /** What a case may pin about a row's money, and what is derived from it. */
 type CostOverrides = {
@@ -184,9 +213,10 @@ function mappedRow(over: Record<string, unknown> & CostOverrides = {}) {
     state: "open",
     isDraft: false,
     authorLogin: "acme-dev",
-    prCreatedAtMs: Date.parse("2026-07-01T09:00:00Z"),
+    prCreatedAtMs: LONG_AGO,
     prClosedAtMs: null,
     prMergedAtMs: null,
+    lastActivityAtMs: LONG_AGO,
     sessionsCount: 6,
     inputTokens: 1_000,
     outputTokens: 2_000,
@@ -206,8 +236,10 @@ function unlinkedRow(over: Record<string, unknown> & CostOverrides = {}) {
     repositoryHost: "github.com",
     repositoryFullName: "acme/widgets",
     headBranch: "feat/git-context",
+    lastActivityAtMs: LONG_AGO,
     sessionsCount: 3,
     totalTokens: 1_240_000,
+    modelBreakdown: [],
     repoCovered: false,
     ...over,
     ...costSplit({ over, defaultCostUsd: 4.25 }),
@@ -286,6 +318,44 @@ describe("the personal Pull Requests table", () => {
       const link = await screen.findByText("Link this repository");
       expect(link.closest("[data-disabled]")).not.toBeNull();
     });
+
+    /** @scenario "An uncovered repository invites linking right on its row" */
+    it("puts the invitation on the row itself, disabled for a member who may not act on it", async () => {
+      const user = userEvent.setup();
+      renderTable();
+
+      const invitation = screen.getByText("Link this repo");
+      expect(invitation.closest("a")).toHaveAttribute("href", INSTALL_URL);
+
+      // The row is the shortcut, not the replacement: the overflow menu still
+      // carries the same offer.
+      await user.click(
+        screen.getByRole("button", { name: "Actions for feat/git-context" }),
+      );
+      expect(
+        await screen.findByText("Link this repository"),
+      ).toBeInTheDocument();
+
+      cleanup();
+      permissionsRef.canManageOrganization = false;
+      renderTable();
+
+      const disabled = screen.getByText("Link this repo");
+      expect(disabled.closest("a")).toBeNull();
+      expect(disabled.closest("button")).toBeDisabled();
+
+      await user.hover(disabled.closest("span[tabindex]") as HTMLElement);
+      expect(
+        await screen.findByText(
+          "Ask an administrator to link this repository.",
+        ),
+      ).toBeInTheDocument();
+
+      // The button is inert, so the click lands on its wrapper; it must stop
+      // there rather than fall through and open whatever the row opens.
+      await user.click(disabled.closest("span[tabindex]") as HTMLElement);
+      expect(mockOpenDrawer).not.toHaveBeenCalled();
+    });
   });
 
   describe("given a mapped pull request whose status came from a snapshot", () => {
@@ -354,6 +424,82 @@ describe("the personal Pull Requests table", () => {
     });
   });
 
+  describe("given pull requests in each of GitHub's four states", () => {
+    /** @scenario "A pull request's status carries GitHub's own color and mark" */
+    it("names each state and carries its mark, drawn solid", () => {
+      pinUsage({
+        rows: [
+          mappedRow({ prNumber: 1, state: "open", isDraft: false }),
+          mappedRow({ prNumber: 2, state: "open", isDraft: true }),
+          mappedRow({
+            prNumber: 3,
+            state: "closed",
+            prMergedAtMs: Date.parse("2026-06-20T09:00:00Z"),
+            prClosedAtMs: Date.parse("2026-06-20T09:00:00Z"),
+          }),
+          mappedRow({
+            prNumber: 4,
+            state: "closed",
+            prClosedAtMs: Date.parse("2026-06-21T09:00:00Z"),
+          }),
+        ],
+        unlinked: [],
+        connection: { connected: true, installUrl: INSTALL_URL },
+      });
+
+      renderTable();
+
+      for (const [label, status] of [
+        ["Open", "open"],
+        ["Draft", "draft"],
+        ["Merged", "merged"],
+        ["Closed", "closed"],
+      ] as const) {
+        const badge = screen.getByText(label);
+        expect(badge).toHaveAttribute("data-status", status);
+        // GitHub's own mark for the state, beside the word.
+        expect(badge.querySelector("svg")).not.toBeNull();
+        // The drawn-back outline belongs to the snapshot alone: these are the
+        // states as GitHub itself draws them.
+        expect(badge).toHaveAttribute("data-status-source", "payload");
+      }
+    });
+  });
+
+  describe("given a pull request whose live status has not arrived yet", () => {
+    /** @scenario "A status shows from the stored snapshot before GitHub answers, and the live answer takes over" */
+    it("shows the stored status straight away and swaps in the live one", () => {
+      pinUsage({
+        rows: [mappedRow({ state: "open", isDraft: false })],
+        unlinked: [],
+        connection: { connected: true, installUrl: INSTALL_URL },
+      });
+      pinStatusesPending();
+
+      const { rerender } = renderTable();
+
+      const stored = screen.getByText("Open");
+      expect(stored).toHaveAttribute("data-status-source", "payload");
+      expect(stored).toHaveAttribute("data-status", "open");
+
+      pinStatuses([
+        {
+          repositoryHost: "github.com",
+          repositoryFullName: "acme/widgets",
+          prNumber: 4218,
+          status: "merged",
+          source: "live",
+          mappedAt: null,
+        },
+      ]);
+      rerender(tableElement());
+
+      expect(screen.queryByText("Open")).not.toBeInTheDocument();
+      const live = screen.getByText("Merged");
+      expect(live).toHaveAttribute("data-status-source", "live");
+    });
+  });
+
   describe("given a row whose cost is partly not billed", () => {
     /** @scenario "A bundled token cost reads like every other token cost" */
     it("draws the value exactly like a billed one and keeps the split to the tooltip", async () => {
@@ -416,6 +562,66 @@ describe("the personal Pull Requests table", () => {
         await screen.findByText(/of the p95 of the visible pull requests/i),
       ).toBeInTheDocument();
     });
+
+    /** @scenario "Sorting is operable from the keyboard and announced to assistive readers" */
+    it("sorts from a heading without a pointer and announces the column and direction", async () => {
+      // The three orders are deliberately all different, so returning to the
+      // default is a real return rather than the input order coming back.
+      pinUsage({
+        rows: [
+          mappedRow({
+            prNumber: 4218,
+            totalTokens: 5_000,
+            lastActivityAtMs: LONG_AGO - 3_000,
+          }),
+          mappedRow({
+            prNumber: 4219,
+            totalTokens: 900_000,
+            lastActivityAtMs: LONG_AGO - 2_000,
+          }),
+          mappedRow({
+            prNumber: 4220,
+            totalTokens: 20_000,
+            lastActivityAtMs: LONG_AGO - 1_000,
+          }),
+        ],
+        unlinked: [],
+        connection: { connected: true, installUrl: INSTALL_URL },
+      });
+      const user = userEvent.setup();
+      renderTable();
+
+      // The table opens ordered by its last update, and says so.
+      expect(headingFor("Last update")).toHaveAttribute(
+        "aria-sort",
+        "descending",
+      );
+      expect(headingFor("Tokens")).toHaveAttribute("aria-sort", "none");
+      const opening = listedNumbers();
+      expect(opening).toEqual(["#4220", "#4219", "#4218"]);
+
+      const tokens = screen.getByRole("button", { name: "Sort by Tokens" });
+      await tabTo({ user, element: tokens });
+      expect(document.activeElement).toBe(tokens);
+
+      await user.keyboard("{Enter}");
+      expect(headingFor("Tokens")).toHaveAttribute("aria-sort", "descending");
+      expect(headingFor("Last update")).toHaveAttribute("aria-sort", "none");
+      expect(listedNumbers()).toEqual(["#4219", "#4220", "#4218"]);
+
+      await user.keyboard("{Enter}");
+      expect(headingFor("Tokens")).toHaveAttribute("aria-sort", "ascending");
+      expect(listedNumbers()).toEqual(["#4218", "#4220", "#4219"]);
+
+      // A third choice hands the table back the order it opened in.
+      await user.keyboard("{Enter}");
+      expect(headingFor("Tokens")).toHaveAttribute("aria-sort", "none");
+      expect(headingFor("Last update")).toHaveAttribute(
+        "aria-sort",
+        "descending",
+      );
+      expect(listedNumbers()).toEqual(opening);
+    });
   });
 
   describe("given a listed pull request", () => {
@@ -455,19 +661,56 @@ describe("the personal Pull Requests table", () => {
   });
 
   describe("given a listed branch with no pull request", () => {
-    /** @scenario "A branch with no pull request opens nothing" */
-    it("opens no detail when the row is clicked", async () => {
+    beforeEach(() => {
       pinUsage({
         rows: [],
         unlinked: [unlinkedRow()],
         connection: { connected: true, installUrl: INSTALL_URL },
       });
+    });
+
+    /** @scenario "A branch with no pull request opens nothing" */
+    it("opens no detail when the row is clicked", async () => {
       const user = userEvent.setup();
       renderTable();
 
-      await user.click(screen.getByText("No pull request yet"));
+      await user.click(screen.getByText("feat/git-context"));
 
       expect(mockOpenDrawer).not.toHaveBeenCalled();
+      expect(screen.queryByText("No pull request yet")).not.toBeInTheDocument();
+      expect(screen.getByText("No PR yet")).toBeInTheDocument();
+    });
+
+    /** @scenario "A branch with no pull request says No PR yet in the status column" */
+    it("says No PR yet rather than borrowing a pull request state", () => {
+      renderTable();
+
+      expect(screen.getByText("No PR yet")).toBeInTheDocument();
+      // No badge at all: an absent pull request has no state to report, and a
+      // gray "Draft" or "Closed" would be a claim about one that never existed.
+      expect(document.querySelector("[data-status]")).toBeNull();
+    });
+
+    /** @scenario "A branch row reports the models its sessions ran" */
+    it("names the models its sessions ran", () => {
+      pinUsage({
+        rows: [],
+        unlinked: [
+          unlinkedRow({
+            modelBreakdown: [
+              { model: "claude-opus-5", tokensKnown: false },
+              { model: "claude-haiku-4-5-20251001", tokensKnown: false },
+            ],
+          }),
+        ],
+        connection: { connected: true, installUrl: INSTALL_URL },
+      });
+
+      renderTable();
+
+      // The leading model, and the count of the rest, exactly as a mapped row
+      // reads: a branch has no per-call totals, not no models.
+      expect(screen.getByText("claude-opus-5 +1")).toBeInTheDocument();
     });
   });
 
@@ -479,7 +722,7 @@ describe("the personal Pull Requests table", () => {
           mappedRow({
             prNumber: 5000 + index,
             title: `Pull request ${index}`,
-            prCreatedAtMs: Date.parse("2026-07-01T09:00:00Z") - index * 1000,
+            lastActivityAtMs: LONG_AGO - index * 1000,
           }),
         ),
         unlinked: [],
@@ -488,7 +731,9 @@ describe("the personal Pull Requests table", () => {
       const user = userEvent.setup();
       renderTable();
 
-      await user.click(screen.getByTestId("pagination-size-10"));
+      fireEvent.change(screen.getByTestId("pagination-page-size"), {
+        target: { value: "10" },
+      });
       expect(screen.getByText("Pull request 0")).toBeInTheDocument();
       expect(screen.queryByText("Pull request 11")).not.toBeInTheDocument();
 
@@ -506,7 +751,7 @@ describe("the personal Pull Requests table", () => {
         mappedRow({
           prNumber: 5000 + index,
           title: `Pull request ${index}`,
-          prCreatedAtMs: Date.parse("2026-07-01T09:00:00Z") - index * 1000,
+          lastActivityAtMs: LONG_AGO - index * 1000,
         }),
       );
       pinUsage({
@@ -517,7 +762,9 @@ describe("the personal Pull Requests table", () => {
       const user = userEvent.setup();
       const { rerender } = renderTable();
 
-      await user.click(screen.getByTestId("pagination-size-10"));
+      fireEvent.change(screen.getByTestId("pagination-page-size"), {
+        target: { value: "10" },
+      });
       await user.click(screen.getByRole("button", { name: /next/i }));
       expect(screen.getByText("Pull request 11")).toBeInTheDocument();
 
@@ -531,7 +778,7 @@ describe("the personal Pull Requests table", () => {
 
       expect(screen.getByText("Pull request 0")).toBeInTheDocument();
       expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "Page 1 of 1",
+        "3 pull requests · showing 1–3",
       );
     });
   });
@@ -577,6 +824,122 @@ describe("the personal Pull Requests table", () => {
         await screen.findByText("Riley Chase: 2 sessions"),
       ).toBeInTheDocument();
       expect(await screen.findByText("Gateway: 1 session")).toBeInTheDocument();
+    });
+  });
+
+  describe("given rows differing in number, title, branch and repository", () => {
+    beforeEach(() => {
+      pinUsage({
+        rows: [
+          mappedRow(),
+          mappedRow({
+            prNumber: 7001,
+            title: "Retry the ingestion queue",
+            headBranch: "fix/queue-retry",
+            repositoryFullName: "acme/gateway",
+            htmlUrl: "https://github.com/acme/gateway/pull/7001",
+          }),
+        ],
+        unlinked: [],
+        connection: { connected: true, installUrl: INSTALL_URL },
+      });
+    });
+
+    /** @scenario "Search matches number, title, branch and repository regardless of case" */
+    it("keeps every row matching on any of the four, in any casing", async () => {
+      const user = userEvent.setup();
+      renderTable();
+
+      const search = screen.getByRole("searchbox");
+      const listed = () => screen.queryByText("Link sessions to pull requests");
+      const other = () => screen.queryByText("Retry the ingestion queue");
+
+      for (const numeric of ["#4218", "4218"]) {
+        await user.clear(search);
+        await user.type(search, numeric);
+        expect(listed()).toBeInTheDocument();
+        expect(other()).not.toBeInTheDocument();
+      }
+
+      await user.clear(search);
+      await user.type(search, "RETRY THE INGESTION");
+      expect(other()).toBeInTheDocument();
+      expect(listed()).not.toBeInTheDocument();
+
+      await user.clear(search);
+      await user.type(search, "GIT-CONTEXT");
+      expect(listed()).toBeInTheDocument();
+      expect(other()).not.toBeInTheDocument();
+
+      await user.clear(search);
+      await user.type(search, "acme/GATEWAY");
+      expect(other()).toBeInTheDocument();
+      expect(listed()).not.toBeInTheDocument();
+
+      await user.clear(search);
+      await user.type(search, "nothing here");
+      expect(screen.getByText("No pull requests match")).toBeInTheDocument();
+      // The way back is where the reader left it.
+      expect(screen.getByRole("searchbox")).toHaveValue("nothing here");
+    });
+  });
+
+  describe("given rows last updated at different times", () => {
+    beforeEach(() => {
+      pinUsage({
+        rows: [
+          mappedRow({
+            prNumber: 8001,
+            title: "Worked on this morning",
+            lastActivityAtMs: Date.now() - 2 * 60 * 60 * 1000,
+          }),
+          mappedRow({
+            prNumber: 8002,
+            title: "Untouched for a month",
+            lastActivityAtMs: Date.now() - 40 * DAY_MS,
+          }),
+        ],
+        unlinked: [],
+        connection: { connected: true, installUrl: INSTALL_URL },
+      });
+    });
+
+    /** @scenario "A period keeps only rows whose last update falls inside it" */
+    it("lists only the rows last updated inside the chosen period", async () => {
+      const user = userEvent.setup();
+      renderTable();
+
+      expect(screen.getByText("Untouched for a month")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: /all time/i }));
+      await user.click(await screen.findByText("Last 7 days"));
+
+      expect(screen.getByText("Worked on this morning")).toBeInTheDocument();
+      expect(
+        screen.queryByText("Untouched for a month"),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario "The period starts at all time and can return to it" */
+    it("opens on all time and widens back to it once narrowed", async () => {
+      const user = userEvent.setup();
+      renderTable();
+
+      // Nothing is hidden until the reader asks for a window.
+      expect(screen.getByRole("button", { name: /all time/i })).toBeVisible();
+      expect(screen.getByText("Untouched for a month")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: /all time/i }));
+      await user.click(await screen.findByText("Last 7 days"));
+      expect(
+        screen.queryByText("Untouched for a month"),
+      ).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: /last 7 days/i }));
+      await user.click(await screen.findByRole("button", { name: "All time" }));
+
+      expect(screen.getByText("Untouched for a month")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /all time/i })).toBeVisible();
     });
   });
 });

@@ -48,6 +48,10 @@ function sessionRow(
     sessionId: "session-a",
     tenantId: "project-1",
     startedAtMs: NOW - 5 * HOUR,
+    // A session whose fold never recorded a last event, which is the shape
+    // most of these cases care nothing about: recency then falls back to the
+    // start time.
+    lastEventOccurredAtMs: 0,
     inputTokens: 100,
     outputTokens: 50,
     cacheReadTokens: 20,
@@ -70,6 +74,7 @@ function personalSessionRow(
   return {
     sessionId: "session-a",
     startedAtMs: NOW - 5 * HOUR,
+    lastEventOccurredAt: 0,
     agent: "claude_code",
     repositoryHost: "github.com",
     repositoryOwner: "acme",
@@ -80,6 +85,7 @@ function personalSessionRow(
     cacheReadTokens: 20,
     cacheCreationTokens: 10,
     costUsd: 1.5,
+    models: ["claude-opus-5"],
     ...over,
   };
 }
@@ -576,6 +582,93 @@ describe("PullRequestUsageService", () => {
     });
   });
 
+  describe("given a pull request whose sessions logged no per-call model data", () => {
+    /** @scenario "A pull request reports its models even without per-call data" */
+    it("reports the models its sessions recorded", async () => {
+      const { service } = personalServiceWith({
+        pullRequests: [pullRequestRow()],
+        personalSessions: [personalSessionRow({ sessionId: "mine" })],
+        organizationSessions: [
+          sessionRow({ sessionId: "mine", models: ["claude-opus-5"] }),
+          sessionRow({
+            sessionId: "theirs",
+            models: ["claude-opus-5", "gpt-5"],
+          }),
+        ],
+        // The per-call table is fed by a carrier these sessions never used.
+        modelTotals: [],
+      });
+
+      const usage = await service.getForPersonalProject(PERSONAL_QUERY);
+
+      expect(
+        usage.rows[0]?.modelBreakdown.map((each) => ({
+          model: each.model,
+          tokensKnown: each.tokensKnown,
+        })),
+      ).toEqual([
+        { model: "claude-opus-5", tokensKnown: false },
+        { model: "gpt-5", tokensKnown: false },
+      ]);
+    });
+
+    /** @scenario "Per-call model data wins over the recorded names" */
+    it("still reports the per-call breakdown when there is one", async () => {
+      const { service } = personalServiceWith({
+        pullRequests: [pullRequestRow()],
+        personalSessions: [personalSessionRow({ sessionId: "mine" })],
+        organizationSessions: [
+          sessionRow({ sessionId: "mine", models: ["claude-opus-5"] }),
+        ],
+        modelTotals: [
+          modelTotalsRow({ sessionId: "mine", model: "claude-opus-5" }),
+        ],
+      });
+
+      const usage = await service.getForPersonalProject(PERSONAL_QUERY);
+
+      expect(usage.rows[0]?.modelBreakdown).toEqual([
+        expect.objectContaining({ model: "claude-opus-5", tokensKnown: true }),
+      ]);
+    });
+  });
+
+  describe("given a branch with no pull request whose sessions ran a model", () => {
+    /** @scenario "A branch rollup carries the models its sessions ran" */
+    it("reports them on the branch rollup", async () => {
+      const { service } = personalServiceWith({
+        pullRequests: [],
+        personalSessions: [
+          personalSessionRow({ sessionId: "mine", models: ["claude-opus-5"] }),
+          personalSessionRow({
+            sessionId: "mine-2",
+            models: ["claude-opus-5", "claude-haiku-4-5-20251001"],
+          }),
+        ],
+      });
+
+      const usage = await service.getForPersonalProject(PERSONAL_QUERY);
+
+      expect(
+        usage.unlinked[0]?.modelBreakdown.map((each) => each.model),
+      ).toEqual(["claude-haiku-4-5-20251001", "claude-opus-5"]);
+    });
+
+    /** @scenario "A branch whose sessions recorded no model reports none" */
+    it("reports no models when its sessions recorded none", async () => {
+      const { service } = personalServiceWith({
+        pullRequests: [],
+        personalSessions: [
+          personalSessionRow({ sessionId: "mine", models: [] }),
+        ],
+      });
+
+      const usage = await service.getForPersonalProject(PERSONAL_QUERY);
+
+      expect(usage.unlinked[0]?.modelBreakdown).toEqual([]);
+    });
+  });
+
   describe("given a pull request whose sessions ran in two projects", () => {
     /** @scenario "A listed pull request counts every project the viewer may read" */
     it("counts every project the viewer may read on the personal row", async () => {
@@ -697,6 +790,97 @@ describe("PullRequestUsageService", () => {
       expect(usage.unlinked).toHaveLength(1);
       expect(usage.unlinked[0]?.sessionsCount).toBe(1);
       expect(usage.unlinked[0]?.costUsd).toBeCloseTo(1.5);
+    });
+  });
+
+  // "Last update" is the page's own answer rather than GitHub's: when the work
+  // this row prices last ran. It follows the same split as the numbers beside
+  // it, organization-wide for a pull request and personal for a branch.
+  describe("given a pull request whose sessions ran at different times", () => {
+    /** @scenario "A pull request's last update is the latest session across every counted project" */
+    it("takes the last update from the most recent session in any counted project", async () => {
+      const { service } = personalServiceWith({
+        pullRequests: [pullRequestRow()],
+        personalSessions: [personalSessionRow({ sessionId: "mine" })],
+        organizationSessions: [
+          sessionRow({
+            sessionId: "mine",
+            tenantId: "project-1",
+            startedAtMs: NOW - 5 * HOUR,
+          }),
+          sessionRow({
+            sessionId: "theirs",
+            tenantId: "project-2",
+            startedAtMs: NOW - HOUR,
+          }),
+        ],
+      });
+
+      const usage = await service.getForPersonalProject({
+        ...PERSONAL_QUERY,
+        ...BOTH_PROJECTS,
+      });
+
+      expect(usage.rows[0]?.lastActivityAtMs).toBe(NOW - HOUR);
+    });
+
+    /** @scenario "A pull request's last update is the latest session across every counted project" */
+    it("counts a long session by when it last ran rather than when it started", async () => {
+      const { service } = personalServiceWith({
+        pullRequests: [pullRequestRow()],
+        personalSessions: [personalSessionRow({ sessionId: "long" })],
+        organizationSessions: [
+          sessionRow({
+            sessionId: "long",
+            startedAtMs: NOW - 6 * HOUR,
+            lastEventOccurredAtMs: NOW - HOUR / 2,
+          }),
+          sessionRow({ sessionId: "short", startedAtMs: NOW - 2 * HOUR }),
+        ],
+      });
+
+      const usage = await service.getForPersonalProject(PERSONAL_QUERY);
+
+      expect(usage.rows[0]?.lastActivityAtMs).toBe(NOW - HOUR / 2);
+    });
+  });
+
+  describe("given a branch with no pull request whose sessions ran at different times", () => {
+    /** @scenario "A branch's last update is the latest of its own sessions" */
+    it("takes the last update from the viewer's own most recent session on it", async () => {
+      const { service } = personalServiceWith({
+        pullRequests: [],
+        personalSessions: [
+          personalSessionRow({
+            sessionId: "older",
+            gitBranch: "feat/orphan",
+            startedAtMs: NOW - 8 * HOUR,
+          }),
+          personalSessionRow({
+            sessionId: "newer",
+            gitBranch: "feat/orphan",
+            startedAtMs: NOW - 2 * HOUR,
+          }),
+        ],
+        // A teammate working more recently in a project the viewer may read:
+        // the branch rollup is personal, so it must not move the answer.
+        organizationSessions: [
+          sessionRow({
+            sessionId: "theirs",
+            tenantId: "project-2",
+            gitBranch: "feat/orphan",
+            startedAtMs: NOW - HOUR,
+          }),
+        ],
+      });
+
+      const usage = await service.getForPersonalProject({
+        ...PERSONAL_QUERY,
+        ...BOTH_PROJECTS,
+      });
+
+      expect(usage.unlinked).toHaveLength(1);
+      expect(usage.unlinked[0]?.lastActivityAtMs).toBe(NOW - 2 * HOUR);
     });
   });
 
@@ -831,6 +1015,7 @@ describe("PullRequestUsageService", () => {
           cacheCreationTokens: 10,
           totalTokens: 180,
           costUsd: 1.5,
+          tokensKnown: true,
         },
         {
           model: "gpt-5-mini",
@@ -840,6 +1025,7 @@ describe("PullRequestUsageService", () => {
           cacheCreationTokens: 1,
           totalTokens: 4,
           costUsd: 0.25,
+          tokensKnown: true,
         },
       ]);
     });
