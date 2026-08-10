@@ -19,6 +19,13 @@ on:
       - "platform/app/.env.example"
       - "docs/self-hosting/**"
 
+# Triggered on `edited`, and it reads the PR description, so an in-flight run
+# is grading a body the author has already rewritten. 18 of the last 100 runs
+# were superseded that way.
+concurrency:
+  group: deployment-impact-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   pull-requests: read

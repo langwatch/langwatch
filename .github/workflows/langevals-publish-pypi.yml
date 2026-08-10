@@ -6,6 +6,13 @@ on:
       - published
   workflow_dispatch:
 
+# A publish run drains — see publish-docker-app. PyPI rejects a re-upload of an
+# existing version outright, so the loser of a race fails the release rather
+# than producing a wrong one, but it fails loudly and for no reason.
+concurrency:
+  group: langevals-publish-pypi-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
