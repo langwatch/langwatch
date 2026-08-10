@@ -1,10 +1,39 @@
+import {
+  createRedisConnection,
+  type RedisConnection,
+} from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
-import { afterEach, describe, expect, it } from "vitest";
-import { connection } from "~/server/redis";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 import { abortManager } from "../abortManager";
+
+/**
+ * This suite talks to whatever Redis the environment points at, and the manager
+ * under test reads its connection off the App — so the test builds one and
+ * hands it over (ADR-090).
+ */
+let connection: RedisConnection | null = null;
 
 describe("AbortManager Integration", () => {
   const testRunIds: string[] = [];
+
+  beforeAll(async () => {
+    connection = createRedisConnection({
+      env: {
+        url: process.env.REDIS_URL,
+        clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
+        dbIndex: process.env.REDIS_DB_INDEX,
+      },
+    });
+    await resetApp();
+    globalForApp.__langwatch_app = createTestApp({ redis: connection });
+  });
+
+  afterAll(async () => {
+    await resetApp();
+    connection?.disconnect();
+  });
 
   // Generate unique run IDs to avoid collisions between test runs
   const createTestRunId = () => {

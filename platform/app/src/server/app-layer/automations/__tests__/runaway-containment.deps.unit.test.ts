@@ -4,7 +4,7 @@
  * strings and lists the dependency factory produces, so they are exercised
  * against stub collaborators rather than a database.
  */
-
+import type { RedisConnection } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -22,10 +22,9 @@ vi.mock("~/server/organizations/resolveOrganizationId", () => ({
     resolveOrganizationId(projectId),
 }));
 
-// `connection` is a mutable module-level binding, so a test can pick the path
-// it exercises: undefined is the per-worker fallback, an object is Redis.
+// A mutable holder read by `makeDeps()`, so a test can pick the path it
+// exercises: null is the per-worker fallback, an object is Redis.
 const redisMock = vi.hoisted(() => ({ connection: undefined as unknown }));
-vi.mock("~/server/redis", () => redisMock);
 
 const findMany = vi.fn();
 const filterSuppressed = vi.fn();
@@ -47,6 +46,7 @@ function makeDeps() {
     resolveClickHouseClient: (async () => {
       throw new Error("not used");
     }) as unknown as ClickHouseClientResolver,
+    redis: (redisMock.connection ?? null) as RedisConnection | null,
   });
 }
 

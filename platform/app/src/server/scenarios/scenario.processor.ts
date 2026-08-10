@@ -16,7 +16,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { type ChildProcess, spawn } from "child_process";
 import { env } from "~/env.mjs";
-import { getApp } from "../app-layer/app";
+import { getApp, tryGetApp } from "../app-layer/app";
 import { resolveAppPackageRoot } from "../appPackageRoot";
 import {
   createContextFromJobData,
@@ -28,7 +28,6 @@ import {
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../metrics";
-import { connection } from "../redis";
 import {
   type CancellationMessage,
   subscribeToCancellations,
@@ -646,6 +645,9 @@ export async function startScenarioProcessor(
   pool: ScenarioExecutionPool,
   deps: ProcessorDependencies = createProcessorDependencies(),
 ): Promise<{ close: () => Promise<void> } | undefined> {
+  // Skipping the processor is this function's documented outcome when there
+  // is no Redis, so absence must not raise (ADR-090).
+  const connection = tryGetApp()?.redis ?? null;
   if (!connection) {
     logger.info("No Redis connection, skipping scenario processor");
     return undefined;

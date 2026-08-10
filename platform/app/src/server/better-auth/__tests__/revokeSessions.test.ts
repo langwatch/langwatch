@@ -14,12 +14,14 @@ import type { PrismaClient } from "~/generated/prisma/client";
 const mockRedisGet = vi.fn();
 const mockRedisDel = vi.fn();
 const mockRedisSet = vi.fn();
-vi.mock("~/server/redis", () => ({
-  connection: {
-    get: (...args: unknown[]) => mockRedisGet(...args),
-    del: (...args: unknown[]) => mockRedisDel(...args),
-    set: (...args: unknown[]) => mockRedisSet(...args),
-  },
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    redis: {
+      get: (...args: unknown[]) => mockRedisGet(...args),
+      del: (...args: unknown[]) => mockRedisDel(...args),
+      set: (...args: unknown[]) => mockRedisSet(...args),
+    },
+  }),
 }));
 
 import {

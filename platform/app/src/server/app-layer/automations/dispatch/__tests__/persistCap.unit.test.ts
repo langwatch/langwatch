@@ -1,16 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// `connection` is undefined under vitest, so these exercise the in-memory
-// fallback. The counting contract is the same either way; what differs is the
-// blast radius when Redis is down, which the email caps already pin.
-vi.mock("~/server/redis", () => ({ connection: undefined }));
-
 const planMock = vi.hoisted(() => ({
   getActivePlan: vi.fn(),
   resolveOrganizationId: vi.fn(),
 }));
+// The App carries no Redis here, so these exercise the in-memory fallback. The
+// counting contract is the same either way; what differs is the blast radius
+// when Redis is down, which the email caps already pin.
 vi.mock("~/server/app-layer/app", () => ({
-  getApp: () => ({ planProvider: { getActivePlan: planMock.getActivePlan } }),
+  getApp: () => ({
+    planProvider: { getActivePlan: planMock.getActivePlan },
+    redis: null,
+  }),
 }));
 vi.mock("~/server/organizations/resolveOrganizationId", () => ({
   resolveOrganizationId: planMock.resolveOrganizationId,

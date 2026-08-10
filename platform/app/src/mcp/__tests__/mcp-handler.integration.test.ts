@@ -47,8 +47,8 @@ vi.mock("~/server/db", () => ({
   prisma: mockPrisma,
 }));
 
-vi.mock("~/server/redis", () => ({
-  connection: mockRedis,
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({ redis: mockRedis }),
 }));
 
 // Mock encryption — use identity functions so tests can inspect values
@@ -1348,7 +1348,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   describe("when the standalone mcp-server package is checked for isolation", () => {
     it("does not import any main app modules", async () => {
       // The mcp-server package's create-mcp-server.ts should not import
-      // from the main app (~/server/db, ~/server/redis, etc.)
+      // from the main app (~/server/db, ~/server/app-layer, etc.)
       const fs = await import("node:fs");
       const path = await import("node:path");
       const mcpServerDir = path.resolve(

@@ -13,14 +13,15 @@ import {
   requestPathname,
 } from "@ee/sso/ssoPathGate";
 import { createLogger } from "@langwatch/observability";
+import { isRedisConfigured } from "@langwatch/redis-client";
 import { compare, hash } from "bcrypt";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { env } from "~/env.mjs";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
-import { connection as redisConnection } from "~/server/redis";
 import { fireActivityTrackingNurturing } from "../../../ee/billing/nurturing/hooks/activityTracking";
 import { ensureUserSyncedToCio } from "../../../ee/billing/nurturing/hooks/userSync";
 import { sendResetPasswordEmail } from "../mailer/resetPasswordEmail";
@@ -72,28 +73,59 @@ const plugins =
     : [];
 
 /**
- * Wire BetterAuth's secondary storage to the shared Redis connection.
- * Used by rate limiting (below) so limits are enforced across pods.
- * Falls back to in-memory when Redis isn't configured (build time, tests).
+ * Wire BetterAuth's secondary storage to the App's Redis connection. Used by
+ * rate limiting (below) so limits are enforced across pods.
+ *
+ * WHETHER to configure it is decided here, at module load, because
+ * `betterAuth()` below is itself constructed at module load and the choice
+ * changes its session strategy — a deployment with no Redis must get `undefined`
+ * and keep its sessions in the database. That decision is a pure question about
+ * *configuration*, so it is answered from env rather than from a live client
+ * (ADR-090); the client itself is resolved lazily, inside each callback.
+ *
+ * `BUILD_TIME` joins `SKIP_REDIS` in the skip signal: a build or a test run has
+ * env pointing at a Redis it must not adopt as a session store.
  */
-const secondaryStorage: BetterAuthOptions["secondaryStorage"] = redisConnection
-  ? {
-      get: async (key) => {
-        const value = await redisConnection!.get(`better-auth:${key}`);
-        return value;
-      },
-      set: async (key, value, ttl) => {
-        if (ttl) {
-          await redisConnection!.set(`better-auth:${key}`, value, "EX", ttl);
-        } else {
-          await redisConnection!.set(`better-auth:${key}`, value);
-        }
-      },
-      delete: async (key) => {
-        await redisConnection!.del(`better-auth:${key}`);
-      },
-    }
-  : undefined;
+const redisEnv = {
+  url: env.REDIS_URL,
+  clusterEndpoints: env.REDIS_CLUSTER_ENDPOINTS,
+  skip: env.SKIP_REDIS || !!process.env.BUILD_TIME,
+};
+
+/**
+ * The App's connection at the moment a storage callback runs.
+ *
+ * Null only where env advertises Redis but the App has none — a test app, or a
+ * callback firing before boot completes. Degrading to a cache miss there is
+ * right: better-auth re-reads from the database, whereas throwing would fail
+ * the request outright.
+ */
+const secondaryStorageConnection = () => getApp().redis;
+
+const secondaryStorage: BetterAuthOptions["secondaryStorage"] =
+  isRedisConfigured(redisEnv)
+    ? {
+        get: async (key) => {
+          const redis = secondaryStorageConnection();
+          if (!redis) return null;
+          return await redis.get(`better-auth:${key}`);
+        },
+        set: async (key, value, ttl) => {
+          const redis = secondaryStorageConnection();
+          if (!redis) return;
+          if (ttl) {
+            await redis.set(`better-auth:${key}`, value, "EX", ttl);
+          } else {
+            await redis.set(`better-auth:${key}`, value);
+          }
+        },
+        delete: async (key) => {
+          const redis = secondaryStorageConnection();
+          if (!redis) return;
+          await redis.del(`better-auth:${key}`);
+        },
+      }
+    : undefined;
 
 const isBuildTime = !!process.env.BUILD_TIME;
 

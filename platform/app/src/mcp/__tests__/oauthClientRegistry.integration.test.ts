@@ -10,23 +10,32 @@
  *
  * Spec: specs/mcp-server/mcp-in-app.feature
  */
+import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 
 import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { connection as redis } from "~/server/redis";
 
 import { getOAuthClient, registerOAuthClient } from "../oauthClientRegistry";
 
+/** The container's connection, handed to the test App the registry reads. */
+let redis: Redis | null = null;
+
 describe("OAuth client registry", () => {
   beforeAll(async () => {
-    await startTestContainers();
+    ({ redisConnection: redis } = await startTestContainers());
+    // The registry reads its connection off the App (ADR-090).
+    await resetApp();
+    globalForApp.__langwatch_app = createTestApp({ redis });
   }, 60_000);
 
   afterAll(async () => {
+    await resetApp();
     await stopTestContainers();
   }, 60_000);
 

@@ -1,5 +1,4 @@
 import { createEnvConfig } from "../../env-create.mjs";
-import { parseRedisDbIndex } from "../redis-db-index";
 
 export type ProcessRole = "web" | "worker" | "migration" | "all";
 
@@ -45,7 +44,8 @@ export interface AppConfig {
   clickhouseUrl?: string;
   redisUrl?: string;
   redisClusterEndpoints?: string;
-  redisDbIndex?: number;
+  /** Raw `REDIS_DB_INDEX`; `@langwatch/redis-client` validates and applies it. */
+  redisDbIndex?: string;
 
   // Services
   langevalsEndpoint?: string;
@@ -92,7 +92,7 @@ export function createAppConfigFromEnv(overrides?: {
     clickhouseUrl: env.CLICKHOUSE_URL,
     redisUrl: env.REDIS_URL,
     redisClusterEndpoints: env.REDIS_CLUSTER_ENDPOINTS,
-    redisDbIndex: parseRedisDbIndex(env.REDIS_DB_INDEX),
+    redisDbIndex: env.REDIS_DB_INDEX,
     langevalsEndpoint: env.LANGEVALS_ENDPOINT,
     baseHost: env.BASE_HOST,
     slackPlanLimitChannel: env.SLACK_PLAN_LIMIT_CHANNEL,

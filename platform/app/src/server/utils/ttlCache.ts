@@ -1,4 +1,4 @@
-import { isBuildOrNoRedis, connection as redisConnection } from "../redis";
+import { tryGetApp } from "../app-layer/app";
 
 type MemoryEntry<T> = { value: T; expiresAt: number };
 
@@ -24,9 +24,16 @@ export class TtlCache<T> {
     this.prefix = prefix;
   }
 
+  /**
+   * The App's connection, or null for the in-memory path.
+   *
+   * `tryGetApp` rather than `getApp` because falling back is this class's
+   * contract, not a failure: no Redis configured, and no App yet, both mean
+   * "cache in memory". Throwing here would turn the documented fallback into a
+   * crash for every caller constructed at module scope (ADR-090).
+   */
   private get redis() {
-    if (isBuildOrNoRedis || !redisConnection) return null;
-    return redisConnection;
+    return tryGetApp()?.redis ?? null;
   }
 
   async get(key: string): Promise<T | undefined> {

@@ -17,7 +17,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type * as ServerRedis from "~/server/redis";
+import type * as AppLayerApp from "~/server/app-layer/app";
 import { app } from "../misc";
 
 const PROJECT_ID = "project_1";
@@ -67,9 +67,9 @@ vi.mock("~/server/auth", () => ({
   getServerAuthSession: vi.fn().mockResolvedValue(SESSION),
 }));
 vi.mock("~/server/db", () => ({ prisma: mockPrisma }));
-vi.mock("~/server/redis", async (importOriginal) => {
-  const actual = await importOriginal<typeof ServerRedis>();
-  return { ...actual, connection: mockRedis };
+vi.mock("~/server/app-layer/app", async (importOriginal) => {
+  const actual = await importOriginal<typeof AppLayerApp>();
+  return { ...actual, getApp: () => ({ redis: mockRedis }) };
 });
 vi.mock("~/utils/encryption", () => ({
   encrypt: (text: string) => `encrypted:${text}`,

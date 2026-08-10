@@ -1,15 +1,16 @@
 /**
  * Public surface of the observability module — singletons that lazily
- * initialise from the global Redis connection so callers in hot paths
+ * initialise from the App's Redis connection so callers in hot paths
  * (GroupQueue producer) don't pay an import cost per invocation and
  * don't need to thread Redis through DI.
  */
-import { connection } from "../redis";
+import { getApp } from "../app-layer/app";
 import { TenantRateTracker } from "./tenantRateTracker";
 
 let _tenantRateTracker: TenantRateTracker | null = null;
 
 export function getTenantRateTracker(): TenantRateTracker | null {
+  const connection = getApp().redis;
   if (!connection) return null;
   if (!_tenantRateTracker) {
     _tenantRateTracker = new TenantRateTracker(connection);

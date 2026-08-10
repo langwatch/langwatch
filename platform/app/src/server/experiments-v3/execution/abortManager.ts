@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { connection } from "~/server/redis";
+import { getApp } from "~/server/app-layer/app";
 
 const logger = createLogger("experiments-v3:abort-manager");
 
@@ -22,6 +22,7 @@ export const abortManager = {
    * Set the abort flag for a run, requesting it to stop.
    */
   async requestAbort(runId: string): Promise<void> {
+    const connection = getApp().redis;
     if (!connection) {
       logger.warn({ runId }, "Redis not available, abort request ignored");
       return;
@@ -37,6 +38,7 @@ export const abortManager = {
    * Returns true if the run should stop.
    */
   async isAborted(runId: string): Promise<boolean> {
+    const connection = getApp().redis;
     if (!connection) {
       return false;
     }
@@ -57,6 +59,7 @@ export const abortManager = {
    * Clear the abort flag for a run (cleanup after execution completes).
    */
   async clearAbort(runId: string): Promise<void> {
+    const connection = getApp().redis;
     if (!connection) {
       return;
     }
@@ -75,6 +78,7 @@ export const abortManager = {
    * stays available for listing active executions.
    */
   async setRunning(runId: string, projectId: string): Promise<void> {
+    const connection = getApp().redis;
     if (!connection) {
       return;
     }
@@ -95,6 +99,7 @@ export const abortManager = {
    * SSE path never creates.
    */
   async getRunningProjectId(runId: string): Promise<string | null> {
+    const connection = getApp().redis;
     if (!connection) {
       return null;
     }
@@ -117,6 +122,7 @@ export const abortManager = {
    * Clear the running flag (cleanup after execution completes).
    */
   async clearRunning(runId: string): Promise<void> {
+    const connection = getApp().redis;
     if (!connection) {
       return;
     }

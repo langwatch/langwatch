@@ -23,7 +23,7 @@ import { createLogger } from "@langwatch/observability";
  * Spec: specs/ai-governance/sessions/sessions-inventory.feature
  */
 import type { Cluster, Redis } from "ioredis";
-import { connection as defaultRedisConnection } from "~/server/redis";
+import { getApp } from "~/server/app-layer/app";
 
 import { CliTokenRevocationService } from "./cliTokenRevocation.service";
 
@@ -74,12 +74,20 @@ interface AccessOrRefreshRecord {
 }
 
 export class CliSessionInventoryService {
-  constructor(private readonly redis: RedisLike | undefined) {}
+  constructor(private readonly injectedRedis?: RedisLike | undefined) {}
 
-  static create(
-    redis: RedisLike | undefined = defaultRedisConnection,
-  ): CliSessionInventoryService {
+  /**
+   * Builds the service. Takes a connection when the caller has one; otherwise
+   * the App's is resolved when a read actually runs, so constructing this
+   * never demands an App (ADR-090).
+   */
+  static create(redis?: RedisLike | undefined): CliSessionInventoryService {
     return new CliSessionInventoryService(redis);
+  }
+
+  /** The injected connection, else the App's, resolved at the point of use. */
+  private get redis(): RedisLike | undefined {
+    return this.injectedRedis ?? getApp().redis ?? void 0;
   }
 
   async listForUser({ userId }: { userId: string }): Promise<CliSession[]> {

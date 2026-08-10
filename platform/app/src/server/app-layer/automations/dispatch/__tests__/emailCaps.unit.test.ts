@@ -5,12 +5,15 @@ import {
   consumeTenantEmailCapSlot,
 } from "../emailCaps";
 
-// `connection` is a mutable module-level binding; the mock lets each test
-// drive it (undefined = in-memory path, an object = Redis path).
+// The cap functions read their connection off the App when the caller does not
+// pass one. Mocking `getApp` to read a mutable holder lets each test drive the
+// path it wants (undefined = in-memory, an object = Redis).
 const redisMock = vi.hoisted(() => ({
   connection: undefined as unknown,
 }));
-vi.mock("~/server/redis", () => redisMock);
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({ redis: redisMock.connection ?? null }),
+}));
 
 // Stable singleton logger so a test can spy the SAME `error` fn the module
 // captured at import time (`const logger = createLogger(...)` runs once).
@@ -24,8 +27,8 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => loggerMock,
 }));
 
-// Redis `connection` is undefined under vitest (BUILD_TIME set in
-// vitest.config.ts), so these exercise the in-memory fallback path.
+// The holder starts empty, so a test that does not set it exercises the
+// in-memory fallback path.
 
 const PROJECT_ID = "proj-1";
 const TRIGGER_ID = "trig-1";

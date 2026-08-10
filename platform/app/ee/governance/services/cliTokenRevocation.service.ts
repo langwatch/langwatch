@@ -2,7 +2,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
-import { connection as defaultRedisConnection } from "~/server/redis";
+import { getApp } from "~/server/app-layer/app";
 
 const logger = createLogger("langwatch:cli-token-revocation");
 
@@ -35,12 +35,21 @@ type RedisLike = Redis | Cluster;
  * `auth-cli.ts:347-348`.
  */
 export class CliTokenRevocationService {
-  constructor(private readonly redis: RedisLike | undefined) {}
+  constructor(private readonly injectedRedis?: RedisLike | undefined) {}
 
-  static create(
-    redis: RedisLike | undefined = defaultRedisConnection,
-  ): CliTokenRevocationService {
+  /**
+   * Builds the service. Takes a connection when the caller has one; otherwise
+   * the App's is resolved when a revocation actually runs, not here —
+   * constructing this must stay free, because `UserService` builds one as a
+   * default parameter and would otherwise demand an App just to exist.
+   */
+  static create(redis?: RedisLike | undefined): CliTokenRevocationService {
     return new CliTokenRevocationService(redis);
+  }
+
+  /** The injected connection, else the App's, resolved at the point of use. */
+  private get redis(): RedisLike | undefined {
+    return this.injectedRedis ?? getApp().redis ?? void 0;
   }
 
   static userTokensIndexKey(userId: string): string {

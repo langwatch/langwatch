@@ -99,6 +99,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/react-rum": "workspace:*",
     "@langwatch/redaction": "workspace:*",
+    "@langwatch/redis-client": "workspace:*",
     "@langwatch/scenario": "file:vendor/langwatch-scenario-1.1.0.tgz",
     "@langwatch/ssrf": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",

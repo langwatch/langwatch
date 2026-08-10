@@ -1,13 +1,24 @@
 import { PlanTypes } from "@ee/billing/planTypes";
 import type { PlanInfo } from "@ee/licensing/planInfo";
 import { createLogger } from "@langwatch/observability";
+import type { RedisConnection } from "@langwatch/redis-client";
 import { env } from "~/env.mjs";
 import { getApp } from "~/server/app-layer/app";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
-import { connection } from "~/server/redis";
 import { TtlCache } from "~/server/utils/ttlCache";
 
 const logger = createLogger("langwatch:automations:persist-cap");
+
+/**
+ * Resolves the connection a cap operation should use.
+ *
+ * Omitting `redis` takes the App's; passing `null` explicitly forces the
+ * in-memory path. A default parameter can't tell "not passed" from "passed
+ * undefined", so the sentinel is how a caller opts out (ADR-090).
+ */
+function resolveRedis(redis: RedisConnection | null | undefined) {
+  return redis === void 0 ? getApp().redis : redis;
+}
 
 const DAY_MS = 86_400_000;
 
@@ -253,6 +264,7 @@ export async function consumePersistCapSlot({
   now,
   cap,
   dedupKey,
+  redis,
 }: {
   projectId: string;
   triggerId: string;
@@ -264,6 +276,8 @@ export async function consumePersistCapSlot({
    * consume a second slot.
    */
   dedupKey: string;
+  /** Omit for the App's connection; pass `null` to force the in-memory path. */
+  redis?: RedisConnection | null;
 }): Promise<PersistCapDecision> {
   const key = persistCapKey({ projectId, triggerId, now });
   const claimKey = persistCapClaimKey({ projectId, triggerId, dedupKey });
@@ -274,7 +288,11 @@ export async function consumePersistCapSlot({
     skipped: Math.max(0, count - cap),
   });
 
-  const viaRedis = await countViaRedis({ key, claimKey });
+  const viaRedis = await countViaRedis({
+    key,
+    claimKey,
+    connection: resolveRedis(redis),
+  });
   if (viaRedis !== null) return decide(viaRedis);
   return decide(countInMemory({ key, claimKey, nowMs: now.getTime() }));
 }
@@ -317,9 +335,11 @@ return count
 async function countViaRedis({
   key,
   claimKey,
+  connection,
 }: {
   key: string;
   claimKey: string;
+  connection: RedisConnection | null;
 }): Promise<number | null> {
   if (!connection) return null;
   try {
@@ -404,11 +424,14 @@ export async function readPersistCapCounts({
   triggerIds,
   now,
   cap,
+  redis: redisOverride,
 }: {
   projectId: string;
   triggerIds: readonly string[];
   now: Date;
   cap: number;
+  /** Omit for the App's connection; pass `null` to force the in-memory path. */
+  redis?: RedisConnection | null;
 }): Promise<Record<string, { count: number; skipped: number }>> {
   const counts: Record<string, { count: number; skipped: number }> = {};
   if (triggerIds.length === 0) return counts;
@@ -417,7 +440,7 @@ export async function readPersistCapCounts({
     persistCapKey({ projectId, triggerId, now }),
   );
   let raw: (string | null)[] = keys.map(() => null);
-  const redis = connection;
+  const redis = resolveRedis(redisOverride);
   if (redis) {
     try {
       // One GET per key, not one MGET: every trigger's key carries its own

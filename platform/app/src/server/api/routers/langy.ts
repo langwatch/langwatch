@@ -31,7 +31,6 @@ import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/lang
 import type { Session } from "~/server/auth";
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
 import { trackServerEvent } from "~/server/posthog";
-import { connection } from "~/server/redis";
 import { checkProjectPermission, type Permission } from "../rbac";
 import {
   type LangyConversationDetailDto,
@@ -202,6 +201,7 @@ async function canWatchTurn({
   turnId: string;
   userId: string;
 }): Promise<boolean> {
+  const connection = getApp().redis;
   if (connection) {
     const access = createLangyTurnAccessStore({ redis: connection });
     if (
@@ -923,6 +923,7 @@ export const langyRouter = createTRPCRouter({
       }
       // No Redis ⇒ no live buffer; the client falls back to the Postgres
       // conversation/message query.
+      const connection = getApp().redis;
       if (!connection) return;
 
       const blocking = connection.duplicate();

@@ -1,4 +1,4 @@
-import IORedis from "ioredis";
+import { createRedisConnection } from "@langwatch/redis-client";
 import { getApp } from "../../app-layer/app";
 import { EvaluationRunClickHouseRepository } from "../../app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
 import { TraceSummaryClickHouseRepository } from "../../app-layer/traces/repositories/trace-summary.clickhouse.repository";
@@ -59,7 +59,16 @@ const STORELESS_REPLAYABLE = new Set(["metric_processing", "log_processing"]);
 export function createReplayRuntime(config: {
   redisUrl: string;
 }): ReplayRuntime {
-  const redis = new IORedis(config.redisUrl, { maxRetriesPerRequest: null });
+  // Replay runs its own connection rather than the App's on purpose: a full
+  // rebuild should not share a socket with live traffic. It is still built by
+  // the client package, so a `rediss://` target gets TLS and the dev database
+  // index applies — building it by hand here silently dropped both (ADR-090).
+  const redis = createRedisConnection({ env: { url: config.redisUrl } });
+  if (!redis) {
+    throw new Error(
+      "Replay requires a Redis URL — none was resolved from the supplied config.",
+    );
+  }
 
   const clientResolver = getApp().clickhouse.resolveClient;
 

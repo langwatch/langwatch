@@ -1,0 +1,30 @@
+{
+  "name": "@langwatch/redis-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The shared Redis client contract: configuration resolved from a supplied environment, standalone and cluster connection construction with TLS and database-index handling, and a readiness probe the caller owns - with no connection opened as an import side effect.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "ioredis": "5.10.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vitest": "^4.1.9"
+  }
+}

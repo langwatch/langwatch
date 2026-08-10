@@ -4,10 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "~/generated/prisma/client";
 import { ScimService } from "../scim.service";
 
-// Mock the redis connection so the revoke helper used by deactivate()
-// (transitively reachable from SCIM deactivation paths) doesn't try to
-// talk to a real Redis from a unit test.
-vi.mock("~/server/redis", () => ({ connection: undefined }));
+// An App carrying no Redis, so the revoke helper reachable from the SCIM
+// deactivation paths takes its Postgres-only path instead of talking to a real
+// Redis from a unit test.
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({ redis: null }),
+}));
 
 function createMockPrisma() {
   const roleBinding = {

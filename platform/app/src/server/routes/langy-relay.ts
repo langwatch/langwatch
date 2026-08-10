@@ -30,7 +30,6 @@ import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langy
 import { createLangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import { LangyTurnRelay } from "~/server/app-layer/langy/streaming/langyTurnRelay";
 import { getLangyRelayFramesCounter } from "~/server/metrics";
-import { connection } from "~/server/redis";
 import { verifyLangyInternalSecret } from "./langy-internal";
 
 const logger = createLogger("langwatch:langy:relay");
@@ -61,6 +60,7 @@ interface RelayTally {
 secured.access(relayPolicy()).post("/relay/frames", async (c) => {
   // No Redis ⇒ no live buffer and no dedup set; refuse rather than silently
   // dropping the turn's live edge.
+  const connection = getApp().redis;
   if (!connection) {
     logger.error("relay called with no Redis connection");
     return c.json({ error: "streaming unavailable" }, 503);

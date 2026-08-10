@@ -16,9 +16,11 @@ vi.mock("../../../../../ee/admin/isAdmin", () => ({
   ),
 }));
 
-// Mock the redis connection so the revoke helper called by
-// UserService.deactivate doesn't try to talk to a real Redis from a unit test.
-vi.mock("~/server/redis", () => ({ connection: undefined }));
+// An App carrying no Redis, so the revoke helper UserService.deactivate calls
+// takes its Postgres-only path instead of talking to a real Redis.
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({ redis: null }),
+}));
 
 vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();

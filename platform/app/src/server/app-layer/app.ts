@@ -69,6 +69,12 @@ export class App {
   readonly gateway: AppDependencies["gateway"];
   readonly filters: AppDependencies["filters"];
   readonly clickhouse: AppDependencies["clickhouse"];
+  /**
+   * The process's one Redis connection, or `null` when none is configured.
+   * See {@link AppDependencies.redis} — inject where you can, read it here
+   * inside the handler where you cannot.
+   */
+  readonly redis: AppDependencies["redis"];
   readonly billing: AppDependencies["billing"];
   readonly usageStats: AppDependencies["usageStats"];
   readonly scenarios: AppDependencies["scenarios"];
@@ -148,6 +154,7 @@ export class App {
     this.gateway = deps.gateway;
     this.filters = deps.filters;
     this.clickhouse = deps.clickhouse;
+    this.redis = deps.redis;
     this.billing = deps.billing;
     this.usageStats = deps.usageStats;
     this.scenarios = deps.scenarios;
@@ -268,6 +275,27 @@ export function getApp(): App {
   if (!globalForApp.__langwatch_app) {
     throw new Error("App not initialized. Call initializeDefaultApp() first.");
   }
+  return globalForApp.__langwatch_app;
+}
+
+/**
+ * The App if one has been initialized, otherwise `null`.
+ *
+ * **Prefer {@link getApp}.** A path that needs the App and cannot run without
+ * it should fail loudly, not read `null` and quietly take a lesser branch.
+ *
+ * This exists for the few consumers whose *documented contract* is to degrade
+ * when there is nothing to reach — `TtlCache`, which is specified as
+ * "Redis available: shared across pods; no Redis configured: in-memory only".
+ * Those are constructed at module scope and used from paths that may run
+ * before, or entirely without, a composition root; throwing there would turn a
+ * working fallback into a crash.
+ *
+ * Reach for this only when absence is a supported outcome you can name, and
+ * never as a way to avoid initializing an App. Nothing outside this module
+ * should read {@link globalForApp} directly.
+ */
+export function tryGetApp(): App | null {
   return globalForApp.__langwatch_app;
 }
 

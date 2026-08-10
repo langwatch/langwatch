@@ -97,8 +97,11 @@ export default defineConfig({
     ],
     env: {
       /*
-       * @see src/server/redis.ts, lines 8-11
-       * This is to prevent the redis connection from being established during the test run.
+       * Marks the run as non-production for the code that still asks. Since
+       * ADR-090 nothing opens a Redis connection at import, so this no longer
+       * has to hold the connection back — a test that wants one builds it or
+       * injects it, and better-auth reads it as a skip signal for its
+       * secondary-storage decision.
        */
       BUILD_TIME: "1",
       // Skip t3-oss/env-nextjs validation - it throws when server env vars are

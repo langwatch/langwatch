@@ -9,10 +9,10 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Force memory-only mode (no Redis) so tests are deterministic.
-vi.mock("../../redis", () => ({
-  isBuildOrNoRedis: true,
-  connection: null,
+// No App, so the cache runs memory-only and these tests stay deterministic —
+// the fallback TtlCache is specified to take (ADR-090).
+vi.mock("~/server/app-layer/app", () => ({
+  tryGetApp: () => null,
 }));
 
 import { StaleWhileRevalidateCache } from "../staleWhileRevalidateCache.redis";

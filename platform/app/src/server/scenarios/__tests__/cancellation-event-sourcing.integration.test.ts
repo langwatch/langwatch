@@ -20,15 +20,18 @@ import {
   vi,
 } from "vitest";
 
-// Mock the Redis module so startScenarioProcessor uses the test Redis connection.
-// The getter is wired in beforeAll after testContainers starts.
+// `startScenarioProcessor` takes its connection off the App. Partial-mock the
+// App module — the rest of it is real — and serve the container's connection,
+// which beforeAll assigns once testContainers has started.
 let _testRedis: any = null;
-vi.mock("~/server/redis", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("~/server/redis")>()),
-  get connection() {
-    return _testRedis;
-  },
-}));
+vi.mock("~/server/app-layer/app", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("~/server/app-layer/app")>();
+  return {
+    ...actual,
+    getApp: () => ({ ...actual.getApp(), redis: _testRedis }),
+  };
+});
 
 import type { Redis } from "ioredis";
 import {

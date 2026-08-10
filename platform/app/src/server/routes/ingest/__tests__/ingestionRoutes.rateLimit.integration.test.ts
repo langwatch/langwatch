@@ -20,16 +20,26 @@
  *
  * Spec: specs/ai-gateway/governance/receiver-auth-rate-limit.feature
  */
+import {
+  createRedisConnection,
+  type RedisConnection,
+} from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-
-import { connection as redisConnection } from "~/server/redis";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 
 import {
   checkIpRateLimit,
   ipRateLimitKey,
   isRateLimitDisabled,
 } from "../rateLimit";
+
+/**
+ * Most calls below omit `redis` and so take the App's — which is the path
+ * production runs, so the App is the right place to put the connection.
+ */
+let redisConnection: RedisConnection | null = null;
 
 const ns = `rl-${nanoid(8)}`;
 
@@ -42,9 +52,18 @@ const ORIGINAL_DISABLED = process.env.LW_INGEST_RATE_LIMIT_DISABLED;
 process.env.LW_INGEST_RATE_LIMIT_DISABLED = "0";
 
 beforeAll(async () => {
+  redisConnection = createRedisConnection({
+    env: {
+      url: process.env.REDIS_URL,
+      clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
+      dbIndex: process.env.REDIS_DB_INDEX,
+    },
+  });
   if (!redisConnection) {
     throw new Error("Redis connection unavailable in test env");
   }
+  await resetApp();
+  globalForApp.__langwatch_app = createTestApp({ redis: redisConnection });
 });
 
 afterAll(async () => {
@@ -53,6 +72,8 @@ afterAll(async () => {
   } else {
     process.env.LW_INGEST_RATE_LIMIT_DISABLED = ORIGINAL_DISABLED;
   }
+  await resetApp();
+  redisConnection?.disconnect();
 });
 
 afterEach(async () => {

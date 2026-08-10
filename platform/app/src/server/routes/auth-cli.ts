@@ -61,7 +61,6 @@ import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
-import { connection as redisConnection } from "~/server/redis";
 
 const logger = createLogger("langwatch:auth-cli");
 
@@ -335,6 +334,7 @@ function pollRateKey(deviceCode: string): string {
 }
 
 function getRedis() {
+  const redisConnection = getApp().redis;
   if (!redisConnection) {
     throw new Error(
       "Redis connection unavailable — CLI auth requires Redis to be configured (REDIS_URL / REDIS_CLUSTER_ENDPOINTS).",

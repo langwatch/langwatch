@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { connection } from "~/server/redis";
+import { getApp } from "~/server/app-layer/app";
 
 const logger = createLogger("langwatch:scenario-tab-registry");
 
@@ -113,6 +113,7 @@ export const scenarioTabRegistry = {
   }): Promise<void> {
     const key = tabSetKey(projectId, tabKey);
 
+    const connection = getApp().redis;
     if (!connection) {
       const entry = memoryEntry(key);
       entry.set(tabId, now);
@@ -153,6 +154,7 @@ export const scenarioTabRegistry = {
       now -
       (SCENARIO_TAB_TTL_SECONDS - SCENARIO_TAB_DISCONNECT_GRACE_SECONDS) * 1000;
 
+    const connection = getApp().redis;
     if (!connection) {
       const entry = memoryTabs.get(key);
       const current = entry?.get(tabId);
@@ -187,6 +189,7 @@ export const scenarioTabRegistry = {
     const key = tabSetKey(projectId, tabKey);
     const cutoff = now - SCENARIO_TAB_TTL_SECONDS * 1000;
 
+    const connection = getApp().redis;
     if (!connection) {
       const entry = memoryTabs.get(key);
       if (!entry) return false;
@@ -223,6 +226,7 @@ export const scenarioTabRegistry = {
   }): Promise<void> {
     const key = scenarioTabPendingKey(projectId, tabKey);
 
+    const connection = getApp().redis;
     if (!connection) {
       prunePendingMemory(now);
       memoryPending.set(key, {
@@ -254,6 +258,7 @@ export const scenarioTabRegistry = {
   }): Promise<string | null> {
     const key = scenarioTabPendingKey(projectId, tabKey);
 
+    const connection = getApp().redis;
     if (!connection) {
       const entry = memoryPending.get(key);
       memoryPending.delete(key);

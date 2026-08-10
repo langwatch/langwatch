@@ -82,6 +82,7 @@ import {
   initializeInProcessApp,
   initializeWebApp,
 } from "./server/app-layer/presets";
+import { assertRedisReady } from "./server/app-layer/redis-readiness";
 import { assetBaseOrigin, getAssetBase } from "./server/asset-base";
 import {
   getWorkerMetricsPort,
@@ -90,7 +91,6 @@ import {
 } from "./server/metrics";
 import { canonicalOtlpPath } from "./server/otel/otlpPathCanonicalisation";
 import { shutdownPostHog } from "./server/posthog";
-import { verifyRedisReady } from "./server/redis";
 import { buildSecurityHeaders } from "./server/securityHeaders";
 import { SHUTDOWN_BUDGET } from "./server/shutdown/budget";
 import { installShutdownHandlers } from "./server/shutdown/runGracefulShutdown";
@@ -164,7 +164,15 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
   // Fail fast if Redis is unreachable — better-auth uses it as secondary
   // session store, and without it every request ends in a "Redirecting to
   // Sign in…" loop with no actionable error for the developer.
-  await verifyRedisReady();
+  //
+  // Exiting is this caller's decision, not the probe's: the web server owns the
+  // process, and one that cannot reach Redis has nothing to serve. The probe
+  // has already logged what and where (ADR-090).
+  try {
+    await assertRedisReady();
+  } catch {
+    process.exit(1);
+  }
 
   // Partial-config assertion on LW_VIRTUAL_KEY_PEPPER /
   // LW_GATEWAY_INTERNAL_SECRET / LW_GATEWAY_JWT_SECRET now lives in

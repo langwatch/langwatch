@@ -81,7 +81,6 @@ import {
 } from "~/server/modelProviders/llmModelCost";
 import { getPostHogInstance } from "~/server/posthog";
 import { rateLimit } from "~/server/rateLimit";
-import { connection as redis } from "~/server/redis";
 import {
   estimateCost,
   matchModelCostWithFallbacks,
@@ -944,6 +943,7 @@ secured
 
     const code = randomUUID();
 
+    const redis = getApp().redis;
     if (!redis) {
       const description = "Authorization is temporarily unavailable";
       return c.json(
