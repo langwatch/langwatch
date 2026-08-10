@@ -543,9 +543,16 @@ describe("classifyClickHouseError", () => {
         ).toBe(ErrorCategory.RECOVERABLE);
       });
 
+      // Both message forms, because they come from different layers: "socket
+      // hang up" is Node's http module, "other side closed" is undici's.
+      // Either is all that survives an error that crossed a worker or
+      // serialisation boundary and lost its errno.
       /** @scenario A socket failure that survived only as a message is still recoverable */
-      it("returns RECOVERABLE for a bare 'socket hang up' with no code", () => {
-        expect(classifyClickHouseError(new Error("socket hang up"))).toBe(
+      it.each([
+        "socket hang up",
+        "other side closed",
+      ])("returns RECOVERABLE for a bare %j message with no code", (message) => {
+        expect(classifyClickHouseError(new Error(message))).toBe(
           ErrorCategory.RECOVERABLE,
         );
       });

@@ -23,10 +23,13 @@ type SettleOutcome =
  * its resources are free, while a task that timed out is still running. Both
  * arriving as a thrown error is what made the caller treat them alike.
  */
-async function settleWithTimeout(
-  run: () => Promise<void>,
-  timeoutMs: number,
-): Promise<SettleOutcome> {
+async function settleWithTimeout({
+  run,
+  timeoutMs,
+}: {
+  run: () => Promise<void>;
+  timeoutMs: number;
+}): Promise<SettleOutcome> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<SettleOutcome>((resolve) => {
     timer = setTimeout(() => resolve({ status: "timeout" }), timeoutMs);
@@ -188,10 +191,10 @@ export class App {
   async close(): Promise<void> {
     if (this._eventSourcing) {
       const eventSourcing = this._eventSourcing;
-      const outcome = await settleWithTimeout(
-        () => eventSourcing.close(),
-        SHUTDOWN_BUDGET.appCloseMs,
-      );
+      const outcome = await settleWithTimeout({
+        run: () => eventSourcing.close(),
+        timeoutMs: SHUTDOWN_BUDGET.appCloseMs,
+      });
 
       if (outcome.status === "timeout") {
         // Still running. Closing the transports now would sever exactly the
