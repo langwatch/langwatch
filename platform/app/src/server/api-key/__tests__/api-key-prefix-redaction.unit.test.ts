@@ -26,7 +26,7 @@ describe("the redaction rules, given the API key prefixes the app mints", () => 
   ];
 
   describe("given a token minted by the real generator", () => {
-    /** @scenario "A key minted by LangWatch is redacted on its prefix alone" */
+    /** @scenario "A key minted by LangWatch is redacted on its prefix" */
     it.each(prefixes)("redacts a %s", (_label, prefix) => {
       const { token } = generateApiKeyToken({ prefix });
       const { text, redactedCount } = redactSecretsInText({

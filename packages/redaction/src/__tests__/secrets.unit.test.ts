@@ -98,11 +98,23 @@ describe("redactSecretsInText", () => {
   });
 
   describe("given an input larger than the scan budget", () => {
-    it("returns it untouched", () => {
+    // Returning it untouched was a bypass, not a budget: anything past the
+    // limit was a reliable way to carry a live key through ingestion unscanned.
+    /** @scenario "A payload past the scan budget is still scanned" */
+    it("slices it and still redacts the key inside", () => {
       const input = "AKIAIOSFODNN7EXAMPLE " + "x".repeat(250_001);
       const { text, redactedCount } = redact(input);
-      expect(text).toBe(input);
-      expect(redactedCount).toBe(0);
+      expect(text).not.toContain("AKIAIOSFODNN7EXAMPLE");
+      expect(redactedCount).toBe(1);
+      expect(text).toHaveLength(input.length - "AKIAIOSFODNN7EXAMPLE".length + "[SECRET]".length);
+    });
+
+    it("finds a key that sits past the first slice boundary", () => {
+      const input = "x".repeat(260_000) + " AKIAIOSFODNN7EXAMPLE tail";
+      const { text, redactedCount } = redact(input);
+      expect(text).not.toContain("AKIAIOSFODNN7EXAMPLE");
+      expect(redactedCount).toBe(1);
+      expect(text.endsWith(" [SECRET] tail")).toBe(true);
     });
   });
 
@@ -218,7 +230,7 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
       ["a short legacy token", "pat-lw-123af"],
     ];
 
-    /** @scenario "A key minted by LangWatch is redacted on its prefix alone" */
+    /** @scenario "A key minted by LangWatch is redacted on its prefix" */
     it("redacts every one of them, however short the body", () => {
       const survived = ownKeys.filter(
         ([, key]) => redact(key).redactedCount === 0,
@@ -240,6 +252,21 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
       const commit = "commit_key_51d07b547d0a8f3e2c1b9d4a6e7f8091a2b3c4d5";
       expect(redact(commit).text).toBe(commit);
       expect(redact(`trace_token_${HEX}aabbccdd`).redactedCount).toBe(0);
+    });
+  });
+
+  describe("given a key whose body is standard base64", () => {
+    // `+` and `/` landing early in the body used to cut the match short of the
+    // length floor, so the key was missed. Measured at a 57% miss rate for
+    // standard-base64 bodies against 0.5% for base64url.
+    /** @scenario "A key with a standard base64 body is redacted" */
+    it("redacts it the same as a base64url body", () => {
+      expect(redact("acme_aB3dEf+gHi/jKlMnOpQrStUvWx0123456789xY").text).toBe(
+        "[SECRET]",
+      );
+      expect(redact("acme_aB+dEf/gHi+jKlMnOpQrStUvWx0123456789xY").text).toBe(
+        "[SECRET]",
+      );
     });
   });
 
@@ -270,8 +297,8 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
   describe("given a credential named in prose and then given a value", () => {
     /** @scenario "A credential introduced by name in free text is redacted" */
     it("redacts the value and leaves the words that introduce it", () => {
-      const { text } = redact("my api key is h9Kd2Lm4Nq7Pr1Ts5Vw8Xz3");
-      expect(text).toBe("my api key is [SECRET]");
+      const { text } = redact("my api key: h9Kd2Lm4Nq7Pr1Ts5Vw8Xz3");
+      expect(text).toBe("my api key: [SECRET]");
     });
 
     it("redacts a value whose shape alone gives nothing away", () => {
@@ -437,6 +464,30 @@ describe("redactSecretsInText, given text that only looks like secrets", () => {
     ],
     ["a transcript tag", "<task-notification> and <task-progress>"],
     ["package versions", "@langwatch/web@3.12.0 and pnpm@10.4.1"],
+    // Record ids. `prefix_<random body>` is how this product and the APIs it
+    // talks to mint an id, which is the shape a key is minted in and carries
+    // the same entropy, so the prefix is the only thing telling them apart. A
+    // sweep of real traces found every one of these being eaten.
+    ["a project id", `project_${BODY.slice(0, 29)}`],
+    ["a card id", `card_${BODY.slice(0, 29)}`],
+    ["a scenario id", `scenario_${BODY.slice(0, 29)}`],
+    ["a langy conversation id", `langyconv_${BODY.slice(0, 29)}`],
+    ["a provider id", `provider_${BODY.slice(0, 29)}`],
+    ["an OpenAI completion id", `chatcmpl-${BODY.slice(0, 29)}`],
+    ["an Anthropic tool use id", `toolu_${BODY.slice(0, 29)}`],
+    ["a thread id", `thread_${BODY.slice(0, 29)}`],
+    ["a run id", `run_${BODY.slice(0, 29)}`],
+    ["an assistant id", `asst_${BODY.slice(0, 29)}`],
+    // Prose. `key is ...` used to be read as a cue, which made these two
+    // ordinary sentences lose everything after the credential word.
+    [
+      "prose about a digest of a key",
+      "a bare digest of an API key is offline-checkable against a list",
+    ],
+    [
+      "prose about an authorization header",
+      "the Authorization header is attacker-controlled and can be killed",
+    ],
   ];
 
   /** @scenario "Ordinary identifiers are never mistaken for secrets" */

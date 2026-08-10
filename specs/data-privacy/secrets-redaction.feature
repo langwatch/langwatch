@@ -112,6 +112,18 @@ Feature: Redacting secrets from traces
     When the text is redacted
     Then the scan completes well inside the ingestion budget
 
+  # Text past the scan budget used to be returned untouched, which was a bypass
+  # rather than a budget: a real agent input of nearly a megabyte carried a live
+  # provider key through ingestion completely unscanned, and being oversized was
+  # a reliable way to smuggle one past redaction. It is sliced now, so the cost
+  # per pass stays bounded and no region goes unscanned.
+
+  @unit
+  Scenario: A payload past the scan budget is still scanned
+    Given a payload larger than the scan budget with a credential inside it
+    When the text is redacted
+    Then the credential is replaced wherever in the payload it sits
+
   # The other half of the same design flaw.
   #
   # When the built-in rules were narrow, teams wrote their own patterns to cover
@@ -140,21 +152,21 @@ Feature: Redacting secrets from traces
 
   # Three shapes the matching layers missed. Our own `ik-lw-` ingest keys were
   # covered by nothing at all and `sk-lw-` only once the body reached the
-  # generic rule's length floor, so both are known prefixes now and match
-  # however short the body is. An all-hex body was refused by the
-  # character-mix gate, which is right for a bare hex run (a commit, a trace id
-  # and a digest are the same shape) and wrong when the token names itself a
-  # credential, so a hex body is accepted only behind a credential segment and
-  # never behind an identifier prefix. And the shape rule read lowercase
+  # generic rule's 20-character floor, so both are known prefixes now and match
+  # on the prefix plus three body characters rather than a full-length body. An
+  # all-hex body was refused by the character-mix gate, which is right for a
+  # bare hex run (a commit, a trace id and a digest are the same shape) and
+  # wrong when the token names itself a credential, so a hex body is accepted
+  # only behind a credential segment and never behind an identifier prefix. And the shape rule read lowercase
   # prefixes only, which missed every vendor minting `LW_`-style keys; the
   # entropy and character-mix gates are what keep a bare environment variable
   # name readable.
 
   @unit
-  Scenario: A key minted by LangWatch is redacted on its prefix alone
+  Scenario: A key minted by LangWatch is redacted on its prefix
     Given a token carrying one of the prefixes the app mints
     When the text is redacted
-    Then the token is redacted however short its body
+    Then the token is redacted without needing a full-length body
 
   @unit
   Scenario: A vendor-prefixed key with an all-hex body is redacted
@@ -167,6 +179,12 @@ Feature: Redacting secrets from traces
     Given a commit or trace identifier with an all-hex body
     When the text is redacted
     Then the identifier is left as written
+
+  @unit
+  Scenario: A key with a standard base64 body is redacted
+    Given a prefixed key whose body uses standard base64 rather than base64url
+    When the text is redacted
+    Then the key is redacted
 
   @unit
   Scenario: A key with an upper or mixed case prefix is redacted

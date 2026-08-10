@@ -128,9 +128,12 @@ const VENDOR_KEY_PATTERNS = [
   // LangWatch's own API, ingest and legacy personal-access tokens, minted as
   // `{prefix}{lookupId}_{secret}` by
   // platform/app/src/server/api-key/api-key-token.utils.ts. Matched on the
-  // prefix alone, like every other known vendor, so a truncated or
-  // short-bodied one still redacts: `sk-lw-` would otherwise reach only the
-  // generic `sk-` rule and its 20-character floor, and `ik-lw-` nothing at all.
+  // prefix plus three body characters, like every other known vendor, so a
+  // truncated or short-bodied one still redacts: `sk-lw-` would otherwise reach
+  // only the generic `sk-` rule and its 20-character floor, and `ik-lw-`
+  // nothing at all. The three-character floor is what keeps the bare prefix,
+  // which documentation and error messages print on its own, from reading as a
+  // key.
   // The prefixes are duplicated rather than imported because this package is
   // shared with the SDK and stays dependency-free; a test pins them to the
   // constants so the two cannot drift.
@@ -197,6 +200,14 @@ const SHAPED_TOKEN_MIN_ENTROPY = 3.9;
  * no uppercase, a screaming-snake-case constant carries no lowercase, and a
  * camelCase identifier carries no digits. A genuinely random base64url body of
  * this length clears all three with room to spare.
+ *
+ * The body class accepts standard base64 (`+` and `/`) as well as base64url.
+ * Without it a `+` or `/` landing early in the body cut the match short of the
+ * length floor and the key was missed: measured at a 57% miss rate for
+ * standard-base64 bodies against 0.5% for base64url, and 100% for an AWS
+ * secret access key, which is 40 characters of standard base64. Adding the two
+ * characters was measured on a real trace corpus at 232 further matches and no
+ * new false positives, and it needs no vendor to be named.
  */
 function isKeyShapedBody(body: string): boolean {
   if (
@@ -290,6 +301,70 @@ const IDENTIFIER_PREFIXES = new Set([
   "etag",
   "checksum",
 ]);
+
+/**
+ * Prefixes that name a RECORD, in this product or in the APIs it talks to.
+ *
+ * `prefix_<random body>` is how this product and most of its neighbours mint an
+ * id, which is the same shape a key is minted in and carries the same entropy.
+ * The difference is not measurable from the string, so it has to be named: a
+ * sweep of real traces found the shape rule redacting `project_…`, `card_…`,
+ * `scenario_…`, `langyconv_…` and OpenAI's own `chatcmpl-…`, and those are
+ * attributes the product groups and attributes traces by. Redaction is
+ * irreversible at ingestion, so eating an id is worse than missing a key.
+ *
+ * On the swept corpus this costs no recall at all: no credential in it used any
+ * of these prefixes. `toolu_` is here for the same reason, having previously
+ * survived only by being two characters under the length floor, which is not a
+ * margin anyone should rely on.
+ */
+const RECORD_ID_PREFIXES = new Set([
+  "project",
+  "provider",
+  "card",
+  "eval",
+  "monitor",
+  "scenario",
+  "ses",
+  "sess",
+  "session",
+  "thread",
+  "conv",
+  "langyconv",
+  "span",
+  "trace",
+  "run",
+  "msg",
+  "task",
+  "job",
+  "step",
+  "node",
+  "team",
+  "org",
+  "user",
+  "call",
+  "req",
+  "resp",
+  "chatcmpl",
+  "toolu",
+  "asst",
+  "file",
+  "batch",
+  "evt",
+  "acct",
+  "cus",
+  "sub",
+]);
+
+/** Every prefix that announces something other than a credential. */
+function isNonCredentialPrefix(prefix: string): boolean {
+  const lower = prefix.toLowerCase();
+  return (
+    DIGEST_PREFIXES.has(lower) ||
+    IDENTIFIER_PREFIXES.has(lower) ||
+    RECORD_ID_PREFIXES.has(lower)
+  );
+}
 
 /**
  * Floor and ceiling for the hex body. The floor is well above a short id; the
@@ -485,11 +560,11 @@ const VALUE_RULES: ValueRule[] = [
     id: "shaped_api_key",
     description: "High-entropy API key with a vendor-style prefix",
     regex: new RegExp(
-      `${TOKEN_START}([A-Za-z][A-Za-z0-9]{1,11})[_-]([A-Za-z0-9_-]{${SHAPED_TOKEN_MIN_BODY},})${TOKEN_END}`,
+      `${TOKEN_START}([A-Za-z][A-Za-z0-9]{1,11})[_-]([A-Za-z0-9_+/-]{${SHAPED_TOKEN_MIN_BODY},})${TOKEN_END}`,
       "g",
     ),
     accept: (groups) =>
-      !DIGEST_PREFIXES.has((groups[1] ?? "").toLowerCase()) &&
+      !isNonCredentialPrefix(groups[1] ?? "") &&
       isKeyShapedBody(groups[2] ?? ""),
     precondition: (text) => text.includes("_") || text.includes("-"),
   },
@@ -503,9 +578,15 @@ const VALUE_RULES: ValueRule[] = [
     // One capture for everything that introduces the value, one for the value
     // itself, so the replacement puts the sentence back and swaps only the
     // credential.
+    // The separator is `:` or `=` only. `key is <value>` was accepted too, and
+    // across a 236 MB corpus of real traces it caught zero credentials while
+    // being the sole source of English-prose redactions: "a bare digest of an
+    // API key is offline-checkable" lost the words after "key is", and so did
+    // "the Authorization header is attacker-controlled". A cue that only ever
+    // fires on prose is not a cue.
     regex: new RegExp(
       `((?:^|[\\W_])(?:${CREDENTIAL_KEYWORD})(?:\\s+[A-Za-z]{1,8}){0,2}["'\`]?` +
-        `(?:\\s*[:=]{1,2}\\s*|\\s+(?:is|was)\\s+)["'\`]?)` +
+        `\\s*[:=]{1,2}\\s*["'\`]?)` +
         `([^\\s"'\`,;<>(){}\\[\\]]{${CONTEXT_VALUE_MIN_LENGTH},})`,
       "gi",
     ),
@@ -687,6 +768,32 @@ function replacementFor(rule: ValueRule, args: string[]): string | null {
  * caller-supplied custom patterns. Returns the scrubbed text and how many
  * secrets were replaced.
  */
+/**
+ * Cut oversized text into scannable pieces, preferring a newline boundary so a
+ * credential is not split down the middle.
+ *
+ * Returning long text untouched, which is what this replaced, was a hard
+ * bypass rather than a budget: an 885 KB agent input carrying a live provider
+ * key went through ingestion completely unscanned, and anything over the limit
+ * was a reliable way to smuggle one past redaction. Slicing keeps the per-pass
+ * cost bounded while leaving no unscanned region.
+ */
+function sliceForScan(text: string): string[] {
+  if (text.length <= MAX_SCAN_LENGTH) return [text];
+  const slices: string[] = [];
+  let start = 0;
+  while (start < text.length) {
+    let end = Math.min(start + MAX_SCAN_LENGTH, text.length);
+    if (end < text.length) {
+      const newline = text.lastIndexOf("\n", end);
+      if (newline > start + MAX_SCAN_LENGTH / 2) end = newline;
+    }
+    slices.push(text.slice(start, end));
+    start = end;
+  }
+  return slices;
+}
+
 export function redactSecretsInText({
   text,
   customPatterns = [],
@@ -694,14 +801,25 @@ export function redactSecretsInText({
   text: string;
   customPatterns?: readonly RegExp[];
 }): SecretsRedactionResult {
-  if (
-    typeof text !== "string" ||
-    text.length === 0 ||
-    text.length > MAX_SCAN_LENGTH
-  ) {
+  if (typeof text !== "string" || text.length === 0) {
     return { text, redactedCount: 0 };
   }
+  if (text.length > MAX_SCAN_LENGTH) {
+    let total = 0;
+    const pieces = sliceForScan(text).map((slice) => {
+      const scanned = redactOneSlice(slice, customPatterns);
+      total += scanned.redactedCount;
+      return scanned.text;
+    });
+    return { text: pieces.join(""), redactedCount: total };
+  }
+  return redactOneSlice(text, customPatterns);
+}
 
+function redactOneSlice(
+  text: string,
+  customPatterns: readonly RegExp[],
+): SecretsRedactionResult {
   let redactedCount = 0;
   let result = text;
 
