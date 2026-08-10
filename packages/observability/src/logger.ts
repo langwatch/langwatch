@@ -150,6 +150,57 @@ function createBrowserLogger(name: string): PinoLogger {
   });
 }
 
+/**
+ * `service.version` for a log record, read from the same place the OTel
+ * resource reads it.
+ *
+ * `OTEL_RESOURCE_ATTRIBUTES` is the `k=v,k=v` form the deployment already sets.
+ * Parsing it keeps one source of truth — two ways to state the version is how
+ * they drift — and `SERVICE_VERSION` is accepted as an explicit override for
+ * anything that sets only that.
+ *
+ * Returns nothing when unset, so a local run adds no field rather than an empty
+ * one.
+ */
+/**
+ * `OTEL_RESOURCE_ATTRIBUTES` values are percent-encoded (the spec's W3C Baggage
+ * octet string), which is how a value containing `,` or `=` survives a format
+ * that separates on both. The OTel SDK's own envDetector decodes them, so this
+ * has to as well: the whole point of reading this variable rather than adding a
+ * second one is that a log and a span cannot disagree about the version, and
+ * emitting `git%2Dabc` where the trace says `git-abc` would be exactly that
+ * disagreement.
+ *
+ * A malformed escape falls back to the raw text. `decodeURIComponent` throws on
+ * a stray `%`, and a version we can print imperfectly beats no version at all.
+ */
+function decodeAttributeValue(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+export function serviceVersionField(): Record<string, string> {
+  const explicit = process.env.SERVICE_VERSION?.trim();
+  if (explicit) return { "service.version": explicit };
+
+  const attrs = process.env.OTEL_RESOURCE_ATTRIBUTES;
+  if (!attrs) return {};
+
+  for (const pair of attrs.split(",")) {
+    const separator = pair.indexOf("=");
+    if (separator === -1) continue;
+    if (pair.slice(0, separator).trim() !== "service.version") continue;
+
+    const value = decodeAttributeValue(pair.slice(separator + 1).trim());
+    if (value) return { "service.version": value };
+  }
+
+  return {};
+}
+
 function createNodeLogger(
   name: string,
   options?: CreateLoggerOptions,
@@ -177,6 +228,17 @@ function createNodeLogger(
       bindings: (bindings) => ({
         ...bindings,
         service: process.env.OTEL_SERVICE_NAME ?? DEFAULT_SERVICE_NAME,
+        // Which build produced the line.
+        //
+        // The deployment already states this — OTEL_RESOURCE_ATTRIBUTES carries
+        // `service.version=<tag>` and `envDetector` merges it into the OTel
+        // resource — but that resource only reaches telemetry we EXPORT.
+        // These logs go to stdout and are picked up from the pod's log file, a
+        // path the resource never touches, so no log line has ever carried a
+        // version: measured 2026-08-07, `service_version` appeared on no record
+        // in the fleet. Reading the same env var keeps one source of truth
+        // rather than introducing a second way to say it.
+        ...serviceVersionField(),
       }),
       level: (label) => ({ level: label.toUpperCase() }),
     },
