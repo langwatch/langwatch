@@ -125,6 +125,16 @@ const TOKEN_END = String.raw`(?![A-Za-z0-9_-])`;
  * personal `phx_` key is matched.
  */
 const VENDOR_KEY_PATTERNS = [
+  // LangWatch's own API, ingest and legacy personal-access tokens, minted as
+  // `{prefix}{lookupId}_{secret}` by
+  // platform/app/src/server/api-key/api-key-token.utils.ts. Matched on the
+  // prefix alone, like every other known vendor, so a truncated or
+  // short-bodied one still redacts: `sk-lw-` would otherwise reach only the
+  // generic `sk-` rule and its 20-character floor, and `ik-lw-` nothing at all.
+  // The prefixes are duplicated rather than imported because this package is
+  // shared with the SDK and stays dependency-free; a test pins them to the
+  // constants so the two cannot drift.
+  String.raw`(?:sk|ik|pat)-lw-[A-Za-z0-9_-]{3,}`,
   // GitLab personal, project, deploy, runner and agent tokens.
   String.raw`gl(?:pat|rt|dt|soat|ptt|cbt|imt|agent|ffct)-[A-Za-z0-9_-]{20,}`,
   String.raw`npm_[A-Za-z0-9]{36}`,
@@ -235,6 +245,58 @@ const DIGEST_PREFIXES = new Set([
   "checksum",
   "integrity",
 ]);
+
+/**
+ * The middle segment that turns a prefixed hex string into a credential.
+ *
+ * An all-hex body carries no uppercase and no symbols, so the character-mix gate
+ * on the shape rule turns it away, and it must: in a tracing product a bare hex
+ * run is far more likely to be a commit, a trace id or a digest than a key. The
+ * Stripe family (`sk_live_…`, `pk_test_…`) and everything modelled on it says so
+ * in the token itself, and that middle word is the only thing separating
+ * `acme_live_<32 hex>` from `commit_<40 hex>`. Nothing here fires without it.
+ */
+const HEX_BODY_CREDENTIAL_SEGMENTS = [
+  "live",
+  "test",
+  "prod",
+  "sk",
+  "pk",
+  "key",
+  "secret",
+  "token",
+] as const;
+
+/**
+ * Prefixes that name an identifier, checked even though a credential segment is
+ * already required. `commit_key_…` and `trace_token_…` are not credentials, and
+ * a rule that eats a trace id destroys the thing the product exists to show.
+ */
+const IDENTIFIER_PREFIXES = new Set([
+  "commit",
+  "sha",
+  "sha1",
+  "sha256",
+  "md5",
+  "hash",
+  "digest",
+  "trace",
+  "span",
+  "id",
+  "uuid",
+  "rev",
+  "blob",
+  "tree",
+  "etag",
+  "checksum",
+]);
+
+/**
+ * Floor and ceiling for the hex body. The floor is well above a short id; the
+ * ceiling keeps a long encoded blob from being swallowed whole.
+ */
+const HEX_BODY_MIN = 24;
+const HEX_BODY_MAX = 128;
 
 /**
  * Words that stand in for a credential in documentation and templates. The
@@ -385,9 +447,35 @@ const VALUE_RULES: ValueRule[] = [
     render: (_m, prefix) => `${prefix}${REPLACEMENT}`,
   },
   {
-    // The layer that catches a vendor nobody has heard of. A short lowercase
-    // prefix, a separator and a high-entropy body is the shape almost every
-    // modern key is minted in, and it needs no vendor knowledge at all.
+    // The all-hex sibling of the shape rule below, which cannot accept a hex
+    // body without also accepting every digest and trace id in the transcript.
+    // A credential segment in the middle of the token is what makes the
+    // difference, so this rule requires one and refuses identifier prefixes on
+    // top of it.
+    id: "prefixed_hex_api_key",
+    description: "API key with a vendor prefix and an all-hex body",
+    regex: new RegExp(
+      `${TOKEN_START}([A-Za-z][A-Za-z0-9]{1,11})_(?:${HEX_BODY_CREDENTIAL_SEGMENTS.join("|")})_` +
+        `([0-9a-f]{${HEX_BODY_MIN},${HEX_BODY_MAX}})${TOKEN_END}`,
+      "gi",
+    ),
+    accept: (groups) =>
+      !IDENTIFIER_PREFIXES.has((groups[1] ?? "").toLowerCase()),
+    precondition: (text) => text.includes("_"),
+  },
+  {
+    // The layer that catches a vendor nobody has heard of. A short prefix, a
+    // separator and a high-entropy body is the shape almost every modern key is
+    // minted in, and it needs no vendor knowledge at all.
+    //
+    // The prefix may be upper, lower or mixed case: plenty of vendors mint
+    // `LW_…` or `Xy_…`, and restricting it to lowercase missed them. That also
+    // makes the prefix the shape of a screaming-snake environment variable
+    // NAME, which must survive as a bare name, and does: `AWS_SECRET_ACCESS_KEY`
+    // and `DATABASE_URL_PRODUCTION` are dictionary words with no digits and no
+    // lowercase, so the length floor and the character-mix gate turn them both
+    // away. The digest check lowercases the prefix so `SHA512-…` is still
+    // recognised as a digest.
     //
     // A declined match consumes the text it spanned, so in principle a benign
     // outer match could hide a secret further inside the same unbroken token.
@@ -397,11 +485,12 @@ const VALUE_RULES: ValueRule[] = [
     id: "shaped_api_key",
     description: "High-entropy API key with a vendor-style prefix",
     regex: new RegExp(
-      `${TOKEN_START}([a-z][a-z0-9]{1,11})[_-]([A-Za-z0-9_-]{${SHAPED_TOKEN_MIN_BODY},})${TOKEN_END}`,
+      `${TOKEN_START}([A-Za-z][A-Za-z0-9]{1,11})[_-]([A-Za-z0-9_-]{${SHAPED_TOKEN_MIN_BODY},})${TOKEN_END}`,
       "g",
     ),
     accept: (groups) =>
-      !DIGEST_PREFIXES.has(groups[1] ?? "") && isKeyShapedBody(groups[2] ?? ""),
+      !DIGEST_PREFIXES.has((groups[1] ?? "").toLowerCase()) &&
+      isKeyShapedBody(groups[2] ?? ""),
     precondition: (text) => text.includes("_") || text.includes("-"),
   },
   {
@@ -446,8 +535,13 @@ export function isSensitiveAttributeKey(key: string): boolean {
 /**
  * A pattern that already states where it may start is compiled exactly as
  * written: the author has said what they meant, so nothing is added.
+ *
+ * The lookbehind arm is `(?<=` or `(?<!` specifically, never a bare `(?<`: a
+ * named capture group opens the same way, so the looser test read
+ * `(?<key>sk-.*)` as an anchor, skipped the guard, and let that pattern shred
+ * `task-notification` exactly like the unguarded `sk-.*` it exists to tame.
  */
-const SELF_ANCHORED_PATTERN = /^(?:\^|\\b|\\B|\(\?<)/;
+const SELF_ANCHORED_PATTERN = /^(?:\^|\\b|\\B|\(\?<[=!])/;
 
 /**
  * Give a hand-written pattern the word boundary it almost certainly meant.
@@ -479,6 +573,13 @@ const ORDINARY_TEXT_PROBES = [
   "platform/app/src/server/traces/trace.service.ts",
   "2026-08-10T14:32:11.482Z",
   "claude-opus-5",
+  // The identifiers a tracing product is made of. Without these a pattern like
+  // `[0-9a-f]{6,}` reads as credential-shaped and is accepted, then redacts
+  // every commit hash, trace id and UUID in the transcript. They are the most
+  // expensive thing a broad pattern can eat here, so they are probed for.
+  "fix in commit 51d07b547d0a8f3e2c1b9d4a6e7f8091a2b3c4d5",
+  "id 550e8400-e29b-41d4-a716-446655440000 done",
+  "traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
 ] as const;
 
 /**
@@ -492,6 +593,12 @@ const ORDINARY_TEXT_PROBES = [
  * warning and the runtime would be describing two different regexes.
  */
 export function overBroadSecretPatternProbe(pattern: string): string | null {
+  // A blank pattern is an empty row the customer has not finished typing, not a
+  // pattern that eats everything. Guarded it compiles to `(?<![A-Za-z0-9_])(?:)`,
+  // which matches at index 0 of every probe, so without this the settings page
+  // reports "also matches ordinary text" the instant a row is added. Handled
+  // here rather than in each caller so a future caller inherits it.
+  if (pattern.trim() === "") return null;
   let probeRegex: RegExp;
   try {
     // Deliberately not global: `.test` on a global regex carries `lastIndex`

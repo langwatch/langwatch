@@ -276,24 +276,36 @@ describe("DataPrivacyPolicyService integration", () => {
       // ordinary prose destroys trace content and cannot be undone.
       const catchAlls = [".*", ".+", "\\w+", "[a-z]+", "[\\s\\S]*"];
 
+      const saveWithPattern = (pattern: string) =>
+        service.setForScope({
+          scope: { scopeType: "PROJECT", scopeId: project.id },
+          personalOnly: false,
+          config: {
+            secrets: { enabled: true, customPatterns: [pattern] },
+          },
+        });
+
       /** @scenario "An over-broad custom secret pattern is rejected when saving the rule" */
       it("rejects a pattern that would erase ordinary text, storing nothing", async () => {
         for (const pattern of catchAlls) {
-          await expect(
-            service.setForScope({
-              scope: { scopeType: "PROJECT", scopeId: project.id },
-              personalOnly: false,
-              config: {
-                secrets: { enabled: true, customPatterns: [pattern] },
-              },
-            }),
-          ).rejects.toThrow(/also matches ordinary text/);
+          await expect(saveWithPattern(pattern)).rejects.toThrow(
+            InvalidDataPrivacyConfigError,
+          );
         }
 
         const rows = await repository.findAllInOrganization({
           organizationId,
         });
         expect(rows).toHaveLength(0);
+      });
+
+      // The wording lives in three places (this service, the settings page and
+      // the presentation registry), so it is pinned once rather than on every
+      // case above, which assert the type instead.
+      it("names the reason in the message a customer reads", async () => {
+        await expect(saveWithPattern(".*")).rejects.toThrow(
+          /also matches ordinary text/,
+        );
       });
 
       it("still accepts a pattern that names an actual credential shape", async () => {

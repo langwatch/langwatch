@@ -371,19 +371,31 @@ export class OtlpSpanPiiRedactionService {
     }
   }
 
-  private redactRecordNative(
-    record: Record<string, string>,
-    policy: ResolvedDataPrivacy,
+  /**
+   * `record` may be keyed by an addressing path rather than by the attribute
+   * name (the log and metric pipelines flatten a decoded OTLP tree into one).
+   * `attributeNames` restores the real name for the sensitive-NAME rules, which
+   * a path can never satisfy; without it those rules silently never fire.
+   */
+  private redactRecordNative({
+    record,
+    policy,
+    compiled,
+    attributeNames,
+  }: {
+    record: Record<string, string>;
+    policy: ResolvedDataPrivacy;
     compiled: {
       secrets: readonly RegExp[] | undefined;
       piiExceptions: readonly RegExp[] | undefined;
-    },
-  ): void {
+    };
+    attributeNames?: Record<string, string>;
+  }): void {
     for (const key of Object.keys(record)) {
       const value = record[key];
       if (value && value.length > 0) {
         const { text } = redactAttributeNative({
-          key,
+          key: attributeNames?.[key] ?? key,
           value,
           policy,
           compiledSecretPatterns: compiled.secrets,
@@ -434,6 +446,7 @@ export class OtlpSpanPiiRedactionService {
       body: string;
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
+      attributeNames?: Record<string, string>;
     },
     policy: ResolvedDataPrivacy,
   ): void {
@@ -448,8 +461,17 @@ export class OtlpSpanPiiRedactionService {
       });
       if (text !== log.body) log.body = text;
     }
-    this.redactRecordNative(log.attributes, policy, compiled);
-    this.redactRecordNative(log.resourceAttributes, policy, compiled);
+    this.redactRecordNative({
+      record: log.attributes,
+      policy,
+      compiled,
+      attributeNames: log.attributeNames,
+    });
+    this.redactRecordNative({
+      record: log.resourceAttributes,
+      policy,
+      compiled,
+    });
   }
 
   /**
@@ -694,6 +716,7 @@ export class OtlpSpanPiiRedactionService {
     metric: {
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
+      attributeNames?: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
     tenantId?: TenantId,
@@ -705,12 +728,17 @@ export class OtlpSpanPiiRedactionService {
     }
     if (this.nativePassActive(native.policy)) {
       const compiled = this.compileNativePatterns(native.policy);
-      this.redactRecordNative(metric.attributes, native.policy, compiled);
-      this.redactRecordNative(
-        metric.resourceAttributes,
-        native.policy,
+      this.redactRecordNative({
+        record: metric.attributes,
+        policy: native.policy,
         compiled,
-      );
+        attributeNames: metric.attributeNames,
+      });
+      this.redactRecordNative({
+        record: metric.resourceAttributes,
+        policy: native.policy,
+        compiled,
+      });
     }
     const lambda = this.lambdaAfterNative(native.policy);
     if (lambda) {

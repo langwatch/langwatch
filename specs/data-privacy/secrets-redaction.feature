@@ -122,20 +122,63 @@ Feature: Redacting secrets from traces
   # irreversible: the original text is gone at ingestion.
   #
   # A custom pattern now matches only at a word boundary and stops at the first
-  # space or bracket. Both are what the author meant; neither weakens the
-  # pattern against the credential it was written for.
+  # whitespace, quote, backtick or angle bracket. Both are what the author
+  # meant; neither weakens the pattern against the credential it was written
+  # for.
 
   @unit
   Scenario: A custom pattern does not fire inside an ordinary word
-    Given a rule on "web-app" whose custom pattern matches tokens starting with "sk-"
-    When a trace is ingested containing the words "task-notification" and "risk-based"
-    Then the stored text still reads "task-notification" and "risk-based"
+    Given a custom pattern that matches tokens starting with "sk-"
+    When text containing the words "task-notification" and "risk-based" is redacted
+    Then the text still reads "task-notification" and "risk-based"
 
   @unit
   Scenario: A custom pattern does not swallow the rest of the line
-    Given a rule on "web-app" whose custom pattern ends in a wildcard
-    When a trace is ingested whose line holds a credential followed by ordinary words
+    Given a custom pattern that ends in a wildcard
+    When a line holding a credential followed by ordinary words is redacted
     Then only the credential is replaced and the words after it survive
+
+  # Three shapes the matching layers missed. Our own `ik-lw-` ingest keys were
+  # covered by nothing at all and `sk-lw-` only once the body reached the
+  # generic rule's length floor, so both are known prefixes now and match
+  # however short the body is. An all-hex body was refused by the
+  # character-mix gate, which is right for a bare hex run (a commit, a trace id
+  # and a digest are the same shape) and wrong when the token names itself a
+  # credential, so a hex body is accepted only behind a credential segment and
+  # never behind an identifier prefix. And the shape rule read lowercase
+  # prefixes only, which missed every vendor minting `LW_`-style keys; the
+  # entropy and character-mix gates are what keep a bare environment variable
+  # name readable.
+
+  @unit
+  Scenario: A key minted by LangWatch is redacted on its prefix alone
+    Given a token carrying one of the prefixes the app mints
+    When the text is redacted
+    Then the token is redacted however short its body
+
+  @unit
+  Scenario: A vendor-prefixed key with an all-hex body is redacted
+    Given a token whose prefix names it a credential and whose body is all hexadecimal
+    When the text is redacted
+    Then the token is redacted
+
+  @unit
+  Scenario: An identifier with an all-hex body is left alone
+    Given a commit or trace identifier with an all-hex body
+    When the text is redacted
+    Then the identifier is left as written
+
+  @unit
+  Scenario: A key with an upper or mixed case prefix is redacted
+    Given a high-entropy token whose prefix is upper or mixed case
+    When the text is redacted
+    Then the token is redacted
+
+  @unit
+  Scenario: An environment variable name is not mistaken for a key
+    Given a bare environment variable name
+    When the text is redacted
+    Then the name is left as written
 
   # Catching it at authorship as well as at match time. An over-broad secret
   # pattern used to be waved through on the reasoning that it "only
@@ -157,9 +200,9 @@ Feature: Redacting secrets from traces
 
   @unit
   Scenario: A custom pattern still redacts the credential it was written for
-    Given a rule on "web-app" whose custom pattern matches tokens starting with "sk-"
-    When a trace is ingested whose input contains a provider key
-    Then the stored input has the key redacted
+    Given a custom pattern that matches tokens starting with "sk-"
+    When text containing a provider key is redacted
+    Then the key is redacted
 
   # "langwatch.api_key.id" carries the id of the ApiKey row that authenticated
   # the request, never the key material. The sensitive-attribute-NAME deny-list
@@ -203,3 +246,24 @@ Feature: Redacting secrets from traces
   Scenario: The receiver-written API key id survives the ingestion pipeline
     When the receiver has written ingest provenance onto a span's resource
     Then the API key id is still on the span the pipeline emits
+
+  # Everything above describes the span path. The log and metric pipelines
+  # flatten a decoded payload into one record keyed by a JSON path, because two
+  # attributes may share a name and each value still needs its own address. A
+  # path can never satisfy a rule written against an attribute NAME, so those
+  # rules never ran on those pipelines: a credential-named attribute was left to
+  # the value-shape rules, and a plain-text one survived them. The name travels
+  # beside the path now, which both closes that gap and makes the exemption
+  # apply on purpose rather than by accident.
+
+  @unit
+  Scenario: A credential-named log attribute is redacted by name
+    Given a log attribute named as a credential whose value is ordinary text
+    When the log record is redacted
+    Then the value is replaced
+
+  @unit
+  Scenario: The receiver-written API key id survives redaction on the log path
+    Given a log attribute holding the receiver-written API key id
+    When the log record is redacted
+    Then the key id is still readable

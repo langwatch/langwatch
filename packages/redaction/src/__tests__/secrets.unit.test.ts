@@ -204,6 +204,69 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
     });
   });
 
+  describe("given a key minted by LangWatch itself", () => {
+    // Our own tokens are `{prefix}{lookupId}_{secret}`. Matching on the prefix
+    // rather than the body means a truncated one still redacts; `ik-lw-` used
+    // to be covered by nothing at all, and `sk-lw-` only by the generic `sk-`
+    // rule once the body reached 20 characters.
+    const ownKeys: Array<[string, string]> = [
+      ["API key", `sk-lw-${BODY.slice(0, 12)}_${BODY.slice(0, 32)}`],
+      ["ingest key", `ik-lw-${BODY.slice(0, 12)}_${BODY.slice(0, 32)}`],
+      ["legacy personal access token", `pat-lw-${BODY.slice(0, 12)}_${BODY}`],
+      ["a short API key", "sk-lw-123af"],
+      ["a short ingest key", "ik-lw-123af"],
+      ["a short legacy token", "pat-lw-123af"],
+    ];
+
+    /** @scenario "A key minted by LangWatch is redacted on its prefix alone" */
+    it("redacts every one of them, however short the body", () => {
+      const survived = ownKeys.filter(
+        ([, key]) => redact(key).redactedCount === 0,
+      );
+      expect(survived.map(([kind]) => kind)).toEqual([]);
+    });
+  });
+
+  describe("given a prefixed key whose body is all hexadecimal", () => {
+    /** @scenario "A vendor-prefixed key with an all-hex body is redacted" */
+    it("redacts it when a credential segment names it as one", () => {
+      expect(redact(`acme_live_${HEX}`).text).toBe("[SECRET]");
+      expect(redact(`widget_test_${HEX}`).text).toBe("[SECRET]");
+      expect(redact(`store_secret_${HEX}`).text).toBe("[SECRET]");
+    });
+
+    /** @scenario "An identifier with an all-hex body is left alone" */
+    it("leaves an identifier alone even when it carries the same segment", () => {
+      const commit = "commit_key_51d07b547d0a8f3e2c1b9d4a6e7f8091a2b3c4d5";
+      expect(redact(commit).text).toBe(commit);
+      expect(redact(`trace_token_${HEX}aabbccdd`).redactedCount).toBe(0);
+    });
+  });
+
+  describe("given a key whose prefix is upper or mixed case", () => {
+    /** @scenario "A key with an upper or mixed case prefix is redacted" */
+    it("redacts it on the same shape rule as a lowercase prefix", () => {
+      expect(redact(`LW_${BODY.slice(0, 43)}`).text).toBe("[SECRET]");
+      expect(redact(`Xy_${BODY.slice(0, 38)}`).text).toBe("[SECRET]");
+    });
+
+    /** @scenario "An environment variable name is not mistaken for a key" */
+    it("leaves a bare environment variable name readable", () => {
+      for (const name of [
+        "AWS_SECRET_ACCESS_KEY",
+        "DATABASE_URL_PRODUCTION",
+        "LANGWATCH_TELEMETRY_ENDPOINT_OVERRIDE_URL",
+      ]) {
+        expect(redact(name).text).toBe(name);
+      }
+    });
+
+    it("still recognises an uppercase digest prefix as a digest", () => {
+      const integrity = `SHA512-${BODY.slice(0, 43)}`;
+      expect(redact(integrity).text).toBe(integrity);
+    });
+  });
+
   describe("given a credential named in prose and then given a value", () => {
     /** @scenario "A credential introduced by name in free text is redacted" */
     it("redacts the value and leaves the words that introduce it", () => {
@@ -333,6 +396,47 @@ describe("redactSecretsInText, given text that only looks like secrets", () => {
       "an ordinary agent sentence",
       "I had to kill the other exploring agent because it was burning tokens on the same files.",
     ],
+    // Bare high-entropy tokens carrying no prefix. Deliberately untouched: a
+    // bare 32-hex credential and a trace id are byte-for-byte identical, so
+    // redacting the class would blank the identifiers the product is built to
+    // show. Detection needs a prefix or a keyword, and these have neither.
+    ["a bare 32-hex token", HEX],
+    ["a bare 64-hex token", `${HEX}${HEX}`],
+    ["a bare base62 token", BODY],
+    ["a bare 21-character nanoid", "V1StGXR8Z5jdHi6BmyT"],
+    ["a bare 32-character nanoid", "V1StGXR8Z5jdHi6BmyTV1StGXR8Z5jdH"],
+    ["a bare git SHA", "51d07b547d0a8f3e2c1b9d4a6e7f8091a2b3c4d5"],
+    ["a bare trace id", "4bf92f3577b34da6a3ce929d0e0e4736"],
+    ["a bare span id", "00f067aa0ba902b7"],
+    // Environment variable NAMES. Uppercase-underscore is also the shape the
+    // shape rule now accepts as a prefix, so these prove the length floor and
+    // the character-mix gate still keep a bare name readable.
+    ["an AWS environment variable name", "AWS_SECRET_ACCESS_KEY"],
+    ["a database environment variable name", "DATABASE_URL_PRODUCTION"],
+    [
+      "a long environment variable name",
+      "LANGWATCH_TELEMETRY_ENDPOINT_OVERRIDE_URL",
+    ],
+    // Identifier prefixes in front of a hex body. The prefixed-hex rule needs a
+    // credential segment, and refuses these prefixes even when one is present.
+    ["a prefixed commit id", "commit_51d07b547d0a8f3e2c1b9d4a6e7f8091a2b3c4d5"],
+    ["a prefixed trace id", "trace_4bf92f3577b34da6a3ce929d0e0e4736"],
+    ["a prefixed digest", `digest_${HEX}`],
+    [
+      "an identifier prefix carrying a credential segment",
+      "commit_key_51d07b547d0a8f3e2c1b9d4a6e7f8091a2b3c4d5",
+    ],
+    [
+      "a trace prefix carrying a credential segment",
+      `trace_token_${HEX}aabbccdd`,
+    ],
+    // Ordinary words that merely contain a vendor prefix as a substring.
+    [
+      "words containing sk- and ask-",
+      "risk-based scoring, disk-usage report, ask-me-anything, mask-sensitive-fields",
+    ],
+    ["a transcript tag", "<task-notification> and <task-progress>"],
+    ["package versions", "@langwatch/web@3.12.0 and pnpm@10.4.1"],
   ];
 
   /** @scenario "Ordinary identifiers are never mistaken for secrets" */
@@ -502,6 +606,38 @@ describe("overBroadSecretPatternProbe", () => {
   describe("given a pattern that does not compile", () => {
     it("defers to the caller's own compile check", () => {
       expect(overBroadSecretPatternProbe("[unclosed")).toBeNull();
+    });
+  });
+
+  describe("given a blank pattern", () => {
+    // An unfinished row in the settings UI, not a pattern that eats everything.
+    // Guarded, an empty pattern matches at index 0 of every probe, so without
+    // the blank check the customer is told their empty row is over-broad.
+    it("reports nothing, so an empty row is not an error", () => {
+      expect(overBroadSecretPatternProbe("")).toBeNull();
+      expect(overBroadSecretPatternProbe("   ")).toBeNull();
+    });
+  });
+
+  describe("given a broad pattern wrapped in a named capture group", () => {
+    // `(?<name>` opens the same way a lookbehind does. Reading it as an anchor
+    // skipped the word-boundary guard, which is the whole defence here.
+    it("guards it like any other unanchored pattern", () => {
+      expect(overBroadSecretPatternProbe("(?<key>sk-.*)")).toBeNull();
+      expect(
+        redact(
+          "a <task-notification> here",
+          compileSecretPatterns(["(?<key>sk-.*)"]),
+        ).text,
+      ).toBe("a <task-notification> here");
+    });
+
+    // A real lookbehind is still the author's own anchor, so it is compiled
+    // exactly as written and the probe reports what it would really erase.
+    it("still treats a real lookbehind as the author's own anchor", () => {
+      expect(overBroadSecretPatternProbe("(?<=the )user")).toBe(
+        "the user asked the agent to summarise the meeting notes",
+      );
     });
   });
 });
