@@ -447,7 +447,7 @@ describe("codingAgentSpanFactsDispatch", () => {
           spanId: "tool-dedup",
           attributes: { tool_name: "Bash" },
         });
-        const makeId = subscriber.options?.enqueue?.deduplication?.makeId;
+        const makeId = subscriber.options?.deduplication?.makeId;
 
         const liftedId = makeId?.(
           staged(subscriber.options?.enqueue?.stage?.(event)),
