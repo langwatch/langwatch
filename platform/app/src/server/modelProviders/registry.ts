@@ -1,5 +1,6 @@
 import type { ModelProvider } from "@prisma/client";
 import { z } from "zod";
+import { providerDefaultBaseUrls } from "../../features/onboarding/regions/model-providers/registry";
 import { codexTokenKeysSchema } from "./codexAccount.schema";
 import { CODEX_ALLOWED_FEATURE_KEYS } from "./codexRestrictions";
 import type { CustomModelEntry } from "./customModel.schema";
@@ -36,6 +37,16 @@ type ModelProviderDefinition = {
   type: "llm" | "safety";
   apiKey: string;
   endpointKey: string | undefined;
+  /**
+   * Where to ask this provider whether a credential is good, when neither the
+   * customer supplies an endpoint nor the onboarding tile carries a default.
+   *
+   * Lives on the definition rather than in the validator so that "what this
+   * provider's key is called" and "where we ask about it" cannot drift apart —
+   * the settings UI has to answer "can this be checked at all?" without
+   * importing the validator, which reaches the database.
+   */
+  validationBaseUrl?: string;
   keysSchema: z.ZodTypeAny;
   enabledSince: Date;
   blurb?: string;
@@ -441,6 +452,10 @@ export const modelProviders = {
     type: "llm",
     apiKey: "ELEVENLABS_API_KEY",
     endpointKey: undefined,
+    // Added directly in Settings rather than through onboarding, so no tile
+    // carries a default base URL for it and this is the only record of where
+    // its models listing lives.
+    validationBaseUrl: "https://api.elevenlabs.io/v1",
     keysSchema: z.object({
       ELEVENLABS_API_KEY: z.string().min(1),
     }),
@@ -581,6 +596,95 @@ export const providerDeprecation = (
       | ModelProviderDefinition
       | undefined
   )?.deprecated;
+
+// ============================================================================
+// Whether a credential can be checked at all
+// ============================================================================
+
+/**
+ * Providers whose credentials no listing endpoint exercises.
+ *
+ * `bedrock`, `vertex_ai` and `azure` sign with AWS credentials, gcloud
+ * application-default credentials and deployment-scoped keys respectively.
+ * `azure_safety` is a content-safety service rather than a language model: it
+ * authenticates with a subscription-key header and has no models route, so a
+ * bearer probe would report a perfectly good credential as refused.
+ *
+ * The validator imports this rather than keeping its own copy. Two lists would
+ * disagree the first time one of them was edited, and the disagreement is
+ * invisible: the settings UI would offer a check that the validator declines
+ * to perform, which reads to a customer as a broken button.
+ */
+export const PROVIDERS_WITH_UNPROBEABLE_AUTH: ReadonlySet<string> = new Set([
+  "azure",
+  "azure_safety",
+  "bedrock",
+  "vertex_ai",
+]);
+
+/**
+ * Providers reachable through the Google Agent Platform door.
+ *
+ * That probe builds its address from a fixed API root plus the project and
+ * location on the credential, so it needs no base URL — "nowhere to ask" is
+ * false for these however empty their endpoint fields are.
+ */
+const PROVIDERS_WITH_AGENT_PLATFORM_DOOR: ReadonlySet<string> = new Set([
+  "gemini",
+  "google_agent_platform",
+]);
+
+/**
+ * Whether a credential for this provider could be checked, if it were filled
+ * in completely.
+ *
+ * A property of the provider, not of what has been typed: the answer decides
+ * whether to offer the check at all, and a control that appeared and vanished
+ * as the customer filled the form would be worse than one that never appeared.
+ * Whether the fields are complete is a separate question, and the answer to it
+ * is whether the control is usable rather than whether it exists.
+ *
+ * Note this deliberately does not replace `isLlmProvider` or the oauth-device
+ * check in the settings form. Those two gate the probe that runs on save, and
+ * folding all three together would change when a save is allowed to proceed.
+ * They overlap; collapsing them is a separate change with its own blast
+ * radius.
+ *
+ * @param provider - Registry key. An unrecognized one answers false: we cannot
+ *   check what we cannot look up.
+ */
+export function isProviderProbeable({
+  provider,
+}: {
+  provider: string;
+}): boolean {
+  const definition = modelProviders[
+    provider as keyof typeof modelProviders
+  ] as ModelProviderDefinition | undefined;
+
+  if (!definition) return false;
+  if (PROVIDERS_WITH_UNPROBEABLE_AUTH.has(provider)) return false;
+
+  // The customer never types a credential for these — the provider's own
+  // sign-in flow persists one — so there is nothing on screen to check.
+  if (definition.authFlow === "oauth-device") return false;
+
+  return (
+    // The customer supplies the address themselves.
+    !!definition.endpointKey ||
+    !!definition.validationBaseUrl ||
+    !!providerDefaultBaseUrls[provider] ||
+    PROVIDERS_WITH_AGENT_PLATFORM_DOOR.has(provider)
+  );
+}
+
+/**
+ * Every provider that cannot be checked, in registry order. Exported for the
+ * test that pins this list against what validation actually does.
+ */
+export const UNPROBEABLE_PROVIDERS: readonly string[] = Object.keys(
+  modelProviders,
+).filter((provider) => !isProviderProbeable({ provider }));
 
 // ============================================================================
 // Parameter Constraints
