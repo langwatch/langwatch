@@ -129,25 +129,15 @@ Feature: Traces tab pagination controls
 
   # ─── Filter And Query Interaction ───────────────────────────────
 
-  @unit @unimplemented
+  # Integration, not unit: observing this means rendering the hook against a
+  # mocked router, which is a boundary. The existing test for this hook is
+  # already useNavigationFooter.cursor.integration.test.ts.
+  @integration @unimplemented
   Scenario: Changing the search query starts the scroll over
     Given I have navigated forward at least once
     When the search query changes
     Then the scrollId is removed from the URL
     And the page size returns to the default of 25
-
-  # ─── Known Gap ──────────────────────────────────────────────────
-  #
-  # The scenario below describes behaviour the code does NOT have today, and is
-  # kept here as the requirement rather than deleted. Changing the search query
-  # resets the scroll; changing a FILTER does not — nothing outside
-  # NavigationFooter, MessagesTable and MessagesList touches `scrollId`, and no
-  # filter path clears it. Applying a filter mid-scroll therefore keeps a cursor
-  # pointing into the unfiltered ordering, so the list resumes partway down the
-  # filtered results instead of at the top.
-  #
-  # Pre-existing, and not caused by removing offset paging. Do not read this
-  # block as a description of what ships.
 
   @integration @unimplemented
   Scenario: Applying a filter starts the scroll over
@@ -155,3 +145,10 @@ Feature: Traces tab pagination controls
     When I apply a filter from the sidebar
     Then the scrollId is removed from the URL
     And the trace list shows the first page of the filtered results
+
+  @integration @unimplemented
+  Scenario: Clearing filters starts the scroll over
+    Given I have navigated forward at least once
+    When I clear all filters
+    Then the scrollId is removed from the URL
+    And the trace list shows the first page of the unfiltered results
