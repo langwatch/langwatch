@@ -4,14 +4,19 @@
 # consolidated status — no per-step `if:` guards needed.
 #
 # LEAN CHECKOUT
-# Every checkout below excludes `docs/` and `assets/`. They are the two
-# largest directories in the tree and hold none of this workflow's inputs:
-# docs/ is 138 MB and assets/ 37 MB, almost entirely .gif and .mp4 marketing
-# media (a single 26 MB mp4, three gifs of 20/16/10 MB), against 81 MB for
-# platform/ — the thing we actually build. Naming a sparse-checkout makes
-# actions/checkout fetch with `--filter=blob:none`, so those blobs never
-# cross the wire at all. Measured on a depth-1 clone: 180 MB -> 39 MB of
-# .git, 490 MB -> 175 MB on disk, 78s -> 15s.
+# Every checkout below excludes the repository's marketing media: docs/media,
+# docs/images and assets/. Together they are 165 MB of .gif and .mp4 — a
+# single 26 MB mp4, gifs of 20/16/10 MB — against 81 MB for platform/, the
+# thing we actually build. Naming a sparse-checkout makes actions/checkout
+# fetch with `--filter=blob:none`, so those blobs never cross the wire at
+# all. Measured on a depth-1 clone: 180 MB -> 42 MB of .git, 490 MB ->
+# 188 MB on disk.
+#
+# It excludes the MEDIA, not docs/ wholesale, and that distinction is load
+# bearing. error-remediation.unit.test.ts resolves ../../../../../../docs and
+# asserts every remediation link maps to a real .mdx, so dropping all of
+# docs/ fails three test-unit shards. The .mdx tree is ~10 MB of the 138;
+# the media is the other 128, and nothing in CI reads it.
 #
 # That is per checkout, and this workflow runs a dozen of them. It also
 # compresses the tail, which is what actually sets wall clock: in run
@@ -175,7 +180,8 @@ jobs:
           # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
           sparse-checkout: |
             /*
-            !/docs/
+            !/docs/media/
+            !/docs/images/
             !/assets/
           sparse-checkout-cone-mode: false
 
@@ -247,7 +253,8 @@ jobs:
           # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
           sparse-checkout: |
             /*
-            !/docs/
+            !/docs/media/
+            !/docs/images/
             !/assets/
           sparse-checkout-cone-mode: false
 
@@ -420,7 +427,8 @@ jobs:
           # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
           sparse-checkout: |
             /*
-            !/docs/
+            !/docs/media/
+            !/docs/images/
             !/assets/
           sparse-checkout-cone-mode: false
 
@@ -576,7 +584,8 @@ jobs:
           # diff below reads them — correct, and rare.
           sparse-checkout: |
             /*
-            !/docs/
+            !/docs/media/
+            !/docs/images/
             !/assets/
           sparse-checkout-cone-mode: false
 
@@ -776,7 +785,8 @@ jobs:
           # diff below reads them — correct, and rare.
           sparse-checkout: |
             /*
-            !/docs/
+            !/docs/media/
+            !/docs/images/
             !/assets/
           sparse-checkout-cone-mode: false
 
@@ -824,7 +834,8 @@ jobs:
           # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
           sparse-checkout: |
             /*
-            !/docs/
+            !/docs/media/
+            !/docs/images/
             !/assets/
           sparse-checkout-cone-mode: false
 
@@ -857,7 +868,8 @@ jobs:
           # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
           sparse-checkout: |
             /*
-            !/docs/
+            !/docs/media/
+            !/docs/images/
             !/assets/
           sparse-checkout-cone-mode: false
 
@@ -902,7 +914,8 @@ jobs:
           # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
           sparse-checkout: |
             /*
-            !/docs/
+            !/docs/media/
+            !/docs/images/
             !/assets/
           sparse-checkout-cone-mode: false
 
@@ -1017,7 +1030,8 @@ jobs:
           # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
           sparse-checkout: |
             /*
-            !/docs/
+            !/docs/media/
+            !/docs/images/
             !/assets/
           sparse-checkout-cone-mode: false
 
@@ -1038,7 +1052,8 @@ jobs:
           # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
           sparse-checkout: |
             /*
-            !/docs/
+            !/docs/media/
+            !/docs/images/
             !/assets/
           sparse-checkout-cone-mode: false
 
