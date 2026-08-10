@@ -397,3 +397,21 @@ Feature: Webhook endpoints, signed outbound event delivery
       When the log is filtered to a budget or virtual-key event type
       Then the page is empty and its next cursor is null
       And the route documents that the log does not retain those families
+
+    # The log is a read over the same 13-month spend table the reconciliation
+    # pull reads, so the created range is part of the contract rather than a
+    # filter: unbounded, a single page sorts every month the organization has,
+    # cold storage included.
+
+    @integration
+    Scenario: The events log refuses a read with no created range
+      When the log is read with neither bound, or with only one of them
+      Then the response status is 400
+      And error.code = "validation_error"
+      And the refusal names the bound that is missing
+
+    @integration
+    Scenario: The events log refuses an inverted created range
+      When the log is read with a range that ends before it starts
+      Then the response status is 400
+      And error.code = "validation_error"

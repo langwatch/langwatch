@@ -84,7 +84,7 @@ jobs:
       # not istanbul), so frequency was the only lever left.
       coverage: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           # The gate reads no working-tree content: on pull_request events
           # dorny/paths-filter takes the changed-file list from the API, and
@@ -130,15 +130,18 @@ jobs:
               - 'platform/app/**'
               - 'packages/**'
               - 'skills/**'
+              - 'plugins/**'
               - 'tools/**'
               - 'mcp/typescript/**'
               - 'sdks/typescript/**'
               - 'sdks/python/**'
+              - 'sdks/go/**'
               - 'services/**'
               - 'pkg/**'
               - 'services/langevals/**'
               - 'langwatch_server/**'
               - 'dev/scripts/**'
+              - '.github/scripts/**'
               - '.github/workflows/langwatch-app-ci.yml'
 
   typecheck:
@@ -147,7 +150,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
@@ -212,7 +215,7 @@ jobs:
     timeout-minutes: 25
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
@@ -230,6 +233,14 @@ jobs:
         # into this file: a committed 32-byte hex literal is indistinguishable
         # from a leaked key, to a scanner and to a reader.
         run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
+      # @langwatch/api ships raw TypeScript the app inlines, so its own suite
+      # runs here rather than in a workflow of its own. Shard 1 only: the
+      # package suite is not sharded, and shard 1 exists in every matrix shape
+      # (drafts run [1]).
+      - name: Run @langwatch/api unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/api run test:unit
 
       - name: Run unit tests (shard ${{ matrix.shard }}/4)
         id: unit-tests
@@ -370,7 +381,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
@@ -514,7 +525,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -705,12 +716,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v5
         with:
           python-version: "3.12"
 
@@ -749,7 +760,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
@@ -775,7 +786,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
@@ -788,6 +799,13 @@ jobs:
       - name: Check OpenAPI completeness
         working-directory: platform/app
         run: pnpm check:openapi-completeness
+
+      # The completeness check only inspects operations already in the
+      # document. This one catches the route that never got there: a handler
+      # with no describeRoute, or one whose app the generator never imports.
+      - name: Check OpenAPI route coverage
+        working-directory: platform/app
+        run: pnpm check:openapi-route-coverage
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -806,15 +824,15 @@ jobs:
       CI: true
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 10.24.0
 
       - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
           node-version: 24
 
@@ -914,7 +932,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
       - name: Test extract-failures.sh
         run: bash .github/scripts/__tests__/extract-failures.test.sh
@@ -928,7 +946,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
       - uses: ./.github/actions/setup-pnpm-node
         with:

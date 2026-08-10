@@ -52,11 +52,14 @@ afterAll(async () => {
 
 describe("AiToolEntryService.ensureDefaultCatalog", () => {
   /** @scenario A fresh organization gets the full standard catalog with no admin action */
-  it("provisions all 8 standard tiles onto a zero-row org", async () => {
+  it("provisions all standard tiles onto a zero-row org", async () => {
     const organizationId = await createOrg("fresh");
 
     const result = await service.ensureDefaultCatalog({ organizationId });
-    expect(result).toEqual({ hasSeeded: true, created: 8 });
+    expect(result).toEqual({
+      hasSeeded: true,
+      created: STARTER_PACK_TILES.length,
+    });
 
     const rows = await prisma.aiToolEntry.findMany({
       where: { organizationId },
@@ -91,7 +94,7 @@ describe("AiToolEntryService.ensureDefaultCatalog", () => {
     const second = await service.ensureDefaultCatalog({ organizationId });
     expect(second).toEqual({ hasSeeded: false, created: 0 });
     expect(await prisma.aiToolEntry.count({ where: { organizationId } })).toBe(
-      8,
+      STARTER_PACK_TILES.length,
     );
   });
 
@@ -160,8 +163,10 @@ describe("AiToolEntryService.ensureDefaultCatalog", () => {
       where: { organizationId },
       select: { slug: true },
     });
-    expect(rows).toHaveLength(8);
-    expect(new Set(rows.map((r) => r.slug)).size).toBe(8);
+    expect(rows).toHaveLength(STARTER_PACK_TILES.length);
+    expect(new Set(rows.map((r) => r.slug)).size).toBe(
+      STARTER_PACK_TILES.length,
+    );
   });
 });
 

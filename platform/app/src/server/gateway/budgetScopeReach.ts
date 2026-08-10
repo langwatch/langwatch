@@ -5,8 +5,8 @@
  * The match is decided by GatewayBudgetRepository.applicableForRequest,
  * against scopes derived from the VK that served the request and from the
  * project its trace landed in, which for a key that is not scoped to
- * exactly one project is the organization's governance project, not the
- * project the key's team owns (see resolveTraceProject).
+ * exactly one project is usually the organization's governance project
+ * rather than the project the key's team owns.
  *
  * That makes two reasonable-looking configurations silently inert: a
  * project-scoped budget and a team-scoped key never interact, and neither
@@ -17,7 +17,7 @@
  */
 import type { GatewayBudget, PrismaClient } from "@prisma/client";
 
-import { resolveTraceProject } from "./scopeResolver";
+import { traceProjectsByIds } from "./scopeResolver";
 
 /**
  * The scopes one active key contributes. Mirrors ApplicableScopes, which is
@@ -25,7 +25,13 @@ import { resolveTraceProject } from "./scopeResolver";
  */
 type KeyReach = {
   organizationId: string;
-  teamId: string | null;
+  /**
+   * The team the key's traces land in, plus every team the key is scoped
+   * to. Both count, and they differ whenever the destination is the
+   * governance inbox, which is what used to make a team-scoped key look
+   * like it belonged to the governance team and nothing else.
+   */
+  teamIds: string[];
   projectId: string | null;
   virtualKeyId: string;
   principalUserId: string | null;
@@ -50,10 +56,11 @@ export type BudgetScopeReach = {
 
 /**
  * Resolve, once per organization, the scopes every active key can put on a
- * request. One `resolveTraceProject` call per key: keys are per-organization
- * and few, and the result is reused across every budget in the list. Group
- * membership is read for every principal in one query, so adding keys costs
- * no extra round-trips.
+ * request. The whole thing is a fixed handful of queries no matter how many
+ * keys the organization has: the keys' trace destinations are read in one
+ * batch, and group membership is read for every principal in one more. That
+ * matters because an organization running a project per customer has
+ * hundreds of keys, and this runs on every budget list.
  */
 async function loadKeyReach(
   prisma: PrismaClient,
@@ -64,27 +71,42 @@ async function loadKeyReach(
     include: { scopes: true },
   });
 
-  const groupIdsByPrincipal = await loadGroupIdsByPrincipal(
-    prisma,
-    organizationId,
-    keys.map((key) => key.principalUserId),
-  );
+  const [groupIdsByPrincipal, traceProjects] = await Promise.all([
+    loadGroupIdsByPrincipal(
+      prisma,
+      organizationId,
+      keys.map((key) => key.principalUserId),
+    ),
+    traceProjectsByIds(
+      prisma,
+      keys.map((key) => key.traceProjectId),
+    ),
+  ]);
 
-  const reach: KeyReach[] = [];
-  for (const key of keys) {
-    const traceProject = await resolveTraceProject(prisma, key);
-    reach.push({
+  return keys.map((key) => {
+    const traceProject = key.traceProjectId
+      ? traceProjects.get(key.traceProjectId)
+      : undefined;
+    return {
       organizationId: key.organizationId,
-      teamId: traceProject?.teamId ?? null,
+      teamIds: Array.from(
+        new Set(
+          [
+            traceProject?.teamId,
+            ...key.scopes
+              .filter((scope) => scope.scopeType === "TEAM")
+              .map((scope) => scope.scopeId),
+          ].filter((id): id is string => typeof id === "string" && id !== ""),
+        ),
+      ),
       projectId: traceProject?.id ?? null,
       virtualKeyId: key.id,
       principalUserId: key.principalUserId,
       groupIds: key.principalUserId
         ? (groupIdsByPrincipal.get(key.principalUserId) ?? [])
         : [],
-    });
-  }
-  return reach;
+    };
+  });
 }
 
 /**
@@ -118,13 +140,22 @@ async function loadGroupIdsByPrincipal(
   return byPrincipal;
 }
 
+/** The part of a budget that decides what it matches. */
+type ScopeRef = Pick<GatewayBudget, "scopeType" | "scopeId">;
+
 /** The same predicate applicableForRequest uses, evaluated in memory. */
-function budgetMatchesKey(budget: GatewayBudget, key: KeyReach): boolean {
+function budgetMatchesKey({
+  budget,
+  key,
+}: {
+  budget: ScopeRef;
+  key: KeyReach;
+}): boolean {
   switch (budget.scopeType) {
     case "ORGANIZATION":
       return budget.scopeId === key.organizationId;
     case "TEAM":
-      return budget.scopeId === key.teamId;
+      return key.teamIds.includes(budget.scopeId);
     case "PROJECT":
       return budget.scopeId === key.projectId;
     case "VIRTUAL_KEY":
@@ -152,29 +183,73 @@ function budgetMatchesKey(budget: GatewayBudget, key: KeyReach): boolean {
   }
 }
 
-export async function resolveBudgetScopeReach(
-  prisma: PrismaClient,
-  organizationId: string,
-  budgets: GatewayBudget[],
-): Promise<Map<string, BudgetScopeReach>> {
+export async function resolveBudgetScopeReach({
+  prisma,
+  organizationId,
+  budgets,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  budgets: GatewayBudget[];
+}): Promise<Map<string, BudgetScopeReach>> {
   const out = new Map<string, BudgetScopeReach>();
   if (budgets.length === 0) return out;
 
   const keys = await loadKeyReach(prisma, organizationId);
-  const reachableProjectIds = Array.from(
+  const reachableProjectIds = tracedProjectIds(keys);
+
+  for (const budget of budgets) {
+    out.set(budget.id, {
+      budgetId: budget.id,
+      reachable: keys.some((key) => budgetMatchesKey({ budget, key })),
+      reachableProjectIds,
+    });
+  }
+  return out;
+}
+
+/**
+ * Reach for a scope no budget carries yet, so a budget that could never
+ * accrue can be refused at the moment it is written rather than found out
+ * from a report a week later.
+ *
+ * `activeKeyCount` is what separates "this cannot work" from "nothing has
+ * been set up yet": budget first, key second is the natural order, so an
+ * organization with no keys at all must never be told its budget is
+ * unreachable.
+ */
+export type ScopeReach = {
+  reachable: boolean;
+  /** Projects the organization's active keys actually trace into. */
+  reachableProjectIds: string[];
+  /** Active keys in the organization, whatever they reach. */
+  activeKeyCount: number;
+};
+
+export async function resolveScopeReach({
+  prisma,
+  organizationId,
+  scope,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  scope: ScopeRef;
+}): Promise<ScopeReach> {
+  const keys = await loadKeyReach(prisma, organizationId);
+  return {
+    reachable: keys.some((key) => budgetMatchesKey({ budget: scope, key })),
+    reachableProjectIds: tracedProjectIds(keys),
+    activeKeyCount: keys.length,
+  };
+}
+
+/** Where the organization's traffic lands today, deduplicated. */
+function tracedProjectIds(keys: KeyReach[]): string[] {
+  return Array.from(
     new Set(
       keys
         .map((k) => k.projectId)
         .filter((id): id is string => typeof id === "string"),
     ),
   );
-
-  for (const budget of budgets) {
-    out.set(budget.id, {
-      budgetId: budget.id,
-      reachable: keys.some((key) => budgetMatchesKey(budget, key)),
-      reachableProjectIds,
-    });
-  }
-  return out;
 }

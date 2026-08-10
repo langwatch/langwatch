@@ -4,6 +4,7 @@ import {
   ClipboardList,
   Database,
   Gauge,
+  GitPullRequest,
   ListTree,
   Settings as SettingsIcon,
   Sliders,
@@ -48,6 +49,7 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
   const isUsageActive = router.pathname === "/me";
   const isConfigureActive = router.pathname.startsWith("/me/configure");
   const isDevicesActive = router.pathname.startsWith("/me/devices");
+  const isPullRequestsActive = router.pathname.startsWith("/me/pull-requests");
   const isOrgSettingsActive =
     router.pathname === "/settings" ||
     (router.pathname.startsWith("/settings") &&
@@ -141,6 +143,13 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
                 showLabel={showExpanded}
               />
             )}
+            <SideMenuLink
+              icon={GitPullRequest}
+              label="Pull Requests"
+              href="/me/pull-requests"
+              isActive={isPullRequestsActive}
+              showLabel={showExpanded}
+            />
             {personalProjectSlug && features?.evaluations && (
               <SideMenuLink
                 icon={ClipboardList}

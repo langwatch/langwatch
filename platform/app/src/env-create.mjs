@@ -281,6 +281,32 @@ export function createEnvConfig() {
         .int()
         .positive()
         .default(10000),
+      // Per-trigger daily ceiling on CONFIRMED persist dispatches — the dataset
+      // rows and annotation-queue items an automation actually creates. Only
+      // customer-attributable volume is counted: match records, unconfirmed
+      // matches, debounce fan-out and retries are our amplification and are
+      // never charged here.
+      //
+      // The tiers are set against what a human can consume rather than what a
+      // machine can produce: annotation throughput is a few hundred items a day,
+      // and 1,000 matches the existing per-project daily email cap. A single
+      // contract can raise its own ceiling past the tier through
+      // `PlanInfo.maxTriggerPersistDispatchesPerDay`.
+      TRIGGER_PERSIST_DAILY_CAP_FREE: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(100),
+      TRIGGER_PERSIST_DAILY_CAP_PAID: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(1000),
+      TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(10000),
       DEMO_PROJECT_ID: z.string().optional(),
       DEMO_PROJECT_USER_ID: z.string().optional(),
       DEMO_PROJECT_SLUG: z.string().optional(),
@@ -301,6 +327,13 @@ export function createEnvConfig() {
       RESEND_API_KEY: z.string().optional(),
       S3_KEY_SALT: z.string().optional(),
       IS_SAAS: z.boolean().optional(),
+      // Instance-wide bearer credential for the self-hosted organization
+      // provisioning API (/api/organizations). Absent (the default) the
+      // family answers 404; it is also absent-by-construction on SaaS, where
+      // the route gate ignores the variable entirely. 32 characters minimum,
+      // the same floor as the gateway secrets: one value provisions
+      // organizations across the whole instance.
+      LANGWATCH_INSTANCE_ADMIN_API_KEY: z.string().min(32).optional(),
       // Browser tracing (ADR-058). Off unless explicitly enabled: it adds
       // frontend telemetry volume, and the ingest route it exports to is
       // inert without OTEL_EXPORTER_OTLP_ENDPOINT anyway.
@@ -383,11 +416,16 @@ export function createEnvConfig() {
       GITHUB_CLIENT_ID: z.string().optional(),
       GITHUB_CLIENT_SECRET: z.string().optional(),
 
-      // GitHub App used by Langy to open bot-authored PRs on repositories the
-      // App is installed on. Separate from the GITHUB_CLIENT_* identity-login
-      // app above. All optional: when the private key is unset the Langy GitHub
-      // feature is silently off, the connect card explains it is unavailable,
-      // and no installation token can be minted. Issue #4747.
+      // The GitHub App behind the organization's GitHub connection: Langy
+      // opens bot-authored pull requests through it, and pull-request linkage
+      // reads through it. Separate from the GITHUB_CLIENT_* identity-login app
+      // above. The names still say LANGY because they are set on every
+      // deployment; renaming them is an infra change of its own. All optional:
+      // when the private key is unset the integration is silently off, the
+      // settings card explains it is unavailable, and no installation token can
+      // be minted. Read through
+      // src/server/app-layer/github/githubAppConfig.ts, the only code site that
+      // names them.
       //   GITHUB_LANGY_APP_ID        — numeric App ID (JWT `iss`).
       //   GITHUB_LANGY_PRIVATE_KEY   — the App's RSA private key PEM (signs the
       //                                app JWT used to mint installation tokens).
@@ -412,6 +450,17 @@ export function createEnvConfig() {
       OKTA_CLIENT_ID: z.string().optional(),
       OKTA_CLIENT_SECRET: z.string().optional(),
       OKTA_ISSUER: z.string().optional(),
+
+      // OneLogin
+      ONELOGIN_CLIENT_ID: z.string().optional(),
+      ONELOGIN_CLIENT_SECRET: z.string().optional(),
+      ONELOGIN_ISSUER: z.string().optional(),
+
+      // Any other OpenID Connect provider. Its endpoints are discovered from
+      // the issuer, so there is nothing to configure beyond these three.
+      OIDC_CLIENT_ID: z.string().optional(),
+      OIDC_CLIENT_SECRET: z.string().optional(),
+      OIDC_ISSUER: z.string().optional(),
 
       POSTHOG_KEY: z.string().optional(),
       POSTHOG_HOST: z.string().optional(),
@@ -516,6 +565,12 @@ export function createEnvConfig() {
       TRIGGER_EMAIL_HOURLY_CAP: process.env.TRIGGER_EMAIL_HOURLY_CAP,
       TRIGGER_EMAIL_TENANT_DAILY_CAP:
         process.env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
+      TRIGGER_PERSIST_DAILY_CAP_FREE:
+        process.env.TRIGGER_PERSIST_DAILY_CAP_FREE,
+      TRIGGER_PERSIST_DAILY_CAP_PAID:
+        process.env.TRIGGER_PERSIST_DAILY_CAP_PAID,
+      TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE:
+        process.env.TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE,
       DEMO_PROJECT_ID: process.env.DEMO_PROJECT_ID,
       DEMO_PROJECT_USER_ID: process.env.DEMO_PROJECT_USER_ID,
       DEMO_PROJECT_SLUG: process.env.DEMO_PROJECT_SLUG,
@@ -535,6 +590,10 @@ export function createEnvConfig() {
       IS_SAAS:
         process.env.IS_SAAS === "1" ||
         process.env.IS_SAAS?.toLowerCase() === "true",
+      // Blank means unset, so a templated .env line with no value cannot take
+      // the whole deployment down over an optional credential.
+      LANGWATCH_INSTANCE_ADMIN_API_KEY:
+        process.env.LANGWATCH_INSTANCE_ADMIN_API_KEY || undefined,
       RUM_ENABLED:
         process.env.RUM_ENABLED === "1" ||
         process.env.RUM_ENABLED?.toLowerCase() === "true",
@@ -596,6 +655,12 @@ export function createEnvConfig() {
       OKTA_CLIENT_ID: process.env.OKTA_CLIENT_ID,
       OKTA_CLIENT_SECRET: process.env.OKTA_CLIENT_SECRET,
       OKTA_ISSUER: process.env.OKTA_ISSUER,
+      ONELOGIN_CLIENT_ID: process.env.ONELOGIN_CLIENT_ID,
+      ONELOGIN_CLIENT_SECRET: process.env.ONELOGIN_CLIENT_SECRET,
+      ONELOGIN_ISSUER: process.env.ONELOGIN_ISSUER,
+      OIDC_CLIENT_ID: process.env.OIDC_CLIENT_ID,
+      OIDC_CLIENT_SECRET: process.env.OIDC_CLIENT_SECRET,
+      OIDC_ISSUER: process.env.OIDC_ISSUER,
       OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
       CLICKHOUSE_CLUSTER: process.env.CLICKHOUSE_CLUSTER,
       LANGWATCH_LICENSE_PUBLIC_KEY: process.env.LANGWATCH_LICENSE_PUBLIC_KEY,

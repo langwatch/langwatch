@@ -75,8 +75,8 @@ const logger = createLogger("langwatch:langy:router");
  *     the demo project, so a permission check alone would expose whatever
  *     Langy chat someone left there; refuse it explicitly.
  *  3. `enforceLangyAccess` — the authoritative rollout gate, the SAME decision
- *     the `langyGithub` / `langyEgress` routers and the GitHub install route
- *     use. Last, so membership is always proven before the flag is read.
+ *     the `langyEgress` router uses. Last, so membership is always proven
+ *     before the flag is read.
  *
  * The permission check must be the FIRST `.use()`: `permissionProcedureBuilder`
  * treats that slot specially and injects `enforcePermissionCheck` after it.

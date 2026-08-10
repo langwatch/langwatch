@@ -26,7 +26,7 @@ jobs:
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           # The gate reads no working-tree content: on pull_request events
           # dorny/paths-filter takes the changed-file list from the API, and
@@ -59,23 +59,28 @@ jobs:
     env:
       GOWORK: "off"
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.25'
           cache: true
+          cache-dependency-path: sdks/go/**/go.sum
 
-      - name: Install dependencies
+      # The SDK is a set of separate modules on purpose: importing one
+      # provider's instrumentation must never pull in another's SDK. A single
+      # `go test ./...` in the core therefore covers none of them, so walk
+      # every go.mod instead — test-all.sh vets, tests and gofmt-checks each
+      # module independently. It forwards its arguments to `go test`, so -race
+      # runs the detector: the SDK's span processing, streaming accumulators and
+      # exporters all run on the caller's goroutines, where a data race is a
+      # customer-visible corruption rather than a test-only artefact.
+      - name: Run tests for every module
         working-directory: ./sdks/go
-        run: go mod download
-
-      - name: Run tests
-        working-directory: ./sdks/go
-        run: go test -v ./...
+        run: ./test-all.sh -race
 
       - name: Install examples dependencies
         working-directory: ./sdks/go/examples
@@ -126,12 +131,12 @@ jobs:
     env:
       GOWORK: "off"
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.25'
           cache: true

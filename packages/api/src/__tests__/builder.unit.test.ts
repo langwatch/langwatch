@@ -731,7 +731,7 @@ describe("version forward-copying via builder", () => {
 // ---------------------------------------------------------------------------
 
 describe("OpenAPI responses", () => {
-  it("documents the configured success status", async () => {
+  it("documents the configured success status on the bare alias path", async () => {
     const app = buildTestService()
       .version("2025-03-15", (v) => {
         v.post(
@@ -743,12 +743,15 @@ describe("OpenAPI responses", () => {
       .build();
 
     const spec = await generateSpecs(app);
-    expect(
-      spec.paths["/api/test/2025-03-15/items"]?.post?.responses,
-    ).toHaveProperty("201");
-    expect(
-      spec.paths["/api/test/2025-03-15/items"]?.post?.responses,
-    ).not.toHaveProperty("200");
+    expect(spec.paths["/api/test/items"]?.post?.responses).toHaveProperty(
+      "201",
+    );
+    expect(spec.paths["/api/test/items"]?.post?.responses).not.toHaveProperty(
+      "200",
+    );
+    // Dated and latest mounts serve traffic but never reach the document.
+    expect(spec.paths["/api/test/2025-03-15/items"]).toBeUndefined();
+    expect(spec.paths["/api/test/latest/items"]).toBeUndefined();
   });
 
   it("adds a default success response for description-only routes", async () => {
@@ -761,9 +764,9 @@ describe("OpenAPI responses", () => {
       .build();
 
     const spec = await generateSpecs(app);
-    expect(
-      spec.paths["/api/test/2025-03-15/health"]?.get?.responses,
-    ).toHaveProperty("200");
+    expect(spec.paths["/api/test/health"]?.get?.responses).toHaveProperty(
+      "200",
+    );
   });
 });
 

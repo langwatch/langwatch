@@ -156,6 +156,7 @@ function buildPrisma() {
 describe("ApiKeyService — safety invariants (mocked)", () => {
   let prisma: ReturnType<typeof buildPrisma>["prisma"];
   let mockTx: ReturnType<typeof buildPrisma>["mockTx"];
+  let txState: ReturnType<typeof buildPrisma>["txState"];
   let service: ApiKeyService;
 
   beforeEach(() => {
@@ -163,6 +164,7 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
     const built = buildPrisma();
     prisma = built.prisma;
     mockTx = built.mockTx;
+    txState = built.txState;
     service = ApiKeyService.create(prisma);
     mockCheckPermission.mockResolvedValue(true);
   });
@@ -981,6 +983,45 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
             ],
           }),
         ).rejects.toThrow("not found or archived");
+      });
+    });
+  });
+
+  describe("create with no bindings", () => {
+    describe("when the key belongs to a user", () => {
+      it("refuses rather than minting a token authorized for nothing", async () => {
+        await expect(
+          service.create({
+            name: "Dead Personal Key",
+            userId: USER_ID,
+            organizationId: ORG_ID,
+            permissionMode: "all",
+            bindings: [],
+          }),
+        ).rejects.toMatchObject({ code: "api_key_scope_violation" });
+
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the key belongs to no user", () => {
+      it("still defaults a service key to organization-wide ADMIN", async () => {
+        const { apiKey } = await service.create({
+          name: "Headless Automation Key",
+          userId: null,
+          organizationId: ORG_ID,
+          permissionMode: "all",
+          bindings: [],
+        });
+
+        expect(apiKey).toBeDefined();
+        expect(txState.createdBindings).toEqual([
+          expect.objectContaining({
+            role: "ADMIN",
+            scopeType: "ORGANIZATION",
+            scopeId: ORG_ID,
+          }),
+        ]);
       });
     });
   });

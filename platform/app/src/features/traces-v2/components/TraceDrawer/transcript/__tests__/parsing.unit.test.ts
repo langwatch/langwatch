@@ -5,6 +5,7 @@ import {
   collectChatTextLeaves,
   extractSystemText,
   parseContentBlocks,
+  withBlockKeys,
 } from "../parsing";
 
 describe("coerceToChatMessages", () => {
@@ -325,6 +326,76 @@ describe("chat text leaves (translation splice)", () => {
     it("leaves the original messages unmutated", () => {
       applyChatTextLeaves(messages, { "0": "Hello world" });
       expect(messages[0]!.content).toBe("Hej världen");
+    });
+  });
+});
+
+/**
+ * A comment on one message of a transcript is stored against the key that
+ * message reads under, so the key has to be the same every time the transcript
+ * is read, and has to be gone when the message it named is.
+ * See specs/traces-v2/anchored-comments.feature.
+ */
+describe("block keys", () => {
+  const transcript = (assistantSays: string) =>
+    JSON.stringify([
+      { type: "text", text: "which policy covers water damage?" },
+      { type: "thinking", text: "look up the policy list" },
+      {
+        type: "tool_use",
+        id: "call-1",
+        name: "search_policies",
+        input: { query: "water damage" },
+      },
+      { type: "text", text: assistantSays },
+    ]);
+
+  const keysOf = (raw: string) =>
+    withBlockKeys(parseContentBlocks(raw)).map((block) => block.blockKey);
+
+  describe("given a transcript read once and read again with the same content", () => {
+    /** @scenario "A message keeps the same identity when the transcript is read again" */
+    it("gives every message the key it had before", () => {
+      const first = keysOf(transcript("policy 4471 covers it"));
+      const second = keysOf(transcript("policy 4471 covers it"));
+
+      expect(second).toEqual(first);
+      expect(new Set(first).size).toBe(first.length);
+    });
+
+    it("gives a message whose content changed a key nothing points at", () => {
+      const before = keysOf(transcript("policy 4471 covers it"));
+      const after = keysOf(transcript("policy 9902 covers it"));
+
+      const changed = after[after.length - 1]!;
+      expect(before).not.toContain(changed);
+      // The messages around it are untouched, so a comment on any of them
+      // still lands where it was left.
+      expect(after.slice(0, -1)).toEqual(before.slice(0, -1));
+    });
+  });
+
+  describe("given a transcript holding the same message twice", () => {
+    it("tells the two apart", () => {
+      const keys = keysOf(
+        JSON.stringify([
+          { type: "text", text: "say that again" },
+          { type: "text", text: "say that again" },
+        ]),
+      );
+
+      expect(keys[0]).not.toBe(keys[1]);
+    });
+  });
+
+  describe("given messages read out of another message", () => {
+    it("keeps their keys under the message they came from", () => {
+      const [nested] = withBlockKeys(
+        parseContentBlocks(JSON.stringify([{ type: "text", text: "inner" }])),
+        "outer-key",
+      );
+
+      expect(nested?.blockKey.startsWith("outer-key/")).toBe(true);
     });
   });
 });

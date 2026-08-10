@@ -14,12 +14,17 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
 
@@ -55,8 +60,51 @@ func (f *fakeResolver) ResolveKey(_ context.Context, _ string) (*domain.Bundle, 
 	return r.bundle, r.err
 }
 
-func (f *fakeResolver) FetchConfig(_ context.Context, _ string) (domain.BundleConfig, error) {
-	return domain.BundleConfig{}, nil
+func (f *fakeResolver) FetchConfig(_ context.Context, _, _ string) (domain.ConfigFetchResult, error) {
+	return domain.ConfigFetchResult{}, nil
+}
+
+// changeKindEnumRe pulls the body out of the control plane's enum block.
+var changeKindEnumRe = regexp.MustCompile(`(?s)enum GatewayChangeEventKind \{(.*?)\}`)
+
+// repoRoot walks up from the test's directory to the module root, so a test
+// can read a control-plane file without a relative path that breaks the
+// moment either side moves.
+func repoRoot(t *testing.T) string {
+	t.Helper()
+	dir, err := os.Getwd()
+	require.NoError(t, err)
+	for {
+		if _, statErr := os.Stat(filepath.Join(dir, "go.mod")); statErr == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		require.NotEqual(t, dir, parent, "no go.mod above the test directory")
+		dir = parent
+	}
+}
+
+// changeKindsFromSchema reads GatewayChangeEventKind out of the Prisma schema,
+// the only source of truth for what the change feed can emit. Reading the
+// schema rather than restating the list here is what makes a kind added
+// upstream fail a test instead of arriving as a production warning.
+func changeKindsFromSchema(t *testing.T) []string {
+	t.Helper()
+	body, err := os.ReadFile(filepath.Join(repoRoot(t), "platform", "app", "prisma", "schema.prisma"))
+	require.NoError(t, err)
+	block := changeKindEnumRe.FindSubmatch(body)
+	require.NotNil(t, block, "GatewayChangeEventKind is not in schema.prisma; this test is looking in the wrong place")
+
+	var kinds []string
+	for _, line := range strings.Split(string(block[1]), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "//") {
+			continue
+		}
+		kinds = append(kinds, line)
+	}
+	require.NotEmpty(t, kinds, "the enum parsed to nothing")
+	return kinds
 }
 
 func newService(t *testing.T, opts Options) (*Service, *observer.ObservedLogs) {
@@ -85,7 +133,7 @@ func freshBundle(vkID string, exp time.Time) *domain.Bundle {
 func seedExpiredEntry(t *testing.T, svc *Service, rawKey, vkID string, staleness time.Duration) {
 	t.Helper()
 	originalExp := time.Now().Add(-staleness)
-	svc.storeL1(hashKey(rawKey), freshBundle(vkID, originalExp))
+	svc.storeL1(hashKey(rawKey), freshBundle(vkID, originalExp), "")
 }
 
 // --- AuthRejection class -----------------------------------------------------
@@ -274,14 +322,14 @@ func TestApplyChange_ModelProviderUpdatedEvictsMatchingModelProvider(t *testing.
 			ID:         "model-provider-1",
 			ProviderID: domain.ProviderOpenAI,
 		}}},
-	})
+	}, "")
 	svc.storeL1(otherKey, &domain.Bundle{
 		VirtualKeyID: "vk-other",
 		Config: domain.BundleConfig{Credentials: []domain.Credential{{
 			ID:         "model-provider-2",
 			ProviderID: domain.ProviderOpenAI,
 		}}},
-	})
+	}, "")
 
 	svc.applyChange("", CacheChange{
 		Kind:            ChangeKindProviderBindingUpdated,
@@ -310,8 +358,8 @@ func TestApplyChange_BudgetMutationWithoutProjectIDEvictsOrganization(t *testing
 		t.Run(kind, func(t *testing.T) {
 			matchingKey := hashKey("vk-lw-budget-matching-" + kind)
 			otherKey := hashKey("vk-lw-budget-other-" + kind)
-			svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"})
-			svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"})
+			svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"}, "")
+			svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"}, "")
 
 			svc.applyChange("org-1", CacheChange{Kind: kind})
 
@@ -335,8 +383,8 @@ func TestApplyChange_VkDisableAndEnableEvictTheKey(t *testing.T) {
 		t.Run(kind, func(t *testing.T) {
 			matchingKey := hashKey("vk-lw-lifecycle-matching-" + kind)
 			otherKey := hashKey("vk-lw-lifecycle-other-" + kind)
-			svc.storeL1(matchingKey, &domain.Bundle{VirtualKeyID: "vk-flipped"})
-			svc.storeL1(otherKey, &domain.Bundle{VirtualKeyID: "vk-untouched"})
+			svc.storeL1(matchingKey, &domain.Bundle{VirtualKeyID: "vk-flipped"}, "")
+			svc.storeL1(otherKey, &domain.Bundle{VirtualKeyID: "vk-untouched"}, "")
 
 			svc.applyChange("org-1", CacheChange{Kind: kind, VirtualKeyID: "vk-flipped"})
 
@@ -344,6 +392,183 @@ func TestApplyChange_VkDisableAndEnableEvictTheKey(t *testing.T) {
 			_, isOtherPresent := svc.l1.Get(otherKey)
 			assert.False(t, isMatchingPresent, "a disabled or enabled key must be evicted so the next request re-resolves its status")
 			assert.True(t, isOtherPresent, "unrelated keys must remain cached")
+		})
+	}
+}
+
+/** @scenario "an edited routing policy evicts the organization's cached bundles" */
+func TestApplyChange_RoutingPolicyUpdatedEvictsOrganization(t *testing.T) {
+	resolver := &fakeResolver{}
+	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
+
+	matchingKey := hashKey("vk-lw-policy-matching")
+	otherKey := hashKey("vk-lw-policy-other")
+	svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"}, "")
+	svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"}, "")
+
+	svc.applyChange("org-1", CacheChange{Kind: ChangeKindRoutingPolicyUpdated})
+
+	_, isMatchingPresent := svc.l1.Get(matchingKey)
+	_, isOtherPresent := svc.l1.Get(otherKey)
+	assert.False(t, isMatchingPresent, "a routing-policy edit must evict the polled organization")
+	assert.True(t, isOtherPresent, "other organizations must remain cached")
+}
+
+/** @scenario "a deleted routing policy evicts the organization's cached bundles" */
+func TestApplyChange_RoutingPolicyDeletedEvictsOrganization(t *testing.T) {
+	resolver := &fakeResolver{}
+	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
+
+	matchingKey := hashKey("vk-lw-policy-deleted-matching")
+	otherKey := hashKey("vk-lw-policy-deleted-other")
+	svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"}, "")
+	svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"}, "")
+
+	svc.applyChange("org-1", CacheChange{Kind: ChangeKindRoutingPolicyDeleted})
+
+	_, isMatchingPresent := svc.l1.Get(matchingKey)
+	_, isOtherPresent := svc.l1.Get(otherKey)
+	assert.False(t, isMatchingPresent, "a routing-policy deletion must evict the polled organization")
+	assert.True(t, isOtherPresent, "other organizations must remain cached")
+}
+
+/** @scenario "a cache-rule mutation evicts the organization's cached bundles" */
+func TestApplyChange_CacheRuleMutationEvictsOrganization(t *testing.T) {
+	resolver := &fakeResolver{}
+	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
+
+	for _, kind := range []string{
+		ChangeKindCacheRuleCreated,
+		ChangeKindCacheRuleUpdated,
+		ChangeKindCacheRuleDeleted,
+	} {
+		t.Run(kind, func(t *testing.T) {
+			matchingKey := hashKey("vk-lw-cache-rule-matching-" + kind)
+			otherKey := hashKey("vk-lw-cache-rule-other-" + kind)
+			svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"}, "")
+			svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"}, "")
+
+			svc.applyChange("org-1", CacheChange{Kind: kind})
+
+			_, isMatchingPresent := svc.l1.Get(matchingKey)
+			_, isOtherPresent := svc.l1.Get(otherKey)
+			assert.False(t, isMatchingPresent, "a cache-rule mutation must evict the polled organization")
+			assert.True(t, isOtherPresent, "other organizations must remain cached")
+		})
+	}
+}
+
+// --- Grace-window classification ---------------------------------------------
+
+/** @scenario "the grace window moves the hard cap, not the bundle's own expiry" */
+func TestResolve_HardGrace_MovesTheCapNotTheExpiry(t *testing.T) {
+	const cachedCred = "cred-from-cache"
+	const freshCred = "cred-from-control-plane"
+
+	cases := []struct {
+		name      string
+		hardGrace time.Duration
+		expiresIn time.Duration
+		wantCred  string
+		wantCalls int64
+	}{
+		// A bundle inside its own expiry serves untouched, whatever the cap
+		// is doing. The negative case is the one that used to diverge: the
+		// cap sits an hour in the PAST, so testing the cap first threw away a
+		// credential that had not expired.
+		{"a positive grace serves a bundle inside its expiry", time.Hour, 10 * time.Minute, cachedCred, 0},
+		{"a zero grace takes the default and serves it", 0, 10 * time.Minute, cachedCred, 0},
+		{"a negative grace still serves a bundle inside its expiry", -time.Hour, 10 * time.Minute, cachedCred, 0},
+		// Past its own expiry, the control plane decides.
+		{"a positive grace refreshes an expired bundle before serving", time.Hour, -30 * time.Second, freshCred, 1},
+		{"a negative grace refuses to serve an expired bundle", -time.Hour, -30 * time.Second, freshCred, 1},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fresh := freshBundle("vk_fresh", time.Now().Add(1*time.Hour))
+			fresh.Credentials = []domain.Credential{{ID: freshCred}}
+			fetcher := &fakeConfigFetcher{
+				cfg: domain.BundleConfig{Credentials: []domain.Credential{{ID: freshCred}}},
+			}
+			fetcher.returns = []resolverReturn{{bundle: fresh}}
+			svc, _ := newService(t, Options{
+				Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher,
+				HardGrace: tc.hardGrace, RefreshThreshold: time.Second,
+			})
+
+			rawKey := "vk-lw-grace-" + tc.name
+			cached := freshBundle("vk_cached", time.Now().Add(tc.expiresIn))
+			cached.Credentials = []domain.Credential{{ID: cachedCred}}
+			svc.storeL1(hashKey(rawKey), cached, "")
+
+			got, err := svc.Resolve(context.Background(), rawKey)
+
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			assert.Equal(t, tc.wantCred, got.Credentials[0].ID,
+				"the grace window must not decide whether a bundle inside its own expiry is servable")
+			assert.Equal(t, tc.wantCalls, fetcher.calls.Load(),
+				"and must not change how often the control plane is consulted")
+		})
+	}
+}
+
+/** @scenario "every kind the control plane can emit is acted on or ignored on purpose" */
+func TestApplyChange_EveryKindTheControlPlaneCanEmitIsAccountedFor(t *testing.T) {
+	for _, kind := range changeKindsFromSchema(t) {
+		t.Run(kind, func(t *testing.T) {
+			core, logs := observer.New(zap.WarnLevel)
+			resolver := &fakeResolver{}
+			svc, _ := newService(t, Options{
+				Resolver: resolver, ConfigFetcher: resolver, Logger: zap.New(core),
+			})
+			svc.storeL1(hashKey("vk-lw-accounted-"+kind), &domain.Bundle{
+				OrganizationID: "org-1",
+				VirtualKeyID:   "vk-accounted",
+			}, "")
+
+			svc.applyChange("org-1", CacheChange{
+				Kind:            kind,
+				VirtualKeyID:    "vk-accounted",
+				ModelProviderID: "model-provider-1",
+			})
+
+			assert.Empty(t, logs.FilterMessage("auth_cache_change_unhandled").All(),
+				"a kind the control plane can emit is either acted on or ignored by name; reaching the unknown-kind warn makes a routine event look like an incident")
+		})
+	}
+}
+
+/** @scenario "the evict log names the change kind that caused it" */
+func TestApplyChange_EvictLogNamesTheChangeKind(t *testing.T) {
+	resolver := &fakeResolver{}
+	for _, tc := range []struct{ kind, reason string }{
+		{ChangeKindRoutingPolicyUpdated, "routing_policy_updated"},
+		{ChangeKindRoutingPolicyDeleted, "routing_policy_deleted"},
+		{ChangeKindCacheRuleCreated, "cache_rule_created"},
+		{ChangeKindCacheRuleDeleted, "cache_rule_deleted"},
+		{ChangeKindBudgetDeleted, "budget_deleted"},
+		{ChangeKindVirtualKeyRevoked, "vk_revoked"},
+	} {
+		t.Run(tc.kind, func(t *testing.T) {
+			// auth_cache_change_evict is an info line, below newService's
+			// default observer level.
+			core, logs := observer.New(zap.InfoLevel)
+			svc, _ := newService(t, Options{
+				Resolver: resolver, ConfigFetcher: resolver, Logger: zap.New(core),
+			})
+			svc.storeL1(hashKey("vk-lw-reason-"+tc.kind), &domain.Bundle{
+				OrganizationID: "org-1",
+				VirtualKeyID:   "vk-reason",
+			}, "")
+
+			svc.applyChange("org-1", CacheChange{Kind: tc.kind, VirtualKeyID: "vk-reason"})
+
+			evictions := logs.FilterMessage("auth_cache_change_evict").All()
+			require.Len(t, evictions, 1, "the eviction must be logged")
+			assert.Equal(t, tc.reason, evictions[0].ContextMap()["reason"],
+				"an operator has to be able to tell a delete from an update")
 		})
 	}
 }
@@ -357,7 +582,7 @@ func TestRefreshBackground_TransportFailure_BumpsSoft(t *testing.T) {
 	rawKey := "vk-lw-bgtransport"
 	// Seed an entry near soft expiry but not past it (so background path is invoked).
 	originalExp := time.Now().Add(30 * time.Second)
-	svc.storeL1(hashKey(rawKey), freshBundle("vk_bgtransport", originalExp))
+	svc.storeL1(hashKey(rawKey), freshBundle("vk_bgtransport", originalExp), "")
 
 	beforeE, _ := svc.l1.Get(hashKey(rawKey))
 	_, beforeSoft, _ := beforeE.snapshot()
@@ -392,7 +617,7 @@ func TestRefreshBackground_AuthRejection_EvictsEntry(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
 	rawKey := "vk-lw-bgrevoked"
 	originalExp := time.Now().Add(30 * time.Second)
-	svc.storeL1(hashKey(rawKey), freshBundle("vk_bgrevoked", originalExp))
+	svc.storeL1(hashKey(rawKey), freshBundle("vk_bgrevoked", originalExp), "")
 
 	svc.refreshBackground(rawKey, hashKey(rawKey))
 
@@ -521,7 +746,9 @@ func init() {
 
 // --- ConfigTTL refresh --------------------------------------------------------
 
-// fakeConfigFetcher returns a programmable config, counting calls.
+// fakeConfigFetcher returns a programmable config, counting calls. It always
+// answers with the config, never a "still current" confirmation; the
+// conditional half of the endpoint is exercised by etagConfigFetcher below.
 type fakeConfigFetcher struct {
 	fakeResolver
 	cfg     domain.BundleConfig
@@ -529,9 +756,12 @@ type fakeConfigFetcher struct {
 	fetches atomic.Int64
 }
 
-func (f *fakeConfigFetcher) FetchConfig(_ context.Context, _ string) (domain.BundleConfig, error) {
+func (f *fakeConfigFetcher) FetchConfig(_ context.Context, _, _ string) (domain.ConfigFetchResult, error) {
 	f.fetches.Add(1)
-	return f.cfg, f.cfgErr
+	if f.cfgErr != nil {
+		return domain.ConfigFetchResult{}, f.cfgErr
+	}
+	return domain.ConfigFetchResult{Config: f.cfg}, nil
 }
 
 // backdateConfig makes the L1 entry's config look older than the TTL.
@@ -566,7 +796,7 @@ func TestResolve_FreshEntry_ConfigPastTTL_RefreshesConfigInBackground(t *testing
 	rawKey := "vk-lw-cfgttl_001"
 	bundle := freshBundle("vk_cfg_001", time.Now().Add(1*time.Hour))
 	bundle.Credentials = []domain.Credential{{ID: "cred-old"}}
-	svc.storeL1(hashKey(rawKey), bundle)
+	svc.storeL1(hashKey(rawKey), bundle, "")
 	backdateConfig(t, svc, rawKey, 2*time.Minute)
 
 	got, err := svc.Resolve(context.Background(), rawKey)
@@ -607,7 +837,7 @@ func TestResolve_FreshEntry_ConfigTTLDisabled_NeverRefreshes(t *testing.T) {
 	})
 
 	rawKey := "vk-lw-cfgttl_002"
-	svc.storeL1(hashKey(rawKey), freshBundle("vk_cfg_002", time.Now().Add(1*time.Hour)))
+	svc.storeL1(hashKey(rawKey), freshBundle("vk_cfg_002", time.Now().Add(1*time.Hour)), "")
 	backdateConfig(t, svc, rawKey, 10*time.Minute)
 
 	if _, err := svc.Resolve(context.Background(), rawKey); err != nil {
@@ -619,9 +849,10 @@ func TestResolve_FreshEntry_ConfigTTLDisabled_NeverRefreshes(t *testing.T) {
 	}
 }
 
+/** @scenario "a refresh the control plane cannot answer leaves the cached config serving" */
 func TestResolve_FreshEntry_ConfigRefreshFailure_KeepsStaleAndWaitsFullTTL(t *testing.T) {
 	fetcher := &fakeConfigFetcher{cfgErr: errors.New("control plane down")}
-	svc, _ := newService(t, Options{
+	svc, logs := newService(t, Options{
 		Resolver:         &fetcher.fakeResolver,
 		ConfigFetcher:    fetcher,
 		ConfigTTL:        60 * time.Second,
@@ -631,7 +862,7 @@ func TestResolve_FreshEntry_ConfigRefreshFailure_KeepsStaleAndWaitsFullTTL(t *te
 	rawKey := "vk-lw-cfgttl_003"
 	bundle := freshBundle("vk_cfg_003", time.Now().Add(1*time.Hour))
 	bundle.Credentials = []domain.Credential{{ID: "cred-old"}}
-	svc.storeL1(hashKey(rawKey), bundle)
+	svc.storeL1(hashKey(rawKey), bundle, "")
 	e := backdateConfig(t, svc, rawKey, 2*time.Minute)
 
 	if _, err := svc.Resolve(context.Background(), rawKey); err != nil {
@@ -669,6 +900,11 @@ func TestResolve_FreshEntry_ConfigRefreshFailure_KeepsStaleAndWaitsFullTTL(t *te
 	if n := fetcher.fetches.Load(); n != 1 {
 		t.Fatalf("expected exactly one fetch until next TTL, got %d", n)
 	}
+	// A safety net that quietly stops working is worse than one that fails
+	// loudly: the config keeps serving either way, and the warn is the only
+	// thing telling an operator the staleness bound is no longer held.
+	assert.Len(t, logs.FilterMessage("config_ttl_refresh_failed").All(), 1,
+		"a refresh the control plane could not answer must be reported")
 }
 
 // blockingConfigFetcher blocks inside FetchConfig until released, so a test
@@ -681,11 +917,11 @@ type blockingConfigFetcher struct {
 	fetches atomic.Int64
 }
 
-func (f *blockingConfigFetcher) FetchConfig(_ context.Context, _ string) (domain.BundleConfig, error) {
+func (f *blockingConfigFetcher) FetchConfig(_ context.Context, _, _ string) (domain.ConfigFetchResult, error) {
 	f.fetches.Add(1)
 	f.started <- struct{}{}
 	<-f.release
-	return f.cfg, nil
+	return domain.ConfigFetchResult{Config: f.cfg}, nil
 }
 
 // Regression: a background ConfigTTL refresh must not resurrect an entry that
@@ -712,7 +948,7 @@ func TestResolve_ConfigRefresh_EvictedMidFetch_NotResurrected(t *testing.T) {
 	h := hashKey(rawKey)
 	bundle := freshBundle("vk_cfg_race", time.Now().Add(1*time.Hour))
 	bundle.Credentials = []domain.Credential{{ID: "cred-old"}}
-	svc.storeL1(h, bundle)
+	svc.storeL1(h, bundle, "")
 	e := backdateConfig(t, svc, rawKey, 2*time.Minute)
 
 	// Triggering request serves the stale bundle and kicks off the refresh.
@@ -754,4 +990,181 @@ func TestResolve_ConfigRefresh_EvictedMidFetch_NotResurrected(t *testing.T) {
 	if n := fetcher.fetches.Load(); n != 1 {
 		t.Fatalf("expected exactly one config fetch, got %d", n)
 	}
+}
+
+// @scenario "A change kind this build does not act on is reported, not dropped"
+func TestApplyChange_UnhandledKindIsReported(t *testing.T) {
+	resolver := &fakeResolver{}
+	svc, logs := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
+
+	key := hashKey("vk-lw-unhandled-kind")
+	svc.storeL1(key, &domain.Bundle{OrganizationID: "org-1"}, "")
+
+	svc.applyChange("org-1", CacheChange{Kind: "SOMETHING_THIS_BUILD_PREDATES"})
+
+	// Not acting on it is fine and often right. Not saying so is how the
+	// CACHE_RULE_* kinds stayed unhandled from the day they shipped.
+	_, isPresent := svc.l1.Get(key)
+	assert.True(t, isPresent, "an unknown kind must not evict anything")
+
+	warnings := logs.FilterMessage("auth_cache_change_unhandled").All()
+	assert.Len(t, warnings, 1, "an unhandled kind must be reported once")
+	assert.Equal(t, "SOMETHING_THIS_BUILD_PREDATES", warnings[0].ContextMap()["kind"])
+}
+
+// --- Conditional config refresh -----------------------------------------------
+
+// etagConfigFetcher answers the config endpoint the way the control plane
+// does (contract §4.2): an If-None-Match that matches the key's current
+// revision is confirmed without a body, anything else gets the config and the
+// revision it was materialized at. The revision moves through edit(), so a
+// test can change a key between refreshes. Locked because the staleness
+// refresh runs on its own goroutine.
+type etagConfigFetcher struct {
+	fakeResolver
+
+	mu       sync.Mutex
+	revision string
+	cred     string
+	// dropETag models a response that carries no ETag header, which leaves
+	// the caller with no token to revalidate against next time.
+	dropETag bool
+	conds    []string
+}
+
+func (f *etagConfigFetcher) FetchConfig(_ context.Context, _, ifNoneMatch string) (domain.ConfigFetchResult, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.conds = append(f.conds, ifNoneMatch)
+	if ifNoneMatch != "" && ifNoneMatch == f.revision {
+		return domain.ConfigFetchResult{ETag: f.revision, NotModified: true}, nil
+	}
+	res := domain.ConfigFetchResult{
+		Config: domain.BundleConfig{Credentials: []domain.Credential{{ID: f.cred}}},
+	}
+	if !f.dropETag {
+		res.ETag = f.revision
+	}
+	return res, nil
+}
+
+// edit moves the key to a new revision carrying a new credential, the way an
+// admin mutation on the control plane does.
+func (f *etagConfigFetcher) edit(revision, cred string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.revision, f.cred = revision, cred
+}
+
+// conditionals reports the If-None-Match each fetch carried, in order.
+func (f *etagConfigFetcher) conditionals() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.conds...)
+}
+
+// awaitConfigRefresh blocks until the background config refresh the last
+// Resolve kicked off has finished. tryBeginConfigRefresh claims the slot
+// before the goroutine starts, so the flag is already set by the time Resolve
+// returns, and clearing it is the goroutine's last act.
+func awaitConfigRefresh(t *testing.T, e *entry) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		e.mu.Lock()
+		defer e.mu.Unlock()
+		return !e.configRefreshing
+	}, 2*time.Second, 5*time.Millisecond, "the background config refresh never finished")
+}
+
+// newETagService wires a service around an etagConfigFetcher whose key starts
+// at the given revision, and warms one cache entry through the cold path so
+// the entry carries whatever ETag that fetch came back with.
+func newETagService(t *testing.T, fetcher *etagConfigFetcher, rawKey string) (*Service, *entry) {
+	t.Helper()
+	fetcher.returns = []resolverReturn{{bundle: freshBundle("vk_etag", time.Now().Add(1*time.Hour))}}
+	svc, _ := newService(t, Options{
+		Resolver:         &fetcher.fakeResolver,
+		ConfigFetcher:    fetcher,
+		ConfigTTL:        60 * time.Second,
+		RefreshThreshold: time.Second,
+	})
+	_, err := svc.Resolve(context.Background(), rawKey)
+	require.NoError(t, err)
+	e, ok := svc.l1.Peek(hashKey(rawKey))
+	require.True(t, ok, "the cold resolve must leave an entry behind")
+	return svc, e
+}
+
+/** @scenario "the staleness refresh revalidates instead of re-downloading" */
+func TestResolve_ConfigTTLRefresh_IsConditional(t *testing.T) {
+	t.Run("when nothing about the key changed", func(t *testing.T) {
+		fetcher := &etagConfigFetcher{revision: "42", cred: "cred-current"}
+		rawKey := "vk-lw-etag-unchanged"
+		svc, e := newETagService(t, fetcher, rawKey)
+
+		backdateConfig(t, svc, rawKey, 2*time.Minute)
+		got, err := svc.Resolve(context.Background(), rawKey)
+		require.NoError(t, err)
+		awaitConfigRefresh(t, e)
+
+		assert.Equal(t, []string{"", "42"}, fetcher.conditionals(),
+			"the cold fetch has nothing to offer; the safety-net refresh offers the revision that fetch came back with")
+		assert.Equal(t, "cred-current", got.Credentials[0].ID)
+		live, ok := svc.l1.Peek(hashKey(rawKey))
+		require.True(t, ok)
+		assert.Same(t, e, live, "a confirmation replaces nothing; the entry that was serving keeps serving")
+		assert.Equal(t, "cred-current", live.bundle.Credentials[0].ID)
+		// The clock restarts on a confirmation, not just on a download: the
+		// config was checked against the control plane and found current, so
+		// re-asking on the very next request would spend a round trip to
+		// learn the same thing.
+		assert.False(t, live.configStale(60*time.Second),
+			"a confirmed config is as fresh as a downloaded one")
+	})
+
+	t.Run("when the key's config changed", func(t *testing.T) {
+		fetcher := &etagConfigFetcher{revision: "42", cred: "cred-old"}
+		rawKey := "vk-lw-etag-changed"
+		svc, e := newETagService(t, fetcher, rawKey)
+
+		fetcher.edit("43", "cred-new")
+		backdateConfig(t, svc, rawKey, 2*time.Minute)
+		_, err := svc.Resolve(context.Background(), rawKey)
+		require.NoError(t, err)
+		awaitConfigRefresh(t, e)
+
+		live, ok := svc.l1.Peek(hashKey(rawKey))
+		require.True(t, ok)
+		assert.Equal(t, "cred-new", live.bundle.Credentials[0].ID,
+			"a revision the control plane has moved past must bring the new config in")
+		assert.Equal(t, "43", live.currentConfigETag(),
+			"and the entry must carry the new revision, or the next refresh revalidates against a dead one")
+
+		// Third pass: the new revision is what gets offered from here on.
+		backdateConfig(t, svc, rawKey, 2*time.Minute)
+		_, err = svc.Resolve(context.Background(), rawKey)
+		require.NoError(t, err)
+		awaitConfigRefresh(t, live)
+		assert.Equal(t, []string{"", "42", "43"}, fetcher.conditionals())
+	})
+
+	t.Run("when the control plane sent no version token", func(t *testing.T) {
+		fetcher := &etagConfigFetcher{revision: "42", cred: "cred-current", dropETag: true}
+		rawKey := "vk-lw-etag-absent"
+		svc, e := newETagService(t, fetcher, rawKey)
+
+		assert.Empty(t, e.currentConfigETag(), "there is no token to remember")
+
+		backdateConfig(t, svc, rawKey, 2*time.Minute)
+		_, err := svc.Resolve(context.Background(), rawKey)
+		require.NoError(t, err)
+		awaitConfigRefresh(t, e)
+
+		assert.Equal(t, []string{"", ""}, fetcher.conditionals(),
+			"with no token to offer, the refresh goes out unconditional rather than inventing one")
+		live, ok := svc.l1.Peek(hashKey(rawKey))
+		require.True(t, ok)
+		assert.Equal(t, "cred-current", live.bundle.Credentials[0].ID,
+			"and it comes back with the config, so the entry is never left without one")
+	})
 }

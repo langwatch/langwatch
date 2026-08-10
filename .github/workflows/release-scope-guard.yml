@@ -1,0 +1,65 @@
+name: release-scope-guard
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/scripts/guard-breaking-change-scope*.ts"
+      - ".github/release-please-config.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  breaking-change-scope:
+    name: breaking change stays in one component
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 24
+
+      - name: Check guard tests
+        run: node --test --experimental-strip-types .github/scripts/guard-breaking-change-scope.test.ts
+
+      # A squash merge puts the pull request title in the subject and the branch
+      # commit messages in the body, so those are the two places a breaking
+      # marker can reach main from. Both arrive as JSON strings, one per line,
+      # so a crafted title cannot escape into the shell or into the guard input.
+      - name: Collect the pull request title, commits and files
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" \
+            --jq '.[].filename' > changed-files.txt
+          gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/commits" \
+            --jq '.[].commit.message | @json' > commit-messages.txt
+          jq -Rn 'env.PR_TITLE' >> commit-messages.txt
+
+      - name: Check the breaking change stays in one release component
+        if: github.event_name == 'pull_request'
+        env:
+          ACKNOWLEDGED: ${{ contains(github.event.pull_request.labels.*.name, 'multi-component-major') }}
+        run: |
+          if [ "$ACKNOWLEDGED" = "true" ]; then
+            echo "multi-component-major label present, a major on every touched component is intended"
+            exit 0
+          fi
+          node --experimental-strip-types \
+            .github/scripts/guard-breaking-change-scope.ts \
+            . changed-files.txt commit-messages.txt

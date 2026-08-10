@@ -12,9 +12,49 @@
  * The token format is `vk-lw-<ulid>` with no live/test discriminator;
  * the gateway never branches on environment, so there is no env field.
  */
+import type { Prisma, PrismaClient } from "@prisma/client";
+
 import { metadataFromRow, type ResourceMetadata } from "./resourceMetadata";
+import { traceProjectsByIds } from "./scopeResolver";
 import type { VirtualKeyWithScopes } from "./virtualKey.repository";
 import { toWireEnum } from "./wireEnums";
+
+/**
+ * The one fact about a key's trace destination that is not on the key row.
+ *
+ * A key follows its stored pointer even after the project behind it is
+ * deleted: the spans keep landing there, intact, and reappear if the customer
+ * restores it. That is the right thing to do and the one thing a reader
+ * cannot work out from the row, since the destination still resolves and the
+ * traffic still flows. So it is read once per listing and published.
+ */
+export type TraceDestinationFacts = {
+  archivedProjectIds: ReadonlySet<string>;
+};
+
+/**
+ * Load the flag for a page of keys in one query, whatever the page's size.
+ * Passed to the DTO explicitly rather than defaulted, because a caller that
+ * forgets it would publish `trace_project_archived: false` for a deleted
+ * project, which is the failure this field exists to prevent.
+ */
+export async function loadTraceDestinationFacts({
+  client,
+  virtualKeys,
+}: {
+  client: PrismaClient | Prisma.TransactionClient;
+  virtualKeys: { traceProjectId: string | null }[];
+}): Promise<TraceDestinationFacts> {
+  const projects = await traceProjectsByIds(
+    client,
+    virtualKeys.map((vk) => vk.traceProjectId),
+  );
+  const archivedProjectIds = new Set<string>();
+  for (const project of projects.values()) {
+    if (project.archivedAt) archivedProjectIds.add(project.id);
+  }
+  return { archivedProjectIds };
+}
 
 export type VirtualKeyScopeEntry = {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
@@ -30,8 +70,17 @@ export type VirtualKeyCamelDto = {
   purpose: "user" | "langy";
   displayPrefix: string;
   principalUserId: string | null;
-  /** Explicit trace destination; grants no access to the key. */
+  /**
+   * Where this key's traces and costs land; grants no access to the key.
+   * Null only for a key written before the destination was stored, in an
+   * organization that had no governance project to fall back to.
+   */
   traceProjectId: string | null;
+  /**
+   * True when the customer has deleted the project the key traces into. The
+   * key keeps sending its traces there, so nothing else on the row says so.
+   */
+  traceProjectArchived: boolean;
   principalUser: { name: string | null; email: string | null } | null;
   /** The caller's own id for this key, unique per organization. */
   externalId: string | null;
@@ -58,6 +107,7 @@ export type VirtualKeySnakeDto = {
   display_prefix: string;
   principal_user_id: string | null;
   trace_project_id: string | null;
+  trace_project_archived: boolean;
   external_id: string | null;
   metadata: ResourceMetadata;
   /**
@@ -81,7 +131,10 @@ export type VirtualKeySnakeDto = {
 
 type BaseVk = Omit<VirtualKeyCamelDto, never>;
 
-function baseVk(vk: VirtualKeyWithScopes): BaseVk {
+function baseVk(
+  vk: VirtualKeyWithScopes,
+  facts: TraceDestinationFacts,
+): BaseVk {
   return {
     id: vk.id,
     organizationId: vk.organizationId,
@@ -97,6 +150,9 @@ function baseVk(vk: VirtualKeyWithScopes): BaseVk {
     displayPrefix: vk.displayPrefix,
     principalUserId: vk.principalUserId,
     traceProjectId: vk.traceProjectId ?? null,
+    traceProjectArchived: vk.traceProjectId
+      ? facts.archivedProjectIds.has(vk.traceProjectId)
+      : false,
     principalUser: vk.principalUser
       ? { name: vk.principalUser.name, email: vk.principalUser.email }
       : null,
@@ -117,16 +173,24 @@ function baseVk(vk: VirtualKeyWithScopes): BaseVk {
   };
 }
 
-export function toVirtualKeyCamelDto(
-  vk: VirtualKeyWithScopes,
-): VirtualKeyCamelDto {
-  return baseVk(vk);
+export function toVirtualKeyCamelDto({
+  virtualKey,
+  facts,
+}: {
+  virtualKey: VirtualKeyWithScopes;
+  facts: TraceDestinationFacts;
+}): VirtualKeyCamelDto {
+  return baseVk(virtualKey, facts);
 }
 
-export function toVirtualKeySnakeDto(
-  vk: VirtualKeyWithScopes,
-): VirtualKeySnakeDto {
-  const base = baseVk(vk);
+export function toVirtualKeySnakeDto({
+  virtualKey,
+  facts,
+}: {
+  virtualKey: VirtualKeyWithScopes;
+  facts: TraceDestinationFacts;
+}): VirtualKeySnakeDto {
+  const base = baseVk(virtualKey, facts);
   return {
     id: base.id,
     organization_id: base.organizationId,
@@ -137,6 +201,7 @@ export function toVirtualKeySnakeDto(
     display_prefix: base.displayPrefix,
     principal_user_id: base.principalUserId,
     trace_project_id: base.traceProjectId,
+    trace_project_archived: base.traceProjectArchived,
     external_id: base.externalId,
     metadata: base.metadata,
     scopes: base.scopes.map((s) => ({

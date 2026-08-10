@@ -33,7 +33,7 @@ vi.mock("~/server/evaluations/evaluators", () => ({
         passed: { description: "The verdict given by the LLM" },
       },
     },
-    "legacy/ragas_answer_relevancy": {
+    "ragas/response_relevancy": {
       name: "Answer Relevancy",
       requiredFields: ["input", "output"],
       optionalFields: ["contexts", "expected_contexts"],
@@ -126,7 +126,7 @@ describe("EvaluatorService", () => {
         findById: vi.fn().mockResolvedValue({
           id: "eval-3",
           type: "evaluator",
-          config: { evaluatorType: "legacy/ragas_answer_relevancy" },
+          config: { evaluatorType: "ragas/response_relevancy" },
         } as unknown as Evaluator),
       } as unknown as EvaluatorRepository;
 
@@ -216,7 +216,7 @@ describe("EvaluatorService", () => {
         findById: vi.fn().mockResolvedValue({
           id: "eval-3",
           type: "evaluator",
-          config: { evaluatorType: "legacy/ragas_answer_relevancy" },
+          config: { evaluatorType: "ragas/response_relevancy" },
         } as unknown as Evaluator),
       } as unknown as EvaluatorRepository;
 

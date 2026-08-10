@@ -352,6 +352,16 @@ evicted key refetches and enforces against the new totals. The 60s
 bounds staleness when a change event is missed or arrives while the gateway is
 disconnected.
 
+**Routing policies and cache rules take the same route.** A policy edit or
+delete (`ROUTING_POLICY_UPDATED` / `ROUTING_POLICY_DELETED`) and any cache-rule
+mutation (`CACHE_RULE_CREATED` / `CACHE_RULE_UPDATED` / `CACHE_RULE_DELETED`)
+also evict every bundle of the polled organization. Both are folded into the
+bundle by the materialiser and neither leaves an id on it to join back on, so
+the organization is the finest key available, the same position a budget event
+without a `project_id` is in. Deleting a policy also releases the keys that
+pointed at it, in the same transaction: the pointer is cleared and the key's
+routing mode moves off `POLICY`, which cannot exist without one.
+
 **The one read a bundle cannot carry.** A per-end-user budget is a template:
 one budget row governs a separate allowance for every end user it has seen, a
 fan-out the bundle cannot bake without the control plane enumerating every
@@ -690,13 +700,16 @@ Pattern (from Bifrost `ObservabilityPlugin.Inject(trace)`):
 
 ## 9. Auth cache strategy (gateway side)
 
-Three layers, documented here so Go code + infra agree:
+Documented here so Go code + infra agree:
 
-1. **L1 in-memory LRU:** 64k entries, TTL = JWT `exp`. Resolved JWT cached by SHA-256(vk_plain). Zero-RTT hot path.
-2. **L2 Redis (optional):** same key, shared across gateway nodes. TTL = JWT `exp`. `$LW_GATEWAY_REDIS_URL` env toggles. When L2 miss, one node wins the resolve; others read cached.
-3. **L3 bootstrap-pull (enterprise opt-in):** on startup, gateway calls `GET /api/internal/gateway/bootstrap` → paginated stream of all non-revoked VKs' JWTs. Enables gateway to serve traffic when control-plane is offline. Flag: `$LW_GATEWAY_BOOTSTRAP_PULL=true`.
+1. **L1 in-memory LRU:** 10k entries by default (`Options.LRUSize`; the chart's `cache.lruSize` is not wired yet). Resolved JWT cached by SHA-256(vk_plain). Zero-RTT hot path. One per pod, shared with nothing: a cross-node tier buys a warm start that a rolling deploy pays for anyway, and costs an invalidation path that has to reach it.
 
-Background refresh: single goroutine long-polls `/api/internal/gateway/changes?since=<rev>` with 25s timeout. On diff → re-fetch affected VK configs and invalidate L1/L2 entries.
+   JWT `exp` bounds normal freshness, it is not the eviction point. Past `exp` an entry is refreshed before it serves, and if that refresh fails for transport reasons the entry keeps serving while its soft expiry is bumped, up to a hard cap of `exp + LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default 6h, negative disables the grace entirely). An auth-class rejection evicts immediately at any point.
+2. **Bootstrap-pull (enterprise opt-in):** on startup, gateway calls `GET /api/internal/gateway/bootstrap` → paginated stream of all non-revoked VKs' JWTs. Enables gateway to serve traffic when control-plane is offline. Flag: `LW_GATEWAY_BOOTSTRAP_PULL=true`, the same name §6 uses. Nothing reads it yet, so it is a name this document reserves rather than one the binary honors.
+
+Background refresh: single goroutine long-polls `/api/internal/gateway/changes?since=<rev>` with 25s timeout. On diff → re-fetch affected VK configs and invalidate the matching L1 entries.
+
+Config staleness is bounded by a TTL refresh underneath the change feed, and that refresh is conditional: it sends `If-None-Match: <etag>` to §4.2 and takes the 304 as "keep the bundle, restart the staleness clock". A key nobody changed costs the control plane a revision lookup rather than a full config materialization.
 
 No filesystem-persisted secrets. JWTs and configs are in-memory only; on restart we re-fetch.
 

@@ -20,7 +20,7 @@ let mockTraceListResult = {
   isFetching: false,
   isPreviousData: false,
   isError: false,
-  error: null,
+  error: null as unknown,
   newIds: new Set<string>(),
 };
 
@@ -28,7 +28,30 @@ vi.mock("../../../hooks/useTraceList", () => ({
   useTraceList: () => mockTraceListResult,
 }));
 
+// ─── Mutable state for useSessionGroups mock ──────────────────────────────────
+
+let mockSessionGroupsResult = {
+  groups: [] as { conversationId: string }[],
+  totalHits: 0,
+  nextCursor: null as unknown,
+  isLoading: false,
+  isFetching: false,
+  isPreviousData: false,
+  isError: false,
+  error: null as unknown,
+};
+
+vi.mock("../../../hooks/useSessionGroups", () => ({
+  useSessionGroups: () => mockSessionGroupsResult,
+  SESSIONS_MAX_PAGE_SIZE: 100,
+}));
+
 // ─── viewStore mock — returns activeLens so TraceTable doesn't bail early ────
+
+// Which lens the table renders. The flat grouping walks the trace list, the
+// by-conversation grouping walks the session rollups, and both read their
+// gating through the same table shell.
+let mockGrouping: "flat" | "by-conversation" = "flat";
 
 vi.mock("../../../stores/viewStore", () => ({
   useViewStore: (selector: (s: unknown) => unknown) =>
@@ -39,10 +62,11 @@ vi.mock("../../../stores/viewStore", () => ({
   getEffectiveLens: (s: { activeLensId: string }) => ({
     id: s.activeLensId,
     label: "All traces",
-    grouping: "none",
+    grouping: mockGrouping,
     columns: [],
   }),
-  rowKindForGrouping: (_grouping: string) => "trace",
+  rowKindForGrouping: (grouping: string) =>
+    grouping === "by-conversation" ? "conversation" : "trace",
 }));
 
 // ─── Lens body stubs ──────────────────────────────────────────────────────────
@@ -121,6 +145,7 @@ afterEach(() => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockGrouping = "flat";
   mockTraceListResult = {
     data: [],
     totalHits: 0,
@@ -130,6 +155,16 @@ beforeEach(() => {
     isError: false,
     error: null,
     newIds: new Set(),
+  };
+  mockSessionGroupsResult = {
+    groups: [],
+    totalHits: 0,
+    nextCursor: null,
+    isLoading: false,
+    isFetching: false,
+    isPreviousData: false,
+    isError: false,
+    error: null,
   };
 });
 
@@ -219,6 +254,72 @@ describe("<TraceTable /> empty-state gating", () => {
           screen.queryByTestId("empty-filter-state"),
         ).not.toBeInTheDocument();
         expect(screen.getByTestId("trace-lens-body")).toBeInTheDocument();
+      });
+    });
+  });
+});
+
+describe("<TraceTable /> failed-read gating", () => {
+  describe("given the trace list query failed", () => {
+    describe("when the failure leaves no rows behind", () => {
+      // The failure mode this pins: a failed read and an empty result are
+      // indistinguishable by row count, and reporting the failure as "nothing
+      // matched" sends someone to widen a filter that was never the problem.
+      /** @scenario A failed session read is not reported as an empty result */
+      it("renders the error surface instead of the empty state", () => {
+        mockTraceListResult = {
+          ...mockTraceListResult,
+          data: [],
+          totalHits: 0,
+          isError: true,
+          error: new Error("clickhouse unreachable"),
+        };
+
+        renderTable();
+
+        expect(
+          screen.queryByTestId("empty-filter-state"),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.getByText(/could not load your traces/i),
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
+  // The sessions lens paginates its own server-grouped rows, so the failure it
+  // has to report is the session rollup's, not the trace list's. Without this
+  // the shell could stop forwarding the sessions query's `isError` entirely and
+  // the flat-lens case above would still pass.
+  describe("given the session rollup query failed", () => {
+    describe("when the by-conversation grouping is active", () => {
+      /** @scenario A failed session read is not reported as an empty result */
+      it("renders the error surface instead of the empty state", () => {
+        mockGrouping = "by-conversation";
+        mockSessionGroupsResult = {
+          ...mockSessionGroupsResult,
+          groups: [],
+          totalHits: 0,
+          isError: true,
+          error: new Error("clickhouse unreachable"),
+        };
+
+        renderTable();
+
+        expect(
+          screen.queryByTestId("empty-filter-state"),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.getByText(/could not load your sessions/i),
+        ).toBeInTheDocument();
+      });
+
+      it("still shows the empty state when the read genuinely came back empty", () => {
+        mockGrouping = "by-conversation";
+
+        renderTable();
+
+        expect(screen.getByTestId("empty-filter-state")).toBeInTheDocument();
       });
     });
   });

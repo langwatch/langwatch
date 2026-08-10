@@ -62,6 +62,40 @@ export type MediaPartData =
  */
 export const MAX_MEDIA_WALK_DEPTH = 8;
 
+/**
+ * Chat roles a media part can be attributed to. Same vocabulary the
+ * transcript parser accepts for a message envelope; anything else is treated
+ * as "no role", which every consumer reads as "show it wherever it would have
+ * shown before roles existed".
+ */
+export const MEDIA_PART_ROLES = [
+  "system",
+  "user",
+  "assistant",
+  "tool",
+  "developer",
+  "function",
+] as const;
+
+export type MediaPartRole = (typeof MEDIA_PART_ROLES)[number];
+
+const MEDIA_PART_ROLE_SET: ReadonlySet<string> = new Set(MEDIA_PART_ROLES);
+
+/** True for a role string the walk is willing to attribute a part to. */
+export function isMediaPartRole(value: unknown): value is MediaPartRole {
+  return typeof value === "string" && MEDIA_PART_ROLE_SET.has(value);
+}
+
+/**
+ * A collected media part together with the chat message the walk found it
+ * under. `role` is absent when the part was not nested in a message envelope
+ * (a bare data-URI attribute, a tool payload, a reply with no role wrapper).
+ */
+export interface CollectedMediaPart {
+  media: MediaPartData;
+  role?: MediaPartRole;
+}
+
 const AUDIO_FORMAT_MIME: Record<string, string> = {
   wav: "audio/wav",
   mp3: "audio/mpeg",
@@ -325,29 +359,56 @@ function bareStringToMediaData(value: string): MediaPartData | null {
  * surfaces its media.
  */
 export function collectMediaParts(value: unknown, depth = 0): MediaPartData[] {
-  const out: MediaPartData[] = [];
-  collectInto(value, depth, out);
+  return collectAnnotatedMediaParts(value, depth).map((part) => part.media);
+}
+
+/**
+ * The same walk as `collectMediaParts`, keeping the chat role each part was
+ * found under. One walker serves both: consumers that only render parts stay
+ * on the plain list, and consumers that must tell the caller's media from the
+ * agent's reply (the trace summary strips) read the role.
+ */
+export function collectAnnotatedMediaParts(
+  value: unknown,
+  depth = 0,
+): CollectedMediaPart[] {
+  const out: CollectedMediaPart[] = [];
+  collectInto({ value, depth, out });
   return out;
 }
 
-function collectInto(
-  value: unknown,
-  depth: number,
-  out: MediaPartData[],
-): void {
+function collectInto({
+  value,
+  depth,
+  out,
+  role,
+}: {
+  value: unknown;
+  depth: number;
+  out: CollectedMediaPart[];
+  /** Role of the nearest enclosing chat message, if the walk passed one. */
+  role?: MediaPartRole;
+}): void {
   if (value == null || depth > MAX_MEDIA_WALK_DEPTH) return;
+
+  const emit = (media: MediaPartData) => {
+    if (!isRenderableCollectedMedia(media)) return;
+    out.push(role ? { media, role } : { media });
+  };
 
   if (typeof value === "string") {
     const bare = bareStringToMediaData(value);
     if (bare) {
-      if (isRenderableCollectedMedia(bare)) out.push(bare);
+      emit(bare);
       return;
     }
     if (!containsRenderableMediaHints(value)) return;
     const trimmed = value.trim();
     if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return;
     try {
-      collectInto(JSON.parse(trimmed), depth + 1, out);
+      // The role carries across the nested-JSON hop: a message whose content
+      // is a stringified array of parts is still that message's content.
+      collectInto({ value: JSON.parse(trimmed), depth: depth + 1, out, role });
     } catch {
       // not JSON — nothing to collect
     }
@@ -355,7 +416,9 @@ function collectInto(
   }
 
   if (Array.isArray(value)) {
-    for (const el of value) collectInto(el, depth + 1, out);
+    for (const el of value) {
+      collectInto({ value: el, depth: depth + 1, out, role });
+    }
     return;
   }
 
@@ -366,12 +429,20 @@ function collectInto(
     // resolve to null here and are walked generically below.
     const media = mediaPartToMediaData(value);
     if (media) {
-      if (isRenderableCollectedMedia(media)) out.push(media);
+      emit(media);
       return;
     }
     const obj = value as Record<string, unknown>;
+    // A chat message envelope re-anchors the role for everything below it, so
+    // the innermost message wins for a nested transcript.
+    const nestedRole = isMediaPartRole(obj.role) ? obj.role : role;
     for (const key of Object.keys(obj)) {
-      collectInto(obj[key], depth + 1, out);
+      collectInto({
+        value: obj[key],
+        depth: depth + 1,
+        out,
+        role: nestedRole,
+      });
     }
   }
 }

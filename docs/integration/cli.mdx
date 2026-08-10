@@ -327,6 +327,8 @@ Run `langwatch <resource> --help` on any of these for subcommand-level options, 
 
 These commands manage org-wide resources and require an API key with organization-level permissions.
 
+The organization, members, invites, groups, roles, role bindings and SCIM token commands are available on Enterprise plans. Without one they exit with `enterprise_plan_required` and tell you what to do about it. Projects, teams, API keys and the self-hosted organizations command are not gated.
+
 ### Projects
 
 ```bash
@@ -369,9 +371,200 @@ langwatch api-keys create \
   --project-id proj_01HZX... \
   --project-id proj_02ABC...
 
+# Read one key and the access it carries
+langwatch api-keys get key_01HZX...
+
+# Rename it, or replace what it reaches
+langwatch api-keys update key_01HZX... --name "Staging (read only)"
+
 # Revoke a key (cannot be undone)
 langwatch api-keys revoke key_01HZX...
 ```
+
+Both `create` and `update` take the access flags: `--binding role:scopeType:scopeId` says what the key reaches and where, `--permission resource:action` narrows a restricted key to an exact list, and `--permission-mode` picks between `all`, `readonly` and `restricted`. The first two repeat. On `update`, the bindings you pass replace the key's existing ones rather than adding to them.
+
+```bash
+langwatch api-keys create \
+  --name "Nightly evaluations" \
+  --permission-mode restricted \
+  --binding CUSTOM:PROJECT:proj_01HZX... \
+  --permission project:view \
+  --permission evaluations:create
+```
+
+### Organization
+
+Read and update the organization your key belongs to. There is no id to pass: the credential decides which organization you are talking to.
+
+```bash
+langwatch organization get
+
+langwatch organization update --name "Acme" --support-contact support@acme.example
+
+# Presence and trace sharing are on/off pairs
+langwatch organization update --no-trace-sharing
+```
+
+Turning trace sharing off revokes the share links that were already handed out, not only future ones.
+
+### Members
+
+Manage the people already in the organization. Someone joins through an invite, so `invites` is where a new person starts.
+
+```bash
+langwatch members list
+langwatch members list --include-disabled
+
+langwatch members get user_01HZX...
+langwatch members update user_01HZX... --role ADMIN
+
+# Offboarding: disable keeps the membership, remove does not
+langwatch members disable user_01HZX...
+langwatch members enable user_01HZX...
+langwatch members remove user_01HZX...
+```
+
+`langwatch members access user_01HZX...` answers the auditor's question: everything the person can reach, and whether it comes from their organization role, a group, or a binding of their own.
+
+### Invites
+
+Invite people in, up to 50 at a time, landing on the teams you name. Accepting stays a browser step; everything before it is here.
+
+```bash
+# One person, one team
+langwatch invites create \
+  --email engineer@acme.example \
+  --role MEMBER \
+  --team team_01HZ...:MEMBER
+
+# A batch, from a file
+langwatch invites create --file ./new-hires.json
+
+langwatch invites list
+langwatch invites revoke <invite_id>
+```
+
+`--email` and `--team` repeat, and `--role` takes either one value for the whole batch or one per email. When people need different teams or a custom role each, `--json`, `--file` and `--stdin` take a JSON array of invites instead, the same entries the API takes. Every invite comes back with its acceptance link, so a deployment with no email provider still has something to send.
+
+### Teams
+
+Teams group projects and the people who work on them.
+
+```bash
+langwatch teams list
+langwatch teams get team_01HZ...
+langwatch teams create --name "Engineering"
+langwatch teams update team_01HZ... --name "Platform Engineering"
+langwatch teams archive team_01HZ...
+
+langwatch teams members list team_01HZ...
+langwatch teams members add team_01HZ... user_01HZX... --role MEMBER
+langwatch teams members remove team_01HZ... user_01HZX...
+```
+
+### Groups
+
+A group is a named set of people that carries role bindings, so everyone in it inherits the same access. Groups synced from your identity provider land here too.
+
+```bash
+langwatch groups list
+langwatch groups get group_01HZ...
+
+# Create with members and access in one call
+langwatch groups create \
+  --name "Backend Engineers" \
+  --member-id user_01HZX... \
+  --binding MEMBER:TEAM:team_01HZ...
+
+langwatch groups rename group_01HZ... --name "Platform Engineers"
+langwatch groups delete group_01HZ...
+
+langwatch groups members list group_01HZ...
+langwatch groups members add group_01HZ... user_01HZX...
+langwatch groups members remove group_01HZ... user_01HZX...
+
+langwatch groups bindings list group_01HZ...
+langwatch groups bindings add group_01HZ... \
+  --role MEMBER --scope-type TEAM --scope-id team_01HZ...
+langwatch groups bindings remove group_01HZ... <binding_id>
+```
+
+A group your identity provider owns cannot be renamed or have its membership edited here, because the provider is the source of truth for both. Its bindings are still yours to manage.
+
+### Roles
+
+Custom roles are named permission sets, for when `ADMIN`, `MEMBER` and `VIEWER` are not the shape you need.
+
+```bash
+# The catalog the permission keys come from
+langwatch roles permissions
+
+langwatch roles create \
+  --name "Release reviewer" \
+  --description "Reads traces and runs evaluations, changes nothing" \
+  --permission project:view \
+  --permission traces:view \
+  --permission evaluations:create
+
+langwatch roles list
+langwatch roles get <custom_role_id>
+langwatch roles delete <custom_role_id>
+```
+
+`langwatch roles update` replaces the permission set with the `--permission` flags you pass, so send the full list you want the role to end up with. A role something still holds cannot be deleted: the error says how many bindings and assignments are in the way.
+
+### Role bindings
+
+A binding is one sentence: this principal has this role, here. Users, groups and API keys are all principals.
+
+```bash
+langwatch role-bindings list
+langwatch role-bindings list --principal-type user --principal-id user_01HZX...
+langwatch role-bindings list --scope-type PROJECT --scope-id proj_01HZX...
+
+langwatch role-bindings create \
+  --principal-type group --principal-id group_01HZ... \
+  --role MEMBER \
+  --scope-type TEAM --scope-id team_01HZ...
+
+# A service credential, scoped to one project through a custom role
+langwatch role-bindings create \
+  --principal-type api-key --principal-id key_01HZX... \
+  --role CUSTOM --custom-role-id <custom_role_id> \
+  --scope-type PROJECT --scope-id proj_01HZX...
+
+langwatch role-bindings update <binding_id> --role ADMIN
+
+langwatch role-bindings delete <binding_id>
+```
+
+Creating a binding that already exists reports `role_binding_already_exists` rather than making a second one, so a provisioning script can run twice. Updating changes only the role a binding grants; the principal and the scope are the binding's identity, so moving a grant means deleting one binding and creating another.
+
+### SCIM tokens
+
+The bearer tokens your identity provider presents to the SCIM endpoints.
+
+```bash
+langwatch scim-tokens create --description "Okta production"
+langwatch scim-tokens list
+langwatch scim-tokens revoke <scim_token_id>
+```
+
+The token value is printed once, when you create it. To rotate: create a second token, store it in the provider, watch the new token's last-used time move, then revoke the old one.
+
+### Organizations (self-hosted)
+
+The one family that authenticates against the instance rather than an organization, because it runs before any organization exists. It is available on self-hosted deployments that have `LANGWATCH_INSTANCE_ADMIN_API_KEY` configured.
+
+```bash
+export LANGWATCH_INSTANCE_ADMIN_API_KEY=...
+
+langwatch organizations create --name "Acme" --slug acme
+langwatch organizations list
+langwatch organizations get organization_01HZ...
+```
+
+Creating an organization returns an organization admin API key alongside it, printed once. That key is what every command above takes, so an infrastructure-as-code run can go from an empty deployment to a configured organization without opening a browser. Pass the instance credential with `--instance-key` if you would rather not export it.
 
 ## Trigger experiments
 

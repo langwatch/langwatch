@@ -91,6 +91,62 @@ export const filterRestrictedModels = ({
       : isModelAllowedForFeature({ modelId: model, featureKey }),
   );
 
+const SCOPE_RANK = { PROJECT: 3, TEAM: 2, ORGANIZATION: 1 } as const;
+const scopeRank = (scopeType?: string): number =>
+  SCOPE_RANK[scopeType as keyof typeof SCOPE_RANK] ?? 0;
+
+/**
+ * Provider keys whose registry models in `mode` must not be offered,
+ * because the row that would actually serve them cannot.
+ *
+ * Availability follows the row execution picks, not the union of rows.
+ * A registry model is listed in no row's custom catalog, so
+ * `findRowServingModel` finds nothing and `resolveServingRow` keeps the
+ * scope-collapse winner — enabled beats disabled, then narrowest scope
+ * (ModelProviderService.isNarrower). An AI Studio row at organization
+ * scope therefore does NOT rescue an Agent Platform row at project scope:
+ * the project row wins and answers 404 on the embeddings endpoint.
+ *
+ * Ties inside the winning tier resolve conservatively — if any row that
+ * could win cannot serve the mode, the models stay hidden. Offering a
+ * model that fails is the defect this exists to remove; hiding one that
+ * would have worked costs a configuration change the customer can see.
+ *
+ * Exported for tests.
+ */
+export const providersWithoutRegistryModels = (
+  rows: Array<{
+    provider: string;
+    enabled: boolean;
+    scopeType?: string | undefined;
+    embeddingsUnsupported?: boolean | undefined;
+  }>,
+  mode: "chat" | "embedding",
+): Set<string> => {
+  const unavailable = new Set<string>();
+  if (mode !== "embedding") return unavailable;
+
+  const byProvider = new Map<string, typeof rows>();
+  for (const row of rows) {
+    if (!row.enabled) continue;
+    const group = byProvider.get(row.provider);
+    if (group) {
+      group.push(row);
+    } else {
+      byProvider.set(row.provider, [row]);
+    }
+  }
+
+  for (const [provider, group] of byProvider) {
+    const topTier = Math.max(...group.map((r) => scopeRank(r.scopeType)));
+    const contenders = group.filter((r) => scopeRank(r.scopeType) === topTier);
+    if (contenders.some((r) => r.embeddingsUnsupported)) {
+      unavailable.add(provider);
+    }
+  }
+  return unavailable;
+};
+
 export const useModelSelectionOptions = (
   options: string[],
   model: string,
@@ -136,11 +192,6 @@ export const useModelSelectionOptions = (
     };
   }
 
-  const allModels = filterRestrictedModels({
-    models: getCustomModels(providersByKey, options, mode),
-    featureKey: opts?.featureKey,
-  });
-
   // Build a set of custom model IDs for quick lookup
   const customModelIdSet = new Set<string>();
   for (const [providerKey, config] of Object.entries(providersByKey)) {
@@ -152,6 +203,26 @@ export const useModelSelectionOptions = (
       }
     }
   }
+
+  // Gemini's Agent Platform door serves chat but not the embeddings
+  // endpoint (verified live: :batchEmbedContents answers 404 on
+  // aiplatform.googleapis.com). Offering registry embedding models a
+  // credential cannot run would recreate the selectable-but-always-fails
+  // class this fold removed. Explicit custom models stay — they are the
+  // customer's own claim about what their endpoint serves.
+  const withoutRegistryModels = providersWithoutRegistryModels(
+    modelProviders.data?.providers ?? [],
+    mode,
+  );
+
+  const allModels = filterRestrictedModels({
+    models: getCustomModels(providersByKey, options, mode),
+    featureKey: opts?.featureKey,
+  }).filter(
+    (model) =>
+      customModelIdSet.has(model) ||
+      !withoutRegistryModels.has(model.split("/")[0]!),
+  );
 
   const displayNames = buildCustomModelDisplayNames(
     modelProviders.data?.providers ?? [],

@@ -94,11 +94,19 @@ func NewRouter(deps RouterDeps) http.Handler {
 	// exclude themselves from the counters.
 	r.Use(gatewaymetrics.Middleware(deps.Metrics))
 	r.Use(httpmiddleware.Recover())
+	// OUTSIDE Telemetry, and that ordering is load-bearing. Telemetry captures
+	// its context up front (`ctx := clog.With(r.Context(), ...)`) and logs
+	// `request_completed` with that same value AFTER the inner chain returns,
+	// so anything a later middleware adds to a DERIVED context is invisible to
+	// it. Registered after Telemetry, the tracer's trace_id/span_id landed on a
+	// context the access log never reads: 0 of 10,762 gateway records carried a
+	// trace_id, against 98.7% for langyagent, which wires the same two
+	// middlewares the other way round and says so in a comment.
+	r.Use(gatewaytracer.Middleware(gatewaytracer.DefaultSpanName))
 	r.Use(httpmiddleware.Telemetry())
 	if deps.Version != "" {
 		r.Use(httpmiddleware.Version("X-LangWatch-Gateway-Version", deps.Version))
 	}
-	r.Use(gatewaytracer.Middleware(gatewaytracer.DefaultSpanName))
 
 	if deps.Health != nil {
 		r.Get("/healthz", deps.Health.Liveness)
@@ -951,6 +959,10 @@ func writeJSONResponse(w http.ResponseWriter, resp *domain.Response) {
 		w.Header().Set(k, v)
 	}
 	w.Header().Set("Content-Type", ct)
+	// A provider must not be able to make its body look LangWatch-authored —
+	// same rule as writeUpstreamError. This lane forwards resp.Headers
+	// wholesale, so an upstream echoing this header must not survive.
+	w.Header().Del(herr.HandledErrorHeader)
 	if resp.StatusCode > 0 {
 		w.WriteHeader(resp.StatusCode)
 	}
@@ -1146,6 +1158,9 @@ func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
 	for k, v := range ue.Headers {
 		w.Header().Set(k, v)
 	}
+	// A provider must not be able to make its body look LangWatch-authored.
+	// herr.WriteHTTP sets this marker only for our handled envelopes.
+	w.Header().Del(herr.HandledErrorHeader)
 	if ue.Provider != "" {
 		w.Header().Set("X-LangWatch-Provider", ue.Provider)
 	}
@@ -1202,6 +1217,7 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrProviderError, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrProviderTimeout, http.StatusGatewayTimeout)
 	herr.RegisterStatus(domain.ErrBadRequest, http.StatusBadRequest)
+	herr.RegisterStatus(domain.ErrMissingModel, http.StatusBadRequest)
 	// Fail-closed attribution: the request is missing a required field
 	// (the end-user id) while a per-end-user template is active. A
 	// request-shape error like the two around it, so 400 per the house
@@ -1218,6 +1234,7 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrNotFound, http.StatusNotFound)
 	herr.RegisterStatus(domain.ErrInternal, http.StatusInternalServerError)
 	herr.RegisterStatus(domain.ErrNoProviderConfigured, http.StatusBadRequest)
+	herr.RegisterStatus(domain.ErrCodexSessionExpired, http.StatusUnauthorized)
 	// Retryable by contract: the control plane failed us, not the caller.
 	// A 5xx keeps client SDKs retrying instead of bubbling a config error.
 	herr.RegisterStatus(domain.ErrAuthUpstream, http.StatusServiceUnavailable)

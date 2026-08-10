@@ -173,3 +173,16 @@ Feature: Codex, the sign-in-with-OpenAI model provider
     When I open settings to add a model provider
     Then Codex is the last option in the list
     Because it only serves the coding-assistant surfaces, not general inference
+
+  # A project that ran "Setting up Codex for Langy" (above) has its FAST
+  # role pinned to a codex model. FAST also feeds the scenario-simulation
+  # agent-under-test resolution when a prompt target has no model of its
+  # own (see specs/scenarios/scenario-model-selection.feature and
+  # specs/scenarios/simulation-run-model-resolution.feature) — the coding
+  # default must never break an unrelated simulation run.
+  @integration
+  Scenario: Coding defaults never break a simulation run
+    Given a project whose FAST role default is a codex model
+    When a scenario run is prefetched for a workflow, code, or HTTP target
+    Then the prefetch succeeds
+    Because those target types never resolve the FAST-role coding default for the agent under test

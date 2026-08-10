@@ -7,15 +7,30 @@ import {
   Input,
   Text,
 } from "@chakra-ui/react";
-import { RoleBindingScopeType } from "@prisma/client";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
 import { Search } from "lucide-react";
-import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useState,
+} from "react";
 import { InputGroup } from "~/components/ui/input-group";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import {
+  getDefaultTeamRoleForOrganizationRole,
+  isBindingRoleAllowedForOrganizationRole,
+  type TeamRoleValue,
+} from "~/utils/memberRoleConstraints";
 
 // ── Shared display helpers ────────────────────────────────────────────────────
 
@@ -53,7 +68,6 @@ const SCOPE_TYPE_ITEMS = [
   { label: "Team", value: RoleBindingScopeType.TEAM },
   { label: "Project", value: RoleBindingScopeType.PROJECT },
 ];
-const scopeTypeCollection = createListCollection({ items: SCOPE_TYPE_ITEMS });
 
 const BASE_ROLE_ITEMS = [
   {
@@ -73,6 +87,102 @@ const BASE_ROLE_ITEMS = [
   },
 ];
 
+/** The roles a row may offer, given the seat of the member it is written for. */
+function roleItemsForSeat({
+  customRoles,
+  organizationRole,
+}: {
+  customRoles: Array<{ id: string; name: string }>;
+  organizationRole?: OrganizationUserRole;
+}) {
+  const items = [
+    ...BASE_ROLE_ITEMS,
+    ...customRoles.map((r) => ({
+      label: r.name,
+      value: `CUSTOM:${r.id}`,
+      customRoleId: r.id,
+    })),
+  ];
+  if (!organizationRole) return items;
+  return items.filter((item) =>
+    isBindingRoleAllowedForOrganizationRole({
+      organizationRole,
+      role: (item.customRoleId
+        ? `custom:${item.customRoleId}`
+        : item.value) as TeamRoleValue,
+    }),
+  );
+}
+
+/** The role a fresh row starts from: the seat's default, or Member without one. */
+function defaultRoleValueFor(organizationRole?: OrganizationUserRole): string {
+  return organizationRole
+    ? getDefaultTeamRoleForOrganizationRole(organizationRole)
+    : TeamUserRole.MEMBER;
+}
+
+/** A Lite Member seat has no organization-scoped rows, so the scope goes too. */
+function scopeTypeItemsForSeat(organizationRole?: OrganizationUserRole) {
+  return organizationRole === OrganizationUserRole.EXTERNAL
+    ? SCOPE_TYPE_ITEMS.filter(
+        (item) => item.value !== RoleBindingScopeType.ORGANIZATION,
+      )
+    : SCOPE_TYPE_ITEMS;
+}
+
+function scopeNameFor({
+  scopeType,
+  scopeId,
+  organizationName,
+  teamItems,
+  projectItems,
+}: {
+  scopeType: RoleBindingScopeType;
+  scopeId: string;
+  organizationName: string | undefined;
+  teamItems: Array<{ label: string; value: string }>;
+  projectItems: Array<{ label: string; value: string }>;
+}): string | undefined {
+  if (scopeType === RoleBindingScopeType.ORGANIZATION)
+    return organizationName ?? "Organization";
+  if (scopeType === RoleBindingScopeType.TEAM)
+    return teamItems.find((t) => t.value === scopeId)?.label;
+  return projectItems.find((p) => p.value === scopeId)?.label;
+}
+
+/**
+ * A seat switched to Lite Member mid-edit takes the picker with it: a
+ * selection now above the seat snaps to Viewer, and an organization scope
+ * in progress falls back to team.
+ */
+function pickerSnapForSeat({
+  organizationRole,
+  roleValue,
+  customRoleId,
+  scopeType,
+}: {
+  organizationRole?: OrganizationUserRole;
+  roleValue: string;
+  customRoleId?: string;
+  scopeType: RoleBindingScopeType;
+}): { snapRoleToViewer: boolean; snapScopeToTeam: boolean } {
+  if (!organizationRole) {
+    return { snapRoleToViewer: false, snapScopeToTeam: false };
+  }
+  const selectionAllowed = isBindingRoleAllowedForOrganizationRole({
+    organizationRole,
+    role: (customRoleId
+      ? `custom:${customRoleId}`
+      : roleValue) as TeamRoleValue,
+  });
+  return {
+    snapRoleToViewer: !selectionAllowed,
+    snapScopeToTeam:
+      organizationRole === OrganizationUserRole.EXTERNAL &&
+      scopeType === RoleBindingScopeType.ORGANIZATION,
+  };
+}
+
 // ── BindingInputRow ───────────────────────────────────────────────────────────
 
 export type BindingInputRowHandle = {
@@ -85,18 +195,40 @@ export const BindingInputRow = forwardRef<
   {
     organizationId: string;
     onAdd: (binding: PendingBinding) => void;
+    /**
+     * Reports whether the row currently holds a complete, addable draft. The
+     * dialog counts that draft as a pending change, so Save works on a row
+     * the admin picked but never pressed Add on — the save flushes it.
+     */
+    onReadyChange?: (isReady: boolean) => void;
+    /**
+     * The seat of the member these rows are written for. A Lite Member seat
+     * offers the Viewer role only, no custom roles, and no organization scope.
+     * The group editors pass nothing: a group has no seat, so every role stays
+     * available there.
+     */
+    organizationRole?: OrganizationUserRole;
     buttonLabel?: string;
     isPending?: boolean;
   }
 >(function BindingInputRow(
-  { organizationId, onAdd, buttonLabel = "Add", isPending = false },
+  {
+    organizationId,
+    onAdd,
+    onReadyChange,
+    organizationRole,
+    buttonLabel = "Add",
+    isPending = false,
+  },
   ref,
 ) {
+  const defaultRoleValue = defaultRoleValueFor(organizationRole);
+
   const [scopeType, setScopeType] = useState<RoleBindingScopeType>(
     RoleBindingScopeType.TEAM,
   );
   const [scopeId, setScopeId] = useState("");
-  const [roleValue, setRoleValue] = useState("MEMBER");
+  const [roleValue, setRoleValue] = useState(defaultRoleValue);
   const [customRoleId, setCustomRoleId] = useState<string | undefined>(
     undefined,
   );
@@ -112,20 +244,43 @@ export const BindingInputRow = forwardRef<
   const customRoles = api.role.getAll.useQuery({ organizationId });
 
   const roleItems = useMemo(
-    () => [
-      ...BASE_ROLE_ITEMS,
-      ...(customRoles.data ?? []).map((r) => ({
-        label: r.name,
-        value: `CUSTOM:${r.id}`,
-        customRoleId: r.id,
-      })),
-    ],
-    [customRoles.data],
+    () =>
+      roleItemsForSeat({
+        customRoles: customRoles.data ?? [],
+        organizationRole,
+      }),
+    [customRoles.data, organizationRole],
   );
   const roleCollection = useMemo(
     () => createListCollection({ items: roleItems }),
     [roleItems],
   );
+
+  const scopeTypeItems = useMemo(
+    () => scopeTypeItemsForSeat(organizationRole),
+    [organizationRole],
+  );
+  const scopeTypeCollection = useMemo(
+    () => createListCollection({ items: scopeTypeItems }),
+    [scopeTypeItems],
+  );
+
+  useEffect(() => {
+    const snap = pickerSnapForSeat({
+      organizationRole,
+      roleValue,
+      customRoleId,
+      scopeType,
+    });
+    if (snap.snapRoleToViewer) {
+      setRoleValue(TeamUserRole.VIEWER);
+      setCustomRoleId(undefined);
+    }
+    if (snap.snapScopeToTeam) {
+      setScopeType(RoleBindingScopeType.TEAM);
+      setScopeId("");
+    }
+  }, [organizationRole, roleValue, customRoleId, scopeType]);
 
   const allTeamItems = useMemo(
     () => (teams.data ?? []).map((t) => ({ label: t.name, value: t.id })),
@@ -189,19 +344,13 @@ export const BindingInputRow = forwardRef<
     [projectItems],
   );
 
-  function getScopeName() {
-    if (scopeType === RoleBindingScopeType.ORGANIZATION)
-      return organization?.name ?? "Organization";
-    if (scopeType === RoleBindingScopeType.TEAM)
-      return allTeamItems.find((t) => t.value === scopeId)?.label;
-    if (scopeType === RoleBindingScopeType.PROJECT)
-      return allProjectItems.find((p) => p.value === scopeId)?.label;
-    return undefined;
-  }
-
   const isReady =
     isDirty &&
     (scopeId !== "" || scopeType === RoleBindingScopeType.ORGANIZATION);
+
+  useEffect(() => {
+    onReadyChange?.(isReady);
+  }, [isReady, onReadyChange]);
 
   function buildBinding(): PendingBinding {
     const cid = customRoleId;
@@ -218,7 +367,13 @@ export const BindingInputRow = forwardRef<
         scopeType === RoleBindingScopeType.ORGANIZATION
           ? organizationId
           : scopeId,
-      scopeName: getScopeName(),
+      scopeName: scopeNameFor({
+        scopeType,
+        scopeId,
+        organizationName: organization?.name,
+        teamItems: allTeamItems,
+        projectItems: allProjectItems,
+      }),
     };
   }
 
@@ -250,7 +405,7 @@ export const BindingInputRow = forwardRef<
         collection={roleCollection}
         value={[roleValue]}
         onValueChange={(e) => {
-          const v = e.value[0] ?? "MEMBER";
+          const v = e.value[0] ?? defaultRoleValue;
           if (v.startsWith("CUSTOM:")) {
             setRoleValue(v);
             setCustomRoleId(v.slice(7));
@@ -300,7 +455,7 @@ export const BindingInputRow = forwardRef<
           <Select.ValueText />
         </Select.Trigger>
         <Select.Content>
-          {SCOPE_TYPE_ITEMS.map((item) => (
+          {scopeTypeItems.map((item) => (
             <Select.Item key={item.value} item={item}>
               {item.label}
             </Select.Item>

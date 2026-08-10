@@ -11,11 +11,13 @@
 /**
  * Off unless explicitly enabled.
  *
- * BullMQ drives every queue operation through Redis, so tracing ioredis in a
- * process that owns a job queue traces the queue's own bookkeeping rather than
- * the work. Measured in production: ~10,116 Redis command spans/sec against 317
- * job spans/sec, about 32 Redis spans per job, which was 93% of every span the
- * platform emitted. Enable it while debugging Redis latency itself, preferably
+ * groupQueue (src/server/event-sourcing/queues/groupQueue) is built directly on
+ * Redis, so tracing ioredis in a process that owns a job queue traces the
+ * queue's own bookkeeping rather than the work. Measured in production: ~10,116
+ * Redis command spans/sec against 317 job spans/sec, about 32 Redis spans per
+ * job, which was 93% of every span the platform emitted. The bulk of it is
+ * `evalsha` from cachedLuaScript, plus the ready-set and lease upkeep in
+ * scripts.ts. Enable it while debugging Redis latency itself, preferably
  * somewhere without a job queue attached.
  *
  * Exact match on "true": a half-recognised value like "1" or "yes" silently

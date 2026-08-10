@@ -33,14 +33,26 @@ const QUEUE_SCRIPT = path.join(REPO_ROOT, "dev/scripts/check-queue.mjs");
  * The command the wrapper runs. Appends `start` on boot and `end` after
  * `holdMs`, so the log is enough to reconstruct who ran when and how many ran
  * at once.
+ *
+ * A test that kills the wrapper mid-hold cannot signal this process, which the
+ * kernel hands to init instead. Watching for that reparenting is what stops a
+ * long hold from outliving the suite as a sleeping process.
  */
 const FAKE_COMMAND = `
 const fs = require("node:fs");
 const [log, tag, holdMs] = process.argv.slice(2);
 const write = (event) =>
   fs.appendFileSync(log, JSON.stringify({ event, tag, at: Date.now() }) + "\\n");
+const wrapper = process.ppid;
+const orphaned = setInterval(() => {
+  if (process.ppid !== wrapper) process.exit(0);
+}, 50);
+orphaned.unref();
 write("start");
-setTimeout(() => write("end"), Number(holdMs));
+setTimeout(() => {
+  write("end");
+  clearInterval(orphaned);
+}, Number(holdMs));
 `;
 
 type Event = { event: "start" | "end"; tag: string; at: number };
@@ -185,6 +197,20 @@ describe("check queue", () => {
       expect(result.code).toBe(0);
       expect(result.stderr).toBe("");
       expect(startOrder(readEvents())).toEqual(["solo"]);
+    });
+
+    /** @scenario "A check does not queue behind itself" */
+    it("tells everything below it that the slot is already held", async () => {
+      // The bin shims mean a queued `pnpm typecheck` spawns another gated
+      // entry point. Without this, it queues behind the slot it is holding and
+      // waits out the entire maximum wait before starting.
+      const run = startRun("nested", {
+        argv: ["node", "-e", "process.stdout.write(process.env.CHECK_SLOTS)"],
+        env: { CHECK_SLOTS: "3" },
+      });
+      const result = await run.done;
+
+      expect(result.stdout).toBe("0");
     });
 
     /** @scenario "The wrapper is transparent to the command it runs" */
@@ -335,9 +361,20 @@ describe("check queue", () => {
 
     /** @scenario "A run that waits too long runs anyway" */
     it("starts without a slot rather than hanging forever", async () => {
-      const holder = startRun("holder", { holdMs: 3000 });
+      // The overlap below is only observable while the holder is still inside
+      // the command, and the impatient run reaches it only after two node
+      // boots and its own maximum wait. The holder is killed as soon as the
+      // overlap has been read, so holding far longer than that costs the suite
+      // nothing and keeps a loaded machine from ending the holder first, which
+      // reads as the queue having serialized the two runs.
+      const holder = startRun("holder", { holdMs: 60_000 });
       await waitForHolder();
+      // The hold must be wide enough that the run's start and end cannot
+      // share a Date.now() millisecond: maxOverlap breaks ties end-first
+      // (which "never runs more than the limit" needs), and a same-instant
+      // start/end pair would collapse this run's occupancy to nothing.
       const impatient = startRun("impatient", {
+        holdMs: 150,
         env: { CHECK_QUEUE_MAX_WAIT_MS: "200" },
       });
 

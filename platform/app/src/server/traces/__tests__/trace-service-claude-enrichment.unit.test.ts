@@ -4,11 +4,12 @@
  * boundaries (no Docker), the enrichment adapter + pure join run for real.
  *
  * A coding-agent-origin trace's real `llm_request` span carries `request_id`
- * but no message content and no cost; the content + cost live in the trace's
- * OTLP log records. getById must join capped `input` / `output` + the
- * authoritative `cost` onto the span. A non-coding-agent trace must not even
- * read the logs. Boundaries are all mocked so this belongs in unit (mirrors the
- * sibling trace-service-4888-full-flag.unit.test.ts).
+ * but no message content; that lives in the trace's OTLP log records. getById
+ * must join capped `input` / `output` onto the span, and must leave the cost
+ * alone: it was computed from the span's own tokens at ingest, so a log record
+ * cannot move it out of step with the rest of the product. A non-coding-agent
+ * trace must not even read the logs. Boundaries are all mocked so this belongs
+ * in unit (mirrors the sibling trace-service-4888-full-flag.unit.test.ts).
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -68,6 +69,8 @@ const PROJECT_ID = "project_test";
 const TRACE_ID = "a3c6656cf433e97549f654034be02955";
 const REQUEST_ID = "req_011CcuGBf1aBcDeFgHiJkLmN";
 const REPL = "repl_main_thread";
+/** What ingest computed from the span's own tokens, and what every read shows. */
+const STORED_COST = 0.193022;
 
 const protections: Protections = {
   canSeeCosts: true,
@@ -90,7 +93,7 @@ function claudeLlmSpan(over: Partial<Span> = {}): Span {
       started_at: 1_700_000_000_000,
       finished_at: 1_700_000_001_000,
     },
-    metrics: { prompt_tokens: 120, completion_tokens: 8, cost: null },
+    metrics: { prompt_tokens: 120, completion_tokens: 8, cost: STORED_COST },
     params: { request_id: REQUEST_ID, query_source: REPL },
     model: "claude-opus-4-8[1m]",
     vendor: "anthropic",
@@ -135,8 +138,11 @@ function logRow(
 }
 
 /**
- * The light events: user_prompt (input), api_request (cost), assistant_response
- * (output) — i.e. the shape emitted WITHOUT `OTEL_LOG_RAW_API_BODIES`.
+ * The light events: user_prompt (input), api_request (the anchor), and
+ * assistant_response (output), the shape emitted WITHOUT
+ * `OTEL_LOG_RAW_API_BODIES`. The anchor's `cost_usd` deliberately disagrees
+ * with the span's stored cost, so any read that starts trusting it again turns
+ * these assertions red.
  *
  * Each event carries its content under its OWN attribute key — there is no
  * shared `body` convention (https://code.claude.com/docs/en/monitoring-usage):
@@ -190,7 +196,7 @@ describe("TraceService.getById — Claude Code log content enrichment", () => {
   });
 
   describe("given a coding-agent-origin trace with a real llm_request span and its content logs", () => {
-    it("joins capped input, output, and the authoritative cost onto the span", async () => {
+    it("joins capped input and output onto the span", async () => {
       mockGetTracesWithSpans.mockResolvedValue([
         makeTrace({ origin: "coding_agent", spans: [claudeLlmSpan()] }),
       ]);
@@ -208,7 +214,7 @@ describe("TraceService.getById — Claude Code log content enrichment", () => {
         type: "text",
         value: "Here is the summary.",
       });
-      expect(span?.metrics?.cost).toBe(0.0421);
+      expect(span?.metrics?.cost).toBe(STORED_COST);
     });
 
     it("reads the trace's logs once, time-capped by the trace's start time", async () => {
@@ -228,7 +234,7 @@ describe("TraceService.getById — Claude Code log content enrichment", () => {
       );
     });
 
-    it("preserves the span's real token metrics while overriding cost", async () => {
+    it("preserves the span's real token metrics and its stored cost", async () => {
       mockGetTracesWithSpans.mockResolvedValue([
         makeTrace({ origin: "coding_agent", spans: [claudeLlmSpan()] }),
       ]);
@@ -238,6 +244,7 @@ describe("TraceService.getById — Claude Code log content enrichment", () => {
 
       expect(trace?.spans?.[0]?.metrics?.prompt_tokens).toBe(120);
       expect(trace?.spans?.[0]?.metrics?.completion_tokens).toBe(8);
+      expect(trace?.spans?.[0]?.metrics?.cost).toBe(STORED_COST);
     });
   });
 
@@ -267,7 +274,7 @@ describe("TraceService.getById — Claude Code log content enrichment", () => {
       const trace = await service.getById(PROJECT_ID, TRACE_ID, protections);
 
       expect(trace?.spans?.[0]?.input ?? null).toBeNull();
-      expect(trace?.spans?.[0]?.metrics?.cost ?? null).toBeNull();
+      expect(trace?.spans?.[0]?.metrics?.cost).toBe(STORED_COST);
     });
   });
 
@@ -303,7 +310,7 @@ describe("TraceService — multi-trace read enrichment", () => {
   const enrichedOutput = { type: "text", value: "Here is the summary." };
 
   describe("when reading via getTracesWithSpans", () => {
-    it("enriches a coding-agent trace with input, output, and cost", async () => {
+    it("enriches a coding-agent trace with input and output", async () => {
       mockGetTracesWithSpans.mockResolvedValue([
         makeTrace({ origin: "coding_agent", spans: [claudeLlmSpan()] }),
       ]);
@@ -318,7 +325,7 @@ describe("TraceService — multi-trace read enrichment", () => {
 
       expect(traces[0]?.spans?.[0]?.input).toEqual(enrichedInput);
       expect(traces[0]?.spans?.[0]?.output).toEqual(enrichedOutput);
-      expect(traces[0]?.spans?.[0]?.metrics?.cost).toBe(0.0421);
+      expect(traces[0]?.spans?.[0]?.metrics?.cost).toBe(STORED_COST);
       expect(getLogs).toHaveBeenCalledTimes(1);
     });
 
@@ -355,7 +362,7 @@ describe("TraceService — multi-trace read enrichment", () => {
       );
 
       expect(traces[0]?.spans?.[0]?.input).toEqual(enrichedInput);
-      expect(traces[0]?.spans?.[0]?.metrics?.cost).toBe(0.0421);
+      expect(traces[0]?.spans?.[0]?.metrics?.cost).toBe(STORED_COST);
     });
 
     it("does not read logs for a non-coding-agent trace", async () => {
@@ -404,7 +411,9 @@ describe("TraceService — multi-trace read enrichment", () => {
       );
 
       expect(result.groups[0]?.[0]?.spans?.[0]?.input).toEqual(enrichedInput);
-      expect(result.groups[0]?.[0]?.spans?.[0]?.metrics?.cost).toBe(0.0421);
+      expect(result.groups[0]?.[0]?.spans?.[0]?.metrics?.cost).toBe(
+        STORED_COST,
+      );
       expect(result.groups[1]?.[0]?.spans?.[0]?.input ?? null).toBeNull();
       expect(getLogs).toHaveBeenCalledTimes(1);
     });

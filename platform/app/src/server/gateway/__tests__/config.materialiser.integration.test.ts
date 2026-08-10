@@ -304,6 +304,9 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
         displayPrefix: "lw_vk_live_xxx_1",
         principalUserId: USER_ID,
         createdById: USER_ID,
+        // The destination is stored on the key rather than taken from its
+        // scope, so a row written straight to PG has to carry it.
+        traceProjectId: PROJECT_ID,
         routingPolicyId: RP_ID,
         config: {
           guardrailAttachments: [
@@ -333,6 +336,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
         displayPrefix: "lw_vk_live_xxx_4",
         principalUserId: USER_ID,
         createdById: USER_ID,
+        traceProjectId: PROJECT_ID,
         config: {
           metadata: {
             tags: [
@@ -359,14 +363,16 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
         displayPrefix: "lw_vk_live_xxx_2",
         principalUserId: USER_ID,
         createdById: USER_ID,
+        traceProjectId: PROJECT_ID,
         config: {},
         scopes: {
           create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
         },
       },
     });
-    // VK 3 — org-scoped (no trace project). Exercises the guardrails:[]
-    // empty-state branch when traceProject resolves to null.
+    // VK 3 — org-scoped with no destination, the shape a key written before
+    // the destination was stored can still be in. Exercises the
+    // guardrails:[] empty-state branch when the pointer is null.
     await prisma.virtualKey.create({
       data: {
         id: VK_NO_PROJECT_ID,
