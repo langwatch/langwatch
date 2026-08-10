@@ -35,7 +35,28 @@ import {
   describe,
   expect,
   it,
+  vi,
 } from "vitest";
+
+/**
+ * Every outbound request the probe could make, recorded.
+ *
+ * The probe goes out through `ssrfSafeFetch`, which dispatches via undici and
+ * therefore never touches `globalThis.fetch`. A spy on the global alone stopped
+ * seeing anything the moment that changed — and the assertions below that say
+ * "the credential never left" kept passing, proving nothing. Both seams are
+ * recorded so a request cannot leave by a route no assertion is watching.
+ */
+const { ssrfCalls } = vi.hoisted(() => ({ ssrfCalls: [] as string[] }));
+
+vi.mock("~/utils/ssrfProtection", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/utils/ssrfProtection")>()),
+  ssrfSafeFetch: async (url: string) => {
+    ssrfCalls.push(String(url));
+    throw new Error("network disabled in test");
+  },
+}));
+
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { appRouter } from "../../api/root";
 import { createInnerTRPCContext } from "../../api/trpc";
@@ -546,6 +567,7 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
 
     beforeEach(() => {
       fetchCalls = [];
+      ssrfCalls.length = 0;
       realFetch = globalThis.fetch;
       // Records rather than stubs the outcome: the assertion is that the
       // request never leaves, so a test that passed because the fetch
@@ -589,7 +611,7 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
         },
       });
 
-      expect(fetchCalls).toEqual([]);
+      expect([...fetchCalls, ...ssrfCalls]).toEqual([]);
     });
 
     /** @scenario "A read-only member cannot probe an arbitrary URL" */
@@ -615,7 +637,7 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
         },
       });
 
-      expect(fetchCalls).toEqual([]);
+      expect([...fetchCalls, ...ssrfCalls]).toEqual([]);
     });
 
     /** @scenario "A read-only member cannot probe an arbitrary URL" */
@@ -639,7 +661,7 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
         },
       });
 
-      expect(fetchCalls).toEqual([]);
+      expect([...fetchCalls, ...ssrfCalls]).toEqual([]);
     });
 
     /** @scenario "A read-only member cannot probe an arbitrary URL" */
@@ -655,7 +677,7 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
         }),
       ).rejects.toThrow(/scopes/);
 
-      expect(fetchCalls).toEqual([]);
+      expect([...fetchCalls, ...ssrfCalls]).toEqual([]);
     });
 
     // The gate has to let the legitimate case through, or the fix is just
@@ -680,7 +702,7 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
         }),
       ).rejects.toThrow(/Could not reach custom/);
 
-      expect(fetchCalls.length).toBeGreaterThan(0);
+      expect([...fetchCalls, ...ssrfCalls].length).toBeGreaterThan(0);
     });
 
     // A host the customer typed being unreachable is not our outage. tRPC

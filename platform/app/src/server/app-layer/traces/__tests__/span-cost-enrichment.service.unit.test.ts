@@ -18,11 +18,12 @@ function createTestSpan(
     key: string;
     value: { stringValue?: string; doubleValue?: number };
   }> = [],
+  name = "test-span",
 ): OtlpSpan {
   return {
     traceId: "trace-1",
     spanId: "span-1",
-    name: "test-span",
+    name,
     kind: 1,
     startTimeUnixNano: { low: 0, high: 0 },
     endTimeUnixNano: { low: 1000000, high: 0 },
@@ -104,6 +105,127 @@ describe("OtlpSpanCostEnrichmentService", () => {
       });
     });
 
+    describe("when custom pricing defines an hour-long cache write rate", () => {
+      /** @scenario "A custom model cost can set its own hour-long cache write rate" */
+      it("sets the hour-long rate attribute on the span", async () => {
+        const customCost: MaybeStoredLLMModelCost = {
+          projectId: "project-1",
+          model: "claude-opus-5",
+          regex: "^claude-opus-5$",
+          inputCostPerToken: 0.000005,
+          outputCostPerToken: 0.000025,
+          cacheCreationCostPerToken: 0.00000625,
+          cacheCreation1hCostPerToken: 0.00001,
+        };
+        const deps = createMockDeps([customCost]);
+        const service = new OtlpSpanCostEnrichmentService(deps);
+        const span = createTestSpan([
+          {
+            key: "gen_ai.request.model",
+            value: { stringValue: "claude-opus-5" },
+          },
+        ]);
+
+        await service.enrichSpan(span, "project-1");
+
+        expect(span.attributes).toContainEqual({
+          key: "langwatch.model.cacheCreation1hCostPerToken",
+          value: { doubleValue: 0.00001 },
+        });
+      });
+    });
+
+    // Claude Code and the other coding agents export their own telemetry and
+    // name the model under a bare `model`, nothing else. Skipping that key made
+    // custom cost rules a no-op on the very traffic whose price a customer most
+    // wants to set.
+    describe("when a coding agent's span names its model under a bare `model`", () => {
+      /** @scenario "A coding agent's model is found under the attribute it uses" */
+      it("matches the rule and stamps its rates", async () => {
+        const customCost: MaybeStoredLLMModelCost = {
+          projectId: "project-1",
+          model: "claude-opus-5",
+          regex: "^claude-opus-5$",
+          inputCostPerToken: 0.000004,
+          outputCostPerToken: 0.00002,
+          cacheCreation1hCostPerToken: 0.000008,
+        };
+        const deps = createMockDeps([customCost]);
+        const service = new OtlpSpanCostEnrichmentService(deps);
+        const span = createTestSpan(
+          [{ key: "model", value: { stringValue: "claude-opus-5" } }],
+          "claude_code.llm_request",
+        );
+
+        await service.enrichSpan(span, "project-1");
+
+        expect(span.attributes).toContainEqual({
+          key: "langwatch.model.inputCostPerToken",
+          value: { doubleValue: 0.000004 },
+        });
+        expect(span.attributes).toContainEqual({
+          key: "langwatch.model.cacheCreation1hCostPerToken",
+          value: { doubleValue: 0.000008 },
+        });
+      });
+
+      it("prefers a semconv model attribute when the span carries both", async () => {
+        const customCost: MaybeStoredLLMModelCost = {
+          projectId: "project-1",
+          model: "gpt-4o",
+          regex: "^gpt-4o$",
+          inputCostPerToken: 0.000005,
+          outputCostPerToken: 0.000015,
+        };
+        const deps = createMockDeps([customCost]);
+        const service = new OtlpSpanCostEnrichmentService(deps);
+        const span = createTestSpan(
+          [
+            { key: "model", value: { stringValue: "claude-opus-5" } },
+            { key: "gen_ai.request.model", value: { stringValue: "gpt-4o" } },
+          ],
+          "claude_code.llm_request",
+        );
+
+        await service.enrichSpan(span, "project-1");
+
+        expect(span.attributes).toContainEqual({
+          key: "langwatch.model.inputCostPerToken",
+          value: { doubleValue: 0.000005 },
+        });
+      });
+    });
+
+    describe("when a span that is not a coding agent call carries a bare `model`", () => {
+      /** @scenario "A dormant cost rule is not woken by an unrelated span's model attribute" */
+      it("leaves it unenriched so a saved rule cannot start pricing it", async () => {
+        const customCost: MaybeStoredLLMModelCost = {
+          projectId: "project-1",
+          model: "claude-opus-5",
+          regex: "^claude-opus-5$",
+          inputCostPerToken: 0.000004,
+          outputCostPerToken: 0.00002,
+        };
+        const deps = createMockDeps([customCost]);
+        const service = new OtlpSpanCostEnrichmentService(deps);
+        // A customer's own span, named whatever their app names it, carrying a
+        // generic `model` that happens to read like a model this project
+        // prices. What enrichment writes outranks a reported cost, so matching
+        // here would reprice traffic the rule was never aimed at.
+        const span = createTestSpan(
+          [{ key: "model", value: { stringValue: "claude-opus-5" } }],
+          "POST /v1/chat",
+        );
+
+        await service.enrichSpan(span, "project-1");
+
+        expect(span.attributes).toEqual([
+          { key: "model", value: { stringValue: "claude-opus-5" } },
+        ]);
+        expect(deps.getCustomModelCosts).not.toHaveBeenCalled();
+      });
+    });
+
     describe("when custom pricing omits cache rates", () => {
       it("does not set cache rate attributes so the input rate fallback applies", async () => {
         const customCost: MaybeStoredLLMModelCost = {
@@ -127,6 +249,9 @@ describe("OtlpSpanCostEnrichmentService", () => {
         );
         expect(cacheKeys).not.toContain(
           "langwatch.model.cacheCreationCostPerToken",
+        );
+        expect(cacheKeys).not.toContain(
+          "langwatch.model.cacheCreation1hCostPerToken",
         );
       });
     });
@@ -323,6 +448,7 @@ describe("createCostEnrichmentDeps", () => {
     outputCostPerToken,
     cacheReadCostPerToken: null,
     cacheCreationCostPerToken: null,
+    cacheCreation1hCostPerToken: null,
     createdAt: new Date("2026-06-04T21:36:54Z"),
     updatedAt: new Date("2026-06-04T21:36:54Z"),
   });

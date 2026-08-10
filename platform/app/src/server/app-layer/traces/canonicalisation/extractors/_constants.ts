@@ -138,6 +138,10 @@ export const ATTR_KEYS = {
     "langwatch.model.cacheReadCostPerToken",
   LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN:
     "langwatch.model.cacheCreationCostPerToken",
+  // The customer's own rate for an hour-long cache entry, which bills above a
+  // short-lived one. Absent, hour-long writes price at the rate above.
+  LANGWATCH_MODEL_CACHE_CREATION_1H_COST_PER_TOKEN:
+    "langwatch.model.cacheCreation1hCostPerToken",
 
   // LangWatch attributes
   LANGWATCH_INPUT: "langwatch.input",

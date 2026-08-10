@@ -2,6 +2,7 @@ import type { TraceListItem } from "../../../../../types/trace";
 import type { TraceColumnId } from "../../../columns";
 import type { CellDef } from "../../types";
 import { type SELECT_COLUMN_ID, TraceSelectCell } from "../SelectCells";
+import { AnnotationsCell } from "./AnnotationsCell";
 import { ContextSizeCell } from "./ContextSizeCell";
 import { CostCell } from "./CostCell";
 import { DurationCell } from "./DurationCell";
@@ -67,6 +68,7 @@ export const traceCells = {
   [PromptCell.id]: PromptCell,
   [EvaluationsCell.id]: EvaluationsCell,
   [EventsCell.id]: EventsCell,
+  [AnnotationsCell.id]: AnnotationsCell,
   [SpanCountCell.id]: SpanCountCell,
   [SizeCell.id]: SizeCell,
   [StatusCell.id]: StatusCell,

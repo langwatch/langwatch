@@ -9,6 +9,7 @@ import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import {
   incrementEsFoldPostStoreFailure,
   incrementEsFoldProjectionTotal,
+  incrementEsMapProjectionEnqueueTotal,
   incrementEsMapProjectionTotal,
   incrementEsProjectionTotal,
   incrementEsReactorCollapsedTotal,
@@ -664,6 +665,13 @@ export class ProjectionRouter<
           ...(context.deliveryAttempt !== undefined
             ? { deliveryAttempt: context.deliveryAttempt }
             : {}),
+          // A bisected sub-batch after the first commit of its dispatch: the
+          // fold commit must extend the applied-id set, not replace it
+          // (#6578). Dropping this here silently re-enables the double-apply
+          // this chain exists to prevent.
+          ...(context.isDeliveryContinuation !== undefined
+            ? { isDeliveryContinuation: context.isDeliveryContinuation }
+            : {}),
         });
       },
     );
@@ -702,7 +710,7 @@ export class ProjectionRouter<
               if (decision === "skip") return;
             }
 
-            const context = await this.buildStoreContext(event);
+            const context = await this.buildStoreContext({ event });
             const record = await withMetrics({
               fn: () => this.mapExecutor.execute(mapProj, event, context),
               onComplete: (ms) => {
@@ -755,7 +763,9 @@ export class ProjectionRouter<
             }
             if (toApply.length === 0) return;
 
-            const firstContext = await this.buildStoreContext(toApply[0]!);
+            const firstContext = await this.buildStoreContext({
+              event: toApply[0]!,
+            });
             const contexts = toApply.map((event) => ({
               ...firstContext,
               aggregateId: String(event.aggregateId),
@@ -1092,6 +1102,7 @@ export class ProjectionRouter<
 
         // Filter events for this handler
         const filteredEvents = [];
+        let declined = 0;
         for (const event of events) {
           const disabled = await isComponentDisabled({
             featureFlagService: this.featureFlagService,
@@ -1111,8 +1122,26 @@ export class ProjectionRouter<
           ) {
             continue;
           }
+
+          if (!this.mapEnqueueAccepts({ mapProj, name, event })) {
+            declined++;
+            continue;
+          }
           filteredEvents.push(event);
         }
+
+        incrementEsMapProjectionEnqueueTotal({
+          pipelineName: this.pipelineName,
+          projectionName: name,
+          outcome: "filtered",
+          count: declined,
+        });
+        incrementEsMapProjectionEnqueueTotal({
+          pipelineName: this.pipelineName,
+          projectionName: name,
+          outcome: "queued",
+          count: filteredEvents.length,
+        });
 
         if (filteredEvents.length === 0) continue;
 
@@ -1157,6 +1186,25 @@ export class ProjectionRouter<
             continue;
           }
 
+          // The same gate the queued branch applies, so the inline path (tests,
+          // queue-less runtimes) reaches the same set of mapped records. There
+          // is no job to avoid minting here — the win is only the skipped
+          // execute — but a seam that answered differently in the two modes
+          // would make every inline test a lie about production.
+          if (!this.mapEnqueueAccepts({ mapProj, name, event })) {
+            incrementEsMapProjectionEnqueueTotal({
+              pipelineName: this.pipelineName,
+              projectionName: name,
+              outcome: "filtered",
+            });
+            continue;
+          }
+          incrementEsMapProjectionEnqueueTotal({
+            pipelineName: this.pipelineName,
+            projectionName: name,
+            outcome: "queued",
+          });
+
           try {
             // Defer or skip if projection-replay is active for this aggregate.
             // Mirrors the fold projection replay-marker check.
@@ -1168,7 +1216,7 @@ export class ProjectionRouter<
               if (decision === "skip") continue;
             }
 
-            const storeContext = await this.buildStoreContext(event);
+            const storeContext = await this.buildStoreContext({ event });
             const record = await withMetrics({
               fn: () => this.mapExecutor.execute(mapProj, event, storeContext),
               onComplete: (ms) => {
@@ -1224,6 +1272,48 @@ export class ProjectionRouter<
         errors,
         `${errors.length} map projection(s) failed during dispatch`,
       );
+    }
+  }
+
+  /**
+   * The map projection's enqueue-time gate (ADR-069 invariant 4): `false`
+   * means no job is ever minted for this event.
+   *
+   * Fail-OPEN on a throw, and deliberately the opposite of the subscriber
+   * seam's rule. There, a thrown filter is reported as a dispatch failure
+   * because a subscriber's job is the only carrier of its side effect and
+   * silently reading the throw as "not relevant" would hide a permanent loss.
+   * Here the filter is a pure restatement of what `map()` already decides, so
+   * admitting the event on a throw costs one job that maps to nothing —
+   * exactly the pre-filter behavior — while declining it would drop a row the
+   * projection was going to write. Between "cost of a job" and "silent hole in
+   * a fact table", the gate opens. It is still a bug: it is logged.
+   */
+  private mapEnqueueAccepts({
+    mapProj,
+    name,
+    event,
+  }: {
+    mapProj: MapProjectionDefinition<any, EventType>;
+    name: string;
+    event: EventType;
+  }): boolean {
+    const filter = mapProj.options?.enqueue?.filter;
+    if (!filter) return true;
+    try {
+      return filter(event);
+    } catch (error) {
+      this.logger.warn(
+        {
+          projectionName: name,
+          eventId: event.id,
+          eventType: event.type,
+          tenantId: String(event.tenantId),
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Map projection enqueue filter threw; admitting the event so no record is lost",
+      );
+      return true;
     }
   }
 
@@ -1504,11 +1594,11 @@ export class ProjectionRouter<
         if (toApply.length === 0) return;
 
         const key = projection.key ? projection.key(toApply[0]!) : undefined;
-        const storeContext = await this.buildStoreContext(
-          toApply[0]!,
+        const storeContext = await this.buildStoreContext({
+          event: toApply[0]!,
           key,
-          context.deliveryAttempt,
-        );
+          deliveryAttempt: context.deliveryAttempt,
+        });
         await withMetrics({
           fn: () =>
             this.stateProjectionExecutor.execute({
@@ -1619,11 +1709,11 @@ export class ProjectionRouter<
         }
 
         const key = fold.key ? fold.key(event) : undefined;
-        const storeContext = await this.buildStoreContext(
+        const storeContext = await this.buildStoreContext({
           event,
           key,
-          context.deliveryAttempt,
-        );
+          deliveryAttempt: context.deliveryAttempt,
+        });
 
         const foldState = await withMetrics({
           fn: () => this.foldExecutor.execute(fold, event, storeContext),
@@ -1809,11 +1899,12 @@ export class ProjectionRouter<
 
         const first = toApply[0]!;
         const key = fold.key ? fold.key(first) : undefined;
-        const storeContext = await this.buildStoreContext(
-          first,
+        const storeContext = await this.buildStoreContext({
+          event: first,
           key,
-          context.deliveryAttempt,
-        );
+          deliveryAttempt: context.deliveryAttempt,
+          isDeliveryContinuation: context.isDeliveryContinuation,
+        });
 
         const foldState = await withMetrics({
           fn: () => this.foldExecutor.executeBatch(fold, toApply, storeContext),
@@ -2276,17 +2367,26 @@ export class ProjectionRouter<
    * Centralising it ensures every store sees the same shape — and any new
    * context field (e.g. process role, trace correlation) lands in one place.
    */
-  private async buildStoreContext(
-    event: EventType,
-    key?: string,
-    deliveryAttempt?: number,
-  ): Promise<ProjectionStoreContext> {
+  private async buildStoreContext({
+    event,
+    key,
+    deliveryAttempt,
+    isDeliveryContinuation,
+  }: {
+    event: EventType;
+    key?: string;
+    deliveryAttempt?: number;
+    isDeliveryContinuation?: boolean;
+  }): Promise<ProjectionStoreContext> {
     const retentionPolicy = await this.resolveRetention(event.tenantId);
     return {
       aggregateId: String(event.aggregateId),
       tenantId: event.tenantId,
       ...(key !== undefined ? { key } : {}),
       ...(deliveryAttempt !== undefined ? { deliveryAttempt } : {}),
+      ...(isDeliveryContinuation !== undefined
+        ? { isDeliveryContinuation }
+        : {}),
       retentionPolicy,
     };
   }

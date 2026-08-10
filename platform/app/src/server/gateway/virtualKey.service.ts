@@ -26,15 +26,21 @@ import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
 import { nextResetAt } from "./budgetWindow";
 import { ChangeEventRepository } from "./changeEvent.repository";
-import { translateExternalIdConflict } from "./errors";
+import {
+  GatewayTraceProjectAmbiguousError,
+  GatewayTraceProjectRequiredError,
+  GatewayTraceProjectUnknownError,
+  translateExternalIdConflict,
+} from "./errors";
 import {
   identityPatchData,
   metadataPatch,
   type ResourceMetadata,
 } from "./resourceMetadata";
 import {
+  decideTraceDestination,
   eligibleModelProvidersForVk,
-  resolveTraceProject,
+  type TraceDestinationInput,
 } from "./scopeResolver";
 import {
   defaultVirtualKeyConfig,
@@ -126,8 +132,10 @@ export type CreateVirtualKeyInput = {
   /** Customer-owned bookkeeping. Never read by the gateway. */
   metadata?: ResourceMetadata;
   /**
-   * Explicit trace destination for org- and team-owned keys. NOT a scope:
-   * it grants no visibility and no operate rights on the key.
+   * Where this key's traces and costs should land. NOT a scope: it grants
+   * no visibility and no operate rights on the key. Omit it and the
+   * destination is decided from what the key is scoped to; either way the
+   * answer is stored on the key.
    */
   traceProjectId?: string | null;
   /**
@@ -157,6 +165,11 @@ export type UpdateVirtualKeyInput = {
   externalId?: string | null;
   /** Undefined leaves the stored map alone; a value REPLACES it wholesale. */
   metadata?: ResourceMetadata;
+  /**
+   * Undefined leaves the stored destination where it is, scope edits
+   * included; a value moves it, validated as on create; null asks for it to
+   * be worked out again from what the key is now.
+   */
   traceProjectId?: string | null;
   routingPolicyId?: string | null;
   routingMode?: VirtualKeyRoutingMode;
@@ -282,6 +295,14 @@ export class VirtualKeyService {
 
     const created = await this.prisma
       .$transaction(async (tx) => {
+        const traceProjectId = await this.resolveStoredTraceDestination(
+          {
+            organizationId: input.organizationId,
+            scopes: input.scopes,
+            traceProjectId: input.traceProjectId ?? null,
+          },
+          tx,
+        );
         const vk = await this.repository.create(
           {
             id,
@@ -296,14 +317,13 @@ export class VirtualKeyService {
             metadata: metadataPatch(input.metadata),
             createdById: input.actorUserId,
             scopes: input.scopes,
-            traceProjectId: input.traceProjectId ?? null,
+            traceProjectId,
             routingPolicyId: input.routingPolicyId ?? null,
             routingMode,
             purpose: input.purpose,
           },
           tx,
         );
-        await this.assertTraceProjectResolvable(vk, tx);
         await this.assertProvidersAllowedReachable(
           vk,
           config.providersAllowed,
@@ -412,6 +432,11 @@ export class VirtualKeyService {
           await this.repository.replaceScopes(input.id, input.scopes, tx);
         }
 
+        const traceProjectId = await this.nextStoredTraceDestination(
+          { existing, input },
+          tx,
+        );
+
         const vk = await tx.virtualKey.update({
           where: { id: input.id, organizationId: input.organizationId },
           data: {
@@ -422,16 +447,13 @@ export class VirtualKeyService {
             ...(input.routingPolicyId !== undefined
               ? { routingPolicyId: input.routingPolicyId }
               : {}),
-            ...(input.traceProjectId !== undefined
-              ? { traceProjectId: input.traceProjectId }
-              : {}),
+            traceProjectId,
             routingMode,
             revision: { increment: 1n },
           },
           include: { scopes: true },
         });
 
-        await this.assertTraceProjectResolvable(vk, tx);
         await this.assertProvidersAllowedReachable(
           vk,
           config.providersAllowed,
@@ -897,37 +919,82 @@ export class VirtualKeyService {
   }
 
   /**
-   * Every key must resolve a project for its traces to land in. Debits no
-   * longer depend on it (they ride the gateway's spend commands), but a
-   * key whose traces land nowhere is invisible in every usage view, and
-   * per-key spend is read from the trace path rather than the ledger.
-   * Project-owned and personal keys resolve a project structurally, and
-   * org/team-owned keys resolve the organization's governance project when
-   * one exists. What is
-   * refused is the remaining shape: ownership above a project in an org
-   * with no governance project, which is exactly the shape that used to
-   * drop traces on the floor.
+   * Every key must SAY where its traces land, rather than have it guessed,
+   * and the answer is written down rather than worked out again on each read.
    *
-   * Runs on create and on every update (not only scope changes), so a key
-   * that predates the rule cannot keep being edited around the hole: the
-   * next touch either gives its traces a home or does not go through.
-   * Revocation is intentionally not guarded, killing the key must always
-   * be possible.
+   * Per-key spend is read off the trace path, so the project a key traces
+   * into is the project its spend is attributed to. The four cases live in
+   * `decideTraceDestination`; what belongs here is what each refusal means
+   * to the person who asked for the key:
+   *
+   *   - `gateway_trace_project_unknown`: the destination named is not a live
+   *     project of this organization. Deleted, or somebody else's.
+   *   - `gateway_trace_project_ambiguous`: nothing was named while the
+   *     organization has projects to choose from. The governance inbox would
+   *     take the traffic and every project budget the creator had in mind
+   *     would count none of it.
+   *   - `trace_project_required`: nothing was named and there is no
+   *     governance project either, so there is no destination to give.
+   *
+   * Revocation is intentionally not guarded: killing a key must always be
+   * possible.
    *
    * Spec: specs/ai-gateway/virtual-key-creation.feature
    */
-  private async assertTraceProjectResolvable(
-    vk: VirtualKeyWithScopes,
+  private async resolveStoredTraceDestination(
+    input: TraceDestinationInput,
     tx: Prisma.TransactionClient,
-  ): Promise<void> {
-    const traceProject = await resolveTraceProject(this.prisma, vk, tx);
-    if (!traceProject) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message:
-          "trace_project_required: an organization- or team-owned key needs a project for its traces and costs to land in; without one its spend could not be capped by any budget. Scope the key to a project, or set up the organization's governance project first.",
-      });
+  ): Promise<string> {
+    const decision = await decideTraceDestination(tx, input);
+    switch (decision.outcome) {
+      case "resolved":
+        return decision.project.id;
+      case "unknown":
+        throw new GatewayTraceProjectUnknownError();
+      case "ambiguous":
+        throw new GatewayTraceProjectAmbiguousError({
+          projectScopeCount: decision.projectScopeCount,
+        });
+      case "no_destination":
+        throw new GatewayTraceProjectRequiredError();
     }
+  }
+
+  /**
+   * What an update leaves in the destination column.
+   *
+   * An untouched destination stays exactly where it is, including when the
+   * edit moves the key's scopes around. Re-deriving it from the scopes is
+   * what used to let an access change silently move where a key's money was
+   * counted: two decisions, made on two screens, one of which never
+   * mentioned the other.
+   *
+   * A destination that IS named on the update is validated the way create
+   * validates it, so an edit can never point a key somewhere a create could
+   * not. Clearing it (an explicit null) re-runs the whole decision, which is
+   * the only way to say "work it out from what the key is now".
+   *
+   * The remaining case is a key that has no stored destination at all: one
+   * written before the column was filled, in an organization that had no
+   * governance project to fall back to. Those resolve like a create, so the
+   * next touch either gives the key's traces a home or does not go through.
+   */
+  private async nextStoredTraceDestination(
+    args: { existing: VirtualKeyWithScopes; input: UpdateVirtualKeyInput },
+    tx: Prisma.TransactionClient,
+  ): Promise<string> {
+    const { existing, input } = args;
+    if (input.traceProjectId === undefined && existing.traceProjectId) {
+      return existing.traceProjectId;
+    }
+    return this.resolveStoredTraceDestination(
+      {
+        organizationId: input.organizationId,
+        scopes: input.scopes ?? existing.scopes,
+        traceProjectId: input.traceProjectId ?? null,
+      },
+      tx,
+    );
   }
 
   /**

@@ -136,6 +136,53 @@ Feature: Model default config cascade
     # Tier order (project → team → org) always beats created-at within a tier.
 
   # ────────────────────────────────────────────────────────────────────────────
+  # Refusal-caused exhaustion (issue #6634, Gap 1)
+  # ────────────────────────────────────────────────────────────────────────────
+  #
+  # A restricted (codex) model saved on a DEFAULT-role key is invisible to
+  # this walk today because every write path already refuses it
+  # (setRoleAtScope / setFeatureAtScope) — the state below is not reachable
+  # through the product yet, but the resolver's own skip-and-continue
+  # behavior (see the "restricted model" note above) means that IF it were
+  # reached — a raw DB write, or a value legal when saved becoming
+  # restricted later — the walk exhausted every tier and reported
+  # ModelNotConfiguredError exactly as if nothing had ever been set. That is
+  # a misdiagnosis: the user configured a value, it was refused. This
+  # resolver-side fix distinguishes the two so a future write path, or a
+  # future restriction on an already-saved value, reports the true cause.
+
+  @unit
+  Scenario: Exhaustion caused entirely by a restricted model reports the refusal, not "nothing configured"
+    Given a project-scoped config whose DEFAULT role value is a restricted (codex) model
+    And no wider-scope config carries the DEFAULT role or the feature key
+    When I resolve a DEFAULT-role feature for that project
+    Then the resolver throws ModelRestrictedForFeatureError
+    And it does not throw ModelNotConfiguredError
+    And the error names the restricted model
+
+  @unit
+  Scenario: Exhaustion caused by an unresolvable latest-alias still reports "nothing configured"
+    Given a project-scoped config whose DEFAULT role value is a latest-alias with no concrete resolution
+    And no wider-scope config carries the DEFAULT role or the feature key
+    When I resolve a DEFAULT-role feature for that project
+    Then the resolver throws ModelNotConfiguredError
+    # An unresolvable alias is not a licensing refusal — conflating the two
+    # would tell the user to change a model-restriction setting that isn't
+    # their actual problem.
+
+  @unit
+  Scenario: A restricted DEFAULT-role value at project tier is skipped in favor of a wider tier
+    Given a project-scoped config { "DEFAULT": "openai_codex/gpt-5.6-terra" }
+    And an organization-scoped config { "DEFAULT": "openai/gpt-5-mini" }
+    When I resolve a DEFAULT-role feature for that project
+    Then the resolver returns "openai/gpt-5-mini"
+    And source is "role_default"
+    And scope is "organization"
+    # The cascade still walks past a restricted value when a usable one
+    # exists further up — ModelRestrictedForFeatureError is only thrown at
+    # full exhaustion, exactly like ModelNotConfiguredError.
+
+  # ────────────────────────────────────────────────────────────────────────────
   # Onboarding seed
   # ────────────────────────────────────────────────────────────────────────────
 

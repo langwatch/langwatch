@@ -1,5 +1,5 @@
 // Package authresolver resolves virtual-key bearer tokens into domain.Bundle
-// via a three-tier cache (L1 in-memory LRU → L2 optional store → L3 upstream resolver).
+// via one in-memory LRU cache (L1) in front of the upstream resolver.
 //
 // Stale-while-error: when a cached L1 entry crosses its natural JWT expiry
 // AND the upstream refresh fails for transport reasons (network error, dial
@@ -16,6 +16,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,20 +27,17 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-// L2Store is an optional second-level cache (e.g., Redis).
-type L2Store interface {
-	Get(ctx context.Context, hash string) (*domain.Bundle, error)
-	Set(ctx context.Context, hash string, bundle *domain.Bundle)
-}
-
 // KeyResolver resolves a raw API key into a Bundle via an upstream source.
 type KeyResolver interface {
 	ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle, error)
 }
 
-// ConfigFetcher retrieves configuration for a virtual key.
+// ConfigFetcher retrieves configuration for a virtual key. ifNoneMatch is the
+// ETag of the config the caller already holds, so an unchanged key can be
+// revalidated rather than materialized again; empty asks for the config
+// outright, and only a conditional call may be answered NotModified.
 type ConfigFetcher interface {
-	FetchConfig(ctx context.Context, vkID string) (domain.BundleConfig, error)
+	FetchConfig(ctx context.Context, vkID, ifNoneMatch string) (domain.ConfigFetchResult, error)
 }
 
 // ChangeKind discriminates the cache-invalidation triggers the gateway
@@ -56,6 +54,11 @@ const (
 	ChangeKindVirtualKeyRevoked      = "VK_REVOKED"
 	ChangeKindVirtualKeyDisabled     = "VK_DISABLED"
 	ChangeKindVirtualKeyEnabled      = "VK_ENABLED"
+	ChangeKindRoutingPolicyUpdated   = "ROUTING_POLICY_UPDATED"
+	ChangeKindRoutingPolicyDeleted   = "ROUTING_POLICY_DELETED"
+	ChangeKindCacheRuleCreated       = "CACHE_RULE_CREATED"
+	ChangeKindCacheRuleUpdated       = "CACHE_RULE_UPDATED"
+	ChangeKindCacheRuleDeleted       = "CACHE_RULE_DELETED"
 )
 
 // CacheChange is one cache-invalidation hint surfaced by ChangePoller.
@@ -76,7 +79,6 @@ type ChangePoller interface {
 	PollChanges(ctx context.Context, organizationID, since string) ([]CacheChange, string, error)
 }
 
-// Service is the three-tier auth resolver.
 // CacheMetrics counts how well the key cache is serving. Declared here
 // rather than imported so the resolver stays free of a metrics
 // dependency; the gateway's Prometheus recorder satisfies it.
@@ -86,15 +88,16 @@ type CacheMetrics interface {
 	RecordAuthCacheMiss(tier string)
 }
 
-// Cache tier names reported on the auth-cache metrics.
-const (
-	tierL1      = "l1"
-	tierL2Redis = "l2_redis"
-)
+// tierL1 is the cache tier name reported on the auth-cache metrics. The
+// gateway caches virtual keys in this node's own memory and nowhere else, so
+// the label carries one value; it stays a label because the metric names are
+// published and an operator's dashboard should not break to save a string.
+const tierL1 = "l1"
 
+// Service is the auth resolver: one in-memory LRU in front of the control
+// plane.
 type Service struct {
 	l1            *lru.Cache[[64]byte, *entry]
-	l2            L2Store
 	resolver      KeyResolver
 	configFetcher ConfigFetcher
 	changePoller  ChangePoller
@@ -138,6 +141,19 @@ type entry struct {
 	// in-flight guard so at most one background config fetch runs per entry.
 	configFetchedAt  time.Time
 	configRefreshing bool
+	// configETag is what the control plane stamped on the config this entry
+	// carries. The staleness refresh sends it as If-None-Match so a key
+	// nobody changed comes back 304 instead of a re-materialized bundle.
+	// Empty means we have no token to revalidate with, and the next refresh
+	// goes out unconditional.
+	configETag string
+}
+
+// currentConfigETag reports the ETag of the config this entry is carrying.
+func (e *entry) currentConfigETag() string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.configETag
 }
 
 // configStale reports whether the entry's config is older than ttl.
@@ -169,6 +185,39 @@ func (e *entry) endConfigRefresh() {
 	defer e.mu.Unlock()
 	e.configRefreshing = false
 	e.configFetchedAt = time.Now()
+}
+
+// entryState is what the cache has decided about an entry it is holding:
+// serve it as is, refresh it before serving, or treat it as gone.
+type entryState int
+
+const (
+	// entryFresh is inside its JWT exp and serves without asking anyone.
+	entryFresh entryState = iota
+	// entryStale is past its JWT exp but inside the hard cap, so the control
+	// plane decides: a rejection evicts, a transport failure serves stale.
+	entryStale
+	// entryDead is past the hard cap and is not servable at all.
+	entryDead
+)
+
+// classifyEntry is the one place that decides which of the three an entry is,
+// so every path through the cache reaches the same verdict about the same
+// bundle. The order is load-bearing: soft expiry is checked BEFORE the hard
+// cap, because a negative HardGrace deliberately puts the cap earlier than
+// the JWT exp (the stale-while-error opt-out, LW_GATEWAY_AUTH_CACHE_HARD_
+// GRACE_SECONDS), and a bundle that has not reached its own expiry is
+// servable wherever the cap happens to sit. Testing the cap first would
+// throw away perfectly valid credentials under that configuration.
+func classifyEntry(e *entry) entryState {
+	switch {
+	case !e.softExpired():
+		return entryFresh
+	case !e.hardExpired():
+		return entryStale
+	default:
+		return entryDead
+	}
 }
 
 func (e *entry) softExpired() bool {
@@ -265,7 +314,6 @@ type Options struct {
 	// stale-while-error entirely, hard-failing at JWT exp.
 	HardGrace     time.Duration
 	Logger        *zap.Logger
-	L2            L2Store // optional, nil = skip L2
 	Resolver      KeyResolver
 	ConfigFetcher ConfigFetcher
 	// ConfigTTL is the max age of a cached bundle's config (credentials,
@@ -326,7 +374,6 @@ func New(opts Options) (*Service, error) {
 
 	return &Service{
 		l1:               l1,
-		l2:               opts.L2,
 		resolver:         opts.Resolver,
 		configFetcher:    opts.ConfigFetcher,
 		changePoller:     opts.ChangePoller,
@@ -341,7 +388,7 @@ func New(opts Options) (*Service, error) {
 }
 
 // Resolve returns a Bundle for the raw bearer token.
-// Checks L1 → L2 → upstream resolver, caching at each tier.
+// Checks L1, then the upstream resolver, caching what the latter answers.
 //
 // On L1 hit past softExpiresAt but within hardExpiresAt, attempts a
 // foreground refresh; on transport-class failure serves the stale bundle
@@ -356,9 +403,9 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 
 	// L1: in-memory
 	if e, ok := s.l1.Get(h); ok {
-		switch {
-		case !e.softExpired():
-			// Fresh: serve, maybe trigger background refresh on near-expiry.
+		switch classifyEntry(e) {
+		case entryFresh:
+			// Serve, maybe trigger background refresh on near-expiry.
 			s.recordHit(tierL1)
 			if e.nearSoftExpiry(s.refreshThreshold) {
 				go s.refreshBackground(rawKey, h) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
@@ -367,7 +414,7 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 			}
 			return e.bundle, nil
 
-		case !e.hardExpired():
+		case entryStale:
 			// Soft-expired but within hard grace. A foreground refresh is
 			// needed before the entry can serve, so it counts as a miss
 			// even when stale-while-error ends up serving the old bundle.
@@ -387,18 +434,6 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 		s.recordMiss(tierL1)
 	}
 
-	// L2: optional store
-	if s.l2 != nil {
-		hStr := string(h[:])
-		if bundle, err := s.l2.Get(ctx, hStr); err == nil && bundle != nil {
-			s.recordHit(tierL2Redis)
-			s.storeL1(h, bundle)
-			return bundle, nil
-		}
-		s.recordMiss(tierL2Redis)
-	}
-
-	// L3: upstream resolver
 	return s.resolveFresh(ctx, rawKey, h)
 }
 
@@ -425,22 +460,20 @@ func (s *Service) recordMiss(tier string) {
 }
 
 // resolveFresh calls the upstream resolver and caches the result.
-// Used for cold L1+L2 misses; not on stale-entry refresh paths (those
-// use refreshOrServeStale for the served-stale fallback).
+// Used for cold misses; not on stale-entry refresh paths (those use
+// refreshOrServeStale for the served-stale fallback).
 func (s *Service) resolveFresh(ctx context.Context, rawKey string, h [64]byte) (*domain.Bundle, error) {
 	bundle, err := s.resolver.ResolveKey(ctx, rawKey)
 	if err != nil {
 		return nil, err
 	}
-	if cfgErr := s.populateConfig(ctx, bundle); cfgErr != nil {
+	etag, cfgErr := s.populateConfig(ctx, bundle)
+	if cfgErr != nil {
 		// Cold miss: no stale entry to fall back on. Cache nothing — a
 		// bundle without its config is not a resolution result.
 		return nil, errConfigUnavailable(ctx, cfgErr)
 	}
-	s.storeL1(h, bundle)
-	if s.l2 != nil {
-		s.l2.Set(ctx, string(h[:]), bundle)
-	}
+	s.storeL1(h, bundle, etag)
 	return bundle, nil
 }
 
@@ -457,7 +490,8 @@ func (s *Service) refreshOrServeStale(ctx context.Context, rawKey string, h [64]
 
 	switch cls {
 	case classNone:
-		if cfgErr := s.populateConfig(ctx, bundle); cfgErr != nil {
+		etag, cfgErr := s.populateConfig(ctx, bundle)
+		if cfgErr != nil {
 			// The control plane authenticated the key but could not hand
 			// over its provider config. Serving the fresh, config-less
 			// bundle would surface as no_provider_configured for an org
@@ -465,10 +499,7 @@ func (s *Service) refreshOrServeStale(ctx context.Context, rawKey string, h [64]
 			// serve the stale entry's known-good credentials instead.
 			return s.serveStaleAfterFailure(ctx, h, stale, staleBundle, vkID, hardExpiresAt, cls, cfgErr)
 		}
-		s.storeL1(h, bundle)
-		if s.l2 != nil {
-			s.l2.Set(ctx, string(h[:]), bundle)
-		}
+		s.storeL1(h, bundle, etag)
 		return bundle, nil
 
 	case classAuthRejection:
@@ -529,19 +560,33 @@ func (s *Service) serveStaleAfterFailure(ctx context.Context, h [64]byte, stale 
 // not cache or serve the bundle as-is: dispatch would answer the terminal
 // no_provider_configured ("add a provider API key in Settings") for an org
 // whose keys are fine, and a cached config-less bundle keeps giving that
-// answer until it expires — on every node that shares the L2 cache.
-func (s *Service) populateConfig(ctx context.Context, bundle *domain.Bundle) error {
+// answer until it expires. Returns the ETag the config was served under, for
+// the entry that will carry it.
+//
+// Unconditional on purpose: this path is materializing config for a bundle
+// that has none, so "still current" would be an answer about nothing. The
+// conditional request belongs to refreshConfigBackground, which already holds
+// a config a 304 can confirm.
+func (s *Service) populateConfig(ctx context.Context, bundle *domain.Bundle) (string, error) {
 	if bundle == nil {
-		return nil
+		return "", nil
 	}
-	cfg, err := s.configFetcher.FetchConfig(ctx, bundle.VirtualKeyID)
+	res, err := s.configFetcher.FetchConfig(ctx, bundle.VirtualKeyID, "")
 	if err != nil {
 		s.logger.Warn("config_fetch_failed", zap.String("vk_id", bundle.VirtualKeyID), zap.Error(err))
-		return err
+		return "", err
 	}
-	bundle.Config = cfg
-	bundle.Credentials = cfg.Credentials
-	return nil
+	if res.NotModified {
+		// Nothing was revalidated, so there is no config behind this answer.
+		// Treated as a failed fetch rather than cached as an empty one, which
+		// would strip the key of every credential it has.
+		err := errors.New("config fetch answered not-modified to an unconditional request")
+		s.logger.Warn("config_fetch_failed", zap.String("vk_id", bundle.VirtualKeyID), zap.Error(err))
+		return "", err
+	}
+	bundle.Config = res.Config
+	bundle.Credentials = res.Config.Credentials
+	return res.ETag, nil
 }
 
 // errConfigUnavailable is the fail-closed answer when the control plane
@@ -575,15 +620,20 @@ func (s *Service) Stop() {
 
 // --- Internal ---
 
-func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle) {
+// storeL1 caches a bundle whose config was just fetched under configETag, and
+// records its org for the change feed. An empty configETag is the honest state
+// after a response that carried none: the next staleness refresh asks for the
+// config outright rather than revalidating against a token we do not have.
+func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) {
 	s.l1.Add(h, &entry{
 		bundle:          bundle,
 		softExpiresAt:   bundle.ExpiresAt,
 		hardExpiresAt:   bundle.ExpiresAt.Add(s.hardGrace),
 		configFetchedAt: time.Now(),
+		configETag:      configETag,
 	})
 	// Record the bundle's org so the change-feed loop knows which orgs
-	// to subscribe to. LoadOrStore is the first-write-wins shape — if
+	// to subscribe to. LoadOrStore is the first-write-wins shape: if
 	// the org's already known, the existing cursor is preserved so we
 	// don't reset to "0" and re-stream the entire history on every new
 	// bundle for an existing org.
@@ -654,6 +704,11 @@ func (s *Service) changeFeedLoop(ctx context.Context) {
 // once with a kind-specific predicate and removes matching entries; the
 // next request for those VKs takes a cold miss and re-resolves with the
 // fresh control-plane state.
+//
+// The evict reason is the lowercased change kind, so an operator reading
+// auth_cache_change_evict sees which mutation caused it. Hardcoding one
+// label per branch collapsed distinct kinds onto one word, and a delete
+// that logs "updated" is worse than no label at all.
 func (s *Service) applyChange(organizationID string, ch CacheChange) {
 	switch ch.Kind {
 	case ChangeKindProviderBindingUpdated:
@@ -670,7 +725,7 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 				}
 			}
 			return false
-		}, "model_provider_updated", ch.ModelProviderID)
+		}, evictReason(ch.Kind), ch.ModelProviderID)
 	case ChangeKindBudgetCreated, ChangeKindBudgetUpdated, ChangeKindBudgetDeleted:
 		// Only PROJECT-scoped creates carry project_id. Updates, deletes, and
 		// every other scope omit it, so invalidate the polled organization in
@@ -678,12 +733,12 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 		if ch.ProjectID != "" {
 			s.evictWhere(func(b *domain.Bundle) bool {
 				return b.ProjectID == ch.ProjectID
-			}, "budget_updated", ch.ProjectID)
+			}, evictReason(ch.Kind), ch.ProjectID)
 			return
 		}
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.OrganizationID == organizationID
-		}, "budget_updated", organizationID)
+		}, evictReason(ch.Kind), organizationID)
 	case ChangeKindVirtualKeyConfigUpdate, ChangeKindVirtualKeyRotated, ChangeKindVirtualKeyRevoked,
 		ChangeKindVirtualKeyDisabled, ChangeKindVirtualKeyEnabled:
 		if ch.VirtualKeyID == "" {
@@ -691,18 +746,64 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 		}
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.VirtualKeyID == ch.VirtualKeyID
-		}, "virtual_key_config_updated", ch.VirtualKeyID)
+		}, evictReason(ch.Kind), ch.VirtualKeyID)
+	case ChangeKindRoutingPolicyUpdated, ChangeKindRoutingPolicyDeleted:
+		// A bundle carries the resolved routing mode and chain, not the id
+		// of the policy they came from, so there is nothing finer than the
+		// organization to key on. Same shape as a budget change with no
+		// project.
+		s.evictWhere(func(b *domain.Bundle) bool {
+			return b.OrganizationID == organizationID
+		}, evictReason(ch.Kind), organizationID)
+	case ChangeKindCacheRuleCreated, ChangeKindCacheRuleUpdated, ChangeKindCacheRuleDeleted:
+		// Cache rules are org-scoped and baked into every bundle as a
+		// pre-sorted array, with no rule id left on the bundle to join on.
+		s.evictWhere(func(b *domain.Bundle) bool {
+			return b.OrganizationID == organizationID
+		}, evictReason(ch.Kind), organizationID)
+	case ChangeKindVirtualKeyCreated:
+		// Nothing to evict: a key nobody has resolved yet is in no cache, on
+		// this node or any other. Named rather than left to the default so a
+		// routine event does not arrive as a warning and bury the kinds an
+		// operator actually needs to see.
+	default:
+		// The cases above are every kind this build knows about, acted on or
+		// deliberately ignored, and the control plane is free to emit others.
+		// Dropping one is often correct, but dropping one silently is how
+		// CACHE_RULE_* went unhandled from the day it shipped: the control
+		// plane emitted it, nothing here named it, and the documented
+		// behavior simply did not happen. Saying so leaves the next one an
+		// hour of log reading rather than a bug report about staleness.
+		s.logger.Warn("auth_cache_change_unhandled",
+			zap.String("kind", ch.Kind),
+			zap.String("organization_id", organizationID),
+		)
 	}
 }
 
+// evictReason turns a change kind into the label its eviction is logged
+// under. One transformation in one place, so every kind reads the same way in
+// auth_cache_change_evict and none of them can drift into a hand-written word
+// that no longer matches the event.
+func evictReason(kind string) string {
+	return strings.ToLower(kind)
+}
+
 // evictWhere walks the L1 LRU once and removes every entry whose bundle
-// matches the predicate. O(N) over LRUSize per call — acceptable for
-// 10k-ish caches and the low frequency of admin mutations.
+// matches the predicate. O(N) over LRUSize per call: acceptable for 10k-ish
+// caches and the low frequency of admin mutations.
+//
+// Peek, not Get: the scan reads the whole cache, and Get takes the
+// exclusive lock and promotes what it reads. That queues every in-flight
+// request behind the scan once per entry, and it drags keys the
+// scan merely looked at ahead of keys real traffic touched after the
+// Keys() snapshot, so the next size eviction picks the wrong victim. Peek
+// takes the shared lock and leaves recency to the request path, the same
+// reason refreshConfigBackground uses it.
 func (s *Service) evictWhere(match func(*domain.Bundle) bool, reason, target string) {
-	keys := s.l1.Keys()
 	evicted := 0
-	for _, h := range keys {
-		e, ok := s.l1.Get(h)
+	for _, h := range s.l1.Keys() {
+		e, ok := s.l1.Peek(h)
 		if !ok {
 			continue
 		}
@@ -712,13 +813,14 @@ func (s *Service) evictWhere(match func(*domain.Bundle) bool, reason, target str
 		s.l1.Remove(h)
 		evicted++
 	}
-	if evicted > 0 {
-		s.logger.Info("auth_cache_change_evict",
-			zap.String("reason", reason),
-			zap.String("target", target),
-			zap.Int("evicted", evicted),
-		)
+	if evicted == 0 {
+		return
 	}
+	s.logger.Info("auth_cache_change_evict",
+		zap.String("reason", reason),
+		zap.String("target", target),
+		zap.Int("evicted", evicted),
+	)
 }
 
 // refreshBackground is the near-soft-expiry proactive refresh: fires
@@ -733,7 +835,8 @@ func (s *Service) refreshBackground(rawKey string, h [64]byte) {
 
 	switch cls {
 	case classNone:
-		if cfgErr := s.populateConfig(ctx, bundle); cfgErr != nil {
+		etag, cfgErr := s.populateConfig(ctx, bundle)
+		if cfgErr != nil {
 			// Keep the existing entry serving its known-good credentials.
 			// Replacing it with a config-less bundle would proactively
 			// poison a perfectly healthy cache entry into answering
@@ -741,10 +844,7 @@ func (s *Service) refreshBackground(rawKey string, h [64]byte) {
 			s.bumpEntryAfterTransportFailure(h, cfgErr)
 			return
 		}
-		s.storeL1(h, bundle)
-		if s.l2 != nil {
-			s.l2.Set(ctx, string(h[:]), bundle)
-		}
+		s.storeL1(h, bundle, etag)
 		s.logger.Debug("auth_cache_refresh_success", zap.String("vk_id", bundle.VirtualKeyID))
 
 	case classAuthRejection:
@@ -792,6 +892,13 @@ func (s *Service) bumpEntryAfterTransportFailure(h [64]byte, cause error) {
 // pointer stays immutable, so in-flight requests holding the old bundle
 // are unaffected. On failure the stale config keeps serving and the next
 // attempt waits a full TTL (endConfigRefresh stamps configFetchedAt).
+//
+// This is the safety net rather than the propagation path: the change feed
+// already evicts on the mutations that emit events, and this bounds staleness
+// for the ones that do not. Which is exactly why it revalidates instead of
+// re-downloading. Most of the time it fires, nothing about the key has
+// changed, and the conditional request turns a full config materialization
+// into a 304 the control plane answers from the key's revision.
 func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 	defer e.endConfigRefresh()
 
@@ -799,7 +906,7 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 	defer cancel()
 
 	stale, _, _ := e.snapshot()
-	cfg, err := s.configFetcher.FetchConfig(ctx, stale.VirtualKeyID)
+	res, err := s.configFetcher.FetchConfig(ctx, stale.VirtualKeyID, e.currentConfigETag())
 	if err != nil {
 		s.logger.Warn("config_ttl_refresh_failed",
 			zap.String("vk_id", stale.VirtualKeyID),
@@ -807,17 +914,25 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 		)
 		return
 	}
+	if res.NotModified {
+		// The config this entry carries is still the current one, so there is
+		// nothing to swap in. The deferred endConfigRefresh restarts the
+		// staleness clock, which is what a confirmation is worth: the entry
+		// was just checked against the control plane, not merely tolerated.
+		s.logger.Debug("config_ttl_refresh_not_modified", zap.String("vk_id", stale.VirtualKeyID))
+		return
+	}
 
 	fresh := *stale
-	fresh.Config = cfg
-	fresh.Credentials = cfg.Credentials
+	fresh.Config = res.Config
+	fresh.Credentials = res.Config.Credentials
 
 	// Guard against resurrecting an entry that another path evicted or
 	// replaced while FetchConfig was in flight: a change-feed eviction
 	// (VK/provider updated or revoked), an async auth rejection, or a
 	// foreground auth refresh that swapped in a newer bundle. If the live L1
 	// entry for h is no longer the one we started from, drop this result
-	// instead of writing a stale (possibly revoked) bundle back into L1/L2.
+	// instead of writing a stale (possibly revoked) bundle back into L1.
 	// Peek avoids perturbing LRU recency from this background goroutine.
 	if cur, ok := s.l1.Peek(h); !ok || cur != e {
 		s.logger.Debug("config_ttl_refresh_dropped_stale",
@@ -825,10 +940,7 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 		)
 		return
 	}
-	s.storeL1(h, &fresh)
-	if s.l2 != nil {
-		s.l2.Set(ctx, string(h[:]), &fresh)
-	}
+	s.storeL1(h, &fresh, res.ETag)
 	s.logger.Debug("config_ttl_refresh_success", zap.String("vk_id", stale.VirtualKeyID))
 }
 

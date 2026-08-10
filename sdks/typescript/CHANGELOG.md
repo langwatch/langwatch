@@ -1,5 +1,51 @@
 # Changelog
 
+## [1.4.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.3.0...typescript-sdk@v1.4.0) (2026-08-09)
+
+
+### Features
+
+* **agent-plugin:** first-class LangWatch plugin for Claude Code and Agent Plugins 1.0 ([#6747](https://github.com/langwatch/langwatch/issues/6747)) ([25625c4](https://github.com/langwatch/langwatch/commit/25625c44e53d6dd23d647e58fad9783464e8a1e2))
+* **cli:** keep the LangWatch Claude Code plugin up to date from every wrapped run ([#6751](https://github.com/langwatch/langwatch/issues/6751)) ([b64a584](https://github.com/langwatch/langwatch/commit/b64a58465e7d35fcc2ae6ba22d9d4ca54e66b7a4))
+* **codex:** capture the conversation for a plain codex, not just the wrapper ([#6433](https://github.com/langwatch/langwatch/issues/6433)) ([38931b4](https://github.com/langwatch/langwatch/commit/38931b4392837c4a011dbde44ec7b80c80b19720))
+* **governance:** copilot capture across three surfaces — CLI wrapper, app login agent, VS Code Chat (ADR-039) ([#5605](https://github.com/langwatch/langwatch/issues/5605)) ([fd6a3b3](https://github.com/langwatch/langwatch/commit/fd6a3b304176137433ad645d718ec1411097c60f))
+
+
+### Documentation
+
+* **sdk:** say which API key family the org-anchored services take ([#6757](https://github.com/langwatch/langwatch/issues/6757)) ([968d317](https://github.com/langwatch/langwatch/commit/968d3171553d8e98ae265359099bc00fe36934a5))
+
+## [1.3.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.2.0...typescript-sdk@v1.3.0) (2026-08-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* **evaluators:** evaluations, monitors and experiments referencing a legacy/ragas_* evaluator type stop working. Their current equivalents in the ragas/* family remain available.
+
+### Features
+
+* **coding-agent:** session economics, and the repositories and pull requests behind them ([#6435](https://github.com/langwatch/langwatch/issues/6435)) ([6430813](https://github.com/langwatch/langwatch/commit/6430813056cda513241a8389a2136fac2d63591e))
+* **evaluators:** remove the legacy Ragas evaluators ([#6600](https://github.com/langwatch/langwatch/issues/6600)) ([ef9ea90](https://github.com/langwatch/langwatch/commit/ef9ea90e22bc2adb92bacf5c732cc996c9782bfe))
+
+
+### Miscellaneous
+
+* **release:** single-footer shadow Release-As 1.3.0 for the typescript SDK ([#6734](https://github.com/langwatch/langwatch/issues/6734)) ([79cd276](https://github.com/langwatch/langwatch/commit/79cd276a940ad8dacf72cab7657f48d01929e048))
+
+## [1.2.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.1.0...typescript-sdk@v1.2.0) (2026-08-07)
+
+
+### Features
+
+* **api-docs:** publish the REST API the SDKs actually call, and gate route coverage ([#6605](https://github.com/langwatch/langwatch/issues/6605)) ([25884bf](https://github.com/langwatch/langwatch/commit/25884bf3992eb99c00c3c7bafb09b979b02f0013))
+* gateway billing follow-ups: anchored cycles, idempotency keys, one webhook pipeline, CodeQL, docs sweep ([#6511](https://github.com/langwatch/langwatch/issues/6511)) ([359f985](https://github.com/langwatch/langwatch/commit/359f985700bc7178ff4725108810b917c626af84))
+
+
+### Bug Fixes
+
+* **sdk:** @opentelemetry/api is a runtime import, so declare it as a dependency ([#6552](https://github.com/langwatch/langwatch/issues/6552)) ([35effd6](https://github.com/langwatch/langwatch/commit/35effd6ae669e5e2799297048c0f87253a0a42d6))
+* **sdk:** declare the otel packages the SDK imports at runtime as dependencies ([35effd6](https://github.com/langwatch/langwatch/commit/35effd6ae669e5e2799297048c0f87253a0a42d6))
+
 ## [1.1.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.0.0...typescript-sdk@v1.1.0) (2026-07-31)
 
 

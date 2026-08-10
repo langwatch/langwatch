@@ -21,13 +21,12 @@ import {
   auditCoverage,
   collectRegisteredRoutes,
   documentedOperations,
-  type Exclusion,
   excludes,
   HANDLER_ROOTS,
   isEntryModule,
   type RegisteredRoute,
-  UNPUBLISHED,
 } from "../check-openapi-route-coverage";
+import { type Exclusion, UNPUBLISHED } from "../openapi-route-exclusions";
 
 const route = ({
   key,

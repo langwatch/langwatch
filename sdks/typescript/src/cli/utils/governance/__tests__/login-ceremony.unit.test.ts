@@ -25,6 +25,17 @@ describe("formatLoginCeremony", () => {
     });
   });
 
+  // Parse the command token right after "$ langwatch" instead of scanning
+  // the whole line: formatLoginCeremony appends the displayName after the
+  // command, so substring checks could match a label ("... # langwatch open
+  // helper") and hide a missing or extra wrapper.
+  const getCommandSlug = (line: string): string | undefined =>
+    /^ {2}\$ langwatch (\S+)/.exec(line)?.[1];
+  const isToolCommand = (line: string): boolean => {
+    const slug = getCommandSlug(line);
+    return slug !== undefined && slug !== "open";
+  };
+
   describe("AI tools block", () => {
     describe("when the org publishes coding-assistant tools", () => {
       it("lists exactly those tools as runnable commands with their names", () => {
@@ -35,9 +46,7 @@ describe("formatLoginCeremony", () => {
             { slug: "codex", displayName: "Codex" },
           ],
         });
-        const toolLines = lines.filter(
-          (l) => l.startsWith("  $ langwatch") && !l.includes("langwatch open"),
-        );
+        const toolLines = lines.filter(isToolCommand);
         expect(toolLines).toHaveLength(2);
         expect(toolLines[0]).toBe("  $ langwatch claude  # Claude Code");
         expect(toolLines[1]).toBe("  $ langwatch codex   # Codex");
@@ -45,23 +54,29 @@ describe("formatLoginCeremony", () => {
     });
 
     describe("when the org publishes no tools", () => {
-      it("falls back to the built-in default wrappers", () => {
+      it("falls back to every built-in wrapper (all seven tools)", () => {
         const lines = formatLoginCeremony(baseInput);
-        const toolLines = lines.filter(
-          (l) => l.startsWith("  $ langwatch") && !l.includes("langwatch open"),
-        );
-        expect(toolLines).toHaveLength(3);
-        expect(toolLines.find((l) => l.includes("claude"))).toBeDefined();
-        expect(toolLines.find((l) => l.includes("codex"))).toBeDefined();
-        expect(toolLines.find((l) => l.includes("cursor"))).toBeDefined();
+        const toolLines = lines.filter(isToolCommand);
+        expect(toolLines).toHaveLength(7);
+        for (const slug of [
+          "claude",
+          "codex",
+          "copilot",
+          "code",
+          "cursor",
+          "gemini",
+          "opencode",
+        ]) {
+          expect(toolLines.some((line) => getCommandSlug(line) === slug)).toBe(
+            true,
+          );
+        }
       });
 
       it("falls back when an empty tools array is supplied", () => {
         const lines = formatLoginCeremony({ ...baseInput, tools: [] });
-        const toolLines = lines.filter(
-          (l) => l.startsWith("  $ langwatch") && !l.includes("langwatch open"),
-        );
-        expect(toolLines).toHaveLength(3);
+        const toolLines = lines.filter(isToolCommand);
+        expect(toolLines).toHaveLength(7);
       });
     });
   });

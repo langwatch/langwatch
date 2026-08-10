@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/langwatch/langwatch/compare/python-sdk@v1.1.0...python-sdk@v1.2.0) (2026-08-07)
+
+
+### Features
+
+* gateway billing follow-ups: anchored cycles, idempotency keys, one webhook pipeline, CodeQL, docs sweep ([#6511](https://github.com/langwatch/langwatch/issues/6511)) ([359f985](https://github.com/langwatch/langwatch/commit/359f985700bc7178ff4725108810b917c626af84))
+
 ## [1.1.0](https://github.com/langwatch/langwatch/compare/python-sdk@v1.0.0...python-sdk@v1.1.0) (2026-08-04)
 
 

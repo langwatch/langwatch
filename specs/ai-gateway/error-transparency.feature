@@ -67,6 +67,17 @@ Feature: AI Gateway — transparent upstream error forwarding
     And the upstream retry-signalling headers (Retry-After, x-should-retry) are preserved
     And the gateway does not flatten the retryable 429 into a terminal 4xx
 
+  # The handled-error marker proves a response body is LangWatch-authored, so
+  # a forwarded provider response must never carry one — on the error path OR
+  # the passthrough lane, which forwards upstream headers wholesale.
+  @bdd @error-transparency @integration
+  Scenario: A provider-set marker header cannot survive the passthrough lane
+    Given the upstream provider answers a passthrough request with an error
+    And the provider set the LangWatch handled-error marker on its response
+    When the gateway forwards that response to the client
+    Then the marker header is stripped
+    And the provider's body and status are still forwarded verbatim
+
   @bdd @error-transparency @integration
   Scenario: Terminal upstream error is identical across stream and non-stream
     Given the upstream provider responds 401 with a terminal error body

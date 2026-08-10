@@ -126,3 +126,18 @@ Feature: Coding-agent sessions
     Given an agent whose model calls are reported as logs rather than spans
     When a run of its model calls is written together
     Then the session's context growth, final request and stop reason match the last call in that run
+
+  Scenario: a reported rate limit is counted apart from an inferred one
+    When an agent session reports rate-limit events and separately fails an API call with a 429
+    Then the session counts the reported rate-limit events on their own
+    And the 429-inferred count is unchanged by them
+
+  Scenario: compactions are told apart by what triggered them
+    When an agent session compacts automatically twice and once at the user's request
+    Then the session records two automatic compactions and one manual one
+    And a compaction that names no trigger is counted as unknown
+
+  Scenario: a spawned session knows its parent
+    When a session's telemetry names the session that spawned it as a fork
+    Then the session records its parent and that it forked the parent's context
+    And later telemetry does not change who the parent was

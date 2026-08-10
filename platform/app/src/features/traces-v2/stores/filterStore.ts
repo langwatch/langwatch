@@ -41,6 +41,14 @@ export interface TraceListCursor {
   traceId: string;
 }
 
+/**
+ * Cursor recorded per visited page. The flat lens stores the structured
+ * trace keyset cursor; the sessions lens stores the opaque string cursor
+ * `tracesV2.sessions` hands back. Each consumer type-guards and treats the
+ * other lens's cursor as "not mine" (falling back to page 1).
+ */
+export type PageCursor = TraceListCursor | string;
+
 interface FilterState {
   /** The parsed query AST (liqe) — single source of truth */
   ast: LiqeQuery;
@@ -53,7 +61,7 @@ interface FilterState {
   page: number;
   pageSize: number;
   /** Cursor used to enter each visited batch. Page 1 intentionally uses null. */
-  pageCursors: Record<number, TraceListCursor | null>;
+  pageCursors: Record<number, PageCursor | null>;
 
   /** Debounced version of queryText to drive network requests */
   debouncedQueryText: string;
@@ -183,7 +191,8 @@ interface FilterState {
   /** Roll forward an existing preset range without resetting page. */
   rollTimeRange: (range: TimeRange) => void;
   setPage: (page: number) => void;
-  setPageCursor: (page: number, cursor: TraceListCursor | null) => void;
+  /** File the cursor that enters a page under that page's number. */
+  setPageCursor: (args: { page: number; cursor: PageCursor | null }) => void;
   resetPagination: () => void;
   setPageSize: (size: number) => void;
   clearAll: () => void;
@@ -503,7 +512,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     set({ timeRange: range, page: 1, pageCursors: { 1: null } }),
   rollTimeRange: (range) => set({ timeRange: range }),
   setPage: (page) => set({ page }),
-  setPageCursor: (page, cursor) =>
+  setPageCursor: ({ page, cursor }) =>
     set((state) => ({
       pageCursors: { ...state.pageCursors, [page]: cursor },
     })),

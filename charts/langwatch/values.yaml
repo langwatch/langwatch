@@ -119,21 +119,21 @@ images:
   ## @param images.app.pullPolicy [string] App image pull policy.
   app:
     repository: langwatch/langwatch
-    tag: 3.9.0 # x-release-please-version
+    tag: 3.12.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langwatch_nlp.repository [string] NLP image repository (Go nlpgo binary, published as langwatch_nlp).
   ## @param images.langwatch_nlp.tag [string] NLP image tag.
   ## @param images.langwatch_nlp.pullPolicy [string] NLP image pull policy.
   langwatch_nlp:
     repository: langwatch/langwatch_nlp
-    tag: 3.9.0 # x-release-please-version
+    tag: 3.12.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langevals.repository [string] Langevals image repository.
   ## @param images.langevals.tag [string] Langevals image tag.
   ## @param images.langevals.pullPolicy [string] Langevals image pull policy.
   langevals:
     repository: langwatch/langevals
-    tag: 3.9.0 # x-release-please-version
+    tag: 3.12.0 # x-release-please-version
     pullPolicy: IfNotPresent
 
 # =============================================================================
@@ -485,7 +485,8 @@ app:
   nextAuth:
     # Authentication provider to use. This value is passed to the app verbatim
     # as NEXTAUTH_PROVIDER, so it has to be one the app recognises:
-    #   email (default), google, github, gitlab, azure-ad, auth0, okta
+    #   email (default), google, github, gitlab, azure-ad, auth0, okta,
+    #   cognito, onelogin, oidc
     # Note that Azure AD is 'azure-ad' here while its credentials live under
     # providers.azureAd below — the first is the app's provider id, the second
     # is this chart's key for the AZURE_AD_* variables.
@@ -503,9 +504,6 @@ app:
     providers:
       # Auth0 OAuth integration
       ## @extra app.nextAuth.providers.auth0 Auth0 OAuth configuration.
-      ## @param app.nextAuth.providers.auth0.clientId.value [string] Auth0 client ID.
-      ## @param app.nextAuth.providers.auth0.clientSecret.value [string] Auth0 client secret.
-      ## @param app.nextAuth.providers.auth0.issuer.value [string] Auth0 issuer URL.
       auth0:
         clientId:
           ## @param app.nextAuth.providers.auth0.clientId.value [string] Auth0 client ID.
@@ -539,6 +537,27 @@ app:
           ## @param app.nextAuth.providers.azureAd.tenantId.value [string] Azure AD tenant ID.
           value: ""
           ## @param app.nextAuth.providers.azureAd.tenantId.secretKeyRef [object] Secret ref for Azure AD tenant ID.
+          secretKeyRef: { name: "", key: "" }
+      # AWS Cognito OAuth integration
+      ## @extra app.nextAuth.providers.cognito AWS Cognito OAuth configuration.
+      cognito:
+        clientId:
+          ## @param app.nextAuth.providers.cognito.clientId.value [string] Cognito client ID.
+          value: ""
+          ## @param app.nextAuth.providers.cognito.clientId.secretKeyRef [object] Secret ref for Cognito client ID.
+          secretKeyRef: { name: "", key: "" }
+        clientSecret:
+          ## @param app.nextAuth.providers.cognito.clientSecret.value [string] Cognito client secret.
+          value: ""
+          ## @param app.nextAuth.providers.cognito.clientSecret.secretKeyRef [object] Secret ref for Cognito client secret.
+          secretKeyRef: { name: "", key: "" }
+        issuer:
+          # The user pool's issuer, https://cognito-idp.<region>.amazonaws.com/<userPoolId>,
+          # not the hosted-UI domain. The hosted-UI endpoints are read from the
+          # issuer's discovery document.
+          ## @param app.nextAuth.providers.cognito.issuer.value [string] Cognito issuer URL.
+          value: ""
+          ## @param app.nextAuth.providers.cognito.issuer.secretKeyRef [object] Secret ref for Cognito issuer URL.
           secretKeyRef: { name: "", key: "" }
       # GitHub OAuth integration
       ## @extra app.nextAuth.providers.github GitHub OAuth configuration.
@@ -596,6 +615,44 @@ app:
           ## @param app.nextAuth.providers.okta.issuer.value [string] Okta issuer URL.
           value: ""
           ## @param app.nextAuth.providers.okta.issuer.secretKeyRef [object] Secret ref for Okta issuer URL.
+          secretKeyRef: { name: "", key: "" }
+      # OneLogin OAuth integration
+      ## @extra app.nextAuth.providers.onelogin OneLogin OAuth configuration.
+      onelogin:
+        clientId:
+          ## @param app.nextAuth.providers.onelogin.clientId.value [string] OneLogin client ID.
+          value: ""
+          ## @param app.nextAuth.providers.onelogin.clientId.secretKeyRef [object] Secret ref for OneLogin client ID.
+          secretKeyRef: { name: "", key: "" }
+        clientSecret:
+          ## @param app.nextAuth.providers.onelogin.clientSecret.value [string] OneLogin client secret.
+          value: ""
+          ## @param app.nextAuth.providers.onelogin.clientSecret.secretKeyRef [object] Secret ref for OneLogin client secret.
+          secretKeyRef: { name: "", key: "" }
+        issuer:
+          # https://<subdomain>.onelogin.com/oidc/2
+          ## @param app.nextAuth.providers.onelogin.issuer.value [string] OneLogin issuer URL.
+          value: ""
+          ## @param app.nextAuth.providers.onelogin.issuer.secretKeyRef [object] Secret ref for OneLogin issuer URL.
+          secretKeyRef: { name: "", key: "" }
+      # Any other OpenID Connect provider, configured by issuer alone
+      ## @extra app.nextAuth.providers.oidc Generic OpenID Connect configuration.
+      oidc:
+        clientId:
+          ## @param app.nextAuth.providers.oidc.clientId.value [string] OIDC client ID.
+          value: ""
+          ## @param app.nextAuth.providers.oidc.clientId.secretKeyRef [object] Secret ref for OIDC client ID.
+          secretKeyRef: { name: "", key: "" }
+        clientSecret:
+          ## @param app.nextAuth.providers.oidc.clientSecret.value [string] OIDC client secret.
+          value: ""
+          ## @param app.nextAuth.providers.oidc.clientSecret.secretKeyRef [object] Secret ref for OIDC client secret.
+          secretKeyRef: { name: "", key: "" }
+        issuer:
+          # Whatever your provider publishes .well-known/openid-configuration under.
+          ## @param app.nextAuth.providers.oidc.issuer.value [string] OIDC issuer URL.
+          value: ""
+          ## @param app.nextAuth.providers.oidc.issuer.secretKeyRef [object] Secret ref for OIDC issuer URL.
           secretKeyRef: { name: "", key: "" }
 
   # Telemetry and monitoring configuration

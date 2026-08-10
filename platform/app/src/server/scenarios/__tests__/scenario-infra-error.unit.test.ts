@@ -5,6 +5,11 @@
  */
 
 import { describe, expect, it } from "vitest";
+// The shared needle couples this classifier to the four sites that actually
+// throw the codex coding-assistant-surfaces refusal (codexGatewayModel.ts,
+// api/routers/modelProviders.utils.ts, modelDefaults.service.ts x2), so a
+// wording change at the source can't silently stop being recognised here.
+import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "../../modelProviders/codexRefusalMessage";
 import {
   classifyScenarioInfraError,
   decodeScenarioError,
@@ -135,6 +140,42 @@ describe("classifyScenarioInfraError", () => {
       const result = classifyScenarioInfraError(undefined);
       expect(result.code).toBe(ScenarioInfraErrorCode.Infra);
       expect(result.message.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("when the raw error is a codex coding-assistant-surface refusal", () => {
+    // Both real wordings the backstop emits (codexGatewayModel.ts and
+    // api/routers/modelProviders.utils.ts / modelDefaults.service.ts)
+    // share the same prefix built from the shared needle — different
+    // suffixes name a different disallowed surface, but the classifier
+    // only needs to recognise the shared part.
+    const gatewayWording = `"openai_codex/gpt-5.6-terra" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot run "prompt.create_default".`;
+    const litellmWording = `"openai_codex/gpt-5.6-terra" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot run workflows, evaluations or the playground.`;
+
+    /** @scenario "A codex coding-assistant-surface refusal becomes a named, actionable error" */
+    it.each([
+      ["the featureKey-style wording (codexGatewayModel.ts)", gatewayWording],
+      [
+        "the litellm-params-style wording (modelProviders.utils.ts)",
+        litellmWording,
+      ],
+    ])("classifies %s to the dedicated code", (_label, raw) => {
+      const result = classifyScenarioInfraError(raw);
+      expect(result.code).toBe(
+        ScenarioInfraErrorCode.ModelNotAllowedForSurface,
+      );
+    });
+
+    it("does not surface a raw stack trace in the message", () => {
+      const raw = `Child process exited with code 1: ${gatewayWording}\n    at getCodexVercelAIModel (codexGatewayModel.ts:32:11)`;
+      const result = classifyScenarioInfraError(raw);
+      expect(result.message).not.toContain("at getCodexVercelAIModel");
+      expect(result.message).not.toContain("Child process exited");
+    });
+
+    it("points the hint at the project's model default settings", () => {
+      const result = classifyScenarioInfraError(gatewayWording);
+      expect(result.hint).toMatch(/model default|default model/i);
     });
   });
 

@@ -567,6 +567,44 @@ const esMapProjectionTotal = new Counter({
   labelNames: ["pipeline_name", "projection_name", "status"] as const,
 });
 
+/**
+ * Map-projection fan-out outcomes decided at enqueue time (ADR-069 invariant
+ * 4), before any job exists.
+ *
+ * `queued` and `filtered` sum to "events routed to this projection after the
+ * event-type match", which is what makes the split readable: `filtered` is the
+ * work the seam avoided minting, and its share against `queued` is the only
+ * way to tell a filter that is earning its place from one that never fires —
+ * or, worse, one that has narrowed past what `map()` still handles.
+ *
+ * Distinct from `es_map_projection_total`, which counts what the WORKER did to
+ * a job that already exists. A filtered event never reaches it.
+ */
+type MapProjectionEnqueueOutcome = "queued" | "filtered";
+register.removeSingleMetric("es_map_projection_enqueue_total");
+const esMapProjectionEnqueueTotal = new Counter({
+  name: "es_map_projection_enqueue_total",
+  help: "Event-sourcing map projection fan-out outcomes decided at enqueue time (ADR-069): queued as a job, or filtered before any job was minted because the projection would have mapped the event to nothing",
+  labelNames: ["pipeline_name", "projection_name", "outcome"] as const,
+});
+
+export const incrementEsMapProjectionEnqueueTotal = ({
+  pipelineName,
+  projectionName,
+  outcome,
+  count = 1,
+}: {
+  pipelineName: string;
+  projectionName: string;
+  outcome: MapProjectionEnqueueOutcome;
+  count?: number;
+}) => {
+  if (count <= 0) return;
+  esMapProjectionEnqueueTotal
+    .labels(pipelineName, projectionName, outcome)
+    .inc(count);
+};
+
 export const incrementEsMapProjectionTotal = ({
   pipelineName,
   projectionName,

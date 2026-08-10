@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { isPreviewTraceId } from "../onboarding/data/samplePreviewTraces";
+import { selectIsTraceEditDirty, useTraceEditStore } from "./traceEditStore";
 
 export type DrawerViewMode =
   | "trace"
@@ -58,6 +60,15 @@ export interface DrawerUrlState {
    * pin loop can't bloat the URL.
    */
   pinnedSpanIds: string[];
+  /**
+   * Whether the drawer is correcting the trace rather than reading it.
+   * Serialised as `drawer.edit=1` (`drawer.mode` is the view mode), so a link
+   * can drop a reviewer straight into edit mode. Only the mode bit travels:
+   * the uncommitted correction itself lives in `traceEditStore` and is never
+   * put in a URL, so a shared link never carries somebody else's half-finished
+   * work.
+   */
+  isEditing: boolean;
 }
 
 /** Hard cap on the number of pinned span tabs (URL + memory). */
@@ -153,6 +164,12 @@ interface DrawerState extends DrawerUrlState {
    * conversation-turn jump. See specs/traces-v2/span-reference-jump-to-trace.feature
    */
   openSpanInTrace: (spanId: string) => void;
+  /**
+   * Turn edit mode on or off. Owns only the mode bit; the draft is started and
+   * dropped by `traceEditStore`. See `enterTraceEditMode` and
+   * `exitTraceEditMode` for the pair that keeps the two in step.
+   */
+  setIsEditing: (value: boolean) => void;
   setViewMode: (mode: DrawerViewMode) => void;
   /**
    * Apply a view mode without writing to localStorage. Use for programmatic
@@ -307,6 +324,7 @@ function readInitialFromURL(): InitialFromURL {
     viewMode: "summary",
     vizTab: "waterfall",
     pinnedSpanIds: [],
+    isEditing: false,
     isOpen: false,
   };
   if (typeof window === "undefined") return fallback;
@@ -333,19 +351,69 @@ function readInitialFromURL(): InitialFromURL {
       ? vizRaw
       : (loadLastVizTab() ?? "waterfall");
     const pinnedSpanIds = parsePinnedSpansParam(pinnedRaw);
+    const isEditing = parseEditParam({
+      raw: params.get("drawer.edit"),
+      traceId,
+    });
 
     return {
       traceId,
       occurredAtMs,
       selectedSpanId,
-      viewMode,
+      viewMode: viewModeForEditState({ viewMode, isEditing }),
       vizTab,
       pinnedSpanIds,
+      isEditing,
       isOpen: isOpen && !!traceId,
     };
   } catch {
     return fallback;
   }
+}
+
+/**
+ * Views that replay an agent run rather than showing the trace's own spans.
+ * There is nothing in them to correct and nothing to point a comment at, so
+ * annotation mode never renders one. The conversation is not one of them: a
+ * turn is a trace, and it is where commenting on one reads best.
+ */
+const UNEDITABLE_VIEW_MODES = new Set<DrawerViewMode>(["terminal", "session"]);
+
+export function isUneditableViewMode(mode: DrawerViewMode): boolean {
+  return UNEDITABLE_VIEW_MODES.has(mode);
+}
+
+/**
+ * The view a link resolves to. A link can name a view and edit mode at once,
+ * and the two can disagree; the correction wins, because rendering a pane the
+ * reviewer cannot correct is a drawer that says it is editing and is not.
+ */
+export function viewModeForEditState({
+  viewMode,
+  isEditing,
+}: {
+  viewMode: DrawerViewMode;
+  isEditing: boolean;
+}): DrawerViewMode {
+  return isEditing && isUneditableViewMode(viewMode) ? "trace" : viewMode;
+}
+
+/**
+ * Parse the `drawer.edit` URL param. A sample preview trace is never editable
+ * because it exists only to show an empty project what a trace looks like and
+ * has nothing to correct, so the flag is dropped rather than opening an edit
+ * session that could never be saved.
+ */
+export function parseEditParam({
+  raw,
+  traceId,
+}: {
+  raw: string | null | undefined;
+  traceId: string | null | undefined;
+}): boolean {
+  if (raw !== "1") return false;
+  if (!traceId) return false;
+  return !isPreviewTraceId(traceId);
 }
 
 /**
@@ -518,13 +586,23 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
   viewMode: initial.viewMode,
   vizTab: initial.vizTab,
   pinnedSpanIds: initial.pinnedSpanIds,
+  isEditing: initial.isEditing,
   eventsExpanded: false,
   evalsExpanded: false,
   conversationExpanded: false,
 
   traceBackStack: [],
 
-  openTrace: (traceId, occurredAtMs, expectedSpanCount) =>
+  openTrace: (traceId, occurredAtMs, expectedSpanCount) => {
+    // Reading the captured trace is a decision about the trace in front of the
+    // reader, not a preference: the next one opens corrected, the way every
+    // trace does until they ask otherwise.
+    useTraceEditStore.getState().setOverlayView("edited");
+    // An unsaved correction belongs to the trace it was written against. The
+    // guards ask before leaving a dirty one, so anything still here once the
+    // next trace opens would be saved against the wrong trace. A session on the
+    // trace being opened survives: a link straight into edit mode re-enters it.
+    useTraceEditStore.getState().dropSessionForOtherTrace(traceId);
     set({
       isOpen: true,
       traceId,
@@ -532,7 +610,12 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       expectedSpanCount: expectedSpanCount ?? null,
       selectedSpanId: null,
       pinnedSpanIds: [],
-    }),
+      // Edit mode belongs to the trace it was started on. Moving to another
+      // trace leaves it, and the caller re-enters explicitly when a link asked
+      // for it.
+      isEditing: false,
+    });
+  },
 
   backfillOccurredAtMs: (occurredAtMs) =>
     set((s) => {
@@ -552,6 +635,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       selectedSpanId: null,
       pinnedSpanIds: [],
       traceBackStack: [],
+      isEditing: false,
     }),
 
   selectSpan: (spanId) =>
@@ -584,6 +668,8 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
     get().setVizTabTransient("waterfall");
     set({ viewMode: "trace" });
   },
+
+  setIsEditing: (value) => set({ isEditing: value }),
 
   setViewMode: (mode) => {
     // Remember the user's last explicit mode choice so the next trace
@@ -777,6 +863,16 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
         !arraysShallowEqual(next.pinnedSpanIds, s.pinnedSpanIds)
       ) {
         patch.pinnedSpanIds = next.pinnedSpanIds;
+      }
+      if (next.isEditing !== undefined && next.isEditing !== s.isEditing) {
+        // Browser history must not throw away work. Going back to a URL from
+        // before the reviewer started editing would otherwise drop an
+        // unsaved correction with no way to get it back, so a dirty session
+        // stays open and the URL is re-asserted by the sync effect.
+        const wouldDiscardUnsavedWork =
+          !next.isEditing &&
+          selectIsTraceEditDirty(useTraceEditStore.getState());
+        if (!wouldDiscardUnsavedWork) patch.isEditing = next.isEditing;
       }
       return Object.keys(patch).length === 0 ? s : patch;
     }),

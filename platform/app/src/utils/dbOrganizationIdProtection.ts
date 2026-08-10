@@ -114,6 +114,52 @@ const isSystemManagedKeySweep = (clause: unknown): boolean => {
   );
 };
 
+/**
+ * The shape of the branch-recheck sweep: a branch that resolved to no pull
+ * request (`notFoundAt: { not: null }`), whose backoff has elapsed
+ * (`recheckAfter: { lte: <now> }`), and that a reader has asked about recently
+ * (`lastRequestedAt: { gt: <cutoff> }`). Exactly those three clauses and
+ * nothing else.
+ *
+ * Each one is load-bearing, and the literal matching is deliberate for the same
+ * reason it is on the ApiKey sweep:
+ *
+ *   - `notFoundAt: { not: null }` is "branches with no pull request". Without
+ *     it the hatch reaches every mapped branch in every organization, which is
+ *     the set that carries the pull-request names worth reading.
+ *   - `recheckAfter: { lte: <now> }` is "…whose backoff has elapsed". Without
+ *     it the hatch reaches branches the sweep is deliberately not asking about.
+ *   - `lastRequestedAt: { gt: <cutoff> }` is "…that anyone still cares about".
+ *     Without it the sweep walks branches abandoned months ago, which is both
+ *     the wrong behavior and a much wider read.
+ *
+ * A sweep that legitimately changes shape must change this predicate with it.
+ */
+const isBranchRecheckSweep = (clause: unknown): boolean => {
+  if (!clause || typeof clause !== "object") return false;
+  const where = clause as Record<string, unknown>;
+  return (
+    Object.keys(where).length === 3 &&
+    isNotNullBound(where.notFoundAt) &&
+    isDateComparison(where.recheckAfter, "lte") &&
+    isDateComparison(where.lastRequestedAt, "gt")
+  );
+};
+
+/** Matches exactly `{ not: null }`, nothing looser. */
+const isNotNullBound = (value: unknown): boolean => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const bound = value as Record<string, unknown>;
+  return Object.keys(bound).length === 1 && bound.not === null;
+};
+
+/** Matches exactly `{ <operator>: <Date> }`, nothing looser. */
+const isDateComparison = (value: unknown, operator: "lte" | "gt"): boolean => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const bound = value as Record<string, unknown>;
+  return Object.keys(bound).length === 1 && bound[operator] instanceof Date;
+};
+
 const isNonEmptyStringList = (value: any): boolean =>
   value &&
   typeof value === "object" &&
@@ -231,13 +277,33 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
       );
     },
   },
-  // GitHub App installation mapped to a LangWatch org (Langy bot-authored PRs).
-  // Bound by organizationId (admin reads) or the globally-unique installationId
-  // (webhook + mint paths). Issue #4747; spec
-  // specs/langy/langy-github-install.feature.
-  LangyGithubInstallation: {
+  // The organization's GitHub connection. Bound by organizationId (admin reads)
+  // or the globally-unique installationId (webhook + mint paths). Spec:
+  // specs/integrations/github-connection.feature.
+  GithubInstallation: {
     extraBound: ({ clause }) =>
       typeof clauseField(clause, "installationId") === "string",
+  },
+  // Pull requests discovered through that connection, and the per-branch
+  // bookkeeping behind the lookup. Both are reached by organizationId, or by
+  // the compound unique key that starts with it: a query that names a
+  // repository without naming the organization would span every tenant that
+  // has a repository by that name.
+  GithubPullRequest: {},
+  GithubBranchPullRequestCheck: {
+    // The branch-recheck sweep is the one read in this feature that cannot
+    // name an organization, for the same structural reason the expired-key
+    // sweep above cannot: it runs on a timer with no request context, and its
+    // whole job is to find the due branches wherever they are.
+    //
+    // Granted on the sweep's TERMS, not its name: the full predicate (see
+    // isBranchRecheckSweep) and `findMany`, the single action
+    // `findRecheckDue` performs. Action-gating is what stops the same shape
+    // being replayed as an `updateMany` that rewrites every organization's
+    // bookkeeping, or a `deleteMany` that erases it. The rows it reaches are
+    // bookkeeping only: a repository name, a branch name and timestamps.
+    extraBound: ({ clause, action }) =>
+      action === "findMany" && isBranchRecheckSweep(clause),
   },
 };
 
