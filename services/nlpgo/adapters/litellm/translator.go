@@ -85,9 +85,13 @@ func FromLiteLLMParams(provider string, params map[string]any) (InlineCredential
 			),
 		}, nil
 	case "gemini":
+		// project_id + region are Gemini's second door: present, they mark
+		// an Agent Platform credential and the gateway dispatches to
+		// aiplatform.googleapis.com at the path they name. Absent, the
+		// credential is an AI Studio key for the Gemini API.
 		return InlineCredentials{
 			Provider: "gemini",
-			Gemini:   pickStrings(params, "api_key"),
+			Gemini:   pickStrings(params, "api_key", "project_id", "region"),
 		}, nil
 	case "xai", "groq", "cerebras", "deepseek":
 		return InlineCredentials{

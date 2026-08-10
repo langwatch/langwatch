@@ -6,11 +6,13 @@
  * left alone.
  */
 import * as fs from "node:fs";
+import * as path from "node:path";
 
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { appSettingsTargetFor, installAppEnv } from "../app-settings";
 import { buildOtelEnvBlock } from "../otel-env-block";
+import { installSessionContextHooks } from "../session-context-hooks";
 import { refreshClaudeUserTelemetryEnv } from "../telemetry-refresh";
 import {
 	CURRENT_ENDPOINT,
@@ -21,7 +23,7 @@ import {
 	STALE_TOKEN,
 } from "./telemetry-refresh-test-helpers";
 
-installTempHomeAndCwd();
+const home = installTempHomeAndCwd();
 
 describe("refreshClaudeUserTelemetryEnv", () => {
 	describe("given a stale langwatch block in ~/.claude/settings.json", () => {
@@ -64,15 +66,70 @@ describe("refreshClaudeUserTelemetryEnv", () => {
 	});
 
 	describe("given the block already matches the current values", () => {
-		it("returns null and leaves the file untouched", () => {
+		it("returns null and leaves the env exactly as it was", () => {
 			const target = appSettingsTargetFor("claude")!;
 			installAppEnv(target, currentClaudeVars());
-			const before = fs.readFileSync(target.path, "utf8");
+			const before = JSON.parse(fs.readFileSync(target.path, "utf8"));
 
 			expect(refreshClaudeUserTelemetryEnv({ vars: currentClaudeVars() })).toBe(
 				null,
 			);
-			expect(fs.readFileSync(target.path, "utf8")).toBe(before);
+
+			const after = JSON.parse(fs.readFileSync(target.path, "utf8"));
+			expect(after.env).toEqual(before.env);
+		});
+
+		/** @scenario "A device whose exports are already current still gets the hooks" */
+		it("installs the session hooks, which a device that persisted earlier lacks", () => {
+			const target = appSettingsTargetFor("claude")!;
+			installAppEnv(target, currentClaudeVars());
+
+			refreshClaudeUserTelemetryEnv({ vars: currentClaudeVars() });
+
+			const after = JSON.parse(fs.readFileSync(target.path, "utf8"));
+			expect(Object.keys(after.hooks)).toEqual(["SessionStart", "Stop"]);
+		});
+	});
+
+	describe("given the device carries the LangWatch Claude Code plugin", () => {
+		beforeEach(() => {
+			const installedPlugins = path.join(
+				home.home,
+				".claude",
+				"plugins",
+				"installed_plugins.json",
+			);
+			fs.mkdirSync(path.dirname(installedPlugins), { recursive: true });
+			fs.writeFileSync(
+				installedPlugins,
+				JSON.stringify({
+					version: 2,
+					plugins: { "langwatch@langwatch": [{ scope: "user" }] },
+				}),
+			);
+		});
+
+		/** @scenario "A login refresh does not put the raw hook entries back on a plugin device" */
+		it("removes the raw hook entries the plugin replaced instead of asserting them", () => {
+			const target = appSettingsTargetFor("claude")!;
+			installAppEnv(target, currentClaudeVars());
+			installSessionContextHooks({ tool: "claude_code" });
+
+			refreshClaudeUserTelemetryEnv({ vars: currentClaudeVars() });
+
+			const after = JSON.parse(fs.readFileSync(target.path, "utf8"));
+			expect(after.hooks).toBeUndefined();
+			expect(after.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(CURRENT_ENDPOINT);
+		});
+
+		it("writes no hook entries onto a device that never had them", () => {
+			const target = appSettingsTargetFor("claude")!;
+			installAppEnv(target, currentClaudeVars());
+
+			refreshClaudeUserTelemetryEnv({ vars: currentClaudeVars() });
+
+			const after = JSON.parse(fs.readFileSync(target.path, "utf8"));
+			expect(after.hooks).toBeUndefined();
 		});
 	});
 

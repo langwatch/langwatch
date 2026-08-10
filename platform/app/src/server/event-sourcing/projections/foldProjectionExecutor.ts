@@ -270,15 +270,29 @@ export class FoldProjectionExecutor {
   private appliedIdsForCommit({
     context,
     loadedAppliedIds,
-    freshIds,
+    deliveredIds,
   }: {
     context: ProjectionStoreContext;
     loadedAppliedIds: readonly string[];
-    freshIds: readonly string[];
+    deliveredIds: readonly string[];
   }): string[] {
-    return (context.deliveryAttempt ?? 1) > 1
-      ? mergeAppliedEventIds({ previous: loadedAppliedIds, applied: freshIds })
-      : [...freshIds];
+    // Replace ONLY on the first commit of a fresh delivery — that is the
+    // garbage collection that keeps the applied set bounded at one delivery's
+    // ids instead of growing forever. Everything else extends:
+    // - a retry (attempt > 1) must keep what earlier attempts recorded, or the
+    //   redelivery re-applies it;
+    // - a continuation (a later sub-batch of the same locked dispatch, from
+    //   batch bisection) must keep what the earlier sub-batches recorded — each
+    //   commit only carries its own sub-batch's ids, and replacing would erase
+    //   the rest of the chain, so a redelivery after a failed later sub-batch
+    //   would double-apply the committed prefix (#6578).
+    const isRetry = (context.deliveryAttempt ?? 1) > 1;
+    return isRetry || context.isDeliveryContinuation
+      ? mergeAppliedEventIds({
+          previous: loadedAppliedIds,
+          applied: deliveredIds,
+        })
+      : [...deliveredIds];
   }
 
   /**
@@ -401,7 +415,7 @@ export class FoldProjectionExecutor {
             this.appliedIdsForCommit({
               context,
               loadedAppliedIds: appliedEventIds,
-              freshIds: [event.id],
+              deliveredIds: [event.id],
             }),
           ),
         );
@@ -480,7 +494,7 @@ export class FoldProjectionExecutor {
         this.appliedIdsForCommit({
           context,
           loadedAppliedIds: appliedEventIds,
-          freshIds: [event.id],
+          deliveredIds: [event.id],
         }),
       ),
     );
@@ -575,7 +589,7 @@ export class FoldProjectionExecutor {
             this.appliedIdsForCommit({
               context,
               loadedAppliedIds: appliedEventIds,
-              freshIds: ordered.map((event) => event.id),
+              deliveredIds: ordered.map((event) => event.id),
             }),
           ),
         );
@@ -653,7 +667,12 @@ export class FoldProjectionExecutor {
         this.appliedIdsForCommit({
           context,
           loadedAppliedIds: appliedEventIds,
-          freshIds: fresh.map((event) => event.id),
+          // `ordered`, not `fresh`: an id dropped as already-applied is still
+          // an id the state being committed absorbs, so the set must keep
+          // vouching for it. Recording only the freshly-folded ids EVICTS a
+          // redelivered id that rode along, and whoever sees it next folds it
+          // a second time (#6578).
+          deliveredIds: ordered.map((event) => event.id),
         }),
       ),
     );

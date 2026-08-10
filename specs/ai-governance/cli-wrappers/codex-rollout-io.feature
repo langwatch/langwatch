@@ -57,6 +57,18 @@ Feature: Codex Path B recovers the full request body from the rollout transcript
     Then the request body carries an assistant tool_call and a tool message with the output
 
   @unit
+  Scenario: Tool calls are captured whichever way codex spelled them
+    Given a rollout turn whose tool call and result use the custom_tool_call spelling
+    When the rollout is parsed
+    Then the request body carries the tool call and its output just as for a function_call
+
+  @unit
+  Scenario: A tool result returned as content blocks reads as its text
+    Given a rollout turn whose tool result is a list of content blocks rather than a string
+    When the rollout is parsed
+    Then the tool message carries the text the command printed, not a serialised blob
+
+  @unit
   Scenario: An id-less tool call and its output share one synthetic id so they still pair
     Given a rollout turn whose function_call and function_call_output both omit the call_id
     When the rollout is parsed

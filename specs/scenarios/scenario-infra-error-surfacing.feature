@@ -53,6 +53,23 @@ Feature: Scenario infrastructure error surfacing and empty-response state
     Then the handled error code is "scenario_infra_error"
     And the message is "Something unexpected happened"
 
+  # A model pinned to the codex provider refused for the requesting feature
+  # (issue #6634's coding-assistant-surfaces backstop, see
+  # specs/model-providers/codex-account-provider.feature — "The server
+  # refuses Codex outside the allowed surfaces") reaches the scenario runner
+  # as a raw refusal message, not an infrastructure crash. It gets its own
+  # code and hint rather than falling into the generic infra bucket, and
+  # both refusal wordings the codex backstop emits classify to it — they
+  # share one message, coupled at the source by
+  # src/server/modelProviders/codexRefusalMessage.ts.
+  @unit
+  Scenario: A codex coding-assistant-surface refusal becomes a named, actionable error
+    Given a scenario run failed with a raw error mentioning that a model "serves the coding-assistant surfaces only"
+    When the failure is classified
+    Then the handled error code is "scenario_model_not_allowed_for_surface"
+    And the message does not contain a raw stack trace
+    And the hint points at the project's model default settings
+
   @unit
   Scenario: The handled error round-trips through the results error field
     Given a classified scenario handled error

@@ -11,16 +11,16 @@ import {
   LuLightbulb,
   LuList,
   LuMessageSquare,
-  LuPencil,
+  type LuPencil,
   LuPlay,
 } from "react-icons/lu";
-import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
-import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
 import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
+import type { TraceAnchor } from "../../hooks/useAnchoredAnnotations";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { useTextTranslation } from "../../hooks/useTextTranslation";
+import { FieldCommentButton } from "./anchoredComments/FieldCommentButton";
 import { AnnotationPopover } from "./conversationView/AnnotationPopover";
 import { IOViewerBody } from "./IOViewerBody";
 import { safePrettyJson } from "./JsonHighlight";
@@ -39,13 +39,20 @@ import {
   tryParseJSON,
   VIRTUALIZE_AT,
 } from "./transcript";
+import { MessageCommentScope } from "./transcript/messageComments";
 import {
   type MarkdownSubmode,
   useIOViewerState,
   type ViewFormat,
 } from "./useIOViewerState";
 
-const TRUNCATE_AT = 100_000;
+/**
+ * How much of a captured value this viewer renders before offering an
+ * expander. Exported because the inline editor refuses anything past it: an
+ * editor seeded with a truncated value would silently save the truncation.
+ */
+export const IO_DISPLAY_TRUNCATE_AT = 100_000;
+const TRUNCATE_AT = IO_DISPLAY_TRUNCATE_AT;
 // Require a meaningful tail before offering an expander — otherwise we
 // render "Show remaining 0K chars" on borderline content right at the cap.
 const TRUNCATE_TAIL_MIN = 1_000;
@@ -105,10 +112,10 @@ interface IOViewerProps {
    */
   mode?: "input" | "output";
   /**
-   * When provided, the panel header shows Annotate + Suggest-correction
-   * actions wired to the annotation comment store. These belong on the
-   * trace's input/output specifically (annotations target a trace, not a
-   * span), so per-span IOViewers leave this undefined.
+   * When provided, the panel header offers to comment on this field and, where
+   * a suggestion can correct it, to suggest what it should have said. The
+   * comment is recorded against the field this viewer is rendering: the span's
+   * when the viewer has a span, the trace's own otherwise.
    */
   traceId?: string;
   /**
@@ -177,37 +184,15 @@ function PlaygroundButton({ spanId }: { spanId: string }) {
   );
 }
 
-function AnnotateButton({ traceId }: { traceId: string }) {
-  const { hasPermission } = useOrganizationTeamProject();
-  const [open, setOpen] = useState(false);
-  const annotationsGate = usePersonalFeatureGate("annotations");
-  if (!hasPermission("annotations:manage")) return null;
-  return (
-    <>
-      <AnnotationPopover
-        traceId={traceId}
-        mode="annotate"
-        open={open}
-        onOpenChange={async (next) => {
-          if (next) {
-            const allowed = await annotationsGate.requestEnable();
-            if (!allowed) return;
-          }
-          setOpen(next);
-        }}
-        trigger={<ActionButton icon={LuPencil} label="Annotate" />}
-      />
-      <PersonalFeatureGateDialog state={annotationsGate.dialogState} />
-    </>
-  );
-}
-
 function SuggestCorrectionButton({
   traceId,
   output,
+  anchor,
 }: {
   traceId: string;
   output: string;
+  /** The field the suggestion corrects. */
+  anchor: TraceAnchor;
 }) {
   const { hasPermission } = useOrganizationTeamProject();
   const [open, setOpen] = useState(false);
@@ -217,6 +202,9 @@ function SuggestCorrectionButton({
       traceId={traceId}
       output={output}
       mode="suggest"
+      anchorKind={anchor.anchorKind}
+      anchorId={anchor.anchorId}
+      anchorPath={anchor.anchorPath}
       open={open}
       onOpenChange={setOpen}
       trigger={<ActionButton icon={LuLightbulb} label="Suggest edit" />}
@@ -332,6 +320,15 @@ export const IOViewer = memo(function IOViewer({
     originalContent,
   ]);
 
+  // Which part of the trace a comment left on this panel is about: the span's
+  // field when the viewer is rendering a span, the trace's own field otherwise.
+  const fieldAnchor = useMemo<TraceAnchor | null>(
+    () =>
+      traceId
+        ? { anchorKind: "field", anchorId: spanId ?? traceId, anchorPath: mode }
+        : null,
+    [traceId, spanId, mode],
+  );
   const parsed = useMemo(() => tryParseJSON(content), [content]);
   // Coerce parsed into a chat message array — handles top-level arrays,
   // single message objects, and `{messages: [...]}` / `{input: [...]}`
@@ -594,11 +591,19 @@ export const IOViewer = memo(function IOViewer({
             onToggle={translation.toggle}
           />
         )}
-        {!collapsed && traceId && <AnnotateButton traceId={traceId} />}
-        {!collapsed && traceId && mode === "output" && (
-          // Corrections must be stored against the REAL output — never the
-          // translated variant the viewer happens to be showing.
-          <SuggestCorrectionButton traceId={traceId} output={originalContent} />
+        {!collapsed && traceId && fieldAnchor && (
+          <FieldCommentButton traceId={traceId} anchor={fieldAnchor} />
+        )}
+        {!collapsed && traceId && fieldAnchor && (
+          // Every field this viewer shows is one a correction can replace,
+          // the trace's own input included. Corrections must be stored
+          // against the REAL text, never the translated variant the viewer
+          // happens to be showing.
+          <SuggestCorrectionButton
+            traceId={traceId}
+            output={originalContent}
+            anchor={fieldAnchor}
+          />
         )}
         {!collapsed && spanType === "llm" && spanId && mode === "input" && (
           <PlaygroundButton spanId={spanId} />
@@ -628,22 +633,27 @@ export const IOViewer = memo(function IOViewer({
               transition="opacity 120ms ease-out"
             >
               <Box padding={innerPadding}>
-                <IOViewerBody
-                  format={format}
-                  isChat={isChat}
-                  canJson={canJson}
-                  prettyJsonContent={prettyJsonContent}
-                  markdownBody={markdownBody}
-                  markdownSubmode={markdownSubmode}
-                  conversationTurns={conversationTurns}
-                  chatLayout={chatLayout}
-                  inlineBlocks={inlineBlocks}
-                  hasInlineRichContent={hasInlineRichContent}
-                  displayContent={displayContent}
-                  isLong={isLong}
-                  expanded={expanded}
-                  mode={mode}
-                />
+                {/* A message inside the transcript is a part of the trace a
+                    comment can point at, and the transcript components are
+                    handed messages rather than the trace they came out of. */}
+                <MessageCommentScope traceId={traceId}>
+                  <IOViewerBody
+                    format={format}
+                    isChat={isChat}
+                    canJson={canJson}
+                    prettyJsonContent={prettyJsonContent}
+                    markdownBody={markdownBody}
+                    markdownSubmode={markdownSubmode}
+                    conversationTurns={conversationTurns}
+                    chatLayout={chatLayout}
+                    inlineBlocks={inlineBlocks}
+                    hasInlineRichContent={hasInlineRichContent}
+                    displayContent={displayContent}
+                    isLong={isLong}
+                    expanded={expanded}
+                    mode={mode}
+                  />
+                </MessageCommentScope>
               </Box>
             </Box>
             {/*

@@ -9,9 +9,9 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import {
-  type OrganizationUserRole,
+  OrganizationUserRole,
   RoleBindingScopeType,
-  type TeamUserRole,
+  TeamUserRole,
 } from "@prisma/client";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -34,6 +34,16 @@ function listTeamNames(names: string[]): string {
   const quoted = names.map((name) => `"${name}"`);
   if (quoted.length <= 1) return quoted[0] ?? "";
   return `${quoted.slice(0, -1).join(", ")} and ${quoted[quoted.length - 1]}`;
+}
+
+/** What makes two access rows the same grant, regardless of which row it is. */
+function bindingKey(binding: {
+  role: string;
+  customRoleId?: string | null;
+  scopeType: RoleBindingScopeType;
+  scopeId: string;
+}): string {
+  return `${binding.role}:${binding.customRoleId ?? ""}:${binding.scopeType}:${binding.scopeId}`;
 }
 
 type MemberSummary = {
@@ -68,6 +78,9 @@ export function MemberDetailDialog({
   const [pendingBindingAdditions, setPendingBindingAdditions] = useState<
     PendingBinding[]
   >([]);
+  // The input row holds a complete draft the admin never pressed Add on. It
+  // counts as a change so Save is enabled, and the save flushes it.
+  const [hasDraftBinding, setHasDraftBinding] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const bindingInputRef = useRef<BindingInputRowHandle>(null);
@@ -76,6 +89,7 @@ export function MemberDetailDialog({
     setPendingRole(member.role);
     setPendingBindingRemovals(new Set());
     setPendingBindingAdditions([]);
+    setHasDraftBinding(false);
   };
 
   useEffect(() => {
@@ -98,14 +112,94 @@ export function MemberDetailDialog({
   const hasBindingChanges =
     pendingBindingRemovals.size > 0 || pendingBindingAdditions.length > 0;
   const roleChanged = pendingRole !== member.role;
-  const hasChanges = hasBindingChanges || roleChanged;
+  const hasChanges = hasBindingChanges || roleChanged || hasDraftBinding;
+
+  // A Lite Member seat allows Viewer only, so anything staged above it snaps
+  // down before it is listed or saved. The input row already restricts what
+  // can be picked; this holds the same line for rows staged before the seat
+  // was switched, and for whatever a stubbed row hands over in tests.
+  const constrainStagedRowToSeat = (binding: PendingBinding): PendingBinding =>
+    pendingRole === OrganizationUserRole.EXTERNAL &&
+    (binding.customRoleId || binding.role !== (TeamUserRole.VIEWER as string))
+      ? {
+          ...binding,
+          role: TeamUserRole.VIEWER,
+          roleValue: TeamUserRole.VIEWER,
+          customRoleId: undefined,
+          customRoleName: undefined,
+        }
+      : binding;
+
+  const stageAddition = (incoming: PendingBinding) => {
+    const binding = constrainStagedRowToSeat(incoming);
+    const alreadyHeld = (directBindings.data ?? []).some(
+      (row) =>
+        !pendingBindingRemovals.has(row.id) &&
+        bindingKey(row) === bindingKey(binding),
+    );
+    if (alreadyHeld) return;
+    setPendingBindingAdditions((prev) =>
+      prev.some((staged) => bindingKey(staged) === bindingKey(binding))
+        ? prev
+        : [...prev, binding],
+    );
+  };
+
+  // Picking a Lite Member seat rewrites the staged rows the way the save
+  // cascade rewrites the stored ones: above-Viewer rows snap down, an
+  // organization row has no lite equivalent and is dropped, and rows made
+  // identical by the correction collapse to one.
+  useEffect(() => {
+    if (pendingRole !== OrganizationUserRole.EXTERNAL) return;
+    setPendingBindingAdditions((prev) => {
+      const seen = new Set<string>();
+      return prev
+        .filter(
+          (binding) => binding.scopeType !== RoleBindingScopeType.ORGANIZATION,
+        )
+        .map(constrainStagedRowToSeat)
+        .filter((binding) => {
+          const key = bindingKey(binding);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingRole]);
+
+  const refreshAccessQueries = () =>
+    Promise.all([
+      queryClient.roleBinding.listForUser.invalidate(),
+      queryClient.roleBinding.listForOrg.invalidate(),
+      queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate(),
+      queryClient.organization.getAll.invalidate(),
+      // An org role change moves the member between full and Lite Member
+      // seats, so the seat counts an admin is reconciling against changed
+      // with this save.
+      queryClient.limits.getUsage.invalidate(),
+    ]);
 
   const handleSave = async () => {
     // Auto-stage any uncommitted binding row (user selected fields but didn't click Add)
     const uncommitted = bindingInputRef.current?.flush() ?? null;
-    const allBindingAdditions = uncommitted
+    const stagedAdditions = uncommitted
       ? [...pendingBindingAdditions, uncommitted]
       : pendingBindingAdditions;
+    // The batch describes the access the admin wants the member to hold, so
+    // a staged row the member already holds (or the same row staged twice)
+    // adds nothing to it.
+    const heldKeys = new Set(
+      (directBindings.data ?? [])
+        .filter((row) => !pendingBindingRemovals.has(row.id))
+        .map(bindingKey),
+    );
+    const allBindingAdditions = stagedAdditions.filter((binding) => {
+      const key = bindingKey(binding);
+      if (heldKeys.has(key)) return false;
+      heldKeys.add(key);
+      return true;
+    });
     const hasBindingChangesNow =
       pendingBindingRemovals.size > 0 || allBindingAdditions.length > 0;
 
@@ -143,16 +237,7 @@ export function MemberDetailDialog({
         });
       }
 
-      await Promise.all([
-        queryClient.roleBinding.listForUser.invalidate(),
-        queryClient.roleBinding.listForOrg.invalidate(),
-        queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate(),
-        queryClient.organization.getAll.invalidate(),
-        // An org role change moves the member between full and Lite Member
-        // seats, so the seat counts an admin is reconciling against changed
-        // with this save.
-        queryClient.limits.getUsage.invalidate(),
-      ]);
+      await refreshAccessQueries();
       toaster.create({
         title: "Member updated",
         // A seat correction is allowed to take away a team's only team-scoped
@@ -169,6 +254,11 @@ export function MemberDetailDialog({
       });
       onClose();
     } catch (e) {
+      // The role change lands before the binding batch, so a failure here can
+      // sit on top of a half-applied save. Re-read rather than keep showing
+      // rows the server already rewrote — reloading the page to find out what
+      // actually happened is the customer experience this replaces.
+      void refreshAccessQueries();
       showErrorToast({
         error: e,
         fallbackTitle: "Couldn't update this member",
@@ -179,6 +269,20 @@ export function MemberDetailDialog({
   };
 
   const userDirectBindings = directBindings.data ?? [];
+
+  // The organization-scoped row that mirrors the member's seat is managed by
+  // the seat selector above, not by this list: deleting it would leave the
+  // seat without its binding and the next role change would just recreate it.
+  // Custom-role and off-seat organization rows are real grants and stay
+  // removable.
+  const mirrorsTheSeat = (binding: {
+    role: string;
+    customRoleId?: string | null;
+    scopeType: RoleBindingScopeType;
+  }) =>
+    binding.scopeType === RoleBindingScopeType.ORGANIZATION &&
+    !binding.customRoleId &&
+    binding.role === (member.role as string);
 
   return (
     <Dialog.Root
@@ -267,29 +371,32 @@ export function MemberDetailDialog({
                             {b.scopeName ?? b.scopeId}
                           </Badge>
                           <Spacer />
-                          {b.scopeType !== RoleBindingScopeType.PROJECT && (
-                            <Button
-                              size="xs"
-                              variant="ghost"
-                              color={markedForRemoval ? "blue.500" : "fg.muted"}
-                              aria-label={
-                                markedForRemoval
-                                  ? "Undo removal"
-                                  : "Remove binding"
-                              }
-                              onClick={() =>
-                                setPendingBindingRemovals((prev) => {
-                                  const next = new Set(prev);
-                                  next.has(b.id)
-                                    ? next.delete(b.id)
-                                    : next.add(b.id);
-                                  return next;
-                                })
-                              }
-                            >
-                              <X size={14} />
-                            </Button>
-                          )}
+                          {b.scopeType !== RoleBindingScopeType.PROJECT &&
+                            !mirrorsTheSeat(b) && (
+                              <Button
+                                size="xs"
+                                variant="ghost"
+                                color={
+                                  markedForRemoval ? "blue.500" : "fg.muted"
+                                }
+                                aria-label={
+                                  markedForRemoval
+                                    ? "Undo removal"
+                                    : "Remove binding"
+                                }
+                                onClick={() =>
+                                  setPendingBindingRemovals((prev) => {
+                                    const next = new Set(prev);
+                                    next.has(b.id)
+                                      ? next.delete(b.id)
+                                      : next.add(b.id);
+                                    return next;
+                                  })
+                                }
+                              >
+                                <X size={14} />
+                              </Button>
+                            )}
                         </HStack>
                       );
                     })}
@@ -333,9 +440,9 @@ export function MemberDetailDialog({
                 <BindingInputRow
                   ref={bindingInputRef}
                   organizationId={organizationId}
-                  onAdd={(b) =>
-                    setPendingBindingAdditions((prev) => [...prev, b])
-                  }
+                  onAdd={stageAddition}
+                  onReadyChange={setHasDraftBinding}
+                  organizationRole={pendingRole}
                 />
               </Box>
             )}
@@ -395,6 +502,13 @@ export function MemberDetailDialog({
                           <Badge colorPalette="purple" size="sm">
                             {scopeTypeLabel(b.scopeType)} {b.scopeName ?? "—"}
                           </Badge>
+                          {pendingRole === OrganizationUserRole.EXTERNAL &&
+                            b.role !== (TeamUserRole.VIEWER as string) &&
+                            b.role !== (TeamUserRole.CUSTOM as string) && (
+                              <Text fontSize="xs" color="fg.muted">
+                                Applies as Viewer while on a Lite Member seat
+                              </Text>
+                            )}
                           <Spacer />
                           <Text fontSize="xs" color="fg.muted">
                             via {group.name}

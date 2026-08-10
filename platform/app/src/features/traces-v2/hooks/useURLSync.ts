@@ -340,9 +340,9 @@ export function useURLSync(): void {
     // same params). Comparing strings made the drawer's own entry look like a
     // real navigation.
     //
-    // No need to also check that a cursor survived for the current page —
-    // `useTraceListQuery` already snaps back to page 1 whenever
-    // `pageCursors[page]` is missing, which is the same guard one layer down.
+    // No need to also check that a cursor survived for the current page: the
+    // flat list reads by position when `pageCursors[page]` is missing, so the
+    // page number stands on its own.
     if (
       !isFirstApply &&
       targetLens &&

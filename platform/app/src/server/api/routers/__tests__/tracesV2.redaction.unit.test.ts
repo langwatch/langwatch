@@ -3,6 +3,7 @@ import type { ContentCategory } from "~/server/data-privacy/dataPrivacy.types";
 import type { CategoryVisibility } from "~/server/traces/protections";
 import {
   buildContentPrivacy,
+  contentSearchTermsForViewer,
   gateTraceLogVisibility,
   redactTraceLogContent,
   redactV2Content,
@@ -589,6 +590,105 @@ describe("redactTraceLogContent", () => {
       ).toBeUndefined();
     });
   });
+
+  /**
+   * Only Claude Code emits bare event names. codex and gemini namespace theirs,
+   * and the transcript derivation resolves both through the canonical
+   * vocabulary — so the gate has to as well, or a namespaced record matches no
+   * known content key and leaves with its payload intact.
+   */
+  describe("given a namespaced agent's wire spelling", () => {
+    const blind = { canSeeCapturedInput: false, canSeeCapturedOutput: false };
+    const inputOnly = {
+      canSeeCapturedInput: true,
+      canSeeCapturedOutput: false,
+    };
+    const outputOnly = {
+      canSeeCapturedInput: false,
+      canSeeCapturedOutput: true,
+    };
+
+    const codexPrompt = logRow({
+      "event.name": "codex.user_prompt",
+      prompt: "summarise the private repo",
+    });
+    const codexToolResult = logRow({
+      "event.name": "codex.tool_result",
+      call_id: "call_1",
+      tool_name: "shell",
+      arguments: '{"command":"cat /etc/private"}',
+      output: "the secret file contents",
+      success: "true",
+    });
+    const geminiResponse = logRow({
+      "event.name": "gemini_cli.api_response",
+      role: "main",
+      response_text:
+        '{"candidates":[{"content":{"parts":[{"text":"secret"}]}}]}',
+    });
+
+    it("withholds a codex prompt behind captured-input visibility", () => {
+      expect(
+        redactTraceLogContent(codexPrompt, blind).attributes.prompt,
+      ).toBeUndefined();
+      expect(
+        redactTraceLogContent(codexPrompt, inputOnly).attributes.prompt,
+      ).toBe("summarise the private repo");
+    });
+
+    it("withholds a gemini reply behind captured-output visibility", () => {
+      expect(
+        redactTraceLogContent(geminiResponse, blind).attributes.response_text,
+      ).toBeUndefined();
+      expect(
+        redactTraceLogContent(geminiResponse, inputOnly).attributes
+          .response_text,
+      ).toBeUndefined();
+      expect(
+        redactTraceLogContent(geminiResponse, outputOnly).attributes
+          .response_text,
+      ).toBe('{"candidates":[{"content":{"parts":[{"text":"secret"}]}}]}');
+    });
+
+    /**
+     * One record, two categories: the arguments are what the agent was asked to
+     * run, the output is what came back. A single verdict for the record could
+     * only ever be right in one direction.
+     */
+    it("gates a codex tool run's arguments and output independently", () => {
+      const hidOutput = redactTraceLogContent(codexToolResult, inputOnly);
+      expect(hidOutput.attributes.arguments).toBe(
+        '{"command":"cat /etc/private"}',
+      );
+      expect(hidOutput.attributes.output).toBeUndefined();
+      // The flag is what makes the UI say "content withheld" rather than
+      // render an empty record as "nothing happened here".
+      expect(hidOutput.bodyRedacted).toBe(true);
+
+      const hidInput = redactTraceLogContent(codexToolResult, outputOnly);
+      expect(hidInput.attributes.arguments).toBeUndefined();
+      expect(hidInput.attributes.output).toBe("the secret file contents");
+      expect(hidInput.bodyRedacted).toBe(true);
+
+      const hidBoth = redactTraceLogContent(codexToolResult, blind);
+      expect(hidBoth.attributes.arguments).toBeUndefined();
+      expect(hidBoth.attributes.output).toBeUndefined();
+      expect(hidBoth.bodyRedacted).toBe(true);
+      // Metadata survives: which tool ran, and whether it worked.
+      expect(hidBoth.attributes.tool_name).toBe("shell");
+      expect(hidBoth.attributes.success).toBe("true");
+    });
+
+    it("names no audience when a record shed both categories at once", () => {
+      const out = redactTraceLogContent(codexToolResult, {
+        ...blind,
+        capturedInputVisibleTo: "Admins",
+        capturedOutputVisibleTo: "Admins",
+      });
+
+      expect(out.bodyVisibleTo).toBeNull();
+    });
+  });
 });
 
 /**
@@ -687,6 +787,120 @@ describe("gateTraceLogVisibility", () => {
       expect(gateTraceLogVisibility(old, full, null).attributes.response).toBe(
         "answer",
       );
+    });
+  });
+});
+
+describe("contentSearchTermsForViewer", () => {
+  const TERMS = ["#6418"];
+
+  describe("given a viewer who may read the whole transcript", () => {
+    /** @scenario A viewer allowed the whole transcript still searches it */
+    it("matches the terms against the transcript bodies", () => {
+      expect(
+        contentSearchTermsForViewer({
+          terms: TERMS,
+          protections: {
+            canSeeCapturedInput: true,
+            canSeeCapturedOutput: true,
+            contentCategories: cats(),
+          },
+        }),
+      ).toEqual(TERMS);
+    });
+  });
+
+  describe("given a viewer whose captured content is hidden", () => {
+    /** @scenario A viewer who cannot read captured content cannot search it */
+    it("drops the terms when the input is hidden", () => {
+      expect(
+        contentSearchTermsForViewer({
+          terms: TERMS,
+          protections: {
+            canSeeCapturedInput: false,
+            canSeeCapturedOutput: true,
+            contentCategories: cats(),
+          },
+        }),
+      ).toEqual([]);
+    });
+
+    /** @scenario A viewer who cannot read captured content cannot search it */
+    it("drops the terms when the output is hidden", () => {
+      expect(
+        contentSearchTermsForViewer({
+          terms: TERMS,
+          protections: {
+            canSeeCapturedInput: true,
+            canSeeCapturedOutput: false,
+            contentCategories: cats(),
+          },
+        }),
+      ).toEqual([]);
+    });
+
+    // The flags default to undefined, which is not `true`, so an unpopulated
+    // protections object must read as "no transcript reach" rather than as a
+    // viewer who may see everything.
+    /** @scenario A viewer who cannot read captured content cannot search it */
+    it("drops the terms when the flags were never set", () => {
+      expect(
+        contentSearchTermsForViewer({ terms: TERMS, protections: {} }),
+      ).toEqual([]);
+    });
+  });
+
+  describe("given a viewer with a transcript category hidden", () => {
+    /** @scenario A viewer with a hidden transcript category cannot search it */
+    it("drops the terms when system turns are hidden", () => {
+      expect(
+        contentSearchTermsForViewer({
+          terms: TERMS,
+          protections: {
+            canSeeCapturedInput: true,
+            canSeeCapturedOutput: true,
+            contentCategories: cats({ system: restricted(null) }),
+          },
+        }),
+      ).toEqual([]);
+    });
+
+    /** @scenario A viewer with a hidden transcript category cannot search it */
+    it("drops the terms when tool turns are hidden", () => {
+      expect(
+        contentSearchTermsForViewer({
+          terms: TERMS,
+          protections: {
+            canSeeCapturedInput: true,
+            canSeeCapturedOutput: true,
+            contentCategories: cats({ tools: restricted(null) }),
+          },
+        }),
+      ).toEqual([]);
+    });
+  });
+
+  describe("given a viewer with a custom attribute rule hidden from them", () => {
+    // hiddenAttributes redacts by KEY (attributes/params), but the transcript
+    // search matches a substring against log_records' AttributesFlatJson,
+    // which is the whole flattened blob, no per-key scoping possible. A term
+    // that only appears inside the hidden attribute's value would still light
+    // up a match, the same oracle the category checks above exist to prevent.
+    /** @scenario A viewer with a hidden custom attribute cannot search it */
+    it("drops the terms even though input, output and every category are visible", () => {
+      expect(
+        contentSearchTermsForViewer({
+          terms: TERMS,
+          protections: {
+            canSeeCapturedInput: true,
+            canSeeCapturedOutput: true,
+            contentCategories: cats(),
+            hiddenAttributes: [
+              { pattern: "app.billing.*", visibleTo: "Admins" },
+            ],
+          },
+        }),
+      ).toEqual([]);
     });
   });
 });

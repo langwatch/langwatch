@@ -154,6 +154,10 @@ const FoundryDrawer = lazyDefault({
   factory: () => import("./ops/foundry/FoundryDrawer"),
   key: "FoundryDrawer",
 });
+const PullRequestDetailDrawer = lazyDefault({
+  factory: () => import("./me/PullRequestDetailDrawer"),
+  key: "PullRequestDetailDrawer",
+});
 const CreateProjectDrawer = lazyDefault({
   factory: () => import("./projects/CreateProjectDrawer"),
   key: "CreateProjectDrawer",
@@ -287,6 +291,8 @@ export const drawers = {
   featureFlags: FeatureFlagsDrawer,
   // Ops
   foundry: FoundryDrawer,
+  // Coding agents
+  pullRequestDetail: PullRequestDetailDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 /**

@@ -84,6 +84,11 @@ vi.mock("~/utils/api", () => ({
         },
       },
     },
+    // The tree is corrected after it is read; with no correction stored the
+    // hook returns the very same array the query produced.
+    traceEditOverlay: {
+      getByTraceId: { useQuery: () => ({ data: null }) },
+    },
   },
 }));
 

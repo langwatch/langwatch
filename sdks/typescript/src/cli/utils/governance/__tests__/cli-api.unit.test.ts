@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 
 import {
   GovernanceCliError,
+  SESSION_EXPIRED_MESSAGE,
   cloneIngestionTemplateFromPlatform,
   getCliBootstrap,
   getEventsForSource,
@@ -79,14 +80,20 @@ describe("cli-api — auth contract", () => {
   });
 
   describe("when the server returns 401", () => {
-    it("throws GovernanceCliError(401, unauthorized) with a re-login hint", async () => {
+    it("surfaces the platform-named failure as a typed HandledError (code unauthorized), keeping the re-login hint", async () => {
+      // The 401 body `{ error: "unauthorized" }` is a named domain-error
+      // envelope, so the ADR-045 path raises a typed LangWatchHandledError
+      // rather than the CLI's generic GovernanceCliError. The `code` and
+      // `status` control-flow surface is unchanged; the CLI's composed
+      // re-login message is reused verbatim.
       const { fetchImpl } = spyFetch(status(401, { error: "unauthorized" }));
       await expect(
         getGovernanceStatus(baseCfg(), { fetchImpl }),
       ).rejects.toMatchObject({
-        name: "GovernanceCliError",
+        name: "LangWatchHandledError",
         status: 401,
         code: "unauthorized",
+        message: SESSION_EXPIRED_MESSAGE,
       });
     });
   });
@@ -186,7 +193,10 @@ describe("cli-api — auth contract", () => {
   });
 
   describe("when the server returns 404 with an error_description", () => {
-    it("surfaces the description verbatim", async () => {
+    it("surfaces the description verbatim as a typed HandledError (the body names the failure)", async () => {
+      // `{ error: "not_found", ... }` is a named envelope, so the ADR-045 path
+      // raises a typed LangWatchHandledError with code `not_found`; the CLI's
+      // composed message (from error_description) is reused verbatim.
       const { fetchImpl } = spyFetch(
         status(404, {
           error: "not_found",
@@ -196,19 +206,24 @@ describe("cli-api — auth contract", () => {
       await expect(
         getSourceHealth(baseCfg(), "missing-id", { fetchImpl }),
       ).rejects.toMatchObject({
-        name: "GovernanceCliError",
+        name: "LangWatchHandledError",
         status: 404,
+        code: "not_found",
         message: "IngestionSource not found",
       });
     });
 
-    it("falls back to a generic message if the body has no description", async () => {
+    it("falls back to a generic GovernanceCliError if the body does not name the failure", async () => {
+      // An empty 404 body is not a domain-error envelope, so it stays the CLI's
+      // own generic GovernanceCliError — still handled-error-shaped for the
+      // render pipeline, but the CLI's fallback rather than a server-named one.
       const { fetchImpl } = spyFetch(status(404));
       await expect(
         getSourceHealth(baseCfg(), "missing-id", { fetchImpl }),
       ).rejects.toMatchObject({
         name: "GovernanceCliError",
         status: 404,
+        code: "not_found",
         message: "Not found",
       });
     });

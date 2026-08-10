@@ -998,9 +998,9 @@ export function MessagesTable({
               closable: true,
             },
             action: {
-              label: "View Queues",
+              label: "View queues",
               onClick: () => {
-                void router.push(`/${project?.slug}/annotations/`);
+                void router.push(`/${project?.slug}/annotations`);
               },
             },
           });

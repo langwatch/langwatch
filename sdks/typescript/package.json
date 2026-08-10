@@ -1,6 +1,6 @@
 {
   "name": "langwatch",
-  "version": "1.1.0",
+  "version": "1.4.0",
   "description": "LangWatch TypeScript/JavaScript SDK. Interact with the full LangWatch API and use the LangWatch OpenTelemetry SDK to instrument your application. For more information, see https://docs.langwatch.ai/integration/typescript/guide",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -15,6 +15,7 @@
     "dist",
     "!dist/bin",
     "!dist/cli/*.map",
+    "!dist/plugin",
     "README.md",
     "LICENSE"
   ],
@@ -64,6 +65,7 @@
     "build": "tsc --noEmit && rm -rf dist && tsup",
     "postbuild": "node -e \"const{statSync}=require('node:fs'),{execFileSync}=require('node:child_process');const f='dist/cli/index.js',want=require('./package.json').version;const s=statSync(f);if(process.platform!=='win32'&&!(s.mode&0o111))throw new Error(f+' is not executable');const got=execFileSync(process.execPath,[f,'--version'],{encoding:'utf8',env:{...process.env,LANGWATCH_NO_DAEMON:'1'}}).trim();if(got!==want)throw new Error('version mismatch: '+f+' reports '+got+', package.json says '+want);console.log('postbuild: '+f+' ok ('+got+')')\"",
     "build:binary": "bun run scripts/build-cli-binary.ts",
+    "build:plugin-hook": "tsup --config tsup.plugin-hook.config.ts",
     "tarball": "pnpm build && pnpm pack",
     "typecheck": "tsc --noEmit",
     "prepublish": "pnpm run build",
@@ -120,6 +122,7 @@
     "commander": "^15.0.0",
     "dotenv": "^17.3.1",
     "js-yaml": "^5.2.0",
+    "jsonc-parser": "^3.3.1",
     "liquidjs": "^10.27.0",
     "open": "^11.0.0",
     "openapi-fetch": "^0.17.0",

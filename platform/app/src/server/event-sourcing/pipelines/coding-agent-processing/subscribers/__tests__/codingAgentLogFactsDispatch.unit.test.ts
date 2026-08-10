@@ -3,12 +3,14 @@
  * log-processing actually stores (attributes flattened as JSON).
  *
  * @see specs/coding-agent/session-aggregate.feature
+ * @see specs/coding-agent/session-git-context.feature
  */
 import { describe, expect, it } from "vitest";
 import { createTenantId } from "~/server/event-sourcing";
 import { CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE } from "../../../log-processing/schemas/constants";
 import type { LogProcessingEvent } from "../../../log-processing/schemas/events";
 import type { ContributeLogFactsCommandData } from "../../schemas/commands";
+import { SESSION_TITLE_FACT_KEY } from "../../services/coding-agent-normalization";
 import { createCodingAgentLogFactsDispatchSubscriber } from "../codingAgentLogFactsDispatch.subscriber";
 
 const WIRE_TRACE = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
@@ -196,6 +198,191 @@ describe("codingAgentLogFactsDispatch", () => {
       );
 
       expect(dispatched).toHaveLength(0);
+    });
+  });
+
+  describe("when a LangWatch session context event arrives", () => {
+    const HOOK_SCOPE = "langwatch.coding_agent.hook";
+    const contextAttributes = (
+      overrides: Record<string, unknown> = {},
+    ): Record<string, unknown> => ({
+      "event.name": "langwatch.session_context",
+      "session.id": "sess-ctx-1",
+      "coding_agent.name": "claude_code",
+      "vcs.repository.host": "github.com",
+      "vcs.repository.owner": "acme",
+      "vcs.repository.name": "widgets",
+      "vcs.ref.head.name": "feat/session-git-context",
+      "vcs.worktree.name": "widgets-feat",
+      ...overrides,
+    });
+
+    /** @scenario A session context contribution is labeled with its declared agent */
+    it("labels the contribution with the agent the event declares", async () => {
+      const { subscriber, dispatched } = makeSubscriber();
+
+      await subscriber.handle(
+        canonicalLogEvent({
+          attributes: contextAttributes(),
+          scopeName: HOOK_SCOPE,
+          resourceAttributes: { "service.name": "langwatch-hook" },
+        }),
+        context,
+      );
+
+      expect(dispatched).toHaveLength(1);
+      const [contribution] = dispatched;
+      expect(contribution!.agent).toBe("claude_code");
+      expect(contribution!.sessionId).toBe("sess-ctx-1");
+      expect(contribution!.facts["vcs.repository.owner"]).toBe("acme");
+      expect(contribution!.facts["vcs.ref.head.name"]).toBe(
+        "feat/session-git-context",
+      );
+      expect(contribution!.facts["vcs.worktree.name"]).toBe("widgets-feat");
+    });
+
+    it.each([
+      "codex",
+      "opencode",
+    ])("labels a %s declaration the same way, with no vendor scope of its own", async (agent) => {
+      const { subscriber, dispatched } = makeSubscriber();
+
+      await subscriber.handle(
+        canonicalLogEvent({
+          attributes: contextAttributes({ "coding_agent.name": agent }),
+          scopeName: HOOK_SCOPE,
+          resourceAttributes: { "service.name": "langwatch-hook" },
+        }),
+        context,
+      );
+
+      expect(dispatched).toHaveLength(1);
+      expect(dispatched[0]!.agent).toBe(agent);
+      expect(dispatched[0]!.facts["vcs.repository.owner"]).toBe("acme");
+    });
+
+    /** @scenario A declared agent outside the registry contributes nothing */
+    it("drops a declaration naming an agent LangWatch does not know", async () => {
+      const { subscriber, dispatched } = makeSubscriber();
+
+      await subscriber.handle(
+        canonicalLogEvent({
+          attributes: contextAttributes({
+            "coding_agent.name": "totally_new_agent",
+          }),
+          scopeName: HOOK_SCOPE,
+          resourceAttributes: { "service.name": "langwatch-hook" },
+        }),
+        context,
+      );
+
+      expect(dispatched).toHaveLength(0);
+    });
+
+    /** @scenario A session context event with no declared agent contributes nothing */
+    it("drops an event that declares no agent at all", async () => {
+      const { subscriber, dispatched } = makeSubscriber();
+
+      await subscriber.handle(
+        canonicalLogEvent({
+          attributes: contextAttributes({ "coding_agent.name": undefined }),
+          scopeName: HOOK_SCOPE,
+          resourceAttributes: { "service.name": "langwatch-hook" },
+        }),
+        context,
+      );
+
+      expect(dispatched).toHaveLength(0);
+    });
+  });
+
+  describe("when a title-generator response body arrives", () => {
+    const titleBody = (title: string): string =>
+      JSON.stringify({
+        content: [{ type: "text", text: JSON.stringify({ title }) }],
+      });
+
+    const responseBodyEvent = ({
+      querySource,
+      body,
+    }: {
+      querySource: string;
+      body: string;
+    }) =>
+      canonicalLogEvent({
+        attributes: {
+          "event.name": "api_response_body",
+          "session.id": "sess-title",
+          query_source: querySource,
+          body,
+        },
+      });
+
+    /** @scenario The title lifts from a generate_session_title response body, capped */
+    it("stamps the generated title as a fact, capped in length", async () => {
+      const { subscriber, dispatched } = makeSubscriber();
+
+      await subscriber.handle(
+        responseBodyEvent({
+          querySource: "generate_session_title",
+          body: titleBody("Fix the flaky session fold test"),
+        }),
+        context,
+      );
+
+      expect(dispatched).toHaveLength(1);
+      expect(dispatched[0]!.facts[SESSION_TITLE_FACT_KEY]).toBe(
+        "Fix the flaky session fold test",
+      );
+
+      const { subscriber: capped, dispatched: cappedOut } = makeSubscriber();
+      await capped.handle(
+        responseBodyEvent({
+          querySource: "generate_session_title",
+          body: titleBody("a".repeat(2_000)),
+        }),
+        context,
+      );
+
+      expect(String(cappedOut[0]!.facts[SESSION_TITLE_FACT_KEY])).toHaveLength(
+        512,
+      );
+    });
+
+    /** @scenario A conversational response body sets no title */
+    it("stamps nothing for a turn of the conversation itself", async () => {
+      const { subscriber, dispatched } = makeSubscriber();
+
+      await subscriber.handle(
+        responseBodyEvent({
+          querySource: "repl_main_thread",
+          body: JSON.stringify({
+            content: [{ type: "text", text: "Done, the test passes now." }],
+          }),
+        }),
+        context,
+      );
+
+      expect(dispatched).toHaveLength(1);
+      expect(dispatched[0]!.facts[SESSION_TITLE_FACT_KEY]).toBeUndefined();
+    });
+
+    /** @scenario An unparseable title body sets no title */
+    it("stamps nothing and still contributes when the body does not parse", async () => {
+      const { subscriber, dispatched } = makeSubscriber();
+
+      await subscriber.handle(
+        responseBodyEvent({
+          querySource: "generate_session_title",
+          body: '{"content":[{"type":"text","text":"{\\"title\\": \\"Fix the fl',
+        }),
+        context,
+      );
+
+      // The contribution proceeds: one odd body must not cost the record.
+      expect(dispatched).toHaveLength(1);
+      expect(dispatched[0]!.facts[SESSION_TITLE_FACT_KEY]).toBeUndefined();
+      expect(dispatched[0]!.facts.query_source).toBe("generate_session_title");
     });
   });
 

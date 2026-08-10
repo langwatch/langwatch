@@ -625,7 +625,7 @@ describe("Feature: Personal usage REST API", () => {
   describe("given a user-bound key that can view another user's personal workspace", () => {
     describe("when reading that other user's usage", () => {
       /** @scenario "A key cannot read another user's personal usage" */
-      it("returns 403 — ownership guard, not just project:view", async () => {
+      it("returns the key mismatch code, not just project:view", async () => {
         const res = await app.request("/api/me/usage", {
           headers: authHeaders({
             apiKey: callerUserToken,
@@ -634,7 +634,8 @@ describe("Feature: Personal usage REST API", () => {
         });
         expect(res.status).toBe(403);
         const body = await res.json();
-        expect(JSON.stringify(body)).toContain("another user");
+        // The code is the contract; the sentence beside it is copy.
+        expect(body.error).toBe("personal_usage_key_mismatch");
       });
     });
 
@@ -689,7 +690,7 @@ describe("Feature: Personal usage REST API", () => {
   describe("given a shared (non-personal) workspace API key", () => {
     describe("when reading usage", () => {
       /** @scenario "A shared-workspace API key is rejected" */
-      it("returns 400 explaining a personal-workspace key is required", async () => {
+      it("returns the personal-workspace key required code", async () => {
         const res = await app.request("/api/me/usage", {
           headers: authHeaders({
             apiKey: sharedProject.apiKey,
@@ -698,7 +699,10 @@ describe("Feature: Personal usage REST API", () => {
         });
         expect(res.status).toBe(400);
         const body = await res.json();
-        expect(JSON.stringify(body)).toContain("personal-project");
+        expect(body.error).toBe("personal_project_key_required");
+        // Nothing on the wire names how the check is made: the refusal has to
+        // stay readable by whoever holds the key, not by whoever wrote the row.
+        expect(JSON.stringify(body)).not.toContain("isPersonal");
       });
     });
   });

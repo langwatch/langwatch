@@ -222,16 +222,17 @@ export const signIn = async (
     return { ok: true };
   }
 
-  // Social providers (google, github, gitlab, microsoft, etc.) and generic
-  // OAuth (auth0, okta) flow through signIn.social — the social plugin and
-  // the generic-oauth plugin both honor the same providerId. BetterAuth
+  // Every provider goes through signIn.social, social (google, github,
+  // gitlab, microsoft) and generic-OAuth (see `PLAIN_OIDC_PROVIDERS` and the
+  // named entries beside it in `ee/sso/providers.ts`) alike: the social plugin
+  // and the generic-oauth plugin both honor the same providerId. BetterAuth
   // handles the redirect to the provider URL itself when `disableRedirect`
   // is unset.
   //
-  // Normalize `azure-ad` → `microsoft` (BetterAuth's internal provider id)
+  // Normalize `azure-ad` to `microsoft` (BetterAuth's internal provider id)
   // to match `linkAccount()` which does the same mapping. Also honor
   // `redirect: false` by passing `disableRedirect: true` so the caller can
-  // handle navigation itself. Caught by CodeRabbit in PR review.
+  // handle navigation itself.
   const mappedProvider = provider === "azure-ad" ? "microsoft" : provider;
   const result = await client.signIn.social({
     provider: mappedProvider as "google",
@@ -353,7 +354,8 @@ const SOCIAL_PROVIDERS = new Set([
  * Link an OAuth account to the currently signed-in user. This is distinct
  * from `signIn(provider)` — which creates/switches sessions. Linking routes
  * through BetterAuth's `/link-social` (for social providers) or
- * `/oauth2/link` (for generic-oauth providers like auth0/okta), both of
+ * `/oauth2/link` (for generic-oauth providers, which is everything not in
+ * `SOCIAL_PROVIDERS` below), both of
  * which enforce same-email matching via
  * `accountLinking.allowDifferentEmails !== true`, blocking the
  * "sign in while logged in and silently switch sessions" regression that a
@@ -387,7 +389,9 @@ export const linkAccount = async (
     return { ok: true };
   }
 
-  // Generic-oauth providers (auth0, okta) — plugin endpoint.
+  // Generic-oauth providers: the plugin's own endpoint. This is the
+  // fall-through on purpose, so a newly supported OIDC provider links
+  // correctly without being listed anywhere here.
   const res = await fetch("/api/auth/oauth2/link", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

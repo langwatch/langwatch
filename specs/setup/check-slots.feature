@@ -144,6 +144,109 @@ Feature: Machine-wide slots for whole-repo checks
     When a check runs
     Then the gate is off, because a CI runner runs one check at a time anyway
 
+  # --- The bin shims: the package scripts are not the only way in ---
+
+  # Wrapping the scripts left every other route to the binary uncounted, and
+  # they get used: `pnpm exec tsgo --noEmit -p tsconfig.tsgo.json`,
+  # `./node_modules/.bin/tsgo`, and the standing advice to iterate with
+  # targeted checks, widened to the whole project. Observed in the wild as
+  # three tsgo processes on an 18 GB laptop with the limit set to 2, one of
+  # them started from the same worktree as a properly queued run.
+  #
+  # dev/scripts/install-check-shims.mjs makes platform/app's bin entries
+  # themselves the boundary, so the route into the tool stops mattering. Only
+  # platform/app's: sdks/typescript's build runs `tsc --noEmit` on the way to
+  # `pnpm dev`, and a dev server that waits for a typecheck slot before it
+  # boots is not an improvement.
+
+  @unit
+  Scenario: A whole-project run counts however it was started
+    When I run "pnpm exec tsgo --noEmit -p tsconfig.tsgo.json" instead of "pnpm typecheck"
+    Then the run counts against the limit, exactly as the script would have
+
+  @unit
+  Scenario: A run over a directory counts
+    When I run "biome check ./src ./ee"
+    Then the run counts against the limit
+
+  @unit
+  Scenario: A run that names no target counts
+    When I run a check with flags only, which walks the project from the cwd
+    Then the run counts against the limit
+
+  # A subcommand and a flag's value are positional too, and reading either as a
+  # file to check is what turns a whole-project run into one nothing waits for.
+  @unit
+  Scenario: A subcommand or a flag's value is not a target
+    When I run "biome check" with no paths, or "tsgo --pretty false"
+    Then the run counts against the limit, because neither names a file and both walk the project
+
+  @unit
+  Scenario: A run that names files starts immediately
+    When I run "tsgo --noEmit src/foo.ts"
+    Then it starts without waiting, so the iterate-fast loop never sits behind a full run
+
+  @unit
+  Scenario: A watch or a language server starts immediately
+    When I start a check with "--watch" or "--lsp"
+    Then it starts without waiting, because it would hold its slot for the whole session
+
+  @unit
+  Scenario: A check does not queue behind itself
+    Given "pnpm typecheck" holds the only slot
+    When the tsgo it runs would otherwise ask for a slot of its own
+    Then it starts without waiting
+    And the check does not sit out the maximum wait before starting
+
+  @unit
+  Scenario: The tool behaves the same either way
+    Given one check that counts and one that does not
+    When each runs
+    Then its arguments, output and exit code are what they would be without the queue
+
+  @unit
+  Scenario: Reinstalling leaves the tools working
+    Given the bin entries already route whole-project runs through the queue
+    When "pnpm install" runs again
+    Then the tools still run, and still count the same runs
+
+  @unit
+  Scenario: A fresh install restores the counting pnpm overwrote
+    Given "pnpm install" has replaced the bin entries with its own
+    When the postinstall step runs
+    Then whole-project runs count again
+
+  # Otherwise a fix to how runs are classified would never reach a checkout
+  # that had already been installed once, which is every checkout.
+  @unit
+  Scenario: An earlier version of the routing is brought up to date
+    Given the bin entries were routed through the queue by an earlier version of the installer
+    When the postinstall step runs
+    Then they are replaced with the current one, and the tools still run
+
+  @unit
+  Scenario: An install that cannot write leaves the tool working
+    Given the bin directory cannot be written to
+    When the postinstall step runs
+    Then the tool still runs, because losing the count is survivable and losing the tool is not
+
+  # The shims are a laptop concern, and neither environment below is a laptop.
+  # CI turns the queue off anyway, so a shim there only puts a node process in
+  # front of every tsc and biome to decide nothing, and an install in an image
+  # or on a server has no bin entries worth rewriting.
+
+  @unit
+  Scenario: CI installs are left alone
+    Given CI is set to anything but "0" or "false"
+    When the postinstall step runs
+    Then it changes nothing, and says which environment it stood down for
+
+  @unit
+  Scenario: Production installs are left alone
+    Given NODE_ENV is production
+    When the postinstall step runs
+    Then it changes nothing
+
   # --- Interaction with haven ---
 
   @unit
