@@ -171,7 +171,10 @@ afterAll(async () => {
 describe("occurred-axis keyset pagination", () => {
   describe("given more traces than fit on one page", () => {
     describe("when walking the scroll to exhaustion", () => {
-      /** @scenario Successive trace-search pages do not overlap */
+      // Deliberately carries no spec-binding annotation: this is a bug fix, and
+      // the repo does not open BDD scenarios for those. An annotation naming a
+      // title that exists in no feature file binds to nothing, which the parity
+      // check reports as a stale reference — correctly.
       it("returns every trace exactly once, in order, with no repeats", async () => {
         const pages = await drainPages();
 
