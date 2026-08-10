@@ -742,6 +742,15 @@ const presentations = {
     describe: () =>
       "They may have been removed since this page loaded. Reload to see who's on it.",
   },
+  team_member_already_added: {
+    title: "They already hold that role here",
+    describe: () =>
+      "Nothing to add. Give them a different role on the team, or leave the one they have.",
+  },
+  team_name_taken: {
+    title: "A team here already has that name",
+    describe: () => "Pick a name no other team in this organization uses.",
+  },
   lite_member_restricted: {
     title: "Your account doesn't include this",
     describe: () => "Ask an admin on your team to upgrade your access.",

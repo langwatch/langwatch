@@ -1,4 +1,4 @@
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import type { Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { slugify } from "~/utils/slugify";
@@ -7,17 +7,60 @@ import type {
   TeamRepository,
 } from "./repositories/team.repository";
 
-export class TeamNotFoundError extends Error {
-  name = "TeamNotFoundError" as const;
+export class TeamNotFoundError extends NotFoundError {
+  declare readonly code: "team_not_found";
+
+  constructor(teamId?: string) {
+    super("team_not_found", "Team", teamId ?? "", {
+      ...(teamId ? { meta: { teamId } } : {}),
+    });
+    this.name = "TeamNotFoundError";
+  }
 }
 
-export class TeamSlugConflictError extends Error {
-  name = "TeamSlugConflictError" as const;
+export class TeamSlugConflictError extends HandledError {
+  declare readonly code: "team_name_taken";
+
+  constructor(message: string) {
+    super("team_name_taken", message, { httpStatus: 409 });
+    this.name = "TeamSlugConflictError";
+  }
 }
 
 /** Raised when something would archive a personal team. */
-export class PersonalTeamProtectedError extends Error {
-  name = "PersonalTeamProtectedError" as const;
+export class PersonalTeamProtectedError extends HandledError {
+  declare readonly code: "personal_workspace_not_managed_here";
+
+  constructor(message: string) {
+    super("personal_workspace_not_managed_here", message, { httpStatus: 403 });
+    this.name = "PersonalTeamProtectedError";
+  }
+}
+
+/** The user id is on the organization but holds no role on this team. */
+export class TeamMembershipNotFoundError extends NotFoundError {
+  declare readonly code: "team_membership_not_found";
+
+  constructor(userId: string) {
+    super("team_membership_not_found", "Team membership", userId, {
+      meta: { userId },
+    });
+    this.name = "TeamMembershipNotFoundError";
+  }
+}
+
+/** The user already holds that role on the team, so granting it changes nothing. */
+export class TeamMemberAlreadyAddedError extends HandledError {
+  declare readonly code: "team_member_already_added";
+
+  constructor(userId: string) {
+    super(
+      "team_member_already_added",
+      "That member already holds that role on this team",
+      { httpStatus: 409, meta: { userId } },
+    );
+    this.name = "TeamMemberAlreadyAddedError";
+  }
 }
 
 /** The refusal a personal team gives to anything that would archive it. */

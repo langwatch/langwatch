@@ -473,6 +473,72 @@ describe("Feature: Teams REST API", () => {
     });
   });
 
+  describe("the codes every refusal answers with", () => {
+    /** @scenario An unknown team names the code */
+    it("names team_not_found for a team that does not exist", async () => {
+      const res = await api.get("/api/teams/team_does_not_exist");
+      expect(res.status).toBe(404);
+      expect((await res.json()).error).toBe("team_not_found");
+    });
+
+    /** @scenario Adding somebody who is not in the organization names the code */
+    it("names user_not_in_organization for somebody outside the organization", async () => {
+      const createRes = await api.post("/api/teams", {
+        name: `Outsider Team ${nanoid(6)}`,
+      });
+      const team = await createRes.json();
+
+      const outsider = await prisma.user.create({
+        data: {
+          name: "Outsider",
+          email: `outsider-${ns}@example.com`,
+        },
+      });
+
+      const res = await api.post(`/api/teams/${team.id}/members`, {
+        userId: outsider.id,
+        role: TeamUserRole.MEMBER,
+      });
+      expect(res.status).toBe(422);
+      expect((await res.json()).error).toBe("user_not_in_organization");
+
+      await prisma.user.delete({ where: { id: outsider.id } });
+    });
+
+    /** @scenario Granting a role a member already holds names the code */
+    it("names team_member_already_added for a role they already hold", async () => {
+      const createRes = await api.post("/api/teams", {
+        name: `Duplicate Role Team ${nanoid(6)}`,
+      });
+      const team = await createRes.json();
+
+      const first = await api.post(`/api/teams/${team.id}/members`, {
+        userId,
+        role: TeamUserRole.MEMBER,
+      });
+      expect(first.status).toBe(201);
+
+      const res = await api.post(`/api/teams/${team.id}/members`, {
+        userId,
+        role: TeamUserRole.MEMBER,
+      });
+      expect(res.status).toBe(409);
+      expect((await res.json()).error).toBe("team_member_already_added");
+    });
+
+    /** @scenario Removing somebody who holds no role on the team names the code */
+    it("names team_membership_not_found for somebody who is not on the team", async () => {
+      const createRes = await api.post("/api/teams", {
+        name: `Empty Team ${nanoid(6)}`,
+      });
+      const team = await createRes.json();
+
+      const res = await api.delete(`/api/teams/${team.id}/members/${userId}`);
+      expect(res.status).toBe(404);
+      expect((await res.json()).error).toBe("team_membership_not_found");
+    });
+  });
+
   describe("when the team is a personal workspace", () => {
     let personalTeamId: string | undefined;
     let colleagueUserId: string | undefined;
@@ -498,6 +564,9 @@ describe("Feature: Teams REST API", () => {
     it("refuses to archive a personal team and leaves it unarchived", async () => {
       const res = await api.delete(`/api/teams/${personalTeamId!}`);
       expect(res.status).toBe(403);
+      expect((await res.json()).error).toBe(
+        "personal_workspace_not_managed_here",
+      );
 
       const team = await prisma.team.findUnique({
         where: { id: personalTeamId! },
@@ -513,6 +582,9 @@ describe("Feature: Teams REST API", () => {
         role: TeamUserRole.MEMBER,
       });
       expect(res.status).toBe(403);
+      expect((await res.json()).error).toBe(
+        "personal_workspace_not_managed_here",
+      );
 
       const bindings = await prisma.roleBinding.findMany({
         where: {
@@ -531,6 +603,9 @@ describe("Feature: Teams REST API", () => {
         `/api/teams/${personalTeamId!}/members/${userId}`,
       );
       expect(res.status).toBe(403);
+      expect((await res.json()).error).toBe(
+        "personal_workspace_not_managed_here",
+      );
 
       const binding = await prisma.roleBinding.findFirst({
         where: {

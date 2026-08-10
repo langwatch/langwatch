@@ -63091,6 +63091,19 @@ Project API keys (`X-Auth-Token`) cannot be used here — they lack organization
 | `DELETE` | `/api/teams/{id}/members/{userId}` | Remove a member from the team |
 | `GET` | `/api/teams/{id}/projects` | List projects in the team |
 
+## Errors
+
+Every refusal carries a stable `code`. Branch on that, not on the message.
+
+| Code | Status | Meaning |
+|------|--------|---------|
+| `team_not_found` | 404 | No such team in this organization, or it is archived |
+| `team_name_taken` | 409 | Another team here already uses that name |
+| `team_member_already_added` | 409 | They already hold that role on the team |
+| `team_membership_not_found` | 404 | They hold no role on this team |
+| `user_not_in_organization` | 422 | The user is not a member of this organization |
+| `personal_workspace_not_managed_here` | 403 | The team is somebody's personal workspace |
+
 ## Soft Delete
 
 `DELETE` does not permanently remove a team. It sets an `archivedAt` timestamp, making the team invisible to list and get operations. Archived teams can still be referenced in historical data (e.g. past project associations).

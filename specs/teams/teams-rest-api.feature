@@ -159,7 +159,7 @@ Feature: Teams REST API
   Scenario: Refuses to archive a personal team
     Given a personal team exists in my organization
     When I DELETE /api/teams/:id for the personal team
-    Then the response status is 403
+    Then the request is refused with code personal_workspace_not_managed_here and status 403
     And the personal team is not archived
 
   @integration
@@ -167,14 +167,14 @@ Feature: Teams REST API
     Given a personal team exists in my organization
     And another member of the organization
     When I POST /api/teams/:id/members for the personal team
-    Then the response status is 403
+    Then the request is refused with code personal_workspace_not_managed_here and status 403
     And the personal team still has only its owner
 
   @integration
   Scenario: Refuses to remove a member from a personal team
     Given a personal team exists in my organization
     When I DELETE /api/teams/:id/members/:userId for its owner
-    Then the response status is 403
+    Then the request is refused with code personal_workspace_not_managed_here and status 403
     And the owner still holds their binding
 
   # Permissions at a scope are the union of every role held there, so removing
@@ -186,6 +186,34 @@ Feature: Teams REST API
     When I DELETE /api/teams/:id/members/:userId for them
     Then the response status is 200
     And they hold no binding on that team
+
+  # Every refusal this family can name answers with its code rather than an
+  # HTTP reason phrase, so a provisioning tool branches on one vocabulary
+  # across the whole management surface.
+
+  @integration
+  Scenario: An unknown team names the code
+    When I GET /api/teams/:id for a team that does not exist
+    Then the request is refused with code team_not_found and status 404
+
+  @integration
+  Scenario: Adding somebody who is not in the organization names the code
+    Given a team exists in my organization
+    And a user who does not belong to it
+    When I POST /api/teams/:id/members for that user
+    Then the request is refused with code user_not_in_organization and status 422
+
+  @integration
+  Scenario: Granting a role a member already holds names the code
+    Given a member holds Member on a team
+    When I POST /api/teams/:id/members granting them Member again
+    Then the request is refused with code team_member_already_added and status 409
+
+  @integration
+  Scenario: Removing somebody who holds no role on the team names the code
+    Given a member of the organization who is not on a team
+    When I DELETE /api/teams/:id/members/:userId for them
+    Then the request is refused with code team_membership_not_found and status 404
 
   # ============================================================================
   # Permission denial

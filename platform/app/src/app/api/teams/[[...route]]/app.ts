@@ -11,19 +11,17 @@ import { validator as zValidator } from "~/server/api/validation";
 import {
   PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
   PersonalTeamProtectedError,
+  TeamMemberAlreadyAddedError,
+  TeamMembershipNotFoundError,
   TeamNotFoundError,
   type TeamRestService,
 } from "~/server/app-layer/teams/team.service";
 import { prisma } from "~/server/db";
+import { UserNotInOrganizationError } from "~/server/role-bindings/errors";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { TeamServiceMiddlewareVariables } from "../../middleware/team-service";
 import { teamServiceMiddleware } from "../../middleware/team-service";
-import {
-  BadRequestError,
-  ForbiddenError,
-  NotFoundError,
-} from "../../shared/errors";
 import { handleTeamError } from "./error-handler";
 
 patchZodOpenapi();
@@ -132,7 +130,7 @@ secured.access(requires("team:view")).get(
       organizationId: organization.id,
     });
     if (!team) {
-      throw new NotFoundError("Team not found");
+      throw new TeamNotFoundError(id);
     }
 
     return c.json(teamResponse(team));
@@ -152,21 +150,13 @@ secured.access(requires("team:update")).patch(
     const body = c.req.valid("json");
     const service = c.get("teamService") as TeamRestService;
 
-    let team;
-    try {
-      team = await service.update({
-        id,
-        organizationId: organization.id,
-        data: {
-          ...(body.name !== undefined && { name: body.name }),
-        },
-      });
-    } catch (error) {
-      if (error instanceof TeamNotFoundError) {
-        throw new NotFoundError("Team not found");
-      }
-      throw error;
-    }
+    const team = await service.update({
+      id,
+      organizationId: organization.id,
+      data: {
+        ...(body.name !== undefined && { name: body.name }),
+      },
+    });
 
     return c.json(teamResponse(team));
   },
@@ -183,21 +173,10 @@ secured.access(requires("team:delete")).delete(
     const organization = c.get("organization") as Organization;
     const service = c.get("teamService") as TeamRestService;
 
-    let team;
-    try {
-      team = await service.archive({
-        id,
-        organizationId: organization.id,
-      });
-    } catch (error) {
-      if (error instanceof TeamNotFoundError) {
-        throw new NotFoundError("Team not found");
-      }
-      if (error instanceof PersonalTeamProtectedError) {
-        throw new ForbiddenError(error.message);
-      }
-      throw error;
-    }
+    const team = await service.archive({
+      id,
+      organizationId: organization.id,
+    });
 
     return c.json({
       id: team.id,
@@ -224,7 +203,7 @@ secured
         id,
         organizationId: organization.id,
       });
-      if (!team) throw new NotFoundError("Team not found");
+      if (!team) throw new TeamNotFoundError(id);
 
       const bindings = await prisma.roleBinding.findMany({
         where: {
@@ -266,12 +245,12 @@ secured
         id,
         organizationId: organization.id,
       });
-      if (!team) throw new NotFoundError("Team not found");
+      if (!team) throw new TeamNotFoundError(id);
       // A personal team holds exactly its owner, which is why plan limits
       // exempt it. A second member would contradict that, so the request is
       // refused rather than the team quietly becoming something else.
       if (team.isPersonal) {
-        throw new ForbiddenError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
+        throw new PersonalTeamProtectedError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
       }
 
       const orgMember = await prisma.organizationUser.findFirst({
@@ -279,7 +258,7 @@ secured
         select: { userId: true },
       });
       if (!orgMember) {
-        throw new BadRequestError("User must belong to the organization");
+        throw new UserNotInOrganizationError(body.userId);
       }
 
       try {
@@ -299,7 +278,7 @@ secured
           "code" in error &&
           (error as { code: string }).code === "P2002"
         ) {
-          throw new BadRequestError("User is already a member of this team");
+          throw new TeamMemberAlreadyAddedError(body.userId);
         }
         throw error;
       }
@@ -323,12 +302,12 @@ secured
         id,
         organizationId: organization.id,
       });
-      if (!team) throw new NotFoundError("Team not found");
+      if (!team) throw new TeamNotFoundError(id);
       // The one member of a personal team is its owner, and nothing puts that
       // binding back, so removal is refused rather than leaving the owner
       // locked out of their own workspace.
       if (team.isPersonal) {
-        throw new ForbiddenError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
+        throw new PersonalTeamProtectedError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
       }
 
       // Every team-scoped binding this member holds, not the first one found:
@@ -344,7 +323,7 @@ secured
         },
       });
       if (removed.count === 0) {
-        throw new NotFoundError("Member not found on this team");
+        throw new TeamMembershipNotFoundError(userId);
       }
 
       return c.json({ success: true });
@@ -368,7 +347,7 @@ secured
         id,
         organizationId: organization.id,
       });
-      if (!team) throw new NotFoundError("Team not found");
+      if (!team) throw new TeamNotFoundError(id);
 
       const projects = await prisma.project.findMany({
         where: {
