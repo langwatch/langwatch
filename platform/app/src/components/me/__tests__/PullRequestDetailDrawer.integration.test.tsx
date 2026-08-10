@@ -120,9 +120,9 @@ function detailPayload(over: Record<string, unknown> = {}) {
         cacheCreationTokens: 3_200,
         totalTokens: 8_000,
         costUsd: 10,
+        tokensKnown: true,
       },
     ],
-    modelNames: ["claude-fable-5"],
     sessions: [
       {
         sessionId: "session-a",
@@ -380,12 +380,7 @@ describe("the pull request detail drawer", () => {
   describe("given a pull request nothing has run on yet", () => {
     it("says so in each section rather than showing empty tables", () => {
       pinDetail(
-        detailPayload({
-          contributors: [],
-          modelBreakdown: [],
-          modelNames: [],
-          sessions: [],
-        }),
+        detailPayload({ contributors: [], modelBreakdown: [], sessions: [] }),
       );
 
       renderDrawer();
@@ -404,8 +399,10 @@ describe("the pull request detail drawer", () => {
     it("names the models rather than claiming there is no model data", () => {
       pinDetail(
         detailPayload({
-          modelBreakdown: [],
-          modelNames: ["claude-opus-5", "gpt-5"],
+          modelBreakdown: [
+            { model: "claude-opus-5", tokensKnown: false },
+            { model: "gpt-5", tokensKnown: false },
+          ],
         }),
       );
 

@@ -93,6 +93,17 @@ async function dedupUnavailableCount(reason: string): Promise<number> {
   );
 }
 
+/** The cache-outcome counter for `test_table`, read off the registry too. */
+async function cacheTotalCount(result: string): Promise<number> {
+  const metric = await register.getSingleMetric("es_fold_cache_total")?.get();
+  return (
+    metric?.values.find(
+      (v) =>
+        v.labels.projection_name === "test_table" && v.labels.result === result,
+    )?.value ?? 0
+  );
+}
+
 function createRedis() {
   const values = new Map<string, { value: string; ttlSeconds: number }>();
 
@@ -187,7 +198,10 @@ describe("RedisCachedFoldStore", () => {
 
   describe("given Redis is unreachable", () => {
     describe("when the fold reads state", () => {
+      /** @scenario an unreadable fold cache is answered from the durable store, and counted apart from a miss */
       it("falls through to the durable store rather than failing the fold", async () => {
+        const before = await cacheTotalCount("fallback_error");
+        const missesBefore = await cacheTotalCount("miss");
         const redis = createRedis();
         redis.get.mockRejectedValueOnce(new Error("connection lost"));
         const { store, inner } = createStore(redis);
@@ -196,6 +210,13 @@ describe("RedisCachedFoldStore", () => {
 
         expect(result).toEqual({ count: 1, UpdatedAt: 100 });
         expect(inner.calls.get).toEqual(["agg-1"]);
+        // Counted as its own outcome, never as an ordinary miss. A miss means
+        // the last write is at least a TTL old and has therefore settled
+        // across the replicas, which is what makes the durable read
+        // authoritative. A failed read means nothing of the kind, so the two
+        // must stay tellable apart from the outside.
+        expect(await cacheTotalCount("fallback_error")).toBe(before + 1);
+        expect(await cacheTotalCount("miss")).toBe(missesBefore);
       });
     });
   });

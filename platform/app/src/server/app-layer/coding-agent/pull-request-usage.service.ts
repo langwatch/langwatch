@@ -149,7 +149,13 @@ export interface CostSplit {
   nonBilledCostUsd: number | null;
 }
 
-/** What one model consumed and cost, within one pull request. */
+/**
+ * What one model consumed and cost, within one pull request.
+ *
+ * `tokensKnown` is false when all we know is that the model ran. The totals are
+ * then zero and mean nothing, so a reader must not print them. See
+ * {@link modelsFor} for when that happens.
+ */
 export interface ModelUsage {
   model: string;
   inputTokens: number;
@@ -159,6 +165,8 @@ export interface ModelUsage {
   totalTokens: number;
   /** Null when no project contributing this model may be priced. */
   costUsd: number | null;
+  /** Whether the totals on this entry are real. */
+  tokensKnown: boolean;
 }
 
 /** How one project is named when it appears as a contributor. */
@@ -230,8 +238,6 @@ export interface PersonalPullRequestRow extends PullRequestIdentity, CostSplit {
   cacheCreationTokens: number;
   totalTokens: number;
   modelBreakdown: ModelUsage[];
-  /** Which models ran, when no per-call breakdown exists. See {@link modelNamesFor}. */
-  modelNames: string[];
   contributorsSummary: ContributorSummary[];
 }
 
@@ -245,11 +251,11 @@ export interface UnlinkedBranchRollup extends CostSplit {
   sessionsCount: number;
   totalTokens: number;
   /**
-   * Which models ran. A branch row has names only: the per-call breakdown is
-   * read for the mapped pull requests, and asking for it again per unlinked
-   * branch would be a second query for a strictly weaker answer.
+   * Which models ran. A branch row carries names only: the per-call totals are
+   * read for the mapped pull requests, and asking for them again per unlinked
+   * branch would be a second query for an answer this page never shows.
    */
-  modelNames: string[];
+  modelBreakdown: ModelUsage[];
   /** Whether the organization's connection reaches this repository at all. */
   repoCovered: boolean;
 }
@@ -281,8 +287,6 @@ export interface PullRequestDetail {
   totals: PullRequestUsageTotals;
   contributors: PullRequestUsageRow[];
   modelBreakdown: ModelUsage[];
-  /** Which models ran, when no per-call breakdown exists. See {@link modelNamesFor}. */
-  modelNames: string[];
   sessions: PullRequestSessionFact[];
 }
 
@@ -417,7 +421,6 @@ export class PullRequestUsageService {
       totals: totalsOf(gathered.rows),
       contributors: gathered.rows,
       modelBreakdown: gathered.modelBreakdown,
-      modelNames: gathered.modelNames,
       sessions: [...gathered.sessions]
         .sort((a, b) => b.startedAtMs - a.startedAtMs)
         .slice(0, DETAIL_SESSIONS_LIMIT)
@@ -608,12 +611,11 @@ export class PullRequestUsageService {
         costUsd: totals.costUsd,
         billedCostUsd: totals.billedCostUsd,
         nonBilledCostUsd: totals.nonBilledCostUsd,
-        modelBreakdown: modelBreakdownFor({
+        modelBreakdown: modelsFor({
           sessions: attached,
           modelTotals,
           costProjects,
         }),
-        modelNames: modelNamesFor(attached),
         contributorsSummary: contributorsSummaryFor({
           sessions: attached,
           projects,
@@ -628,7 +630,6 @@ export class PullRequestUsageService {
     sessions: CodingAgentBranchSessionRow[];
     rows: PullRequestUsageRow[];
     modelBreakdown: ModelUsage[];
-    modelNames: string[];
   }> {
     const target = await this.deps.pullRequests.findByNumber({
       organizationId: query.organizationId,
@@ -643,13 +644,7 @@ export class PullRequestUsageService {
       });
     }
 
-    const empty = {
-      target,
-      sessions: [],
-      rows: [],
-      modelBreakdown: [],
-      modelNames: [],
-    };
+    const empty = { target, sessions: [], rows: [], modelBreakdown: [] };
     if (query.permittedProjectIds.length === 0) return empty;
 
     // Every pull request the branch ever hosted, because the tenure rule needs
@@ -701,12 +696,11 @@ export class PullRequestUsageService {
         nonBillableAgents,
         projects: query.projects,
       }),
-      modelBreakdown: modelBreakdownFor({
+      modelBreakdown: modelsFor({
         sessions: attached,
         modelTotals,
         costProjects,
       }),
-      modelNames: modelNamesFor(attached),
     };
   }
 }
@@ -954,16 +948,48 @@ function emptyTotals(): PullRequestUsageTotals {
 }
 
 /**
- * Roll the per-call model totals up to the pull request, over the sessions the
- * tenure rule attached to it. Cost is summed only across the projects the
- * caller may price, and stays null when none of them is.
+ * Which models ran, and what each consumed where we know it.
+ *
+ * THE one answer to that question: every caller uses this, and nothing
+ * downstream picks between sources. Two of them exist and they are not
+ * interchangeable.
+ *
+ * The per-call fact table has the tokens, so it wins whenever it answers. It
+ * is written from the `api_request` LOG alone, deliberately, because that is
+ * the one carrier holding tokens, cost and duration together and consuming
+ * only it makes double-counting against `llm_request` spans impossible. An
+ * agent reporting usage on spans or metrics instead therefore contributes no
+ * rows to it at all.
+ *
+ * The session's own row is the fallback, because the fold behind it consumes
+ * all three carriers and records which models ran regardless. It holds a SET
+ * of names with no per-model split, so those entries carry `tokensKnown:
+ * false` and totals that mean nothing. That is strictly better than the
+ * alternative, which is a row reporting millions of tokens and no model.
+ *
+ * Both come from reads the caller already made, so the fallback costs no
+ * query. When neither answers, the list is empty and the reader says so.
  */
-function modelBreakdownFor({
+function modelsFor({
   sessions,
   modelTotals,
   costProjects,
 }: {
-  sessions: CodingAgentBranchSessionRow[];
+  sessions: Array<{ tenantId?: string; sessionId?: string; models: string[] }>;
+  modelTotals: SessionModelTotalsRow[];
+  costProjects: ReadonlySet<string>;
+}): ModelUsage[] {
+  const perCall = perCallModelsFor({ sessions, modelTotals, costProjects });
+  return perCall.length > 0 ? perCall : namedModelsFor(sessions);
+}
+
+/** The per-call totals, over the sessions the tenure rule attached. */
+function perCallModelsFor({
+  sessions,
+  modelTotals,
+  costProjects,
+}: {
+  sessions: Array<{ tenantId?: string; sessionId?: string; models: string[] }>;
   modelTotals: SessionModelTotalsRow[];
   costProjects: ReadonlySet<string>;
 }): ModelUsage[] {
@@ -984,6 +1010,7 @@ function modelBreakdownFor({
       cacheCreationTokens: 0,
       totalTokens: 0,
       costUsd: null,
+      tokensKnown: true,
     };
     usage.inputTokens += row.inputTokens;
     usage.outputTokens += row.outputTokens;
@@ -997,28 +1024,24 @@ function modelBreakdownFor({
   return [...byModel.values()].sort((a, b) => b.totalTokens - a.totalTokens);
 }
 
-/**
- * Which models ran, from the session rollup rather than the per-call events.
- *
- * The two stores are fed by different carriers: the session fold consumes
- * spans, logs and metrics, while the per-call events table is log-driven only
- * and records nothing for an agent with no log carrier. Such a session has
- * tokens and model names on its rollup row and no per-call row at all, so the
- * breakdown alone reports it as having no model while the names sit in the
- * same read the tokens came from.
- *
- * The rollup carries a SET of names and no per-model split, so this answers
- * "which models" and never "how much each". That is why it is a fallback for
- * an empty breakdown rather than a replacement for one.
- */
-function modelNamesFor(sessions: Array<{ models: string[] }>): string[] {
+/** The names alone, from the sessions' own rows. Alphabetical: nothing ranks them. */
+function namedModelsFor(sessions: Array<{ models: string[] }>): ModelUsage[] {
   const names = new Set<string>();
   for (const session of sessions) {
     for (const model of session.models) {
       if (model !== "") names.add(model);
     }
   }
-  return [...names].sort();
+  return [...names].sort().map((model) => ({
+    model,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    totalTokens: 0,
+    costUsd: null,
+    tokensKnown: false,
+  }));
 }
 
 /** Who worked on a pull request, largest contribution first. */
@@ -1152,7 +1175,7 @@ function unlinkedRollupsFor({
     lastActivityAtMs: latestActivityAtMs(branchSessions),
     sessionsCount: branchSessions.length,
     totalTokens: branchSessions.reduce((sum, s) => sum + tokensOf(s), 0),
-    modelNames: modelNamesFor(branchSessions),
+    modelBreakdown: namedModelsFor(branchSessions),
     costUsd: sumOf(branchSessions, "costUsd"),
     billedCostUsd: branchSessions
       .filter((session) => !nonBillableAgents.has(session.agent))

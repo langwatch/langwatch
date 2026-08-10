@@ -224,7 +224,6 @@ function mappedRow(over: Record<string, unknown> & CostOverrides = {}) {
     cacheCreationTokens: 4_000,
     totalTokens: 10_000,
     modelBreakdown: [],
-    modelNames: [],
     contributorsSummary: [],
     ...over,
     ...costSplit({ over, defaultCostUsd: 12.5 }),
@@ -240,7 +239,7 @@ function unlinkedRow(over: Record<string, unknown> & CostOverrides = {}) {
     lastActivityAtMs: LONG_AGO,
     sessionsCount: 3,
     totalTokens: 1_240_000,
-    modelNames: [],
+    modelBreakdown: [],
     repoCovered: false,
     ...over,
     ...costSplit({ over, defaultCostUsd: 4.25 }),
@@ -697,7 +696,12 @@ describe("the personal Pull Requests table", () => {
       pinUsage({
         rows: [],
         unlinked: [
-          unlinkedRow({ modelNames: ["claude-opus-5", "claude-haiku-4-5"] }),
+          unlinkedRow({
+            modelBreakdown: [
+              { model: "claude-opus-5", tokensKnown: false },
+              { model: "claude-haiku-4-5", tokensKnown: false },
+            ],
+          }),
         ],
         connection: { connected: true, installUrl: INSTALL_URL },
       });

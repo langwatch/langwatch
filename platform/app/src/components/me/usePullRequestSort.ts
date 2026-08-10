@@ -62,7 +62,6 @@ export interface SortablePullRequestRow {
   lastActivityAtMs: number;
   sessionsCount: number;
   modelBreakdown: ReadonlyArray<{ model: string }>;
-  modelNames: readonly string[];
   totalTokens: number;
   costUsd: number | null;
 }
@@ -87,9 +86,7 @@ const keyOf: Record<
       : PULL_REQUEST_STATUS_SORT_RANK[row.snapshotStatus],
   lastActivity: (row) => row.lastActivityAtMs,
   sessions: (row) => row.sessionsCount,
-  // The same fallback the cell renders, so the order matches what is read.
-  models: (row) =>
-    (row.modelBreakdown[0]?.model ?? row.modelNames[0])?.toLowerCase() ?? null,
+  models: (row) => row.modelBreakdown[0]?.model.toLowerCase() ?? null,
   tokens: (row) => row.totalTokens,
   cost: (row) => row.costUsd,
 };

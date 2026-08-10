@@ -159,8 +159,6 @@ interface PullRequestListRow {
   nonBilledCostUsd: number | null;
   billedCostUsd: number | null;
   modelBreakdown: ModelUsage[];
-  /** Which models ran, for rows the per-call breakdown cannot answer for. */
-  modelNames: string[];
   contributorsSummary: ContributorSummary[];
   /** Whether the organization's connection reaches this repository. */
   repositoryCovered: boolean;
@@ -813,7 +811,7 @@ const PullRequestRow: React.FC<{
       <SessionsCell row={row} />
     </Table.Cell>
     <Table.Cell maxWidth="160px">
-      <ModelsCell models={row.modelBreakdown} names={row.modelNames} />
+      <ModelsCell models={row.modelBreakdown} />
     </Table.Cell>
     <Table.Cell textAlign="end">
       <PeerComparisonCell
@@ -937,52 +935,37 @@ const SessionsCell: React.FC<{ row: PullRequestListRow }> = ({ row }) => {
 /**
  * The leading model, and how many others rode along.
  *
- * Two sources, deliberately unequal. The per-call breakdown is the better
- * answer and wins whenever it exists, because it can say what each model
- * consumed. The names are what the session itself recorded, and they cover the
- * rows the breakdown cannot reach: a branch that has no pull request to read
- * per-call totals for, and an agent whose usage arrives on a carrier the
- * per-call table does not read. Falling back to them is what keeps a row that
- * plainly ran a model from reporting that it ran none.
+ * An entry whose totals are not known carries its name alone. Which models a
+ * row ran, and how much can be said about each, is the read's question and it
+ * has already answered it; this cell only draws the answer.
  */
-const ModelsCell: React.FC<{ models: ModelUsage[]; names: string[] }> = ({
-  models,
-  names,
-}) => {
-  if (models.length === 0 && names.length === 0) {
+const ModelsCell: React.FC<{ models: ModelUsage[] }> = ({ models }) => {
+  if (models.length === 0) {
     return (
       <Text fontSize="sm" color="fg.subtle">
         {MISSING_VALUE}
       </Text>
     );
   }
-
-  // Names alone carry no per-model split, so the hover lists them and claims
-  // nothing about how the row's tokens divide between them.
-  const labels =
-    models.length > 0 ? models.map((model) => model.model) : [...names];
-  const [primary, ...rest] = labels;
-
+  const [primary, ...rest] = models;
   return (
     <Tooltip
       content={
         <VStack align="start" gap={0.5}>
-          {models.length > 0
-            ? models.map((model) => (
-                <Text key={model.model}>
-                  {model.model}: {formatTokens(model.totalTokens)} tokens
-                  {model.costUsd === null
-                    ? ""
-                    : `, ${formatCost(model.costUsd)}`}
-                </Text>
-              ))
-            : names.map((name) => <Text key={name}>{name}</Text>)}
+          {models.map((model) => (
+            <Text key={model.model}>
+              {model.model}
+              {model.tokensKnown
+                ? `: ${formatTokens(model.totalTokens)} tokens${model.costUsd === null ? "" : `, ${formatCost(model.costUsd)}`}`
+                : ""}
+            </Text>
+          ))}
         </VStack>
       }
       positioning={{ placement: "left" }}
     >
       <Text fontSize="xs" color="fg.muted" cursor="help" truncate tabIndex={0}>
-        {primary}
+        {primary!.model}
         {rest.length > 0 ? ` +${rest.length}` : ""}
       </Text>
     </Tooltip>
@@ -1141,7 +1124,6 @@ function toMappedListRow(row: MappedPullRequestPayload): PullRequestListRow {
     billedCostUsd: row.billedCostUsd,
     nonBilledCostUsd: row.nonBilledCostUsd,
     modelBreakdown: row.modelBreakdown,
-    modelNames: row.modelNames,
     contributorsSummary: row.contributorsSummary,
     // A mapped pull request came through the connection, so the repository it
     // lives in is covered by definition.
@@ -1163,10 +1145,7 @@ function toBranchListRow(row: UnlinkedBranchPayload): PullRequestListRow {
     costUsd: row.costUsd,
     billedCostUsd: row.billedCostUsd,
     nonBilledCostUsd: row.nonBilledCostUsd,
-    // A branch is unlinked, so there is no pull request to read per-call totals
-    // for. Its models come from what its own sessions recorded.
-    modelBreakdown: [],
-    modelNames: row.modelNames,
+    modelBreakdown: row.modelBreakdown,
     contributorsSummary: [],
     repositoryCovered: row.repoCovered,
   };

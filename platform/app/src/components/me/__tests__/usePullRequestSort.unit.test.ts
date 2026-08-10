@@ -33,7 +33,6 @@ function row(
     lastActivityAtMs: 1_000,
     sessionsCount: 1,
     modelBreakdown: [{ model: "claude-fable-5" }],
-    modelNames: [],
     totalTokens: 1_000,
     costUsd: 1,
     ...over,
@@ -336,7 +335,10 @@ describe("the Pull Requests table order", () => {
     it("orders a row that has names but no per-call breakdown among the rest", () => {
       const rows = [
         row({ headBranch: "zeta", modelBreakdown: [{ model: "zeta-1" }] }),
-        branchRow({ headBranch: "named", modelNames: ["Alpha-1"] }),
+        branchRow({
+          headBranch: "named",
+          modelBreakdown: [{ model: "Alpha-1" }],
+        }),
         branchRow({ headBranch: "no-model" }),
       ];
 

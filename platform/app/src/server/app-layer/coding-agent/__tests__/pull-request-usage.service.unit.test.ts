@@ -601,8 +601,15 @@ describe("PullRequestUsageService", () => {
 
       const usage = await service.getForPersonalProject(PERSONAL_QUERY);
 
-      expect(usage.rows[0]?.modelBreakdown).toEqual([]);
-      expect(usage.rows[0]?.modelNames).toEqual(["claude-opus-5", "gpt-5"]);
+      expect(
+        usage.rows[0]?.modelBreakdown.map((each) => ({
+          model: each.model,
+          tokensKnown: each.tokensKnown,
+        })),
+      ).toEqual([
+        { model: "claude-opus-5", tokensKnown: false },
+        { model: "gpt-5", tokensKnown: false },
+      ]);
     });
 
     /** @scenario "Per-call model data wins over the recorded names" */
@@ -620,10 +627,9 @@ describe("PullRequestUsageService", () => {
 
       const usage = await service.getForPersonalProject(PERSONAL_QUERY);
 
-      expect(usage.rows[0]?.modelBreakdown.map((each) => each.model)).toEqual([
-        "claude-opus-5",
+      expect(usage.rows[0]?.modelBreakdown).toEqual([
+        expect.objectContaining({ model: "claude-opus-5", tokensKnown: true }),
       ]);
-      expect(usage.rows[0]?.modelNames).toEqual(["claude-opus-5"]);
     });
   });
 
@@ -643,10 +649,9 @@ describe("PullRequestUsageService", () => {
 
       const usage = await service.getForPersonalProject(PERSONAL_QUERY);
 
-      expect(usage.unlinked[0]?.modelNames).toEqual([
-        "claude-haiku-4-5",
-        "claude-opus-5",
-      ]);
+      expect(
+        usage.unlinked[0]?.modelBreakdown.map((each) => each.model),
+      ).toEqual(["claude-haiku-4-5", "claude-opus-5"]);
     });
 
     /** @scenario "A branch whose sessions recorded no model reports none" */
@@ -660,7 +665,7 @@ describe("PullRequestUsageService", () => {
 
       const usage = await service.getForPersonalProject(PERSONAL_QUERY);
 
-      expect(usage.unlinked[0]?.modelNames).toEqual([]);
+      expect(usage.unlinked[0]?.modelBreakdown).toEqual([]);
     });
   });
 
@@ -1010,6 +1015,7 @@ describe("PullRequestUsageService", () => {
           cacheCreationTokens: 10,
           totalTokens: 180,
           costUsd: 1.5,
+          tokensKnown: true,
         },
         {
           model: "gpt-5-mini",
@@ -1019,6 +1025,7 @@ describe("PullRequestUsageService", () => {
           cacheCreationTokens: 1,
           totalTokens: 4,
           costUsd: 0.25,
+          tokensKnown: true,
         },
       ]);
     });

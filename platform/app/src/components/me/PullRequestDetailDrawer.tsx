@@ -144,10 +144,7 @@ export function PullRequestDetailDrawer({
             <VStack align="stretch" gap={6}>
               <SummaryRow detail={detail} />
               <ContributorsSection contributors={detail.contributors} />
-              <ModelsSection
-                models={detail.modelBreakdown}
-                names={detail.modelNames}
-              />
+              <ModelsSection models={detail.modelBreakdown} />
               <SessionsSection sessions={detail.sessions} />
             </VStack>
           )}
