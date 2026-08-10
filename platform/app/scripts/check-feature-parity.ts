@@ -66,6 +66,11 @@ const DEFAULT_TEST_ROOTS: string[] = [
   "platform/app/src",
   "platform/app/ee",
   "platform/app/scripts",
+  // CI's own behaviour is behaviour too. The guards under .github/scripts are
+  // the only tests for it — how workflows check out, what a workflow may not
+  // do — so scenarios in specs/ci/ can only bind from this root. Without it
+  // those feature files report "all bound" while binding nothing at all.
+  ".github/scripts",
   "packages",
   "mcp/typescript/src",
   "sdks/typescript/src",

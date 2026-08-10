@@ -1041,6 +1041,15 @@ jobs:
       - name: Test start-clickhouse-with-storage-policy.sh
         run: bash .github/scripts/__tests__/start-clickhouse-with-storage-policy.test.sh
 
+      # Same runner shape as the guards in release-scope-guard: plain node, no
+      # install. The guard's own fixtures cover the negative cases; the last
+      # test runs it against the live workflows.
+      - name: Test the lean-checkout guard
+        run: node --test --experimental-strip-types .github/scripts/guard-lean-checkout.test.ts
+
+      - name: Lean-checkout guard
+        run: node --experimental-strip-types .github/scripts/guard-lean-checkout.ts .
+
   ci-self-test:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
