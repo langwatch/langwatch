@@ -18,7 +18,7 @@ import { RoleBindingService } from "../role-binding.service";
 
 const validateScopeInOrg = vi.fn();
 const filterAssignableRoleIds = vi.fn();
-const organizationUserCount = vi.fn();
+const organizationUserFindFirst = vi.fn();
 const groupFindFirst = vi.fn();
 const apiKeyFindFirst = vi.fn();
 const bindingCreate = vi.fn();
@@ -28,7 +28,7 @@ const customRoleFindMany = vi.fn();
 const transaction = vi.fn();
 
 const prisma = {
-  organizationUser: { count: organizationUserCount },
+  organizationUser: { findFirst: organizationUserFindFirst },
   group: { findFirst: groupFindFirst },
   apiKey: { findFirst: apiKeyFindFirst },
   // The personal-team guard runs on every binding write; a shared team here.
@@ -53,7 +53,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   validateScopeInOrg.mockResolvedValue(undefined);
   filterAssignableRoleIds.mockResolvedValue([]);
-  organizationUserCount.mockResolvedValue(1);
+  // The membership row rather than a count: the write path reads the seat
+  // off it to ceiling a Lite Member's bindings.
+  organizationUserFindFirst.mockResolvedValue({ role: "MEMBER" });
   groupFindFirst.mockResolvedValue({ id: "group_1" });
   apiKeyFindFirst.mockResolvedValue({ id: "key_1" });
   bindingCreate.mockResolvedValue({ id: "binding_1" });

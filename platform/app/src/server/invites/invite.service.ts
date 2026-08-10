@@ -65,6 +65,8 @@ export const ORGANIZATION_TO_TEAM_ROLE_MAP: Record<
 import { createLogger } from "@langwatch/observability";
 import { TeamUserRole } from "@prisma/client";
 import { env } from "~/env.mjs";
+import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
+import type { Session } from "~/server/auth";
 import { getApp } from "../app-layer/app";
 import type {
   PlanProvider,
@@ -98,6 +100,69 @@ interface TeamAssignmentInput {
  * @param customRoleMap - Map of custom role ID to permissions array
  * @returns Count of full members and lite members
  */
+/**
+ * The team memberships an accepted invitation grants. Pure, like
+ * `classifyInvitesByMemberType`, so the correction is testable in isolation.
+ *
+ * A Lite Member seat allows the Viewer team role only, and a custom role
+ * requires a full seat. New invitations are refused above that ceiling when
+ * they are written, but invitations stored before the rule may still promise
+ * more; the seat corrects them here, the same way a seat change corrects
+ * stored access rows, rather than refusing the person who clicked the link.
+ */
+export function resolveInviteTeamMemberships({
+  role,
+  teamIds,
+  teamAssignments,
+}: {
+  role: OrganizationUserRole;
+  teamIds: string;
+  teamAssignments: unknown;
+}): Array<{ teamId: string; role: TeamUserRole; customRoleId?: string }> {
+  let memberships: Array<{
+    teamId: string;
+    role: TeamUserRole;
+    customRoleId?: string;
+  }>;
+
+  if (teamAssignments && Array.isArray(teamAssignments)) {
+    const assignments = teamAssignments as unknown as Array<{
+      teamId: string;
+      role: TeamUserRole;
+      customRoleId?: string;
+    }>;
+    memberships = assignments.map((a) => ({
+      teamId: a.teamId,
+      role: a.role,
+      customRoleId: a.customRoleId,
+    }));
+  } else {
+    const dedupedTeamIds = Array.from(
+      new Set(
+        teamIds
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      ),
+    );
+    memberships = dedupedTeamIds.map((teamId) => ({
+      teamId,
+      role: ORGANIZATION_TO_TEAM_ROLE_MAP[role],
+    }));
+  }
+
+  if (role !== OrganizationUserRole.EXTERNAL) return memberships;
+  return memberships.map((membership) =>
+    membership.role === TeamUserRole.VIEWER && !membership.customRoleId
+      ? membership
+      : {
+          teamId: membership.teamId,
+          role: TeamUserRole.VIEWER,
+          customRoleId: undefined,
+        },
+  );
+}
+
 export function classifyInvitesByMemberType(
   invites: Array<{
     role: OrganizationUserRole;
@@ -377,6 +442,28 @@ export class InviteService {
   }
 
   /**
+   * A Lite Member seat allows the Viewer team role only, and a custom role
+   * requires a full seat, so an invitation cannot be written promising more.
+   * Refused here, where the admin choosing the roles can act on it; an
+   * invitation stored before this rule is corrected at acceptance instead
+   * (`resolveInviteTeamMemberships`).
+   */
+  private assertAssignmentsWithinInvitedSeat({
+    role,
+    teamAssignments,
+  }: {
+    role: OrganizationUserRole;
+    teamAssignments?: TeamAssignmentInput[];
+  }): void {
+    if (role !== OrganizationUserRole.EXTERNAL) return;
+    for (const assignment of teamAssignments ?? []) {
+      if (assignment.customRoleId || assignment.role !== TeamUserRole.VIEWER) {
+        throw new LiteMemberViewerOnlyError();
+      }
+    }
+  }
+
+  /**
    * Creates an invite record with PENDING status (DB-only, no email).
    * Use this inside transactions to avoid sending emails before commit.
    *
@@ -385,6 +472,9 @@ export class InviteService {
   async createAdminInviteRecord(
     input: CreateAdminInviteInput,
   ): Promise<{ invite: OrganizationInvite; organization: Organization }> {
+    this.assertAssignmentsWithinInvitedSeat(input);
+    const inviteCode = nanoid();
+
     const organization = await this.prisma.organization.findFirst({
       where: { id: input.organizationId },
     });
@@ -407,6 +497,12 @@ export class InviteService {
   private async createInviteRow(
     input: CreateAdminInviteInput,
   ): Promise<OrganizationInvite> {
+    // Every writer of a pending invite passes through here, including the
+    // batch path, so the seat rule is checked here rather than once per
+    // caller: a Lite Member invited through the batch endpoint would
+    // otherwise be promised a team role their seat cannot hold.
+    this.assertAssignmentsWithinInvitedSeat(input);
+
     return this.prisma.organizationInvite.create({
       data: {
         email: input.email,
@@ -967,6 +1063,7 @@ export class InviteService {
   async createMemberInviteRequest(
     input: CreateMemberInviteRequestInput,
   ): Promise<{ invite: OrganizationInvite }> {
+    this.assertAssignmentsWithinInvitedSeat(input);
     const existingInvite = await this.checkDuplicateInvite({
       email: input.email,
       organizationId: input.organizationId,
@@ -1048,6 +1145,7 @@ export class InviteService {
   async createPaymentPendingInvite(
     input: CreatePaymentPendingInviteInput,
   ): Promise<OrganizationInvite> {
+    this.assertAssignmentsWithinInvitedSeat(input);
     const inviteCode = nanoid();
 
     return this.prisma.organizationInvite.create({
@@ -1193,37 +1291,11 @@ export class InviteService {
       });
     }
 
-    let teamMembershipData: Array<{
-      teamId: string;
-      role: TeamUserRole;
-      customRoleId?: string;
-    }> = [];
-
-    if (invite.teamAssignments && Array.isArray(invite.teamAssignments)) {
-      const assignments = invite.teamAssignments as unknown as Array<{
-        teamId: string;
-        role: TeamUserRole;
-        customRoleId?: string;
-      }>;
-      teamMembershipData = assignments.map((a) => ({
-        teamId: a.teamId,
-        role: a.role,
-        customRoleId: a.customRoleId,
-      }));
-    } else {
-      const dedupedTeamIds = Array.from(
-        new Set(
-          invite.teamIds
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean),
-        ),
-      );
-      teamMembershipData = dedupedTeamIds.map((teamId) => ({
-        teamId,
-        role: ORGANIZATION_TO_TEAM_ROLE_MAP[invite.role],
-      }));
-    }
+    let teamMembershipData = resolveInviteTeamMemberships({
+      role: invite.role,
+      teamIds: invite.teamIds,
+      teamAssignments: invite.teamAssignments,
+    });
 
     if (this.roleService) {
       const customRoleIds = teamMembershipData
