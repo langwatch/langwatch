@@ -129,11 +129,14 @@ describe("resolveShutdownBudget", () => {
         );
 
         const helpers = read("charts/langwatch/templates/_helpers.tpl");
-        for (const [, fallback] of helpers.matchAll(
-          /shutdownDrainSeconds"?\s+"fallback"\s+(\d+)/g,
-        )) {
-          expect(Number(fallback)).toBe(drainSeconds);
-        }
+        const fallbacks = [
+          ...helpers.matchAll(/shutdownDrainSeconds"?\s+"fallback"\s+(\d+)/g),
+        ].map((m) => Number(m[1]));
+        // Counted before comparing: a loop over zero matches passes happily,
+        // which would turn this whole guard into decoration the day someone
+        // reformats the helper's arguments.
+        expect(fallbacks.length).toBe(2);
+        for (const fallback of fallbacks) expect(fallback).toBe(drainSeconds);
       });
     });
   });
