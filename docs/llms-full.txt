@@ -61171,7 +61171,7 @@ Available roles: `ADMIN`, `MEMBER`, `VIEWER`, `CUSTOM` (requires `customRoleId`)
 | Code | Status | Meaning |
 |------|--------|---------|
 | `group_not_found` | 404 | No such group in this organization |
-| `scim_managed_group` | 409 | The group is provisioned over SCIM, so its name and members change in the directory |
+| `scim_managed_group` | 409 | The group is provisioned over SCIM, so it is renamed, changed and deleted in the directory |
 | `user_not_in_organization` | 422 | The user is not a member here |
 | `group_member_already_added` | 409 | They are already in the group |
 | `scope_not_in_organization` | 422 | The team or project belongs to another organization |

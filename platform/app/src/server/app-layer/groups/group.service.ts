@@ -245,6 +245,12 @@ export class GroupRestService {
   }): Promise<void> {
     const group = await this.repo.findGroupOnly({ id, organizationId });
     if (!group) throw new GroupNotFoundError();
+    // Deleting is the most destructive thing that can happen to a group the
+    // directory owns: every grant it carries goes with it, and the next sync
+    // pushes the group back without them.
+    if (group.scimSource) {
+      throw new ScimManagedGroupError(id);
+    }
 
     await this.repo.deleteAllMemberships({ groupId: id });
     await this.repo.deleteAllBindings({ groupId: id });

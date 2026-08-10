@@ -83,8 +83,7 @@ Feature: Groups REST API
   Scenario: PATCH /api/groups/:id rejects rename of SCIM-managed group
     Given group "SCIM Group" is SCIM-managed
     When I send PATCH /api/groups/:id with name "Renamed"
-    Then the response status is 400
-    And the error message indicates SCIM groups cannot be renamed
+    Then the request is refused with code scim_managed_group and status 409
 
   # ── Delete group ────────────────────────────────────────────────────────────
 
@@ -94,6 +93,16 @@ Feature: Groups REST API
     When I send DELETE /api/groups/:id
     Then the response status is 200
     And the group is no longer accessible via GET
+
+  # Deleting is the most destructive edit of all: every grant the group carries
+  # goes with it, and the next directory sync pushes the group back without
+  # them. It is refused for the same reason renaming is.
+  @unit
+  Scenario: DELETE /api/groups/:id rejects deleting a SCIM-managed group
+    Given group "SCIM Group" is SCIM-managed
+    When I send DELETE /api/groups/:id
+    Then the request is refused with code scim_managed_group and status 409
+    And the group still exists
 
   @unit
   Scenario: DELETE /api/groups/:id returns 404 for nonexistent group
@@ -120,14 +129,14 @@ Feature: Groups REST API
   Scenario: POST /api/groups/:id/members rejects adding to SCIM-managed group
     Given group "SCIM Group" is SCIM-managed
     When I send POST /api/groups/:id/members with userId "charlie"
-    Then the response status is 400
+    Then the request is refused with code scim_managed_group and status 409
 
   @unit
   Scenario: POST /api/groups/:id/members rejects non-org user
     Given group "Engineering" exists
     And user "outsider" does not belong to the organization
     When I send POST /api/groups/:id/members with userId "outsider"
-    Then the response status is 400
+    Then the request is refused with code user_not_in_organization and status 422
 
   @unit
   Scenario: DELETE /api/groups/:id/members/:userId removes a member
@@ -140,7 +149,7 @@ Feature: Groups REST API
   Scenario: DELETE /api/groups/:id/members/:userId rejects removal from SCIM group
     Given group "SCIM Group" is SCIM-managed with member "alice"
     When I send DELETE /api/groups/:id/members/alice-id
-    Then the response status is 400
+    Then the request is refused with code scim_managed_group and status 409
 
   # ── Bindings ────────────────────────────────────────────────────────────────
 

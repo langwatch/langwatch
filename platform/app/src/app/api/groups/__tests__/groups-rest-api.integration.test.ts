@@ -331,6 +331,27 @@ describe("Feature: Groups REST API", () => {
       expect(getRes.status).toBe(404);
     });
 
+    /** @scenario DELETE /api/groups/:id rejects deleting a SCIM-managed group */
+    it("refuses to delete a directory-managed group and leaves it in place", async () => {
+      const group = await prisma.group.create({
+        data: {
+          id: generate(KSUID_RESOURCES.GROUP).toString(),
+          name: `Scim Delete ${ns}`,
+          slug: `scim-delete-${ns}`,
+          organizationId: testOrganization.id,
+          scimSource: "okta",
+        },
+      });
+
+      const res = await api.delete(`/api/groups/${group.id}`);
+      expect(res.status).toBe(409);
+      expect((await res.json()).error).toBe("scim_managed_group");
+
+      expect(
+        await prisma.group.findUnique({ where: { id: group.id } }),
+      ).not.toBeNull();
+    });
+
     /** @scenario DELETE /api/groups/:id returns 404 for nonexistent group */
     it("returns 404 for nonexistent", async () => {
       const res = await api.delete("/api/groups/nonexistent");

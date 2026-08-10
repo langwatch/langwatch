@@ -28,9 +28,10 @@ export class GroupNotFoundError extends NotFoundError {
 }
 
 /**
- * The group is provisioned by an identity provider over SCIM, so its name and
- * its membership are that directory's to change. Editing it here would be
- * undone on the next sync, silently.
+ * The group is provisioned by an identity provider over SCIM, so its name, its
+ * membership and its existence are that directory's to change. Editing it here
+ * would be undone on the next sync, silently, and deleting it would take every
+ * grant it carries with it until the directory pushed it back.
  */
 export class ScimManagedGroupError extends HandledError {
   declare readonly code: "scim_managed_group";
@@ -38,7 +39,7 @@ export class ScimManagedGroupError extends HandledError {
   constructor(groupId?: string) {
     super(
       "scim_managed_group",
-      "This group is managed by your identity provider, so its name and members are changed there",
+      "This group is managed by your identity provider, so it is renamed, changed and removed there",
       { httpStatus: 409, ...(groupId ? { meta: { groupId } } : {}) },
     );
     this.name = "ScimManagedGroupError";

@@ -901,11 +901,11 @@ const presentations = {
     describe: () => "Nothing to do: the group already grants them its access.",
   },
   scim_managed_group: {
-    // The name and the membership come from the directory on every sync, so a
-    // change made here is not merely refused, it would be undone.
+    // The group, its name and its membership come from the directory on every
+    // sync, so a change made here is not merely refused, it would be undone.
     title: "Your identity provider manages this group",
     describe: () =>
-      "Change its name or its members in the directory that provisions it; changes made here would be overwritten on the next sync.",
+      "Rename it, change its members or remove it in the directory that provisions it; changes made here would be overwritten on the next sync.",
   },
   api_key_not_in_organization: {
     title: "That API key isn't in this organization",
