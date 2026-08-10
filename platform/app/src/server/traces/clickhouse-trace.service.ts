@@ -103,6 +103,23 @@ interface ClickHouseScrollCursor {
   sortDirection: "asc" | "desc";
   /** Time axis the cursor pages on. Absent = legacy "occurred". */
   dateField?: TraceDateField;
+  /**
+   * Epoch ms at which this scroll started, pinned on the first page and carried
+   * unchanged through every later one. Updated-axis only.
+   *
+   * UpdatedAt is a mutable sort key, so without this the dedup re-resolves each
+   * trace to its CURRENT latest version on every page while the cursor still
+   * points at a position computed from an earlier one. A trace bumped above the
+   * cursor mid-scroll then matches no page — later thresholds only move further
+   * away — and is dropped from the scroll entirely. Capping the dedup at this
+   * timestamp makes every page resolve the same versions the first page saw, so
+   * the trace keeps its original position and is still delivered; the newer
+   * version belongs to the next incremental window.
+   *
+   * Absent on cursors minted before this field existed — those keep the old
+   * uncapped behaviour rather than breaking mid-scroll on deploy.
+   */
+  scrollStart?: number;
 }
 
 /**
@@ -979,6 +996,15 @@ export class ClickHouseTraceService {
             );
           }
 
+          // The scroll's snapshot point. Pinned once, on the page that starts
+          // the scroll, then carried by the cursor so every later page resolves
+          // the same versions. Only the updated axis needs it — OccurredAt is
+          // immutable, so the occurred cursor is stable on its own.
+          const scrollStart =
+            dateField === "updated"
+              ? (cursor?.scrollStart ?? Date.now())
+              : undefined;
+
           // Build the query with keyset pagination
           let { traces, totalHits, lastTrace } =
             await this.fetchTracesWithPagination({
@@ -996,6 +1022,7 @@ export class ClickHouseTraceService {
               fetchInput,
               fetchOutput,
               dateField,
+              scrollStart,
             });
 
           // Spans are fetched when the caller wants them OR when it wants full
@@ -1053,6 +1080,9 @@ export class ClickHouseTraceService {
               pageSize,
               sortDirection,
               dateField,
+              // Carried forward unchanged: the snapshot must be the one the
+              // scroll started from, not a fresh reading per page.
+              ...(scrollStart !== undefined ? { scrollStart } : {}),
             };
             newScrollId = Buffer.from(JSON.stringify(newCursor)).toString(
               "base64",
@@ -1780,6 +1810,7 @@ export class ClickHouseTraceService {
     fetchInput = true,
     fetchOutput = true,
     dateField = "occurred",
+    scrollStart,
   }: {
     projectId: string;
     pageSize: number;
@@ -1798,6 +1829,12 @@ export class ClickHouseTraceService {
     fetchOutput?: boolean;
     /** Time axis for the date window + keyset cursor. Default "occurred". */
     dateField?: TraceDateField;
+    /**
+     * Updated-axis snapshot point (epoch ms). Caps version resolution so every
+     * page of one scroll sees the same latest-versions. Undefined on the
+     * occurred axis, and on updated-axis cursors minted before it existed.
+     */
+    scrollStart?: number;
   }): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.fetchTracesWithPagination",
@@ -1891,8 +1928,22 @@ export class ClickHouseTraceService {
           " AND ts.UpdatedAt >= fromUnixTimestamp64Milli({startDate:UInt64}) AND ts.UpdatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})";
         // Collapses ts to each trace's latest version (global max UpdatedAt) so
         // the updated-axis window/filters/cursor evaluate on the latest row.
-        const latestVersionOnly =
-          " AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt) FROM trace_summaries WHERE TenantId = {tenantId:String} GROUP BY TenantId, TraceId)";
+        //
+        // "Latest" is bounded by the scroll's start when one is in play. The
+        // cursor pins a position derived from the versions visible when the
+        // scroll began, and UpdatedAt keeps moving underneath it: re-resolving
+        // to the current latest on every page lets a trace bumped above the
+        // cursor mid-scroll fall outside every remaining page's range, which
+        // drops it from the export with no error and no missing-row signal.
+        // Capping here — inside the dedup rather than on the outer rows, since
+        // it is version RESOLUTION that has to be stable, not just which rows
+        // survive — holds each trace at the version the scroll started with.
+        // The newer version is picked up by the next incremental window.
+        const scrollSnapshotBound =
+          scrollStart !== undefined
+            ? " AND UpdatedAt <= fromUnixTimestamp64Milli({scrollStart:UInt64})"
+            : "";
+        const latestVersionOnly = ` AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt) FROM trace_summaries WHERE TenantId = {tenantId:String}${scrollSnapshotBound} GROUP BY TenantId, TraceId)`;
 
         let occurredCursor = "";
         let updatedCursor = "";
@@ -1912,6 +1963,11 @@ export class ClickHouseTraceService {
                 searchQuery: `%${effectiveQuery.replace(/[%_\\]/g, "\\$&").toLowerCase()}%`,
               }
             : {}),
+          // Shared rather than cursor-scoped: the count query embeds
+          // `latestVersionOnly` too and is bound with sharedParams alone, so a
+          // cursor-scoped binding would leave {scrollStart} unbound there.
+          // Only present when the SQL references it.
+          ...(scrollStart !== undefined ? { scrollStart } : {}),
         };
 
         const cursorParams = {
@@ -2021,6 +2077,7 @@ export class ClickHouseTraceService {
           fetchInput,
           fetchOutput,
           dateColumn,
+          scrollStart,
         });
 
         const traces: Trace[] = summaryRows.map((row) => {
@@ -2055,6 +2112,7 @@ export class ClickHouseTraceService {
     fetchInput = true,
     fetchOutput = true,
     dateColumn = "OccurredAt",
+    scrollStart,
   }: {
     clickHouseClient: ClickHouseClient;
     projectId: string;
@@ -2068,6 +2126,14 @@ export class ClickHouseTraceService {
     fetchOutput?: boolean;
     /** Column the date window + ORDER BY run on (must match the page-ID query). */
     dateColumn?: "OccurredAt" | "UpdatedAt";
+    /**
+     * Updated-axis snapshot point (epoch ms), and it must be the SAME one the
+     * id-query used. This query re-resolves each trace's latest version, so an
+     * uncapped read here would hand back a newer version than the one the page
+     * was selected on — wrong sort position, and a cursor minted from a
+     * timestamp that never appeared in the id-query's ordering.
+     */
+    scrollStart?: number;
   }): Promise<TraceSummaryRow[]> {
     // dateColumn is interpolated into SQL. The surface validates it via a zod
     // enum, but this method is also reachable from tRPC/internal paths whose
@@ -2092,6 +2158,13 @@ export class ClickHouseTraceService {
       ? ""
       : `AND ${dateColumn} >= fromUnixTimestamp64Milli({startDate:UInt64})
                 AND ${dateColumn} <= fromUnixTimestamp64Milli({endDate:UInt64})`;
+    // Same snapshot bound the id-query applied, so both stages resolve the same
+    // version of every trace. Updated axis only; the occurred axis has no
+    // scrollStart and its SQL is unchanged.
+    const dedupScrollBound =
+      isUpdatedAxis && scrollStart !== undefined
+        ? " AND UpdatedAt <= fromUnixTimestamp64Milli({scrollStart:UInt64})"
+        : "";
     const runQuery = async (ids: string[]) => {
       const result = await clickHouseClient.query({
         query: `
@@ -2134,6 +2207,7 @@ export class ClickHouseTraceService {
               FROM trace_summaries
               WHERE TenantId = {tenantId:String}
                 ${dedupWindow}
+                ${dedupScrollBound}
                 AND TraceId IN ({pageTraceIds:Array(String)})
               GROUP BY TenantId, TraceId
             )
@@ -2144,6 +2218,7 @@ export class ClickHouseTraceService {
           startDate,
           endDate,
           pageTraceIds: ids,
+          ...(dedupScrollBound !== "" ? { scrollStart } : {}),
         },
         format: "JSONEachRow",
       });
