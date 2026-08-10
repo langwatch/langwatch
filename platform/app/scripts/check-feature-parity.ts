@@ -66,11 +66,6 @@ const DEFAULT_TEST_ROOTS: string[] = [
   "platform/app/src",
   "platform/app/ee",
   "platform/app/scripts",
-  // CI's own behaviour is behaviour too. The guards under .github/scripts are
-  // the only tests for it — how workflows check out, what a workflow may not
-  // do — so scenarios in specs/ci/ can only bind from this root. Without it
-  // those feature files report "all bound" while binding nothing at all.
-  ".github/scripts",
   "packages",
   "mcp/typescript/src",
   "sdks/typescript/src",
@@ -146,6 +141,11 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   "pkg",
   "tools/thuishaven",
   "tools/herrgen",
+  // CI's own behaviour is behaviour too — how a job checks out, which
+  // toolchain it compiles with. The ciguard tests are the only thing that
+  // asserts it, so scenarios under specs/ci/ can only bind from this root.
+  // Without it those feature files report "all bound" while binding nothing.
+  "tools/ciguard",
 ];
 
 /**
