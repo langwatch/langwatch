@@ -22880,6 +22880,7 @@ export interface operations {
                     };
                     traceIds?: string[];
                     negateFilters?: boolean;
+                    /** @description Removed. Offset pagination is no longer supported and any value other than 0 is rejected. Page with the scrollId returned by the previous response instead. The field remains on the schema so that sending it produces an explanatory error rather than being silently discarded. */
                     pageOffset?: number;
                     pageSize?: number;
                     groupBy?: string;
@@ -22928,6 +22929,8 @@ export interface operations {
                             scrollId?: string;
                             /** @description Number of traces dropped from this page because they failed to serialize. Present only when non-zero, so a caller can tell that traces.length is below the page size for a reason other than reaching the end of the result set. */
                             skipped?: number;
+                            /** @description Only when dateField is 'updated'. Epoch milliseconds: the upper bound this scroll actually covered, which is at or before the endDate you asked for. The scroll reads every trace as of the moment it started, so anything written after that instant belongs to the next pull. Start your next incremental pull from this value — resuming from the endDate you requested would step over the difference and lose those traces. */
+                            updatedThrough?: number;
                         };
                         /** @description Present only when 'select' is provided. Describes the resolved columns — the dotted path, its value type, and whether it belongs to a nested child collection — so callers can pre-allocate a typed reader. */
                         schema?: {
@@ -23387,7 +23390,6 @@ export interface operations {
                     actionParams?: {
                         [key: string]: unknown;
                     };
-                    /** @default {} */
                     filters?: {
                         [key: string]: unknown;
                     };
