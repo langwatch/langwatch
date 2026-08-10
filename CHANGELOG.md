@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.12.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.11.0...langwatch@v3.12.0) (2026-08-10)
+
+
+### Features
+
+* **gateway:** store the trace destination at creation instead of deriving it per read ([#6769](https://github.com/langwatch/langwatch/issues/6769)) ([b65e6f3](https://github.com/langwatch/langwatch/commit/b65e6f3957676df55ba366f0698c9f710b6e5db1))
+
+
+### Bug Fixes
+
+* **members:** desired-state access edits, group-aware guards, Lite Member rows store the truth ([#6698](https://github.com/langwatch/langwatch/issues/6698)) ([aa3ad21](https://github.com/langwatch/langwatch/commit/aa3ad2192645e91896b39d97b7d7f5bc94d1c22d))
+
+
+### Code Refactoring
+
+* **aigateway:** one auth cache tier, and a conditional config refresh ([#6768](https://github.com/langwatch/langwatch/issues/6768)) ([995f0da](https://github.com/langwatch/langwatch/commit/995f0da964e9f85d089b6e55c57149874faadcb3))
+
 ## [3.11.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.10.0...langwatch@v3.11.0) (2026-08-09)
 
 

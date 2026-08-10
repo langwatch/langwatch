@@ -5,7 +5,7 @@
   "sdks/python": "1.2.0",
   "mcp/typescript": "2.0.0",
   "services/langevals": "3.0.0",
-  ".": "3.11.0",
+  ".": "3.12.0",
   "skills": "1.1.0",
   "plugins/langwatch": "0.0.0"
 }
