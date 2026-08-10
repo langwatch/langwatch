@@ -37,6 +37,69 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
   #      non-retryable, so suite/simulation/experiment run-state jobs were
   #      dead-lettered and their groups blocked instead of retried.
 
+  # One budget, four nested clocks
+  #
+  # Four clocks run during termination and they are nested, not parallel:
+  #
+  #   terminationGracePeriodSeconds   kubelet SIGKILL      (charts/langwatch)
+  #   └─ processDeadlineMs            force-exit watchdog  (start.ts, workers.ts)
+  #      └─ appCloseMs                App.close backstop   (app-layer/app.ts)
+  #         └─ queueDrainMs           GroupQueueProcessor  (groupQueue.ts)
+  #
+  # They were four independent literals in four files, agreeing only by
+  # comment — and they did not agree: start.ts force-exited after 5s, inside
+  # the queue's own 20s drain budget, so the `all` process role (the app
+  # hosting the worker stack) could never finish a drain however long the
+  # queue was told it had. They are now derived from one number.
+
+  @unit @shutdown-budget
+  Scenario: Every shutdown clock nests inside the one outside it
+    Given any drain budget
+    When the shutdown clocks are derived from it
+    Then the queue drain is shorter than the App.close backstop
+    And the App.close backstop is shorter than the process deadline
+    And the process deadline is shorter than the required grace period
+
+  @unit @shutdown-budget
+  Scenario: Raising the drain budget widens every clock above it
+    Given the drain budget is raised
+    When the shutdown clocks are derived
+    Then the App.close backstop, the process deadline and the required grace period all move with it
+
+  @unit @shutdown-budget
+  Scenario: The required grace period matches what the chart guard enforces
+    Given the derived shutdown budget
+    Then the required grace period is the drain plus thirty seconds
+    And that is the same margin the Helm guard validates against
+
+  @unit @shutdown-budget
+  Scenario: A malformed drain override is refused, not silently defaulted
+    Given SHUTDOWN_DRAIN_TIMEOUT_MS is set to something that is not a positive number
+    When the shutdown budget is resolved
+    Then resolution fails with an error naming the variable
+
+  # One shutdown implementation, shared by both entrypoints
+
+  @unit @shutdown-runner
+  Scenario: Shutdown phases run in order, never concurrently
+    Given a shutdown with several teardown phases
+    When it runs
+    Then each phase completes before the next begins
+    And the process exits zero
+
+  @unit @shutdown-runner
+  Scenario: A failing phase does not skip the phases after it
+    Given a shutdown whose first phase throws
+    When it runs
+    Then the failure is logged against that phase name
+    And the remaining phases still run
+
+  @unit @shutdown-runner
+  Scenario: A shutdown that overruns its deadline exits on its own terms
+    Given a shutdown phase that never finishes
+    When the deadline passes
+    Then the process exits non-zero with a log line explaining the overrun
+
   # Shutdown ordering
 
   @unit @shutdown-ordering
@@ -110,10 +173,28 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
   Scenario: The workers pod gets long enough to drain
     Given the workers Deployment is rendered
     Then it sets terminationGracePeriodSeconds
-    And the value exceeds the production GroupQueue drain budget of 20 seconds
+    And the value covers the drain budget plus thirty seconds
+
+  @regression @helm-grace-period
+  Scenario: The app pod gets the same budget as the workers
+    Given the app Deployment is rendered
+    Then it sets terminationGracePeriodSeconds
+    And the value covers the drain budget plus thirty seconds
 
   @regression @helm-grace-period
   Scenario: Operators can raise the grace period for a slower drain
     Given a values override setting workers.terminationGracePeriodSeconds
     When the workers Deployment is rendered
     Then it uses the overridden value
+
+  @regression @helm-grace-period
+  Scenario: A grace period too short for the drain refuses to render
+    Given workers.terminationGracePeriodSeconds is set below the drain budget plus thirty
+    When the chart is rendered
+    Then the render fails naming both the granted and the required value
+
+  @regression @helm-grace-period
+  Scenario: Raising the drain budget alone refuses to render
+    Given workers.shutdownDrainSeconds is raised without raising the grace period
+    When the chart is rendered
+    Then the render fails, so the two numbers cannot drift apart

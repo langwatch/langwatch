@@ -72,14 +72,10 @@ spec:
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
       # SIGTERM starts a real drain here, unlike a stateless web pod: the
       # GroupQueue stops dispatching and waits for in-flight jobs to finish
-      # their ClickHouse writes (20s budget in production, 25s backstop in
-      # App.close). The k8s default of 30s left almost nothing for the
-      # process teardown that follows the drain, and a missed grace period is
-      # a SIGKILL — the abrupt shutdown that severs in-flight statements and
-      # produces the `Broken pipe ... ParallelFormattingOutputFormat` bursts
-      # on the ClickHouse side. Keep this above CLOSE_DRAIN_TIMEOUT_MS.
-      # See specs/event-sourcing/worker-graceful-shutdown.feature.
-      terminationGracePeriodSeconds: {{ .Values.workers.terminationGracePeriodSeconds | default 60 }}
+      # their ClickHouse writes. The helper refuses to render when this is too
+      # short for workers.shutdownDrainSeconds, because a missed grace period
+      # is a SIGKILL — the abrupt shutdown that severs in-flight statements.
+      terminationGracePeriodSeconds: {{ include "langwatch.terminationGracePeriod" (dict "ctx" . "component" .Values.workers "name" "workers") }}
       securityContext:
         {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.workers) | nindent 8 }}
 

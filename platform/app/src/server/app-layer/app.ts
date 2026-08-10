@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { EventSourcing } from "../event-sourcing/eventSourcing";
 import type { AppCommands } from "../event-sourcing/pipelineRegistry";
+import { SHUTDOWN_BUDGET } from "../shutdown/budget";
 import type { AppConfig } from "./config";
 import type {
   AppDependencies,
@@ -9,18 +10,6 @@ import type {
 } from "./dependencies";
 
 const logger = createLogger("langwatch:app");
-
-/**
- * Backstop for the drain phase of {@link App.close}.
- *
- * Sits just above the GroupQueue's own 20s production shutdown budget so the
- * queue's timeout is what normally fires and reports which groups were still
- * in flight. This only catches a drain that escaped that race entirely.
- *
- * Whatever this becomes, the workers' terminationGracePeriodSeconds must stay
- * above it — see charts/langwatch/values.yaml.
- */
-const CLOSE_DRAIN_TIMEOUT_MS = 25_000;
 
 async function withTimeout(
   run: () => Promise<void>,
@@ -177,10 +166,12 @@ export class App {
    * budget and the close finished in milliseconds.
    *
    * The drain is bounded twice over: GroupQueueProcessor.close() races its own
-   * shutdown timeout, and CLOSE_DRAIN_TIMEOUT_MS below is the backstop for
-   * anything that escapes it. A drain that hangs must not strand the
-   * connections — Kubernetes answers a missed grace period with SIGKILL, which
-   * is the ungraceful shutdown this method exists to avoid.
+   * shutdown timeout, and SHUTDOWN_BUDGET.appCloseMs is the backstop for
+   * anything that escapes it. Both come from server/shutdown/budget.ts, which
+   * derives them from one number so this backstop cannot end up shorter than
+   * the drain it is supposed to outlive. A drain that hangs must not strand
+   * the connections — Kubernetes answers a missed grace period with SIGKILL,
+   * which is the ungraceful shutdown this method exists to avoid.
    */
   async close(): Promise<void> {
     if (this._eventSourcing) {
@@ -188,7 +179,7 @@ export class App {
       try {
         await withTimeout(
           () => eventSourcing.close(),
-          CLOSE_DRAIN_TIMEOUT_MS,
+          SHUTDOWN_BUDGET.appCloseMs,
           "EventSourcing drain",
         );
       } catch (error) {

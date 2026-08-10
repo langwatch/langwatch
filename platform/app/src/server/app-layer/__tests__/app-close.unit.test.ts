@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { SHUTDOWN_BUDGET } from "~/server/shutdown/budget";
 import { App } from "../app";
 import type { AppDependencies } from "../dependencies";
 
@@ -142,8 +143,10 @@ describe("App.close", () => {
           const closing = app.close();
           // A hung drain must not outlive the pod's termination grace period;
           // Kubernetes answers that with SIGKILL, which is the ungraceful
-          // shutdown the ordering above exists to avoid.
-          await vi.advanceTimersByTimeAsync(25_000);
+          // shutdown the ordering above exists to avoid. Advancing by the
+          // shared budget rather than a literal keeps this test honest if the
+          // drain budget is ever retuned.
+          await vi.advanceTimersByTimeAsync(SHUTDOWN_BUDGET.appCloseMs);
           await closing;
 
           expect(closed).toEqual(["clickhouse"]);

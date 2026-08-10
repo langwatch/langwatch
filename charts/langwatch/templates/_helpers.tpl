@@ -1204,3 +1204,39 @@ here, once, by name, so both consuming templates agree.
   {{- end -}}
   {{- $normalised | uniq | toJson -}}
 {{- end -}}
+
+{{/* Renders terminationGracePeriodSeconds for a Node component, refusing the
+     render when it cannot cover that component's shutdown drain.
+
+     The Node processes run four nested shutdown clocks — the GroupQueue
+     drain, App.close's backstop, the entrypoint watchdog, and this one. They
+     are derived from a single number in
+     platform/app/src/server/shutdown/budget.ts:
+
+       processDeadlineMs = drain + 5s (App.close) + 15s (process teardown)
+       required grace    = processDeadlineMs + 10s of kubelet slack
+
+     So a drain of D seconds needs a grace period of at least D + 30. The
+     workers Deployment had no grace period at all and ran on the k8s default
+     of 30s, which a 20s drain plus teardown does not fit inside; the kubelet
+     answered with SIGKILL mid-drain, severing in-flight ClickHouse statements
+     and producing `Broken pipe ... ParallelFormattingOutputFormat` on the
+     server. See specs/event-sourcing/worker-graceful-shutdown.feature.
+
+     Validated rather than derived, matching the gateway subchart: an operator
+     draining behind a slow load balancer wants a wider margin than a formula
+     would pick, so the number stays theirs to set — the chart only refuses to
+     install a release the kubelet would kill mid-drain.
+
+     Set shutdownDrainSeconds and the app's SHUTDOWN_DRAIN_TIMEOUT_MS together;
+     this helper validates the pod against what the process will actually do. */}}
+{{- define "langwatch.terminationGracePeriod" -}}
+{{- $component := .component -}}
+{{- $drain := int (default 20 $component.shutdownDrainSeconds) -}}
+{{- $required := add $drain 30 -}}
+{{- $granted := int (default $required $component.terminationGracePeriodSeconds) -}}
+{{- if lt $granted $required -}}
+{{- fail (printf "%s.terminationGracePeriodSeconds is %d, too short for a %ds shutdown drain: App.close adds 5s, process teardown 15s and the kubelet 10s of slack, so it needs at least %d. Raise it to %d or more, or lower %s.shutdownDrainSeconds." .name $granted $drain $required $required .name) -}}
+{{- end -}}
+{{- $granted -}}
+{{- end -}}

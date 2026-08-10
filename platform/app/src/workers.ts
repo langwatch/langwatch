@@ -16,6 +16,7 @@ import "./instrumentation.node";
 import "./server/handled-error-wiring";
 import { setEnvironment } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import { installShutdownHandlers } from "./server/shutdown/runGracefulShutdown";
 import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
 
 setEnvironment(process.env.ENVIRONMENT ?? "local");
@@ -32,57 +33,27 @@ const logger = createLogger("langwatch:workers");
 
 logger.info("starting");
 
-let isShuttingDown = false;
 let workerHandle: WorkerHandle | undefined;
 
-/**
- * Hard deadline for the whole shutdown, below the pod's
- * terminationGracePeriodSeconds (60s, charts/langwatch/values.yaml).
- *
- * The phases below are individually bounded — App.close races its own drain
- * backstop — but workerHandle.shutdown() is not, and a shutdown that overruns
- * the grace period is answered with SIGKILL. Exiting slightly early on our own
- * terms means the reason is in the logs; SIGKILL leaves nothing at all.
- */
-const SHUTDOWN_DEADLINE_MS = 45_000;
-
-async function gracefulShutdown(): Promise<void> {
-  if (isShuttingDown) return;
-  isShuttingDown = true;
-
-  const deadline = setTimeout(() => {
-    logger.error(
-      { deadlineMs: SHUTDOWN_DEADLINE_MS },
-      "graceful shutdown exceeded its deadline, exiting before the pod is killed",
-    );
-    process.exit(1);
-  }, SHUTDOWN_DEADLINE_MS);
-  // Never let the watchdog itself be the reason the process stays alive.
-  deadline.unref();
-
-  try {
-    await workerHandle?.shutdown();
-  } catch (error) {
-    logger.error({ error }, "error shutting down workers");
-  }
-  // Close the App (ClickHouse / Redis / Prisma) last, after the workers above
-  // have stopped accepting and draining jobs. App.close drains the queue
-  // consumer BEFORE dropping those connections — closing them alongside a
-  // running drain is what severed in-flight ClickHouse statements on every
-  // rollout. See specs/event-sourcing/worker-graceful-shutdown.feature.
-  try {
-    const { getApp } = await import("./server/app-layer/app");
-    await getApp().close();
-  } catch (error) {
-    logger.error({ error }, "error closing app during shutdown");
-  }
-
-  clearTimeout(deadline);
-  process.exit(0);
-}
-
-process.on("SIGINT", () => void gracefulShutdown());
-process.on("SIGTERM", () => void gracefulShutdown());
+installShutdownHandlers((signal) => ({
+  signal,
+  logger,
+  phases: [
+    { name: "workers", run: async () => await workerHandle?.shutdown() },
+    // The App (ClickHouse / Redis / Prisma) closes last, after the workers
+    // above have stopped accepting jobs. App.close drains the queue consumer
+    // BEFORE dropping those connections — closing them alongside a running
+    // drain is what severed in-flight ClickHouse statements on every rollout.
+    // See specs/event-sourcing/worker-graceful-shutdown.feature.
+    {
+      name: "app",
+      run: async () => {
+        const { getApp } = await import("./server/app-layer/app");
+        await getApp().close();
+      },
+    },
+  ],
+}));
 
 void startWorkers({ shouldStartMetricsServer: true })
   .then((handle) => {

@@ -16,6 +16,7 @@ import { Cluster, Redis as IORedis } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
 import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { SHUTDOWN_BUDGET } from "~/server/shutdown/budget";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   createContextFromJobData,
@@ -145,12 +146,16 @@ const GROUP_QUEUE_CONFIG = {
   signalTimeoutSec: 5,
   /** Interval for collecting queue metrics in milliseconds */
   metricsIntervalMs: 15000,
-  /** Maximum time to wait for graceful shutdown in milliseconds */
-  shutdownTimeoutMs:
-    process.env.NODE_ENV === "development" ||
-    process.env.ENVIRONMENT === "local"
-      ? 2000
-      : 20000,
+  /**
+   * Maximum time to wait for graceful shutdown in milliseconds.
+   *
+   * The innermost of the four nested shutdown clocks — see
+   * server/shutdown/budget.ts, which derives App.close's backstop, the
+   * entrypoint watchdog and the required terminationGracePeriodSeconds from
+   * this one number. Do not hardcode a value here: an increase that the outer
+   * clocks do not hear about is an increase the pod never gets to use.
+   */
+  shutdownTimeoutMs: SHUTDOWN_BUDGET.queueDrainMs,
 } as const;
 
 /** Default TTL for deduplication in milliseconds */
