@@ -53,6 +53,12 @@ Feature: API keys management REST API
     Then the request is refused with code personal_workspace_not_managed_here and status 403
     And no key is created
 
+  @integration
+  Scenario: The owner of a personal workspace may bind their own key into it
+    Given a member has a personal workspace in the organization
+    When that member creates a key of their own bound to their own workspace
+    Then the key is created
+
   # ============================================================================
   # Read
   # ============================================================================

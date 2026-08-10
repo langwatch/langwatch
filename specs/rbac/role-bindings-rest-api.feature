@@ -51,6 +51,16 @@ Feature: Role bindings REST API
     Then the response status is 201
     And the key can read that project and cannot write to it
 
+  # The principal is the binding's identity, so a row with none of them grants
+  # access to nobody and a row with two is ambiguous about whose access it is.
+  # Both are refused by the same name, before anything is written.
+  @integration
+  Scenario: A binding naming no principal, or more than one, is refused
+    When I create a binding that names no principal at all
+    Then the request is refused with code role_binding_principal_invalid and status 422
+    And naming both a user and a group is refused the same way
+    And no binding is created either time
+
   @integration
   Scenario: Binding to a scope from another organization is refused
     Given a team exists in another organization

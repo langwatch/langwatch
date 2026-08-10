@@ -466,6 +466,7 @@ describe("Feature: API keys management REST API", () => {
       expect(body.error).toBe("personal_workspace_not_managed_here");
     });
 
+    /** @scenario The owner of a personal workspace may bind their own key into it */
     it("lets the workspace owner bind their own key to their personal project", async () => {
       const created = await apiKeyService.create({
         name: `owner-personal-${ns}`,

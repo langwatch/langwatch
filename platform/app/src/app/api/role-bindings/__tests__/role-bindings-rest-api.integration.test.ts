@@ -372,6 +372,39 @@ describe("Feature: Role bindings REST API", () => {
       ).toBe(false);
     });
 
+    /** @scenario A binding naming no principal, or more than one, is refused */
+    it("refuses a binding naming no principal, and one naming two", async () => {
+      // The schema leaves all three principal fields optional, since which one
+      // is set is what the request means rather than a shape it has to have.
+      // That makes the REST boundary the place to prove both refusals: a
+      // service-layer test would pass while the route accepted either body.
+      const countBindings = () =>
+        prisma.roleBinding.count({
+          where: { organizationId: seeded.organization.id },
+        });
+      const before = await countBindings();
+
+      const none = await postBinding({
+        role: "MEMBER",
+        scopeType: "TEAM",
+        scopeId: teamBId,
+      });
+      expect(none.status).toBe(422);
+      expect((await none.json()).code).toBe("role_binding_principal_invalid");
+
+      const two = await postBinding({
+        userId: memberUserId,
+        groupId,
+        role: "MEMBER",
+        scopeType: "TEAM",
+        scopeId: teamBId,
+      });
+      expect(two.status).toBe(422);
+      expect((await two.json()).code).toBe("role_binding_principal_invalid");
+
+      expect(await countBindings()).toBe(before);
+    });
+
     /** @scenario Binding to a scope from another organization is refused */
     it("refuses a foreign scope and writes nothing", async () => {
       const response = await postBinding({
