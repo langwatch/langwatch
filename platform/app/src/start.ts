@@ -109,10 +109,12 @@ export const metricsMiddleware = promBundle({
     onRequest: (req) => {
       // The three root-level OTLP paths a misconfigured exporter posts to are
       // served by the API (see the handler below), so leaving them out would
-      // hide exactly the traffic worth watching. Spelled out rather than a
-      // bare `v1` so the label set stays those three and nothing else.
+      // hide exactly the traffic worth watching. The OTLP branch is the only
+      // one anchored at the end: the others are deliberately prefixes, while
+      // this one must not let `/v1/traces-anything` in and turn a claim of
+      // three bounded labels into an open set.
       if (
-        /^\/(api|assets|auth|settings|share|v1\/(traces|logs|metrics)|$)/.test(
+        /^\/(?:api|assets|auth|settings|share|v1\/(?:traces|logs|metrics)\/?(?:\?.*)?$|$)/.test(
           req.url ?? "",
         )
       ) {

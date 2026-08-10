@@ -201,7 +201,13 @@ const CORRECTED_PATH_LOG_WINDOW_MS = 10 * 60 * 1000;
 const CORRECTED_PATH_LOG_MAX_PAIRS = 1000;
 const correctedPathLastLoggedAt = new Map<string, number>();
 
-function correctedPathIsDueToLog(pair: string, now: number): boolean {
+function correctedPathIsDueToLog({
+  pair,
+  now,
+}: {
+  pair: string;
+  now: number;
+}): boolean {
   const last = correctedPathLastLoggedAt.get(pair);
   if (last !== void 0 && now - last < CORRECTED_PATH_LOG_WINDOW_MS)
     return false;
@@ -232,8 +238,10 @@ function logCorrectedPath({
     c.req.header(OTLP_CORRECTED_PATH_HEADER),
   );
   if (!originalPath) return;
-  if (!correctedPathIsDueToLog(`${projectId}\u0000${originalPath}`, Date.now()))
-    return;
+  // NUL joins the pair because it cannot appear in a URL pathname, so no
+  // project and path can collide with a different pair.
+  const pair = `${projectId}\u0000${originalPath}`;
+  if (!correctedPathIsDueToLog({ pair, now: Date.now() })) return;
 
   logger.warn(
     { projectId, originalPath, canonicalPath: c.req.path },

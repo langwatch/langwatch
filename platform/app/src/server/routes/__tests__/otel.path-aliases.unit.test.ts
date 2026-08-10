@@ -106,11 +106,15 @@ const metricPayload = {
   ],
 };
 
-function post(
-  path: string,
-  payload: unknown,
-  headers: Record<string, string> = {},
-) {
+function post({
+  path,
+  payload,
+  headers = {},
+}: {
+  path: string;
+  payload: unknown;
+  headers?: Record<string, string>;
+}) {
   return testApp.request(`http://localhost${path}`, {
     method: "POST",
     headers: {
@@ -148,7 +152,10 @@ describe("OTLP endpoint path canonicalisation", () => {
   describe("given an exporter configured with a signal URL as its base", () => {
     /** @scenario An endpoint that already named a signal */
     it("serves the doubled path as the signal the exporter appended", async () => {
-      const response = await post("/api/otel/v1/traces/v1/logs", logPayload);
+      const response = await post({
+        path: "/api/otel/v1/traces/v1/logs",
+        payload: logPayload,
+      });
 
       expect(response.status).toBe(200);
       expect(mockHandleLogs).toHaveBeenCalledTimes(1);
@@ -156,10 +163,10 @@ describe("OTLP endpoint path canonicalisation", () => {
 
     /** @scenario A metrics suffix under a traces base is metric ingestion */
     it("does not serve a metrics suffix as trace ingestion", async () => {
-      const response = await post(
-        "/api/otel/v1/traces/v1/metrics",
-        metricPayload,
-      );
+      const response = await post({
+        path: "/api/otel/v1/traces/v1/metrics",
+        payload: metricPayload,
+      });
 
       expect(response.status).toBe(200);
       expect(mockHandleMetrics).toHaveBeenCalledTimes(1);
@@ -170,10 +177,10 @@ describe("OTLP endpoint path canonicalisation", () => {
   describe("given an exporter configured with the collector URL as its base", () => {
     /** @scenario An endpoint that named the collector */
     it("serves the collector-prefixed path as trace ingestion", async () => {
-      const response = await post(
-        "/api/collector/api/otel/v1/traces",
-        tracePayload,
-      );
+      const response = await post({
+        path: "/api/collector/api/otel/v1/traces",
+        payload: tracePayload,
+      });
 
       expect(response.status).toBe(200);
       expect(mockHandleTraces).toHaveBeenCalledTimes(1);
@@ -183,7 +190,10 @@ describe("OTLP endpoint path canonicalisation", () => {
   describe("given an exporter configured with the site root as its base", () => {
     /** @scenario An endpoint that named the site root */
     it("serves the root-level path as trace ingestion", async () => {
-      const response = await post("/v1/traces", tracePayload);
+      const response = await post({
+        path: "/v1/traces",
+        payload: tracePayload,
+      });
 
       expect(response.status).toBe(200);
       expect(response.headers.get("content-type")).toContain(
@@ -196,7 +206,10 @@ describe("OTLP endpoint path canonicalisation", () => {
   describe("given a stray trailing slash on the canonical path", () => {
     /** @scenario An endpoint with a stray trailing slash */
     it("serves it as trace ingestion", async () => {
-      const response = await post("/api/otel/v1/traces/", tracePayload);
+      const response = await post({
+        path: "/api/otel/v1/traces/",
+        payload: tracePayload,
+      });
 
       expect(response.status).toBe(200);
       expect(mockHandleTraces).toHaveBeenCalledTimes(1);
@@ -208,7 +221,10 @@ describe("OTLP endpoint path canonicalisation", () => {
     it("refuses it exactly as the canonical path would", async () => {
       mockExtractCredentials.mockReturnValue(void 0);
 
-      const response = await post("/api/otel/v1/traces/v1/logs", logPayload);
+      const response = await post({
+        path: "/api/otel/v1/traces/v1/logs",
+        payload: logPayload,
+      });
 
       expect(response.status).toBe(401);
       expect(mockHandleLogs).not.toHaveBeenCalled();
@@ -218,10 +234,10 @@ describe("OTLP endpoint path canonicalisation", () => {
   describe("when the corrected request is accepted", () => {
     /** @scenario A corrected path answers like the canonical one */
     it("answers with the ordinary ingestion response, not a redirect", async () => {
-      const response = await post(
-        "/api/otel/v1/traces/v1/traces",
-        tracePayload,
-      );
+      const response = await post({
+        path: "/api/otel/v1/traces/v1/traces",
+        payload: tracePayload,
+      });
 
       expect(response.status).toBe(200);
       expect(response.headers.get("location")).toBeNull();
@@ -236,7 +252,7 @@ describe("OTLP endpoint path canonicalisation", () => {
     // test the way it outlives a single request.
     /** @scenario The correction names the path the exporter used */
     it("records the path the exporter used and the one it was served from", async () => {
-      await post("/api/collector/v1/logs", logPayload);
+      await post({ path: "/api/collector/v1/logs", payload: logPayload });
 
       expect(mockWarn).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -250,9 +266,9 @@ describe("OTLP endpoint path canonicalisation", () => {
 
     /** @scenario A repeated misconfiguration is reported once a window */
     it("reports a repeated misconfiguration once, not once per batch", async () => {
-      await post("/api/otel/v1/metrics/v1/logs", logPayload);
-      await post("/api/otel/v1/metrics/v1/logs", logPayload);
-      await post("/api/otel/v1/metrics/v1/logs", logPayload);
+      await post({ path: "/api/otel/v1/metrics/v1/logs", payload: logPayload });
+      await post({ path: "/api/otel/v1/metrics/v1/logs", payload: logPayload });
+      await post({ path: "/api/otel/v1/metrics/v1/logs", payload: logPayload });
 
       expect(mockHandleLogs).toHaveBeenCalledTimes(3);
       expect(mockWarn).toHaveBeenCalledTimes(1);
@@ -297,8 +313,12 @@ describe("OTLP endpoint path canonicalisation", () => {
   describe("when a caller claims its own path was corrected", () => {
     /** @scenario A caller cannot claim its path was corrected */
     it("discards the claim", async () => {
-      await post("/api/otel/v1/logs", logPayload, {
-        "x-langwatch-otlp-corrected-path": "/api/otel/v1/traces/v1/logs",
+      await post({
+        path: "/api/otel/v1/logs",
+        payload: logPayload,
+        headers: {
+          "x-langwatch-otlp-corrected-path": "/api/otel/v1/traces/v1/logs",
+        },
       });
 
       expect(mockHandleLogs).toHaveBeenCalledTimes(1);
@@ -309,9 +329,13 @@ describe("OTLP endpoint path canonicalisation", () => {
       const headers = new Headers();
       stampCorrectedPath({ headers, originalPath: "/v1/logs" });
 
-      await post("/api/otel/v1/logs", logPayload, {
-        "x-langwatch-otlp-corrected-path":
-          headers.get("x-langwatch-otlp-corrected-path") ?? "",
+      await post({
+        path: "/api/otel/v1/logs",
+        payload: logPayload,
+        headers: {
+          "x-langwatch-otlp-corrected-path":
+            headers.get("x-langwatch-otlp-corrected-path") ?? "",
+        },
       });
 
       expect(mockWarn).toHaveBeenCalledWith(
@@ -324,7 +348,10 @@ describe("OTLP endpoint path canonicalisation", () => {
   describe("given a path no misconfiguration produces", () => {
     /** @scenario An unrelated path that happens to end in a signal name */
     it("leaves an unrelated namespace alone", async () => {
-      const response = await post("/api/rum/v1/traces", tracePayload);
+      const response = await post({
+        path: "/api/rum/v1/traces",
+        payload: tracePayload,
+      });
 
       expect(response.status).toBe(404);
       expect(mockHandleTraces).not.toHaveBeenCalled();
@@ -332,10 +359,10 @@ describe("OTLP endpoint path canonicalisation", () => {
 
     /** @scenario A path naming something other than a signal */
     it("leaves an unknown suffix alone", async () => {
-      const response = await post(
-        "/api/otel/v1/traces/v1/profiles",
-        tracePayload,
-      );
+      const response = await post({
+        path: "/api/otel/v1/traces/v1/profiles",
+        payload: tracePayload,
+      });
 
       expect(response.status).toBe(404);
       expect(mockHandleTraces).not.toHaveBeenCalled();
