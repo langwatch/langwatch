@@ -613,6 +613,7 @@ describe("the personal Sessions table", () => {
         expect(mockOpenTrace).toHaveBeenCalledWith(
           "trace-last",
           LONG_AGO + 5_000,
+          { projectId: "proj-personal" },
         ),
       );
       expect(utils.tracesV2.conversationContext.fetch).toHaveBeenCalledWith({
@@ -624,6 +625,7 @@ describe("the personal Sessions table", () => {
         traceId: "trace-last",
         t: String(LONG_AGO + 5_000),
         mode: "terminal",
+        projectId: "proj-personal",
       });
       // The replay opens where the reader already is; nothing navigates.
       expect(mockRouterPush).not.toHaveBeenCalled();

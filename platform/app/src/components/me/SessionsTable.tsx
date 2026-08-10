@@ -453,8 +453,10 @@ function useTerminalReplay({
 
   const openReplay = useCallback(
     (row: SessionListRow) =>
-      withLastTurn(row, (turn) => openReplayHere({ turn, openDrawer })),
-    [openDrawer, withLastTurn],
+      withLastTurn(row, (turn) =>
+        openReplayHere({ turn, projectId, openDrawer }),
+      ),
+    [openDrawer, projectId, withLastTurn],
   );
 
   const openInExplorer = useCallback(
@@ -517,21 +519,29 @@ function sayNothingWasStored(): void {
  * watches, so pushing it before the URL lands means the drawer opens on the
  * same frame as the click. The view mode is set transiently: this reader asked
  * for one replay, not for every trace they open next to be a terminal.
+ *
+ * The project travels with the trace, in the store and in the URL. These rows
+ * are read from the caller's personal workspace while the app chrome is still
+ * sitting in whichever project they last visited, so a drawer left to resolve
+ * the project itself would query the wrong one and report the trace missing.
  */
 function openReplayHere({
   turn,
+  projectId,
   openDrawer,
 }: {
   turn: ConversationTurn;
+  projectId: string;
   openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
 }): void {
   const store = useDrawerStore.getState();
-  store.openTrace(turn.traceId, turn.timestamp);
+  store.openTrace(turn.traceId, turn.timestamp, { projectId });
   store.setViewModeTransient("terminal");
   openDrawer("traceV2Details", {
     traceId: turn.traceId,
     t: String(turn.timestamp),
     mode: "terminal",
+    projectId,
   });
 }
 

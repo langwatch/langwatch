@@ -5,12 +5,12 @@ import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { useLangyContextTarget } from "~/features/langy/hooks/useLangyContextTarget";
 import { traceContextChip } from "~/features/langy/logic/langyContextChips";
 import { PeerCursorOverlay } from "~/features/presence/components/PeerCursorOverlay";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   SpanTreeNode,
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
 import { useTraceEditSession } from "../../hooks/useTraceEditSession";
+import { useTraceQueryArgs } from "../../hooks/useTraceQueryArgs";
 import { useDrawerStore } from "../../stores/drawerStore";
 import { BlurredContentGate } from "../BlurredContentGate";
 import { ConversationContext } from "./ConversationContext";
@@ -346,7 +346,7 @@ function SummaryModePane({
  * mounts it.
  */
 function SessionModePane({ trace }: { trace: TraceHeader }) {
-  const { project } = useOrganizationTeamProject();
+  const { projectId } = useTraceQueryArgs();
   return (
     <IsolatedErrorBoundary
       scope="Couldn't render session overview"
@@ -354,7 +354,7 @@ function SessionModePane({ trace }: { trace: TraceHeader }) {
     >
       <Box flex={1} minHeight={0}>
         <SessionTab
-          projectId={project?.id ?? ""}
+          projectId={projectId}
           traceId={trace.traceId}
           occurredAtMs={trace.timestamp}
         />
@@ -368,7 +368,7 @@ function SessionModePane({ trace }: { trace: TraceHeader }) {
  * In-app only, same gating as SessionModePane.
  */
 function TerminalModePane({ trace }: { trace: TraceHeader }) {
-  const { project } = useOrganizationTeamProject();
+  const { projectId } = useTraceQueryArgs();
   return (
     <IsolatedErrorBoundary
       scope="Couldn't render terminal session"
@@ -380,7 +380,7 @@ function TerminalModePane({ trace }: { trace: TraceHeader }) {
             old one are not this one's history. */}
         <TerminalTab
           key={trace.traceId}
-          projectId={project?.id ?? ""}
+          projectId={projectId}
           traceId={trace.traceId}
           occurredAtMs={trace.timestamp}
           sessionName={trace.traceName?.trim() || trace.name?.trim() || null}

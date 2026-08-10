@@ -161,3 +161,21 @@ Rule: Clicking a session replays it in the terminal
     Given an open terminal replay reached from the table
     When the user closes it
     Then the table is where it was, still sorted and narrowed the same way
+
+  @unit
+  Scenario: The replay reads the session's own workspace, not the last project visited
+    Given a user whose last visited project is not their personal workspace
+    When they choose a session row
+    Then the replay reads the session's workspace
+
+  @unit
+  Scenario: Moving between turns stays in the session's workspace
+    Given an open terminal replay of a session in another workspace
+    When the reader moves to another turn of the same session
+    Then the replay still reads the session's workspace
+
+  @unit
+  Scenario: A replay opened fresh after closing reads the ambient project again
+    Given a terminal replay that was opened and then closed
+    When a trace is opened from a project's own pages
+    Then it reads the project the reader is in

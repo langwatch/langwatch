@@ -24,6 +24,13 @@ export interface TraceV2DrawerShellProps {
    * Optional; the bare `traceId` query path still works on cache miss.
    */
   t?: string;
+  /**
+   * The project the trace belongs to, for openers whose page is not inside
+   * that project — the personal pages read the caller's own workspace while
+   * the chrome stays in the last project visited. Omitted everywhere the
+   * ambient project already is the trace's project.
+   */
+  projectId?: string;
 }
 
 export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
