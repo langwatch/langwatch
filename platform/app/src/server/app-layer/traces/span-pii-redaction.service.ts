@@ -659,6 +659,13 @@ export class OtlpSpanPiiRedactionService {
       body: string;
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
+      /**
+       * The real OTLP attribute name behind each key of `attributes`, where the
+       * two differ. Declared here because the native pass reads it: without it
+       * the public signature promises less than the method actually honours,
+       * and a caller building the argument inline could not pass it at all.
+       */
+      attributeNames?: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
     tenantId?: TenantId,
