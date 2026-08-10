@@ -115,5 +115,16 @@ func parseSizeWithSuffix(s string) (uint64, bool) {
 	if err != nil || n < 0 {
 		return 0, false
 	}
-	return uint64(n * float64(multiplier)), true
+	bytes := n * float64(multiplier)
+	// Go leaves an out-of-range float-to-integer conversion unspecified, so
+	// "1e30T" would yield an arbitrary number rather than a refusal — the same
+	// silently-wrong swap figure this function exists to reject.
+	if bytes > maxParsedBytes {
+		return 0, false
+	}
+	return uint64(bytes), true
 }
+
+// maxParsedBytes is the largest size this will believe: 2^63 bytes, eight
+// exabytes, far above any real machine and safely inside uint64.
+const maxParsedBytes = float64(1 << 63)

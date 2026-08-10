@@ -3,7 +3,9 @@ package app
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -22,6 +24,10 @@ type HeavyRun struct {
 	// Interactive marks a human at a terminal, who gets the long failsafe and
 	// no tightening at all.
 	Interactive bool
+	// Workers is the narrowed width the gate decided on, zero when the run was
+	// not narrowed. It is applied to the run's environment rather than spliced
+	// into the command, so a command that already chose its own width keeps it.
+	Workers int
 }
 
 // heavyRunPoll is how often a waiter re-checks. Frequent enough that a freed
@@ -64,34 +70,90 @@ func (o *Orchestrator) RunHeavy(ctx context.Context, r HeavyRun) error {
 	caller := domain.CallerFromAgentID(r.AgentID, r.Interactive)
 	key := domain.DurationKey(r.Shell)
 
-	waited, queued, err := o.waitForHeavySlot(ctx, caller, key)
+	waited, queued, release, err := o.takeHeavySlot(ctx, waiter{caller: caller, key: key, shell: r.Shell})
 	if err != nil {
 		return err
-	}
-
-	release, err := o.store.ClaimHeavyRun(o.sys.Getpid(), r.Shell)
-	if err != nil {
-		// A slot we cannot record is a slot nobody else can see. Run anyway: a
-		// miscounted slot is a far better outcome than a command that never runs.
-		o.log.Warn("could not record the heavy-run claim; running uncounted")
-		release = func() {}
 	}
 	defer release()
 
 	// Only speak if we actually queued. On the happy path this command is
 	// transparent — the wait is microseconds, and reporting "waited 0s" would
 	// train the reader to ignore the line that matters.
+	//
+	// STDERR, not stdout: the wrapped command owns stdout, and a caller piping
+	// `haven run --sh 'biome ... --reporter=json'` must get its JSON and nothing
+	// else. The reader still sees these lines either way.
 	if queued {
-		fmt.Printf("haven: waited %s for a heavy slot\n", waited.Round(time.Second))
+		fmt.Fprintf(os.Stderr, "haven: waited %s for a heavy slot\n", waited.Round(time.Second))
 	}
 
 	started := o.sys.Now()
 	// The inner script takes a machine-wide slot of its own. We already hold
 	// one, so turn that gate off for this run: counting it twice would queue it
 	// behind itself.
-	err = o.sup.RunOnce(ctx, "heavy", r.Dir, r.Shell, []string{"CHECK_SLOTS=0", "HAVEN_SLOT_HELD=1"})
-	o.store.ObserveDuration(key, o.sys.Now().Sub(started))
+	env := []string{"CHECK_SLOTS=0", "HAVEN_SLOT_HELD=1"}
+	if r.Workers > 0 {
+		env = append(env, "VITEST_MAX_WORKERS="+strconv.Itoa(r.Workers))
+	}
+	err = o.sup.RunOnce(ctx, "heavy", r.Dir, r.Shell, env)
+	if err == nil {
+		// Only a completed run is evidence of how long this kind of command takes.
+		// A suite that died after two seconds would otherwise file two seconds
+		// against the key, and the next caller would be narrowed on the strength
+		// of a crash.
+		o.store.ObserveDuration(key, o.sys.Now().Sub(started))
+	}
 	return err
+}
+
+// waiter is who is asking for a slot and what for: the caller kind picks the
+// ceiling, the key is what the wait estimate is quoted from, and the shell is
+// what gets recorded against the claim.
+type waiter struct {
+	caller domain.CallerKind
+	key    string
+	shell  string
+}
+
+// takeHeavySlot waits for room, claims it, and checks that the claim did not
+// over-subscribe the machine.
+//
+// The check is the point. Two waiters can pass the same poll before either
+// writes its marker, and a cap both of them passed is not a cap — so a claim
+// that turns out to be one too many is given straight back and the wait
+// resumes. Past the caller's ceiling the claim is kept regardless, for the same
+// reason the wait itself gives up there: a run that starts late beats one that
+// never starts, and a wedged queue must not be able to block work entirely.
+func (o *Orchestrator) takeHeavySlot(ctx context.Context, w waiter) (waited time.Duration, queued bool, release func(), err error) {
+	caller, key, shell := w.caller, w.key, w.shell
+	start := o.sys.Now()
+	noRelease := func() {}
+	for {
+		_, queued, err = o.waitForHeavySlot(ctx, caller, key)
+		if err != nil {
+			return o.sys.Now().Sub(start), queued, noRelease, err
+		}
+
+		release, err = o.store.ClaimHeavyRun(o.sys.Getpid(), shell)
+		if err != nil {
+			// A slot we cannot record is a slot nobody else can see. Run anyway: a
+			// miscounted slot is a far better outcome than a command that never runs.
+			o.log.Warn("could not record the heavy-run claim; running uncounted")
+			return o.sys.Now().Sub(start), queued, noRelease, nil
+		}
+
+		elapsed := o.sys.Now().Sub(start)
+		if o.withinHeavyCap() || elapsed >= caller.WaitCeiling() {
+			return elapsed, queued, release, nil
+		}
+		release()
+	}
+}
+
+// withinHeavyCap re-reads occupancy WITH this process's own claim counted, so
+// the answer is "is the machine still inside its cap now that I am on it".
+func (o *Orchestrator) withinHeavyCap() bool {
+	return o.store.HeavyRuns() <= domain.HeavySlots(o.sys.MemStat(), runtime.NumCPU())
 }
 
 // waitForHeavySlot blocks until a slot frees or the ceiling is reached,
@@ -113,14 +175,14 @@ func (o *Orchestrator) waitForHeavySlot(ctx context.Context, caller domain.Calle
 
 		waited := o.sys.Now().Sub(start)
 		if waited >= ceiling {
-			fmt.Printf("haven: no slot after %s, starting anyway (%d of %d busy)\n",
+			fmt.Fprintf(os.Stderr, "haven: no slot after %s, starting anyway (%d of %d busy)\n",
 				waited.Round(time.Second), s.live, s.limit)
 			return waited, true, nil
 		}
 
 		if !announced {
 			announced = true
-			fmt.Println(o.queuedLine(s, caller, key))
+			fmt.Fprintln(os.Stderr, o.queuedLine(s, caller, key))
 		}
 
 		select {

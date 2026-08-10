@@ -10,7 +10,7 @@ import (
 func base() AdmissionRequest {
 	return AdmissionRequest{
 		Pressure:         Green,
-		SlotFree:         false,
+		IsSlotFree:       false,
 		Caller:           SubAgent,
 		Kind:             UnitRun,
 		ObservedDuration: 30 * time.Second,
@@ -121,7 +121,7 @@ func TestSingleProcessRunAlwaysQueues(t *testing.T) {
 func TestCallerSuppliedWorkerCountIsNotOverridden(t *testing.T) {
 	t.Run("given a command that already specifies its worker count", func(t *testing.T) {
 		r := base()
-		r.CallerSetWorkers = true
+		r.HasCallerWorkerCount = true
 
 		t.Run("when it goes through the counter", func(t *testing.T) {
 			t.Run("it is not narrowed, but it is still admitted by the same rules", func(t *testing.T) {
@@ -158,10 +158,21 @@ func TestRedThrottlesAdmissionWithoutStoppingWork(t *testing.T) {
 		t.Run("when a slot is free", func(t *testing.T) {
 			r := base()
 			r.Pressure = Red
-			r.SlotFree = true
+			r.IsSlotFree = true
 
 			t.Run("the run proceeds, because red throttles admission and does not stop work", func(t *testing.T) {
-				if got := DecideAdmission(r); got != Admit {
+				// Proceeding is the assertion, not the width: a loaded machine
+				// takes width off a run that has some to give, and that is still
+				// starting now rather than waiting or being turned away.
+				if got := DecideAdmission(r); got == Refuse || got == Queue {
+					t.Fatalf("expected the run to start, got %s", got)
+				}
+			})
+
+			t.Run("and a run with no width to give up starts at full width", func(t *testing.T) {
+				single := r
+				single.Kind = SingleProcessRun
+				if got := DecideAdmission(single); got != Admit {
 					t.Fatalf("expected admit, got %s", got)
 				}
 			})
@@ -240,6 +251,82 @@ func TestAWaitTooLongToServeIsBackgrounded(t *testing.T) {
 			if got := DecideAdmission(r); got != Refuse {
 				t.Fatalf("expected refuse, got %s", got)
 			}
+		})
+	})
+}
+
+// @scenario "A loaded machine stops admitting at full width"
+func TestAmberStopsAdmittingAtFullWidth(t *testing.T) {
+	t.Run("given a loaded machine that still has a slot free", func(t *testing.T) {
+		r := base()
+		r.Pressure = Amber
+		r.IsSlotFree = true
+
+		t.Run("when a unit run asks for admission", func(t *testing.T) {
+			t.Run("it starts immediately, but not at full width", func(t *testing.T) {
+				if got := DecideAdmission(r); got != Narrow {
+					t.Fatalf("amber has to change something a caller can observe; got %s", got)
+				}
+			})
+
+			t.Run("and a main session is narrowed too, because this is about the machine", func(t *testing.T) {
+				main := r
+				main.Caller = MainSession
+				if got := DecideAdmission(main); got != Narrow {
+					t.Fatalf("expected narrow, got %s", got)
+				}
+			})
+		})
+
+		t.Run("when a human at a terminal asks", func(t *testing.T) {
+			human := r
+			human.Caller = Interactive
+
+			t.Run("their run is left entirely alone", func(t *testing.T) {
+				if got := DecideAdmission(human); got != Admit {
+					t.Fatalf("a human is waiting on the result, not holding a cache; got %s", got)
+				}
+			})
+		})
+
+		t.Run("when the caller chose its own width", func(t *testing.T) {
+			chosen := r
+			chosen.HasCallerWorkerCount = true
+
+			t.Run("that choice is respected rather than overridden", func(t *testing.T) {
+				if got := DecideAdmission(chosen); got != Admit {
+					t.Fatalf("expected admit, got %s", got)
+				}
+			})
+		})
+	})
+
+	t.Run("given an unloaded machine with a slot free", func(t *testing.T) {
+		r := base()
+		r.IsSlotFree = true
+
+		t.Run("nothing is narrowed, because there is nothing to react to", func(t *testing.T) {
+			if got := DecideAdmission(r); got != Admit {
+				t.Fatalf("expected admit, got %s", got)
+			}
+		})
+	})
+}
+
+// @scenario "A run narrowed by pressure gives up half its width"
+func TestPressureWidthHalvesRatherThanDividing(t *testing.T) {
+	t.Run("given a full-width run of six workers", func(t *testing.T) {
+		t.Run("when the machine is loaded but has room for it", func(t *testing.T) {
+			t.Run("it gives up half its width", func(t *testing.T) {
+				if got := PressureWidth(6); got != 3 {
+					t.Fatalf("expected 3, got %d", got)
+				}
+			})
+			t.Run("and never falls below one, because a run with no workers never finishes", func(t *testing.T) {
+				if got := PressureWidth(1); got != 1 {
+					t.Fatalf("expected 1, got %d", got)
+				}
+			})
 		})
 	})
 }

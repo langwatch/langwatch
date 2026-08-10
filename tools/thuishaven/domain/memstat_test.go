@@ -88,4 +88,15 @@ func TestParseSwapUsage(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("given a figure too large to be a real machine", func(t *testing.T) {
+		// Go leaves an out-of-range float-to-integer conversion unspecified, so
+		// without the bound this parses to an arbitrary number rather than a
+		// refusal — and an arbitrary swap figure pins the governor at red.
+		t.Run("it refuses rather than converting to an arbitrary number", func(t *testing.T) {
+			if _, _, ok := ParseSwapUsage("total = 1e30T  used = 1e30T"); ok {
+				t.Fatal("an impossible size must not be believed")
+			}
+		})
+	})
 }

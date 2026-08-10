@@ -75,15 +75,16 @@ func (a Admission) String() string {
 // AdmissionRequest is everything the decision needs. Duration is what haven has
 // previously observed this command to take; zero means never seen.
 type AdmissionRequest struct {
-	Pressure         Pressure
-	SlotFree         bool
+	Pressure Pressure
+	// IsSlotFree is whether the machine-wide heavy pool has room right now.
+	IsSlotFree       bool
 	Caller           CallerKind
 	Kind             RunKind
 	ObservedDuration time.Duration
-	// CallerSetWorkers is true when the command already carries a worker count.
-	// It is respected rather than overridden, but the run is still admitted,
-	// queued or refused by the same rules as any other.
-	CallerSetWorkers bool
+	// HasCallerWorkerCount is true when the command already carries a worker
+	// count. It is respected rather than overridden, but the run is still
+	// admitted, queued or refused by the same rules as any other.
+	HasCallerWorkerCount bool
 	// EstimatedWait is how long this run would sit in the queue. It decides
 	// between blocking and backgrounding: a wait the caller can afford is served
 	// inline, a wait it cannot is handed back detached.
@@ -102,6 +103,13 @@ type AdmissionRequest struct {
 // The narrowed run is assumed to take up to twice as long as observed — fewer
 // workers, more wall clock — which is the pessimistic direction and keeps the
 // decision honest when the estimate is wrong.
+// canGiveUpWidth reports whether there is any width to take away: a kind that
+// divides, a caller that has not already chosen its own count, and not a human
+// waiting at a terminal.
+func (r AdmissionRequest) canGiveUpWidth() bool {
+	return r.Kind.Narrowable() && !r.HasCallerWorkerCount && r.Caller != Interactive
+}
+
 func (r AdmissionRequest) fitsInsideFloor() bool {
 	if r.ObservedDuration <= 0 {
 		return false
@@ -115,17 +123,28 @@ func (r AdmissionRequest) fitsInsideFloor() bool {
 // throttles admission, it does not stop the machine working. Amber's job is to
 // stop admitting at full width, not to refuse.
 //
-// Narrowing is reached only by a sub-agent, because a sub-agent is the caller
-// whose cache actually expires inside a plausible queue wait. Everyone else
-// queues, which holds no memory at all and costs them nothing.
+// The two roads to narrowing are different arguments and are kept separate. On
+// a loaded machine a run with workers to give up gives some up on the way in,
+// whoever is asking — that is Amber's whole contract, and without it Amber
+// would change nothing a caller can observe. In the queue, narrowing is reached
+// only by a sub-agent, because a sub-agent is the caller whose cache actually
+// expires inside a plausible wait; everyone else queues, which holds no memory
+// at all and costs them nothing.
+//
+// A human at a terminal is never tightened either way: they are waiting on the
+// result, not holding a cache, and slowing their run to protect a fleet of
+// agents has the trade backwards.
 func DecideAdmission(r AdmissionRequest) Admission {
-	if r.SlotFree {
+	if r.IsSlotFree {
+		if r.Pressure != Green && r.canGiveUpWidth() {
+			return Narrow
+		}
 		return Admit
 	}
 	if r.Pressure == Red {
 		return Refuse
 	}
-	if r.Caller == SubAgent && r.Kind.Narrowable() && !r.CallerSetWorkers && r.fitsInsideFloor() {
+	if r.Caller == SubAgent && r.canGiveUpWidth() && r.fitsInsideFloor() {
 		return Narrow
 	}
 	// A wait the caller cannot afford is handed back detached rather than served
@@ -150,3 +169,13 @@ func NarrowedWorkers(fullWidth, inFlight int) int {
 	inFlight = max(inFlight, 1)
 	return max(fullWidth/inFlight, 1)
 }
+
+// PressureWidth is what a run gets when the machine is loaded but still has a
+// slot for it — half, floored at one.
+//
+// A fixed reduction rather than a division by the runs in flight, because the
+// memory Amber is reacting to is being held by whatever else is on the machine:
+// an idle heavy pool under Amber still means the machine is short, and dividing
+// by an empty pool would hand back full width and leave Amber with no observable
+// effect at all.
+func PressureWidth(fullWidth int) int { return max(fullWidth/2, 1) }

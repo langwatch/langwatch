@@ -92,11 +92,18 @@ type Store interface {
 	// ObserveDuration records how long a run actually took, so the next one can
 	// be decided on evidence rather than a default.
 	ObserveDuration(command string, took time.Duration)
-	// EnsureClaudeHook registers command as a PreToolUse hook in repoRoot's
+}
+
+// ClaudeSettings writes another tool's configuration, which is why it is not on
+// Store: everything Store persists is haven's OWN state — stacks, slugs,
+// selections, the daemon record, heavy-run slots. This edits a file in the
+// developer's repo that belongs to Claude Code, and only `haven setup` uses it.
+type ClaudeSettings interface {
+	// EnsureHook registers command as a PreToolUse hook in repoRoot's
 	// .claude/settings.local.json — untracked and per worktree. It merges: an
 	// existing hooks block survives and an entry already present is left alone,
 	// so it reports whether anything actually changed.
-	EnsureClaudeHook(repoRoot, command string) (installed bool, err error)
+	EnsureHook(repoRoot, command string) (installed bool, err error)
 }
 
 // Supervisor runs child processes: one-shot prepare/seed steps and the

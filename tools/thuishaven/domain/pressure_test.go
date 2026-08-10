@@ -130,7 +130,7 @@ func TestUntrustworthyPressureRecordReadsGreen(t *testing.T) {
 	})
 }
 
-// @scenario "A caller that cannot be identified is treated as a sub-agent"
+// @scenario "A caller that cannot be identified keeps the main-session ceiling"
 // @scenario "A sub-agent is not held past its five-minute floor"
 // @scenario "An interactive run keeps the long failsafe"
 // @scenario "A main session keeps the long failsafe"
@@ -179,10 +179,23 @@ func TestWaitCeilingFollowsTheCaller(t *testing.T) {
 	})
 
 	t.Run("given a caller that cannot be identified", func(t *testing.T) {
-		// An unidentified caller arrives with no agent id and no terminal, which
-		// is indistinguishable from a main session by inspection — so the rule is
-		// stated as a deliberate default rather than inferred.
-		t.Run("the tighter sub-agent ceiling is what a conservative default means", func(t *testing.T) {
+		// An unidentified caller arrives with no agent id and no terminal — which
+		// is not a third state to resolve, because that is exactly how a main
+		// session arrives. The rule is asserted on the function rather than
+		// implied by comparing the two constants, which is what the earlier
+		// version of this test did while leaving the actual behaviour untested.
+		c := CallerFromAgentID("", false)
+
+		t.Run("it resolves to a main session and keeps the long failsafe", func(t *testing.T) {
+			if c != MainSession {
+				t.Fatalf("an absent agent id IS the main-session signal; got %v", c)
+			}
+			if c.WaitCeiling() != LongFailsafe {
+				t.Fatalf("expected the long failsafe, got %s", c.WaitCeiling())
+			}
+		})
+
+		t.Run("and the sub-agent ceiling remains the tighter of the two", func(t *testing.T) {
 			if SubAgent.WaitCeiling() >= MainSession.WaitCeiling() {
 				t.Fatal("the sub-agent ceiling must be the tighter of the two")
 			}

@@ -98,6 +98,15 @@ Feature: haven answers an agent's tool call before it runs
     Then the rewritten command still runs
     Because installing haven onto PATH is optional, and a rewrite that fails has broken a working command
 
+  @unit
+  Scenario: The rewrap carries the decision it was given
+    Given the gate has resolved who is calling and how the run should be admitted
+    When it rewrites the command
+    Then the rewritten command names the calling agent
+    And it names the worker count the run was admitted at, when it was narrowed
+    Because the wrapped run otherwise re-derives all of it from an empty command line,
+    So every sub-agent takes the main-session ceiling and a narrowing never happens
+
   @unit @unimplemented
   Scenario: A rewrapped run is admitted once, not twice
     Given a rewritten command whose inner package script also routes through the shared counter
@@ -316,7 +325,7 @@ Feature: haven answers an agent's tool call before it runs
 
   # --- Nothing here may wedge an agent ---
 
-  @unit @unimplemented
+  @unit
   Scenario: A malformed payload defers
     Given the gate is handed input it cannot parse
     Then it defers and exits without blocking
@@ -332,3 +341,38 @@ Feature: haven answers an agent's tool call before it runs
     Then it does not exit with the status that blocks a tool call
     And the tool call proceeds
     Because an unrecovered panic exits with exactly that status by default
+
+  # --- Installing the hook, which edits a file haven does not own ---
+  #
+  # The gate only runs if Claude Code is told about it, and telling it means
+  # writing settings in the developer's checkout. It is opt-in — `haven setup
+  # gate-hook`, never `haven up` — and worktree-local, so it configures this
+  # checkout and commits nothing into anyone else's.
+
+  @unit
+  Scenario: The gate hook is installed into this worktree's own Claude settings
+    Given a checkout with no Claude settings yet
+    When the gate hook is installed
+    Then it is written to that worktree's untracked local settings
+    And installing it a second time changes nothing
+
+  @unit
+  Scenario: Settings haven does not own are merged rather than replaced
+    Given settings carrying unrelated keys and hooks for other events
+    When the gate hook is installed
+    Then everything already there survives alongside the new entry
+
+  @unit
+  Scenario: Settings haven cannot read are never overwritten
+    Given a settings file haven cannot parse, cannot read, or does not recognise the shape of
+    When the gate hook is installed
+    Then haven refuses and leaves the file exactly as it was
+    Because writing our own idea of its contents would delete the developer's settings
+
+  @unit
+  Scenario: An unrelated hook whose command merely contains the word is not mistaken for the gate
+    Given an existing hook whose command contains the word gateway
+    When the gate hook is installed
+    Then it is actually installed rather than reported as already present
+    And an existing gate whose path has since moved is replaced rather than duplicated
+    Because reporting success while writing nothing leaves the machine ungoverned

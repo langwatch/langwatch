@@ -89,12 +89,15 @@ const heavyRunBudget = uint64(3) << 30
 
 // HeavySlots is how many heavy runs may be in flight across the whole machine.
 //
-// Sized from what is actually FREE rather than from total RAM. The difference
-// is not academic: on a laptop with a container VM holding 8 GiB, total memory
-// overstates what this process can have by nearly half, and a limit computed
-// from it over-admits by exactly the amount some other tenant is holding.
-// Compressor occupancy is subtracted for the same reason — it is memory the
-// machine has already had to work to reclaim.
+// Sized from total RAM MINUS compressor occupancy — which is a partial answer,
+// and the honest description of it. What the limit should discount is everything
+// another tenant is already holding: on a laptop with a container VM holding
+// 8 GiB, total memory overstates what this process can have by nearly half. Only
+// the compressed part of that is visible here, because MemStat deliberately
+// carries no summed-RSS figure (it double-counts shared pages by several GB, so
+// it is worse than nothing as a control input). A free-memory signal would close
+// the gap; until MemStat carries one, this over-admits by whatever a quiet
+// tenant holds uncompressed, and the cores cap below is what bounds the damage.
 //
 // Capped by cores as well, because these runs saturate CPU as readily as RAM,
 // and never below one, or nothing would ever run.
@@ -161,9 +164,12 @@ func (c CallerKind) WaitCeiling() time.Duration {
 // CallerFromAgentID reads the caller kind off the hook payload's agent id.
 // Present means a sub-agent; absent means a main session.
 //
-// An unidentifiable caller is treated as a sub-agent, because that keeps the
-// tighter ceiling: misreading a sub-agent as a main session silently restores
-// the long park this whole mechanism exists to prevent.
+// An absent agent id IS the main-session signal, so there is no third state to
+// resolve: a caller that cannot be identified is indistinguishable from a main
+// session and gets the long failsafe. Defaulting the other way would be the
+// tighter ceiling but the wrong one far more often — every main-session run
+// would be narrowed and backgrounded on the strength of a field that is empty
+// by design.
 func CallerFromAgentID(agentID string, interactive bool) CallerKind {
 	switch {
 	case interactive:

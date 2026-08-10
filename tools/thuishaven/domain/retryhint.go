@@ -15,7 +15,8 @@ import (
 // not care what anyone believes, whereas a held place is prose handed to a
 // client that may come back early, come back late, or rephrase the command and
 // try again. That half is deliberately not built until the counters show
-// starvation actually happening — see ConsecutiveRefusals.
+// starvation actually happening — see StarvationThreshold and Starving below,
+// which are the measurement that decides it.
 //
 // What is built is the honest half, and it costs arithmetic: a refusal that
 // says "position 4, try again in about 90 seconds" lets a caller do something

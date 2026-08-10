@@ -26,9 +26,7 @@ type fakeStore struct {
 	pressure        domain.PressureRecord
 	pressureWritten bool
 	heavyRuns       int
-	observed        time.Duration
-	hookRoot        string
-	hookCommand     string
+	observed        map[string]time.Duration
 }
 
 func (f *fakeStore) SaveStack(domain.Stack) error { return nil }
@@ -98,12 +96,29 @@ func (f *fakeStore) ClaimHeavyRun(int, string) (func(), error) {
 	f.heavyRuns++
 	return func() { f.heavyRuns-- }, nil
 }
-func (f *fakeStore) EnsureClaudeHook(repoRoot, command string) (bool, error) {
-	f.hookRoot, f.hookCommand = repoRoot, command
+
+// The duration fakes are KEYED, unlike the single-field version they replace:
+// one field answered every key, so a test could not tell two suites sharing a
+// bucket from two suites with their own — which is exactly the collision
+// domain.DurationKey has to be trusted not to make.
+func (f *fakeStore) ObservedDuration(key string) time.Duration { return f.observed[key] }
+func (f *fakeStore) ObserveDuration(key string, took time.Duration) {
+	if f.observed == nil {
+		f.observed = map[string]time.Duration{}
+	}
+	f.observed[key] = took
+}
+
+// fakeClaudeSettings records what `haven setup` asked to install.
+type fakeClaudeSettings struct {
+	root    string
+	command string
+}
+
+func (f *fakeClaudeSettings) EnsureHook(repoRoot, command string) (bool, error) {
+	f.root, f.command = repoRoot, command
 	return true, nil
 }
-func (f *fakeStore) ObservedDuration(string) time.Duration        { return f.observed }
-func (f *fakeStore) ObserveDuration(_ string, took time.Duration) { f.observed = took }
 
 type fakeSystem struct {
 	alive           map[int]bool
@@ -116,6 +131,10 @@ type fakeSystem struct {
 	demoted         []int
 	restored        []int
 	orphans         []int
+	// orphanMarker records what the sweep actually asked for. Without it a test
+	// asserting on the kills would pass with an EMPTY marker, which in production
+	// matches every process on the machine and group-kills the result.
+	orphanMarker string
 }
 
 func (f *fakeSystem) FreePorts(n int) ([]int, error) { return make([]int, n), nil }
@@ -145,7 +164,10 @@ func (f *fakeSystem) GroupRSS(int) uint64                          { return 0 }
 func (f *fakeSystem) MemStat() domain.MemStat                      { return f.memStat }
 func (f *fakeSystem) DemoteGroup(pid int)                          { f.demoted = append(f.demoted, pid) }
 func (f *fakeSystem) RestoreGroup(pid int)                         { f.restored = append(f.restored, pid) }
-func (f *fakeSystem) OrphanedWorkers(string) []int                 { return f.orphans }
+func (f *fakeSystem) OrphanedWorkers(marker string) []int {
+	f.orphanMarker = marker
+	return f.orphans
+}
 
 type fakeProxy struct{ removed []string }
 

@@ -3,6 +3,8 @@ package app
 import (
 	"fmt"
 	"os"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // Feature is an optional integration `haven setup` can install into this
@@ -50,6 +52,9 @@ func (o *Orchestrator) installGateHook() (bool, error) {
 	if o.cfg.RepoRoot == "" {
 		return false, fmt.Errorf("no repository root: run this from inside a checkout")
 	}
+	if o.claude == nil {
+		return false, fmt.Errorf("no Claude settings writer is wired in")
+	}
 	self, err := os.Executable()
 	if err != nil || self == "" {
 		// Without an absolute path the hook would depend on haven being on PATH,
@@ -57,5 +62,8 @@ func (o *Orchestrator) installGateHook() (bool, error) {
 		// fire on every single tool call, so refuse rather than install a trap.
 		return false, fmt.Errorf("cannot resolve haven's own path; run `make haven install` first")
 	}
-	return o.store.EnsureClaudeHook(o.cfg.RepoRoot, self+" gate")
+	// Quoted, because the path is the one thing here haven does not choose: a
+	// checkout under a directory with a space would otherwise install a hook that
+	// splits into two words and fails on every tool call.
+	return o.claude.EnsureHook(o.cfg.RepoRoot, domain.ShellQuote(self)+" gate")
 }

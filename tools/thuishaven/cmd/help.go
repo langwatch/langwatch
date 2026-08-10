@@ -187,18 +187,21 @@ var envHelpText = `Environment variables.
 `
 
 // helpTopic resolves `haven help <topic>`: a named topic, or any command.
-func helpTopic(topic string) string {
+// It reports ok=false for a topic it does not know, so asking for one is a
+// failure rather than a successful print of an apology — a script that names a
+// topic which has since been renamed should learn about it from the exit code.
+func helpTopic(topic string) (string, bool) {
 	switch topic {
 	case "":
-		return helpText
+		return helpText, true
 	case "env", "environment":
-		return envHelpText
+		return envHelpText, true
 	case "hosts", "hostnames":
-		return hostsHelpText
+		return hostsHelpText, true
 	}
 	if body, ok := commandHelp(topic); ok {
-		return body
+		return body, true
 	}
 	return fmt.Sprintf("haven: no help for %q.\n\nTopics: env, hosts\nCommands: %s\n",
-		topic, strings.Join(commandNames(), ", "))
+		topic, strings.Join(commandNames(), ", ")), false
 }

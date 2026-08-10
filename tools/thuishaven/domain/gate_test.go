@@ -106,7 +106,7 @@ func TestWrapCommandKeepsTheWholeShellLineInsideTheSlot(t *testing.T) {
 	const havenPath = "/opt/homebrew/bin/haven"
 
 	t.Run("given a command joined to another by a shell operator", func(t *testing.T) {
-		wrapped := WrapCommand(havenPath, "pnpm test:unit && echo done")
+		wrapped := WrapCommand(havenPath, "pnpm test:unit && echo done", WrapOptions{})
 
 		t.Run("the whole line is passed as one quoted argument", func(t *testing.T) {
 			if !strings.Contains(wrapped, `--sh 'pnpm test:unit && echo done'`) {
@@ -122,14 +122,14 @@ func TestWrapCommandKeepsTheWholeShellLineInsideTheSlot(t *testing.T) {
 		})
 
 		t.Run("and haven is named by absolute path, because PATH is optional", func(t *testing.T) {
-			if !strings.HasPrefix(wrapped, havenPath) {
+			if !strings.HasPrefix(wrapped, ShellQuote(havenPath)) {
 				t.Fatalf("expected an absolute path, got %q", wrapped)
 			}
 		})
 	})
 
 	t.Run("given a command carrying a single quote", func(t *testing.T) {
-		wrapped := WrapCommand(havenPath, `echo 'it works'`)
+		wrapped := WrapCommand(havenPath, `echo 'it works'`, WrapOptions{})
 
 		t.Run("the quote is escaped rather than closing the argument early", func(t *testing.T) {
 			if strings.Count(wrapped, "--sh") != 1 {
@@ -142,7 +142,7 @@ func TestWrapCommandKeepsTheWholeShellLineInsideTheSlot(t *testing.T) {
 	})
 
 	t.Run("given a command already under haven's heavy class", func(t *testing.T) {
-		wrapped := WrapCommand(havenPath, "pnpm test:unit")
+		wrapped := WrapCommand(havenPath, "pnpm test:unit", WrapOptions{})
 
 		t.Run("it is recognised as wrapped, so it is not wrapped again", func(t *testing.T) {
 			if !AlreadyWrapped(wrapped) {
@@ -150,6 +150,89 @@ func TestWrapCommandKeepsTheWholeShellLineInsideTheSlot(t *testing.T) {
 			}
 			if AlreadyWrapped("pnpm test:unit") {
 				t.Fatal("an unwrapped command must not look wrapped")
+			}
+		})
+	})
+}
+
+// @scenario "The rewrap carries the decision it was given"
+func TestWrapCommandCarriesTheDecision(t *testing.T) {
+	t.Run("given a sub-agent's narrowed run", func(t *testing.T) {
+		wrapped := WrapCommand("/opt/haven", "pnpm test:unit",
+			WrapOptions{AgentID: "agent_123", Workers: 2})
+
+		t.Run("the agent id travels with it, because it picks the wait ceiling", func(t *testing.T) {
+			if !strings.Contains(wrapped, "--agent-id 'agent_123'") {
+				t.Fatalf("without the id the run re-resolves as a main session: %q", wrapped)
+			}
+		})
+
+		t.Run("and so does the width it was admitted at", func(t *testing.T) {
+			if !strings.Contains(wrapped, "--workers 2") {
+				t.Fatalf("a narrowing nobody applies is not a narrowing: %q", wrapped)
+			}
+		})
+
+		t.Run("and it is still recognised as wrapped", func(t *testing.T) {
+			if !AlreadyWrapped(wrapped) {
+				t.Fatalf("the flags must not break the idempotence check: %q", wrapped)
+			}
+		})
+	})
+
+	t.Run("given a run that was neither narrowed nor named", func(t *testing.T) {
+		wrapped := WrapCommand("/opt/haven", "pnpm test:unit", WrapOptions{})
+
+		t.Run("neither flag is emitted at all", func(t *testing.T) {
+			if strings.Contains(wrapped, "--workers") || strings.Contains(wrapped, "--agent-id") {
+				t.Fatalf("an absent decision must not become a stated one: %q", wrapped)
+			}
+		})
+	})
+
+	t.Run("given haven installed under a path with a space", func(t *testing.T) {
+		wrapped := WrapCommand("/Users/x/My Tools/haven", "pnpm test:unit", WrapOptions{})
+
+		t.Run("the path survives as one argument", func(t *testing.T) {
+			if !strings.HasPrefix(wrapped, `'/Users/x/My Tools/haven' `) {
+				t.Fatalf("the path split into two words: %q", wrapped)
+			}
+		})
+	})
+}
+
+// @scenario "Timings are filed under what the command actually is"
+func TestDurationKeyFollowsTheClassifiedKind(t *testing.T) {
+	t.Run("given an integration run spelled as a bare vitest invocation", func(t *testing.T) {
+		command := "npx vitest run --config vitest.integration.config.ts"
+
+		t.Run("it is filed as an integration run, not under vitest", func(t *testing.T) {
+			// "vitest" precedes "test:integration" in the heavy list, so a key
+			// taken from list order filed a ten-minute suite in the unit bucket.
+			if got := DurationKey(command); got != "integration" {
+				t.Fatalf("expected the integration bucket, got %q", got)
+			}
+		})
+
+		t.Run("so a unit run cannot inherit its timing", func(t *testing.T) {
+			if DurationKey("pnpm test:unit run src/x") == DurationKey(command) {
+				t.Fatal("the two populations must not share a bucket")
+			}
+		})
+	})
+
+	t.Run("given single-process runs", func(t *testing.T) {
+		t.Run("each keeps its own bucket, because they differ by orders of magnitude", func(t *testing.T) {
+			if DurationKey("pnpm typecheck") == DurationKey("docker build .") {
+				t.Fatal("a typecheck and a docker build are not one population")
+			}
+		})
+	})
+
+	t.Run("given a command that is not heavy at all", func(t *testing.T) {
+		t.Run("there is nothing to time", func(t *testing.T) {
+			if got := DurationKey("git status"); got != "" {
+				t.Fatalf("expected no key, got %q", got)
 			}
 		})
 	})

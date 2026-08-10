@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 )
@@ -22,6 +23,10 @@ func runHeavy(ctx context.Context, d deps, inv invocation) error {
 		Shell:   shell,
 		Dir:     d.lwDir,
 		AgentID: inv.value("--agent-id"),
+		// The gate decided the width; this only applies it. A count that will not
+		// parse is treated as absent rather than fatal, because refusing to run
+		// over a malformed flag would be the gate breaking the command it rewrote.
+		Workers: positiveInt(inv.value("--workers")),
 		// A terminal on stdout means a human is watching, and a human waiting is
 		// not an idle API session — so they keep the long failsafe rather than an
 		// agent's tighter ceiling.
@@ -29,11 +34,22 @@ func runHeavy(ctx context.Context, d deps, inv invocation) error {
 	})
 }
 
+// positiveInt reads a count, treating anything unparseable or non-positive as
+// unset.
+func positiveInt(s string) int {
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 1 {
+		return 0
+	}
+	return n
+}
+
 // runGate is `haven gate` — answer one Claude Code PreToolUse hook.
 //
-// There is no install flag: `haven up` registers this in the worktree's own
-// .claude/settings.local.json, the same way it writes .env.portless. A command
-// whose job is answering hooks should not also be the thing that installs them.
+// There is no install flag: `haven setup gate-hook` registers this in the
+// worktree's own .claude/settings.local.json, and it is opt-in — `haven up`
+// installs nothing that changes how another tool behaves. A command whose job
+// is answering hooks should not also be the thing that installs them.
 //
 // It always exits 0. Exit code 2 BLOCKS the tool call, and an unrecovered Go
 // panic exits with exactly 2, so returning an error from here would risk

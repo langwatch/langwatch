@@ -209,9 +209,20 @@ func (o *Orchestrator) publishPressure(level domain.Pressure) {
 	}
 }
 
+// governable reports whether a stack's launcher is a pid worth signaling.
+//
+// The zero check is not defensive tidiness: a registered stack can carry
+// LauncherPID == 0 (the reaper above guards it for the same reason), and pid 0
+// in kill(2) addresses the caller's OWN process group. Demoting it would demote
+// the daemon, and every group operation here would then be aimed at haven
+// itself.
+func (o *Orchestrator) governable(s domain.Stack) bool {
+	return s.LauncherPID != 0 && o.sys.ProcessAlive(s.LauncherPID)
+}
+
 func (o *Orchestrator) restoreDemoted(stacks []domain.Stack) {
 	for _, s := range stacks {
-		if o.sys.ProcessAlive(s.LauncherPID) {
+		if o.governable(s) {
 			o.sys.RestoreGroup(s.LauncherPID)
 		}
 	}
@@ -224,7 +235,7 @@ func (o *Orchestrator) restoreDemoted(stacks []domain.Stack) {
 func (o *Orchestrator) demoteUnfocused(stacks []domain.Stack) {
 	focused := stacks[0].Slug
 	for _, s := range stacks {
-		if s.Slug == focused || !o.sys.ProcessAlive(s.LauncherPID) {
+		if s.Slug == focused || !o.governable(s) {
 			continue
 		}
 		o.sys.DemoteGroup(s.LauncherPID)
@@ -252,6 +263,9 @@ func (o *Orchestrator) warnCritical() {
 func (o *Orchestrator) sweepOrphanedWorkers() {
 	orphans := o.sys.OrphanedWorkers(vitestWorkerMarker)
 	for _, pid := range orphans {
+		if pid <= 0 {
+			continue // pid 0 kills the daemon's own process group
+		}
 		o.sys.KillGroup(pid)
 	}
 	if len(orphans) > 0 {

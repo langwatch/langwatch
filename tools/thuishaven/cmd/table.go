@@ -391,6 +391,7 @@ var table = []commandSpec{
 			// NOT --agent: that already means plain, token-free output everywhere
 			// else in this CLI, and ADR-064 rule 2 is one meaning per flag.
 			{long: "--agent-id", takesValue: true, value: "<id>", summary: "the sub-agent this run belongs to — picks the shorter wait ceiling its prompt cache needs"},
+			{long: "--workers", takesValue: true, value: "<n>", summary: "run this narrowed to n test workers, the width the gate admitted it at"},
 		},
 		run: runHeavy,
 	},
@@ -406,7 +407,7 @@ var table = []commandSpec{
 	},
 	{
 		name:    "gate",
-		summary: "answer a Claude Code PreToolUse hook on stdin (haven up registers it for you)",
+		summary: "answer a Claude Code PreToolUse hook on stdin (install it with `haven setup gate-hook`)",
 		run:     runGate,
 	},
 	{

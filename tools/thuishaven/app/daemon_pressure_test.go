@@ -150,6 +150,15 @@ func TestGovernorSweepsOrphanedTestWorkers(t *testing.T) {
 					t.Fatalf("expected the orphan reclaimed, got %v", sys.groupKilled)
 				}
 			})
+
+			t.Run("and the sweep asked for the worker path, not for anything at all", func(t *testing.T) {
+				// The result of this is group-killed. An empty or wrong marker
+				// would still return the fake's orphans and this test would still
+				// pass — in production it would match every process on the machine.
+				if sys.orphanMarker != vitestWorkerMarker {
+					t.Fatalf("expected the worker marker, got %q", sys.orphanMarker)
+				}
+			})
 		})
 	})
 

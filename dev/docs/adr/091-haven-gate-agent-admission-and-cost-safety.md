@@ -34,7 +34,9 @@ There is a related cost the spawn cap prices better than RAM does: a cache entry
 
 ## Decision
 
-**`haven gate` is a hook, registered at the user level so it covers every session on the machine.** It reads one JSON payload on stdin, answers, exits. It has two duties sharing one seam: machine admission (ADR-090) and prompt-cost safety.
+**`haven gate` is a hook, and installing it is opt-in and per worktree.** It reads one JSON payload on stdin, answers, exits. It has two duties sharing one seam: machine admission (ADR-090) and prompt-cost safety.
+
+A user-level registration would cover every session on the machine in one write, and that is exactly why it is not what ships: the hook changes how a *different* tool behaves, and haven does not get to assume that for every checkout a developer opens. `haven setup gate-hook` installs it into the worktree's own `.claude/settings.local.json`; `haven up` installs nothing. The cost is that governance is only where it was asked for — a worktree nobody ran `setup` in is ungoverned, and that is the developer's call to make rather than haven's.
 
 **It registers for more than `PreToolUse`, and the Decision names them.** Admission and command-shaped cost checks are `PreToolUse`. Settings and instruction changes that arrive without a tool call are `ConfigChange` and `InstructionsLoaded`. Turn-shaped observations are `PostToolBatch` and `Stop`. Sub-agent accounting is `SubagentStart` and `SubagentStop`. A check with no event that can observe it is not specced.
 
@@ -88,7 +90,7 @@ The honest summary of the cost half: the per-event numbers are computable from p
 
 ## Consequences
 
-A hook entry appears in the user-level `.claude/settings.json`, outside the repo, so this ships as documented configuration plus a `haven` subcommand that installs it. Hooks are read at session start, so the installer affects future sessions only.
+The hook entry lands in the worktree's own `.claude/settings.local.json` — untracked (`.gitignore` carries `**/.claude/settings.local.json*`), so it configures the developer's checkout without committing a hook into everyone else's. `haven setup gate-hook` writes it; nothing else does. Hooks are read at session start, so the installer affects future sessions only.
 
 Narrowing reaches only auto-approving sessions. Under `default` permission mode the gate is an observer that can refuse but not rewrite, and the specs say so rather than implying uniform reach.
 

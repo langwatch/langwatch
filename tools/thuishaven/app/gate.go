@@ -5,8 +5,11 @@ import (
 	"io"
 	"os"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -73,8 +76,14 @@ func (o *Orchestrator) Gate(stdin io.Reader, stdout io.Writer) {
 	reply := deferReply()
 	defer func() {
 		// A panic must not reach the runtime, which would exit 2 and block the
-		// call. Recovering here converts any crash into a defer.
-		_ = recover()
+		// call. Recovering here converts any crash into a defer — and logs what it
+		// caught, because a gate that panics on every call would otherwise degrade
+		// to "defer" forever and nobody would ever learn. The log goes nowhere near
+		// stdout, so saying so cannot affect the decision.
+		if r := recover(); r != nil {
+			o.log.Error("the gate panicked; deferring to the normal permission flow",
+				zap.Any("panic", r), zap.ByteString("stack", debug.Stack()))
+		}
 		_ = json.NewEncoder(stdout).Encode(reply)
 	}()
 
@@ -108,17 +117,21 @@ func (o *Orchestrator) Gate(stdin io.Reader, stdout io.Writer) {
 func (o *Orchestrator) decideHeavy(p hookPayload, command string, kind domain.RunKind) hookReply {
 	caller := domain.CallerFromAgentID(p.AgentID, false)
 	level := domain.ReadPressure(o.readPressureRecord())
-	queueDepth, slotFree := o.queueState()
+	slots := o.slotState()
+	queueDepth := 0
+	if !slots.free() {
+		queueDepth = slots.position()
+	}
 
 	decision := domain.DecideAdmission(domain.AdmissionRequest{
-		Pressure:         level,
-		SlotFree:         slotFree,
-		Caller:           caller,
-		Kind:             kind,
-		ObservedDuration: o.observedDuration(command),
-		CallerSetWorkers: domain.CallerSetWorkers(command),
-		EstimatedWait:    o.estimatedWait(queueDepth, command),
-		CanBackground:    autoApprovingModes[p.PermissionMode],
+		Pressure:             level,
+		IsSlotFree:           slots.free(),
+		Caller:               caller,
+		Kind:                 kind,
+		ObservedDuration:     o.observedDuration(command),
+		HasCallerWorkerCount: domain.CallerSetWorkers(command),
+		EstimatedWait:        o.estimatedWait(queueDepth, command),
+		CanBackground:        autoApprovingModes[p.PermissionMode],
 	})
 
 	switch decision {
@@ -130,12 +143,18 @@ func (o *Orchestrator) decideHeavy(p hookPayload, command string, kind domain.Ru
 		return refuse(level, queueDepth, hint)
 	case domain.Background, domain.Narrow, domain.Queue:
 		// All three run under haven's slot; they differ in how the wrapped run
-		// behaves, which `haven run` decides from the same state. Rewriting needs
-		// an approval, so a session that still prompts is left alone entirely.
+		// behaves. Rewriting needs an approval, so a session that still prompts is
+		// left alone entirely.
 		if !autoApprovingModes[p.PermissionMode] {
 			return deferReply()
 		}
-		return o.rewrap(command, decision, queueDepth)
+		return o.rewrap(rewrapRequest{
+			command:    command,
+			decision:   decision,
+			queueDepth: queueDepth,
+			agentID:    p.AgentID,
+			slots:      slots,
+		})
 	default:
 		return deferReply()
 	}
@@ -152,20 +171,43 @@ func refuse(level domain.Pressure, queueDepth int, hint *domain.RetryHint) hookR
 	}}
 }
 
-// rewrap rewrites the command to run under haven's slot.
-func (o *Orchestrator) rewrap(command string, decision domain.Admission, queueDepth int) hookReply {
-	input := map[string]any{
-		"command": domain.WrapCommand(o.havenPath(), command),
-	}
-	systemMessage := "haven: " + decision.String()
+// rewrapRequest is everything the rewrite needs from the decision that was just
+// taken. It travels as one value because dropping any part of it is exactly the
+// failure this seam had: a rewrite that encodes none of what was decided leaves
+// `haven run` to re-derive it from an empty command line, and every decision
+// collapses back to the default.
+type rewrapRequest struct {
+	command    string
+	decision   domain.Admission
+	queueDepth int
+	agentID    string
+	slots      slotState
+}
 
-	if decision == domain.Background {
+// rewrap rewrites the command to run under haven's slot, carrying the decision
+// with it.
+func (o *Orchestrator) rewrap(r rewrapRequest) hookReply {
+	opts := domain.WrapOptions{AgentID: r.agentID}
+	if r.decision == domain.Narrow {
+		opts.Workers = o.narrowedWidth(r.slots)
+	}
+	input := map[string]any{
+		"command": domain.WrapCommand(o.havenPath(), r.command, opts),
+	}
+	systemMessage := "haven: " + r.decision.String()
+
+	if r.decision == domain.Background {
 		input["run_in_background"] = true
-		input["description"] = domain.BackgroundDescription(queueDepth)
+		input["description"] = domain.BackgroundDescription(r.queueDepth)
 	} else {
 		// The tool's own timeout has to cover the admission wait as well as the
 		// run. Only the WAIT is bounded by the cache window; capping total
 		// runtime there would kill a long suite outright.
+		//
+		// A session configured with a lower BASH_MAX_TIMEOUT_MS clamps this back
+		// down to its own maximum, which is the same ceiling the command would
+		// have had unwrapped — the rewrite cannot raise a limit the harness sets,
+		// and asking for more than it allows costs nothing.
 		input["timeout"] = int(domain.LongFailsafe / time.Millisecond)
 	}
 
@@ -248,20 +290,35 @@ func transcriptSize(path string) int64 {
 	return fi.Size()
 }
 
-// queueState reports how many heavy runs are live and whether a slot is free.
+// slotState reports how many heavy runs are live and how many are allowed.
 //
-// The limit comes from what is actually free rather than total RAM: on a
-// machine with a container VM holding several GiB, os.totalmem() overstates
-// what this process can have (ADR-090).
-func (o *Orchestrator) queueState() (queueDepth int, slotFree bool) {
-	live := o.store.HeavyRuns()
-	limit := domain.HeavySlots(o.sys.MemStat(), runtime.NumCPU())
-	if live < limit {
-		return 0, true
+// The limit discounts what the compressor is already holding rather than
+// trusting total RAM, because on a machine with a container VM holding several
+// GiB os.totalmem() overstates what this process can have (ADR-090).
+func (o *Orchestrator) slotState() slotState {
+	return slotState{
+		live:  o.store.HeavyRuns(),
+		limit: domain.HeavySlots(o.sys.MemStat(), runtime.NumCPU()),
 	}
-	// Position is how many are ahead, so a caller arriving behind `live` runs
-	// with `limit` slots waits for (live - limit) + 1 of them to finish.
-	return live - limit + 1, false
+}
+
+// fullWidth is the width a unit run takes when nobody narrows it: half the
+// cores, which is what platform/app/vitest.config.ts asks for with
+// `maxWorkers: "50%"`.
+func fullWidth() int { return max(runtime.NumCPU()/2, 1) }
+
+// narrowedWidth is how many workers a narrowed run actually gets, and the two
+// roads to Narrow want different arithmetic.
+//
+// With a slot free, the machine is loaded rather than full, and the reduction is
+// a fixed fraction. With no slot free, the run is starting alongside everything
+// already in flight, so it divides by them — sizing against the limit instead
+// would let ten agents each start "narrowed" and rebuild the burst.
+func (o *Orchestrator) narrowedWidth(s slotState) int {
+	if s.free() {
+		return domain.PressureWidth(fullWidth())
+	}
+	return domain.NarrowedWorkers(fullWidth(), s.live)
 }
 
 // observedDuration is how long this command has taken before. Zero means never

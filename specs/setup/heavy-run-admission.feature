@@ -6,10 +6,8 @@ Feature: Heavy runs are admitted, queued, or refused
 
   # Extends specs/setup/check-slots.feature, which put `typecheck`, `lint` and
   # `format` behind one machine-wide counter in dev/scripts/check-queue.mjs.
-  # That spec and that script arrive with PR #6598, which is OPEN AND UNMERGED
-  # at the time of writing — this feature is stacked on it and neither the file
-  # reference above nor the scenarios below resolve until it lands. See ADR-090
-  # for the precedence table these scenarios are rows of.
+  # This feature adds the runs that counter never covered. See ADR-090 for the
+  # precedence table these scenarios are rows of.
   #
   # 1. TESTS WERE NOT ON THE COUNTER, and they are the larger problem. Measured
   # mid-session on an 11-core / 18 GiB machine: 17 node processes, 550-712 MB
@@ -160,11 +158,12 @@ Feature: Heavy runs are admitted, queued, or refused
     Then it queues rather than narrowing
 
   @unit
-  Scenario: A caller that cannot be identified is treated as a sub-agent
+  Scenario: A caller that cannot be identified keeps the main-session ceiling
     Given a heavy run whose caller cannot be identified
     When it finds no free slot
-    Then the five-minute ceiling applies to it
-    Because misreading a sub-agent as a main session restores the long park it exists to prevent
+    Then the thirty-minute failsafe applies to it
+    Because an absent agent id is how a main session arrives, not a third state
+    And defaulting the other way would narrow and background every main-session run
 
   @unit
   Scenario: A narrowed run still takes a slot
@@ -186,6 +185,57 @@ Feature: Heavy runs are admitted, queued, or refused
     When it goes through the counter
     Then the count it asked for is not overridden
     But it is admitted, queued or refused by the same rules as any other run
+
+  # --- Narrowing under pressure, which is a different argument ---
+  #
+  # The narrowing above is about a sub-agent's cache expiring in a queue. This
+  # one is about the machine: a loaded machine has to stop handing out full
+  # width even when it still has a slot, or the middle pressure level changes
+  # nothing anybody can observe.
+
+  @unit
+  Scenario: A loaded machine stops admitting at full width
+    Given the machine is under memory pressure
+    And a slot is still free
+    When a unit test run starts
+    Then it starts immediately, but not at full width
+    And the same applies to a main session, because this is about the machine
+    But a run started from a terminal is left entirely alone
+    Because a human is waiting on the result rather than holding a cache
+
+  @unit
+  Scenario: A run narrowed by pressure gives up half its width
+    Given a run narrowed because the machine is loaded rather than because it queued
+    Then it gives up half its width
+    And never falls below one worker
+    Because the memory pressure is held by whatever else is on the machine,
+    So dividing by an idle heavy pool would hand back full width and mean nothing
+
+  @unit
+  Scenario: A narrowed run is actually run at the narrower width
+    Given a run the gate admitted at a reduced worker count
+    When it runs
+    Then that count is applied to the run
+    And the caller's command line is left exactly as it was written
+    Because a narrowing nobody applies is a decision the machine never sees
+
+  # --- What haven learns from a run ---
+
+  @unit
+  Scenario: Timings are filed under what the command actually is
+    Given an integration suite invoked directly through vitest rather than its package script
+    When its duration is recorded
+    Then it is filed as an integration run
+    And a unit run cannot inherit that timing
+    Because a ten-minute suite in the unit bucket narrows a run that should have queued
+
+  @unit
+  Scenario: A run that failed is not evidence of how long it takes
+    Given a heavy run that fails part-way through
+    When it finishes
+    Then nothing is recorded against that command's duration
+    Because a suite that died after two seconds is not a two-second suite,
+    And the next caller would be narrowed on the strength of a crash
 
   # --- Refusal ---
 

@@ -77,6 +77,21 @@ func AlreadyWrapped(command string) bool {
 // and a nested wrap could arrive by any spelling.
 const havenRunMarker = "run --class heavy"
 
+// WrapOptions carries what the gate already decided into the wrapped command.
+//
+// Without it `haven run` re-derives its behaviour from nothing and the decision
+// is silently discarded: an unnamed caller resolves to a main session and takes
+// the one-hour ceiling that the sub-agent ceiling exists to avoid, and a
+// narrowed run is indistinguishable from a queued one.
+type WrapOptions struct {
+	// AgentID is the caller's agent id, which picks the wait ceiling because it
+	// picks the prompt-cache floor.
+	AgentID string
+	// Workers is the narrowed width. Zero means "not narrowed", and the run keeps
+	// whatever width its own config chooses.
+	Workers int
+}
+
 // WrapCommand rewrites a heavy command to run under haven's slot.
 //
 // The original is passed as a single argument for a shell to run, NOT spliced
@@ -86,13 +101,28 @@ const havenRunMarker = "run --class heavy"
 //
 // havenPath is haven's own absolute path, because installing it onto PATH is
 // optional and a rewrite that yields "command not found" has broken a working
-// command in the name of failing open.
-func WrapCommand(havenPath, command string) string {
-	return fmt.Sprintf("%s %s --sh %s", havenPath, havenRunMarker, shellQuote(command))
+// command in the name of failing open. It is quoted for the same reason it is
+// absolute: a checkout under a directory with a space would otherwise split
+// into two words and fail exactly the way the absolute path exists to prevent.
+func WrapCommand(havenPath, command string, opts WrapOptions) string {
+	var b strings.Builder
+	b.WriteString(ShellQuote(havenPath))
+	b.WriteString(" ")
+	b.WriteString(havenRunMarker)
+	if opts.AgentID != "" {
+		b.WriteString(" --agent-id ")
+		b.WriteString(ShellQuote(opts.AgentID))
+	}
+	if opts.Workers > 0 {
+		fmt.Fprintf(&b, " --workers %d", opts.Workers)
+	}
+	b.WriteString(" --sh ")
+	b.WriteString(ShellQuote(command))
+	return b.String()
 }
 
-// shellQuote single-quotes s for safe interpolation, escaping embedded quotes.
-func shellQuote(s string) string {
+// ShellQuote single-quotes s for safe interpolation, escaping embedded quotes.
+func ShellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
 }
 
@@ -147,13 +177,32 @@ func BackgroundDescription(queueDepth int) string {
 // A per-invocation key would almost never have a prior observation, and an
 // unobserved command is treated as long — so a too-specific key would quietly
 // disable narrowing altogether.
+//
+// Keyed on the CLASSIFIED KIND rather than on which substring matched first.
+// `npx vitest run --config vitest.integration.config.ts` classifies as an
+// integration run but matches "vitest" before "test:integration", so a list
+// order key filed a ten-minute integration run under the unit bucket — and a
+// polluted estimate narrows a run that should have queued.
 func DurationKey(command string) string {
-	for _, marker := range heavyCommands {
-		if strings.Contains(command, marker) {
-			return marker
-		}
+	kind, heavy := ClassifyCommand(command)
+	if !heavy {
+		return ""
 	}
-	return ""
+	switch kind {
+	case IntegrationRun:
+		return "integration"
+	case UnitRun:
+		return "unit"
+	default:
+		// Single-process runs are not one population: a typecheck and a docker
+		// build differ by an order of magnitude, so each keeps its own bucket.
+		for _, marker := range heavyCommands {
+			if strings.Contains(command, marker) {
+				return marker
+			}
+		}
+		return ""
+	}
 }
 
 func containsAny(s string, needles []string) bool {

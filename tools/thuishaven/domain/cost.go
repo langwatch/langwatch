@@ -206,10 +206,16 @@ const MaxConcurrentAgents = 12
 const SpawnEntryTTL = 30 * time.Minute
 
 // LiveSpawns counts entries that have not expired, given when each was recorded.
+//
+// An entry stamped in the FUTURE is not counted. A negative age is under the TTL
+// by arithmetic, so a clock that went backwards — or one corrupt record — would
+// otherwise hold the machine-wide cap full until that timestamp passed, which is
+// precisely the stale-high count this design says must never be possible.
 func LiveSpawns(recorded []time.Time, now time.Time) int {
 	live := 0
 	for _, at := range recorded {
-		if now.Sub(at) < SpawnEntryTTL {
+		age := now.Sub(at)
+		if age >= 0 && age < SpawnEntryTTL {
 			live++
 		}
 	}

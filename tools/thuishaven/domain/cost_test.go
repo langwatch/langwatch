@@ -182,6 +182,19 @@ func TestSpawnCapExpiresRatherThanFailingClosed(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("given a spawn stamped in the future", func(t *testing.T) {
+		// A negative age is under the TTL by arithmetic, so a clock that went
+		// backwards would hold the cap full until the timestamp passed — the
+		// stale-high count the fail-open design says must be impossible.
+		recorded := []time.Time{now.Add(time.Minute)}
+
+		t.Run("it is not counted, because an impossible entry is not evidence", func(t *testing.T) {
+			if got := LiveSpawns(recorded, now); got != 0 {
+				t.Fatalf("expected a future entry ignored, got %d", got)
+			}
+		})
+	})
 }
 
 func TestParallelSpawnsPayTheWriteNotTheRead(t *testing.T) {

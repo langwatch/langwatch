@@ -5,7 +5,7 @@ package fileregistry
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"os"
 	"path/filepath"
 	"sort"
@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/atomicfile"
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -172,24 +173,7 @@ func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
 // writeFileAtomic writes data to a temp file in the destination directory and
 // renames it into place, so a reader never observes a partial file.
 func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".tmp-*")
-	if err != nil {
-		return err
-	}
-	tmpName := tmp.Name()
-	defer func() { _ = os.Remove(tmpName) }() // a no-op once the rename succeeds
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Chmod(perm); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmpName, path)
+	return atomicfile.Write(path, data, perm)
 }
 
 // WriteOverlay writes platform/app/.env.portless. Mode 0o600: it carries
@@ -316,6 +300,11 @@ func (s *Store) durationsPath() string { return filepath.Join(s.home, "run-durat
 // than from a counter anyone has to decrement, so a killed run frees its place
 // with no bookkeeping — the same property the shared check queue relies on. A
 // dead entry is swept as it is found.
+//
+// Liveness alone is not enough, which is why the timestamp is read as well. Pids
+// are recycled, and an orphaned marker whose number has been handed to some
+// long-lived process reads as live forever — the pool then counts a run that
+// ended days ago and caps every real one behind it.
 func (s *Store) HeavyRuns() int {
 	entries, err := os.ReadDir(s.heavyRunsDir())
 	if err != nil {
@@ -324,16 +313,41 @@ func (s *Store) HeavyRuns() int {
 	live := 0
 	for _, e := range entries {
 		pid, err := strconv.Atoi(strings.TrimSuffix(e.Name(), ".json"))
+		path := filepath.Join(s.heavyRunsDir(), e.Name())
 		if err != nil {
 			continue
 		}
-		if processAlive(pid) {
+		if processAlive(pid) && !s.heavyRunExpired(path) {
 			live++
 			continue
 		}
-		_ = os.Remove(filepath.Join(s.heavyRunsDir(), e.Name()))
+		_ = os.Remove(path)
 	}
 	return live
+}
+
+// HeavyRunClaimTTL is how long a claim is believed. Far longer than any real
+// heavy run — the longest thing on the list is a docker build — so it never
+// expires a run out from under itself, and short enough that a recycled pid
+// cannot hold a slot for a working day.
+const HeavyRunClaimTTL = 6 * time.Hour
+
+// heavyRunExpired reads the claim's own timestamp. A marker that cannot be read
+// or parsed has not expired: the pid check already said something is alive
+// there, and inventing an expiry from an unreadable file would free a slot that
+// is genuinely in use.
+func (s *Store) heavyRunExpired(path string) bool {
+	b, err := os.ReadFile(path) // #nosec G304 -- path is built from haven's own home dir
+	if err != nil {
+		return false
+	}
+	var rec struct {
+		At time.Time `json:"at"`
+	}
+	if json.Unmarshal(b, &rec) != nil || rec.At.IsZero() {
+		return false
+	}
+	return time.Since(rec.At) > HeavyRunClaimTTL
 }
 
 // ClaimHeavyRun records this process as holding a heavy slot.
@@ -354,7 +368,9 @@ func (s *Store) ClaimHeavyRun(pid int, command string) (func(), error) {
 
 // processAlive reports whether a pid is a live process. Signal 0 tests for
 // existence without delivering anything; EPERM means it exists but belongs to
-// someone else, which still counts as occupied.
+// someone else, which still counts as occupied — a heavy run started under
+// another uid on a shared machine holds its slot exactly like any other, and
+// reading its refusal as "gone" would free the slot while the run continues.
 func processAlive(pid int) bool {
 	if pid <= 0 {
 		return false
@@ -363,7 +379,8 @@ func processAlive(pid int) bool {
 	if err != nil {
 		return false
 	}
-	return p.Signal(syscall.Signal(0)) == nil
+	err = p.Signal(syscall.Signal(0))
+	return err == nil || errors.Is(err, syscall.EPERM)
 }
 
 // ObservedDuration is how long this kind of command has taken before, or zero
@@ -406,70 +423,6 @@ func (s *Store) readDurations() map[string]time.Duration {
 	}
 	_ = json.Unmarshal(b, &out)
 	return out
-}
-
-// EnsureClaudeHook registers command as a PreToolUse hook in this checkout's
-// own Claude settings.
-//
-// settings.LOCAL.json, deliberately: .gitignore carries
-// `**/.claude/settings.local.json*` while .claude/settings.json is checked in,
-// so this configures the developer's checkout without committing a hook into
-// everyone else's. repoRoot comes from `git rev-parse --show-toplevel`, which
-// in a worktree resolves to that worktree — so each one gets its own file,
-// matching the fact that each gets its own stack.
-func (s *Store) EnsureClaudeHook(repoRoot, command string) (bool, error) {
-	path := filepath.Join(repoRoot, ".claude", "settings.local.json")
-
-	settings := map[string]any{}
-	existing, readErr := os.ReadFile(path) // #nosec G304 -- repoRoot is git's own toplevel
-	if readErr == nil {
-		if err := json.Unmarshal(existing, &settings); err != nil {
-			// Someone else's file that we cannot parse is someone else's file.
-			// Refusing beats overwriting it with our own idea of its contents.
-			return false, fmt.Errorf("%s is not valid JSON; leaving it alone: %w", path, err)
-		}
-	}
-	if !mergeClaudeHook(settings, command) {
-		return false, nil
-	}
-
-	body, err := json.MarshalIndent(settings, "", "  ")
-	if err != nil {
-		return false, err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
-		return false, err
-	}
-	if err := writeFileAtomic(path, append(body, '\n'), 0o600); err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-// mergeClaudeHook adds the entry unless one naming this command is already
-// there, and reports whether it changed anything — so a second `haven up` is a
-// no-op rather than a duplicate hook or a pointless rewrite.
-func mergeClaudeHook(settings map[string]any, command string) bool {
-	hooks, _ := settings["hooks"].(map[string]any)
-	if hooks == nil {
-		hooks = map[string]any{}
-	}
-	entries, _ := hooks["PreToolUse"].([]any)
-	for _, e := range entries {
-		if strings.Contains(fmt.Sprint(e), " gate") {
-			return false
-		}
-	}
-	hooks["PreToolUse"] = append(entries, map[string]any{
-		"matcher": "Bash|Agent",
-		"hooks": []any{map[string]any{
-			"type":    "command",
-			"command": command,
-			"timeout": 10,
-		}},
-	})
-	settings["hooks"] = hooks
-	return true
 }
 
 func (s *Store) pressurePath() string { return filepath.Join(s.home, "pressure.json") }

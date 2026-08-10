@@ -5,6 +5,7 @@ package system
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -224,17 +225,32 @@ func (s System) MemStat() domain.MemStat {
 	if runtime.GOOS != "darwin" {
 		return m
 	}
-	if out, err := exec.Command("vm_stat").Output(); err == nil {
+	if out, err := probe("vm_stat"); err == nil {
 		if pageSize, occupied, ok := domain.ParseVMStat(string(out)); ok {
 			m.CompressedBytes = occupied * pageSize
 		}
 	}
-	if out, err := exec.Command("sysctl", "-n", "vm.swapusage").Output(); err == nil {
+	if out, err := probe("sysctl", "-n", "vm.swapusage"); err == nil {
 		if used, total, ok := domain.ParseSwapUsage(string(out)); ok {
 			m.SwapUsedBytes, m.SwapTotalBytes = used, total
 		}
 	}
 	return m
+}
+
+// probeTimeout bounds every external command the governor shells out to.
+//
+// These all run on the daemon's tick. One that blocks — a wedged `ps`, a `vm_stat`
+// against a stuck VM subsystem — would stop the tick completing, and readers age
+// the pressure record out to green after 90s. The machine would lose governance
+// silently, which is the one failure mode worth spending a deadline on.
+const probeTimeout = 2 * time.Second
+
+// probe runs a short-lived read-only command under that deadline.
+func probe(name string, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
+	defer cancel()
+	return exec.CommandContext(ctx, name, args...).Output()
 }
 
 // DemoteGroup moves every process in pid's group into the throttled background
@@ -256,39 +272,63 @@ func (System) retierGroup(pid int, flag string) {
 	if runtime.GOOS != "darwin" || pid <= 0 {
 		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
+	defer cancel()
 	for _, member := range groupMembers(pid) {
 		// Best effort per process: one that exits between listing and signaling
 		// is not an error, and must not stop the rest of the group being moved.
-		_ = exec.Command("taskpolicy", flag, "-p", strconv.Itoa(member)).Run()
+		// The deadline is shared across the group for the same reason it exists at
+		// all — this runs on the daemon's tick and must always return to it.
+		_ = exec.CommandContext(ctx, "taskpolicy", flag, "-p", strconv.Itoa(member)).Run()
 	}
 }
 
 // groupMembers lists every live pid sharing pid's process group.
+//
+// One `ps` listing, not two: the same table that names the members also names
+// the group, so asking for the group first was a second full process listing for
+// a number already in hand. Both sides are compared as INTEGERS — two ps
+// invocations can format the same group differently, and a padding difference
+// silently yielded an empty group, which reads as "nothing to demote" rather
+// than as a failure.
 func groupMembers(pid int) []int {
-	out, err := exec.Command("ps", "-o", "pgid=", "-p", strconv.Itoa(pid)).Output()
+	out, err := probe("ps", "-ax", "-o", "pgid=,pid=")
 	if err != nil {
 		return nil
 	}
-	pgid := strings.TrimSpace(string(out))
-	if pgid == "" {
-		return nil
+
+	byGroup := parseProcessGroups(string(out))
+	for group, members := range byGroup {
+		for _, member := range members {
+			if member == pid {
+				return byGroup[group]
+			}
+		}
 	}
-	all, err := exec.Command("ps", "-ax", "-o", "pgid=,pid=").Output()
-	if err != nil {
-		return nil
-	}
-	var members []int
-	for line := range strings.SplitSeq(string(all), "\n") {
+	return nil
+}
+
+// parseProcessGroups indexes a `ps -o pgid=,pid=` listing by group.
+func parseProcessGroups(listing string) map[int][]int {
+	byGroup := map[int][]int{}
+	for line := range strings.SplitSeq(listing, "\n") {
 		fields := strings.Fields(line)
-		if len(fields) != 2 || fields[0] != pgid {
+		if len(fields) != 2 {
 			continue
 		}
-		if member, err := strconv.Atoi(fields[1]); err == nil {
-			members = append(members, member)
+		group, groupErr := strconv.Atoi(fields[0])
+		member, memberErr := strconv.Atoi(fields[1])
+		if groupErr != nil || memberErr != nil {
+			continue
 		}
+		byGroup[group] = append(byGroup[group], member)
 	}
-	return members
+	return byGroup
 }
+
+// psCommandColumns is how many leading numeric columns the orphan listing asks
+// for before the command itself (ppid, pid).
+const psCommandColumns = 2
 
 // OrphanedWorkers lists test-worker processes whose parent is PID 1 — on macOS
 // that is launchd, and it means an interrupted run left them behind.
@@ -298,18 +338,28 @@ func groupMembers(pid int) []int {
 // CLAUDE.md currently asks people to pkill by hand. The rule is deliberately
 // narrow: matching the worker path AND being owned by nobody. Anything needing
 // a judgment about whether a process is still wanted stays manual.
+// An empty marker matches nothing. The result of this is group-killed, so the
+// rule has to be narrower than its inputs: a marker that arrived empty by
+// accident would otherwise select every orphaned process on the machine.
 func (System) OrphanedWorkers(marker string) []int {
-	out, err := exec.Command("ps", "-ax", "-o", "ppid=,pid=,command=").Output()
+	if marker == "" {
+		return nil
+	}
+	out, err := probe("ps", "-ax", "-o", "ppid=,pid=,command=")
 	if err != nil {
 		return nil
 	}
 	var orphans []int
 	for line := range strings.SplitSeq(string(out), "\n") {
 		fields := strings.Fields(line)
-		if len(fields) < 3 || fields[0] != "1" {
+		if len(fields) <= psCommandColumns || fields[0] != "1" {
 			continue
 		}
-		if !strings.Contains(line, marker) {
+		// The COMMAND only. The line begins with two numeric columns, so matching
+		// the whole of it lets a marker match a pid — and the caller kills the
+		// group of whatever it matched, which is not an outcome to be approximate
+		// about.
+		if !strings.Contains(strings.Join(fields[psCommandColumns:], " "), marker) {
 			continue
 		}
 		if pid, err := strconv.Atoi(fields[1]); err == nil {
