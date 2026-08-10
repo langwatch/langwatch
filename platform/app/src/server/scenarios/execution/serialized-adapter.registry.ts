@@ -44,11 +44,11 @@ export const SERIALIZED_ADAPTER_FACTORIES: Record<string, AdapterFactory> = {
     if (!modelParams) {
       throw new Error("Prompt adapter requires modelParams");
     }
-    return new SerializedPromptConfigAdapter(
-      data as PromptConfigData,
-      modelParams,
-      nlpServiceUrl,
-    );
+    return new SerializedPromptConfigAdapter({
+      config: data as PromptConfigData,
+      litellmParams: modelParams,
+      nlpServiceUrl: nlpServiceUrl,
+    });
   },
   http: ({ data }) => new SerializedHttpAgentAdapter(data as HttpAgentData),
   code: ({ data, nlpServiceUrl, projectApiKey }) => {
