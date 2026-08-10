@@ -106,6 +106,12 @@ const registry = {
       "Contact support to have it enabled for this workspace",
     ],
   },
+  page_too_deep: {
+    tips: [
+      "Narrow the time range or filters so the page falls inside the window",
+      "Walk forward page by page, which has no depth limit",
+    ],
+  },
   clickhouse_unavailable: {
     tips: [
       "This is a temporary platform issue — retry in a few seconds",
@@ -154,6 +160,22 @@ const registry = {
       "This name is reserved for keys LangWatch manages on your behalf — pick a different name",
     ],
     docsPath: "/api-reference/api-keys/create-api-key",
+  },
+
+  // ---- personal workspace reads ----
+  // Both are hit almost entirely by agents and CLIs, which have no UI to fall
+  // back on, so the tips have to name the key to swap in rather than restate
+  // the refusal.
+  personal_project_key_required: {
+    tips: [
+      "Send the API key from your own personal workspace; a shared or team workspace key names no single owner to report for",
+      "Every personal workspace carries its own API key on its settings page",
+    ],
+  },
+  personal_usage_key_mismatch: {
+    tips: [
+      "Send a key scoped to your own personal workspace; being allowed to view a workspace is not the same as it being yours",
+    ],
   },
 
   // ---- evaluations ----

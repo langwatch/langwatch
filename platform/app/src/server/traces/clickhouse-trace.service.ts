@@ -5,6 +5,8 @@ import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
 import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
+import { AnnotationService } from "~/server/annotations/annotation.service";
+import { annotationSuggestedOutput } from "~/server/annotations/annotationSuggestedOutput";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
   queryWindowed,
@@ -561,6 +563,76 @@ export class ClickHouseTraceService {
             "Failed to resolve trace ID by prefix from ClickHouse",
           );
           throw new Error("Failed to resolve trace ID by prefix");
+        }
+      },
+    );
+  }
+
+  /**
+   * Narrow a set of candidate trace IDs down to the ones this project actually
+   * holds a trace for. Reads IDs only, so it stays cheap enough to sit in front
+   * of a write path that would otherwise store references to nothing.
+   *
+   * Deliberately unbounded on the partition key, unlike every other read here,
+   * so the cold-scan detector flags it and that is correct rather than an
+   * oversight: callers hold a bare list of IDs of unknown age (a queue hand-off,
+   * an automation firing on a trace someone picked weeks ago) and have no time
+   * range to bound it with. Guessing one would report an old-but-live trace as
+   * missing, which is the failure this guard exists to prevent. What keeps the
+   * cost down is the sort key: `TraceId` follows `TenantId`, so each partition's
+   * primary index narrows to the candidate IDs without reading their rows.
+   *
+   * No dedup: several unmerged versions of a row all prove the same thing, and
+   * the answer is set membership, not a value.
+   *
+   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
+   */
+  async findExistingTraceIds({
+    projectId,
+    traceIds,
+  }: {
+    /** The project ID (scoped via TenantId) */
+    projectId: string;
+    /** Candidate trace IDs to check */
+    traceIds: string[];
+  }): Promise<string[]> {
+    if (traceIds.length === 0) return [];
+
+    return await this.tracer.withActiveSpan(
+      "ClickHouseTraceService.findExistingTraceIds",
+      {
+        attributes: {
+          "tenant.id": projectId,
+          "trace.id.candidate_count": traceIds.length,
+        },
+      },
+      async () => {
+        const clickHouseClient = await this.resolveClient(projectId);
+
+        try {
+          const result = await clickHouseClient.query({
+            query: `
+              SELECT DISTINCT TraceId
+              FROM trace_summaries
+              WHERE TenantId = {tenantId:String}
+                AND TraceId IN ({traceIds:Array(String)})
+            `,
+            query_params: { tenantId: projectId, traceIds },
+            format: "JSONEachRow",
+          });
+
+          const rows = (await result.json()) as Array<{ TraceId: string }>;
+          return rows.map((row) => row.TraceId);
+        } catch (error) {
+          this.logger.error(
+            {
+              projectId,
+              traceIdCount: traceIds.length,
+              error: error instanceof Error ? error.message : error,
+            },
+            "Failed to check trace existence in ClickHouse",
+          );
+          throw new Error("Failed to check which traces exist");
         }
       },
     );
@@ -2245,6 +2317,12 @@ export class ClickHouseTraceService {
    * Annotations are Postgres-only (Prisma), never carried by the ClickHouse
    * read path. Fetched scoped to the page's trace IDs (multitenancy: projectId
    * is the first predicate). Mutates each trace's `annotations` in place.
+   *
+   * Every comment left on those traces, anchored ones included: this one read
+   * feeds the trace table, the export and the dataset columns, and a comment on
+   * one span of a trace is part of what reviewers said about it. A suggestion
+   * only reads as the trace's expected output when that is what it suggested;
+   * a correction proposed for a span or for the trace's input is not one.
    */
   private async enrichTracesWithAnnotationsForProjection({
     projectId,
@@ -2260,20 +2338,9 @@ export class ClickHouseTraceService {
     // name-addressable (annotations.scores.<name>), so fetch the score
     // definitions to remap id -> name. Deleted definitions are included so
     // historical scoreOptions still resolve.
+    const annotations = AnnotationService.create({ prisma: this.prisma });
     const [rows, scoreDefs] = await Promise.all([
-      this.prisma.annotation.findMany({
-        where: { projectId, traceId: { in: traceIds } },
-        select: {
-          id: true,
-          traceId: true,
-          isThumbsUp: true,
-          comment: true,
-          expectedOutput: true,
-          scoreOptions: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: "asc" },
-      }),
+      annotations.getAllForProjection({ projectId, traceIds }),
       this.prisma.annotationScore.findMany({
         where: { projectId },
         select: { id: true, name: true },
@@ -2288,7 +2355,11 @@ export class ClickHouseTraceService {
         id: row.id,
         is_thumbs_up: row.isThumbsUp ?? null,
         comment: row.comment ?? null,
-        expected_output: row.expectedOutput ?? null,
+        expected_output:
+          annotationSuggestedOutput({
+            annotation: row,
+            traceId: row.traceId,
+          }) ?? null,
         scores: remapScoreOptionsToNames(row.scoreOptions, scoreNameById),
         created_at: row.createdAt.getTime(),
       });

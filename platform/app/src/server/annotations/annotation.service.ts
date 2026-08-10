@@ -4,6 +4,7 @@ import {
   AnnotationRepository,
   type CreateAnnotationInput,
   type DeleteAnnotationInput,
+  type ProjectionAnnotationRow,
   type UpdateAnnotationInput,
 } from "./annotation.repository";
 
@@ -24,6 +25,26 @@ export class AnnotationService {
 
   async delete(input: DeleteAnnotationInput): Promise<Annotation> {
     return this.repository.delete(input);
+  }
+
+  /**
+   * What a page of traces carries in its `annotations` collection: every
+   * comment left on those traces, each carrying the part of the trace it is
+   * about. A trace row, an export and a dataset column all show what reviewers
+   * said, and a comment on one span is one of the things they said.
+   */
+  async getAllForProjection({
+    projectId,
+    traceIds,
+  }: {
+    projectId: string;
+    traceIds: string[];
+  }): Promise<ProjectionAnnotationRow[]> {
+    return this.repository.findAllForProjection({
+      projectId,
+      traceIds,
+      anchorScope: "all",
+    });
   }
 
   async getProjectOrganizationId({

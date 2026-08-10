@@ -12,7 +12,6 @@ import { useRouter } from "~/utils/compat/next-router";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { api } from "../../utils/api";
-import { Link } from "../ui/link";
 import { Message, TraceMessages } from "./TraceMessages";
 
 export function Conversation({
@@ -119,28 +118,6 @@ export function Conversation({
                   loadingMore={threadTraces.isFetching}
                 />
               )}
-            {trace.data && !trace.data.metadata.thread_id && (
-              <Box width="full" maxWidth="1000px" paddingY={8}>
-                <Text
-                  fontStyle="italic"
-                  color="fg.muted"
-                  textAlign="center"
-                  width="full"
-                >
-                  Pass the thread_id on your integration to capture and
-                  visualize the whole conversation or associated actions. Read
-                  more on our{" "}
-                  <Link
-                    isExternal
-                    href="https://docs.langwatch.ai/integration/python/guide#adding-metadata"
-                    textDecoration="underline"
-                  >
-                    docs
-                  </Link>
-                  .
-                </Text>
-              </Box>
-            )}
           </>
         ) : trace.isLoading ? (
           <Box maxWidth="1000px" width="full">

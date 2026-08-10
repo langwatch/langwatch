@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaymetrics"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -55,13 +56,27 @@ func faultForUpstreamStatus(status int) Fault {
 }
 
 // faultForCode attributes the gateway's own error codes.
+//
+// Every code the gateway AUTHORS belongs in one of the two named cases. The
+// default is for codes that genuinely are our problem, so a customer-caused
+// code left out of the list here does not read as unattributed — it reads as
+// a platform incident, at error level, on the one log line operators alert
+// on. That is the trap ErrCodexSessionExpired fell into when it stopped
+// being a forwarded provider 401 and became a handled error of our own:
+// faultForUpstreamStatus had been answering "customer" for it by reading the
+// status off the response it no longer has.
 func faultForCode(code herr.Code) Fault {
 	switch code {
 	case domain.ErrInvalidAPIKey, domain.ErrBudgetExceeded, domain.ErrRateLimited,
 		domain.ErrGuardrailBlocked, domain.ErrPolicyViolation, domain.ErrModelNotAllowed,
-		domain.ErrPayloadTooLarge, domain.ErrBadRequest, domain.ErrNotFound,
+		domain.ErrPayloadTooLarge, domain.ErrBadRequest, domain.ErrMissingModel, domain.ErrNotFound,
 		domain.ErrKeyRevoked, domain.ErrKeyDisabled, domain.ErrNoProviderConfigured,
-		domain.ErrEndUserRequired:
+		domain.ErrEndUserRequired,
+		// The customer's own OpenAI sign-in died and only they can restore it,
+		// so it is their fault in the only sense this attribution means: whose
+		// action fixes it. Counted per key too, which is what shows an
+		// operator a key wedged in a re-authenticate loop.
+		domain.ErrCodexSessionExpired:
 		return FaultCustomer
 	case domain.ErrProviderError, domain.ErrProviderTimeout,
 		domain.ErrChainExhausted, domain.ErrCircuitOpen:
@@ -94,6 +109,32 @@ func logRequestError(logger *zap.Logger, ctx context.Context, fault Fault, code 
 	logger.Log(fault.level(), "gateway_request_failed", fields...)
 }
 
+// recordClientReject counts a rejection the GATEWAY issued against the caller.
+//
+// Scoped to faultForCode deliberately, with two exclusions on top of that.
+// faultForUpstreamStatus also answers FaultCustomer, for any provider 4xx, so
+// counting every customer fault would put every OpenAI 429 and Anthropic 402
+// on a counter named "client rejects". A provider having a bad hour would
+// then read as clients looping on malformed bodies, for keys doing nothing
+// wrong, and the per-key alert this metric exists for would be muted with the
+// real signal inside it. Provider rejections are already carried by
+// gateway_provider_attempts_total.
+//
+// domain.ErrRateLimited is excluded too, for the same "keys doing nothing
+// wrong" reason: a key legitimately sustained at its RPM/RPD ceiling would
+// pin this counter and mute the alert it exists for, and that rejection is
+// already carried by gateway_rate_limit_denied_total.
+func recordClientReject(ctx context.Context, code herr.Code) {
+	if faultForCode(code) != FaultCustomer || code == domain.ErrRateLimited {
+		return
+	}
+	virtualKeyID := ""
+	if bundle := BundleFromContext(ctx); bundle != nil {
+		virtualKeyID = bundle.VirtualKeyID
+	}
+	gatewaymetrics.RecorderFromContext(ctx).RecordClientReject(code.String(), virtualKeyID)
+}
+
 // logWriteError classifies err and logs it; the single logging choke point
 // for every error response the gateway writes (writeError).
 func logWriteError(logger *zap.Logger, ctx context.Context, err error) {
@@ -113,6 +154,7 @@ func logWriteError(logger *zap.Logger, ctx context.Context, err error) {
 			msg = m
 		}
 		logRequestError(logger, ctx, faultForCode(e.Code), e.Code.String(), 0, msg)
+		recordClientReject(ctx, e.Code)
 		return
 	}
 	logRequestError(logger, ctx, FaultPlatform, "unhandled", 0, err.Error())

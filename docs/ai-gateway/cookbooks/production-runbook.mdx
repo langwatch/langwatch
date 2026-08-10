@@ -244,7 +244,7 @@ The three log lines form a ladder operators read in order:
 **Customer-facing behaviour during the grace window:**
 
 - Requests against any VK that resolved successfully **before** the outage continue to work transparently.
-- Requests against any VK **never seen by this pod** (cold) still fail, the gateway has no bundle to fall back to. Today's mitigation is Redis L2 (`GATEWAY_REDIS_URL`): HPA-scaled pods inherit the warm set from L2 even while the control plane is unreachable. (`GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` is a planned v1.1 enhancement to also pre-warm L1 from a `/bootstrap` snapshot on startup; the flag is reserved in env wiring but has no Go-side implementation today, so setting it is currently a no-op.)
+- Requests against any VK **never seen by this pod** (cold) still fail, the gateway has no bundle to fall back to. The cache is per pod, so a pod added during the outage starts cold. (`GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` is a planned enhancement to pre-warm the cache from a `/bootstrap` snapshot on startup; the flag is reserved in env wiring but has no Go-side implementation today, so setting it is currently a no-op.)
 - Requests against any VK whose JWT was **revoked just before the outage** but the revocation `/changes` event hadn't propagated yet, these stay served until the cache entry crosses its hard cap. Acceptable trade-off for the grace; auth rejections from a healthy CP still evict instantly via `auth_cache_hard_evict reason=auth_rejection`.
 
 **Tune:**
@@ -274,10 +274,9 @@ The gateway is a cache of the control plane, so a surprising amount continues to
 
 | Component down | Customer impact | How long gateway stays up | Notes |
 |---|---|---|---|
-| LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default 21600, 6 h) of stale-while-error; Redis L2 extends coverage to cold-for-pod VKs | Spend accounting is unaffected: cost rides the spend commands the gateway spools, and the ledger catches up once the control plane returns. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
+| LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default 21600, 6 h) of stale-while-error; a VK the pod has never resolved is not covered | Spend accounting is unaffected: cost rides the spend commands the gateway spools, and the ledger catches up once the control plane returns. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
 | One upstream provider | None for VKs with fallback; 502/504 for VKs without | Indefinite, circuit breaker + fallback chain absorb it | `gateway_circuit_state{credential_id}` shows which provider is down |
-| Redis L2 cache | +~30 ms on cold-for-pod VKs | Indefinite, L1 + `/resolve-key` cover the miss | Fail-open by design (poison entries `DEL`, network errors log and miss) |
-| Gateway pod (crash, eviction) | None, HPA replaces, PDB holds ≥ 2 replicas | N/A | Stateless; new pod warms from Redis L2 + `/bootstrap` |
+| Gateway pod (crash, eviction) | Streams in flight on that pod are cut; other requests retry onto a surviving replica | N/A | Stateless; the replacement pod warms from the control plane on its first request per key. The PDB (`minAvailable: 1` by default, against 2 replicas) only bounds voluntary disruptions like a drain, so it does not apply to a crash |
 
 For multi-region deployments with shared control plane: a gateway region down is handled by Route53 latency-based failover. See [Scaling → Regional placement](/ai-gateway/self-hosting/scaling#regional-placement).
 

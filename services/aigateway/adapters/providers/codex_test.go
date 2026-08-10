@@ -13,6 +13,7 @@ import (
 
 	"github.com/tidwall/gjson"
 
+	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -192,15 +193,12 @@ func TestCodexStream_StillUnauthorizedAfterRefreshIsSessionExpired(t *testing.T)
 		"openai_codex/gpt-5.6-terra",
 		codexCredential(),
 	)
-	var upstream *domain.UpstreamError
-	if !errors.As(err, &upstream) {
-		t.Fatalf("expected UpstreamError, got %v", err)
+	var herrErr herr.E
+	if !errors.As(err, &herrErr) {
+		t.Fatalf("expected herr.E, got %v", err)
 	}
-	if upstream.StatusCode != http.StatusUnauthorized {
-		t.Errorf("expected 401, got %d", upstream.StatusCode)
-	}
-	if !strings.Contains(string(upstream.Body), "codex_session_expired") {
-		t.Errorf("retry-still-401 must carry the typed code, got: %s", upstream.Body)
+	if herrErr.Code != domain.ErrCodexSessionExpired {
+		t.Errorf("retry-still-401 must carry the typed code, got: %s", herrErr.Code)
 	}
 }
 
@@ -220,15 +218,12 @@ func TestCodexStream_DeadSessionSurfacesTypedError(t *testing.T) {
 		"openai_codex/gpt-5.6-terra",
 		codexCredential(),
 	)
-	var upstream *domain.UpstreamError
-	if !errors.As(err, &upstream) {
-		t.Fatalf("expected UpstreamError, got %v", err)
+	var herrErr herr.E
+	if !errors.As(err, &herrErr) {
+		t.Fatalf("expected herr.E, got %v", err)
 	}
-	if upstream.StatusCode != http.StatusUnauthorized {
-		t.Errorf("expected 401, got %d", upstream.StatusCode)
-	}
-	if !strings.Contains(string(upstream.Body), "codex_session_expired") {
-		t.Errorf("body missing typed code: %s", upstream.Body)
+	if herrErr.Code != domain.ErrCodexSessionExpired {
+		t.Errorf("body missing typed code: %s", herrErr.Code)
 	}
 }
 

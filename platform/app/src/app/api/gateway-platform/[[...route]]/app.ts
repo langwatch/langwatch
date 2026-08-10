@@ -68,7 +68,12 @@ import {
   parseVirtualKeyConfig,
   virtualKeyConfigSchema,
 } from "~/server/gateway/virtualKey.config";
-import { toVirtualKeySnakeDto } from "~/server/gateway/virtualKey.dto";
+import {
+  loadTraceDestinationFacts,
+  toVirtualKeySnakeDto,
+  type VirtualKeySnakeDto,
+} from "~/server/gateway/virtualKey.dto";
+import type { VirtualKeyWithScopes } from "~/server/gateway/virtualKey.repository";
 // GatewayProviderCredentialService removed in iter 110; /providers REST
 // routes return 410 Gone until A3 lands the ModelProvider-backed
 // replacement surface (current proposal: fold into /model-providers).
@@ -151,9 +156,17 @@ const virtualKeyDtoSchema = z.object({
   purpose: z.enum(["user", "langy"]),
   display_prefix: z.string(),
   principal_user_id: z.string().nullable(),
-  // Where an org- or team-owned key's traces and costs land. Not a
-  // scope: it grants no access to the key.
-  trace_project_id: z.string().nullable(),
+  trace_project_id: z
+    .string()
+    .nullable()
+    .describe(
+      "The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination.",
+    ),
+  trace_project_archived: z
+    .boolean()
+    .describe(
+      "True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone.",
+    ),
   /** The caller's own id for this key, unique within the organization. */
   external_id: z.string().nullable(),
   /** Customer-owned bookkeeping, echoed back verbatim. Never interpreted. */
@@ -233,6 +246,12 @@ const budgetDtoSchema = z.object({
   member_count: z.number().int().optional(),
   end_users_seen: z.number().int().optional(),
   end_users_over: z.number().int().optional(),
+  scope_reach: z
+    .enum(["reachable", "unreachable"])
+    .optional()
+    .describe(
+      "Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. This is the only field that tells a budget nothing can reach apart from one that simply has not been breached.",
+    ),
 });
 
 const spendSummaryDtoSchema = z.object({
@@ -455,8 +474,11 @@ const createVirtualKeySchema = z.object({
    */
   scopes: z.array(scopeWireSchema).min(1).optional(),
   /**
-   * Explicit trace destination for org- and team-owned keys. NOT a
-   * scope: it grants no visibility and no operate rights on the key.
+   * Where this key's traces and costs land. NOT a scope: it grants no
+   * visibility and no operate rights on the key. Omit it and the
+   * destination is taken from the key's single project scope, or from the
+   * organization's governance project when there is nothing else to name.
+   * Either way the answer is stored on the key.
    */
   trace_project_id: z.string().nullable().optional(),
   routing_policy_id: z.string().nullable().optional(),
@@ -481,7 +503,13 @@ const updateVirtualKeySchema = z.object({
   name: z.string().min(1).max(128).optional(),
   description: z.string().nullable().optional(),
   scopes: z.array(scopeWireSchema).min(1).optional(),
-  trace_project_id: z.string().nullable().optional(),
+  trace_project_id: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "Where the key's traces and costs land. Omit it and the destination stays exactly where it is, scope edits included. A value moves it, validated the way create validates it. Explicit null does not clear it: it asks for the destination to be worked out again from what the key is now, under the same rules create uses. It lands on the key's single project scope when exactly one names a live project, and otherwise on the organization's oldest live governance project when there are no other live projects to choose from. An organization with live projects that could have been named refuses with `gateway_trace_project_ambiguous`, and one with no governance project to fall back on refuses with `trace_project_required`.",
+    ),
   routing_policy_id: z.string().nullable().optional(),
   routing_mode: routingModeWireSchema.optional(),
   /** Undefined leaves the key's cap alone; a value upserts it; null archives it. */
@@ -574,9 +602,40 @@ const createBudgetSchema = z.object({
     .describe(
       "Phases the budget's cycle off this instant instead of the calendar, so a `month` budget anchored 2026-01-17T09:00:00Z starts a fresh period every 17th at 09:00 UTC. Omit for calendar alignment, which is the default and unchanged behaviour. A month cycle anchored past the 28th clamps into shorter months and springs back: anchored on the 31st gives Feb 28, then Mar 31. Immutable after create, since moving it would redraw periods the budget has already reported and enforced on. Rejected with `gateway_budget_cycle_anchor_invalid` on `total` and `manual`, which do not cycle.",
     ),
+  allow_unreachable: z
+    .boolean()
+    .optional()
+    .describe(
+      "Keeps a `team`, `project` or `group` budget that no active key can produce traffic for, which is otherwise refused with `gateway_budget_scope_unreachable`. Send it to provision ahead of the keys that will use the budget. An organization with no active keys is never refused, so this is not needed during first setup.",
+    ),
 });
 
-const toVkDto = toVirtualKeySnakeDto;
+/**
+ * The published shape of one key. Async because `trace_project_archived` is a
+ * fact about the project row rather than the key row, and a key goes on
+ * sending its traces to a project the customer deleted, so nothing else the
+ * caller can read says the destination is gone.
+ */
+async function toVkDto(vk: VirtualKeyWithScopes): Promise<VirtualKeySnakeDto> {
+  return toVirtualKeySnakeDto({
+    virtualKey: vk,
+    facts: await loadTraceDestinationFacts({
+      client: prisma,
+      virtualKeys: [vk],
+    }),
+  });
+}
+
+/** `toVkDto` for a page, in one read of the destinations however long it is. */
+async function toVkDtos(
+  vks: VirtualKeyWithScopes[],
+): Promise<VirtualKeySnakeDto[]> {
+  const facts = await loadTraceDestinationFacts({
+    client: prisma,
+    virtualKeys: vks,
+  });
+  return vks.map((vk) => toVirtualKeySnakeDto({ virtualKey: vk, facts }));
+}
 
 type GatewayContext = Context<{ Variables: AuthMiddlewareVariables }>;
 
@@ -875,9 +934,9 @@ secured.access(apiKeyPermission("virtualKeys:view")).get(
     // cursor therefore advances over rows READ, so a page can be shorter than
     // `limit` without meaning the walk is done.
     return c.json({
-      data: rows
-        .filter((vk) => isVisibleToMembership(membership, vk.scopes))
-        .map(toVkDto),
+      data: await toVkDtos(
+        rows.filter((vk) => isVisibleToMembership(membership, vk.scopes)),
+      ),
       next_cursor: nextPageCursor(rows, page.data.limit, (vk) => [
         vk.createdAt.getTime(),
         vk.id,
@@ -891,7 +950,7 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
   describeRoute({
     summary: "Create virtual key",
     description:
-      "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
+      "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
     tags: ["Virtual Keys"],
     parameters: [idempotencyKeyParameter],
     responses: {
@@ -1004,7 +1063,7 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
           // use, so the secret has to transit the receipt.
           return {
             status: 201,
-            body: { virtual_key: toVkDto(virtualKey), secret },
+            body: { virtual_key: await toVkDto(virtualKey), secret },
           };
         },
       });
@@ -1049,7 +1108,7 @@ secured.access(apiKeyPermission("virtualKeys:view")).get(
         membershipForApiCaller(project),
         { id, organizationId },
       );
-      return c.json({ virtual_key: toVkDto(vk) });
+      return c.json({ virtual_key: await toVkDto(vk) });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1157,7 +1216,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
   describeRoute({
     summary: "Update virtual key",
     description:
-      "Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.",
+      "Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope, and does NOT move where the key's traces and costs land: send `trace_project_id` for that, validated the way create validates it; explicit null re-resolves it under the create-time rules rather than clearing it. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.",
     tags: ["Virtual Keys"],
     responses: {
       ...canonicalBaseResponses,
@@ -1210,7 +1269,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
         externalId: body.data.external_id,
         metadata: body.data.metadata,
       });
-      return c.json({ virtual_key: toVkDto(updated) });
+      return c.json({ virtual_key: await toVkDto(updated) });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1259,7 +1318,7 @@ secured.access(apiKeyPermission("virtualKeys:rotate")).post(
         organizationId,
         actorUserId,
       });
-      return c.json({ virtual_key: toVkDto(virtualKey), secret });
+      return c.json({ virtual_key: await toVkDto(virtualKey), secret });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1329,7 +1388,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).post(
         actorUserId,
         reason: body.data.reason ?? null,
       });
-      return c.json({ virtual_key: toVkDto(updated) });
+      return c.json({ virtual_key: await toVkDto(updated) });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1373,7 +1432,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).post(
         organizationId,
         actorUserId,
       });
-      return c.json({ virtual_key: toVkDto(updated) });
+      return c.json({ virtual_key: await toVkDto(updated) });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1417,7 +1476,7 @@ secured.access(apiKeyPermission("virtualKeys:delete")).post(
         organizationId,
         actorUserId,
       });
-      return c.json({ virtual_key: toVkDto(updated) });
+      return c.json({ virtual_key: await toVkDto(updated) });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1556,6 +1615,7 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
       budgets: rows,
       spendAvailable,
       readAt,
+      scopeReach,
     } = await service.listPageWithHealth({
       organizationId,
       limit: page.data.limit,
@@ -1577,6 +1637,7 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
           memberCount: memberCounts.get(b.scopeId),
           spendAvailable,
           readAt,
+          reachable: scopeReach.get(b.id)?.reachable,
         }),
       ),
       next_cursor: nextPageCursor(rows, page.data.limit, (b) => [
@@ -1641,6 +1702,7 @@ secured.access(apiKeyPermission("gatewayBudgets:view")).get(
         memberCount: memberCounts.get(found.budget.scopeId),
         spendAvailable: found.spendAvailable,
         readAt: found.readAt,
+        reachable: !found.unreachableByAnyKey,
       }),
     });
   },
@@ -1651,7 +1713,7 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
   describeRoute({
     summary: "Create budget",
     description:
-      "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). `group` budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the calendar, for budgets that have to line up with a billing date. Send `Idempotency-Key` to make a retry safe.",
+      "Creates an organization-owned budget. The scope discriminates which resource the budget covers, across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user). `group` budgets are per-member allowances and `attributed_user` budgets are per-end-user templates; both require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the calendar, for budgets that have to line up with a billing date. A `team`, `project` or `group` budget that none of the organization's active keys can produce traffic for is refused with `gateway_budget_scope_unreachable`, since it would never spend and never block; send `allow_unreachable` to keep it anyway, and note that an organization with no active keys is never refused. Send `Idempotency-Key` to make a retry safe.",
     tags: ["Budgets"],
     parameters: [idempotencyKeyParameter],
     responses: {
@@ -1713,15 +1775,20 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
             cycleAnchorAt: body.data.cycle_anchor_at
               ? new Date(body.data.cycle_anchor_at)
               : null,
+            allowUnreachable: body.data.allow_unreachable,
             actorUserId,
           });
-          const memberCounts = await groupMemberCounts([row]);
+          const [memberCounts, reach] = await Promise.all([
+            groupMemberCounts([row]),
+            service.scopeReach({ organizationId, scope: row }),
+          ]);
           return {
             status: 201,
             body: {
               budget: toBudgetDto({
                 budget: row,
                 memberCount: memberCounts.get(row.scopeId),
+                reachable: reach.reachable,
               }),
             },
           };

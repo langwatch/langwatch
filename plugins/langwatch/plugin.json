@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "langwatch",
+  "version": "1.0.0",
+  "description": "Records which repository and branch each coding-agent session worked in, and teaches the agent to read its own traces back from LangWatch.",
+  "author": {
+    "name": "LangWatch",
+    "url": "https://langwatch.ai"
+  },
+  "homepage": "https://docs.langwatch.ai",
+  "repository": "https://github.com/langwatch/agent-plugin",
+  "license": "MIT",
+  "keywords": [
+    "langwatch",
+    "observability",
+    "telemetry",
+    "traces",
+    "coding-agent"
+  ]
+}

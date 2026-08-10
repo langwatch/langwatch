@@ -219,6 +219,28 @@ describe("TerminalView", () => {
       expect(screen.getByText("step 4/4")).toBeInTheDocument();
     });
 
+    it("counts no step when the agent reported usage but nothing to walk", () => {
+      renderView({
+        entries: [
+          {
+            kind: "model_call",
+            atMs: 1000,
+            model: "claude-opus-5",
+            tokens: 212,
+            costUsd: 0.1930215,
+            durationMs: 2000,
+            spanId: "llm-only",
+            inputTokens: 2,
+            outputTokens: 210,
+            cacheReadTokens: 18443,
+            cacheCreationTokens: 17854,
+          },
+        ],
+      });
+
+      expect(screen.getByText("step 0/0")).toBeInTheDocument();
+    });
+
     it("has no drag-to-scrub control — scrolling is the only way to travel through it", () => {
       renderView();
       expect(screen.queryByRole("slider")).toBeNull();

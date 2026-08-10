@@ -37,6 +37,7 @@ func TestWriteHTTP_ExposesMetaTraceAndReasons(t *testing.T) {
 	WriteHTTP(rec, e)
 
 	assert.Equal(t, http.StatusBadGateway, rec.Code)
+	assert.Equal(t, "chain_exhausted", rec.Header().Get(HandledErrorHeader))
 
 	var resp ErrorResponse
 	require.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))

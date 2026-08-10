@@ -81,7 +81,7 @@ readinessProbe:
 
 - **Per-provider live health.** If OpenAI is rate-limiting, the gateway still serves and falls back per the VK's configured chain. Reporting `not_ready` for one upstream would amplify the incident.
 - **The control plane.** A control-plane blip is a degradation the auth cache is built to absorb: warm keys keep serving from the in-process cache. Failing readiness on it would drop every replica from the load balancer at once and turn that degradation into a total outage. Control-plane reachability is reported on `/health` instead, where it informs a status page rather than gating traffic.
-- **Redis L2.** The current gateway has no Redis client; the auth cache is in-process LRU.
+- **Any shared cache.** The gateway has no Redis client; the auth cache is an in-process LRU, private to the pod.
 - **PostgreSQL.** The gateway never talks to Postgres directly; the control plane mediates persistence.
 
 The blast-radius of readiness is specifically: "is this pod still meant to serve traffic?", and the only condition today is `MarkDraining`.

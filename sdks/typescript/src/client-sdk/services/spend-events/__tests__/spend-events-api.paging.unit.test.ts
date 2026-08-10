@@ -61,6 +61,8 @@ const spendEvent = (id: string): SpendEvent => ({
 
 const summaryRow = (key: string): SpendSummaryRow => ({
   key,
+  group: { virtual_key: key },
+  bucket_start: null,
   event_count: 3,
   settled_count: 1,
   usage: {

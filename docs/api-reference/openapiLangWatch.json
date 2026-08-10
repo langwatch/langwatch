@@ -523,6 +523,21 @@
     "/api/annotations": {
       "get": {
         "description": "Returns all annotations for project",
+        "parameters": [
+          {
+            "name": "anchor",
+            "in": "query",
+            "description": "Which comments to return. Omitted returns every comment, including the ones left on a span, a field, an attribute or a message; \"trace\" returns only the comments about whole traces.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "trace",
+                "all"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Annotation response",
@@ -561,6 +576,19 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "anchor",
+            "in": "query",
+            "description": "Which comments to return. Omitted returns every comment, including the ones left on a span, a field, an attribute or a message; \"trace\" returns only the comments about whole traces.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "trace",
+                "all"
+              ]
             }
           }
         ],
@@ -1588,7 +1616,12 @@
         },
         "operationId": "getApiModel-defaults",
         "parameters": [],
-        "description": "Snapshot of the default-model cascade for this project: effective resolution per role, plus the configs the caller can read."
+        "description": "Snapshot of the default-model cascade for this project: effective resolution per role, plus the configs the caller can read.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {
@@ -1743,7 +1776,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/model-defaults/{id}": {
@@ -1889,7 +1927,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {
@@ -1992,7 +2035,12 @@
             "required": true
           }
         ],
-        "description": "Delete a default-model config. Scope attachments cascade."
+        "description": "Delete a default-model config. Scope attachments cascade.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/teams": {
@@ -2020,7 +2068,12 @@
             }
           }
         ],
-        "description": "List all non-archived teams for the organization (paginated)"
+        "description": "List all non-archived teams for the organization (paginated)",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {},
@@ -2045,7 +2098,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/teams/{id}": {
@@ -2062,7 +2120,12 @@
             "required": true
           }
         ],
-        "description": "Get a team by its id"
+        "description": "Get a team by its id",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       },
       "patch": {
         "responses": {},
@@ -2093,7 +2156,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {},
@@ -2108,7 +2176,12 @@
             "required": true
           }
         ],
-        "description": "Archive a team (soft-delete)"
+        "description": "Archive a team (soft-delete)",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/teams/{id}/members": {
@@ -2125,7 +2198,12 @@
             "required": true
           }
         ],
-        "description": "List members of a team"
+        "description": "List members of a team",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {},
@@ -2168,7 +2246,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/teams/{id}/members/{userId}": {
@@ -2193,7 +2276,12 @@
             "required": true
           }
         ],
-        "description": "Remove a member from a team"
+        "description": "Remove a member from a team",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/teams/{id}/projects": {
@@ -2210,7 +2298,12 @@
             "required": true
           }
         ],
-        "description": "List projects in a team"
+        "description": "List projects in a team",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/groups": {
@@ -2238,7 +2331,12 @@
             }
           }
         ],
-        "description": "List all groups for the organization"
+        "description": "List all groups for the organization",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {},
@@ -2306,7 +2404,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/groups/{id}": {
@@ -2323,7 +2426,12 @@
             "required": true
           }
         ],
-        "description": "Get a group with members and bindings"
+        "description": "Get a group with members and bindings",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       },
       "patch": {
         "responses": {},
@@ -2357,7 +2465,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {},
@@ -2372,7 +2485,12 @@
             "required": true
           }
         ],
-        "description": "Delete a group"
+        "description": "Delete a group",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/groups/{id}/members": {
@@ -2389,7 +2507,12 @@
             "required": true
           }
         ],
-        "description": "List members of a group"
+        "description": "List members of a group",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {},
@@ -2422,7 +2545,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/groups/{id}/members/{userId}": {
@@ -2447,7 +2575,12 @@
             "required": true
           }
         ],
-        "description": "Remove a member from a group"
+        "description": "Remove a member from a group",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/groups/{id}/bindings": {
@@ -2464,7 +2597,12 @@
             "required": true
           }
         ],
-        "description": "List role bindings for a group"
+        "description": "List role bindings for a group",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {},
@@ -2519,7 +2657,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/groups/{id}/bindings/{bindingId}": {
@@ -2544,7 +2687,12 @@
             "required": true
           }
         ],
-        "description": "Remove a role binding from a group"
+        "description": "Remove a role binding from a group",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/agents": {
@@ -2572,7 +2720,12 @@
             }
           }
         ],
-        "description": "List all non-archived agents for the project (paginated)"
+        "description": "List all non-archived agents for the project (paginated)",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {},
@@ -2615,7 +2768,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/agents/{id}": {
@@ -2632,7 +2790,12 @@
             "required": true
           }
         ],
-        "description": "Get an agent by its id"
+        "description": "Get an agent by its id",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "patch": {
         "responses": {},
@@ -2682,7 +2845,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {},
@@ -2697,7 +2865,12 @@
             "required": true
           }
         ],
-        "description": "Archive an agent (soft-delete)"
+        "description": "Archive an agent (soft-delete)",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/api-keys": {
@@ -4972,7 +5145,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/v1/projects/{projectId}/analytics/query/clickhouse": {
@@ -5215,7 +5393,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/v1/projects/{projectId}/analytics/schema": {
@@ -5434,7 +5617,743 @@
           }
         ],
         "summary": "Discover the governed analytics schema",
-        "description": "Lists the governed analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query."
+        "description": "Lists the governed analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/coding-agent/sessions/{sessionId}/events": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "One page of session events plus the cursor for the next page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sessionId": {
+                            "type": "string"
+                          },
+                          "timeUnixMs": {
+                            "type": "number"
+                          },
+                          "recordId": {
+                            "type": "string"
+                          },
+                          "eventKind": {
+                            "type": "string"
+                          },
+                          "agent": {
+                            "type": "string"
+                          },
+                          "sessionKeySource": {
+                            "type": "string"
+                          },
+                          "traceId": {
+                            "type": "string"
+                          },
+                          "spanId": {
+                            "type": "string"
+                          },
+                          "promptId": {
+                            "type": "string"
+                          },
+                          "querySource": {
+                            "type": "string"
+                          },
+                          "agentType": {
+                            "type": "string"
+                          },
+                          "eventSequence": {
+                            "type": "number"
+                          },
+                          "requestId": {
+                            "type": "string"
+                          },
+                          "model": {
+                            "type": "string"
+                          },
+                          "inputTokens": {
+                            "type": "number"
+                          },
+                          "outputTokens": {
+                            "type": "number"
+                          },
+                          "cacheReadTokens": {
+                            "type": "number"
+                          },
+                          "cacheCreationTokens": {
+                            "type": "number"
+                          },
+                          "costUsd": {
+                            "type": "number"
+                          },
+                          "durationMs": {
+                            "type": "number"
+                          },
+                          "ttftMs": {
+                            "type": "number"
+                          },
+                          "attempt": {
+                            "type": "number"
+                          },
+                          "speed": {
+                            "type": "string"
+                          },
+                          "stopReason": {
+                            "type": "string"
+                          },
+                          "preTokens": {
+                            "type": "number"
+                          },
+                          "postTokens": {
+                            "type": "number"
+                          },
+                          "compactionTrigger": {
+                            "type": "string"
+                          },
+                          "precomputeReuse": {
+                            "type": "string"
+                          },
+                          "statusCode": {
+                            "type": "string"
+                          },
+                          "errorType": {
+                            "type": "string"
+                          },
+                          "rateLimitCarrier": {
+                            "type": "string"
+                          },
+                          "retryDurationMs": {
+                            "type": "number"
+                          },
+                          "toolName": {
+                            "type": "string"
+                          },
+                          "success": {
+                            "type": "string"
+                          },
+                          "decision": {
+                            "type": "string"
+                          },
+                          "decisionSource": {
+                            "type": "string"
+                          },
+                          "toolInputBytes": {
+                            "type": "number"
+                          },
+                          "toolResultBytes": {
+                            "type": "number"
+                          },
+                          "promptChars": {
+                            "type": "number"
+                          },
+                          "totalTokens": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "sessionId",
+                          "timeUnixMs",
+                          "recordId",
+                          "eventKind",
+                          "agent",
+                          "sessionKeySource",
+                          "traceId",
+                          "spanId",
+                          "promptId",
+                          "querySource",
+                          "agentType",
+                          "eventSequence",
+                          "requestId",
+                          "model",
+                          "inputTokens",
+                          "outputTokens",
+                          "cacheReadTokens",
+                          "cacheCreationTokens",
+                          "costUsd",
+                          "durationMs",
+                          "ttftMs",
+                          "attempt",
+                          "speed",
+                          "stopReason",
+                          "preTokens",
+                          "postTokens",
+                          "compactionTrigger",
+                          "precomputeReuse",
+                          "statusCode",
+                          "errorType",
+                          "rateLimitCarrier",
+                          "retryDurationMs",
+                          "toolName",
+                          "success",
+                          "decision",
+                          "decisionSource",
+                          "toolInputBytes",
+                          "toolResultBytes",
+                          "promptChars",
+                          "totalTokens"
+                        ]
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "events",
+                    "nextCursor"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiCoding-agentSessionsBySessionIdEvents",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The agent's own session id (session.id / conversation id)."
+          },
+          {
+            "name": "kinds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated event kinds to include. Known kinds: model_call, compaction, rate_limit, api_error, retries_exhausted, tool_result, tool_decision, user_prompt, subagent_completed."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Opaque keyset cursor from the previous response's nextCursor."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "default": 500
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Epoch ms lower bound on event time; with `to`, prunes storage partitions for faster reads."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Epoch ms upper bound on event time."
+          }
+        ],
+        "summary": "List coding agent session events",
+        "description": "List a coding-agent session's events (model calls, compactions, rate limits, tool runs, prompts) in time order, keyset-paginated. Pass the previous response's nextCursor to continue; filter with kinds (comma-separated).",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/coding-agent/pull-request-usage": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "The pull request's usage rollup",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pullRequest": {
+                      "type": "object",
+                      "properties": {
+                        "repositoryHost": {
+                          "type": "string"
+                        },
+                        "repositoryFullName": {
+                          "type": "string"
+                        },
+                        "prNumber": {
+                          "type": "number"
+                        },
+                        "headBranch": {
+                          "type": "string"
+                        },
+                        "htmlUrl": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "type": "string"
+                        },
+                        "isDraft": {
+                          "type": "boolean"
+                        },
+                        "authorLogin": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "prCreatedAtMs": {
+                          "type": "number"
+                        },
+                        "prClosedAtMs": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "prMergedAtMs": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "repositoryHost",
+                        "repositoryFullName",
+                        "prNumber",
+                        "headBranch",
+                        "htmlUrl",
+                        "state",
+                        "isDraft",
+                        "authorLogin",
+                        "prCreatedAtMs",
+                        "prClosedAtMs",
+                        "prMergedAtMs"
+                      ]
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "projectId": {
+                            "type": "string"
+                          },
+                          "projectSlug": {
+                            "type": "string"
+                          },
+                          "contributorLabel": {
+                            "type": "string"
+                          },
+                          "contributorIsProject": {
+                            "type": "boolean"
+                          },
+                          "agent": {
+                            "type": "string"
+                          },
+                          "models": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "sessionsCount": {
+                            "type": "number"
+                          },
+                          "inputTokens": {
+                            "type": "number"
+                          },
+                          "outputTokens": {
+                            "type": "number"
+                          },
+                          "cacheReadTokens": {
+                            "type": "number"
+                          },
+                          "cacheCreationTokens": {
+                            "type": "number"
+                          },
+                          "totalTokens": {
+                            "type": "number"
+                          },
+                          "costUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "billedCostUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "nonBilledCostUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "projectId",
+                          "projectSlug",
+                          "contributorLabel",
+                          "contributorIsProject",
+                          "agent",
+                          "models",
+                          "sessionsCount",
+                          "inputTokens",
+                          "outputTokens",
+                          "cacheReadTokens",
+                          "cacheCreationTokens",
+                          "totalTokens",
+                          "costUsd",
+                          "billedCostUsd",
+                          "nonBilledCostUsd"
+                        ]
+                      }
+                    },
+                    "totals": {
+                      "type": "object",
+                      "properties": {
+                        "sessionsCount": {
+                          "type": "number"
+                        },
+                        "inputTokens": {
+                          "type": "number"
+                        },
+                        "outputTokens": {
+                          "type": "number"
+                        },
+                        "cacheReadTokens": {
+                          "type": "number"
+                        },
+                        "cacheCreationTokens": {
+                          "type": "number"
+                        },
+                        "totalTokens": {
+                          "type": "number"
+                        },
+                        "costUsd": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "billedCostUsd": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "nonBilledCostUsd": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "sessionsCount",
+                        "inputTokens",
+                        "outputTokens",
+                        "cacheReadTokens",
+                        "cacheCreationTokens",
+                        "totalTokens",
+                        "costUsd",
+                        "billedCostUsd",
+                        "nonBilledCostUsd"
+                      ]
+                    },
+                    "modelBreakdown": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "model": {
+                            "type": "string"
+                          },
+                          "inputTokens": {
+                            "type": "number"
+                          },
+                          "outputTokens": {
+                            "type": "number"
+                          },
+                          "cacheReadTokens": {
+                            "type": "number"
+                          },
+                          "cacheCreationTokens": {
+                            "type": "number"
+                          },
+                          "totalTokens": {
+                            "type": "number"
+                          },
+                          "costUsd": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "tokensKnown": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "model",
+                          "inputTokens",
+                          "outputTokens",
+                          "cacheReadTokens",
+                          "cacheCreationTokens",
+                          "totalTokens",
+                          "costUsd",
+                          "tokensKnown"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "pullRequest",
+                    "rows",
+                    "totals",
+                    "modelBreakdown"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiCoding-agentPull-request-usage",
+        "parameters": [
+          {
+            "name": "repository",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The repository as \"owner/name\"."
+          },
+          {
+            "name": "pullRequest",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The pull request number."
+          },
+          {
+            "name": "host",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "github.com"
+            }
+          }
+        ],
+        "summary": "Get pull request coding agent usage",
+        "description": "Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/dashboards": {
@@ -5442,7 +6361,12 @@
         "responses": {},
         "operationId": "getApiDashboards",
         "parameters": [],
-        "description": "List all dashboards for the project with graph counts"
+        "description": "List all dashboards for the project with graph counts",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {},
@@ -5467,7 +6391,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/dashboards/reorder": {
@@ -5497,7 +6426,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/dashboards/{id}": {
@@ -5514,7 +6448,12 @@
             "required": true
           }
         ],
-        "description": "Get a dashboard by its id, including its graphs"
+        "description": "Get a dashboard by its id, including its graphs",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "patch": {
         "responses": {},
@@ -5548,7 +6487,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {},
@@ -5563,7 +6507,12 @@
             "required": true
           }
         ],
-        "description": "Delete a dashboard and its graphs (hard delete, cascade)"
+        "description": "Delete a dashboard and its graphs (hard delete, cascade)",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/dataset": {
@@ -5591,7 +6540,12 @@
             }
           }
         ],
-        "description": "List all non-archived datasets for the project (paginated)"
+        "description": "List all non-archived datasets for the project (paginated)",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {},
@@ -5683,7 +6637,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/dataset/upload": {
@@ -5691,7 +6650,12 @@
         "responses": {},
         "operationId": "postApiDatasetUpload",
         "parameters": [],
-        "description": "Create a new dataset from an uploaded file (CSV, JSON, JSONL)"
+        "description": "Create a new dataset from an uploaded file (CSV, JSON, JSONL)",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/dataset/direct-upload": {
@@ -5699,7 +6663,12 @@
         "responses": {},
         "operationId": "postApiDatasetDirect-upload",
         "parameters": [],
-        "description": "Start a direct browser→S3 dataset upload (returns a presigned PUT)"
+        "description": "Start a direct browser→S3 dataset upload (returns a presigned PUT)",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/dataset/direct-upload/staging/{uploadId}": {
@@ -5716,7 +6685,12 @@
             "required": true
           }
         ],
-        "description": "Stream a heavy upload into staging when there is no browser-reachable S3"
+        "description": "Stream a heavy upload into staging when there is no browser-reachable S3",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/dataset/direct-upload/{datasetId}/finalize": {
@@ -5733,7 +6707,12 @@
             "required": true
           }
         ],
-        "description": "Finalize a direct upload: size-check and start processing"
+        "description": "Finalize a direct upload: size-check and start processing",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/dataset/direct-upload/{datasetId}/retry": {
@@ -5750,7 +6729,12 @@
             "required": true
           }
         ],
-        "description": "Retry normalization of a failed or stuck dataset"
+        "description": "Retry normalization of a failed or stuck dataset",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/dataset/direct-upload/{datasetId}": {
@@ -5767,7 +6751,12 @@
             "required": true
           }
         ],
-        "description": "Abort a still-pending direct upload and clean up its row"
+        "description": "Abort a still-pending direct upload and clean up its row",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/dataset/{slugOrId}/upload": {
@@ -5784,7 +6773,12 @@
             "required": true
           }
         ],
-        "description": "Upload a file (CSV, JSON, JSONL) to an existing dataset"
+        "description": "Upload a file (CSV, JSON, JSONL) to an existing dataset",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/dataset/{slugOrId}/records": {
@@ -5824,7 +6818,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "get": {
         "responses": {},
@@ -5858,7 +6857,12 @@
             "required": true
           }
         ],
-        "description": "List records for a dataset (paginated)"
+        "description": "List records for a dataset (paginated)",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {},
@@ -5895,7 +6899,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/dataset/{slug}/entries": {
@@ -5921,7 +6930,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/dataset/{slugOrId}": {
@@ -6094,7 +7108,12 @@
             "required": true
           }
         ],
-        "description": "Get a dataset by its slug or id."
+        "description": "Get a dataset by its slug or id.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "patch": {
         "responses": {},
@@ -6191,7 +7210,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {},
@@ -6206,7 +7230,12 @@
             "required": true
           }
         ],
-        "description": "Archive a dataset (soft-delete)"
+        "description": "Archive a dataset (soft-delete)",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/dataset/{slugOrId}/records/{recordId}": {
@@ -6249,7 +7278,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/evaluators": {
@@ -6467,7 +7501,12 @@
         },
         "operationId": "getApiEvaluators",
         "parameters": [],
-        "description": "Get all evaluators for a project"
+        "description": "Get all evaluators for a project",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {
@@ -6704,7 +7743,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/evaluators/{idOrSlug}": {
@@ -6949,7 +7993,12 @@
             "required": true
           }
         ],
-        "description": "Get a specific evaluator by ID or slug"
+        "description": "Get a specific evaluator by ID or slug",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/evaluators/{id}": {
@@ -7214,7 +8263,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {
@@ -7353,7 +8407,12 @@
             "required": true
           }
         ],
-        "description": "Archive (soft-delete) an evaluator"
+        "description": "Archive (soft-delete) an evaluator",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/events/track": {
@@ -7465,7 +8524,12 @@
         },
         "operationId": "postApiEventsTrack",
         "parameters": [],
-        "description": "Record a user event (e.g. thumbs up/down, selected text) attached to a trace. Predefined event types validate against their schemas; custom event types pass through `trackEventRESTParamsValidatorSchema`."
+        "description": "Record a user event (e.g. thumbs up/down, selected text) attached to a trace. Predefined event types validate against their schemas; custom event types pass through `trackEventRESTParamsValidatorSchema`.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/experiments": {
@@ -7675,7 +8739,12 @@
           }
         ],
         "summary": "List experiments for the project",
-        "description": "List experiments for the project. Includes a runs count and last-run timestamp per experiment."
+        "description": "List experiments for the project. Includes a runs count and last-run timestamp per experiment.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/evaluations/list": {
@@ -8183,7 +9252,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/evaluations/{evaluator}/evaluate": {
@@ -8468,7 +9542,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/evaluations/{evaluator}/{subpath}/evaluate": {
@@ -8762,7 +9841,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/guardrails/{evaluator}/evaluate": {
@@ -9047,7 +10131,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/dataset/evaluate": {
@@ -9248,6 +10337,16 @@
                 }
               }
             }
+          },
+          "413": {
+            "description": "The body is larger than 30MB. Refused before it is read, so the response is the plain sentence `Payload Too Large` rather than a JSON error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           }
         },
         "operationId": "postApiDatasetEvaluate",
@@ -9256,7 +10355,7 @@
         ],
         "parameters": [],
         "summary": "Evaluate a dataset",
-        "description": "Run one evaluator across a saved dataset and record the result against an experiment. Name the dataset by slug and the evaluator the same way the evaluate endpoints do; results are grouped under `experimentSlug`, or under a generated batch id when you omit it.",
+        "description": "Run one evaluator across a saved dataset and record the result against an experiment. Name the dataset by slug and the evaluator the same way the evaluate endpoints do; results are grouped under `experimentSlug`, or under a generated batch id when you omit it. Bodies up to 30MB are accepted.",
         "requestBody": {
           "required": true,
           "content": {
@@ -9301,7 +10400,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/experiments/{slug}/run": {
@@ -9507,7 +10611,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/experiments/runs": {
@@ -9845,7 +10954,12 @@
           }
         ],
         "summary": "List runs of an experiment",
-        "description": "Runs recorded for one experiment, newest first. Page through them with `page` and `pageSize`."
+        "description": "Runs recorded for one experiment, newest first. Page through them with `page` and `pageSize`.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/experiments/runs/{runId}": {
@@ -10173,7 +11287,12 @@
           }
         ],
         "summary": "Poll a run",
-        "description": "Current state of one run. Returns progress while it is going and a summary once it finishes, so a CI job can poll this until `status` leaves `running`."
+        "description": "Current state of one run. Returns progress while it is going and a summary once it finishes, so a CI job can poll this until `status` leaves `running`.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/experiments/runs/{runId}/results": {
@@ -10607,7 +11726,12 @@
           }
         ],
         "summary": "Read run results",
-        "description": "Every dataset row of a run with what the target predicted, plus one entry per evaluator per row. Runs older than the status cache need `experimentSlug` as well, since a run id is only unique within its experiment."
+        "description": "Every dataset row of a run with what the target predicted, plus one entry per evaluator per row. Runs older than the status cache need `experimentSlug` as well, since a run id is only unique within its experiment.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/analytics": {
@@ -12709,7 +13833,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/dspy/log_steps": {
@@ -13100,7 +14229,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/experiment/init": {
@@ -13290,7 +14424,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/optimization/{workflowId}/{versionId}": {
@@ -13475,7 +14614,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/track_event": {
@@ -13632,7 +14776,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/trigger/slack": {
@@ -14689,7 +15838,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/workflows/{workflowId}/run": {
@@ -14866,7 +16020,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/workflows/{workflowId}/{versionId}/run": {
@@ -15051,7 +16210,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/gateway/v1/virtual-keys": {
@@ -15112,7 +16276,12 @@
                             "type": [
                               "string",
                               "null"
-                            ]
+                            ],
+                            "description": "The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination."
+                          },
+                          "trace_project_archived": {
+                            "type": "boolean",
+                            "description": "True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone."
                           },
                           "external_id": {
                             "type": [
@@ -15196,6 +16365,7 @@
                           "display_prefix",
                           "principal_user_id",
                           "trace_project_id",
+                          "trace_project_archived",
                           "external_id",
                           "metadata",
                           "scopes",
@@ -15436,7 +16606,12 @@
           }
         ],
         "summary": "List virtual keys",
-        "description": "Returns the virtual keys visible to the caller's project credential: keys scoped to this project, to its team, or to the whole organization. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Visibility is applied to each page after it is read, so a page can hold fewer than `limit` rows without meaning the walk is finished."
+        "description": "Returns the virtual keys visible to the caller's project credential: keys scoped to this project, to its team, or to the whole organization. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Visibility is applied to each page after it is read, so a page can hold fewer than `limit` rows without meaning the walk is finished.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {
@@ -15504,7 +16679,12 @@
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "description": "The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination."
+                        },
+                        "trace_project_archived": {
+                          "type": "boolean",
+                          "description": "True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone."
                         },
                         "external_id": {
                           "type": [
@@ -15588,6 +16768,7 @@
                         "display_prefix",
                         "principal_user_id",
                         "trace_project_id",
+                        "trace_project_archived",
                         "external_id",
                         "metadata",
                         "scopes",
@@ -15851,7 +17032,7 @@
           }
         ],
         "summary": "Create virtual key",
-        "description": "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
+        "description": "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value, because LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land, and must say where: pass `trace_project_id` (needs `virtualKeys:manage` on that project). Without it, and without exactly one project scope to take it from, creation refuses with `gateway_trace_project_ambiguous`, because the spend would be attributed to the organization's hidden governance project and counted by no budget on the project you had in mind. An organization whose only project is the governance one is exempt, since there is nothing else to name; one with no governance project either refuses with `trace_project_required`. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -16158,7 +17339,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/gateway/v1/virtual-keys/{id}": {
@@ -16217,7 +17403,12 @@
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "description": "The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination."
+                        },
+                        "trace_project_archived": {
+                          "type": "boolean",
+                          "description": "True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone."
                         },
                         "external_id": {
                           "type": [
@@ -16301,6 +17492,7 @@
                         "display_prefix",
                         "principal_user_id",
                         "trace_project_id",
+                        "trace_project_archived",
                         "external_id",
                         "metadata",
                         "scopes",
@@ -16556,7 +17748,12 @@
             "required": true
           }
         ],
-        "summary": "Get virtual key"
+        "summary": "Get virtual key",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "patch": {
         "responses": {
@@ -16613,7 +17810,12 @@
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "description": "The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination."
+                        },
+                        "trace_project_archived": {
+                          "type": "boolean",
+                          "description": "True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone."
                         },
                         "external_id": {
                           "type": [
@@ -16697,6 +17899,7 @@
                         "display_prefix",
                         "principal_user_id",
                         "trace_project_id",
+                        "trace_project_archived",
                         "external_id",
                         "metadata",
                         "scopes",
@@ -16909,7 +18112,7 @@
           }
         ],
         "summary": "Update virtual key",
-        "description": "Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.",
+        "description": "Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope, and does NOT move where the key's traces and costs land: send `trace_project_id` for that, validated the way create validates it; explicit null re-resolves it under the create-time rules rather than clearing it. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -16956,7 +18159,8 @@
                     "type": [
                       "string",
                       "null"
-                    ]
+                    ],
+                    "description": "Where the key's traces and costs land. Omit it and the destination stays exactly where it is, scope edits included. A value moves it, validated the way create validates it. Explicit null does not clear it: it asks for the destination to be worked out again from what the key is now, under the same rules create uses. It lands on the key's single project scope when exactly one names a live project, and otherwise on the organization's oldest live governance project when there are no other live projects to choose from. An organization with live projects that could have been named refuses with `gateway_trace_project_ambiguous`, and one with no governance project to fall back on refuses with `trace_project_required`."
                   },
                   "routing_policy_id": {
                     "type": [
@@ -17206,7 +18410,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/gateway/v1/virtual-keys/{id}/spend": {
@@ -17553,7 +18762,12 @@
           }
         ],
         "summary": "Read a virtual key's spend",
-        "description": "Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Reads the cost path (`trace_summaries`), the same source the dashboard's key list and Usage tab read, so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key."
+        "description": "Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Reads the cost path (`trace_summaries`), the same source the dashboard's key list and Usage tab read, so this number, the UI column, and the Usage page agree by construction. Returns 412 `spend_source_unavailable` on deploys without a ClickHouse spend source rather than a $0.00 that cannot be told apart from a zero-spend key.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/gateway/v1/virtual-keys/{id}/rotate": {
@@ -17612,7 +18826,12 @@
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "description": "The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination."
+                        },
+                        "trace_project_archived": {
+                          "type": "boolean",
+                          "description": "True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone."
                         },
                         "external_id": {
                           "type": [
@@ -17696,6 +18915,7 @@
                         "display_prefix",
                         "principal_user_id",
                         "trace_project_id",
+                        "trace_project_archived",
                         "external_id",
                         "metadata",
                         "scopes",
@@ -17912,7 +19132,12 @@
           }
         ],
         "summary": "Rotate virtual key secret",
-        "description": "Mints a fresh secret for an existing VK. The old secret remains valid for 24h (grace window) so in-flight clients can roll over."
+        "description": "Mints a fresh secret for an existing VK. The old secret remains valid for 24h (grace window) so in-flight clients can roll over.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/gateway/v1/virtual-keys/{id}/disable": {
@@ -17971,7 +19196,12 @@
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "description": "The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination."
+                        },
+                        "trace_project_archived": {
+                          "type": "boolean",
+                          "description": "True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone."
                         },
                         "external_id": {
                           "type": [
@@ -18055,6 +19285,7 @@
                         "display_prefix",
                         "principal_user_id",
                         "trace_project_id",
+                        "trace_project_archived",
                         "external_id",
                         "metadata",
                         "scopes",
@@ -18284,7 +19515,12 @@
             }
           }
         },
-        "description": "Reversible stop: requests on the key are rejected with the distinct `virtual_key_disabled` error until it is enabled again. Budgets, scopes, key material, and any rotation grace stay intact. The change propagates through the gateway's change-event feed. Idempotent."
+        "description": "Reversible stop: requests on the key are rejected with the distinct `virtual_key_disabled` error until it is enabled again. Budgets, scopes, key material, and any rotation grace stay intact. The change propagates through the gateway's change-event feed. Idempotent.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/gateway/v1/virtual-keys/{id}/enable": {
@@ -18343,7 +19579,12 @@
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "description": "The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination."
+                        },
+                        "trace_project_archived": {
+                          "type": "boolean",
+                          "description": "True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone."
                         },
                         "external_id": {
                           "type": [
@@ -18427,6 +19668,7 @@
                         "display_prefix",
                         "principal_user_id",
                         "trace_project_id",
+                        "trace_project_archived",
                         "external_id",
                         "metadata",
                         "scopes",
@@ -18639,7 +19881,12 @@
           }
         ],
         "summary": "Enable virtual key",
-        "description": "Reverses disable: the key returns to `active` exactly as it was, including any rotation grace that was running. Idempotent."
+        "description": "Reverses disable: the key returns to `active` exactly as it was, including any rotation grace that was running. Idempotent.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/gateway/v1/virtual-keys/{id}/revoke": {
@@ -18698,7 +19945,12 @@
                           "type": [
                             "string",
                             "null"
-                          ]
+                          ],
+                          "description": "The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination."
+                        },
+                        "trace_project_archived": {
+                          "type": "boolean",
+                          "description": "True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone."
                         },
                         "external_id": {
                           "type": [
@@ -18782,6 +20034,7 @@
                         "display_prefix",
                         "principal_user_id",
                         "trace_project_id",
+                        "trace_project_archived",
                         "external_id",
                         "metadata",
                         "scopes",
@@ -18994,7 +20247,12 @@
           }
         ],
         "summary": "Revoke virtual key",
-        "description": "Marks the virtual key as revoked and archives its own budgets. Clients using it start receiving 401 within ~60s (the gateway's change-event long-poll period). Idempotent."
+        "description": "Marks the virtual key as revoked and archives its own budgets. Clients using it start receiving 401 within ~60s (the gateway's change-event long-poll period). Idempotent.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/gateway/v1/providers": {
@@ -19227,7 +20485,12 @@
         ],
         "parameters": [],
         "summary": "List provider bindings",
-        "description": "Lists every gateway-bound model-provider credential for the caller's project, including health and rate-limit settings."
+        "description": "Lists every gateway-bound model-provider credential for the caller's project, including health and rate-limit settings.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {
@@ -19458,7 +20721,12 @@
         ],
         "parameters": [],
         "summary": "Bind a model provider to the gateway",
-        "description": "Creates a GatewayProviderCredential binding. Reuses the ModelProvider API key already configured in project settings; this only adds gateway-specific settings (rate limits, rotation, fallback priority)."
+        "description": "Creates a GatewayProviderCredential binding. Reuses the ModelProvider API key already configured in project settings; this only adds gateway-specific settings (rate limits, rotation, fallback priority).",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/gateway/v1/budgets": {
@@ -19612,6 +20880,14 @@
                           },
                           "end_users_over": {
                             "type": "integer"
+                          },
+                          "scope_reach": {
+                            "type": "string",
+                            "enum": [
+                              "reachable",
+                              "unreachable"
+                            ],
+                            "description": "Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. This is the only field that tells a budget nothing can reach apart from one that simply has not been breached."
                           }
                         },
                         "required": [
@@ -19879,7 +21155,12 @@
           }
         ],
         "summary": "List budgets",
-        "description": "Returns the non-archived budgets in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Filter with `scope_type` (comma-separated), which is applied in the query, so `limit` counts rows returned. `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. A template's own `spent_usd` and `spent_nano_usd` are null because one allowance per person has no single total to report; each person's figure is in `GET /spend-summaries` and the seat buckets. `spend_available: false` means spend could not be totalled at all, and both fields are null for that reason instead, rather than a stale figure a caller could read as real money. Every amount is published twice: `_usd` is the display string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events carry, so a budget and its spend reconcile without parsing decimals."
+        "description": "Returns the non-archived budgets in the caller's organization across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user), with live `spent_usd` from the spend ledger. Newest first, paged by cursor: follow `next_cursor` until it comes back null. Filter with `scope_type` (comma-separated), which is applied in the query, so `limit` counts rows returned. `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and `end_users_over` how many of them are at or over that limit. A template's own `spent_usd` and `spent_nano_usd` are null because one allowance per person has no single total to report; each person's figure is in `GET /spend-summaries` and the seat buckets. `spend_available: false` means spend could not be totalled at all, and both fields are null for that reason instead, rather than a stale figure a caller could read as real money. Every amount is published twice: `_usd` is the display string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events carry, so a budget and its spend reconcile without parsing decimals.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {
@@ -20040,6 +21321,14 @@
                         },
                         "end_users_over": {
                           "type": "integer"
+                        },
+                        "scope_reach": {
+                          "type": "string",
+                          "enum": [
+                            "reachable",
+                            "unreachable"
+                          ],
+                          "description": "Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. This is the only field that tells a budget nothing can reach apart from one that simply has not been breached."
                         }
                       },
                       "required": [
@@ -20314,7 +21603,7 @@
           }
         ],
         "summary": "Create budget",
-        "description": "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). `group` budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the calendar, for budgets that have to line up with a billing date. Send `Idempotency-Key` to make a retry safe.",
+        "description": "Creates an organization-owned budget. The scope discriminates which resource the budget covers, across all seven scope types (organization / team / project / virtual_key / principal / group / attributed_user). `group` budgets are per-member allowances and `attributed_user` budgets are per-end-user templates; both require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider. `cycle_anchor_at` optionally phases the window off a chosen instant instead of the calendar, for budgets that have to line up with a billing date. A `team`, `project` or `group` budget that none of the organization's active keys can produce traffic for is refused with `gateway_budget_scope_unreachable`, since it would never spend and never block; send `allow_unreachable` to keep it anyway, and note that an organization with no active keys is never refused. Send `Idempotency-Key` to make a retry safe.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -20514,6 +21803,10 @@
                     "type": "string",
                     "format": "date-time",
                     "description": "Phases the budget's cycle off this instant instead of the calendar, so a `month` budget anchored 2026-01-17T09:00:00Z starts a fresh period every 17th at 09:00 UTC. Omit for calendar alignment, which is the default and unchanged behaviour. A month cycle anchored past the 28th clamps into shorter months and springs back: anchored on the 31st gives Feb 28, then Mar 31. Immutable after create, since moving it would redraw periods the budget has already reported and enforced on. Rejected with `gateway_budget_cycle_anchor_invalid` on `total` and `manual`, which do not cycle."
+                  },
+                  "allow_unreachable": {
+                    "type": "boolean",
+                    "description": "Keeps a `team`, `project` or `group` budget that no active key can produce traffic for, which is otherwise refused with `gateway_budget_scope_unreachable`. Send it to provision ahead of the keys that will use the budget. An organization with no active keys is never refused, so this is not needed during first setup."
                   }
                 },
                 "required": [
@@ -20525,7 +21818,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/gateway/v1/budgets/{id}": {
@@ -20677,6 +21975,14 @@
                         },
                         "end_users_over": {
                           "type": "integer"
+                        },
+                        "scope_reach": {
+                          "type": "string",
+                          "enum": [
+                            "reachable",
+                            "unreachable"
+                          ],
+                          "description": "Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. This is the only field that tells a budget nothing can reach apart from one that simply has not been breached."
                         }
                       },
                       "required": [
@@ -20952,7 +22258,12 @@
           }
         ],
         "summary": "Get budget",
-        "description": "One budget, in exactly the row shape `GET /budgets` returns, including the live spend enrichment and the per-person `end_users_seen` / `end_users_over` standing on attributed-user templates. Archived budgets are not returned. `spend_available: false` means spend could not be totalled, and `spent_usd` / `spent_nano_usd` are null rather than a figure that cannot be told apart from zero spend. A per-person template reports null there too, because one allowance per person has no single total; each person's figure is in `GET /spend-summaries` and the seat buckets."
+        "description": "One budget, in exactly the row shape `GET /budgets` returns, including the live spend enrichment and the per-person `end_users_seen` / `end_users_over` standing on attributed-user templates. Archived budgets are not returned. `spend_available: false` means spend could not be totalled, and `spent_usd` / `spent_nano_usd` are null rather than a figure that cannot be told apart from zero spend. A per-person template reports null there too, because one allowance per person has no single total; each person's figure is in `GET /spend-summaries` and the seat buckets.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "patch": {
         "responses": {
@@ -21102,6 +22413,14 @@
                         },
                         "end_users_over": {
                           "type": "integer"
+                        },
+                        "scope_reach": {
+                          "type": "string",
+                          "enum": [
+                            "reachable",
+                            "unreachable"
+                          ],
+                          "description": "Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. This is the only field that tells a budget nothing can reach apart from one that simply has not been breached."
                         }
                       },
                       "required": [
@@ -21396,7 +22715,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {
@@ -21546,6 +22870,14 @@
                         },
                         "end_users_over": {
                           "type": "integer"
+                        },
+                        "scope_reach": {
+                          "type": "string",
+                          "enum": [
+                            "reachable",
+                            "unreachable"
+                          ],
+                          "description": "Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. This is the only field that tells a budget nothing can reach apart from one that simply has not been breached."
                         }
                       },
                       "required": [
@@ -21773,7 +23105,12 @@
           }
         ],
         "summary": "Archive budget",
-        "description": "Soft-delete: the row is marked archived and no longer counted by the budget engine. Historical ledger entries are retained."
+        "description": "Soft-delete: the row is marked archived and no longer counted by the budget engine. Historical ledger entries are retained.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/gateway/v1/budgets/{id}/reset": {
@@ -21925,6 +23262,14 @@
                         },
                         "end_users_over": {
                           "type": "integer"
+                        },
+                        "scope_reach": {
+                          "type": "string",
+                          "enum": [
+                            "reachable",
+                            "unreachable"
+                          ],
+                          "description": "Whether any active key in the organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block as configured: scope a key to its target, or move the budget where the keys already run. This is the only field that tells a budget nothing can reach apart from one that simply has not been breached."
                         }
                       },
                       "required": [
@@ -22178,7 +23523,12 @@
             }
           }
         },
-        "description": "Moves the budget's period boundary to now and recomputes the next reset; recorded spend is NEVER mutated (the ledger and every emitted billing event are immutable, so reconciliation is unaffected). On calendar windows this truncates the running period and the next boundary stays calendar; on `manual` windows the new period stays open until the next reset. For attributed-user templates, `end_user_id` resets ONE end-user bucket's boundary and leaves the template period untouched."
+        "description": "Moves the budget's period boundary to now and recomputes the next reset; recorded spend is NEVER mutated (the ledger and every emitted billing event are immutable, so reconciliation is unaffected). On calendar windows this truncates the running period and the next boundary stays calendar; on `manual` windows the new period stays open until the next reset. For attributed-user templates, `end_user_id` resets ONE end-user bucket's boundary and leaves the template period untouched.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/gateway/v1/providers/{id}": {
@@ -22420,7 +23770,12 @@
           }
         ],
         "summary": "Update provider binding",
-        "description": "Partial update of gateway-specific settings (rate limits, rotation, slot, extra headers). The underlying ModelProvider credentials are managed in project settings, not here."
+        "description": "Partial update of gateway-specific settings (rate limits, rotation, slot, extra headers). The underlying ModelProvider credentials are managed in project settings, not here.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {
@@ -22660,7 +24015,12 @@
           }
         ],
         "summary": "Disable provider binding",
-        "description": "Marks the binding disabled. Requests routing to this slot are skipped (fallback chain continues). Historical ledger rows are retained."
+        "description": "Marks the binding disabled. Requests routing to this slot are skipped (fallback chain continues). Historical ledger rows are retained.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/gateway/v1/cache-rules": {
@@ -22980,7 +24340,12 @@
           }
         ],
         "summary": "List cache-control rules",
-        "description": "Organization-scoped operator-authored rules, sorted priority descending then oldest first, with archived rules excluded. Paged by cursor: follow `next_cursor` until it comes back null. Matchers and action are returned verbatim as JSON."
+        "description": "Organization-scoped operator-authored rules, sorted priority descending then oldest first, with archived rules excluded. Paged by cursor: follow `next_cursor` until it comes back null. Matchers and action are returned verbatim as JSON.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {
@@ -23427,7 +24792,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/gateway/v1/cache-rules/{id}": {
@@ -23726,7 +25096,12 @@
           }
         ],
         "summary": "Get a cache rule",
-        "description": "Returns the rule if it belongs to the caller's organisation; 404 otherwise. Archived rules are NOT returned (use the audit log to inspect removed rules)."
+        "description": "Returns the rule if it belongs to the caller's organisation; 404 otherwise. Archived rules are NOT returned (use the audit log to inspect removed rules).",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "patch": {
         "responses": {
@@ -24110,7 +25485,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {
@@ -24407,7 +25787,12 @@
           }
         ],
         "summary": "Archive a cache rule",
-        "description": "Soft-delete: sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row."
+        "description": "Soft-delete: sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/governance/ingestion-templates": {
@@ -24585,7 +25970,12 @@
         ],
         "parameters": [],
         "summary": "List ingestion templates",
-        "description": "Returns the union of platform-published default templates and any org-authored templates visible to the caller's organization. Disabled / archived rows are filtered out. `ottl_rules` is empty in this end-user shape; admins use GET /ingestion-templates/admin to read the canonical OTTL."
+        "description": "Returns the union of platform-published default templates and any org-authored templates visible to the caller's organization. Disabled / archived rows are filtered out. `ottl_rules` is empty in this end-user shape; admins use GET /ingestion-templates/admin to read the canonical OTTL.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {
@@ -24771,7 +26161,12 @@
         ],
         "parameters": [],
         "summary": "Create org-authored ingestion template",
-        "description": "Creates a brand-new template scoped to the caller's organization. Slug is auto-generated. Platform rows (organizationId IS NULL) are NEVER created via this endpoint — admins customize platform defaults via POST /ingestion-templates/clone instead."
+        "description": "Creates a brand-new template scoped to the caller's organization. Slug is auto-generated. Platform rows (organizationId IS NULL) are NEVER created via this endpoint — admins customize platform defaults via POST /ingestion-templates/clone instead.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/governance/ingestion-templates/admin": {
@@ -24949,7 +26344,12 @@
         ],
         "parameters": [],
         "summary": "List ingestion templates (admin shape, includes OTTL)",
-        "description": "Same union as the user list but includes the canonical `ottl_rules` source for every row. Used by admin tooling to render the transparency block / authoring drawer."
+        "description": "Same union as the user list but includes the canonical `ottl_rules` source for every row. Used by admin tooling to render the transparency block / authoring drawer.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/governance/ingestion-templates/{id}": {
@@ -25167,7 +26567,12 @@
           }
         ],
         "summary": "Get ingestion template",
-        "description": "Single-template lookup by id, scoped to the caller's organization. Cross-org probes collapse to 404 (no enumeration vector)."
+        "description": "Single-template lookup by id, scoped to the caller's organization. Cross-org probes collapse to 404 (no enumeration vector).",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {
@@ -25358,7 +26763,12 @@
           }
         ],
         "summary": "Soft-archive an org-authored template",
-        "description": "Marks the row archived; existing ingestion keys continue to land traces but the row disappears from list views. Platform-published rows reject with 403."
+        "description": "Marks the row archived; existing ingestion keys continue to land traces but the row disappears from list views. Platform-published rows reject with 403.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/governance/ingestion-templates/{id}/ottl-rules": {
@@ -25610,7 +27020,12 @@
           }
         ],
         "summary": "Replace ottl_rules on an org-authored template",
-        "description": "Audit-logged with line counts pre/post. Platform-published rows reject with 403. Admins must clone a platform row before editing it."
+        "description": "Audit-logged with line counts pre/post. Platform-published rows reject with 403. Admins must clone a platform row before editing it.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/governance/ingestion-templates/clone": {
@@ -25819,7 +27234,12 @@
         ],
         "parameters": [],
         "summary": "Clone a platform-published template into the caller's org",
-        "description": "Forks the source row's source_type / display_name / OTTL into a fresh org-authored row that the admin can then edit via PATCH /ingestion-templates/:id/ottl-rules."
+        "description": "Forks the source row's source_type / display_name / OTTL into a fresh org-authored row that the admin can then edit via PATCH /ingestion-templates/:id/ottl-rules.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/graphs": {
@@ -25989,7 +27409,12 @@
             }
           }
         ],
-        "description": "List all custom graphs, optionally filtered by dashboard"
+        "description": "List all custom graphs, optionally filtered by dashboard",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {
@@ -26195,7 +27620,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/graphs/{id}": {
@@ -26384,7 +27814,12 @@
             "required": true
           }
         ],
-        "description": "Get a custom graph by its ID"
+        "description": "Get a custom graph by its ID",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "patch": {
         "responses": {
@@ -26594,7 +28029,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {
@@ -26737,7 +28177,12 @@
             "required": true
           }
         ],
-        "description": "Delete a custom graph"
+        "description": "Delete a custom graph",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/me/usage": {
@@ -26964,7 +28409,12 @@
             }
           }
         ],
-        "description": "Personal AI usage for the current month (or an explicit window): spend, billed spend, request + token counts, per-day buckets, and per-model breakdown. Requires a personal-project API key."
+        "description": "Personal AI usage for the current month (or an explicit window): spend, billed spend, request + token counts, per-day buckets, and per-model breakdown. Requires a personal-project API key.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/me/project": {
@@ -27087,7 +28537,12 @@
         },
         "operationId": "getApiMeProject",
         "parameters": [],
-        "description": "Identity of the project the calling API key belongs to: id, name, slug and whether it is a personal workspace project. Lets a client (the CLI's identity notice, a widget) say which project a key targets without any further access."
+        "description": "Identity of the project the calling API key belongs to: id, name, slug and whether it is a personal workspace project. Lets a client (the CLI's identity notice, a widget) say which project a key targets without any further access.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/prompts": {
@@ -27642,7 +29097,12 @@
         },
         "operationId": "getApiPrompts",
         "parameters": [],
-        "description": "Get all prompts for a project"
+        "description": "Get all prompts for a project",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {
@@ -28372,7 +29832,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/prompts/{id}/tags/{tag}": {
@@ -28551,7 +30016,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/prompts/tags": {
@@ -28673,7 +30143,12 @@
         },
         "operationId": "getApiPromptsTags",
         "parameters": [],
-        "description": "List all prompt tag definitions for the organization"
+        "description": "List all prompt tag definitions for the organization",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {
@@ -28807,7 +30282,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/prompts/tags/{tag}": {
@@ -28952,7 +30432,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {
@@ -29055,7 +30540,12 @@
             "required": true
           }
         ],
-        "description": "Delete a prompt tag definition and cascade to assignments"
+        "description": "Delete a prompt tag definition and cascade to assignments",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/prompts/{id}/versions": {
@@ -29640,7 +31130,12 @@
             "required": true
           }
         ],
-        "description": "Get all versions for a prompt. Does not include base prompt data, only versioned data."
+        "description": "Get all versions for a prompt. Does not include base prompt data, only versioned data.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/prompts/{id}/versions/{versionId}/restore": {
@@ -30230,7 +31725,12 @@
             "required": true
           }
         ],
-        "description": "Restore a prompt to a previous version. Creates a new version with the same config data as the specified version."
+        "description": "Restore a prompt to a previous version. Creates a new version with the same config data as the specified version.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/prompts/{id}": {
@@ -30832,7 +32332,12 @@
             }
           }
         ],
-        "description": "Get a specific prompt by slug, with optional shorthand syntax for tags and versions. Pass a bare slug like \"pizza-prompt\" to get the latest version, \"pizza-prompt:production\" to resolve a tagged version, or \"pizza-prompt:2\" to fetch version 2. Alternatively, use the tag or version query parameters with a bare slug."
+        "description": "Get a specific prompt by slug, with optional shorthand syntax for tags and versions. Pass a bare slug like \"pizza-prompt\" to get the latest version, \"pizza-prompt:production\" to resolve a tagged version, or \"pizza-prompt:2\" to fetch version 2. Alternatively, use the tag or version query parameters with a bare slug.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "put": {
         "responses": {
@@ -31591,7 +33096,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {
@@ -31730,7 +33240,12 @@
             "required": true
           }
         ],
-        "description": "Delete a prompt"
+        "description": "Delete a prompt",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/prompts/{id}/sync": {
@@ -33160,7 +34675,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/model-providers": {
@@ -33470,7 +34990,12 @@
         },
         "operationId": "getApiModel-providers",
         "parameters": [],
-        "description": "List all model providers for a project with masked API keys"
+        "description": "List all model providers for a project with masked API keys",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/model-providers/{provider}": {
@@ -33978,7 +35503,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/monitors": {
@@ -34157,7 +35687,12 @@
         },
         "operationId": "getApiMonitors",
         "parameters": [],
-        "description": "List all online evaluation monitors for the project"
+        "description": "List all online evaluation monitors for the project",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {
@@ -34530,7 +36065,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/monitors/{id}": {
@@ -34736,7 +36276,12 @@
             "required": true
           }
         ],
-        "description": "Get a monitor by its ID"
+        "description": "Get a monitor by its ID",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "patch": {
         "responses": {
@@ -35135,7 +36680,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {
@@ -35278,7 +36828,12 @@
             "required": true
           }
         ],
-        "description": "Delete a monitor"
+        "description": "Delete a monitor",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/monitors/{id}/toggle": {
@@ -35440,7 +36995,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/scenario-events": {
@@ -37297,7 +38857,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {
@@ -37427,7 +38992,12 @@
             "required": true
           }
         ],
-        "description": "Archive all simulation runs for a scenario set. Pass `scenarioSetId=default` to archive runs in the implicit default set; future SDK runs without an explicit setId will repopulate it."
+        "description": "Archive all simulation runs for a scenario set. Pass `scenarioSetId=default` to archive runs in the implicit default set; future SDK runs without an explicit setId will repopulate it.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/scenario-events/browser-tab": {
@@ -37572,7 +39142,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/scenarios": {
@@ -37713,7 +39288,12 @@
         },
         "operationId": "getApiScenarios",
         "parameters": [],
-        "description": "Get all scenarios for a project"
+        "description": "Get all scenarios for a project",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {
@@ -37885,7 +39465,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/scenarios/{id}": {
@@ -38053,7 +39638,12 @@
             "required": true
           }
         ],
-        "description": "Get a specific scenario by ID"
+        "description": "Get a specific scenario by ID",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "put": {
         "responses": {
@@ -38249,7 +39839,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {
@@ -38392,7 +39987,12 @@
             "required": true
           }
         ],
-        "description": "Archive (soft-delete) a scenario"
+        "description": "Archive (soft-delete) a scenario",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/projects": {
@@ -38955,7 +40555,12 @@
         },
         "operationId": "getApiSecrets",
         "parameters": [],
-        "description": "List all secrets for the project (values are never returned)"
+        "description": "List all secrets for the project (values are never returned)",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {
@@ -39126,7 +40731,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/secrets/{id}": {
@@ -39283,7 +40893,12 @@
             "required": true
           }
         ],
-        "description": "Get a secret by its ID (value is never returned)"
+        "description": "Get a secret by its ID (value is never returned)",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "put": {
         "responses": {
@@ -39457,7 +41072,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {
@@ -39600,7 +41220,12 @@
             "required": true
           }
         ],
-        "description": "Delete a secret"
+        "description": "Delete a secret",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/simulation-runs": {
@@ -39864,7 +41489,12 @@
             }
           }
         ],
-        "description": "List simulation runs, optionally filtered by scenarioSetId or batchRunId"
+        "description": "List simulation runs, optionally filtered by scenarioSetId or batchRunId",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/simulation-runs/{scenarioRunId}": {
@@ -40109,7 +41739,12 @@
             "required": true
           }
         ],
-        "description": "Get a single simulation run by its ID"
+        "description": "Get a single simulation run by its ID",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/simulation-runs/batches/list": {
@@ -40307,7 +41942,12 @@
             "required": false
           }
         ],
-        "description": "List batch summaries for a scenario set (pass/fail counts per batch)"
+        "description": "List batch summaries for a scenario set (pass/fail counts per batch)",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/suites": {
@@ -40492,7 +42132,12 @@
         },
         "operationId": "getApiSuites",
         "parameters": [],
-        "description": "List all non-archived suites (run plans) for the project"
+        "description": "List all non-archived suites (run plans) for the project",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {
@@ -40740,7 +42385,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/suites/{id}": {
@@ -40952,7 +42602,12 @@
             "required": true
           }
         ],
-        "description": "Get a suite (run plan) by its ID"
+        "description": "Get a suite (run plan) by its ID",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "patch": {
         "responses": {
@@ -41226,7 +42881,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {
@@ -41369,7 +43029,12 @@
             "required": true
           }
         ],
-        "description": "Archive (soft-delete) a suite (run plan)"
+        "description": "Archive (soft-delete) a suite (run plan)",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/suites/{id}/duplicate": {
@@ -41581,7 +43246,12 @@
             "required": true
           }
         ],
-        "description": "Duplicate a suite (run plan)"
+        "description": "Duplicate a suite (run plan)",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/suites/{id}/run": {
@@ -41818,7 +43488,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/traces/search": {
@@ -42973,7 +44648,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/traces/{traceId}/transcript": {
@@ -43184,7 +44864,12 @@
             }
           }
         ],
-        "description": "Derived coding-agent transcript for a trace: what the agent did, in order, with per-call token and cost economics. Empty entries for traces without coding-agent content."
+        "description": "Derived coding-agent transcript for a trace: what the agent did, in order, with per-call token and cost economics. Empty entries for traces without coding-agent content.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/traces/{traceId}": {
@@ -43369,7 +45054,12 @@
             }
           }
         ],
-        "description": "Get a single trace by ID."
+        "description": "Get a single trace by ID.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/traces/{traceId}/metadata": {
@@ -43534,7 +45224,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/triggers": {
@@ -43709,7 +45404,12 @@
         },
         "operationId": "getApiTriggers",
         "parameters": [],
-        "description": "List all active triggers (automations) for the project"
+        "description": "List all active triggers (automations) for the project",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "post": {
         "responses": {
@@ -43928,7 +45628,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/triggers/{id}": {
@@ -44130,7 +45835,12 @@
             "required": true
           }
         ],
-        "description": "Get a trigger by its ID"
+        "description": "Get a trigger by its ID",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "patch": {
         "responses": {
@@ -44374,7 +46084,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {
@@ -44517,7 +46232,12 @@
             "required": true
           }
         ],
-        "description": "Delete (soft-delete) a trigger"
+        "description": "Delete (soft-delete) a trigger",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/webhooks/v1/endpoints": {
@@ -44916,7 +46636,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       },
       "get": {
         "responses": {
@@ -45206,7 +46931,12 @@
         ],
         "parameters": [],
         "summary": "List webhook endpoints",
-        "description": "List the organization's webhook endpoints"
+        "description": "List the organization's webhook endpoints",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/webhooks/v1/endpoints/{id}": {
@@ -45548,7 +47278,12 @@
           }
         ],
         "summary": "Get a webhook endpoint",
-        "description": "Get one webhook endpoint"
+        "description": "Get one webhook endpoint",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       },
       "patch": {
         "responses": {
@@ -45930,7 +47665,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {
@@ -46197,7 +47937,12 @@
           }
         ],
         "summary": "Archive a webhook endpoint",
-        "description": "Archive a webhook endpoint"
+        "description": "Archive a webhook endpoint",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/webhooks/v1/endpoints/{id}/roll-secret": {
@@ -46543,7 +48288,12 @@
           }
         ],
         "summary": "Roll an endpoint's signing secret",
-        "description": "Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately."
+        "description": "Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/webhooks/v1/endpoints/{id}/test": {
@@ -46824,7 +48574,12 @@
           }
         ],
         "summary": "Send a test event to an endpoint",
-        "description": "Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the body, not the status code."
+        "description": "Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the body, not the status code.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/webhooks/v1/endpoints/{id}/deliveries": {
@@ -47168,7 +48923,12 @@
           }
         ],
         "summary": "List an endpoint's delivery attempts",
-        "description": "The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error"
+        "description": "The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/webhooks/v1/endpoints/{id}/health": {
@@ -47497,7 +49257,12 @@
           }
         ],
         "summary": "Read an endpoint's delivery health",
-        "description": "Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success rate, and p95 latency over the last hour."
+        "description": "Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success rate, and p95 latency over the last hour.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/webhooks/v1/event-types": {
@@ -47731,7 +49496,12 @@
         ],
         "parameters": [],
         "summary": "List subscribable event types",
-        "description": "The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet"
+        "description": "The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/webhooks/v1/events": {
@@ -48018,7 +49788,12 @@
           }
         ],
         "summary": "List emitted events",
-        "description": "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly."
+        "description": "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/webhooks/v1/events/{id}": {
@@ -48303,7 +50078,12 @@
           }
         ],
         "summary": "Get one emitted event",
-        "description": "One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or belonging to another organization -- because telling those apart would confirm the existence of another tenant's request ids."
+        "description": "One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or belonging to another organization -- because telling those apart would confirm the existence of another tenant's request ids.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/gateway/v1/spend-summaries": {
@@ -48323,6 +50103,18 @@
                         "properties": {
                           "key": {
                             "type": "string"
+                          },
+                          "group": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          },
+                          "bucket_start": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
                           },
                           "event_count": {
                             "type": "integer"
@@ -48377,6 +50169,8 @@
                         },
                         "required": [
                           "key",
+                          "group",
+                          "bucket_start",
                           "event_count",
                           "settled_count",
                           "usage",
@@ -48586,19 +50380,56 @@
             "name": "group_by",
             "schema": {
               "type": "string",
-              "enum": [
-                "virtual_key",
-                "end_user"
-              ]
+              "description": "One or two dimensions, comma separated: virtual_key, end_user, project, model, provider, principal, request_type. A dimension may not repeat. Each row's `key` is the first dimension's value and `group` names them all, so two rows may share a key.",
+              "example": "model,end_user"
             },
             "required": true
+          },
+          {
+            "in": "query",
+            "name": "bucket",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "none",
+                "hour",
+                "day"
+              ],
+              "default": "none"
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "timezone",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "default": "UTC"
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "allow_unstable",
+            "schema": {
+              "type": "string",
+              "default": "false",
+              "description": "true, 1, yes for yes; false, 0, no or omitted for no. Case does not matter, so a Python True is accepted as sent.",
+              "example": "true"
+            },
+            "required": false
           },
           {
             "in": "query",
             "name": "from",
             "schema": {
               "type": "integer",
-              "exclusiveMinimum": 0
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error.",
+              "example": 1782864000000
             },
             "required": true
           },
@@ -48607,19 +50438,12 @@
             "name": "to",
             "schema": {
               "type": "integer",
-              "exclusiveMinimum": 0
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error.",
+              "example": 1782864000000
             },
             "required": true
-          },
-          {
-            "in": "query",
-            "name": "project_id",
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 100
-            },
-            "required": false
           },
           {
             "in": "query",
@@ -48643,17 +50467,281 @@
           },
           {
             "in": "query",
+            "name": "project_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "team_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "external_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
             "name": "virtual_key_id",
             "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "end_user_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "principal_user_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "model",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "provider_key",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "request_type",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 50
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "label",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "metadata",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 3,
+                  "maxLength": 640
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 640
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 100
+              "enum": [
+                "success",
+                "error",
+                "confirmed",
+                "failed",
+                "settled"
+              ],
+              "description": "Narrow to one lifecycle status. `admitted` is not accepted here: a rollup sums the cost of requests past admission, and an admitted request is still in flight with no cost of its own yet. Ask /spend-events for those."
             },
             "required": false
           }
         ],
         "summary": "List spend summaries",
-        "description": "Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more."
+        "description": "Reconciliation checksum fast path: spend rollups with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. `group_by` takes one or two of virtual_key, end_user, project, model, provider, principal and request_type, comma-separated, and `bucket` adds an hour or day column in the `timezone` you name. `key` stays the first dimension's value for consumers written against the single-dimension surface; read `group` to tell two dimensions apart. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more. Grouping by model or provider, or into time buckets, is refused with `gateway_spend_group_by_unstable` while the window is recent enough that outcomes can still arrive, because those groups can move under a page walk and the totals would double-count some requests and miss others; ask for an older range, or send `allow_unstable` when an approximate shape is enough. Every filter here is accepted by /spend-events too, and the reverse holds apart from `status=admitted`: a rollup sums the cost of requests past admission, so an admitted request has none to contribute and that narrowing is refused rather than answered with a zero. Ask /spend-events for those.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/gateway/v1/spend-events": {
@@ -49030,8 +51118,10 @@
             "name": "from",
             "schema": {
               "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error.",
+              "example": 1782864000000
             },
             "required": true
           },
@@ -49040,8 +51130,10 @@
             "name": "to",
             "schema": {
               "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "description": "Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error.",
+              "example": 1782864000000
             },
             "required": true
           },
@@ -49067,11 +51159,93 @@
           },
           {
             "in": "query",
+            "name": "project_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "team_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "external_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
             "name": "virtual_key_id",
             "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 100
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "maxItems": 100
+                }
+              ]
             },
             "required": false
           },
@@ -49079,19 +51253,45 @@
             "in": "query",
             "name": "end_user_id",
             "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 256
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "maxItems": 100
+                }
+              ]
             },
             "required": false
           },
           {
             "in": "query",
-            "name": "project_id",
+            "name": "principal_user_id",
             "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 100
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "maxItems": 100
+                }
+              ]
             },
             "required": false
           },
@@ -49099,9 +51299,114 @@
             "in": "query",
             "name": "model",
             "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 200
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "provider_key",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "request_type",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 50
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "label",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "maxItems": 100
+                }
+              ]
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "metadata",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 3,
+                  "maxLength": 640
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 640
+                  },
+                  "maxItems": 100
+                }
+              ]
             },
             "required": false
           },
@@ -49123,7 +51428,12 @@
           }
         ],
         "summary": "List spend events",
-        "description": "Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days, Stripe meters 24h+): re-pulling older ranges into a biller past its window can double-bill."
+        "description": "Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days and Stripe meters 24h+ at the time of writing; both vendors own those numbers, so confirm the current one before you rely on it): re-pulling older ranges into a biller past its window can double-bill. Every filter here is accepted by /spend-summaries too, so a checksum that disagrees can be diffed on exactly the same narrowing; the one difference is `status=admitted`, which only this read answers, because an admitted request is still in flight and contributes no cost to a rollup. Repeat a filter to widen it (`model=a&model=b` matches either); name two different filters to narrow. `metadata` is written `key:value`, split on the first colon, and repeating a key widens that key. `team_id` and `external_id` name Postgres records and are resolved to the projects and keys they cover, so a team with no projects or an external id nobody minted answers with no spend rather than with everything.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/gateway/v1/end-users/{id}/spend": {
@@ -49492,7 +51802,12 @@
           }
         ],
         "summary": "Read one end user's spend",
-        "description": "Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `cap` is the applicable attributed-user budget cap and its remaining headroom once such a budget template applies; null until then."
+        "description": "Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `caps` lists every attributed-user budget that applies to this end user, each with its limit and the spend against it. It is an empty array until such a budget template applies, never null.",
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/gateway/v1/spend-events/replay": {
@@ -49762,7 +52077,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ]
       }
     },
     "/api/workflows": {
@@ -49915,7 +52235,12 @@
         },
         "operationId": "getApiWorkflows",
         "parameters": [],
-        "description": "List all non-archived workflows for the project"
+        "description": "List all non-archived workflows for the project",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/workflows/{id}": {
@@ -50095,7 +52420,12 @@
             "required": true
           }
         ],
-        "description": "Get a workflow by its ID"
+        "description": "Get a workflow by its ID",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "patch": {
         "responses": {
@@ -50294,7 +52624,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       },
       "delete": {
         "responses": {
@@ -50437,7 +52772,12 @@
             "required": true
           }
         ],
-        "description": "Archive (soft-delete) a workflow"
+        "description": "Archive (soft-delete) a workflow",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     },
     "/api/workflows/{id}/evaluate": {
@@ -50642,7 +52982,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
       }
     }
   },

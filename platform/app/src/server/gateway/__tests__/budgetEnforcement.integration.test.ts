@@ -136,6 +136,9 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
         displayPrefix: "vk-lw-xxxxxxx",
         principalUserId: USER_ID,
         createdById: USER_ID,
+        // The destination is stored on the key rather than taken from its
+        // scope, so a row written straight to PG has to carry it.
+        traceProjectId: PROJECT_ID,
         scopes: { create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }] },
       },
     });
@@ -349,6 +352,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
           displayPrefix: "vk-lw-yyyyyyy",
           principalUserId: USER_ID,
           createdById: USER_ID,
+          traceProjectId: PRE_PROJECT_ID,
           scopes: {
             create: [{ scopeType: "PROJECT", scopeId: PRE_PROJECT_ID }],
           },

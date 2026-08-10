@@ -313,3 +313,54 @@ func TestBuildGuardrails_FailureModeReachesTheDataPlane(t *testing.T) {
 		assert.False(t, got.ResponseFailOpen)
 	})
 }
+
+// The materialiser (config.materialiser.ts, gemini branch) emits project_id
+// and region on a Gemini credential exactly when it names the Agent
+// Platform door, and the router's door detection reads exactly those two
+// Extra fields (credentialIsAgentPlatform). This is the contract test for
+// that pair surviving the wire decoder: dropping either field silently
+// reroutes an Agent Platform key to generativelanguage.googleapis.com,
+// where its own restrictions refuse it.
+//
+// Spec: specs/model-providers/google-agent-platform.feature
+func TestProviderSlotToCredential_GeminiAgentPlatform(t *testing.T) {
+	t.Run("gemini slot preserves the agent-platform pair", func(t *testing.T) {
+		cred := providerSlotToCredential(providerSlotWire{
+			ID:   "mp-gap",
+			Type: "gemini",
+			Credentials: map[string]interface{}{
+				"api_key":    "AQ.agent-platform-key",
+				"project_id": "acme-123",
+				"region":     "us-central1",
+			},
+		})
+		assert.Equal(t, domain.ProviderGemini, cred.ProviderID)
+		assert.Equal(t, "AQ.agent-platform-key", cred.APIKey)
+		assert.Equal(t, "acme-123", cred.Extra["project_id"])
+		assert.Equal(t, "us-central1", cred.Extra["region"])
+	})
+
+	t.Run("bare gemini slot carries no pair", func(t *testing.T) {
+		cred := providerSlotToCredential(providerSlotWire{
+			ID:          "mp-gem",
+			Type:        "gemini",
+			Credentials: map[string]interface{}{"api_key": "AIza-studio"},
+		})
+		assert.Equal(t, domain.ProviderGemini, cred.ProviderID)
+		assert.Equal(t, "AIza-studio", cred.APIKey)
+		assert.Empty(t, cred.Extra["project_id"])
+		assert.Empty(t, cred.Extra["region"])
+	})
+
+	t.Run("half a pair is dropped, not forwarded", func(t *testing.T) {
+		cred := providerSlotToCredential(providerSlotWire{
+			ID:   "mp-half",
+			Type: "gemini",
+			Credentials: map[string]interface{}{
+				"api_key":    "k",
+				"project_id": "acme-123",
+			},
+		})
+		assert.Empty(t, cred.Extra["project_id"])
+	})
+}
