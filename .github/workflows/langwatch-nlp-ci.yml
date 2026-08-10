@@ -70,8 +70,10 @@ jobs:
           file: infra/docker/Dockerfile.langwatch_nlp
           push: false
           tags: langwatch/langwatch_nlp:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Scoped: see the note in langevals-ci.yml. These two were the only
+          # unscoped buildx caches left, which meant they shared one.
+          cache-from: type=gha,scope=langwatch-nlp
+          cache-to: type=gha,mode=max,scope=langwatch-nlp
 
   langwatch-nlp-complete:
     needs: [changes, docker-build]
