@@ -1,26 +1,48 @@
-name: Auto-approve for validated Low-Risk or Firefighting Check
+name: Auto-approve for validated Low-Risk, AI-Reviewed, Dependabot or Firefighting Check
 
 # PR auto-approval workflow.
 #
-# The bot submits an APPROVE review for low-risk and firefighting PRs, which
-# satisfies branch protection's required_approving_review_count. Branch
-# protection — not this workflow — is what actually blocks merges; this
-# workflow only decides whether the bot adds its approving review. The
-# `low-risk-change` label is audit-only — no gating logic depends on it.
+# The bot submits an APPROVE review for qualifying PRs, which satisfies
+# branch protection's required_approving_review_count. Branch protection —
+# not this workflow — is what actually blocks merges; this workflow only
+# decides whether the bot adds its approving review. The `low-risk-change`
+# and `ai-reviewed-change` labels are audit-only — no gating logic depends
+# on them.
 #
 # Decision tree, in order:
 #   1. Bot already approved current head_sha → no-op (idempotency).
 #   2. Human already approved current head_sha → no-op.
 #   3. `firefighting` label present → bot APPROVE, skip everything else.
-#   4. Otherwise → low-risk evaluation (size/path/LLM) → label + comment + approve, or remove label + comment.
+#   4. Dependabot-authored PR with only Dependabot commits → bot APPROVE.
+#   5. Low-risk evaluation (size/path/LLM impact=low) → label + comment +
+#      approve, or remove label + comment.
+#   6. AI-reviewed evaluation (required AI reviews clean on current head +
+#      no unresolved AI threads + LLM impact ≤ medium) → label + comment +
+#      approve. Signal gaps (missing/stale review, open threads) log and
+#      wait — the review/thread triggers below re-run the evaluation when
+#      the signals land.
 #
 # Self-healing on push: branch protection's `dismiss_stale_reviews: true`
 # strips ALL approvals on every push, so this workflow re-walks the tree
 # from scratch on every `synchronize` event.
+#
+# Policy documents (read from the BASE branch, see the checkout note below):
+#   dev/docs/LOW_RISK_PULL_REQUESTS.md    — low-risk lane policy
+#   dev/docs/AI_REVIEWED_PULL_REQUESTS.md — AI-reviewed lane policy
+#   dev/docs/PR_IMPACT_EVALUATION.md      — the LLM evaluator's system prompt
 
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, labeled, unlabeled]
+  # The AI-reviewed lane's inputs (bot reviews, thread resolution) land
+  # minutes AFTER the push events above. These triggers re-run the
+  # evaluation when a review is submitted or a thread's resolution changes;
+  # both payloads carry `pull_request`, so the shared context expressions
+  # work across all three event types.
+  pull_request_review:
+    types: [submitted, dismissed]
+  pull_request_review_thread:
+    types: [resolved, unresolved]
 
 permissions:
   pull-requests: write
@@ -29,6 +51,13 @@ permissions:
 concurrency:
   group: pr-auto-approve-${{ github.event.pull_request.number }}
   cancel-in-progress: true
+
+env:
+  # Paths never eligible for ANY automated approval lane. Includes every
+  # policy/prompt document the evaluator reads — changes to the rules are
+  # never themselves auto-approvable. Kept as an ERE that is also a valid
+  # JS RegExp: shell steps use it with grep -E, script steps with RegExp().
+  RESTRICTED_PATTERN: '^(\.github/workflows/|dev/docs/LOW_RISK_PULL_REQUESTS\.md$|dev/docs/AI_REVIEWED_PULL_REQUESTS\.md$|dev/docs/PR_IMPACT_EVALUATION\.md$|(auth|security|migrations|prisma)/|.*/(auth|security|migrations|prisma)/)'
 
 jobs:
   preflight:
@@ -104,10 +133,10 @@ jobs:
       contains(needs.preflight.outputs.labels, ',firefighting,')
     runs-on: ubuntu-latest
     steps:
-      # Clean up any stale low-risk-change label and assessment comments
+      # Clean up any stale qualification labels and assessment comments
       # from a prior evaluator run, then APPROVE. Otherwise the PR thread
       # contradicts itself ("does not qualify" comment + bot approval).
-      - name: Cleanup stale low-risk artifacts and submit bot APPROVE
+      - name: Cleanup stale assessment artifacts and submit bot APPROVE
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -116,15 +145,17 @@ jobs:
           script: |
             const prNumber = parseInt(process.env.PR_NUMBER, 10);
 
-            try {
-              await github.rest.issues.removeLabel({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                name: "low-risk-change",
-              });
-            } catch (error) {
-              if (error.status !== 404) throw error;
+            for (const label of ["low-risk-change", "ai-reviewed-change"]) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  name: label,
+                });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
             }
 
             const comments = await github.paginate(github.rest.issues.listComments, {
@@ -135,7 +166,8 @@ jobs:
             for (const comment of comments) {
               if (
                 comment.user?.login === "github-actions[bot]" &&
-                comment.body?.startsWith("**Automated low-risk assessment**")
+                (comment.body?.startsWith("**Automated low-risk assessment**") ||
+                 comment.body?.startsWith("**Automated AI-review assessment**"))
               ) {
                 await github.rest.issues.deleteComment({
                   owner: context.repo.owner,
@@ -207,24 +239,76 @@ jobs:
               core.info(`No bot firefighting approvals to dismiss on PR #${prNumber}.`);
             }
 
-  evaluate:
+  dependabot:
     needs: preflight
+    # Dependabot-triggered runs receive Dependabot secrets, not Actions
+    # secrets, so the LLM lanes (whose API key would be empty) must never
+    # run for these PRs — this lane approves without any secret, and the
+    # evaluate/ai-reviewed jobs exclude the dependabot author explicitly.
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
       needs.preflight.outputs.short_circuit != 'true' &&
-      !contains(needs.preflight.outputs.labels, ',firefighting,')
+      !contains(needs.preflight.outputs.labels, ',firefighting,') &&
+      github.event.pull_request.user.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
+    steps:
+      - name: Verify every commit is Dependabot-authored, then approve
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ needs.preflight.outputs.head_sha }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+            const commits = await github.paginate(github.rest.pulls.listCommits, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            // A human pushing to the branch (a fix-up, a rebase with edits)
+            // means the diff is no longer purely machine-generated — the
+            // fast lane no longer applies and normal review does.
+            const foreign = commits.filter(c => c.author?.login !== "dependabot[bot]");
+            if (foreign.length > 0) {
+              const who = [...new Set(foreign.map(c => c.author?.login ?? "unknown"))].join(", ");
+              core.info(`PR #${prNumber} has ${foreign.length} non-Dependabot commit(s) (${who}); normal review applies.`);
+              return;
+            }
+            await github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              commit_id: process.env.HEAD_SHA,
+              event: "APPROVE",
+              body: "Approved by automation: Dependabot-authored dependency update — every commit on the branch is authored by `dependabot[bot]`. Required status checks still gate the merge.",
+            });
+            core.info(`PR #${prNumber} approved via the Dependabot lane.`);
+
+  evaluate:
+    needs: preflight
+    # Push/label events only: the low-risk verdict depends solely on the
+    # diff, which review/thread events do not change. Review-driven events
+    # go straight to the ai-reviewed job below.
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.preflight.outputs.short_circuit != 'true' &&
+      !contains(needs.preflight.outputs.labels, ',firefighting,') &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    outputs:
+      qualifies: ${{ steps.oversized.outputs.qualifies || steps.restricted.outputs.qualifies || steps.llm.outputs.qualifies }}
     steps:
       # Deliberately checkout the base branch, not the PR head, because this is
       # a `pull_request_target` workflow with write permissions and access to
-      # secrets. Reading the policy doc from the base prevents a PR from
+      # secrets. Reading the policy docs from the base prevents a PR from
       # changing the policy that evaluates itself.
-      - name: Checkout repo (policy doc)
+      - name: Checkout repo (policy docs)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.base.sha }}
 
-      - name: Strip stale low-risk-change label on synchronize
+      - name: Strip stale qualification labels on synchronize
         if: github.event.action == 'synchronize'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -232,17 +316,18 @@ jobs:
         with:
           script: |
             const prNumber = parseInt(process.env.PR_NUMBER, 10);
-            try {
-              await github.rest.issues.removeLabel({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                name: "low-risk-change",
-              });
-              core.info(`Removed low-risk-change label from PR #${prNumber} (new commits pushed). Re-evaluation follows.`);
-            } catch (error) {
-              if (error.status !== 404) throw error;
-              core.info("No low-risk-change label present; nothing to strip.");
+            for (const label of ["low-risk-change", "ai-reviewed-change"]) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  name: label,
+                });
+                core.info(`Removed ${label} label from PR #${prNumber} (new commits pushed). Re-evaluation follows.`);
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
             }
 
       - name: Fetch PR diff and metadata
@@ -290,16 +375,13 @@ jobs:
           {
             echo "qualifies=false"
             echo "scope=Diff too large for automated evaluation"
-            echo "reasoning=This PR's diff exceeds the size limit for automated low-risk evaluation. Manual review required."
+            echo "reasoning=This PR's diff exceeds the size limit for automated evaluation. Manual review required."
           } >> "$GITHUB_OUTPUT"
 
       - name: Check for restricted paths
         id: path-check
         if: steps.pr-data.outputs.oversized == 'false'
         run: |
-          # dev/docs/LOW_RISK_PULL_REQUESTS.md is the policy doc the LLM
-          # evaluator reads — changes to it are never themselves low-risk.
-          RESTRICTED_PATTERN='^(\.github/workflows/|dev/docs/LOW_RISK_PULL_REQUESTS\.md$|(auth|security|migrations|prisma)/|.*/(auth|security|migrations|prisma)/)'
           if grep -qE "$RESTRICTED_PATTERN" /tmp/pr_files.txt; then
             echo "Restricted paths detected:"
             grep -E "$RESTRICTED_PATTERN" /tmp/pr_files.txt
@@ -318,19 +400,26 @@ jobs:
             echo "reasoning=This PR modifies files in restricted directories that require manual review per policy."
           } >> "$GITHUB_OUTPUT"
 
-      - name: Evaluate PR with OpenAI
+      # Keep this step in sync with the ai-reviewed job's `llm-ai` step: same
+      # evaluator prompt, same schema — only the qualification rule differs
+      # (low lane: impact=low + low_risk_qualifies; ai lane: impact ≤ medium).
+      - name: Evaluate PR impact with OpenAI
         id: llm
         if: steps.pr-data.outputs.oversized == 'false' && steps.path-check.outputs.blocked == 'false'
         env:
           OPENAI_API_KEY: ${{ secrets.LOW_RISK_OPENAI_API_KEY }}
         run: |
-          POLICY=$(cat dev/docs/LOW_RISK_PULL_REQUESTS.md)
+          EVALUATOR=$(cat dev/docs/PR_IMPACT_EVALUATION.md)
+          LOW_POLICY=$(cat dev/docs/LOW_RISK_PULL_REQUESTS.md)
+          AI_POLICY=$(cat dev/docs/AI_REVIEWED_PULL_REQUESTS.md)
           PR_TITLE=$(cat /tmp/pr_title.txt)
           PR_BODY=$(cat /tmp/pr_body.txt)
           PR_DIFF=$(cat /tmp/pr_diff_truncated.txt)
 
           PAYLOAD=$(jq -n \
-            --arg policy "$POLICY" \
+            --arg evaluator "$EVALUATOR" \
+            --arg low_policy "$LOW_POLICY" \
+            --arg ai_policy "$AI_POLICY" \
             --arg title "$PR_TITLE" \
             --arg body "$PR_BODY" \
             --arg diff "$PR_DIFF" \
@@ -339,16 +428,18 @@ jobs:
               response_format: {
                 type: "json_schema",
                 json_schema: {
-                  name: "low_risk_evaluation",
+                  name: "pr_impact_evaluation",
                   strict: true,
                   schema: {
                     type: "object",
                     properties: {
-                      qualifies: { type: "boolean", description: "true if the PR meets ALL low-risk criteria" },
-                      reasoning: { type: "string", description: "2-3 sentence explanation of the assessment" },
-                      scope: { type: "string", description: "Brief summary of what the PR changes" }
+                      impact: { type: "string", enum: ["low", "medium", "high"], description: "overall change impact per the rubric" },
+                      touches_excluded_areas: { type: "boolean", description: "true if the diff touches any always-excluded area" },
+                      low_risk_qualifies: { type: "boolean", description: "true if the PR fits the low-risk policy allowed categories AND impact is low" },
+                      reasoning: { type: "string", description: "2-4 sentence explanation of the assessment" },
+                      scope: { type: "string", description: "one-line summary of what the PR changes" }
                     },
-                    required: ["qualifies", "reasoning", "scope"],
+                    required: ["impact", "touches_excluded_areas", "low_risk_qualifies", "reasoning", "scope"],
                     additionalProperties: false
                   }
                 }
@@ -356,11 +447,13 @@ jobs:
               messages: [
                 {
                   role: "system",
-                  content: ("You evaluate pull requests against a low-risk change policy.\n\nHere is the policy:\n\n" + $policy + "\n\nEvaluate the PR and return JSON with exactly these fields:\n- \"qualifies\": boolean (true if the PR meets ALL low-risk criteria)\n- \"reasoning\": string (2-3 sentence explanation of your assessment)\n- \"scope\": string (brief summary of what the PR changes)")
+                  content: ($evaluator
+                    + "\n\n# Low-risk policy (allowed categories for low_risk_qualifies)\n\n" + $low_policy
+                    + "\n\n# AI-reviewed policy (context for the medium tier)\n\n" + $ai_policy)
                 },
                 {
                   role: "user",
-                  content: ("PR Title: " + $title + "\n\nPR Description:\n" + $body + "\n\nDiff:\n" + $diff)
+                  content: ("BEGIN UNTRUSTED PR DATA\n\nPR Title: " + $title + "\n\nPR Description:\n" + $body + "\n\nDiff:\n" + $diff)
                 }
               ]
             }')
@@ -378,11 +471,18 @@ jobs:
             exit 1
           fi
 
-          QUALIFIES=$(echo "$RESULT" | jq -r '.qualifies')
+          IMPACT=$(echo "$RESULT" | jq -r '.impact')
+          EXCLUDED=$(echo "$RESULT" | jq -r '.touches_excluded_areas')
+          LOW_OK=$(echo "$RESULT" | jq -r '.low_risk_qualifies')
           REASONING=$(echo "$RESULT" | jq -r '.reasoning')
           SCOPE=$(echo "$RESULT" | jq -r '.scope')
 
-          echo "qualifies=$QUALIFIES" >> "$GITHUB_OUTPUT"
+          if [ "$LOW_OK" = "true" ] && [ "$EXCLUDED" = "false" ] && [ "$IMPACT" = "low" ]; then
+            echo "qualifies=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "qualifies=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "impact=$IMPACT" >> "$GITHUB_OUTPUT"
 
           SCOPE_DELIM="$(openssl rand -hex 16)"
           {
@@ -494,9 +594,454 @@ jobs:
                   "",
                   `> ${reasoning}`,
                   "",
+                  "This PR may still qualify for the [AI-reviewed tier](https://github.com/langwatch/langwatch/blob/main/dev/docs/AI_REVIEWED_PULL_REQUESTS.md) once the required AI reviews are clean, or it requires a manual review before merging.",
+                ].join("\n"),
+              });
+
+              core.info(`PR #${prNumber} does not qualify as low-risk.`);
+            }
+
+  ai-reviewed:
+    needs: [preflight, evaluate]
+    # Runs on every trigger event. `always()` is required because `evaluate`
+    # is skipped on review/thread events and a plain `needs` would then skip
+    # this job too; the explicit conditions below re-establish every guard.
+    # When `evaluate` qualified and approved, this lane is redundant and
+    # skips; when it failed or was skipped, this lane evaluates on its own.
+    if: >-
+      always() &&
+      needs.preflight.result == 'success' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.preflight.outputs.short_circuit != 'true' &&
+      !contains(needs.preflight.outputs.labels, ',firefighting,') &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      needs.evaluate.outputs.qualifies != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      # Same base-branch checkout rationale as `evaluate`: never let the PR
+      # rewrite the policy that judges it.
+      - name: Checkout repo (policy docs)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Check AI review signals (coverage, freshness, open threads)
+        id: signals
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ needs.preflight.outputs.head_sha }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+            const headSha = process.env.HEAD_SHA;
+            const restricted = new RegExp(process.env.RESTRICTED_PATTERN);
+            // "A few tweaks here and there" stay covered by an earlier
+            // review; anything past this is a fundamental change that
+            // needs a fresh review of the new head.
+            const TRIVIAL_LINE_LIMIT = 50;
+            // CodeRabbit counts via its review's commit_id; the LangWatch
+            // reviewer only via its verdict trailer (author identity +
+            // trailer SHA are the trusted parts — parsed leniently from
+            // anywhere in the body, last trailer wins).
+            const REQUIRED = [
+              { name: "CodeRabbit", login: "coderabbitai[bot]", requireTrailer: false },
+              { name: "LangWatch PR reviewer", login: "langwatch-agent", requireTrailer: true },
+            ];
+            const TRAILER_RE = /LangWatch-Review:\s*verdict=(clean|findings)\s+sha=([0-9a-fA-F]{7,40})/g;
+
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+
+            function latestReviewFor({ login, requireTrailer }) {
+              const own = reviews
+                .filter(r => r.user?.login === login && r.submitted_at)
+                .sort((a, b) => new Date(a.submitted_at) - new Date(b.submitted_at));
+              for (let i = own.length - 1; i >= 0; i--) {
+                const r = own[i];
+                if (!requireTrailer) return { review: r, sha: r.commit_id };
+                const matches = [...(r.body || "").matchAll(TRAILER_RE)];
+                if (matches.length) return { review: r, sha: matches[matches.length - 1][2] };
+              }
+              return null;
+            }
+
+            async function freshness(sha) {
+              if (headSha === sha || (sha.length >= 7 && headSha.startsWith(sha))) {
+                return { fresh: true, why: "reviewed the current head" };
+              }
+              let cmp;
+              try {
+                cmp = await github.rest.repos.compareCommitsWithBasehead({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  basehead: `${sha}...${headSha}`,
+                });
+              } catch (error) {
+                // 404 = the reviewed SHA is gone (force-push). Always stale.
+                return { fresh: false, why: `reviewed SHA ${sha} is not comparable to the head (force-push?)` };
+              }
+              if (cmp.data.status !== "ahead") {
+                return { fresh: false, why: `branch is ${cmp.data.status} relative to the reviewed SHA` };
+              }
+              const files = cmp.data.files ?? [];
+              // compareCommits caps the file list; a capped list means the
+              // interdiff is far past trivial anyway.
+              if (files.length >= 300 || (cmp.data.total_commits > 0 && files.length === 0)) {
+                return { fresh: false, why: "interdiff too large to verify as trivial" };
+              }
+              const changed = files.reduce((n, f) => n + f.additions + f.deletions, 0);
+              if (changed > TRIVIAL_LINE_LIMIT) {
+                return { fresh: false, why: `${changed} lines changed since the review (> ${TRIVIAL_LINE_LIMIT})` };
+              }
+              if (files.some(f => f.status !== "modified")) {
+                return { fresh: false, why: "files were added, removed, or renamed since the review" };
+              }
+              if (files.some(f => restricted.test(f.filename))) {
+                return { fresh: false, why: "restricted paths were touched since the review" };
+              }
+              return { fresh: true, why: `only trivial tweaks since the reviewed SHA (${changed} lines)` };
+            }
+
+            const gaps = [];
+            const summaryLines = [];
+            for (const reviewer of REQUIRED) {
+              const latest = latestReviewFor(reviewer);
+              if (!latest) {
+                gaps.push(`${reviewer.name} has not reviewed this PR${reviewer.requireTrailer ? " (no review with a verdict trailer)" : ""}`);
+                continue;
+              }
+              const { fresh, why } = await freshness(latest.sha);
+              if (!fresh) {
+                gaps.push(`${reviewer.name}'s latest review (${latest.sha.slice(0, 12)}) is stale: ${why}`);
+                continue;
+              }
+              summaryLines.push(`- **${reviewer.name}** — [review](${latest.review.html_url}) at \`${latest.sha.slice(0, 12)}\` (${why})`);
+            }
+
+            // Unresolved threads from the required AI reviewers. GraphQL
+            // reports Bot actors without the "[bot]" suffix, so normalize
+            // both sides before comparing.
+            const requiredLogins = new Set(REQUIRED.map(r => r.login.replace(/\[bot\]$/, "")));
+            let unresolved = 0;
+            let cursor = null;
+            while (true) {
+              const resp = await github.graphql(
+                `query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
+                  repository(owner: $owner, name: $repo) {
+                    pullRequest(number: $number) {
+                      reviewThreads(first: 100, after: $cursor) {
+                        pageInfo { hasNextPage endCursor }
+                        nodes {
+                          isResolved
+                          comments(first: 1) { nodes { author { login } } }
+                        }
+                      }
+                    }
+                  }
+                }`,
+                { owner: context.repo.owner, repo: context.repo.repo, number: prNumber, cursor },
+              );
+              const threads = resp.repository.pullRequest.reviewThreads;
+              for (const t of threads.nodes) {
+                const author = t.comments.nodes[0]?.author?.login?.replace(/\[bot\]$/, "");
+                if (!t.isResolved && author && requiredLogins.has(author)) unresolved++;
+              }
+              if (!threads.pageInfo.hasNextPage) break;
+              cursor = threads.pageInfo.endCursor;
+            }
+            if (unresolved > 0) {
+              gaps.push(`${unresolved} unresolved review thread(s) from required AI reviewers`);
+            } else {
+              summaryLines.push("- **Outstanding comments:** none — no unresolved threads from required AI reviewers.");
+            }
+
+            if (gaps.length > 0) {
+              core.setOutput("signals_ok", "false");
+              core.info(`AI-reviewed lane waiting on signals for head ${headSha}:`);
+              for (const gap of gaps) core.info(`  - ${gap}`);
+              core.info("No comment posted — these states are transient; review/thread events re-run this evaluation.");
+            } else {
+              core.setOutput("signals_ok", "true");
+              core.setOutput("summary", summaryLines.join("\n"));
+              core.info(`All AI review signals green for head ${headSha}.`);
+            }
+
+      - name: Fetch PR diff and metadata
+        id: pr-data-ai
+        if: steps.signals.outputs.signals_ok == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json title,body --template '{{.title}}' > /tmp/pr_title.txt
+          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json title,body --template '{{.body}}' > /tmp/pr_body.txt
+          gh api --paginate \
+            "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" \
+            --jq '.[].filename' > /tmp/pr_files.txt
+
+          # Same limits and 406 handling as the evaluate job's pr-data step.
+          FILE_LIMIT=300
+          FILE_COUNT=$(wc -l < /tmp/pr_files.txt)
+          DIFF_LIMIT=100000
+          if [ "$FILE_COUNT" -gt "$FILE_LIMIT" ]; then
+            echo "PR changes ${FILE_COUNT} files (> ${FILE_LIMIT}); too large for automated evaluation."
+            echo "oversized=true" >> "$GITHUB_OUTPUT"
+          elif ! gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" > /tmp/pr_diff.txt; then
+            echo "PR diff exceeds what the API will serve; too large for automated evaluation."
+            echo "oversized=true" >> "$GITHUB_OUTPUT"
+          else
+            DIFF_SIZE=$(wc -c < /tmp/pr_diff.txt)
+            if [ "$DIFF_SIZE" -gt "$DIFF_LIMIT" ]; then
+              echo "PR diff is ${DIFF_SIZE} chars (> ${DIFF_LIMIT}); too large for automated evaluation."
+              echo "oversized=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "oversized=false" >> "$GITHUB_OUTPUT"
+              cp /tmp/pr_diff.txt /tmp/pr_diff_truncated.txt
+            fi
+          fi
+
+      - name: Fail fast for oversized diffs
+        id: oversized-ai
+        if: steps.signals.outputs.signals_ok == 'true' && steps.pr-data-ai.outputs.oversized == 'true'
+        run: |
+          {
+            echo "qualifies=false"
+            echo "scope=Diff too large for automated evaluation"
+            echo "reasoning=This PR's diff exceeds the size limit for automated evaluation. Manual review required."
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check for restricted paths
+        id: path-check-ai
+        if: steps.signals.outputs.signals_ok == 'true' && steps.pr-data-ai.outputs.oversized == 'false'
+        run: |
+          if grep -qE "$RESTRICTED_PATTERN" /tmp/pr_files.txt; then
+            echo "Restricted paths detected:"
+            grep -E "$RESTRICTED_PATTERN" /tmp/pr_files.txt
+            echo "blocked=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "blocked=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fail fast for restricted paths
+        id: restricted-ai
+        if: steps.path-check-ai.outputs.blocked == 'true'
+        run: |
+          {
+            echo "qualifies=false"
+            echo "scope=Changes include restricted paths (workflows, auth, migrations, etc.)"
+            echo "reasoning=This PR modifies files in restricted directories that always require manual review per policy."
+          } >> "$GITHUB_OUTPUT"
+
+      # Keep this step in sync with the evaluate job's `llm` step: same
+      # evaluator prompt, same schema — only the qualification rule differs.
+      - name: Evaluate PR impact with OpenAI
+        id: llm-ai
+        if: >-
+          steps.signals.outputs.signals_ok == 'true' &&
+          steps.pr-data-ai.outputs.oversized == 'false' &&
+          steps.path-check-ai.outputs.blocked == 'false'
+        env:
+          OPENAI_API_KEY: ${{ secrets.LOW_RISK_OPENAI_API_KEY }}
+        run: |
+          EVALUATOR=$(cat dev/docs/PR_IMPACT_EVALUATION.md)
+          LOW_POLICY=$(cat dev/docs/LOW_RISK_PULL_REQUESTS.md)
+          AI_POLICY=$(cat dev/docs/AI_REVIEWED_PULL_REQUESTS.md)
+          PR_TITLE=$(cat /tmp/pr_title.txt)
+          PR_BODY=$(cat /tmp/pr_body.txt)
+          PR_DIFF=$(cat /tmp/pr_diff_truncated.txt)
+
+          PAYLOAD=$(jq -n \
+            --arg evaluator "$EVALUATOR" \
+            --arg low_policy "$LOW_POLICY" \
+            --arg ai_policy "$AI_POLICY" \
+            --arg title "$PR_TITLE" \
+            --arg body "$PR_BODY" \
+            --arg diff "$PR_DIFF" \
+            '{
+              model: "gpt-5-mini",
+              response_format: {
+                type: "json_schema",
+                json_schema: {
+                  name: "pr_impact_evaluation",
+                  strict: true,
+                  schema: {
+                    type: "object",
+                    properties: {
+                      impact: { type: "string", enum: ["low", "medium", "high"], description: "overall change impact per the rubric" },
+                      touches_excluded_areas: { type: "boolean", description: "true if the diff touches any always-excluded area" },
+                      low_risk_qualifies: { type: "boolean", description: "true if the PR fits the low-risk policy allowed categories AND impact is low" },
+                      reasoning: { type: "string", description: "2-4 sentence explanation of the assessment" },
+                      scope: { type: "string", description: "one-line summary of what the PR changes" }
+                    },
+                    required: ["impact", "touches_excluded_areas", "low_risk_qualifies", "reasoning", "scope"],
+                    additionalProperties: false
+                  }
+                }
+              },
+              messages: [
+                {
+                  role: "system",
+                  content: ($evaluator
+                    + "\n\n# Low-risk policy (allowed categories for low_risk_qualifies)\n\n" + $low_policy
+                    + "\n\n# AI-reviewed policy (context for the medium tier)\n\n" + $ai_policy)
+                },
+                {
+                  role: "user",
+                  content: ("BEGIN UNTRUSTED PR DATA\n\nPR Title: " + $title + "\n\nPR Description:\n" + $body + "\n\nDiff:\n" + $diff)
+                }
+              ]
+            }')
+
+          RESPONSE=$(curl -s --max-time 60 https://api.openai.com/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            -d "$PAYLOAD")
+
+          RESULT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
+
+          if [ "$RESULT" = "null" ] || [ -z "$RESULT" ]; then
+            echo "OpenAI API error:"
+            echo "$RESPONSE" | jq .
+            exit 1
+          fi
+
+          IMPACT=$(echo "$RESULT" | jq -r '.impact')
+          EXCLUDED=$(echo "$RESULT" | jq -r '.touches_excluded_areas')
+          REASONING=$(echo "$RESULT" | jq -r '.reasoning')
+          SCOPE=$(echo "$RESULT" | jq -r '.scope')
+
+          if [ "$EXCLUDED" = "false" ] && { [ "$IMPACT" = "low" ] || [ "$IMPACT" = "medium" ]; }; then
+            echo "qualifies=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "qualifies=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "impact=$IMPACT" >> "$GITHUB_OUTPUT"
+
+          SCOPE_DELIM="$(openssl rand -hex 16)"
+          {
+            echo "scope<<$SCOPE_DELIM"
+            echo "$SCOPE"
+            echo "$SCOPE_DELIM"
+          } >> "$GITHUB_OUTPUT"
+
+          REASONING_DELIM="$(openssl rand -hex 16)"
+          {
+            echo "reasoning<<$REASONING_DELIM"
+            echo "$REASONING"
+            echo "$REASONING_DELIM"
+          } >> "$GITHUB_OUTPUT"
+
+      # Only runs once the review signals are green — signal gaps above are
+      # transient and log-only. From here the outcome is a real verdict
+      # (qualify or not), so it labels/comments like the low-risk lane.
+      - name: Apply outcome — label, comment, and bot review
+        if: steps.signals.outputs.signals_ok == 'true'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ needs.preflight.outputs.head_sha }}
+          QUALIFIES: ${{ steps.oversized-ai.outputs.qualifies || steps.restricted-ai.outputs.qualifies || steps.llm-ai.outputs.qualifies }}
+          SCOPE: ${{ steps.oversized-ai.outputs.scope || steps.restricted-ai.outputs.scope || steps.llm-ai.outputs.scope }}
+          REASONING: ${{ steps.oversized-ai.outputs.reasoning || steps.restricted-ai.outputs.reasoning || steps.llm-ai.outputs.reasoning }}
+          IMPACT: ${{ steps.llm-ai.outputs.impact }}
+          SIGNAL_SUMMARY: ${{ steps.signals.outputs.summary }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+            const headSha = process.env.HEAD_SHA;
+            const qualifies = process.env.QUALIFIES === "true";
+            const scope = process.env.SCOPE;
+            const reasoning = process.env.REASONING;
+            const impact = process.env.IMPACT || "n/a";
+            const signalSummary = process.env.SIGNAL_SUMMARY;
+
+            // Drop previous AI-review assessment comments to keep the PR tidy.
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+            for (const comment of comments) {
+              if (
+                comment.user?.login === "github-actions[bot]" &&
+                comment.body?.startsWith("**Automated AI-review assessment**")
+              ) {
+                await github.rest.issues.deleteComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: comment.id,
+                });
+              }
+            }
+
+            if (qualifies) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: ["ai-reviewed-change"],
+              });
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: [
+                  "**Automated AI-review assessment**",
+                  "",
+                  "This PR was evaluated against the repository's [AI-Reviewed Pull Requests](https://github.com/langwatch/langwatch/blob/main/dev/docs/AI_REVIEWED_PULL_REQUESTS.md) procedure.",
+                  `- **Scope:** ${scope}`,
+                  `- **Impact:** ${impact} (medium or lower is required).`,
+                  "- **Reviews counted for the evaluated head:**",
+                  signalSummary,
+                  "- **Classification:** `ai-reviewed-change` under the documented policy.",
+                  "",
+                  `> ${reasoning}`,
+                  "",
+                  "An approving review has been submitted by automation. The PR may merge once required CI checks pass.",
+                ].join("\n"),
+              });
+
+              await github.rest.pulls.createReview({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                commit_id: headSha,
+                event: "APPROVE",
+                body: "Approved by automation: PR qualifies as `ai-reviewed-change` under the documented policy — required AI reviews are clean for the evaluated head and impact is medium or lower.",
+              });
+              core.info(`PR #${prNumber} labeled ai-reviewed-change and bot-approved.`);
+            } else {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  name: "ai-reviewed-change",
+                });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: [
+                  "**Automated AI-review assessment**",
+                  "",
+                  "This PR's required AI reviews are clean, but it was evaluated against the repository's [AI-Reviewed Pull Requests](https://github.com/langwatch/langwatch/blob/main/dev/docs/AI_REVIEWED_PULL_REQUESTS.md) procedure and **does not qualify** for AI-reviewed merging.",
+                  `- **Impact:** ${impact} (medium or lower is required).`,
+                  "",
+                  `> ${reasoning}`,
+                  "",
                   "This PR requires a manual review before merging.",
                 ].join("\n"),
               });
 
-              core.info(`PR #${prNumber} does not qualify as low-risk; manual review required.`);
+              core.info(`PR #${prNumber} does not qualify as ai-reviewed-change; manual review required.`);
             }
