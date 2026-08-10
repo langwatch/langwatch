@@ -5,18 +5,22 @@
 > `ProcessManagerOutbox` row per settled intent, and until the retention sweep
 > shipped, nothing ever deleted them. The tables grew ~3.6 GB in twenty days on
 > a 20 GiB instance with storage autoscaling off, which put the database weeks
-> away from a write outage. The sweep stops the growth going forward. It does
-> not, on its own, clear the backlog fast enough on a database that is already
-> close to full, because the first sweep tick would try to delete millions of
-> rows through the same bounded batches it uses for steady state.
+> away from a write outage. The sweep stops the growth going forward, and it
+> clears the historical backlog on its own: its per-wake budget opens at 25,000
+> rows per family and doubles every hour, so the catch-up is spread across
+> roughly a day instead of landing on the instance in one wake.
 >
-> This runbook is the one-time catch-up: a manual batched purge that clears the
-> historical backlog before the sweep takes over.
+> This runbook is the supervised version of that same catch-up. It clears the
+> backlog in a single pass while somebody is watching the instance, which leaves
+> the sweep with only the interim to absorb.
 
 ## When to run
 
-Once, immediately before the deploy that carries the retention sweep. Running it
-first is deliberate:
+Ideally once, immediately before the deploy that carries the retention sweep.
+This is an accelerator, not a prerequisite: the sweep ramps its own budget, so a
+deploy that lands first, or a purge that fails halfway, leaves the backlog to
+drain over about a day rather than leaving the database exposed. Running the
+purge first is still worth it:
 
 - The purge does the bulk work with `ctid` batches, which need no index. The
   index builds in step 5 then have only the few surviving live rows to sort
@@ -203,7 +207,10 @@ Run it outside an explicit transaction, then run the build again.
 The `processRetentionSweep` process manager takes over on an hourly schedule and
 holds the tables at their steady state: dispatched outbox rows older than 24
 hours, dead outbox rows older than 30 days, consumed inbox rows older than 7
-days. Watch these for the first 48 hours:
+days. Its first wake spends 5 batches per family and doubles that every hour up
+to 200, so if any backlog is left the hourly swept counts roughly double for the
+first seven hours and then flatten. Each wake logs the budget it was allowed as
+`maxBatchesPerFamily`. Watch these for the first 48 hours:
 
 - `process_manager_retention_swept_rows_total{family}` climbing every hour.
 - Row counts for both tables flat, rather than resuming their previous slope.

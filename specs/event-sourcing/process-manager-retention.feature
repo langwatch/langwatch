@@ -111,6 +111,34 @@ Feature: Process-manager inbox and outbox rows are reaped on a schedule
       When the sweep wakes
       Then each family is handed its share of the wake's budget
 
+    # A bounded batch bounds one statement's lock footprint and a bounded batch
+    # count bounds how many statements a wake issues. Neither bounds what the
+    # deletes cost underneath: write-ahead log, dead tuples until autovacuum
+    # catches up, and index churn. The first wake is the one that meets the
+    # whole historical backlog, on the least free space, with nobody watching,
+    # so opening at the full ceiling is how this cleanup would cause the write
+    # outage it exists to prevent. The one-time purge runbook is an accelerator
+    # for that first drain, never the thing that makes it safe.
+    @unit
+    Scenario: The first wake after a deploy drains far below the ceiling
+      Given a backlog larger than any single wake can drain
+      When the sweep wakes for the first time
+      Then it spends only its opening budget
+
+    @unit
+    Scenario: The wake budget climbs to the ceiling and stops there
+      Given a sweep that has already woken several times
+      When its next budget is resolved
+      Then the budget has doubled once per wake
+      And it never exceeds the steady-state ceiling
+
+    @unit
+    Scenario: The sweep pauses between delete statements
+      Given a family with several full batches to drain
+      When the sweep drains it
+      Then it pauses between statements
+      And it does not pause after the statement that drained the family
+
     @unit
     Scenario: A family that runs dry ends its drain loop early
       Given fewer expired rows than one batch holds

@@ -47,17 +47,45 @@ export const CONSUMED_INBOX_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 export const RETENTION_SWEEP_BATCH_SIZE = 5_000;
 
 /**
- * Batches per family per wake. The ceiling exists so a first tick against a
- * huge backlog degrades into "drains 1M rows an hour" rather than "holds the
- * database for as long as it takes", which is the failure mode an unbounded
- * catch-up delete has.
+ * The ceiling on batches per family per wake, reached by the ramp below rather
+ * than on the first tick. It degrades a huge backlog into "drains a million
+ * rows an hour" rather than "holds the database for as long as it takes",
+ * which is the failure mode an unbounded catch-up delete has.
  */
 export const RETENTION_SWEEP_MAX_BATCHES_PER_WAKE = 200;
 
 /**
- * Outbox lease for the sweep intent. Generous because the FIRST tick after
- * deploy drains whatever backlog the one-time purge left behind, and that run
- * is far longer than the steady-state one.
+ * Batches per family on the first wake. The budget doubles every wake after it
+ * until it reaches the ceiling above.
+ *
+ * The batch SIZE bounds one statement's lock footprint and the batch CEILING
+ * bounds how many statements a wake issues, but neither bounds what the deletes
+ * cost the instance underneath: write-ahead log, dead tuples until autovacuum
+ * catches up, and index churn. A wake that opened at the full ceiling would
+ * spend all of that at once, and the first wake is exactly when the backlog is
+ * largest and the free space smallest. That is the shape that turns a cleanup
+ * into the write outage it exists to prevent.
+ *
+ * Ramping instead reaches the ceiling in seven wakes, so a multi-million row
+ * backlog still drains within a day while the early hours stay small enough for
+ * checkpoints and autovacuum to keep pace. It costs nothing in steady state,
+ * where an hour of traffic is a few batches and even the first wake's budget is
+ * never spent.
+ */
+export const RETENTION_SWEEP_INITIAL_BATCHES_PER_WAKE = 5;
+
+/**
+ * Pause between delete statements, so a wake leaves the instance room to serve
+ * the pipeline that is still writing to these tables. The one-time backlog
+ * purge paces itself the same way, and this worker has more reason to rather
+ * than less: it runs hourly with nobody watching the database while it works.
+ */
+export const RETENTION_SWEEP_BATCH_PAUSE_MS = 200;
+
+/**
+ * Outbox lease for the sweep intent. Generous because a wake that has ramped to
+ * the ceiling spends 600 paced delete statements across the three families,
+ * which takes far longer than the handful a steady-state hour needs.
  */
 export const PROCESS_RETENTION_SWEEP_LEASE_MS = 15 * 60 * 1000;
 
@@ -77,10 +105,33 @@ export const RETENTION_SWEEP_DEADLINE_MS = 10 * 60 * 1000;
 
 export const processRetentionSweepSchema = z.object({
   scheduledFor: z.number().int(),
+  /**
+   * Optional so a payload written without it drains at the opening budget
+   * rather than the ceiling, which is the safe direction to guess in.
+   */
+  maxBatchesPerFamily: z.number().int().positive().optional(),
 });
+
+export type ProcessRetentionSweepPayload = z.output<
+  typeof processRetentionSweepSchema
+>;
 
 export interface ProcessRetentionSweepState {
   lastSweepAt: number | null;
+  /** Wakes this process has scheduled, which is what the ramp counts. */
+  sweepsScheduled: number;
+}
+
+/**
+ * Batches one family may spend on a wake that follows `priorWakes` earlier
+ * ones: the opening budget doubled once per wake, up to the ceiling.
+ */
+export function retentionSweepBatchBudget(priorWakes: number): number {
+  const doublings = Math.min(Math.max(priorWakes, 0), 32);
+  return Math.min(
+    RETENTION_SWEEP_MAX_BATCHES_PER_WAKE,
+    RETENTION_SWEEP_INITIAL_BATCHES_PER_WAKE * 2 ** doublings,
+  );
 }
 
 /** The three row families this sweep reaps, each with its own window. */
@@ -100,6 +151,8 @@ export interface ProcessRetentionSweepDeps {
     limit: number;
   }) => Promise<number>;
   now?: () => number;
+  /** Overridable so a test does not wait out the pacing pause. */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 type ProcessRetentionSweepIntents = {
@@ -115,10 +168,18 @@ type ProcessRetentionSweepIntents = {
 export const processRetentionSweepWake: WakeHandler<
   ProcessRetentionSweepState,
   ProcessRetentionSweepIntents
-> = (_state, ctx) => ({
-  state: { lastSweepAt: ctx.at },
-  intents: [ctx.intents.sweep(`sweep:${ctx.at}`, { scheduledFor: ctx.at })],
-});
+> = (state, ctx) => {
+  const priorWakes = state.sweepsScheduled ?? 0;
+  return {
+    state: { lastSweepAt: ctx.at, sweepsScheduled: priorWakes + 1 },
+    intents: [
+      ctx.intents.sweep(`sweep:${ctx.at}`, {
+        scheduledFor: ctx.at,
+        maxBatchesPerFamily: retentionSweepBatchBudget(priorWakes),
+      }),
+    ],
+  };
+};
 
 type DeleteBatch = (params: {
   before: number;
@@ -167,14 +228,18 @@ async function drainFamily({
   before,
   deadline,
   now,
+  maxBatches,
+  sleep,
 }: {
   deleteBatch: DeleteBatch;
   before: number;
   deadline: number;
   now: () => number;
+  maxBatches: number;
+  sleep: (ms: number) => Promise<void>;
 }): Promise<number> {
   let total = 0;
-  for (let batch = 0; batch < RETENTION_SWEEP_MAX_BATCHES_PER_WAKE; batch++) {
+  for (let batch = 0; batch < maxBatches; batch++) {
     if (now() >= deadline) break;
     const deleted = await deleteBatch({
       before,
@@ -182,6 +247,7 @@ async function drainFamily({
     });
     total += deleted;
     if (deleted < RETENTION_SWEEP_BATCH_SIZE) break;
+    await sleep(RETENTION_SWEEP_BATCH_PAUSE_MS);
   }
   return total;
 }
@@ -194,10 +260,26 @@ async function drainFamily({
  */
 async function sweepFamily(
   plan: FamilyPlan,
-  { deadline, now }: { deadline: number; now: () => number },
+  {
+    deadline,
+    now,
+    maxBatches,
+    sleep,
+  }: {
+    deadline: number;
+    now: () => number;
+    maxBatches: number;
+    sleep: (ms: number) => Promise<void>;
+  },
 ): Promise<number> {
   try {
-    const rows = await drainFamily({ ...plan, deadline, now });
+    const rows = await drainFamily({
+      ...plan,
+      deadline,
+      now,
+      maxBatches,
+      sleep,
+    });
     incrementProcessManagerRetentionSweptRows(plan.family, rows);
     return rows;
   } catch (error) {
@@ -210,8 +292,13 @@ async function sweepFamily(
 }
 
 export function runProcessRetentionSweep(deps: ProcessRetentionSweepDeps) {
-  return async (): Promise<void> => {
+  return async (payload: ProcessRetentionSweepPayload): Promise<void> => {
     const now = deps.now ?? Date.now;
+    const sleep =
+      deps.sleep ??
+      ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+    const maxBatches =
+      payload.maxBatchesPerFamily ?? RETENTION_SWEEP_INITIAL_BATCHES_PER_WAKE;
     const startedAt = now();
     const deadline = startedAt + RETENTION_SWEEP_DEADLINE_MS;
 
@@ -239,6 +326,8 @@ export function runProcessRetentionSweep(deps: ProcessRetentionSweepDeps) {
       swept[plan.family] = await sweepFamily(plan, {
         deadline: familyDeadline,
         now,
+        maxBatches,
+        sleep,
       });
     }
 
@@ -249,6 +338,9 @@ export function runProcessRetentionSweep(deps: ProcessRetentionSweepDeps) {
         deadOutboxRows: swept.dead_outbox,
         inboxRows: swept.inbox,
         durationMs,
+        // The budget this wake was allowed, so an operator watching the first
+        // hours after deploy can see the ramp climbing toward the ceiling.
+        maxBatchesPerFamily: maxBatches,
         // A wake that stops on the deadline leaves work behind on purpose. It
         // is not an error, but a run of them means the hourly budget is no
         // longer keeping up with the insert rate.

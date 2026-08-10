@@ -56,7 +56,10 @@ export function createProcessManagerMaintenancePipeline(
       .withAggregateType("global")
       .withProcessManager(PROCESS_RETENTION_SWEEP_PROCESS_NAME, (pm) =>
         pm
-          .state<ProcessRetentionSweepState>({ lastSweepAt: null })
+          .state<ProcessRetentionSweepState>({
+            lastSweepAt: null,
+            sweepsScheduled: 0,
+          })
           .schedule({ everyMs: PROCESS_RETENTION_SWEEP_INTERVAL_MS })
           .onWake(processRetentionSweepWake)
           .intent(

@@ -9,9 +9,12 @@ import {
   DISPATCHED_OUTBOX_RETENTION_MS,
   type ProcessRetentionSweepDeps,
   processRetentionSweepWake,
+  RETENTION_SWEEP_BATCH_PAUSE_MS,
   RETENTION_SWEEP_BATCH_SIZE,
   RETENTION_SWEEP_DEADLINE_MS,
+  RETENTION_SWEEP_INITIAL_BATCHES_PER_WAKE,
   RETENTION_SWEEP_MAX_BATCHES_PER_WAKE,
+  retentionSweepBatchBudget,
   runProcessRetentionSweep,
 } from "../process-manager/processRetentionSweep.process";
 
@@ -39,26 +42,68 @@ function deps(
     deleteDeadOutboxBatch: backlog(0),
     deleteConsumedInboxBatch: backlog(0),
     now: () => NOW,
+    sleep: async () => {},
     ...overrides,
   };
+}
+
+/**
+ * The payload a wake hands the sweep. Defaults to the ceiling, because most of
+ * these tests are about what bounds a wake once the ramp has finished climbing.
+ */
+function payload(maxBatchesPerFamily = RETENTION_SWEEP_MAX_BATCHES_PER_WAKE) {
+  return { scheduledFor: NOW, maxBatchesPerFamily };
 }
 
 describe("processRetentionSweep", () => {
   describe("given a scheduled sweep process", () => {
     describe("when the schedule wakes it", () => {
       it("emits one sweep intent keyed on the tick it woke at", () => {
-        const sweep = vi.fn((key: string, payload: unknown) => ({
+        const sweep = vi.fn((key: string, intentPayload: unknown) => ({
           key,
-          payload,
+          payload: intentPayload,
         }));
-        const result = processRetentionSweepWake({ lastSweepAt: null }, {
-          at: NOW,
-          intents: { sweep },
-        } as never);
+        const result = processRetentionSweepWake(
+          { lastSweepAt: null, sweepsScheduled: 0 },
+          { at: NOW, intents: { sweep } } as never,
+        );
 
-        expect(result.state).toEqual({ lastSweepAt: NOW });
+        expect(result.state).toEqual({ lastSweepAt: NOW, sweepsScheduled: 1 });
         expect(sweep).toHaveBeenCalledWith(`sweep:${NOW}`, {
           scheduledFor: NOW,
+          maxBatchesPerFamily: RETENTION_SWEEP_INITIAL_BATCHES_PER_WAKE,
+        });
+      });
+    });
+
+    describe("when it has woken before", () => {
+      /** @scenario "The wake budget climbs to the ceiling and stops there" */
+      it("doubles the budget each wake until it reaches the ceiling", () => {
+        expect(retentionSweepBatchBudget(0)).toBe(
+          RETENTION_SWEEP_INITIAL_BATCHES_PER_WAKE,
+        );
+        expect(retentionSweepBatchBudget(1)).toBe(
+          RETENTION_SWEEP_INITIAL_BATCHES_PER_WAKE * 2,
+        );
+        expect(retentionSweepBatchBudget(2)).toBe(
+          RETENTION_SWEEP_INITIAL_BATCHES_PER_WAKE * 4,
+        );
+        expect(retentionSweepBatchBudget(50)).toBe(
+          RETENTION_SWEEP_MAX_BATCHES_PER_WAKE,
+        );
+      });
+
+      it("counts the wakes it has scheduled so the ramp survives a restart", () => {
+        const sweep = vi.fn(() => ({}));
+        const result = processRetentionSweepWake(
+          { lastSweepAt: NOW - 1, sweepsScheduled: 3 },
+          { at: NOW, intents: { sweep } } as never,
+        );
+
+        expect(result.state).toEqual({ lastSweepAt: NOW, sweepsScheduled: 4 });
+        expect(sweep).toHaveBeenCalledWith(`sweep:${NOW}`, {
+          scheduledFor: NOW,
+          maxBatchesPerFamily: retentionSweepBatchBudget(3),
         });
       });
     });
@@ -76,7 +121,7 @@ describe("processRetentionSweep", () => {
             deleteDeadOutboxBatch: dead,
             deleteConsumedInboxBatch: inbox,
           }),
-        )();
+        )(payload());
 
         expect(dispatched).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -101,7 +146,7 @@ describe("processRetentionSweep", () => {
 
         await runProcessRetentionSweep(
           deps({ deleteDispatchedOutboxBatch: dispatched }),
-        )();
+        )(payload());
 
         expect(dispatched).toHaveBeenCalledTimes(
           RETENTION_SWEEP_MAX_BATCHES_PER_WAKE,
@@ -118,9 +163,48 @@ describe("processRetentionSweep", () => {
 
         await runProcessRetentionSweep(
           deps({ deleteDispatchedOutboxBatch: dispatched }),
-        )();
+        )(payload());
 
         expect(dispatched).toHaveBeenCalledTimes(1);
+      });
+
+      /** @scenario "The first wake after a deploy drains far below the ceiling" */
+      it("spends only the opening budget when the ramp has not climbed yet", async () => {
+        // The backlog here is the one the incident left behind: far more than
+        // any wake can drain. What matters is that the FIRST wake takes a small
+        // bite of it, because that is the wake with the least free space under
+        // it and nobody watching.
+        const inbox = backlog(Number.MAX_SAFE_INTEGER);
+
+        await runProcessRetentionSweep(
+          deps({ deleteConsumedInboxBatch: inbox }),
+        )(payload(retentionSweepBatchBudget(0)));
+
+        expect(inbox).toHaveBeenCalledTimes(
+          RETENTION_SWEEP_INITIAL_BATCHES_PER_WAKE,
+        );
+      });
+
+      /** @scenario "The sweep pauses between delete statements" */
+      it("pauses between statements, but not after the one that drained it", async () => {
+        const pauses: number[] = [];
+        const inbox = backlog(RETENTION_SWEEP_BATCH_SIZE * 3);
+
+        await runProcessRetentionSweep(
+          deps({
+            deleteConsumedInboxBatch: inbox,
+            sleep: async (ms) => {
+              pauses.push(ms);
+            },
+          }),
+        )(payload());
+
+        expect(inbox).toHaveBeenCalledTimes(4);
+        expect(pauses).toEqual([
+          RETENTION_SWEEP_BATCH_PAUSE_MS,
+          RETENTION_SWEEP_BATCH_PAUSE_MS,
+          RETENTION_SWEEP_BATCH_PAUSE_MS,
+        ]);
       });
 
       it("issues no second statement for a family that was already empty", async () => {
@@ -128,7 +212,7 @@ describe("processRetentionSweep", () => {
 
         await runProcessRetentionSweep(
           deps({ deleteConsumedInboxBatch: inbox }),
-        )();
+        )(payload());
 
         expect(inbox).toHaveBeenCalledTimes(1);
       });
@@ -151,7 +235,7 @@ describe("processRetentionSweep", () => {
               deleteDeadOutboxBatch: dead,
               deleteConsumedInboxBatch: inbox,
             }),
-          )(),
+          )(payload()),
         ).resolves.toBeUndefined();
 
         expect(dead).toHaveBeenCalledTimes(1);
@@ -193,7 +277,7 @@ describe("processRetentionSweep", () => {
             deleteConsumedInboxBatch: inbox,
             now: creepingClock(RETENTION_SWEEP_DEADLINE_MS / 10),
           }),
-        )();
+        )(payload());
 
         expect(dispatched.mock.calls.length).toBeGreaterThan(0);
         expect(dead.mock.calls.length).toBeGreaterThan(0);
@@ -213,7 +297,7 @@ describe("processRetentionSweep", () => {
             deleteDispatchedOutboxBatch: dispatched,
             now: creepingClock(RETENTION_SWEEP_DEADLINE_MS / 10),
           }),
-        )();
+        )(payload());
 
         expect(dispatched.mock.calls.length).toBeLessThan(
           RETENTION_SWEEP_MAX_BATCHES_PER_WAKE,
@@ -232,7 +316,7 @@ describe("processRetentionSweep", () => {
               deleteDispatchedOutboxBatch: dispatched,
               now: creepingClock(RETENTION_SWEEP_DEADLINE_MS),
             }),
-          )(),
+          )(payload()),
         ).resolves.toBeUndefined();
 
         // The deadline is already spent when the first batch is considered.
@@ -258,7 +342,7 @@ describe("processRetentionSweep", () => {
             deleteDispatchedOutboxBatch: backlog(3),
             deleteConsumedInboxBatch: backlog(7),
           }),
-        )();
+        )(payload());
 
         const after = await familyCounts(counter);
         expect(
