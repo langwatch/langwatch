@@ -374,6 +374,95 @@ interface PagedRead<T> {
   complete: boolean;
 }
 
+/**
+ * Where in a list of spaces this run should start.
+ *
+ * An id that is not in the list means the space was deleted since the cursor
+ * was written, and starting over is the safe answer: the watermark did not
+ * move either, so nothing is skipped by re-reading from the top.
+ */
+function spaceStartIndex({
+  spaces,
+  resumeSpaceId,
+}: {
+  spaces: Array<z.infer<typeof spaceSchema>>;
+  resumeSpaceId: string | null;
+}): number {
+  if (!resumeSpaceId) return 0;
+  return Math.max(
+    spaces.findIndex((s) => s.space_id === resumeSpaceId),
+    0,
+  );
+}
+
+/**
+ * One space's conversations in a deterministic order, plus where to start.
+ *
+ * The sort is the load-bearing part — see `spaceMessages` for why resuming is
+ * only sound against an order we impose rather than the one the workspace
+ * happened to return.
+ *
+ * `resumable` is false when the listing was itself cut short. A partial list
+ * is only a PREFIX of the space's conversations, so a position inside it means
+ * nothing: the conversations that would have sorted earlier may sit on a page
+ * that was never read, and resuming into it would skip them permanently once
+ * the sweep completed. Such a space restarts from the top instead — slower,
+ * and still lossless.
+ */
+function conversationWalkPlan({
+  conversations,
+  resumeConversationId,
+}: {
+  conversations: PagedRead<z.infer<typeof conversationSchema>>;
+  resumeConversationId: string | null;
+}): {
+  ordered: Array<z.infer<typeof conversationSchema>>;
+  startAt: number;
+  resumable: boolean;
+} {
+  const ordered = [...conversations.items].sort((a, b) =>
+    a.conversation_id < b.conversation_id
+      ? -1
+      : a.conversation_id > b.conversation_id
+        ? 1
+        : 0,
+  );
+  const resumable = conversations.complete;
+  // An id no longer in the list means the conversation was deleted since the
+  // last run; starting the space over is safe for the same reason as a space.
+  const startAt =
+    resumable && resumeConversationId
+      ? Math.max(
+          ordered.findIndex((c) => c.conversation_id === resumeConversationId),
+          0,
+        )
+      : 0;
+  return { ordered, startAt, resumable };
+}
+
+/**
+ * The result for a space walk that stopped early on a given conversation.
+ *
+ * The resume point is dropped when the plan says the space is not resumable
+ * (a truncated listing), which turns the next run into a clean restart of the
+ * space rather than a resume into a position that was never trustworthy.
+ */
+function stoppedAt({
+  items,
+  conversation,
+  plan,
+}: {
+  items: NormalizedPullEvent[];
+  conversation: z.infer<typeof conversationSchema>;
+  plan: { resumable: boolean };
+}): SpaceRead {
+  return {
+    items,
+    complete: false,
+    resumeConversationId: plan.resumable ? conversation.conversation_id : null,
+  };
+}
+
 /** What one space's walk read, and where to pick it up if it was cut short. */
 interface SpaceRead {
   items: NormalizedPullEvent[];
@@ -529,14 +618,13 @@ export class DatabricksGeniePuller
     const spaces = await this.resolveSpaces({ config, token, options, budget });
     let complete = spaces.complete;
 
-    // Resume where the budget cut the last sweep short. An unknown id means the
-    // space was deleted since, and starting over is the safe answer: the
-    // watermark did not move either, so nothing is skipped.
-    const resumeAt = cursor.spaceId
-      ? spaces.items.findIndex((s) => s.space_id === cursor.spaceId)
-      : 0;
+    // Resume where the budget cut the last sweep short.
+    const resumeAt = spaceStartIndex({
+      spaces: spaces.items,
+      resumeSpaceId: cursor.spaceId,
+    });
 
-    for (let i = Math.max(resumeAt, 0); i < spaces.items.length; i += 1) {
+    for (let i = resumeAt; i < spaces.items.length; i += 1) {
       const space = spaces.items[i]!;
       // Only the space the cursor actually stopped in inherits the conversation
       // resume point. Every space after it is taken from the top.
@@ -648,69 +736,71 @@ export class DatabricksGeniePuller
     identities: Map<number, GenieIdentity>;
     resumeConversationId: string | null;
   }): Promise<SpaceRead> {
-    const conversations = await this.isolate({
-      what: "conversations",
-      context: { spaceId: space.space_id },
-      run: () =>
-        this.paginate({
-          config,
-          token,
-          options,
-          budget,
-          path: `/api/2.0/genie/spaces/${encodeURIComponent(space.space_id)}/conversations`,
-          // Without this the endpoint answers with the CALLER'S OWN
-          // conversations only, and a governance sweep would quietly report one
-          // service account's activity as the workspace's.
-          query: { include_all: "true" },
-          parse: (body) => {
-            const page = conversationsPageSchema.parse(body);
-            return { items: page.conversations, next: page.next_page_token };
-          },
-        }),
+    const conversations = await this.listConversations({
+      config,
+      token,
+      options,
+      budget,
+      space,
     });
     if (!conversations)
       return { items: [], complete: false, resumeConversationId: null };
 
+    const plan = conversationWalkPlan({ conversations, resumeConversationId });
+    const walked = await this.walkConversations({
+      config,
+      token,
+      options,
+      budget,
+      space,
+      sinceMs,
+      identities,
+      plan,
+    });
+
+    // A truncated LISTING keeps the space incomplete even when everything the
+    // walk actually saw was read in full — there are pages of conversations it
+    // never got to.
+    return {
+      ...walked,
+      complete: walked.complete && conversations.complete,
+    };
+  }
+
+  /**
+   * Reads one space's conversations in the planned order, stopping when the
+   * budget runs out.
+   *
+   * Stopping hands back the conversation to restart ON — not the one after it
+   * — so a conversation whose message pages were cut partway is re-read rather
+   * than half-skipped.
+   */
+  private async walkConversations({
+    config,
+    token,
+    options,
+    budget,
+    space,
+    sinceMs,
+    identities,
+    plan,
+  }: {
+    config: DatabricksGeniePullConfig;
+    token: string;
+    options: PullRunOptions;
+    budget: RunBudget;
+    space: z.infer<typeof spaceSchema>;
+    sinceMs: number;
+    identities: Map<number, GenieIdentity>;
+    plan: ReturnType<typeof conversationWalkPlan>;
+  }): Promise<SpaceRead> {
     const events: NormalizedPullEvent[] = [];
-    let complete = conversations.complete;
+    let complete = true;
 
-    const ordered = [...conversations.items].sort((a, b) =>
-      a.conversation_id < b.conversation_id
-        ? -1
-        : a.conversation_id > b.conversation_id
-          ? 1
-          : 0,
-    );
-
-    // A listing that was itself cut short is only a PREFIX of the space's
-    // conversations, so a position inside it means nothing — the conversations
-    // that would have sorted earlier may be sitting on a page we never read.
-    // Resuming into it would skip them permanently once the sweep completed.
-    // So a truncated listing forfeits sub-space resume and the space restarts
-    // from the top, which is slower and still lossless.
-    const resumable = conversations.complete;
-
-    // An id that is no longer in the list means the conversation was deleted
-    // since the last run. Starting the space over is the safe answer: the
-    // watermark did not move, so nothing is skipped.
-    const startAt =
-      resumable && resumeConversationId
-        ? Math.max(
-            ordered.findIndex(
-              (c) => c.conversation_id === resumeConversationId,
-            ),
-            0,
-          )
-        : 0;
-
-    for (let i = startAt; i < ordered.length; i += 1) {
-      const conversation = ordered[i]!;
+    for (let i = plan.startAt; i < plan.ordered.length; i += 1) {
+      const conversation = plan.ordered[i]!;
       if (budget.exhausted()) {
-        return {
-          items: events,
-          complete: false,
-          resumeConversationId: resumable ? conversation.conversation_id : null,
-        };
+        return stoppedAt({ items: events, conversation, plan });
       }
 
       const read = await this.isolate({
@@ -731,28 +821,63 @@ export class DatabricksGeniePuller
             identities,
           }),
       });
-      if (!read) {
-        // Isolated failure on one conversation. Keep going — the held
-        // watermark plus a full re-sweep already covers it, and stopping here
-        // would wedge the space on a permanently-broken conversation.
-        complete = false;
-        continue;
-      }
-      events.push(...read.items);
-      if (!read.complete) complete = false;
 
-      // This conversation's own message pages ran out of budget partway.
-      // Resume ON it rather than after it, so its unread tail is re-read.
-      if (!read.complete && budget.exhausted()) {
-        return {
-          items: events,
-          complete: false,
-          resumeConversationId: resumable ? conversation.conversation_id : null,
-        };
+      if (read) events.push(...read.items);
+      // Null is an isolated failure on this one conversation; false means its
+      // pages were cut short. Both leave the space incomplete.
+      if (!read?.complete) complete = false;
+
+      // Out of budget with this conversation unfinished — stop here. An
+      // isolated failure with budget still left falls through and keeps going
+      // instead, so one broken conversation cannot wedge the whole space.
+      if (!read?.complete && budget.exhausted()) {
+        return stoppedAt({ items: events, conversation, plan });
       }
     }
 
     return { items: events, complete, resumeConversationId: null };
+  }
+
+  /**
+   * Every conversation in one space, or null when the space could not be read.
+   *
+   * Isolated: a space the credential cannot see must not cost the workspace
+   * the others, so the caller turns a null into `complete: false` rather than
+   * letting the failure unwind the whole sweep.
+   */
+  private async listConversations({
+    config,
+    token,
+    options,
+    budget,
+    space,
+  }: {
+    config: DatabricksGeniePullConfig;
+    token: string;
+    options: PullRunOptions;
+    budget: RunBudget;
+    space: z.infer<typeof spaceSchema>;
+  }): Promise<PagedRead<z.infer<typeof conversationSchema>> | null> {
+    return await this.isolate({
+      what: "conversations",
+      context: { spaceId: space.space_id },
+      run: () =>
+        this.paginate({
+          config,
+          token,
+          options,
+          budget,
+          path: `/api/2.0/genie/spaces/${encodeURIComponent(space.space_id)}/conversations`,
+          // Without this the endpoint answers with the CALLER'S OWN
+          // conversations only, and a governance sweep would quietly report one
+          // service account's activity as the workspace's.
+          query: { include_all: "true" },
+          parse: (body) => {
+            const page = conversationsPageSchema.parse(body);
+            return { items: page.conversations, next: page.next_page_token };
+          },
+        }),
+    });
   }
 
   /** The configured spaces, or every space the credential can see. */
