@@ -942,6 +942,23 @@ export class ClickHouseTraceService {
                 cursor = null;
               } else if (
                 cursor &&
+                cursor.scrollStart !== undefined &&
+                (typeof cursor.scrollStart !== "number" ||
+                  !Number.isFinite(cursor.scrollStart) ||
+                  cursor.scrollStart <= 0)
+              ) {
+                // scrollId is client-supplied base64 JSON parsed without a shape
+                // check, and scrollStart binds as {scrollStart:UInt64}. A string,
+                // a null or a negative would fail the query outright instead of
+                // degrading, so a malformed one drops the cursor like every other
+                // mismatch here and the scroll restarts uncapped.
+                this.logger.warn(
+                  { cursorScrollStart: cursor.scrollStart },
+                  "Invalid scrollStart in cursor, ignoring cursor",
+                );
+                cursor = null;
+              } else if (
+                cursor &&
                 (cursor.dateField ?? "occurred") !== dateField
               ) {
                 this.logger.warn(
@@ -1002,7 +1019,13 @@ export class ClickHouseTraceService {
           // immutable, so the occurred cursor is stable on its own.
           const scrollStart =
             dateField === "updated"
-              ? (cursor?.scrollStart ?? Date.now())
+              ? // A cursor minted before this field existed carries no snapshot.
+                // Leave that scroll uncapped rather than pinning it to a point
+                // after its earlier pages were already served — a bound taken
+                // now would describe a moment that scroll never read from.
+                cursor
+                ? cursor.scrollStart
+                : Date.now()
               : undefined;
 
           // Build the query with keyset pagination

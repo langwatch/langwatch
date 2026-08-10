@@ -150,8 +150,12 @@ async function fetchPage(
     openProtections,
     { downloadMode: true, dateField: "updated", scrollId },
   );
-  expect(results).not.toBeNull();
-  return results as TracesForProjectResult;
+  // A plain throw rather than expect(): this is a helper, not a test body, and
+  // an assertion out here reads as a passing check that never ran.
+  if (!results) {
+    throw new Error(`getAllTracesForProject returned null for ${tenantId}`);
+  }
+  return results;
 }
 
 function traceIdsOf(result: TracesForProjectResult): string[] {
