@@ -297,8 +297,17 @@ export function runProcessRetentionSweep(deps: ProcessRetentionSweepDeps) {
     const sleep =
       deps.sleep ??
       ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
-    const maxBatches =
-      payload.maxBatchesPerFamily ?? RETENTION_SWEEP_INITIAL_BATCHES_PER_WAKE;
+    // Clamped here rather than bounded in the schema. The only writer is the
+    // wake handler above, which already caps the budget, so a larger value
+    // could only arrive on a payload this code did not write. Rejecting one
+    // would fail the intent, exhaust its retries and dead-letter the sweep,
+    // which stops retention altogether and regrows the tables this exists to
+    // bound. Clamping holds the delete loop to the same ceiling and keeps the
+    // sweep running.
+    const maxBatches = Math.min(
+      payload.maxBatchesPerFamily ?? RETENTION_SWEEP_INITIAL_BATCHES_PER_WAKE,
+      RETENTION_SWEEP_MAX_BATCHES_PER_WAKE,
+    );
     const startedAt = now();
     const deadline = startedAt + RETENTION_SWEEP_DEADLINE_MS;
 

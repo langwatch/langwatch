@@ -207,6 +207,18 @@ describe("processRetentionSweep", () => {
         ]);
       });
 
+      it("holds a payload asking for more than the ceiling down to it", async () => {
+        const inbox = backlog(Number.MAX_SAFE_INTEGER);
+
+        await runProcessRetentionSweep(
+          deps({ deleteConsumedInboxBatch: inbox }),
+        )(payload(RETENTION_SWEEP_MAX_BATCHES_PER_WAKE * 10));
+
+        expect(inbox).toHaveBeenCalledTimes(
+          RETENTION_SWEEP_MAX_BATCHES_PER_WAKE,
+        );
+      });
+
       it("issues no second statement for a family that was already empty", async () => {
         const inbox = backlog(0);
 
