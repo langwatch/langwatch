@@ -20,6 +20,7 @@ vi.mock("../../../../../ee/admin/isAdmin", () => ({
 // takes its Postgres-only path instead of talking to a real Redis.
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ redis: null }),
+  tryGetApp: () => ({ redis: null }),
 }));
 
 vi.mock("../../rbac", async (importOriginal) => {

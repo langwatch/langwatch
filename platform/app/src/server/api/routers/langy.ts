@@ -6,7 +6,7 @@ import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
+import { getApp, tryGetApp } from "~/server/app-layer/app";
 import {
   LangyConversationNotFoundError,
   LangyRateLimitedError,
@@ -201,7 +201,7 @@ async function canWatchTurn({
   turnId: string;
   userId: string;
 }): Promise<boolean> {
-  const connection = getApp().redis;
+  const connection = tryGetApp()?.redis ?? null;
   if (connection) {
     const access = createLangyTurnAccessStore({ redis: connection });
     if (
@@ -923,7 +923,7 @@ export const langyRouter = createTRPCRouter({
       }
       // No Redis ⇒ no live buffer; the client falls back to the Postgres
       // conversation/message query.
-      const connection = getApp().redis;
+      const connection = tryGetApp()?.redis ?? null;
       if (!connection) return;
 
       const blocking = connection.duplicate();

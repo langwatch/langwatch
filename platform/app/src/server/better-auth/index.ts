@@ -20,7 +20,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { env } from "~/env.mjs";
-import { getApp } from "~/server/app-layer/app";
+import { tryGetApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { fireActivityTrackingNurturing } from "../../../ee/billing/nurturing/hooks/activityTracking";
 import { ensureUserSyncedToCio } from "../../../ee/billing/nurturing/hooks/userSync";
@@ -100,7 +100,7 @@ const redisEnv = {
  * right: better-auth re-reads from the database, whereas throwing would fail
  * the request outright.
  */
-const secondaryStorageConnection = () => getApp().redis;
+const secondaryStorageConnection = () => tryGetApp()?.redis ?? null;
 
 const secondaryStorage: BetterAuthOptions["secondaryStorage"] =
   isRedisConfigured(redisEnv)

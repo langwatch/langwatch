@@ -281,19 +281,23 @@ export function getApp(): App {
 /**
  * The App if one has been initialized, otherwise `null`.
  *
- * **Prefer {@link getApp}.** A path that needs the App and cannot run without
- * it should fail loudly, not read `null` and quietly take a lesser branch.
+ * **Use {@link getApp} unless absence is a supported outcome you can name.** A
+ * path that needs the App and cannot run without it should fail loudly, not
+ * read `null` and quietly take a lesser branch.
  *
- * This exists for the few consumers whose *documented contract* is to degrade
- * when there is nothing to reach — `TtlCache`, which is specified as
- * "Redis available: shared across pods; no Redis configured: in-memory only".
- * Those are constructed at module scope and used from paths that may run
- * before, or entirely without, a composition root; throwing there would turn a
- * working fallback into a crash.
+ * Redis consumers are the main legitimate users, because Redis has always been
+ * optional here: nearly all of them already branch on `if (!redis)` and have a
+ * documented fallback — an in-memory counter, a skipped dedupe, an open-failed
+ * rate limit, a 503. For those, "no App" and "no Redis" mean the same thing,
+ * and raising would turn a working fallback into a crash on a path that was
+ * built to survive exactly this.
  *
- * Reach for this only when absence is a supported outcome you can name, and
- * never as a way to avoid initializing an App. Nothing outside this module
- * should read {@link globalForApp} directly.
+ * The consumers that keep {@link getApp} are the ones where doing less is not
+ * a degraded success but a wrong answer — session revocation, where skipping
+ * the Redis clear leaves a revoked user logged in.
+ *
+ * Never reach for this to avoid initializing an App. Nothing outside this
+ * module should read {@link globalForApp} directly.
  */
 export function tryGetApp(): App | null {
   return globalForApp.__langwatch_app;

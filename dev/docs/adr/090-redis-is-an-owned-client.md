@@ -105,14 +105,31 @@ Three parts:
    should say so rather than quietly take a lesser branch.
 
    The exception is a consumer whose *documented contract* is to degrade, and
-   for those there is a named accessor, `tryGetApp(): App | null`. `TtlCache` is
-   the one that matters: it is specified as "Redis available: shared across
-   pods; no Redis configured: in-memory only", it is constructed at module scope
-   in ~20 places, and making it raise turns a working fallback into a crash —
-   measured, it broke 171 unit tests across 23 files, none of which are about
-   Redis. `tryGetApp` keeps that read explicit and greppable instead of hidden
-   behind a reach for the global, and its doc comment says plainly that
-   `getApp()` is the default and absence must be a named, supported outcome.
+   for those there is a named accessor, `tryGetApp(): App | null`.
+
+   That exception turned out to cover most Redis consumers, and the reason is
+   worth stating plainly: **Redis has always been optional in this codebase**.
+   Nearly every consumer already opens with `if (!redis)` and has a documented
+   fallback — an in-memory counter, a skipped dedupe, an open-failed rate limit,
+   a 503, "run state not stored". For those, "no App" and "no Redis" are the
+   same condition, and raising on the first turns a path built to survive
+   exactly this into a crash. We measured both halves of that: strict `getApp()`
+   in `TtlCache` alone broke 171 unit tests across 23 files, and applying it to
+   the route-level consumers turned integration tests into 500s in suites that
+   have nothing to do with Redis.
+
+   What keeps this from hollowing out the decision is that the invariant worth
+   protecting is not "reads raise without an App" — it is **one owner, no
+   module-level connection, nothing constructed at import**. That is preserved
+   whole, and the two source guards enforce it. The accessor choice only decides
+   what a consumer does when there is no App, and for a consumer that already
+   branches on absence the honest answer is: the same thing it does without
+   Redis.
+
+   `getApp()` is kept where doing less is not a degraded success but a wrong
+   answer — `revokeSessions`, where skipping the Redis clear leaves a revoked
+   user logged in for up to the session TTL — and on the boot probe, which runs
+   after `initializeApp` by construction.
 
    `task.ts` also uses the accessor, for a different question: "did this task
    build an App?", asked in order to close it. That is not a Redis read at all.

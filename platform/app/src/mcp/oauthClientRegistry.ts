@@ -11,7 +11,7 @@
  * the token-exchanger holds the verifier for the challenge in the code, and
  * an attacker who authored the request holds both.
  */
-import { getApp } from "~/server/app-layer/app";
+import { tryGetApp } from "~/server/app-layer/app";
 
 const REDIS_CLIENT_PREFIX = "mcp:oauth:client:";
 
@@ -34,7 +34,7 @@ export async function registerOAuthClient({
   clientId: string;
   client: RegisteredOAuthClient;
 }): Promise<void> {
-  const redis = getApp().redis;
+  const redis = tryGetApp()?.redis ?? null;
   if (!redis) {
     throw new Error("Redis is not available");
   }
@@ -49,7 +49,7 @@ export async function registerOAuthClient({
 export async function getOAuthClient(
   clientId: string,
 ): Promise<RegisteredOAuthClient | null> {
-  const redis = getApp().redis;
+  const redis = tryGetApp()?.redis ?? null;
   if (!redis) return null;
   const raw = await redis.get(`${REDIS_CLIENT_PREFIX}${clientId}`);
   if (!raw) return null;

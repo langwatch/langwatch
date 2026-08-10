@@ -52,7 +52,7 @@ import {
   requireApiKeyPermission,
   type UnifiedAuthVariables,
 } from "~/server/api-key/auth-middleware";
-import { getApp } from "~/server/app-layer/app";
+import { getApp, tryGetApp } from "~/server/app-layer/app";
 import type { DspyStepData } from "~/server/app-layer/dspy-steps/types";
 import {
   predefinedEventsSchemas,
@@ -943,7 +943,7 @@ secured
 
     const code = randomUUID();
 
-    const redis = getApp().redis;
+    const redis = tryGetApp()?.redis ?? null;
     if (!redis) {
       const description = "Authorization is temporarily unavailable";
       return c.json(

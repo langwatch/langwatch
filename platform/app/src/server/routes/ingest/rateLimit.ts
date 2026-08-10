@@ -19,7 +19,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
-import { getApp } from "~/server/app-layer/app";
+import { tryGetApp } from "~/server/app-layer/app";
 
 const logger = createLogger("langwatch:ingest:rate-limit");
 
@@ -29,6 +29,15 @@ export const DEFAULT_WINDOW_SEC = 60;
 export const DEFAULT_MAX_REQUESTS = 60;
 
 type RedisLike = Redis | Cluster;
+
+/**
+ * Omitting `redis` takes the App's; passing `null` explicitly forces the
+ * open-fail path. A default parameter can't tell "not passed" from "passed
+ * undefined", so the sentinel is how a caller opts out (ADR-090).
+ */
+function resolveRedis(redis: RedisLike | null | undefined): RedisLike | null {
+  return redis === void 0 ? (tryGetApp()?.redis ?? null) : redis;
+}
 
 export interface RateLimitDecision {
   allowed: boolean;
@@ -75,7 +84,7 @@ export async function checkIpRateLimit({
   if (isRateLimitDisabled()) {
     return { allowed: true, retryAfterSec: 0, count: 0 };
   }
-  const effectiveRedis = redis === void 0 ? getApp().redis : redis;
+  const effectiveRedis = resolveRedis(redis);
   if (!effectiveRedis) {
     logger.warn(
       { ip },

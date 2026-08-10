@@ -3,7 +3,7 @@ import type { PlanInfo } from "@ee/licensing/planInfo";
 import { createLogger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { env } from "~/env.mjs";
-import { getApp } from "~/server/app-layer/app";
+import { getApp, tryGetApp } from "~/server/app-layer/app";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { TtlCache } from "~/server/utils/ttlCache";
 
@@ -17,7 +17,7 @@ const logger = createLogger("langwatch:automations:persist-cap");
  * undefined", so the sentinel is how a caller opts out (ADR-090).
  */
 function resolveRedis(redis: RedisConnection | null | undefined) {
-  return redis === void 0 ? getApp().redis : redis;
+  return redis === void 0 ? (tryGetApp()?.redis ?? null) : redis;
 }
 
 const DAY_MS = 86_400_000;

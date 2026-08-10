@@ -33,7 +33,7 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import type { Redis } from "ioredis";
-import { getApp } from "../server/app-layer/app";
+import { tryGetApp } from "../server/app-layer/app";
 import { prisma } from "../server/db";
 import type { NextApiRequest } from "../types/next-stubs";
 import { decrypt, encrypt } from "../utils/encryption";
@@ -221,7 +221,7 @@ export function createMcpHandler(): McpHandler {
   // (start.ts), and the App's connection does not change for the life of the
   // process. Null means no Redis is configured — every use below branches on
   // it, degrading OAuth tokens and sessions to in-memory (ADR-090).
-  const redis = getApp().redis;
+  const redis = tryGetApp()?.redis ?? null;
 
   // Ensure the MCP config is initialized with the app's endpoint
   try {

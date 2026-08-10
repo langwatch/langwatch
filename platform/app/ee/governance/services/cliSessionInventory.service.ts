@@ -23,7 +23,7 @@ import { createLogger } from "@langwatch/observability";
  * Spec: specs/ai-governance/sessions/sessions-inventory.feature
  */
 import type { Cluster, Redis } from "ioredis";
-import { getApp } from "~/server/app-layer/app";
+import { tryGetApp } from "~/server/app-layer/app";
 
 import { CliTokenRevocationService } from "./cliTokenRevocation.service";
 
@@ -87,7 +87,7 @@ export class CliSessionInventoryService {
 
   /** The injected connection, else the App's, resolved at the point of use. */
   private get redis(): RedisLike | undefined {
-    return this.injectedRedis ?? getApp().redis ?? void 0;
+    return this.injectedRedis ?? tryGetApp()?.redis ?? void 0;
   }
 
   async listForUser({ userId }: { userId: string }): Promise<CliSession[]> {

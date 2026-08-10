@@ -22,7 +22,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import { createServiceApp, internalSecret } from "~/server/api/security";
-import { getApp } from "~/server/app-layer/app";
+import { getApp, tryGetApp } from "~/server/app-layer/app";
 import { createLangyFrameDedup } from "~/server/app-layer/langy/streaming/langyFrameDedup";
 import { resolveNavigateFallbackUrl } from "~/server/app-layer/langy/streaming/langyNavigateFallback";
 import { createLangyResourceLinkStore } from "~/server/app-layer/langy/streaming/langyResourceLinks";
@@ -60,7 +60,7 @@ interface RelayTally {
 secured.access(relayPolicy()).post("/relay/frames", async (c) => {
   // No Redis ⇒ no live buffer and no dedup set; refuse rather than silently
   // dropping the turn's live edge.
-  const connection = getApp().redis;
+  const connection = tryGetApp()?.redis ?? null;
   if (!connection) {
     logger.error("relay called with no Redis connection");
     return c.json({ error: "streaming unavailable" }, 503);

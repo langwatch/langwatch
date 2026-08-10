@@ -4,13 +4,13 @@
  * (GroupQueue producer) don't pay an import cost per invocation and
  * don't need to thread Redis through DI.
  */
-import { getApp } from "../app-layer/app";
+import { tryGetApp } from "../app-layer/app";
 import { TenantRateTracker } from "./tenantRateTracker";
 
 let _tenantRateTracker: TenantRateTracker | null = null;
 
 export function getTenantRateTracker(): TenantRateTracker | null {
-  const connection = getApp().redis;
+  const connection = tryGetApp()?.redis ?? null;
   if (!connection) return null;
   if (!_tenantRateTracker) {
     _tenantRateTracker = new TenantRateTracker(connection);

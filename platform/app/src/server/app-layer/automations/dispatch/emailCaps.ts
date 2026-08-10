@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { getApp } from "~/server/app-layer/app";
+import { tryGetApp } from "~/server/app-layer/app";
 
 const logger = createLogger("langwatch:outbox:emailHourlyCap");
 
@@ -117,7 +117,7 @@ async function expireIfUnset(
  * ingest rate limiter).
  */
 function resolveRedis(redis: RedisConnection | null | undefined) {
-  return redis === void 0 ? getApp().redis : redis;
+  return redis === void 0 ? (tryGetApp()?.redis ?? null) : redis;
 }
 
 const MEMORY_GC_THRESHOLD = 1000;

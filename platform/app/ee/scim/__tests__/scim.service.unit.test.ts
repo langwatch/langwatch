@@ -9,6 +9,7 @@ import { ScimService } from "../scim.service";
 // Redis from a unit test.
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ redis: null }),
+  tryGetApp: () => ({ redis: null }),
 }));
 
 function createMockPrisma() {

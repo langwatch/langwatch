@@ -13,7 +13,7 @@ import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
-import { getApp } from "~/server/app-layer/app";
+import { tryGetApp } from "~/server/app-layer/app";
 import { getServerAuthSession } from "~/server/auth";
 import { auth } from "~/server/better-auth";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
@@ -102,7 +102,7 @@ const logoutHandler = async (c: Context) => {
           // Session may already be deleted
         }
 
-        const redisConnection = getApp().redis;
+        const redisConnection = tryGetApp()?.redis ?? null;
         if (redisConnection) {
           try {
             await redisConnection.del(`better-auth:${token}`);

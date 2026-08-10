@@ -8,7 +8,7 @@
  * The `langy:` key prefix is kept so a nonce issued before the deploy can still
  * be burned by the callback that lands after it.
  */
-import { getApp } from "~/server/app-layer/app";
+import { tryGetApp } from "~/server/app-layer/app";
 
 function nonceKey(nonce: string): string {
   return `langy:gh:nonce:${nonce}`;
@@ -22,7 +22,7 @@ export async function registerGithubInstallNonce(
   nonce: string,
   ttlSec: number,
 ): Promise<boolean> {
-  const connection = getApp().redis;
+  const connection = tryGetApp()?.redis ?? null;
   if (!connection) return false;
   try {
     await (
@@ -49,7 +49,7 @@ export async function registerGithubInstallNonce(
 export async function consumeGithubInstallNonce(
   nonce: string,
 ): Promise<boolean | null> {
-  const connection = getApp().redis;
+  const connection = tryGetApp()?.redis ?? null;
   if (!connection) return null;
   try {
     const conn = connection as {

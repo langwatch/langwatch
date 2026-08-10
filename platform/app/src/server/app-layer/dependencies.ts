@@ -223,6 +223,10 @@ export interface AppDependencies {
    * Prefer taking a connection as a constructor dependency. Read it from here
    * only where there is no seam to inject through — a route module or a tRPC
    * router — and read it *inside the handler*, never at module scope.
+   *
+   * Most such readers go through `tryGetApp()` rather than `getApp()`, because
+   * they already branch on absence and treat "no App" the same as "no Redis".
+   * See ADR-090 for which ones deliberately do not.
    */
   redis: RedisConnection | null;
   /** Deduplicated usage counters written to ClickHouse for billing. */

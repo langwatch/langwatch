@@ -10,7 +10,7 @@
 
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { getApp } from "~/server/app-layer/app";
+import { tryGetApp } from "~/server/app-layer/app";
 import type { EvaluationV3Event, ExecutionSummary } from "./types";
 
 const logger = createLogger("experiments-v3:run-state-manager");
@@ -91,7 +91,7 @@ export const runStateManager = {
     experimentSlug: string;
     total: number;
   }): Promise<void> {
-    const connection = getApp().redis;
+    const connection = tryGetApp()?.redis ?? null;
     if (!connection) {
       logger.warn(
         { runId: params.runId },
@@ -126,7 +126,7 @@ export const runStateManager = {
    * Update run progress.
    */
   async updateProgress(runId: string, progress: number): Promise<void> {
-    const connection = getApp().redis;
+    const connection = tryGetApp()?.redis ?? null;
     if (!connection) return;
 
     const state = await this.getRunState(runId);
@@ -147,7 +147,7 @@ export const runStateManager = {
    * Add an event to recent events (for debugging).
    */
   async addEvent(runId: string, event: EvaluationV3Event): Promise<void> {
-    const connection = getApp().redis;
+    const connection = tryGetApp()?.redis ?? null;
     if (!connection) return;
 
     const state = await this.getRunState(runId);
@@ -181,7 +181,7 @@ export const runStateManager = {
     runId: string,
     summary: RunState["summary"],
   ): Promise<void> {
-    const connection = getApp().redis;
+    const connection = tryGetApp()?.redis ?? null;
     if (!connection) return;
 
     const state = await this.getRunState(runId);
@@ -217,7 +217,7 @@ export const runStateManager = {
       traceId?: string;
     },
   ): Promise<void> {
-    const connection = getApp().redis;
+    const connection = tryGetApp()?.redis ?? null;
     if (!connection) return;
 
     const state = await this.getRunState(runId);
@@ -246,7 +246,7 @@ export const runStateManager = {
    * Mark run as stopped (aborted by user).
    */
   async stopRun(runId: string): Promise<void> {
-    const connection = getApp().redis;
+    const connection = tryGetApp()?.redis ?? null;
     if (!connection) return;
 
     const state = await this.getRunState(runId);
@@ -269,7 +269,7 @@ export const runStateManager = {
    * Get current run state.
    */
   async getRunState(runId: string): Promise<RunState | null> {
-    const connection = getApp().redis;
+    const connection = tryGetApp()?.redis ?? null;
     if (!connection) {
       return null;
     }
@@ -293,7 +293,7 @@ export const runStateManager = {
    * Delete run state (cleanup).
    */
   async deleteRun(runId: string): Promise<void> {
-    const connection = getApp().redis;
+    const connection = tryGetApp()?.redis ?? null;
     if (!connection) return;
 
     const key = `${RUN_STATE_KEY_PREFIX}${runId}`;

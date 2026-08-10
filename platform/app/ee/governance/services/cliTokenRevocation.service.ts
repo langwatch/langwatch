@@ -2,7 +2,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
-import { getApp } from "~/server/app-layer/app";
+import { tryGetApp } from "~/server/app-layer/app";
 
 const logger = createLogger("langwatch:cli-token-revocation");
 
@@ -49,7 +49,7 @@ export class CliTokenRevocationService {
 
   /** The injected connection, else the App's, resolved at the point of use. */
   private get redis(): RedisLike | undefined {
-    return this.injectedRedis ?? getApp().redis ?? void 0;
+    return this.injectedRedis ?? tryGetApp()?.redis ?? void 0;
   }
 
   static userTokensIndexKey(userId: string): string {

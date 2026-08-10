@@ -96,7 +96,13 @@ vi.mock("~/server/db", () => ({ prisma: mockPrisma }));
 // connection the handler writes the auth code to.
 vi.mock("~/server/app-layer/app", async (importOriginal) => {
   const actual = await importOriginal<typeof AppLayerApp>();
-  return { ...actual, getApp: () => ({ redis: mockRedis }) };
+  // misc.ts reads its connection through tryGetApp; getApp is overridden too
+  // so both accessors agree on the fake.
+  return {
+    ...actual,
+    getApp: () => ({ redis: mockRedis }),
+    tryGetApp: () => ({ redis: mockRedis }),
+  };
 });
 vi.mock("~/utils/encryption", () => ({
   encrypt: (text: string) => `encrypted:${text}`,

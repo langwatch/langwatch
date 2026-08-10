@@ -12,6 +12,8 @@ vi.mock("~/server/app-layer/app", () => ({
     planProvider: { getActivePlan: planMock.getActivePlan },
     redis: null,
   }),
+  // The cap paths read Redis through this one; null keeps them in-memory.
+  tryGetApp: () => ({ redis: null }),
 }));
 vi.mock("~/server/organizations/resolveOrganizationId", () => ({
   resolveOrganizationId: planMock.resolveOrganizationId,
