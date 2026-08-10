@@ -107,11 +107,15 @@ export const metricsMiddleware = promBundle({
   customLabels: { project_name: "langwatch" },
   bypass: {
     onRequest: (req) => {
-      // `v1` covers the root-level OTLP paths a misconfigured exporter posts
-      // to. They are served by the API (see the handler below), so leaving
-      // them out would hide exactly the traffic worth watching. Bounded
-      // cardinality: /v1/traces, /v1/logs, /v1/metrics and nothing else.
-      if (/^\/(api|assets|auth|settings|share|v1|$)/.test(req.url ?? "")) {
+      // The three root-level OTLP paths a misconfigured exporter posts to are
+      // served by the API (see the handler below), so leaving them out would
+      // hide exactly the traffic worth watching. Spelled out rather than a
+      // bare `v1` so the label set stays those three and nothing else.
+      if (
+        /^\/(api|assets|auth|settings|share|v1\/(traces|logs|metrics)|$)/.test(
+          req.url ?? "",
+        )
+      ) {
         return false;
       }
       return true;

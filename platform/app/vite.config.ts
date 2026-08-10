@@ -323,7 +323,7 @@ export default defineConfig(async (): Promise<UserConfig> => {
       // `/v1/traces`. In production start.ts routes those into the API; in dev
       // the frontend owns the root, so they need an entry of their own or they
       // fall through to the SPA. Exact-match, same reasoning as /mcp below.
-      "^/v1/(?:traces|logs|metrics)(?:\\?.*)?$": {
+      "^/v1/(?:traces|logs|metrics)/?(?:\\?.*)?$": {
         target: API_TARGET,
         changeOrigin: true,
         secure: false,

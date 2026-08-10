@@ -199,9 +199,9 @@ export function createApiRouter() {
   api.route("/", authCliApp); // /api/auth/cli/* — RFC 8628 device-flow for CLI
   api.route("/", authApp);
   api.route("/", collectorApp);
-  // ORDERING: last of the ingestion apps. It claims the OTLP paths a
-  // misconfigured exporter produces, which overlap the /api/otel and
-  // /api/collector namespaces, so every real route must get its match first.
+  // ORDERING: must come after otelApp and collectorApp, whose namespaces its
+  // aliases overlap — the real routes get their match first. It declines
+  // anything it does not recognise, so apps mounted after it are unaffected.
   api.route("/", otelPathAliasApp);
   api.route("/", ingestionRoutesApp); // /api/ingest/* — Activity Monitor receivers
   api.route("/", cronApp);

@@ -231,17 +231,65 @@ describe("OTLP endpoint path canonicalisation", () => {
       });
     });
 
+    // Each reporting test uses a path of its own: the report is throttled per
+    // (project, path) pair for ten minutes, and that state outlives a single
+    // test the way it outlives a single request.
     /** @scenario The correction names the path the exporter used */
     it("records the path the exporter used and the one it was served from", async () => {
-      await post("/api/otel/v1/traces/v1/logs", logPayload);
+      await post("/api/collector/v1/logs", logPayload);
 
       expect(mockWarn).toHaveBeenCalledWith(
         expect.objectContaining({
           projectId: "project-123",
-          originalPath: "/api/otel/v1/traces/v1/logs",
+          originalPath: "/api/collector/v1/logs",
           canonicalPath: "/api/otel/v1/logs",
         }),
         expect.stringContaining("non-canonical path"),
+      );
+    });
+
+    /** @scenario A repeated misconfiguration is reported once a window */
+    it("reports a repeated misconfiguration once, not once per batch", async () => {
+      await post("/api/otel/v1/metrics/v1/logs", logPayload);
+      await post("/api/otel/v1/metrics/v1/logs", logPayload);
+      await post("/api/otel/v1/metrics/v1/logs", logPayload);
+
+      expect(mockHandleLogs).toHaveBeenCalledTimes(3);
+      expect(mockWarn).toHaveBeenCalledTimes(1);
+    });
+
+    // The correction rebuilds the request around a new path, and an exporter
+    // streams rather than buffers. A body dropped there would be answered with
+    // a cheerful 200 - the exact failure this feature exists to remove.
+    /** @scenario A streamed payload survives the correction */
+    it("carries a streamed payload through to ingestion", async () => {
+      const streamed: RequestInit & { duplex: "half" } = {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": "test-token",
+          "Content-Type": "application/json",
+        },
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(
+              new TextEncoder().encode(JSON.stringify(tracePayload)),
+            );
+            controller.close();
+          },
+        }),
+        duplex: "half",
+      };
+
+      const response = await testApp.request(
+        new Request("http://localhost/api/v1/traces", streamed),
+      );
+
+      expect(response.status).toBe(200);
+      // An empty body short-circuits before the handler with "No traces to
+      // process", so reaching it at all proves the bytes survived the replay.
+      expect(mockHandleTraces).toHaveBeenCalledTimes(1);
+      expect(mockHandleTraces.mock.calls[0]?.[1]).toEqual(
+        expect.objectContaining({ resourceSpans: tracePayload.resourceSpans }),
       );
     });
   });

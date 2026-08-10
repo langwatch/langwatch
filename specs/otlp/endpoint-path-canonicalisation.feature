@@ -76,6 +76,15 @@ Feature: OTLP endpoint path canonicalisation
       Then the response is the ordinary ingestion response
       And the response does not ask the client to send the batch elsewhere
 
+    # An exporter streams its payload rather than buffering it, and the
+    # correction rebuilds the request around a new path. A body dropped there
+    # would be answered with a cheerful 200, which is the failure this whole
+    # feature exists to remove.
+    @unit @regression
+    Scenario: A streamed payload survives the correction
+      When an exporter streams spans to a misconfigured path
+      Then the whole payload reaches ingestion
+
   Rule: Only known misconfigurations are accepted
 
     @unit
@@ -95,6 +104,14 @@ Feature: OTLP endpoint path canonicalisation
       When an exporter posts spans to a misconfigured path
       Then the platform records the path the exporter used
       And it records the canonical path the request was served from
+
+    # A misconfigured fleet posts continuously and every batch carries the same
+    # project and the same path, so reporting each one costs money on an
+    # ingestion hot path and says nothing the first line did not.
+    @unit
+    Scenario: A repeated misconfiguration is reported once a window
+      When an exporter posts repeatedly to the same misconfigured path
+      Then the platform reports it once rather than once per batch
 
     @unit
     Scenario: A caller cannot claim its path was corrected
