@@ -22,9 +22,13 @@ import { resetParamCounter } from "../filter-translator";
  * Emptying rather than removing keeps each item's shape, so
  * `map(...) AS SpanAttributes` stays distinguishable from a bare
  * `SpanAttributes`, which is the whole point of the assertion.
+ *
+ * Quoted strings are emptied first: an attribute key is arbitrary text, so a
+ * key like `'tool(args)'` would otherwise contribute an unbalanced parenthesis
+ * and leave its enclosing call un-emptied.
  */
 function selectListItems(selectList: string): string[] {
-  let flattened = selectList;
+  let flattened = selectList.replace(/'[^']*'/g, "''");
   let previous = "";
   while (flattened !== previous) {
     previous = flattened;
@@ -36,6 +40,32 @@ function selectListItems(selectList: string): string[] {
 describe("column-pruning", () => {
   beforeEach(() => {
     resetParamCounter();
+  });
+
+  // The whole-map assertions below are only as trustworthy as the split they
+  // rely on, so pin it here rather than inferring it from a passing assertion.
+  describe("given a SELECT list is split into items", () => {
+    it("keeps a reconstructed map as one item", () => {
+      expect(
+        selectListItems(
+          "TraceId, map('k', SpanAttributes['k']) AS SpanAttributes",
+        ),
+      ).toEqual(["TraceId", "map() AS SpanAttributes"]);
+    });
+
+    it("keeps it as one item when the key contains parentheses", () => {
+      expect(
+        selectListItems(
+          "TraceId, map('tool(args)', SpanAttributes['tool(args)']) AS SpanAttributes",
+        ),
+      ).toEqual(["TraceId", "map() AS SpanAttributes"]);
+    });
+
+    it("still surfaces a whole-map projection in any position", () => {
+      expect(selectListItems("SpanAttributes, TraceId, DurationMs")).toContain(
+        "SpanAttributes",
+      );
+    });
   });
 
   const baseInput = {
