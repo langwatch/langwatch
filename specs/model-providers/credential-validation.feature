@@ -648,6 +648,13 @@ Feature: Credential Validation
     Then the earlier result is no longer shown
 
   @unit
+  Scenario: A result still in flight when I change the credential is discarded
+    Given I have asked for a check from the drawer and the answer has not arrived
+    When I change a credential field before it does
+    Then the answer is discarded when it arrives
+    And I am not told the connection works
+
+  @unit
   Scenario: Repeated checks are limited however they are made
     Given I have checked connections many times in quick succession
     When I check a credential I have just typed in

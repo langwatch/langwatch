@@ -34,7 +34,6 @@ import {
  */
 type ConnectionTestResult = ValidationResult;
 
-export type { ConnectionTestState };
 
 export function useModelProviderConnectionTest({
   projectId,

@@ -13,7 +13,7 @@
  * and which route the click takes is settled by the same helpers the save path
  * uses. Mocking any of those would leave the test asserting its own fixtures.
  */
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -343,6 +343,32 @@ describe("Feature: checking a credential from the drawer it was typed into", () 
       await waitFor(() =>
         expect(screen.queryByText("Connection works")).toBeNull(),
       );
+    });
+
+    /** @scenario "A result still in flight when I change the credential is discarded" */
+    it("discards an answer that arrives after the credential has changed", async () => {
+      // The case the test above cannot reach, because a resolved mock lands
+      // before the edit. Here the answer is held open across the edit, which is
+      // where the guard either works or silently does nothing: a verdict about
+      // the previous credential reappearing is a success claim about a key that
+      // is no longer on screen.
+      let answer: (value: unknown) => void = () => undefined;
+      mockValidateApiKeyMutation.mockImplementation(
+        () => new Promise((resolve) => (answer = resolve)),
+      );
+
+      await userEvent.type(inputFor("OPENAI_API_KEY"), "sk-typed-just-now");
+      await userEvent.click(checkButton()!);
+      expect(await screen.findByText("Testing…")).toBeTruthy();
+
+      await userEvent.type(inputFor("OPENAI_API_KEY"), "-edited");
+
+      await act(async () => {
+        answer({ outcome: "verified", valid: true });
+        await Promise.resolve();
+      });
+
+      expect(screen.queryByText("Connection works")).toBeNull();
     });
   });
 });

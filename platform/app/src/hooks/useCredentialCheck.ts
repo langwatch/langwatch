@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { describeError } from "../features/errors";
 import type { UncheckedReason } from "../server/modelProviders/providerValidation";
 import { api } from "../utils/api";
@@ -72,17 +72,34 @@ export function useCredentialCheck({
     () => JSON.stringify(customKeys),
     [customKeys],
   );
+
+  /**
+   * The fingerprint as of the latest render, readable from inside a callback
+   * that closed over an older one.
+   *
+   * A ref rather than the value itself, and this is the whole point: `check`
+   * captures the credentials it was called with, so comparing the captured
+   * fingerprint against the captured credentials compares a value with itself
+   * and is true however much has changed since. The ref is the only thing in
+   * scope that moves, so it is the only thing that can answer "are these still
+   * the credentials on screen?".
+   */
+  const latestFingerprint = useRef(credentialsFingerprint);
   useEffect(() => {
+    latestFingerprint.current = credentialsFingerprint;
     setState(undefined);
   }, [credentialsFingerprint, modelProviderId]);
 
   const check = useCallback(async () => {
     const asked = credentialsFingerprint;
     // Discard anything that arrives about credentials the customer has since
-    // changed, rather than showing a verdict about keys that are gone.
+    // changed, rather than showing a verdict about keys that are gone. Without
+    // this an answer still in flight when they edit lands afterwards and puts
+    // a green result back on screen — about a credential that is no longer
+    // there, which is the one thing this feature must never produce.
     const settle = (next: ConnectionTestState) =>
       setState((current) =>
-        asked === JSON.stringify(customKeys) ? next : current,
+        asked === latestFingerprint.current ? next : current,
       );
 
     setState({ status: "testing" });
