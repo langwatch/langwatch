@@ -177,6 +177,16 @@ Feature: Teams REST API
     Then the response status is 403
     And the owner still holds their binding
 
+  # Permissions at a scope are the union of every role held there, so removing
+  # one binding and calling it a removal leaves the member on the team through
+  # whichever role the delete did not reach.
+  @integration
+  Scenario: Removing a member takes every role they hold on the team
+    Given a member holds two roles on the same team
+    When I DELETE /api/teams/:id/members/:userId for them
+    Then the response status is 200
+    And they hold no binding on that team
+
   # ============================================================================
   # Permission denial
   # ============================================================================

@@ -432,6 +432,47 @@ describe("Feature: Teams REST API", () => {
     });
   });
 
+  describe("when a member holds more than one role on the team", () => {
+    /** @scenario Removing a member takes every role they hold on the team */
+    it("removes every role they hold there, not the first one found", async () => {
+      const createRes = await api.post("/api/teams", {
+        name: `Multi Role Team ${nanoid(6)}`,
+      });
+      const team = await createRes.json();
+
+      expect(
+        (
+          await api.post(`/api/teams/${team.id}/members`, {
+            userId,
+            role: TeamUserRole.MEMBER,
+          })
+        ).status,
+      ).toBe(201);
+      expect(
+        (
+          await api.post(`/api/teams/${team.id}/members`, {
+            userId,
+            role: TeamUserRole.VIEWER,
+          })
+        ).status,
+      ).toBe(201);
+
+      const res = await api.delete(`/api/teams/${team.id}/members/${userId}`);
+      expect(res.status).toBe(200);
+
+      const left = await prisma.roleBinding.findMany({
+        where: {
+          organizationId: testOrganization.id,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: team.id,
+          userId,
+        },
+        select: { role: true },
+      });
+      expect(left).toEqual([]);
+    });
+  });
+
   describe("when the team is a personal workspace", () => {
     let personalTeamId: string | undefined;
     let colleagueUserId: string | undefined;

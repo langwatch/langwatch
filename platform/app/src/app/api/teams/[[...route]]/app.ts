@@ -331,7 +331,11 @@ secured
         throw new ForbiddenError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
       }
 
-      const binding = await prisma.roleBinding.findFirst({
+      // Every team-scoped binding this member holds, not the first one found:
+      // permissions at a scope are the union of the roles held there, so a
+      // member granted both Member and Viewer would otherwise keep the team
+      // through the binding the delete did not reach.
+      const removed = await prisma.roleBinding.deleteMany({
         where: {
           organizationId: organization.id,
           scopeType: RoleBindingScopeType.TEAM,
@@ -339,9 +343,10 @@ secured
           userId,
         },
       });
-      if (!binding) throw new NotFoundError("Member not found on this team");
+      if (removed.count === 0) {
+        throw new NotFoundError("Member not found on this team");
+      }
 
-      await prisma.roleBinding.delete({ where: { id: binding.id } });
       return c.json({ success: true });
     },
   );
