@@ -49710,10 +49710,12 @@
                     "type": "boolean"
                   },
                   "pageOffset": {
-                    "type": "number"
+                    "type": "number",
+                    "description": "Removed. Offset pagination is no longer supported and any value other than 0 is rejected. Page with the scrollId returned by the previous response instead. The field remains on the schema so that sending it produces an explanatory error rather than being silently discarded."
                   },
                   "pageSize": {
-                    "type": "number"
+                    "type": "integer",
+                    "exclusiveMinimum": 0
                   },
                   "groupBy": {
                     "type": "string"
@@ -50762,8 +50764,7 @@
                   },
                   "filters": {
                     "type": "object",
-                    "additionalProperties": {},
-                    "default": {}
+                    "additionalProperties": {}
                   },
                   "message": {
                     "type": "string"

@@ -489,7 +489,6 @@ export const tracesRouter = createTRPCRouter({
       return traceService.getAllTracesForProject(
         {
           ...input,
-          pageOffset: input.pageOffset ?? 0,
           pageSize: input.pageSize ?? 10_000,
         },
         protections,

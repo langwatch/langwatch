@@ -52,7 +52,8 @@ export interface GetAllTracesForProjectOptions {
 export type GetAllTracesForProjectInput = z.infer<
   typeof sharedFiltersInputSchema
 > & {
-  pageOffset?: number;
+  // No pageOffset: offset paging was dropped in the ClickHouse migration and
+  // the boundary now rejects a non-zero one (#6808). Paging is scrollId only.
   pageSize?: number;
   groupBy?: string;
   sortBy?: string;
