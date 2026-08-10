@@ -11,7 +11,10 @@ permissions:
 
 jobs:
   publish:
-    if: startsWith(github.event.release.tag_name, 'sdk-go@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    # Go requires a submodule's tag to be <subdir>/vX.Y.Z, so this component
+    # tags as sdks/go/vX.Y.Z rather than the sdk-go@vX.Y.Z the other components
+    # use. Nothing resolved from the proxy until that changed.
+    if: startsWith(github.event.release.tag_name, 'sdks/go/v') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
 
     steps:
@@ -34,13 +37,13 @@ jobs:
       - name: Trigger pkg.go.dev to index the new version
         run: |
           # Request pkg.go.dev to fetch the new version
-          curl -s "https://proxy.golang.org/github.com/langwatch/langwatch/sdks/go/@v/$(echo ${{ github.event.release.tag_name }} | sed 's/sdk-go@//').info" || true
+          curl -s "https://proxy.golang.org/github.com/langwatch/langwatch/sdks/go/@v/$(echo ${{ github.event.release.tag_name }} | sed 's|^sdks/go/||').info" || true
 
       - name: Get version from tag or manifest
         id: get_version
         run: |
           if [ "${{ github.event_name }}" = "release" ]; then
-            VERSION=${GITHUB_REF#refs/tags/sdk-go@v}
+            VERSION=${GITHUB_REF#refs/tags/sdks/go/v}
           else
             VERSION=$(cat .github/.release-please-manifest.json | jq -r '."sdks/go"')
           fi
