@@ -116,9 +116,38 @@ func TestGoVersionExemptsThePublishedSDKFromTheRootVersion(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, problems, "the SDK's floor is exempt and must not be reported")
 
-	reason, ok := ciguard.ExemptModules["sdks/go/go.mod"]
+	reason, ok := ciguard.ModuleFamilies["sdks/go/"]
 	require.True(t, ok)
-	assert.Contains(t, strings.ToLower(reason), "floor", "an exemption must record why")
+	assert.Contains(t, strings.ToLower(reason), "floor", "a family must record why")
+}
+
+// @scenario "A module inside the SDK tracks the SDK's floor, not the repo's"
+//
+// The nine instrumentation modules #4998 added all sit at the SDK's floor,
+// below the repo's. Exempting them one by one would have meant a new provider
+// package broke the guard on arrival; exempting the subtree wholesale would
+// have meant nothing inside it was checked at all.
+func TestGoVersionAcceptsAFamilyMemberAtTheFamilyFloor(t *testing.T) {
+	problems, err := ciguard.GoVersion(agreeingRepo(t, map[string]string{
+		"sdks/go/go.mod":                        "module sdk\n\ngo 1.25.0\n",
+		"sdks/go/instrumentation/openai/go.mod": "module sdk/openai\n\ngo 1.25.0\n",
+	}))
+
+	require.NoError(t, err)
+	assert.Empty(t, problems)
+}
+
+// @scenario "A module inside the SDK that drifts above the floor fails the check"
+func TestGoVersionReportsAFamilyMemberAboveTheFloor(t *testing.T) {
+	problems, err := ciguard.GoVersion(agreeingRepo(t, map[string]string{
+		"sdks/go/go.mod":                        "module sdk\n\ngo 1.25.0\n",
+		"sdks/go/instrumentation/openai/go.mod": "module sdk/openai\n\ngo 1.25.3\n",
+	}))
+
+	require.NoError(t, err)
+	require.Len(t, problems, 1)
+	assert.Contains(t, problems[0], "sdks/go/instrumentation/openai/go.mod declares Go 1.25.3")
+	assert.Contains(t, problems[0], "sdks/go/go.mod says 1.25.0")
 }
 
 // @scenario "A workflow that sets up Go without naming a module fails the check"

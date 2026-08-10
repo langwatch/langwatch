@@ -27,12 +27,20 @@ import (
 // GoDockerfileRoots are the directories walked for Dockerfiles.
 var GoDockerfileRoots = []string{"infra", "services", "platform", "tools"}
 
-// ExemptModules are modules that deliberately do not track the root version,
-// each with the reason. An exemption is a decision, so it carries one.
-var ExemptModules = map[string]string{
-	"sdks/go/go.mod":          "published SDK: its go directive is the floor consumers must meet, and raising it drops support for anyone below. sdk-go-ci and sdk-go-cd build it standalone with GOWORK=off precisely so that stays true.",
-	"sdks/go/examples/go.mod": "compiled against the published SDK at its own floor, and deliberately outside the workspace (see go.work) so it resolves the SDK by relative replace. Raising it here would test the examples on a Go the SDK does not require.",
-	"sdks/go/e2e/go.mod":      "same as sdks/go/examples: outside the workspace by design, pinned to the SDK's floor rather than the repo's.",
+// ModuleFamilies are subtrees that track a floor of their own instead of the
+// root module's version, each with the reason. A family is a decision, so it
+// carries one.
+//
+// The exemption is from the ROOT version, not from agreement: every module
+// inside a family must still match the family's own go.mod. That distinction
+// is the whole point here — #4998 added nine modules under sdks/go/, and
+// enumerating each one would have meant the guard broke on every new
+// instrumentation package while still missing the failure that matters, which
+// is one of them drifting above the floor the SDK actually publishes. A
+// consumer who meets the SDK's directive cannot build a sibling module that
+// quietly asks for more.
+var ModuleFamilies = map[string]string{
+	"sdks/go/": "published SDK: its go directive is the floor consumers must meet, and raising it drops support for anyone below. sdk-go-ci and sdk-go-cd build the tree standalone with GOWORK=off precisely so that stays true, and examples/ and e2e/ sit outside the workspace so they compile against the SDK at the floor it really publishes.",
 }
 
 var (
@@ -95,13 +103,14 @@ func GoVersion(repoRoot string) ([]string, error) {
 	return append(problems, images...), nil
 }
 
-// goChildModules compares every non-root go.mod against the root version.
+// goChildModules compares every non-root go.mod against the version it is
+// supposed to track — the root module's, or its family's floor.
 //
 // Without this the guard read the root module and nothing else, so
 // infra/clickhouse-serverless/go.mod could drift straight back to 1.26.1
-// unnoticed — and ExemptModules, which exists to let sdks/go keep its floor,
+// unnoticed — and the family list, which exists to let sdks/go keep its floor,
 // was never consulted at runtime at all.
-func goChildModules(repoRoot, want string) ([]string, error) {
+func goChildModules(repoRoot, rootVersion string) ([]string, error) {
 	paths, err := childModulePaths(repoRoot)
 	if err != nil {
 		return nil, err
@@ -109,7 +118,11 @@ func goChildModules(repoRoot, want string) ([]string, error) {
 
 	var problems []string
 	for _, path := range paths {
-		if _, exempt := ExemptModules[path]; exempt {
+		expected, governed, err := expectationFor(repoRoot, path, rootVersion)
+		if err != nil {
+			return nil, err
+		}
+		if !governed {
 			continue
 		}
 
@@ -117,15 +130,80 @@ func goChildModules(repoRoot, want string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		got := goDirective(string(contents))
-		if got != want {
-			problems = append(problems, fmt.Sprintf(
-				"%s declares Go %s, go.mod says %s — add it to ExemptModules with a reason if that is deliberate",
-				path, got, want))
+		if got := goDirective(string(contents)); got != expected.version {
+			problems = append(problems, expected.disagreement(path, got))
 		}
 	}
 
 	return problems, nil
+}
+
+// expectation is the version a module must declare and the file that decides
+// it, so a report can name the authority it disagrees with rather than always
+// pointing at the root.
+type expectation struct {
+	version   string
+	authority string
+	inFamily  bool
+}
+
+// expectationFor decides which file governs a module's version. `governed` is
+// false for the module that defines its own family's floor: it is the
+// authority, so it has nothing above it to disagree with.
+func expectationFor(repoRoot, path, rootVersion string) (expectation, bool, error) {
+	family, isInFamily := moduleFamily(path)
+	if !isInFamily {
+		return expectation{version: rootVersion, authority: "go.mod"}, true, nil
+	}
+
+	authority := family + "go.mod"
+	if path == authority {
+		return expectation{}, false, nil
+	}
+
+	floor, err := floorOf(repoRoot, authority)
+	if err != nil {
+		return expectation{}, false, err
+	}
+
+	return expectation{version: floor, authority: authority, inFamily: true}, true, nil
+}
+
+func (e expectation) disagreement(path, got string) string {
+	if e.inFamily {
+		return fmt.Sprintf(
+			"%s declares Go %s, %s says %s — a module in this family tracks the floor its own tree publishes, not the repo's",
+			path, got, e.authority, e.version)
+	}
+
+	return fmt.Sprintf(
+		"%s declares Go %s, %s says %s — add its subtree to ModuleFamilies with a reason if that is deliberate",
+		path, got, e.authority, e.version)
+}
+
+// moduleFamily returns the family prefix a module sits under, if any.
+func moduleFamily(path string) (string, bool) {
+	for prefix := range ModuleFamilies {
+		if strings.HasPrefix(path, prefix) {
+			return prefix, true
+		}
+	}
+
+	return "", false
+}
+
+func floorOf(repoRoot, modulePath string) (string, error) {
+	contents, err := os.ReadFile(filepath.Join(repoRoot, modulePath))
+	if err != nil {
+		return "", fmt.Errorf("read %s: %w", modulePath, err)
+	}
+
+	floor := goDirective(string(contents))
+	if floor == "" {
+		return "", fmt.Errorf("%s has no parseable `go` directive, so it cannot define a floor", modulePath)
+	}
+
+	return floor, nil
 }
 
 func childModulePaths(repoRoot string) ([]string, error) {

@@ -82,3 +82,21 @@ Feature: One Go version, stated once
     # Its go directive is the floor consumers must meet; raising it drops
     # support for anyone below. sdk-go-ci and sdk-go-cd build it standalone
     # with GOWORK=off precisely so that stays true.
+
+  @unit
+  Scenario: A module inside the SDK tracks the SDK's floor, not the repo's
+    Given a module under sdks/go declaring the same version as sdks/go/go.mod
+    Then the guard reports no disagreement
+    # The exemption is from the ROOT version, not from agreement. #4998 added
+    # nine modules under sdks/go — a client and eight provider
+    # instrumentations — all at the SDK's floor. Listing each one would mean
+    # every new provider package breaks the guard the day it lands.
+
+  @unit
+  Scenario: A module inside the SDK that drifts above the floor fails the check
+    Given a module under sdks/go declaring a higher version than sdks/go/go.mod
+    Then the guard names the module, the family's go.mod and both versions
+    # This is the failure that actually reaches a customer: someone who meets
+    # the SDK's declared directive cannot build a sibling instrumentation
+    # module that quietly asks for more. Waving the whole subtree through
+    # would have left it unchecked.
