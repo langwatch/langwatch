@@ -89,12 +89,14 @@ export async function runGracefulShutdown({
   // themselves exported. Appended here rather than by each caller: a provider
   // that flushes on its own signal handler is racing this sequence, and one
   // that calls process.exit() when its flush resolves wins the race.
-  const all = [
+  const all: ShutdownPhase[] = [
     ...phases,
-    ...telemetryFlushes().map((f) => ({
-      name: `telemetry:${f.name}`,
-      run: f.run,
-    })),
+    ...telemetryFlushes().map(
+      (f): ShutdownPhase => ({
+        name: `telemetry:${f.name}`,
+        run: f.run,
+      }),
+    ),
   ];
 
   try {

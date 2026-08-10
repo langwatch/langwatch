@@ -81,6 +81,13 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
     And a development or local environment drains for 5 seconds
 
   @unit @shutdown-budget
+  Scenario: The chart is sized for the same production drain the code uses
+    Given the resolved production drain budget
+    When it is compared with the drain the chart and its suite declare
+    Then all of them agree
+    So that the pod cannot be sized for a budget the process no longer uses
+
+  @unit @shutdown-budget
   Scenario: A malformed drain override is reported and falls back, never fatal
     Given the configured drain budget is not a positive number of milliseconds
     When the shutdown budget is resolved
