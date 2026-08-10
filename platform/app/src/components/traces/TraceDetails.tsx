@@ -183,10 +183,10 @@ export function TraceDetails(props: {
             description: (
               <>
                 <Link
-                  href={`/${project?.slug}/annotations/`}
+                  href={`/${project?.slug}/annotations`}
                   textDecoration="underline"
                 >
-                  View Queues
+                  View queues
                 </Link>
               </>
             ),

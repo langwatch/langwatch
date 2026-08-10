@@ -61,6 +61,12 @@ function mockPrismaWithBudgets(budgets: GatewayBudget[]): PrismaClient {
     project: {
       findMany: async () => [{ id: "project_01" }],
     },
+    // The resolver reads the key's own team scopes so a team-scoped key
+    // reaches its team's budget. These checks pass the team directly, so
+    // the key contributes nothing extra.
+    virtualKeyScope: {
+      findMany: async () => [],
+    },
   } as unknown as PrismaClient;
 }
 
@@ -330,6 +336,7 @@ describe("GatewayBudgetService.getDetail", () => {
       },
       virtualKeyScope: {
         findFirst: vi.fn(async () => ({ scopeId: "project_01" })),
+        findMany: vi.fn(async () => []),
       },
       user: {
         findUnique: vi.fn(async () => scopeRow),

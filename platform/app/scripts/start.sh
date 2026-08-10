@@ -169,8 +169,16 @@ fi
 # silently when that port is already taken (another worktree / a manual run),
 # when LANGWATCH_NLP_SERVICE points at an external host, when the Go toolchain
 # isn't on PATH, and via LANGWATCH_SKIP_NLP=1.
+#
+# The address has to come out of the env files, not just the shell: the Node
+# entry points load .env (then the .env.portless overlay) with `override: true`
+# AFTER this script runs, so a pinned LANGWATCH_NLP_SERVICE is what the app
+# dials while this shell sees nothing at all. Reading it here is what keeps the
+# engine and the app on one port.
 START_NLP_COMMAND=""
 if [[ "$NODE_ENV" = "development" && "$LANGWATCH_SKIP_NLP" != "1" ]]; then
+  . "$(dirname "$0")/../../../dev/scripts/lib/resolve-nlp-service.sh"
+  resolve_nlp_service "$(dirname "$0")/.."
   _NLP_PORT=""
   if [ -z "$LANGWATCH_NLP_SERVICE" ]; then
     _NLP_PORT=$((_APP_PORT + 1))

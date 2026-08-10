@@ -1,6 +1,6 @@
 {
   "name": "@langwatch/web",
-  "version": "3.10.0",
+  "version": "3.12.0",
   "private": true,
   "engines": {
     "node": "24.x || 25.x || 26.x",
@@ -22,10 +22,10 @@
     "check:openapi-completeness": "tsx scripts/check-openapi-completeness.ts",
     "check:openapi-route-coverage": "tsx scripts/check-openapi-route-coverage.ts",
     "format": "node ../../dev/scripts/check-queue.mjs pnpm exec biome format src/ ee/ --write",
-    "postinstall": "make -C ../.. setup-hooks 2>/dev/null || true",
+    "postinstall": "make -C ../.. setup-hooks 2>/dev/null || true; node ../../dev/scripts/install-check-shims.mjs || true",
     "dev": "WORKERS_IN_PROCESS=1 pnpm run dev:app",
-    "dev:app": "NODE_ENV=development ./scripts/check-ports.sh && pnpm run start:prepare:files && NODE_ENV=development FORCE_COLOR=1 pnpm start 2>&1 | tee server.log",
-    "dev:worker": "NODE_ENV=development pnpm run start:prepare:files && NODE_ENV=development FORCE_COLOR=1 pnpm run start:workers:dev",
+    "dev:app": "NODE_ENV=development ./scripts/check-ports.sh && pnpm run start:prepare:files && NODE_ENV=development FORCE_COLOR=1 node ../../dev/scripts/dev-supervisor.mjs pnpm start 2>&1 | tee server.log",
+    "dev:worker": "NODE_ENV=development pnpm run start:prepare:files && NODE_ENV=development FORCE_COLOR=1 node ../../dev/scripts/dev-supervisor.mjs pnpm run start:workers:dev",
     "dev:concurrent": "START_WORKERS=true pnpm run dev:app",
     "dev:vite": "vite",
     "dev:clean": "rm -rf node_modules/.vite .dev-certs && echo 'Vite cache and dev certs cleared. Restart dev server.'",

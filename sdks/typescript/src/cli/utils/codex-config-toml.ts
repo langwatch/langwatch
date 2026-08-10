@@ -171,6 +171,33 @@ export function codexOtelBlockEndpoint(
 }
 
 /**
+ * The ingest token inlined on the langwatch `[otel]` block's `headers` entry,
+ * or null when the block carries no persisted header.
+ *
+ * This is what lets the turn-completion harvest stand on its own: it runs as a
+ * bare process codex spawned, with no session and no login to lean on, and the
+ * one file that says "capture is on for plain codex" is the same file holding
+ * the endpoint and key codex itself is posting with. Reading them back means
+ * the harvest posts exactly where codex's own spans went.
+ */
+export function codexOtelBlockAuthToken(
+	filePath: string = defaultCodexConfigPath(),
+): string | null {
+	let content: string;
+	try {
+		content = fs.readFileSync(filePath, "utf8");
+	} catch {
+		return null;
+	}
+	const begin = content.indexOf(BEGIN);
+	const end = content.indexOf(END);
+	if (begin === -1 || end === -1 || end < begin) return null;
+	const block = content.slice(begin, end);
+	const match = /"Authorization"\s*=\s*"Bearer\s+([^"]+)"/.exec(block);
+	return match?.[1]?.trim() ?? null;
+}
+
+/**
  * Merge result returned by writeCodexOtelBlock so callers can
  * report which action was taken without re-reading the file.
  */
@@ -217,7 +244,7 @@ export function writeCodexOtelBlock(
 		"m",
 	);
 	if (re.test(prior)) {
-		const next = prior.replace(re, block);
+		const next = replaceVerbatim(prior, re, block);
 		if (next === prior) return { action: "unchanged", path: filePath };
 		writeFile0600(filePath, next);
 		return { action: "updated", path: filePath };
@@ -230,6 +257,24 @@ export function writeCodexOtelBlock(
 
 function escapeRe(s: string): string {
 	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Replace the span `re` matches with `replacement` exactly as written.
+ *
+ * A string replacement is not inserted literally: `$&`, `` $` ``, `$'` and `$n`
+ * are directives that splice the match and the text around it back into the
+ * result. Every replacement in this file is built from values the user
+ * authored, and a config holding a shell one-liner reaches for all of them, so
+ * expanding them duplicates the surrounding config until codex refuses to parse
+ * the file. A replacer function is inserted as-is and has no such reading.
+ */
+function replaceVerbatim(
+	content: string,
+	re: RegExp,
+	replacement: string,
+): string {
+	return content.replace(re, () => replacement);
 }
 
 /**
@@ -248,6 +293,498 @@ function writeFile0600(filePath: string, content: string): void {
 	}
 	fs.writeFileSync(filePath, content, { mode: 0o600 });
 	fs.chmodSync(filePath, 0o600);
+}
+
+const NOTIFY_BEGIN = "# >>> langwatch codex notify begin >>>";
+const NOTIFY_END = "# <<< langwatch codex notify end <<<";
+
+/**
+ * Prefix stamped on a user-authored `notify` line we had to move aside. TOML
+ * rejects a duplicate key outright, so leaving theirs in place next to ours
+ * would stop codex from starting at all; the original argv is preserved
+ * verbatim in the comment AND re-run via the chain arg in our own block.
+ */
+const DISPLACED_NOTE =
+	"# langwatch moved this notify into the block at the top of the file, which still runs it:";
+
+/**
+ * Bracket the displaced assignment so removal restores exactly the lines it
+ * commented out. Without an explicit end, "the comments after the note" is the
+ * only available boundary, and that silently annexes whatever the user wrote
+ * below their own notify.
+ */
+const DISPLACED_BEGIN = "# >>> langwatch displaced notify begin >>>";
+const DISPLACED_END = "# <<< langwatch displaced notify end <<<";
+
+/** The whole displaced region, capturing the commented-out lines it stores. */
+function displacedRegionRe(): RegExp {
+	return new RegExp(
+		`${escapeRe(DISPLACED_BEGIN)}\\n${escapeRe(DISPLACED_NOTE)}\\n([\\s\\S]*?)\\n${escapeRe(DISPLACED_END)}\\n?`,
+		"m",
+	);
+}
+
+/** Comment out the lines an assignment occupied, bracketed for exact recovery. */
+function buildDisplacedRegion(raw: string): string {
+	return [
+		DISPLACED_BEGIN,
+		DISPLACED_NOTE,
+		...raw.split("\n").map((line) => `# ${line}`),
+		DISPLACED_END,
+	].join("\n");
+}
+
+/** Give the stored lines back exactly as the user wrote them. */
+function uncommentDisplaced(commented: string): string {
+	return commented
+		.split("\n")
+		.map((line) => line.replace(/^[ \t]*# ?/, ""))
+		.join("\n");
+}
+
+/**
+ * The user's own notify argv as a prior install stored it, or null when the
+ * file carries no displaced region.
+ *
+ * Once the region is written, the argv it holds is a comment: no scan for a
+ * live `notify` will ever see it again. Reading it back from here is what keeps
+ * the chain alive across repeat installs, where otherwise the second write
+ * would find nothing to chain and quietly stop running the user's program while
+ * the note left in their file still says we run it.
+ */
+function findDisplacedNotify(
+	content: string,
+): { start: number; end: number; argv: string[] } | null {
+	const match = displacedRegionRe().exec(content);
+	if (!match) return null;
+	const argv = findNotifyAssignment(uncommentDisplaced(match[1] ?? ""))?.argv;
+	if (!argv?.length) return null;
+	return { start: match.index, end: match.index + match[0].length, argv };
+}
+
+export interface CodexNotifyBlockInputs {
+	/**
+	 * The harvest argv up to but NOT including the trailing `--notify`: program
+	 * first, then args. The flag is appended here rather than by the caller
+	 * because it has to stay last, and that is easy to get wrong from outside.
+	 */
+	command: string[];
+	/** A user-authored notify argv to run after ours, when we displaced one. */
+	chained?: readonly string[] | null;
+}
+
+/**
+ * Flag carrying the turn payload. Codex appends its JSON as the final argv, so
+ * this has to be the last thing we write or it captures one of our own args as
+ * its value instead.
+ */
+const NOTIFY_PAYLOAD_FLAG = "--notify";
+
+function tomlStringArray(values: readonly string[]): string {
+	return `[${values.map((v) => `"${tomlStr(v)}"`).join(", ")}]`;
+}
+
+/**
+ * The harvest argv to write into `notify`, as an absolute node binary plus this
+ * CLI's own entry script.
+ *
+ * Spelled out rather than left as the bare `langwatch` name because codex runs
+ * it as a plain process with whatever environment codex itself was started in:
+ * a name resolved against PATH works from the shell the user installed from and
+ * then quietly stops working from a launcher, a cron, or an editor terminal.
+ *
+ * Returns null when the entry script cannot be determined, which is the caller's
+ * cue to skip the install rather than write an argv that will never run.
+ */
+export function defaultCodexNotifyCommand(): string[] | null {
+	const entry = process.argv[1];
+	if (!entry) return null;
+	return [process.execPath, path.resolve(entry), "ingest", "codex"];
+}
+
+/**
+ * Whether the harvest argv points into an ephemeral `npx` cache, which npm is
+ * free to clean up. Capture would work now and silently stop later, so the
+ * install path says so instead of pretending it is wired for good.
+ */
+export function codexNotifyCommandIsEphemeral(
+	command: readonly string[],
+): boolean {
+	return command.some(
+		(part) => part.includes("/_npx/") || part.includes("\\_npx\\"),
+	);
+}
+
+/**
+ * Build the bracketed `notify` block, WITH markers and a trailing newline.
+ *
+ * Codex exports no conversation content on its telemetry signal — the reply is
+ * parsed out of the streaming response and dropped before export, and no codex
+ * setting turns it back on. What codex does offer is `notify`: a program it
+ * runs after every completed turn, handed a JSON payload naming the session
+ * that finished. Pointing that at our own harvest is what lets a plain `codex`
+ * (no langwatch wrapper in front) record the conversation.
+ *
+ * The chained argv, when present, is the user's own notify program: we run it
+ * after ours so installing capture never silently kills their notifications.
+ * It is passed BEFORE `--notify` on purpose — codex appends the turn payload as
+ * the final argv, so `--notify` has to be last to receive it as its value.
+ */
+export function buildCodexNotifyBlock(inputs: CodexNotifyBlockInputs): string {
+	const chained = inputs.chained?.length
+		? ["--chain", JSON.stringify(inputs.chained)]
+		: [];
+	const argv = [...inputs.command, ...chained, NOTIFY_PAYLOAD_FLAG];
+	return [
+		NOTIFY_BEGIN,
+		"# Managed by 'langwatch'. Codex runs this after every completed turn so",
+		"# the conversation (prompt, tool calls, reply) lands on the same trace",
+		"# codex already reports tokens on. Codex's own telemetry carries none of",
+		"# that content. Remove the marker pair above and below to opt out.",
+		`notify = ${tomlStringArray(argv)}`,
+		NOTIFY_END,
+		"",
+	].join("\n");
+}
+
+/** Where a line left the scanner: array nesting, and any open multi-line string. */
+interface ScanState {
+	depth: number;
+	/** The delimiter of the multi-line string still open, null when none is. */
+	openMultiline: '"""' | "'''" | null;
+}
+
+/**
+ * Advance the scan across one line, ignoring brackets inside strings and after
+ * an unquoted `#`. Multi-line values are the reason this is needed: a line's
+ * meaning depends on what an earlier line left open.
+ *
+ * All four TOML string forms are tracked. Literal strings are single-quoted and
+ * have no escape mechanism at all, so `path = 'C:\dir['` is an unbalanced
+ * bracket that must not count, and single-quoted values are the form codex's
+ * own documentation uses for commands. The triple-delimited forms span lines
+ * and are opaque in between: an `instructions = """..."""` block full of
+ * brackets and `#` characters is prose, not structure, and reading it as
+ * structure would leave the scanner at a depth that hides the real top-level
+ * `notify` below it.
+ */
+function scanLine(line: string, state: ScanState): ScanState {
+	let next = state.depth;
+	let openMultiline = state.openMultiline;
+	let quote: '"' | "'" | null = null;
+	let escaped = false;
+
+	for (let i = 0; i < line.length; i++) {
+		const ch = line[i]!;
+
+		if (openMultiline !== null) {
+			// Basic multi-line strings honour backslash escapes; literal ones do
+			// not, so a lone backslash there cannot hide the terminator.
+			if (escaped) {
+				escaped = false;
+				continue;
+			}
+			if (openMultiline === '"""' && ch === "\\") {
+				escaped = true;
+				continue;
+			}
+			if (line.startsWith(openMultiline, i)) {
+				i += openMultiline.length - 1;
+				openMultiline = null;
+			}
+			continue;
+		}
+
+		if (quote !== null) {
+			if (escaped) escaped = false;
+			else if (quote === '"' && ch === "\\") escaped = true;
+			else if (ch === quote) quote = null;
+			continue;
+		}
+
+		if (ch === '"' || ch === "'") {
+			const triple = `${ch}${ch}${ch}` as '"""' | "'''";
+			if (line.startsWith(triple, i)) {
+				openMultiline = triple;
+				i += 2;
+			} else {
+				quote = ch;
+			}
+		} else if (ch === "#") break;
+		else if (ch === "[") next++;
+		else if (ch === "]") next--;
+	}
+
+	// An unterminated single-line string cannot continue onto the next line in
+	// TOML, so only the multi-line state survives the line break.
+	return { depth: next, openMultiline };
+}
+
+/**
+ * Whether a line is a table header rather than a continuation of a multi-line
+ * value. A header's brackets close on the same line; `[1, 2],` inside an array
+ * does not, and only the former ends the top level.
+ */
+function isTableHeaderLine(line: string): boolean {
+	if (!/^[ \t]*\[/.test(line)) return false;
+	if (/^[ \t]*notify[ \t]*=/.test(line)) return false;
+	return scanLine(line, { depth: 0, openMultiline: null }).depth === 0;
+}
+
+/**
+ * Offsets of every live `notify = [` assignment above the file's first table
+ * header — the ones TOML binds to no table, which is what codex reads.
+ */
+function topLevelNotifyOffsets(content: string): number[] {
+	const found: number[] = [];
+	let state: ScanState = { depth: 0, openMultiline: null };
+	let offset = 0;
+	for (const line of content.split("\n")) {
+		// Inside a multi-line string every line is prose, including one that
+		// happens to read like `[a.table]` or `notify = [...]`.
+		if (state.depth === 0 && state.openMultiline === null) {
+			// Everything past a table header belongs to that table.
+			if (isTableHeaderLine(line)) return found;
+			if (/^[ \t]*notify[ \t]*=[ \t]*\[/.test(line)) found.push(offset);
+		}
+		state = scanLine(line, state);
+		offset += line.length + 1;
+	}
+	return found;
+}
+
+/**
+ * The offset of codex's own top-level `notify = [` assignment, or null when the
+ * file has none above its first table header.
+ *
+ * Depth is tracked rather than cutting at the first line that starts with `[`.
+ * TOML lets an array span lines, so a nested one puts an element like `[1, 2],`
+ * at the start of a continuation line. Reading that as a table header would
+ * hide a genuinely top-level `notify` below it, and hiding it is not a benign
+ * miss: the writer would then add a second `notify`, and a duplicate key stops
+ * codex parsing its config at all.
+ */
+function topLevelNotifyMatch(content: string): { index: number } | null {
+	const [first] = topLevelNotifyOffsets(content);
+	return first === undefined ? null : { index: first };
+}
+
+/**
+ * The value of codex's own top-level `notify` key in `content`, or null when
+ * absent. Returns the span the assignment occupies alongside the raw text and
+ * the parsed argv, so a caller moves those exact bytes. The span is what makes
+ * it the live assignment that moves: an identical spelling quoted in a comment
+ * or inside a `"""` block is prose, and searching for the text would find that
+ * copy first and comment out someone's documentation instead of the key codex
+ * reads.
+ *
+ * "Top-level" is enforced, not assumed. TOML binds a bare key to the table
+ * above it, so `[integrations.slack]` followed by `notify = [...]` is
+ * `integrations.slack.notify` and has nothing to do with codex — displacing it
+ * would rewrite unrelated config and run someone else's program on every turn.
+ *
+ * Only single-line and simple multi-line array forms are recognised, which is
+ * every form codex's own docs show. Anything else is left alone rather than
+ * half-parsed — see `writeCodexNotifyBlock` for what that means for the user.
+ *
+ * Both quoting forms are read. A literal (single-quoted) element is valid TOML
+ * and is what codex's own docs use for a Windows path, and since the assignment
+ * would be displaced either way, failing to parse it would comment the user's
+ * program out and chain nothing in its place, silently dropping it.
+ */
+const TOML_ARRAY_ELEMENT = /"((?:[^"\\]|\\.)*)"|'([^']*)'/g;
+
+interface NotifyAssignment {
+	/** Offset of the assignment's first character. */
+	start: number;
+	/** Offset just past its closing `]`. */
+	end: number;
+	raw: string;
+	argv: string[];
+}
+
+function findNotifyAssignment(content: string): NotifyAssignment | null {
+	const start = topLevelNotifyMatch(content);
+	if (!start) return null;
+	const openIndex = content.indexOf("[", start.index);
+	let depth = 0;
+	let quote: '"' | "'" | null = null;
+	let escaped = false;
+	// The array's own text, minus its comments. A `#` run holds prose, and its
+	// quotes are not elements: reading them would chain a program the user
+	// deliberately commented out, and a lone apostrophe in the prose would open
+	// a string that never closes, losing the assignment entirely.
+	let elements = "";
+	for (let i = openIndex; i < content.length; i++) {
+		const ch = content[i];
+		if (quote !== null) {
+			// Literal strings have no escape mechanism, so only a basic string's
+			// backslash can hide its closing quote.
+			if (escaped) escaped = false;
+			else if (quote === '"' && ch === "\\") escaped = true;
+			else if (ch === quote) quote = null;
+			elements += ch;
+			continue;
+		}
+		if (ch === "#") {
+			const lineEnd = content.indexOf("\n", i);
+			// A comment with no line after it cannot be followed by the `]` that
+			// would close the array, so the assignment is unterminated.
+			if (lineEnd === -1) return null;
+			elements += "\n";
+			i = lineEnd;
+			continue;
+		}
+		elements += ch;
+		if (ch === '"' || ch === "'") quote = ch;
+		else if (ch === "[") depth++;
+		else if (ch === "]") {
+			depth--;
+			if (depth === 0) {
+				// `raw` stays the verbatim source span: the caller moves exactly
+				// the lines the assignment occupied, comments included.
+				const end = i + 1;
+				const raw = content.slice(start.index, end);
+				const argv = Array.from(elements.matchAll(TOML_ARRAY_ELEMENT)).map(
+					(m) =>
+						m[1] !== undefined ? m[1].replace(/\\(.)/g, "$1") : (m[2] ?? ""),
+				);
+				return { start: start.index, end, raw, argv };
+			}
+		}
+	}
+	return null;
+}
+
+/** The argv codex currently runs on turn completion, or null when unset. */
+export function codexNotifyCommand(
+	filePath: string = defaultCodexConfigPath(),
+): string[] | null {
+	try {
+		return (
+			findNotifyAssignment(fs.readFileSync(filePath, "utf8"))?.argv ?? null
+		);
+	} catch {
+		return null;
+	}
+}
+
+/** Whether config.toml currently carries the langwatch notify block. */
+export function codexHasNotifyBlock(
+	filePath: string = defaultCodexConfigPath(),
+): boolean {
+	return fileHasMarker(filePath, NOTIFY_BEGIN);
+}
+
+export interface CodexNotifyWriteResult {
+	action: CodexOtelWriteAction;
+	path: string;
+	/** The user's own notify argv we displaced and now chain, when there was one. */
+	chained: string[] | null;
+}
+
+/**
+ * Idempotent merge of the notify block into config.toml.
+ *
+ * The block is always written at the TOP of the file. `notify` is a top-level
+ * key, and TOML binds a bare key to whatever table precedes it — appended after
+ * the `[otel]` block the way the other blocks are, it would silently become
+ * `otel.notify`, which codex ignores without complaint. Writing it first is the
+ * one placement that cannot be wrong regardless of what the user's file holds.
+ *
+ * A user-authored `notify` is moved aside rather than left in place: TOML
+ * forbids a duplicate key, so keeping both would stop codex from starting. The
+ * displaced argv is commented out where it stood and re-run from our block, and
+ * a repeat install reads it back out of that region so their program stays on
+ * the chain instead of being dropped the second time capture is enabled.
+ */
+export function writeCodexNotifyBlock(
+	inputs: CodexNotifyBlockInputs,
+	options: { filePath?: string } = {},
+): CodexNotifyWriteResult {
+	const filePath = options.filePath ?? defaultCodexConfigPath();
+
+	let prior = "";
+	try {
+		prior = fs.readFileSync(filePath, "utf8");
+	} catch {
+		/* absent — treated as empty below */
+	}
+
+	// Strip our own block first so the search for a foreign notify can't match
+	// the one we wrote last time, and so a block left mid-file by an older
+	// write is re-seated at the top.
+	const withoutOurs =
+		stripMarkerBlock(prior, NOTIFY_BEGIN, NOTIFY_END) ?? prior;
+
+	const existing = findNotifyAssignment(withoutOurs);
+	// With no live `notify` the user may still have one: an earlier install
+	// already moved it into the displaced region, where it is a comment rather
+	// than a key. That region is the only surviving record of it.
+	const displaced = existing ? null : findDisplacedNotify(withoutOurs);
+	const chained = existing?.argv.length
+		? existing.argv
+		: (displaced?.argv ?? null);
+	// Splice by the offsets the scanner resolved. Searching the file for the
+	// assignment's text would land on the first copy of that spelling, and a
+	// `notify` quoted in a comment or a `"""` block reads the same as the live
+	// one, so the comment would be commented out and the real key left standing.
+	const body = existing
+		? withoutOurs.slice(0, existing.start) +
+			buildDisplacedRegion(existing.raw) +
+			withoutOurs.slice(existing.end)
+		: withoutOurs;
+
+	const block = buildCodexNotifyBlock({ ...inputs, chained });
+	const next = body.trim() ? `${block}\n${body.replace(/^\n+/, "")}` : block;
+
+	// Last line of defence. Deciding which `notify` is codex's means reading
+	// TOML with a line scanner, and a config shape it reads wrong would leave
+	// two top-level `notify` keys — a duplicate key, which stops codex starting
+	// at all. Refusing to write beats breaking the user's editor on a shape we
+	// did not anticipate; capture stays off and says so.
+	if (topLevelNotifyOffsets(next).length > 1) {
+		throw new Error(
+			`refusing to write ${filePath}: it already defines a top-level 'notify' this merge cannot safely move`,
+		);
+	}
+
+	if (next === prior) return { action: "unchanged", path: filePath, chained };
+
+	if (!fs.existsSync(filePath)) {
+		fs.mkdirSync(path.dirname(filePath), { recursive: true });
+		writeFile0600(filePath, next);
+		return { action: "created", path: filePath, chained };
+	}
+	writeFile0600(filePath, next);
+	return { action: "updated", path: filePath, chained };
+}
+
+/**
+ * Remove the langwatch notify block, restoring a user-authored `notify` we had
+ * commented out when we installed. Returns true when a block was removed.
+ */
+export function removeCodexNotifyBlock(
+	filePath: string = defaultCodexConfigPath(),
+): boolean {
+	let content: string;
+	try {
+		content = fs.readFileSync(filePath, "utf8");
+	} catch {
+		return false;
+	}
+	const stripped = stripMarkerBlock(content, NOTIFY_BEGIN, NOTIFY_END);
+	if (stripped === null) return false;
+	// Restore only what sits between the displaced markers. Matching "the run of
+	// comment lines after the note" instead would swallow whatever the user had
+	// written below their own notify and uncomment it, turning their prose into
+	// bare TOML that codex then refuses to parse.
+	const restored = stripped.replace(
+		displacedRegionRe(),
+		(_match, commented: string) => `${uncommentDisplaced(commented)}\n`,
+	);
+	fs.writeFileSync(filePath, restored);
+	return true;
 }
 
 const GW_BEGIN = "# >>> langwatch gateway begin >>>";
@@ -404,7 +941,7 @@ export function writeCodexGatewayBlock(
 			"m",
 		);
 		if (re.test(prior)) {
-			const next = prior.replace(re, block);
+			const next = replaceVerbatim(prior, re, block);
 			if (next === prior) {
 				action = "unchanged";
 			} else {

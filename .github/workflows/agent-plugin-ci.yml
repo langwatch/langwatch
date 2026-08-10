@@ -1,0 +1,110 @@
+# Always-run workflow with internal path gating + aggregator. See #3223.
+# Upstream jobs skip when paths don't match, and `alls-green` reports the
+# final status.
+#
+# What it guards: the plugin is published as a directory of hand-authored JSON
+# plus one bundled script, so nothing about it is checked by any other job. Its
+# manifests are read by two clients that both fail quietly (an Agent Plugins
+# client rejects a manifest that violates the closed schema; Claude Code loads a
+# plugin whose hooks point at a file that is not there), and the bundle is only
+# ever exercised by spawning it.
+name: agent-plugin-ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  # Supersede an outdated run on a PR branch, never on main: every commit
+  # that lands on main has to keep its own validation, and cancelling here
+  # would let a merge silently void the run for the commit before it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.detect.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # The gate reads no working-tree content: on pull_request events
+          # dorny/paths-filter takes the changed-file list from the API, and
+          # every file this job needs on disk lives under .github/.
+          sparse-checkout: .github
+      - uses: ./.github/actions/detect-changes
+        id: detect
+        with:
+          filters: |
+            relevant:
+              - 'plugins/**'
+              # The hook script is bundled from these, so a change to any of
+              # them changes what the published plugin runs.
+              - 'sdks/typescript/src/cli/plugin/**'
+              - 'sdks/typescript/src/cli/commands/ingestion/**'
+              - 'sdks/typescript/src/internal/endpoint.ts'
+              - 'sdks/typescript/tsup.plugin-hook.config.ts'
+              - 'sdks/typescript/package.json'
+              # The single lockfile, workspace definition, root manifest and
+              # hoist config live at the repo root since ADR-076; a dependency
+              # or override change touches only these.
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'package.json'
+              - '.npmrc'
+              - '.github/workflows/agent-plugin-ci.yml'
+              - '.github/actions/setup-pnpm-node/**'
+              # The gate itself: a change here decides whether any of the
+              # filters above are ever consulted, so it has to match too.
+              - '.github/actions/detect-changes/**'
+
+  build_and_test:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      # Two filters, so the shared action's single-filter input cannot express
+      # it: the build needs the SDK the hook is bundled from, and the tests need
+      # the plugin package's own vitest.
+      - uses: ./.github/actions/setup-pnpm-node
+
+      - name: Install dependencies
+        run: >
+          CI=true pnpm install --frozen-lockfile
+          --filter "langwatch..."
+          --filter "@langwatch/agent-plugin..."
+
+      - name: Typecheck
+        run: pnpm --filter @langwatch/agent-plugin run typecheck
+
+      - name: Build the plugin
+        run: pnpm --filter @langwatch/agent-plugin run build
+
+      # Unit tests read the manifests; integration tests spawn the bundle
+      # against a local collector and a scratch git checkout. Both need only
+      # node and git, which the runner already has.
+      - name: Run tests
+        run: pnpm --filter @langwatch/agent-plugin run test
+
+  agent-plugin-complete:
+    needs: [changes, build_and_test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
+        with:
+          jobs: ${{ toJSON(needs) }}
+          allowed-skips: build_and_test

@@ -9,6 +9,7 @@
 
 import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
 import {
+  dropForeignScopesForVscodeKey,
   enforceApiKeyIdOnLogRequest,
   enforceApiKeyIdOnMetricRequest,
   enforceApiKeyIdOnTraceRequest,
@@ -20,7 +21,6 @@ import { createLogger } from "@langwatch/observability";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
-import { bodyLimit } from "hono/body-limit";
 import { getLangWatchTracer } from "langwatch";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import {
@@ -44,6 +44,7 @@ import {
 } from "~/server/otel/parseOtlpBody";
 import { decodeBase64OpenTelemetryId } from "~/server/tracer/utils";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { bodyLimit } from "./_lib/body-limit";
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
@@ -295,6 +296,22 @@ async function applyReceiverProvenanceToTraces({
 
   if (resolved?.type !== "apiKey" || !resolved.ingestSourceType) return;
 
+  // A copilot_vscode key rides spec-standard OTEL_* env in a long-lived
+  // editor; processes VS Code spawns outside integrated terminals (js-debug
+  // internal console, extension children) inherit it, so a developer's own
+  // instrumented service could POST here under this key. Only Copilot's
+  // instrumentation scopes pass.
+  const droppedForeign = dropForeignScopesForVscodeKey(
+    request as unknown as Parameters<typeof dropForeignScopesForVscodeKey>[0],
+    resolved.ingestSourceType,
+  );
+  if (droppedForeign > 0) {
+    loggerTraces.warn(
+      { droppedForeign, apiKeyId: resolved.apiKeyId },
+      "dropped non-copilot instrumentation scopes posted on a copilot_vscode ingest key",
+    );
+  }
+
   // Whether this tool's direct-OTLP usage is bundled (non-billed per token).
   // Cached per (org, sourceType); drives the trace summary's billed-vs-non-
   // billed cost split. Gateway usage never reaches here.
@@ -365,6 +382,19 @@ function applyReceiverProvenanceToMetrics({
   );
 
   if (resolved?.type !== "apiKey" || !resolved.ingestSourceType) return;
+
+  // Same foreign-scope gate as the traces signal: the code() env enables
+  // OTEL_METRICS_EXPORTER too, so an inherited env can push foreign metrics.
+  const droppedForeign = dropForeignScopesForVscodeKey(
+    request as Parameters<typeof dropForeignScopesForVscodeKey>[0],
+    resolved.ingestSourceType,
+  );
+  if (droppedForeign > 0) {
+    loggerMetrics.warn(
+      { droppedForeign, apiKeyId: resolved.apiKeyId },
+      "dropped non-copilot instrumentation scopes posted on a copilot_vscode ingest key",
+    );
+  }
 
   stampIngestKeyProvenanceOnMetricRequest(
     request as Parameters<typeof stampIngestKeyProvenanceOnMetricRequest>[0],

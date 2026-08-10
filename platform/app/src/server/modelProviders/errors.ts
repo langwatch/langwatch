@@ -192,3 +192,37 @@ export class ModelProviderTestRateLimitedError extends HandledError {
     this.name = "ModelProviderTestRateLimitedError";
   }
 }
+
+/**
+ * A write carried credentials, but none of the ones this provider declares,
+ * while the row on file holds some. Applying it would leave the provider with
+ * no credential at all.
+ *
+ * The merge keeps a stored value when the payload sends the masked
+ * placeholder for it. A key the payload never mentions has no such signal, so
+ * it is dropped, and a payload naming no credential at all drops every one of
+ * them. That is never what a caller means: clearing a credential is sending it
+ * empty, not leaving it out.
+ *
+ * Refusing rather than repairing, because the payload does not say what was
+ * intended and a guess would be silently wrong in the other direction. The
+ * check exists because the same silent loss has now arrived twice by different
+ * routes, and both times the provider's schema was loose enough to accept the
+ * short payload without complaint.
+ */
+export class ModelProviderCredentialsWouldBeDroppedError extends HandledError {
+  declare readonly code: "model_provider_credentials_would_be_dropped";
+
+  constructor({ provider }: { provider: string }) {
+    super(
+      "model_provider_credentials_would_be_dropped",
+      "This save would delete the credentials already stored for this provider. Send the credentials with it, or leave them out of the request entirely to keep them.",
+      {
+        meta: { provider },
+        httpStatus: 400,
+        fault: "customer",
+      },
+    );
+    this.name = "ModelProviderCredentialsWouldBeDroppedError";
+  }
+}

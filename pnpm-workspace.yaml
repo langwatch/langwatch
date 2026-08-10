@@ -14,6 +14,7 @@ packages:
   - "platform/app"
   - "packages/*"
   - "mcp/typescript"
+  - "plugins/*"
   - "sdks/typescript"
   - "skills"
   - "tests/agentic-e2e"

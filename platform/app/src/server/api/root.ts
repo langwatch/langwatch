@@ -36,6 +36,7 @@ import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
 import { gatewayGuardrailsRouter } from "./routers/gatewayGuardrails";
 import { gatewaySpendEventsRouter } from "./routers/gatewaySpendEvents";
 import { gatewayUsageRouter } from "./routers/gatewayUsage";
+import { githubRouter } from "./routers/github";
 import { graphsRouter } from "./routers/graphs";
 import { groupRouter } from "./routers/group";
 import { homeRouter } from "./routers/home";
@@ -43,7 +44,6 @@ import { httpProxyRouter } from "./routers/httpProxy";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
 import { langyRouter } from "./routers/langy";
 import { langyEgressRouter } from "./routers/langyEgress";
-import { langyGithubRouter } from "./routers/langyGithub";
 import { licenseRouter } from "./routers/license";
 import { licenseEnforcementRouter } from "./routers/licenseEnforcement";
 import { limitsRouter } from "./routers/limits";
@@ -78,6 +78,7 @@ import { subscriptionRouter } from "./routers/subscription";
 import { suiteRouter } from "./routers/suites";
 import { teamRouter } from "./routers/team";
 import { topicsRouter } from "./routers/topics";
+import { traceEditOverlayRouter } from "./routers/traceEditOverlay";
 import { tracesRouter } from "./routers/traces";
 import { tracesV2Router } from "./routers/tracesV2";
 import { translateRouter } from "./routers/translate";
@@ -95,6 +96,7 @@ const coreRouters = {
   team: teamRouter,
   traces: tracesRouter,
   tracesV2: tracesV2Router,
+  traceEditOverlay: traceEditOverlayRouter,
   codingAgents: codingAgentsRouter,
   spans: spansRouter,
   analytics: analyticsRouter,
@@ -168,7 +170,7 @@ const coreRouters = {
   gatewayUsage: gatewayUsageRouter,
   gatewaySpendEvents: gatewaySpendEventsRouter,
   webhookEndpoints: webhookEndpointsRouter,
-  langyGithub: langyGithubRouter,
+  github: githubRouter,
   langyEgress: langyEgressRouter,
   langy: langyRouter,
 };

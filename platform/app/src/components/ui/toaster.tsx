@@ -33,19 +33,33 @@ export const toaster = {
   },
 };
 
-/** The status colour, spent only on the small icon. */
+/**
+ * The status colour, spent on the small icon and on the action.
+ *
+ * The action carries the accent, and on a toast that already reads as good news
+ * the warm accent reads as a warning about it. So a success toast's action wears
+ * the same green its icon does, and every other status keeps the accent.
+ */
 const STATUS = {
-  error: { fg: "red.fg" },
-  warning: { fg: "yellow.fg" },
-  success: { fg: "green.fg" },
-  info: { fg: "fg.muted" },
-  loading: { fg: "fg.muted" },
+  error: { fg: "red.fg", action: "orange.fg" },
+  warning: { fg: "yellow.fg", action: "orange.fg" },
+  success: { fg: "green.fg", action: "green.fg" },
+  info: { fg: "fg.muted", action: "orange.fg" },
+  loading: { fg: "fg.muted", action: "orange.fg" },
 } as const;
 
 type ToastStatus = keyof typeof STATUS;
 
 const statusOf = (type: string | undefined): ToastStatus =>
   type && type in STATUS ? (type as ToastStatus) : "info";
+
+/**
+ * The colour a toast's action reads in. Exported because it is the whole of the
+ * rule: on a toast that already says something went right, the warm accent
+ * reads as a warning about it, so success spends its own green there.
+ */
+export const toastActionColor = (type: string | undefined): string =>
+  STATUS[statusOf(type)].action;
 
 function StatusIcon({ status }: { status: ToastStatus }) {
   const { fg } = STATUS[status];
@@ -129,7 +143,7 @@ export const Toaster = () => {
                     alignSelf="flex-start"
                     fontSize="12px"
                     fontWeight="560"
-                    color="orange.fg"
+                    color={toastActionColor(toast.type)}
                   >
                     {toast.action.label}
                   </Toast.ActionTrigger>

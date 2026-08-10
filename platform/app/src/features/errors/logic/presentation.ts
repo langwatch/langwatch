@@ -90,6 +90,20 @@ const describeMissingModel = (error: HandledErrorShape): string =>
   ] ?? "Set the model where this endpoint expects it, then try again.";
 
 /**
+ * Reads a number out of `meta` without trusting it. `meta` crosses a wire,
+ * so a value that arrives as a string or NaN has to read as absent rather
+ * than reach a sentence as "NaN projects".
+ */
+const num = (
+  error: HandledErrorShape,
+  key: string,
+  fallback: number,
+): number => {
+  const value = error.meta[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+};
+
+/**
  * The two plan allowances an admin meets while reconciling seats, in words that
  * read inside a sentence. Not taken from the license-enforcement labels, which
  * are column headings ("Team Members") and land badly mid-sentence.
@@ -218,6 +232,11 @@ const presentations = {
   time_range_too_wide: {
     title: "Time range is too wide",
     describe: () => "Pick a shorter range and try again.",
+  },
+  page_too_deep: {
+    title: "That page is too deep to open by number",
+    describe: () =>
+      "Narrow the time range or filters, or step forward with Next.",
   },
   filter_parse_error: {
     title: "This filter isn't valid",
@@ -508,6 +527,11 @@ const presentations = {
     describe: () =>
       "A provider added outside a project needs at least one scope, so pick the teams or projects it covers.",
   },
+  model_provider_credentials_would_be_dropped: {
+    title: "That save would delete the stored credentials",
+    describe: () =>
+      "Saving this would remove the credentials already stored for this provider. Leave the credential fields as they are to keep them, or empty them yourself if removing them is what you want.",
+  },
   missing_provider: {
     // fault: customer — a configuration choice they can change, so the copy
     // names it rather than apologising.
@@ -719,6 +743,23 @@ const presentations = {
     title: "Your account doesn't include this",
     describe: () => "Ask an admin on your team to upgrade your access.",
   },
+  personal_project_key_required: {
+    // Reached with a key in hand, so the answer is which key to use instead.
+    // "Personal workspace" is the name the product uses on the page the right
+    // key comes from, which is what makes it findable rather than a rule.
+    title: "That API key isn't for a personal workspace",
+    describe: () =>
+      "This shows one person's own activity, so it needs the API key from your personal workspace. A shared or team workspace key covers everybody in it and can't answer for one person.",
+  },
+  personal_usage_key_mismatch: {
+    // A deliberate denial rather than a mistake to correct: being allowed to
+    // view somebody's workspace is not the same as it being yours, so the copy
+    // has to close the retry rather than invite one. Nothing here names whose
+    // workspace it is, which is the question the refusal exists to withhold.
+    title: "That workspace is somebody else's",
+    describe: () =>
+      "A key only reports on the personal workspace it belongs to, even where you can otherwise view the workspace. Use the API key from your own personal workspace.",
+  },
   personal_workspace_not_managed_here: {
     // Whoever reads this was managing somebody's access, so the answer has to
     // say why there is nothing to manage here rather than restate the rule. An
@@ -757,12 +798,13 @@ const presentations = {
   },
   lite_member_viewer_only: {
     // Not a field to correct: the seat sets the ceiling, so the two ways out
-    // are the two named here.
-    title: "A Lite Member can only view a team",
+    // are the two named here. The scope can be a team, a project, or the
+    // organization, so the copy names the seat rather than any of them.
+    title: "A Lite Member seat allows viewing only",
     describe: (error) => {
       const teamName = str(error, "teamName", "");
-      const team = teamName ? ` in "${teamName}"` : "";
-      return `A Lite Member seat allows the Viewer role only${team}. Leave the team role as Viewer, or move them to a full member seat to give them more.`;
+      const scope = teamName ? ` in "${teamName}"` : "";
+      return `A Lite Member seat allows the Viewer role only${scope}. Leave the role as Viewer, or move them to a full member seat to give them more.`;
     },
   },
   already_organization_member: {
@@ -854,9 +896,24 @@ const presentations = {
       "Send an organization API key as Authorization: Bearer <api-key>.",
   },
   invalid_credentials: {
+    // Deliberately says nothing about which credential class the route
+    // wanted. A key of the wrong class gets `credential_class_mismatch` and
+    // is told so exactly; naming a class here as well would send everyone
+    // holding a typo or a revoked key to swap a working credential.
     title: "That API key was not accepted",
     describe: () =>
-      "Organization endpoints need an admin API key from Settings > API Keys. A project key cannot be used here.",
+      "Check the key is current and copied in full. If it was revoked or rotated, create a new one in Settings > API Keys.",
+  },
+  credential_class_mismatch: {
+    // Both classes are named, because the fix is to swap one for the other
+    // and a caller holding several keys cannot otherwise tell which is which.
+    title: "That's the wrong kind of API key for this endpoint",
+    describe: (error) => {
+      const required = str(error, "required", "");
+      return required === "organization_api_key"
+        ? "This endpoint needs an organization API key, created in Settings > API Keys. The key sent belongs to a single project."
+        : "Send the credential class this endpoint accepts. Organization API keys are created in Settings > API Keys.";
+    },
   },
   scenario_run_export_unauthenticated: {
     title: "Log in to export simulation runs",
@@ -1473,6 +1530,35 @@ const presentations = {
     title: "You don't have permission to attach guardrails",
     describe: () => "Ask an admin on your team for access to this project.",
   },
+  github_not_connected: {
+    title: "GitHub is not connected",
+    describe: () =>
+      "Connect GitHub for this organization in Settings, Integrations. An organization admin can do it.",
+  },
+  github_installation_suspended: {
+    // Only a person on github.com can lift a suspension, so there is nothing to
+    // retry and nothing to change in LangWatch.
+    title: "The GitHub connection is suspended",
+    describe: () =>
+      "GitHub has suspended the LangWatch app for this account. Resume it from the app's page on GitHub.",
+  },
+  github_repo_not_accessible: {
+    title: "That repository isn't available to LangWatch",
+    describe: () =>
+      "The GitHub app doesn't have access to that repository. Grant it access from Settings, Integrations, Configure, then try again.",
+  },
+  github_rate_limited: {
+    // fault: provider. Nobody did anything wrong, GitHub is simply throttling.
+    title: "GitHub is rate limiting requests",
+    describe: () => "Try again in a few minutes.",
+  },
+  github_pr_not_mapped: {
+    // Two causes, one sentence each: the repository was never connected, or it
+    // was and the mapping has not run yet. Both are waits, not mistakes.
+    title: "That pull request isn't linked yet",
+    describe: () =>
+      "Connect the repository in Settings, Integrations, or wait a few minutes for the linking to catch up.",
+  },
   virtual_key_not_found: {
     title: "Virtual key not found",
     describe: () =>
@@ -1491,6 +1577,56 @@ const presentations = {
       return window
         ? `A ${window.toLowerCase()} budget doesn't roll on a cycle, so it has no start date to set. Pick a minute, hour, day, week or month window, or drop the start date.`
         : "This budget doesn't roll on a cycle, so it has no start date to set. Pick a minute, hour, day, week or month window, or drop the start date.";
+    },
+  },
+  trace_project_required: {
+    // Names the one field that fixes it, since the alternative fix (an
+    // administrator setting the organization's governance project up) is
+    // not something the person looking at this form can do.
+    title: "This key needs somewhere for its traces to land",
+    describe: () =>
+      "Pick the project where its traces and costs land, under Ownership. Without one its spend is invisible and no budget can cap it.",
+  },
+  gateway_trace_project_ambiguous: {
+    // The refusal is about what the key did NOT say, so the copy has to
+    // say it back: the caller believes they already picked the project.
+    title: "This key doesn't say where its traces land",
+    describe: (error) => {
+      const scopes = num(error, "project_scope_count", 0);
+      return scopes > 1
+        ? `It can reach ${scopes} projects, so its traces and costs would go to none of them. Pick the one they should land in.`
+        : "Pick the project where its traces and costs land. Without one they go to a hidden governance project, and every budget on the project you had in mind counts nothing.";
+    },
+  },
+  gateway_trace_project_unknown: {
+    // Says the destination is the problem, not the key, because the form
+    // shows a picker and the natural reading of a refusal there is that the
+    // whole key was rejected.
+    title: "That project isn't in this organization",
+    describe: () =>
+      "Pick a project this organization owns for its traces and costs to land in. The one saved on this key no longer resolves.",
+  },
+  gateway_budget_scope_unreachable: {
+    // Says what would have gone wrong rather than what was rejected: a budget
+    // that never fires looks identical to one that was never breached, so the
+    // reason this was worth refusing is the whole message.
+    title: "Nothing would count against this budget",
+    describe: (error) => {
+      const scopeType = str(error, "scope_type", "scope");
+      return `None of your keys send traffic to that ${scopeType}, so this budget would never spend and never stop anything. Put it where your keys already run, scope a key to that ${scopeType}, or save it anyway to set it up ahead of the keys that will use it.`;
+    },
+  },
+  gateway_spend_group_by_unstable: {
+    // Says what the numbers would have done, not what the walk does
+    // internally: "your totals could double-count" is actionable, "the
+    // cursor is not exact over a mutable group key" is not.
+    title: "These totals would not add up yet",
+    describe: (error) => {
+      const settlesAt = str(error, "settles_at", "");
+      const when = settlesAt
+        ? ` Requests in this range finish arriving at ${settlesAt}.`
+        : "";
+      return `Recent requests can still change which model or provider they are counted under, and which time bucket they fall in, so grouping this way now could count some twice and miss others. Ask for an older range, group by key or end user instead, or allow an approximate read if you only need a rough shape.${when}`;
     },
   },
   gateway_scope_org_mismatch: {

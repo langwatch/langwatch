@@ -52,7 +52,8 @@ Feature: AI Gateway Governance — Admin RoutingPolicies (decoupled from VK)
     Then the existing row is updated (not duplicated)
     And the change is reflected in any new VK config materialised after the update
     And an audit log row "gateway.routing_policy.updated" is written
-    And existing VKs that reference this policy automatically pick up the new allowlist within 30 seconds (gateway auth-cache TTL)
+    And a ROUTING_POLICY_UPDATED change event is appended in the same transaction
+    And existing VKs that reference this policy pick up the new allowlist on the gateway's next /changes long-poll, which evicts their cached bundles
 
   @bdd @routing-policy @set-default
   Scenario: Admin can swap the default policy at org scope

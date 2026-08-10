@@ -530,14 +530,15 @@ export const groupRouter = createTRPCRouter({
     // userId and enumerate which groups that user belongs to (which
     // role bindings they inherit). That's admin-surface authorization
     // visibility. Sole TS caller is MemberDetailDialog under settings/.
+    //
+    // Deliberately not plan-gated, unlike the group management surfaces:
+    // permission resolution honours group bindings on every plan, and the
+    // member dialog reads this for every member of every organization, so
+    // gating the read either misreports a member's effective access or (as
+    // customers hit) turns every dialog open into a refused request. An
+    // organization that never had groups simply gets an empty list.
     .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ ctx, input }) => {
-      await assertEnterprisePlan({
-        organizationId: input.organizationId,
-        user: ctx.session.user,
-        errorMessage: ENTERPRISE_FEATURE_ERRORS.SCIM,
-      });
-
       const groups = await ctx.prisma.group.findMany({
         where: {
           organizationId: input.organizationId,

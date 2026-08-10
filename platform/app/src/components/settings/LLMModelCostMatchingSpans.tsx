@@ -26,6 +26,7 @@ export interface MatchingSpansPreviewInput {
   outputCostPerToken?: number;
   cacheReadCostPerToken?: number;
   cacheCreationCostPerToken?: number;
+  cacheCreation1hCostPerToken?: number;
 }
 
 /**
@@ -99,6 +100,7 @@ export function LLMModelCostMatchingSpans({
       outputCostPerToken: input.outputCostPerToken,
       cacheReadCostPerToken: input.cacheReadCostPerToken,
       cacheCreationCostPerToken: input.cacheCreationCostPerToken,
+      cacheCreation1hCostPerToken: input.cacheCreation1hCostPerToken,
     },
     {
       enabled: !!project?.id && regexValid,

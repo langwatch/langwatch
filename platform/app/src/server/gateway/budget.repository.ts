@@ -33,7 +33,10 @@ export class GatewayBudgetRepository {
     scopes: ApplicableScopes,
     tx?: Prisma.TransactionClient,
   ): Promise<ResolvedBudget[]> {
-    return resolveApplicableBudgets(tx ?? this.prisma, scopes);
+    return resolveApplicableBudgets({
+      client: tx ?? this.prisma,
+      target: scopes,
+    });
   }
 
   async applicableForRequest(

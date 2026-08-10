@@ -1,3 +1,4 @@
+import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";
 import type { TraceMediaRef } from "~/shared/traces/media-refs";
 
 export type TraceStatus = "ok" | "error" | "warning";
@@ -159,4 +160,24 @@ export interface TraceListItem {
    * having none.
    */
   eventsUnavailable?: boolean;
+  /**
+   * What reviewers left on the trace: their comments, ratings, scores and
+   * suggested outputs. Annotations live in their own store rather than on the
+   * trace summary, so the list reads them separately and lays them over the
+   * row (`useTraceListAnnotations`). Undefined until the Annotations column
+   * asks for them.
+   */
+  annotations?: AnnotationByTrace[];
+  /**
+   * True while the page's annotations read is still in flight. The column
+   * holds the space rather than showing its empty marker, which would claim
+   * nobody has reviewed the trace.
+   */
+  annotationsLoading?: boolean;
+  /**
+   * True when the page's annotations could not be read, whether the read
+   * failed or the reader may not see them. The column says so instead of
+   * reporting a reviewed trace as unreviewed.
+   */
+  annotationsUnavailable?: boolean;
 }

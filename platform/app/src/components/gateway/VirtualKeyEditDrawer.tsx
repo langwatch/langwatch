@@ -61,6 +61,8 @@ type VirtualKeyDetail = {
   routingPolicyId: string | null;
   routingMode?: "NONE" | "FALLBACK_ALL" | "POLICY";
   traceProjectId?: string | null;
+  /** True when the project the key traces into has been deleted. */
+  traceProjectArchived?: boolean;
   principalUserId?: string | null;
   principalUser?: { name: string | null; email: string | null } | null;
   config: {
@@ -369,6 +371,8 @@ export function VirtualKeyEditDrawer({
                       ? vk.principalUser
                       : undefined
                   }
+                  traceProjectId={vk.traceProjectId ?? null}
+                  traceProjectArchived={vk.traceProjectArchived ?? false}
                   ctx={{
                     organizationName: organization?.name,
                     availableTeams,

@@ -36,11 +36,11 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-// Auth cache tiers reported on the auth-cache metrics.
-const (
-	TierL1      = "l1"
-	TierL2Redis = "l2_redis"
-)
+// TierL1 is the auth cache tier reported on the auth-cache metrics. The
+// gateway caches virtual keys in each pod's own memory and nowhere else, so
+// the label carries one value; it stays a label because these metric names
+// are published and an operator's dashboard should not break to save a string.
+const TierL1 = "l1"
 
 // Guardrail verdict label values. Allow/block/modify mirror the control
 // plane's decision; FailOpen is recorded when the guardrail service could
@@ -187,7 +187,7 @@ func New() *Recorder {
 
 	r.authHits = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "gateway_auth_cache_hits_total",
-		Help: "Virtual-key resolutions served from cache, by tier (l1, l2_redis).",
+		Help: "Virtual-key resolutions served from cache, by tier (l1).",
 	}, []string{"tier"})
 
 	r.authMisses = prometheus.NewCounterVec(prometheus.CounterOpts{

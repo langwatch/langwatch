@@ -116,6 +116,35 @@ jobs:
       # baked in) — the env-var gate plus the binary-identity assertions
       # below (version match + stripped check) are what catch a regression.
 
+      # node-pty ships prebuilds only for darwin and win32, so on Linux its
+      # postinstall always falls back to `node-gyp rebuild`. pnpm runs that
+      # rebuild with its OWN vendored node-gyp, whose `gyp/gyp_main.py` ships
+      # mode 644. That is harmless while make only compiles, but the moment
+      # make decides the generated Makefile is stale it re-runs gyp_main.py as
+      # a command and the build dies with "Permission denied" / error 126.
+      # Whether it decides that depends on file mtimes, so the failure comes
+      # and goes with how the concurrent native builds happen to interleave
+      # over the shared ~/.cache/node-gyp headers.
+      #
+      # Installing node-gyp globally is not enough on its own: pnpm exports
+      # `npm_config_node_gyp` pointing at its vendored copy, and that variable
+      # wins over PATH for every lifecycle script, so the global install sits
+      # unused. Point the variable at the published node-gyp, which ships
+      # gyp_main.py mode 755, and the landmine is gone for every later install
+      # in the job. sdk-javascript-ci.yml does the same.
+      - name: Install node-gyp (for node-pty postinstall)
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install -g node-gyp@12.3.0
+          gyp="$(npm root -g)/node-gyp/bin/node-gyp.js"
+          # Assert rather than trust: a wrong path here would not fail this
+          # step, it would fail whichever native build ran next, which reads
+          # as an unrelated compiler error.
+          test -f "$gyp"
+          test -x "$(dirname "$gyp")/../gyp/gyp_main.py"
+          echo "npm_config_node_gyp=$gyp" >> "$GITHUB_ENV"
+
       # Install ONLY tools that aren't predeps but the CLI needs to operate
       # (lsof for port-collision detection on linux). Postgres, redis,
       # clickhouse, uv, and goose all flow through their respective predeps,

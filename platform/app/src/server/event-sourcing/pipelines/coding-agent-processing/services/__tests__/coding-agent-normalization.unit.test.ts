@@ -8,8 +8,10 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  declaredCodingAgent,
   detectCodingAgent,
   isCodingAgentMetricName,
+  liftCodingAgentLogFacts,
   mergeAliasTables,
   normalizeEventName,
   normalizeMetricName,
@@ -17,6 +19,7 @@ import {
   parseMcpToolName,
   resolveConversationKey,
   resolveToolName,
+  SESSION_CONTEXT_EVENT_NAME,
 } from "../coding-agent-normalization";
 
 describe("detectCodingAgent", () => {
@@ -188,11 +191,105 @@ describe("normalizeEventName", () => {
     });
   });
 
+  describe("given the LangWatch companion event", () => {
+    it("lands the qualified and bare spellings on one fact", () => {
+      // `langwatch.` is nobody's agent prefix, so nothing is stripped and the
+      // dot-flattened spelling is what the alias table has to carry.
+      expect(normalizeEventName("langwatch.session_context")).toBe(
+        "session_context",
+      );
+      expect(normalizeEventName("session_context")).toBe("session_context");
+    });
+  });
+
+  describe("given Claude's response-body half of a model call", () => {
+    it("lands it on the same fact as Gemini's completion event", () => {
+      expect(normalizeEventName("claude_code.api_response_body")).toBe(
+        "api_response",
+      );
+      expect(normalizeEventName("gemini_cli.api_response")).toBe(
+        "api_response",
+      );
+    });
+  });
+
   describe("given an event we have no use for", () => {
     it("returns null instead of inventing a fact", () => {
       expect(normalizeEventName("codex.websocket_connect")).toBeNull();
       expect(normalizeEventName("")).toBeNull();
       expect(normalizeEventName(null)).toBeNull();
+    });
+  });
+});
+
+describe("liftCodingAgentLogFacts", () => {
+  describe("given a log record named langwatch.session_context under the langwatch hook scope", () => {
+    const attributes = {
+      "event.name": SESSION_CONTEXT_EVENT_NAME,
+      "session.id": "sess-ctx-1",
+      "coding_agent.name": "claude_code",
+      "vcs.repository.host": "github.com",
+      "vcs.repository.owner": "acme",
+      "vcs.repository.name": "widgets",
+      "vcs.ref.head.name": "feat/session-git-context",
+      "vcs.worktree.name": "widgets-feat",
+    };
+
+    /** @scenario A langwatch session context event passes the log lift without a vendor scope */
+    it("admits the record and lifts its vcs attributes", () => {
+      const facts = liftCodingAgentLogFacts({
+        scopeName: "langwatch.coding_agent.hook",
+        attributes,
+      });
+
+      expect(facts).toEqual(attributes);
+    });
+
+    /** @scenario A langwatch session context event passes the log lift without a vendor scope */
+    it("required no vendor instrumentation scope to be admitted", () => {
+      // The proof that the admission is the event name and nothing else: the
+      // same scope and event name identify no agent at all.
+      expect(
+        detectCodingAgent({
+          scopeName: "langwatch.coding_agent.hook",
+          recordName: SESSION_CONTEXT_EVENT_NAME,
+        }),
+      ).toBe("unknown");
+    });
+  });
+
+  describe("given an ordinary application log", () => {
+    it("declines it, so the firehose costs one name check", () => {
+      expect(
+        liftCodingAgentLogFacts({
+          scopeName: "express",
+          attributes: { "event.name": "http.request", "session.id": "s" },
+        }),
+      ).toBeNull();
+    });
+  });
+});
+
+describe("declaredCodingAgent", () => {
+  describe("given a declaration naming an agent in the registry", () => {
+    it("answers that agent", () => {
+      expect(declaredCodingAgent({ "coding_agent.name": "claude_code" })).toBe(
+        "claude_code",
+      );
+      expect(declaredCodingAgent({ "coding_agent.name": "codex" })).toBe(
+        "codex",
+      );
+    });
+  });
+
+  describe("given a declaration LangWatch cannot resolve", () => {
+    it("answers null rather than trusting the wire", () => {
+      expect(
+        declaredCodingAgent({ "coding_agent.name": "totally_new_agent" }),
+      ).toBeNull();
+      expect(declaredCodingAgent({ "coding_agent.name": "" })).toBeNull();
+      expect(declaredCodingAgent({ "coding_agent.name": 42 })).toBeNull();
+      expect(declaredCodingAgent({})).toBeNull();
     });
   });
 });

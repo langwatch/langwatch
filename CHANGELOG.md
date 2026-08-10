@@ -1,5 +1,68 @@
 # Changelog
 
+## [3.12.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.11.0...langwatch@v3.12.0) (2026-08-10)
+
+
+### Features
+
+* **gateway:** store the trace destination at creation instead of deriving it per read ([#6769](https://github.com/langwatch/langwatch/issues/6769)) ([b65e6f3](https://github.com/langwatch/langwatch/commit/b65e6f3957676df55ba366f0698c9f710b6e5db1))
+
+
+### Bug Fixes
+
+* **members:** desired-state access edits, group-aware guards, Lite Member rows store the truth ([#6698](https://github.com/langwatch/langwatch/issues/6698)) ([aa3ad21](https://github.com/langwatch/langwatch/commit/aa3ad2192645e91896b39d97b7d7f5bc94d1c22d))
+
+
+### Code Refactoring
+
+* **aigateway:** one auth cache tier, and a conditional config refresh ([#6768](https://github.com/langwatch/langwatch/issues/6768)) ([995f0da](https://github.com/langwatch/langwatch/commit/995f0da964e9f85d089b6e55c57149874faadcb3))
+
+## [3.11.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.10.0...langwatch@v3.11.0) (2026-08-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **spend:** POST /api/gateway/v1/virtual-keys refuses an organization- or team-scoped key, and a key scoped to more than one project, when it does not carry trace_project_id and the organization has projects to choose from. Send trace_project_id, or scope the key to exactly one project. Existing keys are unaffected until they are next edited.
+* **gateway:** POST /api/gateway/v1/virtual-keys refuses an organization- or team-scoped key, and a key scoped to more than one project, when it does not carry trace_project_id and the organization has projects to choose from. Send trace_project_id, or scope the key to exactly one project. Existing keys are unaffected until they are next edited.
+* **evaluators:** evaluations, monitors and experiments referencing a legacy/ragas_* evaluator type stop working. Their current equivalents in the ragas/* family remain available.
+* **mcp-server:** three behaviors change for callers of the HTTP server. A client that authenticated once at initialize and then sent only the session id must now send Authorization: Bearer <key> on every request. GET /sse?apiKey=<key> no longer authenticates; use the Authorization header. A deployment relying on the implicit 0.0.0.0 bind must pass --host 0.0.0.0, which the published container image already does.
+
+### Features
+
+* **agent-plugin:** first-class LangWatch plugin for Claude Code and Agent Plugins 1.0 ([#6747](https://github.com/langwatch/langwatch/issues/6747)) ([25625c4](https://github.com/langwatch/langwatch/commit/25625c44e53d6dd23d647e58fad9783464e8a1e2))
+* **cli:** keep the LangWatch Claude Code plugin up to date from every wrapped run ([#6751](https://github.com/langwatch/langwatch/issues/6751)) ([b64a584](https://github.com/langwatch/langwatch/commit/b64a58465e7d35fcc2ae6ba22d9d4ca54e66b7a4))
+* **codex:** capture the conversation for a plain codex, not just the wrapper ([#6433](https://github.com/langwatch/langwatch/issues/6433)) ([38931b4](https://github.com/langwatch/langwatch/commit/38931b4392837c4a011dbde44ec7b80c80b19720))
+* **coding-agent:** session economics, and the repositories and pull requests behind them ([#6435](https://github.com/langwatch/langwatch/issues/6435)) ([6430813](https://github.com/langwatch/langwatch/commit/6430813056cda513241a8389a2136fac2d63591e))
+* **evaluators:** remove the legacy Ragas evaluators ([#6600](https://github.com/langwatch/langwatch/issues/6600)) ([ef9ea90](https://github.com/langwatch/langwatch/commit/ef9ea90e22bc2adb92bacf5c732cc996c9782bfe))
+* **gateway:** make a budget reach the traffic it names, and every route say which key it wants ([#6647](https://github.com/langwatch/langwatch/issues/6647)) ([eaf6573](https://github.com/langwatch/langwatch/commit/eaf6573f95cfb5bec234dfbe5c3643126e53fb3c))
+* **governance:** copilot capture across three surfaces — CLI wrapper, app login agent, VS Code Chat (ADR-039) ([#5605](https://github.com/langwatch/langwatch/issues/5605)) ([fd6a3b3](https://github.com/langwatch/langwatch/commit/fd6a3b304176137433ad645d718ec1411097c60f))
+* **langy:** show a data-use notice under the composer ([#6755](https://github.com/langwatch/langwatch/issues/6755)) ([98395a4](https://github.com/langwatch/langwatch/commit/98395a4e6e470773bd9a82354e55b249df306dce))
+* **model-providers:** test a credential you have already saved ([#6657](https://github.com/langwatch/langwatch/issues/6657)) ([223f6f4](https://github.com/langwatch/langwatch/commit/223f6f4f30d973735f6917bfe19a67fb8e541469))
+* **spend:** one filter vocabulary on both reads, and a grouping that refuses to lie ([#6656](https://github.com/langwatch/langwatch/issues/6656)) ([dd3be46](https://github.com/langwatch/langwatch/commit/dd3be46de9aa70d40f256b26a4ee49a1ec753e53))
+* **traces:** trace edit overlay and annotation queue to dataset workflow ([#6565](https://github.com/langwatch/langwatch/issues/6565)) ([33d55ee](https://github.com/langwatch/langwatch/commit/33d55ee3b6f3a031f753c252fc89f243d7f9310c))
+
+
+### Bug Fixes
+
+* **aigateway:** propagate routing-policy and cache-rule edits through the change feed ([#6737](https://github.com/langwatch/langwatch/issues/6737)) ([b2377ca](https://github.com/langwatch/langwatch/commit/b2377caa9e3fa7c0ef41e7a24434f79e46988ef9))
+* **charts:** unpin the clickhouse-serverless subchart and resync the lock ([#6745](https://github.com/langwatch/langwatch/issues/6745)) ([0e2c9c7](https://github.com/langwatch/langwatch/commit/0e2c9c7a6521725c0c4cfcb363d0a866aae45936))
+* **ci:** the release-scope guard recognizes its own pin remediation ([#6759](https://github.com/langwatch/langwatch/issues/6759)) ([bdde347](https://github.com/langwatch/langwatch/commit/bdde347d14435ac96dcf112b151ea15442fb2ce5))
+* **cli:** survive orphaned member rows when resolving the bootstrap admin email ([#6738](https://github.com/langwatch/langwatch/issues/6738)) ([f2149eb](https://github.com/langwatch/langwatch/commit/f2149eb4c648ccffab6151eff05b2d28d4d78f65))
+* **dev:** count the checks that go around the package scripts ([#6733](https://github.com/langwatch/langwatch/issues/6733)) ([824a297](https://github.com/langwatch/langwatch/commit/824a297757875829702a9339dbf80947e6581a90))
+* **dev:** identify a dev lane by its command line, not by ps comm alone ([#6753](https://github.com/langwatch/langwatch/issues/6753)) ([38e1e34](https://github.com/langwatch/langwatch/commit/38e1e34c31a1367ed3218bddabca9d0ffb38f7b2))
+* **dev:** take a dev stack down with whoever started it ([#6749](https://github.com/langwatch/langwatch/issues/6749)) ([474c7a0](https://github.com/langwatch/langwatch/commit/474c7a0b6668e64b4d19e55388b83914d387ab69))
+* **mcp-server:** authorize every request to the standalone HTTP server ([#6641](https://github.com/langwatch/langwatch/issues/6641)) ([af324de](https://github.com/langwatch/langwatch/commit/af324deeb3700f2745783a46e6fd5e8625ef868e))
+* **model-providers:** an extra header no longer deletes the stored Azure credentials ([#6730](https://github.com/langwatch/langwatch/issues/6730)) ([11f4736](https://github.com/langwatch/langwatch/commit/11f473670f92098b07eb1b57a9ac4b3f7dc65c09))
+* **observability:** default ClickHouse backup metrics ON, opt out where there are no backups ([#6756](https://github.com/langwatch/langwatch/issues/6756)) ([8f1c021](https://github.com/langwatch/langwatch/commit/8f1c0215742ae49a18997ca424af8f1630383013))
+* **tests:** read the annotations column as the text it is, and stop the queue overlap test racing its holder ([#6764](https://github.com/langwatch/langwatch/issues/6764)) ([d79fe54](https://github.com/langwatch/langwatch/commit/d79fe543ea6855a412eebb3bf0fdcedd8d158d7b))
+* **traces:** default the oversized-span S3 spool on so configured storage means no truncation ([#6729](https://github.com/langwatch/langwatch/issues/6729)) ([6bf9ec8](https://github.com/langwatch/langwatch/commit/6bf9ec80ad5982cb9a422145b608c6ea1a8d2823))
+* **traces:** gate coding-agent log content by canonical event and per key ([#6743](https://github.com/langwatch/langwatch/issues/6743)) ([157eb0e](https://github.com/langwatch/langwatch/commit/157eb0e772232a52be22d1cd2a5336842dc06def))
+
+
+### Miscellaneous
+
+* **release:** single-footer shadow Release-As 3.11.0 ([#6744](https://github.com/langwatch/langwatch/issues/6744)) ([54885bd](https://github.com/langwatch/langwatch/commit/54885bd6a06aa4e57791eba470a7771c6d02c9ff))
+
 ## [3.10.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.9.0...langwatch@v3.10.0) (2026-08-07)
 
 

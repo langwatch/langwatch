@@ -40,6 +40,7 @@ export class App {
   readonly commands: AppCommands;
   readonly storedObjects: AppDependencies["storedObjects"];
   readonly opsExplain: AppDependencies["opsExplain"];
+  readonly github: AppDependencies["github"];
   readonly langy: AppDependencies["langy"];
   readonly experiments: AppDependencies["experiments"];
   readonly triggers: AppDependencies["triggers"];
@@ -118,6 +119,7 @@ export class App {
     this.commands = deps.commands;
     this.storedObjects = deps.storedObjects;
     this.opsExplain = deps.opsExplain;
+    this.github = deps.github;
     this.langy = deps.langy;
     this.ops = deps.ops;
     this.retentionPolicyCache = deps.retentionPolicyCache;

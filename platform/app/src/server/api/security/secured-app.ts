@@ -24,7 +24,7 @@ import {
 import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
 import { prisma } from "~/server/db";
 
-import type { AccessPolicy } from "./access-policy";
+import { type AccessPolicy, credentialClassFor } from "./access-policy";
 import { registerRoutePolicy } from "./route-registry";
 
 /**
@@ -155,6 +155,10 @@ export class SecuredApp<E extends Env> {
           path: mergePath(this.basePath, path),
           policy,
           family: this.family,
+          credentialClass: credentialClassFor({
+            scope: this.strategy.scope,
+            policy,
+          }),
         });
         // Prepend the enforcement chain, then the caller's handlers. The
         // verb method's STATIC type is Hono's own, so validator + context
