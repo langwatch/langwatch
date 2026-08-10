@@ -266,6 +266,26 @@ function assertRequiredVariablesPresent({
 }
 
 /**
+ * The two transport guards every token-mode credential must pass, exported as
+ * one seam so ALL construction sites share them: a bearer token must never
+ * travel a plaintext connection, and a non-public-cloud endpoint must name
+ * the identity authority its tokens come from. The migration task builds its
+ * credentials from its own OBJECT_STORAGE_MIGRATION_* namespace rather than
+ * through `resolveAzureCredentials`, and bypassing these guards there would
+ * let a migration run leak bearer tokens the app itself refuses to.
+ */
+export function assertTokenModeTransportSafety({
+  endpointBaseUrl,
+  authorityHost,
+}: {
+  endpointBaseUrl: string | undefined;
+  authorityHost: string | undefined;
+}): void {
+  assertHttpsEndpoint(endpointBaseUrl);
+  assertSovereignAuthority({ endpointBaseUrl, authorityHost });
+}
+
+/**
  * Resolves Azure Blob credentials for whichever auth mode is configured, or
  * throws `AzureBackendMisconfiguredError` naming exactly what's wrong.
  *
@@ -319,8 +339,7 @@ export function resolveAzureCredentials({
     };
   }
 
-  assertHttpsEndpoint(endpointBaseUrl);
-  assertSovereignAuthority({ endpointBaseUrl, authorityHost });
+  assertTokenModeTransportSafety({ endpointBaseUrl, authorityHost });
 
   if (mode === "workloadIdentity") {
     assertWorkloadIdentityInjectedValues();

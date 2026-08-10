@@ -161,6 +161,34 @@ describe("resolveAzureCredentials", () => {
         /STORED_OBJECTS_BACKEND=azure/,
       );
     });
+
+    /**
+     * The read exemption is the whole reason an Azure->S3 migration keeps its
+     * history: `maybeAzureDriver` resolves with `purpose: "read"`, and if that
+     * threw here it would register no driver and strand every object ever
+     * written to azure-blob://. Nothing else in the repo exercised this, so
+     * deleting the `purpose === "write" &&` clause left every test green.
+     */
+    /** @scenario "Historical Azure objects stay readable after moving writes to S3" */
+    it("still resolves credentials for reads, so historical objects stay reachable", () => {
+      mockEnv.STORED_OBJECTS_BACKEND = "s3";
+      mockEnv.AZURE_BLOB_AUTH_MODE = "workloadIdentity";
+      mockEnv.AZURE_BLOB_ACCOUNT_NAME = "acct";
+      mockEnv.AZURE_BLOB_CONTAINER = "cont";
+      process.env.AZURE_CLIENT_ID = "client-id";
+      process.env.AZURE_TENANT_ID = "tenant-id";
+      process.env.AZURE_FEDERATED_TOKEN_FILE =
+        "/var/run/secrets/azure/tokens/azure-identity-token";
+
+      const credentials = resolveAzureCredentials({ purpose: "read" });
+
+      expect(credentials.mode).toBe("workloadIdentity");
+      expect(credentials.accountName).toBe("acct");
+      // ...while the default (write) resolution still refuses the same config.
+      expect(() => resolveAzureCredentials()).toThrow(
+        AzureBackendMisconfiguredError,
+      );
+    });
   });
 
   describe("given AZURE_BLOB_AUTH_MODE=workloadIdentity with the platform-injected values absent", () => {

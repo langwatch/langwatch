@@ -104,7 +104,8 @@ async function drain(stream: Readable | Buffer | null): Promise<string> {
 
 describe("groupQueue durable blob tier on an Azure-only install", () => {
   describe("given a job body over the durable threshold and no S3 configured", () => {
-    /** @scenario "The groupQueue durable blob tier works in a token-based mode" */
+    /** @scenario "The groupQueue durable blob tier works on an Azure-only install" */
+    /** @scenario "An Azure-only installation supports every shared object-storage workload" */
     it("stores it in Azure Blob and reads the same bytes back", async () => {
       const store = azureOnlyStore();
       const body = Buffer.from("x".repeat(THRESHOLD * 4), "utf8");
