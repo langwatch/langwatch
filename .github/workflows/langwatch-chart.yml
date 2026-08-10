@@ -155,6 +155,27 @@ jobs:
       - name: "assert rendered SSO provider configuration"
         run: ./tests/sso-providers.sh
 
+  workers-shutdown:
+    name: "workers shutdown"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: charts/langwatch
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        with:
+          version: v3.12.0
+      - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      - run: helm repo add langwatch https://langwatch.github.io/langwatch
+      - run: helm dependency build .
+      # Workers drain in-flight queue jobs and their ClickHouse writes on
+      # SIGTERM. Too short a grace period turns that drain into a SIGKILL,
+      # which severs in-flight statements — invisible in the template source,
+      # visible only in the rendered value.
+      - name: "assert workers get long enough to drain"
+        run: ./tests/workers-shutdown.sh
+
   e2e:
     name: "e2e: ${{ matrix.name }}"
     runs-on: ubuntu-latest

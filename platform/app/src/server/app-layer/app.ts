@@ -10,6 +10,39 @@ import type {
 
 const logger = createLogger("langwatch:app");
 
+/**
+ * Backstop for the drain phase of {@link App.close}.
+ *
+ * Sits just above the GroupQueue's own 20s production shutdown budget so the
+ * queue's timeout is what normally fires and reports which groups were still
+ * in flight. This only catches a drain that escaped that race entirely.
+ *
+ * Whatever this becomes, the workers' terminationGracePeriodSeconds must stay
+ * above it — see charts/langwatch/values.yaml.
+ */
+const CLOSE_DRAIN_TIMEOUT_MS = 25_000;
+
+async function withTimeout(
+  run: () => Promise<void>,
+  timeoutMs: number,
+  label: string,
+): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      run(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`${label} timed out after ${timeoutMs}ms`)),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export class App {
   readonly config: AppConfig;
 
@@ -130,25 +163,48 @@ export class App {
     this._gracefulCloseables = deps._gracefulCloseables ?? [];
   }
 
+  /**
+   * Shut down in two ordered phases: drain the work, then drop the transports
+   * it was using.
+   *
+   * These MUST NOT overlap. The graceful closeables are ClickHouse, Redis and
+   * Prisma — the very connections the event-sourcing consumer is still issuing
+   * statements over while it drains. Closing them concurrently destroys the
+   * ClickHouse HTTP client mid-request, which the server reports as
+   * `Broken pipe, while writing to socket ... ParallelFormattingOutputFormat`
+   * and the driver reports back here as `socket hang up`. Every worker rollout
+   * produced a burst of both (prod, 2026-08-10), because the drain has a 20s
+   * budget and the close finished in milliseconds.
+   *
+   * The drain is bounded twice over: GroupQueueProcessor.close() races its own
+   * shutdown timeout, and CLOSE_DRAIN_TIMEOUT_MS below is the backstop for
+   * anything that escapes it. A drain that hangs must not strand the
+   * connections — Kubernetes answers a missed grace period with SIGKILL, which
+   * is the ungraceful shutdown this method exists to avoid.
+   */
   async close(): Promise<void> {
-    await Promise.allSettled([
-      (async () => {
-        if (this._eventSourcing) {
-          try {
-            await this._eventSourcing.close();
-          } catch (error) {
-            logger.error({ error }, "Failed to close EventSourcing");
-          }
-        }
-      })(),
-      ...this._gracefulCloseables.map(async (c) => {
+    if (this._eventSourcing) {
+      const eventSourcing = this._eventSourcing;
+      try {
+        await withTimeout(
+          () => eventSourcing.close(),
+          CLOSE_DRAIN_TIMEOUT_MS,
+          "EventSourcing drain",
+        );
+      } catch (error) {
+        logger.error({ error }, "Failed to close EventSourcing");
+      }
+    }
+
+    await Promise.allSettled(
+      this._gracefulCloseables.map(async (c) => {
         try {
           await c.close();
         } catch (error) {
           logger.error({ name: c.name, error }, "Failed to close");
         }
       }),
-    ]);
+    );
   }
 }
 

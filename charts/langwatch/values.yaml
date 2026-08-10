@@ -823,6 +823,15 @@ workers:
   ## @param workers.replicaCount [default: 1] Number of worker replicas.
   replicaCount: 1
 
+  # How long Kubernetes waits after SIGTERM before SIGKILL. Workers drain
+  # in-flight queue jobs and their ClickHouse writes on shutdown, so this must
+  # stay above the drain backstop in App.close (25s) plus process teardown.
+  # Raise it if your queue runs long jobs; lowering it below ~30s reintroduces
+  # the severed-connection errors this default exists to prevent.
+  # See: https://kubespec.dev/v1/Pod#spec.terminationGracePeriodSeconds
+  ## @param workers.terminationGracePeriodSeconds [default: 60] Seconds to allow for the shutdown drain before SIGKILL.
+  terminationGracePeriodSeconds: 60
+
   # Resource requirements for worker pods
   # Workers are CPU/memory intensive for processing evaluations and trace collection
   # See: https://kubespec.dev/v1/Pod#spec.containers.resources
