@@ -33,6 +33,8 @@ export const ScenarioInfraErrorCode = {
   ModelToolReasoningConflict: "scenario_model_tool_reasoning_conflict",
   /** The run exceeded its time budget. */
   ExecutionTimeout: "scenario_execution_timeout",
+  /** The runner process itself couldn't boot (a broken build or deployment). */
+  RunnerUnavailable: "scenario_runner_unavailable",
   /** Anything else that failed at the infrastructure level. */
   Infra: "scenario_infra_error",
 } as const;
@@ -54,6 +56,9 @@ export interface ScenarioErrorEnvelope {
 
 /** Longest message we keep for the generic fallback; raw dumps get trimmed. */
 const MAX_GENERIC_MESSAGE_LENGTH = 300;
+
+/** Shown when the raw error is empty, or is nothing but runtime noise. */
+const GENERIC_FAILURE_MESSAGE = "The simulation failed before it could run.";
 
 /** Case-insensitive substring test that tolerates undefined. */
 function contains(haystack: string, needle: string): boolean {
@@ -80,21 +85,93 @@ function extractProviderMessage(raw: string): string | undefined {
 }
 
 /**
+ * Lines that carry no meaning for a user and expose our internals: stack
+ * frames, the interpreter's own source locations, the `throw err; ^` preamble
+ * Node prints above an uncaught throw, `Require stack:` path lists, and the
+ * trailing runtime-version footer.
+ *
+ * The generic fallback picks the first line that survives this filter, so an
+ * unclassified crash dump degrades to a plain sentence rather than leaking a
+ * path like `node:internal/modules/cjs/loader:1520` — which is what the
+ * fallback used to show for a runner that failed to boot.
+ */
+const NOISE_LINE_PATTERNS: RegExp[] = [
+  /^at\s/,
+  /^node:/,
+  /^\^+$/,
+  /^throw\s/,
+  /^Require stack:/i,
+  /^-\s*[/\\]/,
+  /^[/\\][^\s]*$/,
+  /^Node\.js\s+v?\d/i,
+];
+
+/** True when a line is pure runtime noise rather than a human explanation. */
+function isNoiseLine(line: string): boolean {
+  return NOISE_LINE_PATTERNS.some((pattern) => pattern.test(line));
+}
+
+/**
+ * Anything that betrays where our code lives or how it is built: an
+ * interpreter source location, a stack frame, or an absolute filesystem path.
+ *
+ * This is the final guard on the generic bucket — the line filter above works
+ * by enumeration, and enumeration always lags the next crash shape, so a
+ * candidate that still matches here is dropped for the generic sentence rather
+ * than shown. The path pattern needs the slash to start the line or follow
+ * whitespace/a quote, which is why a URL's `https://host/v1/x` never trips it.
+ */
+const INTERNALS_PATTERNS: RegExp[] = [
+  /node:internal/,
+  /\bat\s+\S+\s+\(/,
+  /(?:^|[\s'"(])[/\\][\w.-]+[/\\][\w.-]+/,
+];
+
+/** True when a candidate message would expose our internals to the user. */
+function exposesInternals(message: string): boolean {
+  return INTERNALS_PATTERNS.some((pattern) => pattern.test(message));
+}
+
+/**
+ * The first line of a crash dump that reads as a human explanation.
+ *
+ * Node prints the error's own properties as a brace block under the stack
+ * (`{ code: 'MODULE_NOT_FOUND', requireStack: [ '/app/…' ] }`). Skipping only
+ * the opening brace would leave its inner lines as candidates, so depth is
+ * tracked and the block skipped whole.
+ */
+function findMeaningfulLine(text: string): string | undefined {
+  let depth = 0;
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.trim();
+    const insideBlock = depth > 0;
+    depth = Math.max(
+      0,
+      depth +
+        (line.match(/[{[]/g)?.length ?? 0) -
+        (line.match(/[}\]]/g)?.length ?? 0),
+    );
+    if (insideBlock || line.startsWith("{") || line.length === 0) continue;
+    if (!isNoiseLine(line)) return line;
+  }
+  return undefined;
+}
+
+/**
  * Collapse a raw error blob (often a multi-line child-process dump) into a
  * single concise line: strip the "Child process exited with code N:" wrapper
- * and any JSON-log noise, keep the first meaningful line, and cap the length.
+ * and any runtime noise, keep the first meaningful line, and cap the length.
+ *
+ * Returns undefined when nothing but noise is left, so the caller falls back to
+ * a generic sentence instead of surfacing a stack frame.
  */
-function summarize(raw: string): string {
+function summarize(raw: string): string | undefined {
   const withoutWrapper = raw
     .replace(/^Child process exited with code \d+:\s*/i, "")
     .trim();
-  const firstMeaningfulLine =
-    withoutWrapper
-      .split("\n")
-      .map((line) => line.trim())
-      .find((line) => line.length > 0 && !line.startsWith("{")) ??
-    withoutWrapper;
-  const collapsed = firstMeaningfulLine.replace(/\s+/g, " ").trim();
+  const meaningful = findMeaningfulLine(withoutWrapper);
+  if (!meaningful || exposesInternals(meaningful)) return undefined;
+  const collapsed = meaningful.replace(/\s+/g, " ").trim();
   if (collapsed.length <= MAX_GENERIC_MESSAGE_LENGTH) return collapsed;
   return `${collapsed.slice(0, MAX_GENERIC_MESSAGE_LENGTH - 1).trimEnd()}…`;
 }
@@ -102,8 +179,35 @@ function summarize(raw: string): string {
 interface ClassificationRule {
   /** Any one of these appearing in the raw error selects this rule. */
   needles: string[];
+  /**
+   * Optional second condition — the rule then needs a needle AND this. Used
+   * where the needle words alone don't say whose process actually failed.
+   */
+  alsoRequires?: (text: string) => boolean;
   /** Build the envelope for a matched raw error. */
   build: (text: string) => ScenarioErrorEnvelope;
+}
+
+/**
+ * Markers that only an uncaught Node crash prints: a loader frame, the
+ * `Require stack:` list, or an internal module frame.
+ *
+ * The module-resolution words on their own don't identify the process that
+ * died — a customer's own Node agent can fail with `Cannot find module` and
+ * have that text surface through the adapter. Telling them "this is a fault on
+ * our side" would then be worse than saying nothing, so the runner rule needs
+ * one of these too, and a bare sentence falls through to the generic bucket
+ * where the customer's own text is passed on unchanged.
+ */
+const NODE_CRASH_MARKERS = [
+  "node:internal/modules",
+  "Require stack:",
+  "at Module._",
+];
+
+/** True when the blob is a Node process's own crash dump. */
+function isNodeCrashDump(text: string): boolean {
+  return NODE_CRASH_MARKERS.some((marker) => contains(text, marker));
 }
 
 /**
@@ -177,6 +281,30 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
     },
   },
   {
+    // The runner process died before it could run anything — a module missing
+    // from the production bundle, a native addon that won't load, an ESM/CJS
+    // mismatch. Always our deployment, never the customer's scenario, so the
+    // copy says so plainly instead of dumping the loader's stack. The build
+    // gate in scripts/build-server.mjs is what stops the common cause (an
+    // external require that isn't declared in dependencies) from shipping;
+    // this rule is the user-facing half for anything that still gets through.
+    needles: [
+      "MODULE_NOT_FOUND",
+      "ERR_MODULE_NOT_FOUND",
+      "Cannot find module",
+      "Cannot find package",
+      "ERR_REQUIRE_ESM",
+      "ERR_DLOPEN_FAILED",
+    ],
+    alsoRequires: isNodeCrashDump,
+    build: () => ({
+      code: ScenarioInfraErrorCode.RunnerUnavailable,
+      message:
+        "The simulation runner couldn't start, so the scenario never ran.",
+      hint: "This is a fault on our side, not a problem with your scenario. Retry the run, and contact support if it keeps happening.",
+    }),
+  },
+  {
     needles: ["timed out", "ETIMEDOUT"],
     build: () => ({
       code: ScenarioInfraErrorCode.ExecutionTimeout,
@@ -216,19 +344,20 @@ export function classifyScenarioInfraError(
   if (text.length === 0) {
     return {
       code: ScenarioInfraErrorCode.Infra,
-      message: "The simulation failed before it could run.",
+      message: GENERIC_FAILURE_MESSAGE,
     };
   }
 
   for (const rule of CLASSIFICATION_RULES) {
-    if (rule.needles.some((needle) => contains(text, needle))) {
+    const hit = rule.needles.some((needle) => contains(text, needle));
+    if (hit && (rule.alsoRequires?.(text) ?? true)) {
       return rule.build(text);
     }
   }
 
   return {
     code: ScenarioInfraErrorCode.Infra,
-    message: summarize(text),
+    message: summarize(text) ?? GENERIC_FAILURE_MESSAGE,
   };
 }
 
@@ -333,6 +462,8 @@ export function scenarioErrorTitle(code: ScenarioInfraErrorCode): string {
       return "Judge model configuration conflict";
     case ScenarioInfraErrorCode.ExecutionTimeout:
       return "Simulation timed out";
+    case ScenarioInfraErrorCode.RunnerUnavailable:
+      return "Simulation runner unavailable";
     case ScenarioInfraErrorCode.Infra:
       return "Simulation failed";
     default: {

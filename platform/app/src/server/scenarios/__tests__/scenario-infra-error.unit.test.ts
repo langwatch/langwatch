@@ -20,6 +20,32 @@ import {
   scenarioErrorTitle,
 } from "../scenario-infra-error";
 
+/** The internals a user must never read, each with the name it fails under. */
+const INTERNAL_MARKERS: { label: string; pattern: RegExp }[] = [
+  { label: "stack frame", pattern: /\bat\s+\S+\s+\(/ },
+  { label: "interpreter source location", pattern: /node:internal/ },
+  {
+    label: "container path",
+    pattern: /(?:^|[\s'"])\/(?:app|usr|home|Users)\//,
+  },
+  { label: "child-process wrapper", pattern: /Child process exited/ },
+  { label: "bundle filename", pattern: /\.cjs\b|\.js:/ },
+];
+
+/**
+ * Nothing a user reads may carry a stack frame, an interpreter source
+ * location, or a path from inside our container. Asserted on the message
+ * rather than the input, so it holds whichever classification rule matched,
+ * and reported by label so a failure names what leaked.
+ */
+function expectNoInternals(message: string): void {
+  const leaked = INTERNAL_MARKERS.filter(({ pattern }) =>
+    pattern.test(message),
+  ).map(({ label }) => label);
+  // biome-ignore lint/suspicious/noMisplacedAssertion: one shared guard for every "no internals" case; the assertion belongs with the marker list it checks
+  expect(leaked).toEqual([]);
+}
+
 describe("classifyScenarioInfraError", () => {
   describe("when the raw error is a self-signed certificate failure", () => {
     /** @scenario "A self-signed certificate failure becomes an untrusted-certificate error" */
@@ -140,6 +166,113 @@ describe("classifyScenarioInfraError", () => {
       const result = classifyScenarioInfraError(undefined);
       expect(result.code).toBe(ScenarioInfraErrorCode.Infra);
       expect(result.message.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("when the runner process failed to boot", () => {
+    // Verbatim from a customer report: the production bundle was built
+    // without pino declared, so the child died in Node's CJS loader and the
+    // whole dump — interpreter paths, stack frames, the bundle's absolute
+    // path inside the container — was stored as the run's verdict reasoning.
+    const moduleNotFoundDump = [
+      "Child process exited with code 1: node:internal/modules/cjs/loader:1520",
+      "  throw err;",
+      "  ^",
+      "",
+      "Error: Cannot find module 'pino'",
+      "Require stack:",
+      "- /app/langwatch/langwatch/dist/scenario-child-process.js",
+      "    at Module._resolveFilename (node:internal/modules/cjs/loader:1517:15)",
+      "    at Module._load (node:internal/modules/cjs/loader:1294:5)",
+      "{",
+      "  code: 'MODULE_NOT_FOUND',",
+      "  requireStack: [ '/app/langwatch/langwatch/dist/scenario-child-process.js' ]",
+      "}",
+      "",
+      "Node.js v24.18.0",
+      "",
+    ].join("\n");
+
+    /** @scenario "A runner that fails to boot becomes a named runner-unavailable error" */
+    it("classifies the loader crash as runner-unavailable without leaking internals", () => {
+      const result = classifyScenarioInfraError(moduleNotFoundDump);
+      expect(result.code).toBe(ScenarioInfraErrorCode.RunnerUnavailable);
+      expectNoInternals(result.message);
+      expect(result.hint).toMatch(/fault on our side/i);
+    });
+
+    it("keeps the internals out of the reasoning the run stores", () => {
+      // buildFailureResults() puts this string in the run's `reasoning`, which
+      // is what the customer report showed the loader dump in. Pinned exactly,
+      // because the whole point of the fix is the words the customer reads.
+      const { message } = classifyScenarioInfraError(moduleNotFoundDump);
+      expect(message).toBe(
+        "The simulation runner couldn't start, so the scenario never ran.",
+      );
+      expect(message).not.toContain("pino");
+      expect(message).not.toContain("MODULE_NOT_FOUND");
+    });
+
+    it.each([
+      "Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod'\n    at Module._load (node:internal/modules/cjs/loader:1294:5)",
+      "Error: Cannot find module '../dist/index.js'\nRequire stack:\n- /app/dist/server/workers.cjs",
+      "Error [ERR_REQUIRE_ESM]: require() of ES Module not supported\n    at Module._compile (node:internal/modules/cjs/loader:1871:14)",
+      "Error: ERR_DLOPEN_FAILED: invalid ELF header\n    at Module._extensions..node (node:internal/modules/cjs/loader:1928:18)",
+    ])("classifies a %s crash as runner-unavailable", (raw) => {
+      expect(classifyScenarioInfraError(raw).code).toBe(
+        ScenarioInfraErrorCode.RunnerUnavailable,
+      );
+    });
+
+    /** @scenario "A customer's own module error is not blamed on our runner" */
+    it("does not claim our runner failed when the words came from the agent", () => {
+      // A customer's Node agent can fail this way and have the text surface
+      // through the adapter. Blaming our deployment would send them looking in
+      // the wrong place, so without a Node crash dump around it this stays in
+      // the generic bucket with their own wording intact.
+      const agentReply = "Cannot find module 'my-tools/pricing'";
+      const result = classifyScenarioInfraError(agentReply);
+      expect(result.code).toBe(ScenarioInfraErrorCode.Infra);
+      expect(result.message).toBe(agentReply);
+    });
+  });
+
+  describe("when the raw error is nothing but runtime noise", () => {
+    /** @scenario "An unclassified crash dump degrades to a plain sentence" */
+    it("degrades to a plain sentence rather than a stack frame", () => {
+      // No loader needles here, so this lands in the generic bucket — the
+      // path the old summarize() walked straight into, returning the
+      // interpreter's own source location as the user-facing message.
+      const framesOnly = [
+        "Child process exited with code 1: node:internal/process/task_queues:105",
+        "  throw err;",
+        "  ^",
+        "    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+        "    at async /app/langwatch/dist/server/scenario-child-process.cjs:80978:27",
+        "{",
+        "  code: 'SOME_CODE'",
+        "}",
+        "",
+        "Node.js v24.18.0",
+      ].join("\n");
+      const result = classifyScenarioInfraError(framesOnly);
+      expect(result.code).toBe(ScenarioInfraErrorCode.Infra);
+      expectNoInternals(result.message);
+      expect(result.message).toBe("The simulation failed before it could run.");
+    });
+
+    it("still keeps a real sentence buried in a crash dump", () => {
+      // The noise filter skips lines, it does not skip the whole blob: a
+      // genuine explanation between the frames still reaches the user.
+      const withRealLine = [
+        "node:internal/process/task_queues:105",
+        "  throw err;",
+        "The judge could not parse the agent's reply.",
+        "    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+      ].join("\n");
+      expect(classifyScenarioInfraError(withRealLine).message).toBe(
+        "The judge could not parse the agent's reply.",
+      );
     });
   });
 
