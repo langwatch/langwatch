@@ -258,9 +258,12 @@ func TestFindVersionRefs(t *testing.T) {
 			want:     []string{"3.12.0"},
 		},
 		{
-			name:     "finds every version in a file, in order",
-			contents: "langwatch/langwatch chart\nVERSION=1.2.3\nmore\ntag: \"4.5.6\"\n",
-			want:     []string{"1.2.3", "4.5.6"},
+			name: "finds every version in a file, in order",
+			contents: "VERSION=1.2.3\n" +
+				"docker pull \"langwatch/langwatch:$VERSION\"\n" +
+				"    repository: langwatch/langwatch\n" +
+				"    tag: \"4.5.6\"\n",
+			want: []string{"1.2.3", "4.5.6"},
 		},
 		{
 			name:     "finds a pinned chart release in a helm command",
@@ -311,6 +314,34 @@ func TestFindVersionRefs(t *testing.T) {
 			want:     nil,
 		},
 		{
+			// The tag has to be paired with its own repository, not with any
+			// nearby mention of LangWatch: this block is correct at 0.2.0.
+			name: "ignores a tag belonging to an independently versioned image",
+			contents: "clickhouse:\n  image:\n" +
+				"    repository: langwatch/clickhouse-serverless\n" +
+				"    tag: \"0.2.0\"\n",
+			want: nil,
+		},
+		{
+			name: "still finds a tag belonging to a release-tracking image",
+			contents: "app:\n  image:\n" +
+				"    repository: registry.example.com/langwatch/langwatch\n" +
+				"    tag: \"3.12.0\"\n",
+			want: []string{"3.12.0"},
+		},
+		{
+			// Every page linking to the repository would otherwise count as
+			// chart context, which is most of the site.
+			name:     "a GitHub source link is not chart context",
+			contents: "See [the repo](https://github.com/langwatch/langwatch).\n--version 1.14.5\n",
+			want:     nil,
+		},
+		{
+			name:     "an unrelated repoURL containing langwatch is not chart context",
+			contents: "    repoURL: https://charts.example.com/langwatch-mirror\n    targetRevision: 9.1.0\n",
+			want:     nil,
+		},
+		{
 			name:     "still finds the three release-tracking images",
 			contents: "langwatch/langwatch:1.1.1 langwatch/langwatch_nlp:2.2.2 langwatch/langevals:3.3.3\n",
 			want:     []string{"1.1.1", "2.2.2", "3.3.3"},
@@ -339,7 +370,7 @@ func TestFindVersionRefs(t *testing.T) {
 func TestFindVersionRefsReportsFileAndLine(t *testing.T) {
 	refs := docsscan.FindVersionRefs(
 		"docs/page.mdx",
-		"a\nlangwatch/langwatch\nVERSION=9.9.9\n",
+		"a\ndocker pull \"langwatch/langwatch:$VERSION\"\nVERSION=9.9.9\n",
 	)
 	if len(refs) != 1 {
 		t.Fatalf("found %d refs, want 1", len(refs))
