@@ -456,12 +456,25 @@ Feature: Credential Validation
     Then the stored credential is found
     And I am not told the provider has no credential
 
+  # A check can be asked about the settings on screen rather than the ones
+  # stored, because a customer editing an endpoint needs an answer about the
+  # endpoint they are looking at. What must never happen is the two being
+  # combined: an address chosen by the caller, filled in with a credential out
+  # of storage that the caller may never have been allowed to read. That would
+  # turn permission to edit a provider into permission to extract its key.
+
   @unit
-  Scenario: A test never accepts an endpoint from the caller
+  Scenario: A test never sends a stored credential to an endpoint from the caller
     Given I have a configured provider
-    When I test the connection
+    When I test the connection against settings supplied with the request
+    Then only the settings supplied are used
+    And the stored credential is not added to them
+
+  @unit
+  Scenario: A test with nothing supplied uses what is stored
+    Given I have a configured provider
+    When I test the connection without supplying any settings
     Then the endpoint already saved on the provider is used
-    And an endpoint supplied with the request is refused
 
   @unit
   Scenario: Testing a provider I cannot manage is refused

@@ -33,10 +33,7 @@ import {
   ModelProviderService,
   testConnectionInputSchema,
 } from "../../modelProviders/modelProvider.service";
-import {
-  validateKeyWithCustomUrl,
-  validateProviderApiKey,
-} from "../../modelProviders/providerValidation";
+import { validateKeyWithCustomUrl } from "../../modelProviders/providerValidation";
 import {
   checkOrganizationPermission,
   checkProjectPermission,
@@ -262,6 +259,11 @@ export const modelProviderRouter = createTRPCRouter({
    * parameters leave the server parsing an absent input, which surfaces to
    * the customer as a validation error against a key that is perfectly good.
    * POSTing the key in a body avoids all of it.
+   *
+   * It goes through the service rather than calling the validator directly so
+   * that it is counted against the same budget as `testConnection`. Both end
+   * in the same outbound request, and a limit that covers one of two doors is
+   * the size of the door it does not cover.
    */
   validateApiKey: protectedProcedure
     .input(
@@ -278,9 +280,16 @@ export const modelProviderRouter = createTRPCRouter({
         .superRefine(requireTenantAnchor),
     )
     .use(checkProviderValidationPermission())
-    .mutation(async ({ input }) => {
-      const { provider, customKeys } = input;
-      return validateProviderApiKey(provider, customKeys);
+    .mutation(async ({ input, ctx }) => {
+      const service = ModelProviderService.create(ctx.prisma);
+      return await service.validateCredential({
+        input: {
+          projectId: input.projectId,
+          organizationId: input.organizationId,
+          provider: input.provider,
+          customKeys: input.customKeys,
+        },
+      });
     }),
 
   /**
