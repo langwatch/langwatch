@@ -149,7 +149,11 @@ export class AnalyticsService {
         // `trace_summaries`.
         const [routedResult, legacyResult] = await Promise.all([
           this.runRouted(table, input, options),
-          legacyForTripwire(input),
+          // The comparison read carries the caller's ceiling too. Without it a
+          // tripwire-enabled project would still materialise the unbounded
+          // legacy result alongside the bounded routed one — the bound would
+          // hold everywhere except the projects we turned extra reads on for.
+          legacyForTripwire(input, options),
         ]);
         compareForTripwire({
           projectId: input.projectId,
@@ -215,11 +219,6 @@ export class AnalyticsService {
     );
   }
 
-  /**
-   * Resolve which analytics table should serve this `getTimeseries` call.
-   * Flag OFF → always `"trace_summaries"` (legacy code path, unchanged).
-   * Flag ON  → delegate to `pickAnalyticsTable(...)` per query shape.
-   */
   /**
    * Which table answers this query — a pure function of the query's SHAPE.
    *

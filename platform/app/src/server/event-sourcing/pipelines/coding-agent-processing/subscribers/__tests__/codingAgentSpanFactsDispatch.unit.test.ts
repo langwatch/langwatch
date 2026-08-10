@@ -255,6 +255,24 @@ function makeSubscriber(
 
 const context = { tenantId: "tenant-1", aggregateId: TRACE_ID };
 
+/**
+ * A coding-agent span whose body passes the raw name gate but that the
+ * normalizer cannot read, so the seam cannot lift it.
+ */
+function unliftableSpanEvent(): SpanReceivedEvent {
+  const event = rawSpanEvent({
+    name: "claude_code.tool",
+    spanId: "tool-broken",
+  }) as SpanReceivedEvent;
+  (event.data as { span: unknown }).span = {
+    name: "claude_code.tool",
+    spanId: "tool-broken",
+    startTimeUnixNano: {},
+    endTimeUnixNano: {},
+  };
+  return event;
+}
+
 describe("codingAgentSpanFactsDispatch", () => {
   describe("when a coding-agent span carries the session key", () => {
     /** @scenario a session assembles from spans, logs and metrics */
@@ -448,15 +466,19 @@ describe("codingAgentSpanFactsDispatch", () => {
           attributes: { tool_name: "Bash" },
         });
         const makeId = subscriber.options?.deduplication?.makeId;
+        // Without this the assertion below compares undefined to undefined and
+        // passes even if the subscriber stopped declaring a dedup strategy.
+        expect(makeId).toBeDefined();
 
-        const liftedId = makeId?.(
+        const liftedId = makeId!(
           staged(subscriber.options?.enqueue?.stage?.(event)),
         );
-        const referencedId = makeId?.(
+        const referencedId = makeId!(
           staged(makeSpanReferencedPayload(event as SpanReceivedEvent)),
         );
 
         expect(liftedId).toBe(referencedId);
+        expect(liftedId).toContain("tool-dedup");
       });
     });
 
@@ -467,17 +489,7 @@ describe("codingAgentSpanFactsDispatch", () => {
       /** @scenario an event whose payload cannot be pointed at is still processed */
       it("stages the whole event rather than throwing on the routing path", () => {
         const { subscriber } = makeSubscriber();
-        const event = rawSpanEvent({
-          name: "claude_code.tool",
-          spanId: "tool-broken",
-        }) as SpanReceivedEvent;
-        // A span body the normalizer cannot read at all.
-        (event.data as { span: unknown }).span = {
-          name: "claude_code.tool",
-          spanId: "tool-broken",
-          startTimeUnixNano: {},
-          endTimeUnixNano: {},
-        };
+        const event = unliftableSpanEvent();
 
         const payload = subscriber.options?.enqueue?.stage?.(event);
 
@@ -485,6 +497,28 @@ describe("codingAgentSpanFactsDispatch", () => {
         expect((payload as { type?: string }).type).toBe(
           SPAN_RECEIVED_EVENT_TYPE,
         );
+      });
+
+      // The staged fallback is only safe if the handler can actually finish it.
+      // Normalization is a pure function of the span's bytes, so the full-event
+      // path re-derives the SAME failure: throwing there would spend all 25
+      // attempts and then park the trace's group, losing every other span's
+      // facts in that group — the exact class this change exists to remove.
+      // Driving `handle` is the point; asserting on the staged shape alone
+      // cannot observe it.
+      /** @scenario an event the subscriber declines is still completed quietly */
+      it("completes the staged fallback instead of retrying it into a blocked group", async () => {
+        const { subscriber, dispatched, reads } = makeSubscriber();
+        const payload = subscriber.options?.enqueue?.stage?.(
+          unliftableSpanEvent(),
+        );
+
+        await expect(
+          subscriber.handle(staged(payload), context),
+        ).resolves.toBeUndefined();
+
+        expect(dispatched).toHaveLength(0);
+        expect(reads).toHaveLength(0);
       });
     });
   });

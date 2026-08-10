@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
 import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types";
@@ -26,6 +27,10 @@ import {
   resolveConversationKey,
 } from "../services/coding-agent-normalization";
 import { CODING_AGENT_SPAN_NAMES } from "../services/coding-agent-session.derivation";
+
+const logger = createLogger(
+  "langwatch:coding-agent-processing:span-facts-dispatch",
+);
 
 /**
  * The span→session dispatcher (ADR-056 §2): a subscriber on trace-processing's
@@ -106,7 +111,10 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
         // The stage hook lifts that span's facts HERE, so the job carries its
         // own finished result and the handler reads nothing back.
         stage: (event) =>
-          makeSpanFactsLiftedPayload(event as SpanReceivedEvent, normalization),
+          makeSpanFactsLiftedPayload({
+            event: event as SpanReceivedEvent,
+            normalization,
+          }),
       },
       // The lifted derivation resolves without touching the span store, so
       // there is no sibling write left to debounce past. The delay stays only
@@ -186,12 +194,38 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
       // unreadable shape — a build that poisons the queue with every ordinary
       // span is worse than the loss this refusal prevents.
       if (!isCodingAgentSpan(event)) return;
-      const span = normalization.normalizeSpanReceived(
-        event.tenantId,
-        event.data.span,
-        event.data.resource,
-        event.data.instrumentationScope,
-      );
+
+      // Normalization is a pure function of the span's own bytes, so a body it
+      // cannot read will fail identically on every redelivery. Throwing would
+      // spend all 25 attempts re-deriving the same failure and then park the
+      // TRACE's group — losing every other span's facts in that group to save
+      // one span that was never recoverable. That is the blocked-group class
+      // this whole change removes, so an unreadable body completes quietly and
+      // loudly instead: logged for an operator, not retried.
+      //
+      // This is the only path a span reaches after the seam already failed to
+      // lift it (`makeSpanFactsLiftedPayload` stages the full event on a
+      // normalizer throw), which is exactly why it must not throw here too.
+      let span: NormalizedSpan;
+      try {
+        span = normalization.normalizeSpanReceived(
+          event.tenantId,
+          event.data.span,
+          event.data.resource,
+          event.data.instrumentationScope,
+        );
+      } catch (error) {
+        logger.error(
+          {
+            tenantId: String(event.tenantId),
+            traceId: String(event.aggregateId),
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "codingAgentSpanFactsDispatch: span body failed normalization; completing without contributing rather than blocking the trace's group",
+        );
+        return;
+      }
+
       await deps.contributeSpanFacts(
         liftContribution({
           span,
@@ -245,10 +279,13 @@ function hasReadableSpanBody(event: SpanReceivedEvent): boolean {
  * seam cannot lift take it, and `filter` has already established that the span
  * carries a listed coding-agent name.
  */
-function makeSpanFactsLiftedPayload(
-  event: SpanReceivedEvent,
-  normalization: SpanNormalizationPipelineService,
-): SpanFactsLiftedPayload | SpanReceivedEvent {
+function makeSpanFactsLiftedPayload({
+  event,
+  normalization,
+}: {
+  event: SpanReceivedEvent;
+  normalization: SpanNormalizationPipelineService;
+}): SpanFactsLiftedPayload | SpanReceivedEvent {
   let data: ContributeSpanFactsCommandData;
   try {
     const span = normalization.normalizeSpanReceived(
