@@ -30,7 +30,7 @@ When you retrieve a prompt, you get all the configuration in a single response:
   "deletedAt": null,
   
   "prompt": "You are a helpful customer support agent...",
-  "model": "openai/gpt-4o-mini",
+  "model": "openai/gpt-5-mini",
   "temperature": 0.7,
   "maxTokens": 1000,
   "messages": [
@@ -118,7 +118,7 @@ Soft delete timestamp (null if not deleted)
 ### Model Configuration
 
 <ResponseField name="model" type="string" required>
-The LLM model to use (e.g., "openai/gpt-4o-mini"). Model names follow the litellm structure ("provider/model")
+The LLM model to use (e.g., "openai/gpt-5-mini"). Model names follow the litellm structure ("provider/model")
 </ResponseField>
 
 <ResponseField name="temperature" type="float" required>

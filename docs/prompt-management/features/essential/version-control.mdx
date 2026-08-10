@@ -142,7 +142,7 @@ Create new prompts with templates and variables:
        handle: "customer-support-bot",                    // Required
        scope: "PROJECT",                                  // Required
        prompt: "You are a helpful customer support agent. Help with: {{input}}", // Required
-       model: "openai/gpt-4o-mini",                      // Required
+       model: "openai/gpt-5-mini",                       // Required
 
        // Optional fields:
        temperature: 0.7,                                  // Optional: Model temperature (0.0-2.0)
@@ -162,7 +162,7 @@ Create new prompts with templates and variables:
          handle="customer-support-bot",                    # Required
          scope="PROJECT",                                  # Required
          prompt="You are a helpful customer support agent. Help with: {{input}}", # Required
-         model="openai/gpt-4o-mini",                      # Required
+         model="openai/gpt-5-mini",                       # Required
 
          # Optional fields:
          temperature=0.7,                                  # Optional: Model temperature (0.0-2.0)
@@ -198,7 +198,7 @@ You must include at least one field to update the prompt.
        prompt: "You are an expert customer support agent. Help with: {{input}}",
 
        // Optional fields:
-       model: "openai/gpt-4o",                            // Optional: Change the model
+       model: "openai/gpt-5.5",                           // Optional: Change the model
        temperature: 0.5,                                  // Optional: Adjust temperature
        maxTokens: 2000,                                  // Optional: Change max tokens
        // messages: [...],                                 // Optional: Messages array in OpenAI format { role: "system" | "user" | "assistant", content: "..." }
@@ -216,7 +216,7 @@ You must include at least one field to update the prompt.
          "customer-support-bot",
          # All fields are optional for updates - only specify what you want to change
          prompt="You are an expert customer support agent. Help with: {{input}}",
-         model="openai/gpt-4o",                            # Optional: Change the model
+         model="openai/gpt-5.5",                           # Optional: Change the model
          temperature=0.5,                                  # Optional: Adjust temperature
          max_tokens=2000,                                  # Optional: Change max tokens
          # messages=[...],                                 # Optional: Messages array in OpenAI format { role: "system" | "user" | "assistant", content: "..." }

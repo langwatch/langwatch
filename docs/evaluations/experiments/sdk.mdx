@@ -980,7 +980,7 @@ For each target in your evaluation, the following columns are exported:
 
 | Column Pattern | Description | Example |
 |----------------|-------------|---------|
-| `{target}_model` | Model used for this target | `gpt-4_model` → `openai/gpt-4` |
+| `{target}_model` | Model used for this target | `gpt-5-mini_model` → `openai/gpt-5-mini` |
 | `{target}_prompt_id` | Prompt configuration ID (for prompt targets) | `gpt-4_prompt_id` → `prompt-abc123` |
 | `{target}_prompt_version` | Prompt version number | `gpt-4_prompt_version` → `2` |
 | `{target}_{metadata_key}` | Custom metadata values | `gpt-4_temperature` → `0.7` |
@@ -1035,8 +1035,8 @@ For an evaluation comparing GPT-4 and Claude with a faithfulness evaluator:
 
 ```csv
 index,question,expected,gpt-4_model,gpt-4_output,gpt-4_cost,gpt-4_duration_ms,gpt-4_faithfulness_score,gpt-4_faithfulness_passed,claude_model,claude_output,claude_cost,claude_duration_ms,claude_faithfulness_score,claude_faithfulness_passed
-0,What is 2+2?,4,openai/gpt-4,The answer is 4,0.0012,1250,0.95,true,anthropic/claude-3,2+2 equals 4,0.0008,980,0.92,true
-1,Capital of France?,Paris,openai/gpt-4,Paris is the capital of France,0.0015,1100,0.98,true,anthropic/claude-3,The capital of France is Paris,0.0010,890,0.97,true
+0,What is 2+2?,4,openai/gpt-5-mini,The answer is 4,0.0012,1250,0.95,true,anthropic/claude-sonnet-5,2+2 equals 4,0.0008,980,0.92,true
+1,Capital of France?,Paris,openai/gpt-5-mini,Paris is the capital of France,0.0015,1100,0.98,true,anthropic/claude-sonnet-5,The capital of France is Paris,0.0010,890,0.97,true
 ```
 
 ### Using the Data
