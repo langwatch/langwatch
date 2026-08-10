@@ -49,6 +49,9 @@ vi.mock("~/server/db", () => ({
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ redis: mockRedis }),
+  // Both accessors, so a path that reaches a TtlCache resolves rather than
+  // tripping over a missing export.
+  tryGetApp: () => ({ redis: mockRedis }),
 }));
 
 // Mock encryption — use identity functions so tests can inspect values

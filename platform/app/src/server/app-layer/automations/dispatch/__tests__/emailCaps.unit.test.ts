@@ -13,6 +13,7 @@ const redisMock = vi.hoisted(() => ({
 }));
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ redis: redisMock.connection ?? null }),
+  tryGetApp: () => ({ redis: redisMock.connection ?? null }),
 }));
 
 // Stable singleton logger so a test can spy the SAME `error` fn the module

@@ -20,16 +20,18 @@ import {
   vi,
 } from "vitest";
 
-// `startScenarioProcessor` takes its connection off the App. Partial-mock the
-// App module — the rest of it is real — and serve the container's connection,
-// which beforeAll assigns once testContainers has started.
+// `startScenarioProcessor` reads its connection through `tryGetApp` — skipping
+// the processor is its documented outcome when there is none, so overriding
+// `getApp` here would leave it silently skipped and the suite watching a
+// processor that never started. Partial-mock: only the accessor it reads is
+// replaced, and `beforeAll` fills the connection in once testContainers is up.
 let _testRedis: any = null;
 vi.mock("~/server/app-layer/app", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("~/server/app-layer/app")>();
   return {
     ...actual,
-    getApp: () => ({ ...actual.getApp(), redis: _testRedis }),
+    tryGetApp: () => (_testRedis ? { redis: _testRedis } : null),
   };
 });
 
