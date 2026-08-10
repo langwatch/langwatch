@@ -289,6 +289,125 @@ describe("useModelProviderForm()", () => {
     });
   });
 
+  // A stored header arrives masked and the form wraps it with a `concealed`
+  // flag for the show/hide eye. Comparing the objects whole made every
+  // provider holding a header read as dirty the moment its drawer opened, so
+  // Save was live over a form nobody had touched, and clicking it sent a save
+  // the customer never asked for.
+  describe("given a saved provider that already holds an extra header", () => {
+    // Built once per test, never inside the render callback: the hook's reset
+    // effect keys on `provider.customKeys` and `provider.extraHeaders`, so a
+    // fresh object each render re-fires it forever. Scopes are set so the row
+    // reads as saved and the header comparison is the only thing under test.
+    const openForm = (headers: { key: string; value: string }[]) => {
+      const provider = createOpenAIProvider({
+        name: "OpenAI",
+        scopes: [{ scopeType: "PROJECT", scopeId: "test-project-id" }],
+        extraHeaders: headers,
+      } as Partial<MaybeStoredModelProvider>);
+      return renderHook(() =>
+        useModelProviderForm({
+          provider,
+          projectId: "test-project-id",
+          enabledProvidersCount: 2,
+        }),
+      );
+    };
+    const withHeader = () =>
+      openForm([{ key: "api-key", value: MASKED_KEY_PLACEHOLDER }]);
+
+    describe("when the drawer has just opened and nothing was touched", () => {
+      /** @scenario A stored extra header does not make the form dirty on open */
+      it("leaves the form clean, so Save stays disabled", () => {
+        expect(withHeader().result.current[0].isDirty).toBe(false);
+      });
+    });
+
+    describe("when the same provider holds no headers at all", () => {
+      it("also leaves the form clean, which is the control for the case above", () => {
+        expect(openForm([]).result.current[0].isDirty).toBe(false);
+      });
+    });
+
+    describe("when the header's value is edited", () => {
+      it("marks the form dirty", () => {
+        const { result } = withHeader();
+
+        act(() => {
+          result.current[1].setExtraHeaderValue(0, "a-new-value");
+        });
+
+        expect(result.current[0].isDirty).toBe(true);
+      });
+    });
+
+    describe("when another header is added", () => {
+      it("marks the form dirty", () => {
+        const { result } = withHeader();
+
+        act(() => {
+          result.current[1].addExtraHeader();
+        });
+
+        expect(result.current[0].isDirty).toBe(true);
+      });
+    });
+  });
+
+  // Emptying a credential is an edit like any other. Dirty detection used to
+  // ask only whether a new key had been typed, so Save stayed disabled over a
+  // cleared field and a credential could not be removed at all.
+  describe("given a saved provider whose API key is already on file", () => {
+    // Same rule as above: one provider object per test, held stable across
+    // renders so the hook's reset effect fires once.
+    const openForm = () => {
+      const provider = createOpenAIProvider({
+        name: "OpenAI",
+        enabled: true,
+        scopes: [{ scopeType: "PROJECT", scopeId: "test-project-id" }],
+        customKeys: { OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER },
+      } as Partial<MaybeStoredModelProvider>);
+      return renderHook(() =>
+        useModelProviderForm({
+          provider,
+          projectId: "test-project-id",
+          enabledProvidersCount: 2,
+        }),
+      );
+    };
+
+    describe("when the drawer has just opened and nothing was touched", () => {
+      it("leaves the form clean, which is the control for the cases below", () => {
+        expect(openForm().result.current[0].isDirty).toBe(false);
+      });
+    });
+
+    describe("when the key field is cleared", () => {
+      /** @scenario Clearing a stored API key enables Save */
+      it("marks the form dirty, so the credential can be removed", () => {
+        const { result } = openForm();
+
+        act(() => {
+          result.current[1].setCustomKey("OPENAI_API_KEY", "");
+        });
+
+        expect(result.current[0].isDirty).toBe(true);
+      });
+    });
+
+    describe("when a new key is typed", () => {
+      it("marks the form dirty", () => {
+        const { result } = openForm();
+
+        act(() => {
+          result.current[1].setCustomKey("OPENAI_API_KEY", "sk-freshly-typed");
+        });
+
+        expect(result.current[0].isDirty).toBe(true);
+      });
+    });
+  });
+
   describe("Extra Headers", () => {
     it("initializes with existing extra headers", () => {
       const provider = createOpenAIProvider({

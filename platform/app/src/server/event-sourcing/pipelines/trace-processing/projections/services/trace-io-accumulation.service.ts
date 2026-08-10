@@ -223,7 +223,11 @@ export class TraceIOAccumulationService {
     // span's IO becomes the trace's headline input/output, its media parts
     // (already externalized to /api/files references) become the trace-level
     // media refs — ComputedInput is flattened text, so this is the only place
-    // the list and drawer summary can learn about the trace's media.
+    // the list and drawer summary can learn about the trace's media. Each ref
+    // keeps the role of the chat message it was found under (the winning
+    // payload is the whole transcript, so one side's payload can hold both the
+    // caller's recording and the agent's reply), which is what lets the
+    // summary strips show each side only its own media.
     let inputMediaRefs = state.attributes[RESERVED_INPUT_MEDIA_REFS] ?? null;
     let outputMediaRefs = state.attributes[RESERVED_OUTPUT_MEDIA_REFS] ?? null;
 

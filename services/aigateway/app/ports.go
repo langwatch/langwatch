@@ -54,9 +54,12 @@ type CacheEvaluator interface {
 	Evaluate(ctx context.Context, rules []domain.CacheRule, eval domain.CacheEvalContext) *domain.CacheDecision
 }
 
-// ModelResolver resolves a raw model string against bundle config.
+// ModelResolver resolves a request's model against bundle config. It takes
+// the request rather than the bare model string so a rejection can name the
+// surface the caller used: the endpoints disagree about where the model comes
+// from (JSON body, multipart form part, URL path).
 type ModelResolver interface {
-	Resolve(ctx context.Context, rawModel string, config domain.BundleConfig) (*domain.ResolvedModel, error)
+	Resolve(ctx context.Context, req *domain.Request, config domain.BundleConfig) (*domain.ResolvedModel, error)
 }
 
 // AITraceEmitter exports AI completion data to the customer's project.

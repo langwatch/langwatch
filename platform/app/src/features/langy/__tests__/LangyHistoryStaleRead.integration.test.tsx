@@ -285,8 +285,8 @@ vi.mock("~/utils/api", async () => {
     virtualKeys: {
       list: { useQuery: () => ({ data: undefined, isLoading: false }) },
     },
-    langyGithub: {
-      getInstallStatus: {
+    github: {
+      getConnectionStatus: {
         useQuery: () => ({ data: undefined, isLoading: false, isError: true }),
       },
       disconnect: {

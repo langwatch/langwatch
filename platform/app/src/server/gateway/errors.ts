@@ -237,6 +237,191 @@ export class GatewayGroupBudgetUnsupportedError extends HandledError {
 }
 
 /**
+ * A key was written with nowhere for its traces to land.
+ *
+ * Per-key spend is read off the trace path, so a key whose traces land
+ * nowhere is invisible in every usage view and its spend can be capped by
+ * no budget. Reached only when the organization has no governance project
+ * either, which is the older self-hosted shape.
+ */
+export class GatewayTraceProjectRequiredError extends HandledError {
+  declare readonly code: "trace_project_required";
+
+  constructor() {
+    super(
+      "trace_project_required",
+      "An organization- or team-owned key needs a project for its traces and costs to land in",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "GatewayTraceProjectRequiredError";
+  }
+}
+
+/**
+ * A key names a trace destination this organization does not have.
+ *
+ * Resolution tries the explicit destination, then the key's single project
+ * scope, then the governance project, and each stage only answers for the
+ * keys the previous one left. That is right on the read path, where an
+ * outlived destination should degrade rather than break dispatch, and wrong
+ * on the write path: a key naming a deleted or foreign project would be
+ * accepted with its traffic quietly attributed to whichever later stage
+ * answered, while the saved `trace_project_id` went on claiming otherwise.
+ * The two would then disagree forever, and nothing would say so.
+ *
+ * So a destination that is named has to be one that resolves. The id is
+ * never echoed: it belongs to a record in another organization, if it names
+ * a record at all, and confirming which of the two would be a small
+ * disclosure of somebody else's data.
+ */
+export class GatewayTraceProjectUnknownError extends HandledError {
+  declare readonly code: "gateway_trace_project_unknown";
+
+  constructor() {
+    super(
+      "gateway_trace_project_unknown",
+      "That project is not in this organization, so traces could not land there",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "GatewayTraceProjectUnknownError";
+  }
+}
+
+/**
+ * A key was written whose traces would land somewhere it never named.
+ *
+ * A key resolves its trace destination from an explicit one it carries, or
+ * from its single project scope. A key that has neither, an organization-
+ * or team-owned key with no destination set, or one scoped to several
+ * projects at once, falls back to the organization's governance project.
+ * That is a fine read-path tolerance for keys that already exist, and a bad
+ * shape to write: every project budget the creator had in mind matches
+ * nothing, because the traffic is attributed to a project they never
+ * mentioned.
+ *
+ * The app has always required the destination for these ownerships; this is
+ * the API agreeing with it. An organization whose only project IS the
+ * governance one is not refused, since there would be nothing else to pick.
+ */
+export class GatewayTraceProjectAmbiguousError extends HandledError {
+  declare readonly code: "gateway_trace_project_ambiguous";
+
+  constructor({ projectScopeCount }: { projectScopeCount: number }) {
+    super(
+      "gateway_trace_project_ambiguous",
+      "This key does not say which project its traces and costs land in",
+      {
+        meta: { project_scope_count: projectScopeCount },
+        httpStatus: 400,
+        fault: "customer",
+      },
+    );
+    this.name = "GatewayTraceProjectAmbiguousError";
+  }
+}
+
+/**
+ * How many of the organization's projects the refusal names before it stops
+ * counting. An organization running a project per customer has hundreds, and
+ * an error payload is not a listing endpoint; `reachable_project_count` says
+ * how many there were in total so a client never mistakes the sample for all
+ * of them.
+ */
+const REACHABLE_PROJECT_HINT_LIMIT = 10;
+
+/**
+ * A budget was written on a scope none of the organization's active keys can
+ * produce traffic for.
+ *
+ * Whether a completed request matches a TEAM, PROJECT or GROUP budget is
+ * decided by the key that served it, not by anything chosen while writing the
+ * budget. So the two sides can each look correct and never meet: a
+ * team-scoped key whose traces land in the governance project matched no
+ * budget on its own team, and a group budget matches nothing at all through a
+ * shared key with no person behind it. The result is a spending control that
+ * silently never fires, which is the worst way for one to fail.
+ *
+ * Refused at write time rather than reported later, with `allow_unreachable`
+ * for the legitimate case of provisioning ahead of the keys that will use it.
+ * An organization with no active keys is never refused: budget first, key
+ * second is the natural setup order.
+ */
+export class GatewayBudgetScopeUnreachableError extends HandledError {
+  declare readonly code: "gateway_budget_scope_unreachable";
+
+  constructor({
+    scopeType,
+    reachableProjectIds,
+  }: {
+    /**
+     * The three scopes whose reach depends on a key. The other four are
+     * either reachable by construction or matched directly, so they never
+     * arrive here, and a wider type would let one onto the published
+     * `meta.scope_type` that the documented values do not include.
+     */
+    scopeType: "team" | "project" | "group";
+    reachableProjectIds: string[];
+  }) {
+    super(
+      "gateway_budget_scope_unreachable",
+      "No active key sends traffic to that scope, so the budget would never spend",
+      {
+        meta: {
+          scope_type: scopeType,
+          reachable_project_ids: reachableProjectIds.slice(
+            0,
+            REACHABLE_PROJECT_HINT_LIMIT,
+          ),
+          reachable_project_count: reachableProjectIds.length,
+        },
+        httpStatus: 400,
+        fault: "customer",
+      },
+    );
+    this.name = "GatewayBudgetScopeUnreachableError";
+  }
+}
+
+/**
+ * A rollup was asked for on a dimension whose groups can still move.
+ *
+ * The walk pages by group key, which is exact only while a row cannot change
+ * groups. Requested model and provider are replaced by the resolved ones when
+ * the outcome lands, so over a window that has not settled a row can cross a
+ * page boundary and be served twice or skipped. A checksum built on that
+ * quietly disagrees with the books and gives no sign it did.
+ *
+ * `meta.group_by` names the dimensions that move, and `meta.settles_at` is
+ * when the requested window will be safe to group this way, so a caller can
+ * schedule the read rather than guess at it.
+ */
+export class GatewaySpendGroupByUnstableError extends HandledError {
+  declare readonly code: "gateway_spend_group_by_unstable";
+
+  constructor({
+    groupBy,
+    settlesAtMs,
+  }: {
+    groupBy: string[];
+    settlesAtMs: number;
+  }) {
+    super(
+      "gateway_spend_group_by_unstable",
+      "That grouping can still change over this window, so the page walk would not be exact",
+      {
+        meta: {
+          group_by: groupBy,
+          settles_at: new Date(settlesAtMs).toISOString(),
+        },
+        httpStatus: 400,
+        fault: "customer",
+      },
+    );
+    this.name = "GatewaySpendGroupByUnstableError";
+  }
+}
+
+/**
  * A cycle anchor was sent on a window that has no cycle to phase.
  *
  * TOTAL never rolls and MANUAL rolls only when someone asks it to, so an

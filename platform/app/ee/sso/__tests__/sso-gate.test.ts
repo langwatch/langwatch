@@ -14,6 +14,16 @@ vi.mock("~/env.mjs", () => ({
     AUTH0_CLIENT_ID: "auth0-client",
     AUTH0_CLIENT_SECRET: "auth0-secret",
     AUTH0_ISSUER: "https://acme.us.auth0.com/",
+    COGNITO_CLIENT_ID: "cognito-client",
+    COGNITO_CLIENT_SECRET: "cognito-secret",
+    COGNITO_ISSUER:
+      "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_abc123",
+    ONELOGIN_CLIENT_ID: "onelogin-client",
+    ONELOGIN_CLIENT_SECRET: "onelogin-secret",
+    ONELOGIN_ISSUER: "https://acme.onelogin.com/oidc/2",
+    OIDC_CLIENT_ID: "oidc-client",
+    OIDC_CLIENT_SECRET: "oidc-secret",
+    OIDC_ISSUER: "https://idp.acme.test",
     NEXTAUTH_URL: "https://acme.test",
   },
 }));
@@ -42,6 +52,7 @@ import {
   parseLicenseKey,
   verifySignature,
 } from "../../licensing/validation";
+import { PLAIN_OIDC_PROVIDERS } from "../providers";
 import {
   __resetSsoGateForTests,
   __setSsoLicenseRepositoryForTests,
@@ -50,6 +61,14 @@ import {
 } from "../sso-gate";
 import type { ISsoLicenseRepository } from "../sso-license.repository";
 
+/**
+ * Taken from the provider table rather than listed here, so a provider added
+ * there is gated by these tests without anyone remembering to come back. The
+ * gate is provider-agnostic today, and this is what would notice if that ever
+ * stopped being true for one of them.
+ */
+const PLAIN_OIDC_PROVIDER_IDS = PLAIN_OIDC_PROVIDERS.map((p) => p.providerId);
+
 const envMock = env as unknown as {
   IS_SAAS: boolean;
   NEXTAUTH_PROVIDER: string;
@@ -57,6 +76,12 @@ const envMock = env as unknown as {
   AUTH0_CLIENT_ID: string | undefined;
   AUTH0_CLIENT_SECRET: string | undefined;
   AUTH0_ISSUER: string | undefined;
+  COGNITO_CLIENT_ID: string | undefined;
+  COGNITO_CLIENT_SECRET: string | undefined;
+  COGNITO_ISSUER: string | undefined;
+  ONELOGIN_CLIENT_ID: string | undefined;
+  ONELOGIN_CLIENT_SECRET: string | undefined;
+  ONELOGIN_ISSUER: string | undefined;
   NEXTAUTH_URL: string | undefined;
 };
 
@@ -402,6 +427,31 @@ describe("resolveAuthProvider", () => {
 
       expect(provider).toBe("email");
     });
+
+    /** @scenario Without a license the provider is not offered */
+    it.each(
+      PLAIN_OIDC_PROVIDER_IDS,
+    )("coerces %s to email as well, credentials notwithstanding", async (configured) => {
+      envMock.NEXTAUTH_PROVIDER = configured;
+      __setSsoLicenseRepositoryForTests(repoWithOrgs([]));
+
+      const provider = await resolveAuthProvider();
+
+      expect(provider).toBe("email");
+    });
+  });
+
+  describe("when the gate allows an OIDC provider", () => {
+    it.each(
+      PLAIN_OIDC_PROVIDER_IDS,
+    )("reports %s, so the sign-in page federates to it", async (configured) => {
+      allowTheGate();
+      envMock.NEXTAUTH_PROVIDER = configured;
+
+      const provider = await resolveAuthProvider();
+
+      expect(provider).toBe(configured);
+    });
   });
 
   describe("when the gate allows", () => {
@@ -446,12 +496,12 @@ describe("resolveAuthProvider", () => {
 
     it("names the provider in the warning, so the operator can see what to fix", async () => {
       allowTheGate();
-      envMock.NEXTAUTH_PROVIDER = "cognito";
+      envMock.NEXTAUTH_PROVIDER = "azureAd";
 
       await resolveAuthProvider();
 
       expect(loggerMock.warn).toHaveBeenCalledWith(
-        { provider: "cognito" },
+        { provider: "azureAd" },
         expect.stringContaining("cannot mount"),
       );
     });

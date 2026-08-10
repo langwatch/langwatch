@@ -45,6 +45,29 @@ func SetDispatchLabels(ctx context.Context, provider, model string) {
 	}
 }
 
+type recorderKey struct{}
+
+// ContextWithRecorder seeds rec on a context. Middleware calls it for every
+// request; nothing else should, outside tests standing in for it.
+func ContextWithRecorder(ctx context.Context, rec *Recorder) context.Context {
+	return context.WithValue(ctx, recorderKey{}, rec)
+}
+
+// RecorderFromContext returns the recorder Middleware seeded on this
+// request's context, or nil when the request did not come through
+// Middleware. Every Recorder method is nil-safe, so a caller can record
+// unconditionally.
+//
+// It exists for the layers that must record but cannot reach the wiring: the
+// gateway's error choke point (httpapi.writeError) is reached from two dozen
+// call sites, most of them helpers that were never given the router's
+// dependencies, and the request context is the one thing all of them do hold.
+// Same reasoning as SetDispatchLabels above, in the opposite direction.
+func RecorderFromContext(ctx context.Context) *Recorder {
+	rec, _ := ctx.Value(recorderKey{}).(*Recorder)
+	return rec
+}
+
 // statusRecorder captures the response status for the request counter.
 // The gateway's other ResponseWriter wrappers keep their status private,
 // so this one stays deliberately minimal: status only, with Flush and
@@ -116,6 +139,7 @@ func Middleware(rec *Recorder) func(http.Handler) http.Handler {
 
 			labels := &dispatchLabels{}
 			ctx := context.WithValue(r.Context(), dispatchLabelsKey{}, labels)
+			ctx = ContextWithRecorder(ctx, rec)
 
 			sr := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 			start := time.Now()

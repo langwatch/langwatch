@@ -243,30 +243,17 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                   paddingY={2}
                   width="80%"
                 >
-                  <Box
-                    onDoubleClick={() => {
-                      setCommentState?.({
-                        traceId: trace.trace_id,
-                        action: "new",
-                        annotationId: undefined,
-                        expectedOutput: stringifyIfObject(trace.output?.value),
-                        expectedOutputAction: "new",
-                      });
-                    }}
-                  >
-                    <RedactedField field="output">
-                      <Markdown>
-                        {translationState.translatedTextOutput &&
-                        translationState.translationActive
-                          ? translationState.translatedTextOutput
-                          : stringifyIfObject(trace.output.value)}
-                      </Markdown>
-                    </RedactedField>
-                  </Box>
+                  <RedactedField field="output">
+                    <Markdown>
+                      {translationState.translatedTextOutput &&
+                      translationState.translationActive
+                        ? translationState.translatedTextOutput
+                        : stringifyIfObject(trace.output.value)}
+                    </Markdown>
+                  </RedactedField>
 
                   <AnnotationExpectedOutputs
                     traceId={trace.trace_id}
-                    setHover={setHover}
                     output={stringifyIfObject(trace.output.value)}
                   />
                 </VStack>
@@ -314,7 +301,8 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                 traceId: trace.trace_id,
                 action: "new",
                 annotationId: undefined,
-                expectedOutputAction: "new",
+                // A new comment starts without a suggestion, so a correction
+                // being edited elsewhere is never carried into it.
                 expectedOutput: null,
               });
             }}

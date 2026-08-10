@@ -139,6 +139,13 @@ export class WebhooksApiError extends Error {
  * rejected by the server. The surface is anchored on the organization alone,
  * so there is no project id to give this client.
  *
+ * The key MUST be an organization API key (`sk-lw-{id}_{secret}`, from
+ * Settings > API Keys). A project API key is refused with
+ * `credential_class_mismatch` before any permission is consulted, and no
+ * header makes it work. The same organization key also reaches the
+ * project-scoped surfaces when given `X-Project-Id`, so one key covers both
+ * families and a project key covers only one.
+ *
  * The endpoint entity and the create/update bodies mirror the wire verbatim,
  * so their fields are lowercase snake_case: virtual keys and gateway budgets
  * already take the wire body as it is, and translating field by field here

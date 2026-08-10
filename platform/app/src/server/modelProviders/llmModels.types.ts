@@ -17,7 +17,15 @@ export type LLMModelPricing = {
   outputCostPerToken: number;
   // Optional extended pricing fields
   inputCacheReadPerToken?: number;
+  // Writing to the prompt cache, priced by how long the entry lives.
+  // `inputCacheWritePerToken` is the short-lived rate (Anthropic's 5 minute
+  // entry, 1.25x the input rate); `inputCacheWrite1hPerToken` is the hour-long
+  // one (2x the input rate). Only the short-lived rate reaches us from the
+  // upstream catalog today, so the hour-long rate is derived for Anthropic
+  // models at load time; the field exists so a future sync can carry the real
+  // number and take precedence over the derivation.
   inputCacheWritePerToken?: number;
+  inputCacheWrite1hPerToken?: number;
   imageCostPerToken?: number;
   imageOutputCostPerToken?: number;
   audioCostPerToken?: number;

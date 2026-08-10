@@ -232,6 +232,14 @@ export function createTestJobData(
       api_key: "test-api-key",
       model: "openai/gpt-4o-mini",
     },
+    simulatorModelParams: {
+      api_key: "test-api-key",
+      model: "openai/gpt-5-mini",
+    },
+    judgeModelParams: {
+      api_key: "test-api-key",
+      model: "openai/gpt-5-mini",
+    },
     nlpServiceUrl: "http://localhost:8080",
     target: { type: "http", referenceId: "test-agent" },
     ...overrides,

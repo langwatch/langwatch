@@ -129,7 +129,9 @@ function resolveLabel(env, commandArgv) {
   const named = script ? [pkg, script].filter(Boolean).join(" ") : null;
   const repoRoot = path.resolve(fileURLToPath(import.meta.url), "../../..");
   const worktree = path.basename(repoRoot);
-  const fallback = path.basename(commandArgv[0] ?? "check");
+  // A direct invocation has no pnpm script to name it, and arrives through the
+  // bin shim as `<tool>.real`, which is an implementation detail of the shim.
+  const fallback = path.basename(commandArgv[0] ?? "check").replace(/\.real$/, "");
   return `${named ?? fallback} (${worktree})`;
 }
 
@@ -347,6 +349,11 @@ function runCommand(commandArgv) {
   return new Promise((resolve) => {
     const child = spawn(commandArgv[0], commandArgv.slice(1), {
       stdio: "inherit",
+      // We are the slot for everything below us. Without this, a run holding
+      // the only slot queues behind itself the moment it reaches a bin shim
+      // (`pnpm typecheck` spawns .bin/tsgo, which is one) or a nested package
+      // script, and waits out the whole maximum wait before starting.
+      env: { ...process.env, CHECK_SLOTS: "0" },
     });
     // Handling these keeps the wrapper alive through a Ctrl-C so it releases its
     // slot after the child is done, instead of dying first and leaving an entry

@@ -53,6 +53,13 @@ export interface EventStoreReadContext<_EventType extends Event = Event> {
    * outside the queue, e.g. during replay.
    */
   deliveryAttempt?: number;
+  /**
+   * True when this call is a later sub-batch of the same locked dispatch and an
+   * earlier sub-batch already committed (GroupQueue batch bisection). A fold
+   * commit must EXTEND the applied-event-id set rather than replace it, or the
+   * earlier sub-batches' ids are erased and a retry re-applies them (#6578).
+   */
+  isDeliveryContinuation?: boolean;
 }
 
 /**

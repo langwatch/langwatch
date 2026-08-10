@@ -15,6 +15,7 @@ import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
 import { getTokenType } from "./api-key-token.utils";
 import { ApiKeyPermissionDeniedError } from "./errors";
 import {
+  type OrgResolution,
   type OrgResolvedToken,
   type ResolvedToken,
   TokenResolver,
@@ -318,7 +319,47 @@ type AuthRefusal = {
   code: string;
   legacyError: string;
   message: string;
+  /**
+   * Client-readable context for the refusal. Only fields a caller acts on:
+   * the credential class a route needs against the one that arrived is the
+   * difference between swapping a key and hunting a typo.
+   */
+  meta?: Record<string, string>;
 };
+
+/**
+ * What to tell a caller whose token resolved to no organization.
+ *
+ * A working key of the wrong family gets its own answer. The one message this
+ * used to give asserted "Project API keys cannot be used here" at a typo and
+ * at a revoked key too, sending people to check a credential class that was
+ * never the problem. Everything else stays deliberately vague: telling "no
+ * such key" apart from "revoked key" for an unauthenticated caller would
+ * confirm which secrets exist.
+ */
+function refusalForUnresolvedOrg(
+  reason: Extract<OrgResolution, { ok: false }>["reason"],
+): AuthRefusal {
+  if (reason === "wrong_credential_class") {
+    return {
+      status: 401,
+      code: "credential_class_mismatch",
+      legacyError: "Unauthorized",
+      message:
+        "This endpoint needs an organization API key. The key sent is a project API key.",
+      meta: {
+        required: "organization_api_key",
+        presented: "project_api_key",
+      },
+    };
+  }
+  return {
+    status: 401,
+    code: "invalid_credentials",
+    legacyError: "Unauthorized",
+    message: "Invalid credentials.",
+  };
+}
 
 /**
  * The organization behind a credential, or the reason there isn't one.
@@ -357,9 +398,9 @@ async function resolveOrgPrincipal({
     };
   }
 
-  let resolved: OrgResolvedToken | null;
+  let resolution: OrgResolution;
   try {
-    resolved = await resolver.resolveOrgOnly({ token: credentials.token });
+    resolution = await resolver.resolveOrgOnly({ token: credentials.token });
   } catch (error) {
     orgLogger.error({ ...diag, error }, "Database error during org auth");
     return {
@@ -373,22 +414,15 @@ async function resolveOrgPrincipal({
     };
   }
 
-  if (!resolved) {
+  if (!resolution.ok) {
     orgLogger.warn(
-      { ...diag, hasToken: true },
-      "Org auth failed: invalid credentials",
+      { ...diag, hasToken: true, reason: resolution.reason },
+      "Org auth failed",
     );
-    return {
-      ok: false,
-      refusal: {
-        status: 401,
-        code: "invalid_credentials",
-        legacyError: "Unauthorized",
-        message:
-          "Invalid credentials. Organization-level endpoints require an admin API key created in Settings > API Keys. Project API keys cannot be used here.",
-      },
-    };
+    return { ok: false, refusal: refusalForUnresolvedOrg(resolution.reason) };
   }
+
+  const resolved = resolution.resolved;
 
   const organization = await prisma.organization.findUnique({
     where: { id: resolved.organizationId },

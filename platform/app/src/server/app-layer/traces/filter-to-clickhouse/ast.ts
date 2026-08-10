@@ -13,6 +13,7 @@ import {
   EVENT_ATTRIBUTE_PREFIX,
   EVENT_ATTRIBUTE_PREFIX_LEGACY,
   extractStringValue,
+  MAX_VALUE_LENGTH,
   nextParam,
   SPAN_ATTRIBUTE_PREFIX,
   TRACE_ATTRIBUTE_PREFIX,
@@ -80,6 +81,129 @@ export function translateFilterToClickHouse(
   }
 
   return { sql, params: ctx.params };
+}
+
+/**
+ * How many free-text terms the transcript-content search will carry. A
+ * handful is a search; dozens is a scan of `log_records` wearing a query's
+ * clothes, and the trace-level filter still applies every one of them.
+ */
+const MAX_CONTENT_TERMS = 8;
+
+/**
+ * The positive free-text terms of a query: every non-negated implicit-field
+ * value ("#6418", a quoted phrase), skipping structured `field:value` tags.
+ * The Sessions lens matches these against session transcript content in
+ * `log_records`, ON TOP of the trace-level translation above, so a term that
+ * only ever appeared in a transcript still finds its session. Returns [] for
+ * empty or unparsable input (the translator throws on those first anyway),
+ * and for any query carrying an OR.
+ */
+export function extractFreeTextTerms(queryText: string): string[] {
+  const trimmed = normalizeQuery(queryText);
+  if (!trimmed) return [];
+
+  let ast: LiqeQuery;
+  try {
+    ast = parse(trimmed);
+  } catch {
+    return [];
+  }
+
+  // The content search joins these terms with AND, which cannot express a
+  // disjunction. So a query carrying OR anywhere contributes NO content
+  // terms: the content branch is skipped entirely and the search falls back
+  // to the trace-level filter, which does translate OR correctly. Fewer
+  // matches beats wrong ones, `checkout OR refund` must never be answered as
+  // `checkout AND refund`.
+  if (containsOrOperator(ast)) return [];
+
+  const terms: string[] = [];
+  collectFreeTextTerms(ast, false, terms);
+  // Each term becomes its own `positionCaseInsensitive` over the transcript
+  // bodies, so the count and the width of each term decide how much work that
+  // subquery does. Past either bound the content branch is dropped whole
+  // rather than truncated: the terms are ANDed, so keeping a prefix would
+  // answer a narrower question than the one asked and return sessions that do
+  // not match the rest. Same call as the OR case above, for the same reason.
+  if (terms.length > MAX_CONTENT_TERMS) return [];
+  if (terms.some((term) => term.length > MAX_VALUE_LENGTH)) return [];
+  return terms;
+}
+
+/** Whether an OR joins any two branches of the query, at any depth. */
+function containsOrOperator(node: LiqeQuery): boolean {
+  switch (node.type) {
+    case "LogicalExpression": {
+      const logExpr = node as LogicalExpressionToken;
+      return (
+        logExpr.operator.operator === "OR" ||
+        containsOrOperator(logExpr.left) ||
+        containsOrOperator(logExpr.right)
+      );
+    }
+    case "UnaryOperator":
+      return containsOrOperator((node as UnaryOperatorToken).operand);
+    case "ParenthesizedExpression":
+      return containsOrOperator(
+        (node as ParenthesizedExpressionToken).expression,
+      );
+    default:
+      return false;
+  }
+}
+
+/**
+ * Walk the query, pushing every positively-asserted bare word onto `terms`.
+ * A negated branch contributes nothing: excluding a word cannot also be a
+ * search for it.
+ */
+function collectFreeTextTerms(
+  node: LiqeQuery,
+  negated: boolean,
+  terms: string[],
+): void {
+  switch (node.type) {
+    case "Tag": {
+      const value = freeTextTermOf(node as TagToken, negated);
+      if (value !== null) terms.push(value);
+      return;
+    }
+    case "LogicalExpression": {
+      const logExpr = node as LogicalExpressionToken;
+      collectFreeTextTerms(logExpr.left, negated, terms);
+      collectFreeTextTerms(logExpr.right, negated, terms);
+      return;
+    }
+    case "UnaryOperator": {
+      const unary = node as UnaryOperatorToken;
+      const isNeg = unary.operator === "NOT" || unary.operator === "-";
+      collectFreeTextTerms(unary.operand, negated !== isNeg, terms);
+      return;
+    }
+    case "ParenthesizedExpression":
+      collectFreeTextTerms(
+        (node as ParenthesizedExpressionToken).expression,
+        negated,
+        terms,
+      );
+      return;
+    default:
+      return;
+  }
+}
+
+/**
+ * The bare search word this tag carries, or null when it is not one.
+ * Literals only: the content search matches a term as a plain substring, so a
+ * regex would be looked up by its source text (`/checkout.*failed/` searched
+ * for those very characters) and match nothing.
+ */
+function freeTextTermOf(tag: TagToken, negated: boolean): string | null {
+  if (negated || tag.field.type !== "ImplicitField") return null;
+  if (tag.expression.type !== "LiteralExpression") return null;
+  const value = extractStringValue(tag);
+  return value.length > 0 ? value : null;
 }
 
 function translateNode(

@@ -40,6 +40,11 @@ on:
         type: string
         default: ''
   pull_request:
+    # `ready_for_review` on top of the defaults, because the job below
+    # skips drafts: without it a PR opened as a draft and then marked
+    # ready never runs the matrix until someone happens to push again,
+    # and the gap is invisible.
+    types: [opened, synchronize, reopened, ready_for_review]
     # Only fire when gateway-relevant code or this workflow itself
     # changes — doc-only / unrelated PRs stay free.
     paths:
@@ -64,21 +69,55 @@ permissions:
 concurrency:
   # Serialize runs against the shared matrix-* VKs and budgets so
   # parallel invocations don't double-count spend on the same key.
-  group: gateway-matrix-shared-vks
+  #
+  # Only a run that dials providers needs that lock, so this group
+  # lists exactly the same four exemptions as the job guard below and
+  # the two must be edited together. GitHub cancels whichever run is
+  # already pending in a group when a new one queues, independently of
+  # `cancel-in-progress`, and that happens at queue time rather than
+  # run time: a run parked here evicts a real PR's queued run even
+  # when its own job never executes, so finishing in seconds is no
+  # mitigation. Entering the group at all is the harm.
+  #
+  # The two automation exemptions take the branch prefix AND the
+  # account that opened the PR, so a human branch that happens to be
+  # named `dependabot/...` keeps its gateway coverage instead of
+  # silently losing it to a name.
+  group: ${{ (github.event_name == 'pull_request' && (github.event.pull_request.draft || github.event.pull_request.head.repo.fork || (startsWith(github.head_ref, 'release-please--') && github.event.pull_request.user.login == 'langwatch-agent') || (startsWith(github.head_ref, 'dependabot/') && github.event.pull_request.user.login == 'dependabot[bot]'))) && format('gateway-matrix-idle-{0}', github.head_ref) || 'gateway-matrix-shared-vks' }}
   cancel-in-progress: false
 
 jobs:
   matrix:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Skip on draft PRs (cost discipline) and on fork PRs (GitHub
-    # deliberately strips secrets on `pull_request` from forks, so a
-    # live-credential matrix can never succeed there — running it
-    # would only produce phantom red checks for external contributors).
+    # Four exemptions, mirrored by the concurrency group above.
+    # Drafts, for cost discipline. Forks, because GitHub strips secrets
+    # on `pull_request` from them, so a live-credential matrix can only
+    # produce phantom red checks for external contributors. Release
+    # PRs, because they bump `charts/gateway/Chart.yaml` and nothing
+    # else this workflow watches, so the matrix would spend live
+    # provider calls proving a version string still answers; the branch
+    # prefix carries the double dash release-please actually emits, so
+    # a hand-written `release-please-config-...` branch is not caught
+    # by it. Dependabot, because its PRs bump the action SHAs pinned in
+    # this file and read the Dependabot secret store rather than the
+    # Actions one, so the matrix either bills real provider calls for a
+    # SHA bump or goes green on empty credentials, and neither answers
+    # a question about the gateway.
+    #
+    # Both automation exemptions require the opening account as well as
+    # the branch prefix: a branch name is chosen by whoever pushes it,
+    # so on its own it decides coverage by string rather than by who
+    # actually raised the PR. Requiring both can only ever run the
+    # matrix more often, which is the safe direction to fail in.
     if: |
       github.event_name != 'pull_request' ||
       (github.event.pull_request.draft == false &&
-       github.event.pull_request.head.repo.fork == false)
+       github.event.pull_request.head.repo.fork == false &&
+       !(startsWith(github.head_ref, 'release-please--') &&
+         github.event.pull_request.user.login == 'langwatch-agent') &&
+       !(startsWith(github.head_ref, 'dependabot/') &&
+         github.event.pull_request.user.login == 'dependabot[bot]'))
     env:
       GATEWAY_URL: http://localhost:5563
       LW_BASE_URL: http://localhost:5560
@@ -150,16 +189,16 @@ jobs:
         ports: ['6379:6379']
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4
         with:
           node-version: '24'
           cache: 'pnpm'

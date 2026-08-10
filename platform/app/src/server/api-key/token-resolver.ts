@@ -40,6 +40,19 @@ export type OrgResolvedToken = {
 };
 
 /**
+ * The outcome of org-level resolution, with the two failures kept apart.
+ *
+ * `wrong_credential_class` is a working credential of the other family: the
+ * caller has to swap the key, and telling them to check it for typos wastes
+ * their afternoon. `unusable_credential` is everything else, and stays
+ * deliberately vague, since distinguishing "no such key" from "revoked key"
+ * for an unauthenticated caller would confirm which secrets exist.
+ */
+export type OrgResolution =
+  | { ok: true; resolved: OrgResolvedToken }
+  | { ok: false; reason: "wrong_credential_class" | "unusable_credential" };
+
+/**
  * Strategy-based token resolver. Routes tokens to the correct verification
  * path based on prefix and structure:
  *   - pat-lw-* → API key lookup (old PAT format, backward compat)
@@ -170,26 +183,39 @@ export class TokenResolver {
   }
 
   /**
-   * Resolves an API key to organization-level context without requiring a project.
-   * Returns null when the token is invalid or not an API key.
+   * Resolves an API key to organization-level context without requiring a
+   * project.
+   *
+   * On failure it says WHICH failure, because the three are far apart in what
+   * the caller should do next and used to be told apart by nothing: a typo, a
+   * revoked key, and a perfectly good project key sent to a route only an
+   * organization key reaches all produced the same sentence asserting the
+   * last of the three. `wrong_credential_class` is returned only when the
+   * token really does resolve as a project key, so the answer is never a
+   * guess about a credential we could not read.
    */
-  async resolveOrgOnly({
-    token,
-  }: {
-    token: string;
-  }): Promise<OrgResolvedToken | null> {
-    const tokenType = getTokenType(token);
-    if (tokenType !== "apiKey") return null;
+  async resolveOrgOnly({ token }: { token: string }): Promise<OrgResolution> {
+    if (getTokenType(token) === "apiKey") {
+      const apiKey = await this.apiKeyService.verify({ token });
+      if (apiKey) {
+        return {
+          ok: true,
+          resolved: {
+            type: "apiKey-org",
+            apiKeyId: apiKey.id,
+            userId: apiKey.userId,
+            organizationId: apiKey.organizationId,
+          },
+        };
+      }
+    }
 
-    const apiKey = await this.apiKeyService.verify({ token });
-    if (!apiKey) return null;
-
-    return {
-      type: "apiKey-org",
-      apiKeyId: apiKey.id,
-      userId: apiKey.userId,
-      organizationId: apiKey.organizationId,
-    };
+    // A legacy project key can be shaped exactly like an API key, so the
+    // shape alone never decides this; only a hit on the stored key does.
+    const legacy = await this.resolveLegacyProjectKey(token);
+    return legacy
+      ? { ok: false, reason: "wrong_credential_class" }
+      : { ok: false, reason: "unusable_credential" };
   }
 
   /**

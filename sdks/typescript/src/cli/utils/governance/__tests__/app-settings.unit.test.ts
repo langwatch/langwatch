@@ -138,15 +138,16 @@ describe("installAppEnv", () => {
   });
 
   describe("when the settings file is malformed JSON", () => {
-    it("recovers by replacing the file with a clean env block", () => {
+    /** @scenario "A settings file LangWatch cannot parse is never overwritten" */
+    it("refuses to write, leaving the user's file exactly as it was", () => {
       const target = appSettingsTargetFor("claude")!;
       fs.mkdirSync(path.dirname(target.path), { recursive: true });
       fs.writeFileSync(target.path, "{not valid json");
 
-      installAppEnv(target, otelVars);
-
-      const written = JSON.parse(fs.readFileSync(target.path, "utf8"));
-      expect(written).toEqual({ env: otelVars });
+      expect(() => installAppEnv(target, otelVars)).toThrow(
+        /is not valid JSON/,
+      );
+      expect(fs.readFileSync(target.path, "utf8")).toBe("{not valid json");
     });
   });
 });

@@ -282,6 +282,9 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	if params.Usage.CacheCreationTokens > 0 {
 		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheCreate, params.Usage.CacheCreationTokens))
 	}
+	if params.Usage.CacheCreation1hTokens > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheCreate1h, params.Usage.CacheCreation1hTokens))
+	}
 	// Audio usage: TTS reports the characters synthesized, STT the seconds
 	// transcribed. Character- and duration-priced audio models have no token
 	// usage, so these attrs are what the cost pipeline prices them from.

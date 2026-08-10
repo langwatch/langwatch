@@ -131,18 +131,29 @@ function CapabilityRow({
  * get a divider with nothing under it.
  */
 /**
- * The one state an operator cannot diagnose from the page alone: an identity
+ * The states an operator cannot diagnose from the page alone: an identity
  * provider is configured, everybody is signing in by email anyway, and the
- * reason is a license the deployment does not hold. The gate logs it at
- * startup, but nobody reads server logs to explain a login screen.
+ * reason is either a license the deployment does not hold or a provider that
+ * never started. The gate logs both at startup, but nobody reads server logs
+ * to explain a login screen, and email mode looks identical to a deployment
+ * that never wanted single sign-on.
+ *
+ * Each cause is fixed somewhere else, so each gets its own remedy rather than
+ * one message covering both.
  */
-function SsoConfiguredButUnlicensedNotice() {
+function SsoConfiguredButNotInUseNotice() {
   const ssoGate = api.license.getSsoGateStatus.useQuery(
     {},
     { refetchOnWindowFocus: false },
   );
 
-  if (!ssoGate.data?.configuredProvider || ssoGate.data.licensed) return null;
+  const gate = ssoGate.data;
+  if (!gate?.configuredProvider) return null;
+  if (gate.licensed && gate.mounted) return null;
+
+  // An unlicensed deployment has not tried to mount anything, so the license is
+  // the cause to report even when both look unsatisfied.
+  const unlicensed = !gate.licensed;
 
   return (
     <Box
@@ -152,7 +163,9 @@ function SsoConfiguredButUnlicensedNotice() {
       borderRadius="lg"
       padding={4}
       width="full"
-      data-testid="sso-unlicensed-notice"
+      data-testid={
+        unlicensed ? "sso-unlicensed-notice" : "sso-not-started-notice"
+      }
       _dark={{ backgroundColor: "orange.950", borderColor: "orange.700" }}
     >
       <HStack align="start" gap={3}>
@@ -161,13 +174,24 @@ function SsoConfiguredButUnlicensedNotice() {
         </Box>
         <VStack align="start" gap={1}>
           <Text fontWeight="medium">
-            Single sign-on is configured but not licensed on this deployment
+            {unlicensed
+              ? "Single sign-on is configured but not licensed on this deployment"
+              : "Single sign-on is configured but could not be started"}
           </Text>
           <Text color="fg.muted" fontSize="sm">
-            This deployment is set up for{" "}
-            <b>{ssoGate.data.configuredProvider}</b>, so everyone is signing in
-            by email until a license is activated. Activate one and restart the
-            server to switch single sign-on on.
+            This deployment is set up for <b>{gate.configuredProvider}</b>,{" "}
+            {unlicensed ? (
+              <>
+                so everyone is signing in by email until a license is activated.
+                Activate one and restart the server to switch single sign-on on.
+              </>
+            ) : (
+              <>
+                but it could not be started, so everyone is signing in by email.
+                Check that the provider name is one LangWatch supports and that
+                its client credentials are set, then restart the server.
+              </>
+            )}
           </Text>
         </VStack>
       </HStack>
@@ -191,7 +215,7 @@ export function EnterpriseCapabilitiesSection() {
         width="full"
         data-testid="enterprise-capabilities"
       >
-        <SsoConfiguredButUnlicensedNotice />
+        <SsoConfiguredButNotInUseNotice />
 
         <VStack align="start" gap={1}>
           <Heading as="h2" size="md">

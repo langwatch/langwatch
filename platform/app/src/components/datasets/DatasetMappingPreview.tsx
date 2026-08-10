@@ -78,11 +78,13 @@ export function DatasetMappingPreview({
     return Array.from(new Set(ids));
   }, [traces]);
 
-  // Fetch all traces with matching thread_ids when thread mapping is enabled
+  // Fetch all traces with matching thread_ids when thread mapping is enabled.
+  // Corrections apply here too, so thread mode maps the corrected traces.
   const threadTraces = api.traces.getTracesWithSpansByThreadIds.useQuery(
     {
       projectId: project?.id ?? "",
       threadIds: threadIds,
+      withEditOverlay: true,
     },
     {
       enabled: !!project && isThreadMapping && threadIds.length > 0,
@@ -273,6 +275,7 @@ export function DatasetMappingPreview({
                 (selectedDataset.mapping as MappingState | undefined)
               }
               traces={tracesToUse}
+              shouldApplyCorrections
               targetFields={columnTypes.map(({ name }) => name)}
               setDatasetEntries={onRowDataChange}
               setTraceMapping={(newMappingState) => {

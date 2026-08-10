@@ -147,8 +147,8 @@ LEAN BOUNDARIES  (what stays small at each hop)
 ## On-prem / no-object-storage deployments
 
 - **Reads are object-storage-independent.** Full content lives in `event_log` (ClickHouse). `BlobStore.getFromEventLog` (`blob-store.service.ts:85-158`) issues a CH SELECT and parses `EventPayload`; it never calls `resolveS3Client`. "Show full" and online-eval work with no object storage present.
-- **The edge spool is flag-gated and fail-open.** `release_trace_blob_offload` off → edge spool code never runs → pre-ADR-022 behavior (worker-side `capOversizedAttributes` bounds the payload). Flag on but storage absent → edge PUT fails open (full inline payload forwarded, `warn` logged) — ingestion is never blocked.
-- **"No S3 equivalent" means no object storage at all.** S3-compatible stores (MinIO, Ceph RGW) satisfy the AWS S3 client; they are equivalent. Deployments with no object storage should leave `release_trace_blob_offload` off; they lose only the edge Redis-queue oversize protection, not any read-path capability.
+- **The edge spool is on by default and fail-open.** `release_trace_blob_offload` defaults to on, so a deployment that has object storage configured keeps oversized content intact without setting anything; the flag stays the kill switch and the per-project opt-out. Flag off → edge spool code never runs → pre-ADR-022 behavior (worker-side `capOversizedAttributes` bounds the payload). Flag on but storage absent → edge PUT fails open (full inline payload forwarded, `warn` logged), ingestion is never blocked.
+- **"No S3 equivalent" means no object storage at all.** S3-compatible stores (MinIO, Ceph RGW) satisfy the AWS S3 client; they are equivalent. Deployments with no object storage keep ingesting with the flag on: every over-threshold span fails open to the inline path, costing a `warn` per span and the edge Redis-queue oversize protection, not any read-path capability. Switching `release_trace_blob_offload` off there silences the warn and changes nothing else.
 
 ## Rules
 
