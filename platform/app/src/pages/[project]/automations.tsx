@@ -47,7 +47,6 @@ import {
   SectionHeader,
   TableShell,
 } from "~/features/automations/components/page/AutomationTableCells";
-import { DAILY_CAP_STATUS_MAX_TRIGGERS } from "~/features/automations/logic/dailyCapAdvice";
 import { RUNAWAY_PAUSE_REASON } from "~/features/automations/logic/pauseReasons";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
@@ -127,16 +126,8 @@ function AutomationsPage() {
   // the trigger rows because the counters live in Redis, not Postgres, and a
   // Redis outage should cost the page these badges rather than the whole list.
   const capStatus = api.automation.getDailyCapStatus.useQuery(
-    {
-      projectId: project?.id ?? "",
-      // Sliced to the query's own ceiling. Sending more is rejected as invalid
-      // input, which would cost the page every badge on exactly the projects
-      // that own enough automations to care about them.
-      triggerIds: (triggers.data ?? [])
-        .slice(0, DAILY_CAP_STATUS_MAX_TRIGGERS)
-        .map((trigger) => trigger.id),
-    },
-    { enabled: !!project?.id && (triggers.data ?? []).length > 0 },
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id },
   );
 
   // A report's cron only DESCRIBES its schedule; the scheduler owns the real

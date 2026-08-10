@@ -51,7 +51,7 @@ describe("Feature: runaway automation containment", () => {
 
   let projectTraces24h = 10_000;
   let sentEmails: Array<{ kind: string; skippedToday: number }>;
-  let claimed: Set<string>;
+  let claimed: Map<string, string>;
   /** Set to make `pauseTrigger` throw, standing in for a Prisma timeout. */
   let pauseFails = false;
   let pauseAttempts = 0;
@@ -80,14 +80,16 @@ describe("Feature: runaway automation containment", () => {
         if (mailFails) throw new Error("smtp refused the connection");
         sentEmails.push({ kind, skippedToday });
       },
-      // A real SET-NX has the same shape: true only for the first claimant.
+      // A real SET-NX has the same shape: a lease only for the first claimant,
+      // and a release that drops the key only while that lease still holds it.
       claimOnce: async (key) => {
-        if (claimed.has(key)) return false;
-        claimed.add(key);
-        return true;
+        if (claimed.has(key)) return null;
+        const token = nanoid();
+        claimed.set(key, token);
+        return { key, token };
       },
-      releaseClaim: async (key) => {
-        claimed.delete(key);
+      releaseClaim: async ({ key, token }) => {
+        if (claimed.get(key) === token) claimed.delete(key);
       },
       projectName: async () => "Test project",
       automationUrl: async () => "https://app.example.test/automations",
@@ -175,7 +177,7 @@ describe("Feature: runaway automation containment", () => {
   beforeEach(() => {
     projectTraces24h = 10_000;
     sentEmails = [];
-    claimed = new Set();
+    claimed = new Map();
     pauseFails = false;
     pauseAttempts = 0;
     mailFails = false;

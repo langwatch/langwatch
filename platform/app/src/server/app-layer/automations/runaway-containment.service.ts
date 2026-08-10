@@ -14,6 +14,20 @@ const logger = createLogger("langwatch:automations:runaway-containment");
 /** Which limit mail a breach produces: the ceiling was hit, or it was paused. */
 type LimitEmailKind = "ceiling_reached" | "paused";
 
+/**
+ * Proof that this worker holds a claim, rather than only that the key exists.
+ *
+ * Releasing by key alone crosses workers. A worker that claimed locally while
+ * Redis was unreachable, whose send then fails after Redis comes back, would
+ * delete the claim a different worker took in the meantime and has already
+ * mailed on, which buys the customer a second copy of the same mail. The token
+ * makes a release a no-op unless this lease is still the holder.
+ */
+export interface ClaimLease {
+  key: string;
+  token: string;
+}
+
 export { RUNAWAY_PAUSE_REASON };
 
 /**
@@ -69,15 +83,16 @@ export interface RunawayContainmentDeps {
     actionUrl: string;
   }) => Promise<void>;
   /**
-   * Once-only gate, SET-NX backed. Returns true only for the caller that newly
-   * claimed the key, which is what keeps a breach that repeats on every trace
-   * from mailing the customer on every trace. `ttlSeconds` defaults to the
-   * day-long window the mail claims use; the pause attempt passes a short one
-   * so a failed write is retried in a minute rather than tomorrow.
+   * Once-only gate, SET-NX backed. Returns a lease only to the caller that
+   * newly claimed the key, which is what keeps a breach that repeats on every
+   * trace from mailing the customer on every trace, and null to everyone else.
+   * `ttlSeconds` defaults to the day-long window the mail claims use; the pause
+   * attempt passes a short one so a failed write is retried in a minute rather
+   * than tomorrow.
    */
-  claimOnce: (key: string, ttlSeconds?: number) => Promise<boolean>;
-  /** Drops a claim taken by `claimOnce`, so a later attempt can retake it. */
-  releaseClaim: (key: string) => Promise<void>;
+  claimOnce: (key: string, ttlSeconds?: number) => Promise<ClaimLease | null>;
+  /** Drops a claim this lease still owns, so a later attempt can retake it. */
+  releaseClaim: (lease: ClaimLease) => Promise<void>;
   projectName: (projectId: string) => Promise<string>;
   automationUrl: (params: {
     projectId: string;
@@ -205,12 +220,13 @@ async function notifyOncePerDay({
   kind: LimitEmailKind;
   claimKey: string;
 }): Promise<void> {
-  if (!(await deps.claimOnce(claimKey))) return;
+  const lease = await deps.claimOnce(claimKey);
+  if (!lease) return;
 
   try {
     await notify(deps, breach, kind);
   } catch (error) {
-    await deps.releaseClaim(claimKey);
+    await deps.releaseClaim(lease);
     throw error;
   }
 }

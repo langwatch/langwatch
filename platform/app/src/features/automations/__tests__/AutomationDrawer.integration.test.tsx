@@ -128,7 +128,7 @@ vi.mock("~/utils/api", () => ({
       getTriggers: { invalidate: mockInvalidate },
       // Read by the trace-subject preview to warn when a condition would
       // outrun the plan's daily action ceiling.
-      getDailyCapStatus: { useQuery: () => ({ data: undefined }) },
+      getDailyCap: { useQuery: () => ({ data: undefined }) },
     },
     graphs: {
       getAll: { useQuery: () => ({ data: [], isLoading: false }) },

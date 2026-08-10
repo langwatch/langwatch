@@ -18,7 +18,6 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { DAILY_CAP_STATUS_MAX_TRIGGERS } from "~/features/automations/logic/dailyCapAdvice";
 import { getApp } from "~/server/app-layer/app";
 import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
 import { listSlackChannels } from "~/server/app-layer/automations/delivery/slackWebApi";
@@ -469,25 +468,41 @@ export const automationRouter = createTRPCRouter({
       return enhancedTriggers;
     }),
   /**
+   * The plan's daily ceiling on persist actions, on its own. The authoring
+   * drawer only advises against the ceiling and never reads a count, so it
+   * takes this rather than the status below and skips a scan it would discard.
+   */
+  getDailyCap: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("triggers:view"))
+    .query(async ({ input }) => ({
+      cap: await resolvePersistDailyCap(input.projectId),
+    })),
+  /**
    * Today's confirmed-match count and skipped count per automation, so the
    * list can say "N matches skipped today" instead of leaving the customer to
-   * wonder why an automation they can see running produced nothing. One Redis
-   * MGET for the whole list; a Redis outage degrades to showing no skips
-   * rather than failing the page.
+   * wonder why an automation they can see running produced nothing. A Redis
+   * outage degrades to showing no skips rather than failing the page.
+   *
+   * The automations it covers are read here rather than taken from the caller.
+   * The page renders every automation in the project, so a caller-supplied list
+   * either has to be unbounded, which puts the read's size in the caller's
+   * hands, or capped, which silently drops the badge from every automation past
+   * the cap. Reading the ids here bounds the work by what the project actually
+   * owns, which is the same set the page is already rendering.
    */
   getDailyCapStatus: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        triggerIds: z.array(z.string()).max(DAILY_CAP_STATUS_MAX_TRIGGERS),
-      }),
-    )
+    .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("triggers:view"))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const cap = await resolvePersistDailyCap(input.projectId);
+      const triggers = await ctx.prisma.trigger.findMany({
+        where: { projectId: input.projectId },
+        select: { id: true },
+      });
       const counts = await readPersistCapCounts({
         projectId: input.projectId,
-        triggerIds: input.triggerIds,
+        triggerIds: triggers.map((trigger) => trigger.id),
         now: new Date(),
         cap,
       });

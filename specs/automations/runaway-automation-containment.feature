@@ -141,6 +141,17 @@ Feature: Runaway automations are contained without punishing the customer
       When further confirmed matches are dropped
       Then the number of skipped matches for today is readable
 
+    # The list renders every automation in the project, so the status behind it
+    # covers every automation too. Reading a caller-supplied slice instead is
+    # what made the badge disappear past whatever size that slice was capped at,
+    # which lands on exactly the projects with enough automations to need it.
+    @integration
+    Scenario: Every automation on the list reports what it skipped
+      Given a project with more automations than one request used to carry
+      And one of the later ones passed its ceiling today
+      When the automations list reads the daily cap status
+      Then that automation still reports its skipped count
+
     @integration
     Scenario: The automations list shows what was skipped today
       Given a trigger that skipped matches today
@@ -219,6 +230,27 @@ Feature: Runaway automations are contained without punishing the customer
       Given a limit email that no recipient could be delivered
       When the mail is sent
       Then the send is reported as failed
+
+    # A mail provider quotes the envelope back in its rejection, so the failure
+    # text carries the admin's address. The failure is reported by its code,
+    # which is the part an operator acts on and names nobody.
+    @unit
+    Scenario: A failed limit email is reported without quoting the provider
+      Given a limit email the provider rejected with the recipient in the message
+      When the failure is reported
+      Then it names the provider's failure code
+      And it does not carry the recipient's address
+
+    # Releasing by key alone crosses workers. A worker that claimed while Redis
+    # was unreachable, and whose send fails only after the fleet moved on, would
+    # otherwise drop the claim the worker that did mail is holding, and the next
+    # breach would mail the customer a second time.
+    @unit
+    Scenario: A stale claim release never frees another worker's claim
+      Given a worker holding a claim another worker has since retaken
+      When that worker releases its claim
+      Then the current holder keeps it
+      And no second limit email is sent
 
     @unit
     Scenario: An unreadable suppression list still lets the mail out

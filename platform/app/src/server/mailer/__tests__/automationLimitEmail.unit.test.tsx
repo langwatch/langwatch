@@ -178,6 +178,30 @@ describe("automationLimitEmail", () => {
           }),
         ).rejects.toThrow(/any of its 2 recipients/);
       });
+
+      /** @scenario "A failed limit email is reported without quoting the provider" */
+      it("names the failure code and drops the provider's wording", async () => {
+        // A rejection quotes the envelope back, so repeating the message would
+        // write the recipient's address into every log that handles the throw.
+        vi.mocked(sendEmail).mockRejectedValue(
+          Object.assign(
+            new Error("550 5.1.1 <a@example.com>: recipient rejected"),
+            { code: "EENVELOPE" },
+          ),
+        );
+
+        const error = await sendAutomationLimitEmail({
+          ...pausedProps,
+          to: ["a@example.com"],
+        }).then(
+          () => null,
+          (thrown: unknown) => thrown as Error,
+        );
+
+        expect(error?.message).toContain("EENVELOPE");
+        expect(error?.message).not.toContain("a@example.com");
+        expect(error?.message).not.toContain("recipient rejected");
+      });
     });
   });
 });

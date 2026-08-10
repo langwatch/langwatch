@@ -1134,14 +1134,58 @@ describe("automationRouter", () => {
           });
         }
 
-        const status = await caller.getDailyCapStatus({
-          projectId,
-          triggerIds: [busyTrigger, quietTrigger],
-        });
+        mockTriggerFindMany.mockResolvedValue([
+          { id: busyTrigger },
+          { id: quietTrigger },
+        ]);
+
+        const status = await caller.getDailyCapStatus({ projectId });
 
         expect(status.cap).toBe(cap);
         expect(status.counts[busyTrigger]?.skipped).toBe(1);
         expect(status.counts[quietTrigger]?.skipped).toBe(0);
+      });
+
+      /** @scenario "Every automation on the list reports what it skipped" */
+      it("covers automations past the size one request used to carry", async () => {
+        // The status used to take the ids from the caller, capped at 500, so
+        // the badge silently vanished from every automation after that. The
+        // count is read here for whatever the project owns.
+        _resetMemoryPersistCapStore();
+        const projectId = `proj_${nanoid(8)}`;
+        const lateTrigger = `trigger_late_${nanoid(8)}`;
+        const now = new Date();
+
+        const cap = await resolvePersistDailyCap(projectId);
+        writtenKeys.push(
+          `ttlcache:persist-daily-cap:${projectId}`,
+          persistCapKey({ projectId, triggerId: lateTrigger, now }),
+        );
+        for (let index = 0; index <= cap; index++) {
+          const dedupKey = `${projectId}/${lateTrigger}:persist:trace-${index}`;
+          writtenKeys.push(
+            persistCapClaimKey({ projectId, triggerId: lateTrigger, dedupKey }),
+          );
+          await consumePersistCapSlot({
+            projectId,
+            triggerId: lateTrigger,
+            now,
+            cap,
+            dedupKey,
+          });
+        }
+
+        mockTriggerFindMany.mockResolvedValue([
+          ...Array.from({ length: 600 }, (_, index) => ({
+            id: `trigger_quiet_${index}`,
+          })),
+          { id: lateTrigger },
+        ]);
+
+        const status = await caller.getDailyCapStatus({ projectId });
+
+        expect(Object.keys(status.counts)).toHaveLength(601);
+        expect(status.counts[lateTrigger]?.skipped).toBe(1);
       });
     });
   });

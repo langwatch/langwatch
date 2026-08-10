@@ -377,6 +377,24 @@ function countInMemory({
   return existing.count;
 }
 
+/** How many count reads run at once. See the call site for why they chunk. */
+const CAP_COUNT_READ_CHUNK = 100;
+
+/** Runs `each` over `items` a chunk at a time, keeping the results in order. */
+async function inChunks<T, R>(
+  items: readonly T[],
+  size: number,
+  each: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = [];
+  for (let start = 0; start < items.length; start += size) {
+    results.push(
+      ...(await Promise.all(items.slice(start, start + size).map(each))),
+    );
+  }
+  return results;
+}
+
 /**
  * How many confirmed matches each of these triggers dropped today, for the
  * automations list. Read-only: it never consumes a slot.
@@ -405,14 +423,17 @@ export async function readPersistCapCounts({
       // One GET per key, not one MGET: every trigger's key carries its own
       // hash tag, so on a Redis Cluster a multi-key read spanning triggers
       // fails CROSSSLOT, and this catch would render every count as zero.
-      raw = await Promise.all(keys.map((key) => redis.get(key)));
+      // Chunked because that is one command per automation, and a project can
+      // own thousands: the chunk bounds how many are in flight at once, while
+      // the loop still covers every automation the list renders.
+      raw = await inChunks(keys, CAP_COUNT_READ_CHUNK, (key) => redis.get(key));
     } catch (error) {
       logger.warn(
         {
           projectId,
           error: error instanceof Error ? error.message : String(error),
         },
-        "Could not read automation persist cap counts — the list will show " +
+        "Could not read automation persist cap counts, the list will show " +
           "no skipped matches for this render",
       );
     }

@@ -54,7 +54,7 @@ vi.mock("~/utils/api", () => ({
       getAll: { useQuery: () => ({ data: [], isLoading: false }) },
     },
     tracesV2: { list: { useQuery: () => server.preview } },
-    automation: { getDailyCapStatus: { useQuery: () => server.cap } },
+    automation: { getDailyCap: { useQuery: () => server.cap } },
     useContext: () => ({}),
   },
 }));

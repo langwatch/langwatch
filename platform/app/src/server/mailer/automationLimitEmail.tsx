@@ -175,20 +175,39 @@ export const sendAutomationLimitEmail = async ({
   // landed is a failure worth reporting upward, because the caller answers that
   // by trying again, and trying again would mail the admins who did receive it
   // a second time.
-  const reasons = failures.map((failure) =>
-    failure.reason instanceof Error
-      ? failure.reason.message
-      : String(failure.reason),
-  );
+  const kinds = [
+    ...new Set(failures.map((failure) => failureKind(failure.reason))),
+  ].sort();
   if (failures.length === to.length) {
     throw new Error(
       `Could not send the automation limit email to any of its ${to.length} ` +
-        `recipients: ${reasons.join("; ")}`,
+        `recipients (${kinds.join(", ")})`,
     );
   }
 
   logger.warn(
-    { failed: failures.length, recipients: to.length, reasons },
+    { failed: failures.length, recipients: to.length, kinds },
     "Some automation limit emails could not be sent",
   );
 };
+
+/**
+ * A provider failure reduced to something safe to write down.
+ *
+ * A rejection message from a mail provider routinely quotes the envelope back,
+ * as in `550 5.1.1 <someone@example.com>: recipient rejected`, so the message
+ * carries the recipient's address into any log or exception that repeats it.
+ * The code or SMTP status is the part that tells an operator what went wrong,
+ * and it names no one.
+ */
+function failureKind(reason: unknown): string {
+  if (typeof reason === "object" && reason !== null) {
+    const { code, responseCode } = reason as {
+      code?: unknown;
+      responseCode?: unknown;
+    };
+    if (typeof code === "string" && code !== "") return code;
+    if (typeof responseCode === "number") return `smtp_${responseCode}`;
+  }
+  return reason instanceof Error ? reason.name : "unknown";
+}

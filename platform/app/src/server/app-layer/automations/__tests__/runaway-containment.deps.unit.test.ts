@@ -5,7 +5,8 @@
  * against stub collaborators rather than a database.
  */
 import type { PrismaClient } from "@prisma/client";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { nanoid } from "nanoid";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { ProjectService } from "../../projects/project.service";
 import type { EmailSuppressionService } from "../emailSuppression.service";
@@ -19,6 +20,11 @@ vi.mock("~/server/organizations/resolveOrganizationId", () => ({
   resolveOrganizationId: (projectId: string) =>
     resolveOrganizationId(projectId),
 }));
+
+// `connection` is a mutable module-level binding, so a test can pick the path
+// it exercises: undefined is the per-worker fallback, an object is Redis.
+const redisMock = vi.hoisted(() => ({ connection: undefined as unknown }));
+vi.mock("~/server/redis", () => redisMock);
 
 const findMany = vi.fn();
 const filterSuppressed = vi.fn();
@@ -54,6 +60,81 @@ describe("defaultRunawayContainmentDeps", () => {
     filterSuppressed.mockImplementation(
       async ({ emails }: { emails: string[] }) => emails,
     );
+  });
+
+  describe("given the once-per-day claim gate", () => {
+    // The claim stores are module-level, so every case needs a key of its own.
+    const freshKey = () => `automation-cap-mail:${nanoid(8)}`;
+
+    describe("when a second worker claims a key another worker holds", () => {
+      it("hands it no lease", async () => {
+        const deps = makeDeps();
+        const key = freshKey();
+
+        expect(await deps.claimOnce(key, 60)).not.toBeNull();
+        expect(await deps.claimOnce(key, 60)).toBeNull();
+      });
+    });
+
+    describe("when the holder releases the claim it took", () => {
+      it("puts the key back in reach of the next attempt", async () => {
+        const deps = makeDeps();
+        const key = freshKey();
+
+        const lease = await deps.claimOnce(key, 60);
+        await deps.releaseClaim(lease!);
+
+        expect(await deps.claimOnce(key, 60)).not.toBeNull();
+      });
+    });
+
+    describe("when a lease releases a key the fleet has since retaken", () => {
+      /** @scenario "A stale claim release never frees another worker's claim" */
+      it("leaves the current holder's claim standing", async () => {
+        const deps = makeDeps();
+        const key = freshKey();
+
+        // The shape this guards: a worker claims while Redis is unreachable,
+        // Redis comes back, another worker claims the key and mails on it, and
+        // only then does the first worker's send fail and release.
+        const stale = await deps.claimOnce(key, 60);
+        await deps.releaseClaim(stale!);
+        expect(await deps.claimOnce(key, 60)).not.toBeNull();
+
+        await deps.releaseClaim(stale!);
+
+        expect(await deps.claimOnce(key, 60)).toBeNull();
+      });
+    });
+
+    describe("when Redis is the store", () => {
+      afterEach(() => {
+        redisMock.connection = undefined;
+      });
+
+      it("releases by compare-and-delete on its own token", async () => {
+        const del = vi.fn();
+        const evaluate = vi.fn().mockResolvedValue(1);
+        redisMock.connection = {
+          set: vi.fn().mockResolvedValue("OK"),
+          del,
+          eval: evaluate,
+        };
+        const key = freshKey();
+
+        const deps = makeDeps();
+        const lease = await deps.claimOnce(key, 60);
+        await deps.releaseClaim(lease!);
+
+        expect(del).not.toHaveBeenCalled();
+        expect(evaluate).toHaveBeenCalledWith(
+          expect.stringContaining("redis.call('DEL', KEYS[1])"),
+          1,
+          key,
+          lease!.token,
+        );
+      });
+    });
   });
 
   describe("given a limit email is being addressed", () => {

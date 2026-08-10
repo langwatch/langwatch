@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { OrganizationUserRole, type PrismaClient } from "@prisma/client";
+import { nanoid } from "nanoid";
 
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { sendAutomationLimitEmail } from "~/server/mailer/automationLimitEmail";
@@ -7,7 +8,10 @@ import { resolveOrganizationId } from "~/server/organizations/resolveOrganizatio
 import { connection } from "~/server/redis";
 import type { ProjectService } from "../projects/project.service";
 import type { EmailSuppressionService } from "./emailSuppression.service";
-import type { RunawayContainmentDeps } from "./runaway-containment.service";
+import type {
+  ClaimLease,
+  RunawayContainmentDeps,
+} from "./runaway-containment.service";
 import type { TriggerService } from "./trigger.service";
 
 const logger = createLogger("langwatch:automations:runaway-containment");
@@ -24,14 +28,14 @@ const CLAIM_EXPIRE_SECONDS = 90_000;
  */
 const CLAIM_SWEEP_INTERVAL_MS = 60_000;
 
-const claimMemory = new Map<string, number>();
+const claimMemory = new Map<string, { token: string; expiresAt: number }>();
 let lastClaimSweepAt = 0;
 
 function sweepExpiredClaims(now: number): void {
   if (now - lastClaimSweepAt < CLAIM_SWEEP_INTERVAL_MS) return;
   lastClaimSweepAt = now;
-  for (const [key, expiresAt] of claimMemory) {
-    if (expiresAt <= now) claimMemory.delete(key);
+  for (const [key, claim] of claimMemory) {
+    if (claim.expiresAt <= now) claimMemory.delete(key);
   }
 }
 
@@ -39,14 +43,19 @@ function sweepExpiredClaims(now: number): void {
  * Once-only gate across the fleet. Redis SET-NX when it is available; a
  * per-worker Map otherwise, which degrades "one email per day" to "one per
  * worker per day" rather than to none at all.
+ *
+ * The value is a fresh token rather than a constant, so a later release can
+ * prove it owns the claim it is dropping. See `ClaimLease`.
  */
 async function claimOnce(
   key: string,
   ttlSeconds: number = CLAIM_EXPIRE_SECONDS,
-): Promise<boolean> {
+): Promise<ClaimLease | null> {
+  const token = nanoid();
   if (connection) {
     try {
-      return (await connection.set(key, "1", "EX", ttlSeconds, "NX")) !== null;
+      const taken = await connection.set(key, token, "EX", ttlSeconds, "NX");
+      return taken !== null ? { key, token } : null;
     } catch (error) {
       logger.warn(
         { key, error: error instanceof Error ? error.message : String(error) },
@@ -58,33 +67,52 @@ async function claimOnce(
   const now = Date.now();
   sweepExpiredClaims(now);
   const existing = claimMemory.get(key);
-  if (existing !== undefined && existing > now) return false;
-  claimMemory.set(key, now + ttlSeconds * 1000);
-  return true;
+  if (existing !== undefined && existing.expiresAt > now) return null;
+  claimMemory.set(key, { token, expiresAt: now + ttlSeconds * 1000 });
+  return { key, token };
 }
+
+/**
+ * Deletes only a key still holding this lease's token, so a release cannot
+ * drop a claim that has since been retaken. Read and delete go in one script
+ * because as two round trips another worker can claim the key in between, and
+ * the delete would then land on the new holder.
+ */
+const RELEASE_IF_OWNED_SCRIPT = `
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  return redis.call('DEL', KEYS[1])
+end
+return 0
+`;
 
 /**
  * Gives a claim back. Used when the thing the claim was meant to dedupe did not
  * happen, so the next attempt can retake it rather than waiting out a TTL that
  * can be a whole day.
  *
- * Both stores are cleared, not one: a claim can land in Redis and the release
- * can arrive while Redis is unreachable, and the memory map is where this
- * worker would then look.
+ * Both stores are asked, not one: a claim can land in Redis and the release can
+ * arrive while Redis is unreachable, and the memory map is where this worker
+ * would then look. Each store drops the claim only while this lease still owns
+ * it, which is what keeps a release from crossing into another worker's claim.
  */
-async function releaseClaim(key: string): Promise<void> {
+async function releaseClaim(lease: ClaimLease): Promise<void> {
   if (connection) {
     try {
-      await connection.del(key);
+      await connection.eval(RELEASE_IF_OWNED_SCRIPT, 1, lease.key, lease.token);
     } catch (error) {
       logger.warn(
-        { key, error: error instanceof Error ? error.message : String(error) },
+        {
+          key: lease.key,
+          error: error instanceof Error ? error.message : String(error),
+        },
         "Redis error releasing an automation containment claim, the fleet " +
           "keeps it until it expires",
       );
     }
   }
-  claimMemory.delete(key);
+  if (claimMemory.get(lease.key)?.token === lease.token) {
+    claimMemory.delete(lease.key);
+  }
 }
 
 export function defaultRunawayContainmentDeps({

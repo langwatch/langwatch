@@ -460,8 +460,8 @@ function TraceQuerySubject({
 
   // The plan's daily ceiling on persist actions, read once and held: it moves
   // only when the plan does, and a failed read simply means no advice below.
-  const capStatus = api.automation.getDailyCapStatus.useQuery(
-    { projectId, triggerIds: [] },
+  const capStatus = api.automation.getDailyCap.useQuery(
+    { projectId },
     {
       enabled: !!projectId,
       staleTime: 10 * 60 * 1000,
