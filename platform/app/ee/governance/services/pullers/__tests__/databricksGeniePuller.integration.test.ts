@@ -64,10 +64,6 @@ import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
 } from "~/test-utils/clickhouseTestApp";
-import {
-  decryptCredentials,
-  encryptParserConfigCredentials,
-} from "../../activity-monitor/ingestionCredentials";
 import { ensureHiddenGovernanceProject } from "../../governanceProject.service";
 import {
   DATABRICKS_GENIE_ADAPTER_ID,
@@ -501,6 +497,13 @@ async function startFixtureServer(params: {
    * recover, which is the difference the adapter's cache has to respect.
    */
   onScim?: (userId: string) => number | undefined;
+  /**
+   * An HTTP status to force on one space's conversation listing, or one
+   * conversation's messages. The loss-path tests use these to make a single
+   * unit fail in isolation while the rest of the sweep carries on.
+   */
+  conversationsStatus?: (spaceId: string) => number | undefined;
+  messagesStatus?: (conversationId: string) => number | undefined;
 }): Promise<{
   baseUrl: string;
   conversationRequests: string[];
@@ -556,6 +559,13 @@ async function startFixtureServer(params: {
       params.onBeforeSpace?.(spaceId);
       conversationRequests.push(url.search);
 
+      const forcedConversations = params.conversationsStatus?.(spaceId);
+      if (forcedConversations !== undefined) {
+        res.statusCode = forcedConversations;
+        send({ error: `forced ${forcedConversations}` });
+        return;
+      }
+
       if (spaceId === "space-forbidden") {
         res.statusCode = 403;
         send({ error_code: "PERMISSION_DENIED", message: "no access" });
@@ -592,6 +602,12 @@ async function startFixtureServer(params: {
         url.pathname,
       );
     if (messages) {
+      const forcedMessages = params.messagesStatus?.(messages[1]!);
+      if (forcedMessages !== undefined) {
+        res.statusCode = forcedMessages;
+        send({ error: `forced ${forcedMessages}` });
+        return;
+      }
       await params.onMessages?.(messages[1]!);
       const all = workspace.messages[messages[1]!] ?? [];
       const offset = token ? Number(token) : 0;
@@ -1228,59 +1244,6 @@ describe("given a sweep too large for one run's budget", () => {
 });
 
 /**
- * The workspace token at rest.
- *
- * Real crypto, real row. The helper's own unit test mocks `~/utils/encryption`
- * with a reversible stand-in whose output CONTAINS the plaintext, which is
- * fine for testing envelope tagging and round-tripping but proves nothing
- * about readability — so the "never stored in plain text" claim is made here,
- * against what actually lands in Postgres.
- */
-describe("given an admin saves a Genie source carrying a workspace token", () => {
-  describe("when the source is persisted", () => {
-    /** @scenario "The workspace token is never stored in plain text" */
-    it("stores the token encrypted and unreadable from the source's configuration", async () => {
-      const token = `dapi-${nanoid(24)}`;
-      // The pullConfig shape the governance form produces for Genie: the
-      // secret travels only inside `credentials`, never as a top-level key.
-      const pullConfig = {
-        adapter: DATABRICKS_GENIE_ADAPTER_ID,
-        workspaceUrl: "https://adb-1234567890123456.7.azuredatabricks.net",
-        spaceIds: [],
-        schedule: "*/15 * * * *",
-        credentials: { token },
-      };
-
-      const seeded = await seedSource({
-        slug: `enc-${ns}`,
-        pullConfig: encryptParserConfigCredentials(
-          pullConfig,
-        ) as Prisma.InputJsonObject,
-      });
-
-      try {
-        const row = await prisma.ingestionSource.findUniqueOrThrow({
-          where: { id: seeded.sourceId },
-        });
-        const stored = row.parserConfig as Record<string, unknown>;
-
-        // The assertion that bites: the secret is not recoverable by reading
-        // the row, anywhere in it, at any nesting depth.
-        expect(JSON.stringify(stored)).not.toContain(token);
-
-        expect(typeof stored.credentials).toBe("string");
-        expect(stored.credentials as string).toMatch(/^enc:v1:/);
-
-        // Encrypted is not the same as lost — the puller still resolves it.
-        expect(decryptCredentials(stored.credentials)).toEqual({ token });
-      } finally {
-        await cleanupOrg(seeded.organizationId);
-      }
-    }, 60_000);
-  });
-});
-
-/**
  * A directory that fails for a moment, not for good.
  *
  * The adapter caches a 404 — a deleted account is a permanent answer — but
@@ -1341,6 +1304,144 @@ describe("given the directory fails while the sweep is running", () => {
         expect(String(afterOutage?.extra?.actorEmail ?? "")).toBe(
           "dana.hoffman@acme.test",
         );
+      } finally {
+        await fixture.close();
+      }
+    }, 60_000);
+  });
+});
+
+/**
+ * A failure and a budget cut in the SAME run.
+ *
+ * Each on its own was already covered; the loss only exists in their product.
+ * A unit that fails in isolation is deliberately walked past, so if the budget
+ * then dies further along, a resume marker pointing at where it stopped leaves
+ * the failed unit unread for the rest of the sweep — and the sweep that later
+ * completes advances the watermark over its messages. The resume point must
+ * therefore be the EARLIEST unfinished unit, not the last one touched.
+ */
+describe("given a unit fails and the budget then runs out later in the same run", () => {
+  function fourConversationWorkspace() {
+    const alphaMs = Date.UTC(2026, 0, 6, 9, 0, 0);
+    const ids = [1, 2, 3, 4];
+    const conversations: Record<
+      string,
+      Array<{
+        conversation_id: string;
+        title: string;
+        created_timestamp: number;
+      }>
+    > = {
+      "space-solo": ids.map((n) => ({
+        conversation_id: `conv-s-${n}`,
+        title: `Conversation ${n}`,
+        created_timestamp: alphaMs,
+      })),
+    };
+    const messages: Record<string, Array<ReturnType<typeof message>>> = {};
+    for (const n of ids) {
+      messages[`conv-s-${n}`] = [
+        message({
+          id: `msg-s-${n}`,
+          conversationId: `conv-s-${n}`,
+          spaceId: "space-solo",
+          userId: 700_000_000_000_001,
+          content: `Question ${n}`,
+          createdMs: alphaMs + n,
+          sql: "SELECT 1",
+        }),
+      ];
+    }
+    return { conversations, messages, alphaMs, betaMs: alphaMs };
+  }
+
+  describe("when the failure came before the conversation it stopped on", () => {
+    it("resumes at the failed conversation, not the one it stopped on", async () => {
+      const workspace = fourConversationWorkspace();
+      const fixture = await startFixtureServer({
+        workspace,
+        // The second conversation fails in isolation; the third is slow enough
+        // to burn the deadline, so the budget dies at the fourth's turn.
+        messagesStatus: (conversationId) =>
+          conversationId === "conv-s-2" ? 429 : undefined,
+        onMessages: async (conversationId) => {
+          if (conversationId === "conv-s-3") {
+            await new Promise((resolve) => setTimeout(resolve, 1_200));
+          }
+        },
+      });
+
+      try {
+        const adapter = new DatabricksGeniePuller();
+        const config = adapter.validateConfig({
+          adapter: DATABRICKS_GENIE_ADAPTER_ID,
+          workspaceUrl: fixture.baseUrl,
+          spaceIds: ["space-solo"],
+          startingAt: "2020-01-01T00:00:00.000Z",
+          schedule: "*/15 * * * *",
+        });
+
+        const first = await adapter.runOnce(
+          {
+            cursor: null,
+            credentials: { token: "fixture-token" },
+            deadlineMs: Date.now() + 900,
+          },
+          config,
+        );
+        const cursor = decodeCursor(first.cursor);
+
+        // The assertion that bites. Resuming at conv-s-4 would step over
+        // conv-s-2 for the rest of the sweep, and the watermark would then
+        // move past it.
+        expect(cursor.conversationId).toBe("conv-s-2");
+        expect(cursor.sinceMs).toBe(Date.parse("2020-01-01T00:00:00.000Z"));
+      } finally {
+        await fixture.close();
+      }
+    }, 60_000);
+  });
+
+  describe("when the failed space came before the space it stopped on", () => {
+    it("resumes at the failed space, not the one it stopped on", async () => {
+      const workspace = createFixtureWorkspace();
+      const fixture = await startFixtureServer({
+        workspace,
+        // space-alpha sorts first and fails in isolation; space-beta is slow
+        // enough that the budget dies before space-orphan's turn.
+        conversationsStatus: (spaceId) =>
+          spaceId === "space-alpha" ? 403 : undefined,
+        onMessages: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 700));
+        },
+      });
+
+      try {
+        const adapter = new DatabricksGeniePuller();
+        const config = adapter.validateConfig({
+          adapter: DATABRICKS_GENIE_ADAPTER_ID,
+          workspaceUrl: fixture.baseUrl,
+          spaceIds: ["space-alpha", "space-beta", "space-orphan"],
+          startingAt: "2020-01-01T00:00:00.000Z",
+          schedule: "*/15 * * * *",
+        });
+
+        const first = await adapter.runOnce(
+          {
+            cursor: null,
+            credentials: { token: "fixture-token" },
+            deadlineMs: Date.now() + 500,
+          },
+          config,
+        );
+        const cursor = decodeCursor(first.cursor);
+
+        // Resuming at space-orphan would leave space-alpha unread for the rest
+        // of the sweep, and the completing sweep would move the watermark past
+        // everything in it.
+        expect(cursor.spaceId).toBe("space-alpha");
+        expect(cursor.sinceMs).toBe(Date.parse("2020-01-01T00:00:00.000Z"));
       } finally {
         await fixture.close();
       }

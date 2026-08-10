@@ -174,13 +174,38 @@ function nextWatermark({
   return Math.max(previousMs, sweepStartedAtMs - WATERMARK_LAG_MS);
 }
 
+/**
+ * The cursor's one invariant, enforced in the single place that mints one:
+ * `conversationId` requires `spaceId`, and `spaceId` requires
+ * `sweepStartedAtMs`.
+ *
+ * A resume point without the anchor it belongs to is worse than no resume
+ * point. `runOnce` only treats a cursor as resuming when BOTH `spaceId` and
+ * `sweepStartedAtMs` are set, so a cursor carrying a position but no anchor
+ * would stamp a fresh anchor at now, still skip every space before the
+ * position, complete, and then set the watermark from that fresh anchor —
+ * losing everything it skipped. Cursors written before the anchor existed have
+ * exactly that shape, so this is reachable rather than theoretical.
+ */
+function withoutOrphanedResume(cursor: GenieCursor): GenieCursor {
+  if (cursor.sweepStartedAtMs !== null && cursor.spaceId !== null) {
+    return cursor;
+  }
+  if (cursor.spaceId === null && cursor.conversationId === null) return cursor;
+  logger.warn(
+    { cursor },
+    "databricks genie cursor carries a resume position with no sweep anchor; restarting the sweep from the top",
+  );
+  return { ...cursor, spaceId: null, conversationId: null };
+}
+
 function parseCursor(
   cursor: string | null,
   config: DatabricksGeniePullConfig,
 ): GenieCursor {
   if (cursor) {
     try {
-      return cursorSchema.parse(JSON.parse(cursor));
+      return withoutOrphanedResume(cursorSchema.parse(JSON.parse(cursor)));
     } catch {
       logger.warn(
         { cursor },
@@ -375,24 +400,45 @@ interface PagedRead<T> {
 }
 
 /**
- * Where in a list of spaces this run should start.
+ * The spaces to sweep in a deterministic order, plus where to start.
  *
- * An id that is not in the list means the space was deleted since the cursor
- * was written, and starting over is the safe answer: the watermark did not
- * move either, so nothing is skipped by re-reading from the top.
+ * Exactly the same argument as `conversationWalkPlan`, one level up, and for
+ * exactly the same reason: resuming skips everything before the resume point,
+ * which is only sound if a space cannot move across it between runs.
+ * `/api/2.0/genie/spaces` carries no ordering guarantee either, so a space that
+ * existed when the sweep began could sit after the resume point on one run and
+ * before it on the next, never be read, and then fall outside the window once
+ * the completed sweep advanced the watermark. Sorting on the immutable
+ * `space_id` removes the dependency on the API's order.
+ *
+ * `resumable` is false when the space listing was itself truncated: a partial
+ * list has no trustworthy position in it, so the sweep restarts from the top.
  */
-function spaceStartIndex({
+function spaceWalkPlan({
   spaces,
   resumeSpaceId,
 }: {
-  spaces: Array<z.infer<typeof spaceSchema>>;
+  spaces: PagedRead<z.infer<typeof spaceSchema>>;
   resumeSpaceId: string | null;
-}): number {
-  if (!resumeSpaceId) return 0;
-  return Math.max(
-    spaces.findIndex((s) => s.space_id === resumeSpaceId),
-    0,
+}): {
+  ordered: Array<z.infer<typeof spaceSchema>>;
+  startAt: number;
+  resumable: boolean;
+} {
+  const ordered = [...spaces.items].sort((a, b) =>
+    a.space_id < b.space_id ? -1 : a.space_id > b.space_id ? 1 : 0,
   );
+  const resumable = spaces.complete;
+  // An id no longer in the list means the space was deleted since the cursor
+  // was written; starting over only ever re-reads, and the watermark is held.
+  const startAt =
+    resumable && resumeSpaceId
+      ? Math.max(
+          ordered.findIndex((s) => s.space_id === resumeSpaceId),
+          0,
+        )
+      : 0;
+  return { ordered, startAt, resumable };
 }
 
 /**
@@ -438,6 +484,52 @@ function conversationWalkPlan({
         )
       : 0;
   return { ordered, startAt, resumable };
+}
+
+/**
+ * Remembers the FIRST thing a walk did not finish.
+ *
+ * Both loops in this file need the same rule and get it wrong the same way
+ * without it: a unit that fails in isolation is walked past deliberately, so
+ * the unit the budget finally stops on is not necessarily the earliest one
+ * still owed. Resuming at the later one silently abandons the earlier, and the
+ * sweep that eventually completes moves the watermark over it.
+ */
+class FirstUnfinished<T> {
+  private value: T | null = null;
+
+  note(candidate: T): void {
+    this.value ??= candidate;
+  }
+
+  /** The earliest unfinished unit, or `fallback` when nothing failed yet. */
+  resolve(fallback: T): T {
+    return this.value ?? fallback;
+  }
+}
+
+/**
+ * The result for a sweep that stopped early, owing the given space.
+ *
+ * The resume point is dropped when the space listing was not resumable, which
+ * restarts the sweep from the top rather than resuming into a position that was
+ * never trustworthy.
+ */
+function sweptUpTo({
+  events,
+  resume,
+  plan,
+}: {
+  events: NormalizedPullEvent[];
+  resume: { space: z.infer<typeof spaceSchema>; at: string | null };
+  plan: { resumable: boolean };
+}): SweepResult {
+  return {
+    events,
+    complete: false,
+    resumeSpaceId: plan.resumable ? resume.space.space_id : null,
+    resumeConversationId: plan.resumable ? resume.at : null,
+  };
 }
 
 /**
@@ -618,31 +710,35 @@ export class DatabricksGeniePuller
     const spaces = await this.resolveSpaces({ config, token, options, budget });
     let complete = spaces.complete;
 
-    // Resume where the budget cut the last sweep short.
-    const resumeAt = spaceStartIndex({
-      spaces: spaces.items,
-      resumeSpaceId: cursor.spaceId,
-    });
+    const plan = spaceWalkPlan({ spaces, resumeSpaceId: cursor.spaceId });
 
-    for (let i = resumeAt; i < spaces.items.length; i += 1) {
-      const space = spaces.items[i]!;
+    // Where the next run picks up: the earliest space this sweep did not
+    // finish, NOT the one the budget happened to stop on. They differ whenever
+    // a space is walked past — one 403s in isolation and a later one runs out
+    // of budget — and resuming at the later one abandons the earlier for the
+    // rest of the sweep.
+    const owed = new FirstUnfinished<{
+      space: z.infer<typeof spaceSchema>;
+      at: string | null;
+    }>();
+
+    for (let i = plan.startAt; i < plan.ordered.length; i += 1) {
+      const space = plan.ordered[i]!;
       // Only the space the cursor actually stopped in inherits the conversation
       // resume point. Every space after it is taken from the top.
       const resumeConversationId =
         space.space_id === cursor.spaceId ? cursor.conversationId : null;
 
       if (budget.exhausted()) {
-        // Everything read so far is kept, the watermark is held, and the next
-        // run starts at this space rather than crawling from the top. The
-        // conversation position is handed straight back rather than dropped, so
-        // a run that ends before it could touch this space does not undo the
-        // progress an earlier run already made inside it.
-        return {
+        // Everything read so far is kept and the watermark is held. The
+        // conversation position is handed back rather than dropped, so a run
+        // that ends before it could touch this space does not undo the progress
+        // an earlier run already made inside it.
+        return sweptUpTo({
           events,
-          complete: false,
-          resumeSpaceId: space.space_id,
-          resumeConversationId,
-        };
+          resume: owed.resolve({ space, at: resumeConversationId }),
+          plan,
+        });
       }
 
       const read = await this.spaceMessages({
@@ -656,34 +752,25 @@ export class DatabricksGeniePuller
         resumeConversationId,
       });
       events.push(...read.items);
-      if (!read.complete) complete = false;
+      if (!read.complete) {
+        complete = false;
+        // `read.resumeConversationId` narrows a re-read of this space to the
+        // conversation it stopped on, which is what lets a space bigger than one
+        // run's whole budget finish across several runs. It is null for an
+        // isolated failure, which correctly restarts the space from the top.
+        owed.note({ space, at: read.resumeConversationId });
+      }
 
-      // A budget that ran out INSIDE this space leaves its tail unread. Resume
-      // at THIS space, not the next one. The top-of-loop check above only sees
-      // the exhaustion one iteration late and would hand the resume marker to
-      // space i+1, skipping this space's tail — and then a later complete sweep
-      // would advance the watermark past those never-fetched messages: silent,
-      // permanent loss on exactly the large workspaces this resume path exists
-      // for. Re-reading is safe either way: the watermark is held and both
-      // sinks dedup on the message id.
-      //
-      // `read.resumeConversationId` narrows that re-read from the whole space
-      // to the conversation it stopped on, which is what lets a space bigger
-      // than one run's entire budget finish across several runs instead of
-      // restarting forever and starving every space behind it.
-      //
-      // Gated on `budget.exhausted()`, not on `!read.complete` alone: an
-      // isolated 403/429/cycle on one conversation also sets `complete: false`
-      // but must NOT stop the sweep — the held watermark plus a full re-sweep
-      // next run already makes that case lossless, and bailing here would wedge
-      // the sweep on a permanently-unreadable space and never reach the rest.
+      // Out of budget with something unfinished — stop, and resume at the
+      // earliest space still owed rather than this one. An isolated failure
+      // with budget left falls through and keeps going, so one unreadable
+      // space cannot wedge the sweep before the rest of the workspace.
       if (!read.complete && budget.exhausted()) {
-        return {
+        return sweptUpTo({
           events,
-          complete: false,
-          resumeSpaceId: space.space_id,
-          resumeConversationId: read.resumeConversationId,
-        };
+          resume: owed.resolve({ space, at: read.resumeConversationId }),
+          plan,
+        });
       }
     }
 
@@ -796,11 +883,18 @@ export class DatabricksGeniePuller
   }): Promise<SpaceRead> {
     const events: NormalizedPullEvent[] = [];
     let complete = true;
+    // The earliest conversation this walk did not finish. Same argument as the
+    // space loop one level up.
+    const owed = new FirstUnfinished<z.infer<typeof conversationSchema>>();
 
     for (let i = plan.startAt; i < plan.ordered.length; i += 1) {
       const conversation = plan.ordered[i]!;
       if (budget.exhausted()) {
-        return stoppedAt({ items: events, conversation, plan });
+        return stoppedAt({
+          items: events,
+          conversation: owed.resolve(conversation),
+          plan,
+        });
       }
 
       const read = await this.isolate({
@@ -825,13 +919,21 @@ export class DatabricksGeniePuller
       if (read) events.push(...read.items);
       // Null is an isolated failure on this one conversation; false means its
       // pages were cut short. Both leave the space incomplete.
-      if (!read?.complete) complete = false;
+      if (!read?.complete) {
+        complete = false;
+        owed.note(conversation);
+      }
 
-      // Out of budget with this conversation unfinished — stop here. An
-      // isolated failure with budget still left falls through and keeps going
-      // instead, so one broken conversation cannot wedge the whole space.
+      // Out of budget with something unfinished — stop, and resume at the
+      // earliest conversation still owed rather than this one. An isolated
+      // failure with budget still left falls through and keeps going, so one
+      // broken conversation cannot wedge the whole space.
       if (!read?.complete && budget.exhausted()) {
-        return stoppedAt({ items: events, conversation, plan });
+        return stoppedAt({
+          items: events,
+          conversation: owed.resolve(conversation),
+          plan,
+        });
       }
     }
 
