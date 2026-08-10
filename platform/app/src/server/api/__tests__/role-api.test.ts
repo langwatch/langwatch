@@ -16,7 +16,6 @@ const mockPrisma = {
     findUnique: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
-    delete: vi.fn(),
   },
   team: {
     findFirst: vi.fn(),
@@ -27,6 +26,7 @@ const mockPrisma = {
     findFirst: vi.fn(),
     findUnique: vi.fn(),
     update: vi.fn(),
+    count: vi.fn().mockResolvedValue(0),
   },
   roleBinding: {
     findFirst: vi.fn(),
@@ -40,6 +40,11 @@ const mockPrisma = {
   $transaction: vi
     .fn()
     .mockImplementation((fn: (tx: any) => Promise<any>) => fn(mockPrisma)),
+  // The delete carries its own in-use condition, so it is one raw statement
+  // rather than a read followed by `customRole.delete`. It answers the number
+  // of rows it removed, which is how the caller tells "deleted" from "somebody
+  // took a reference in between".
+  $executeRaw: vi.fn().mockResolvedValue(1),
 } as any;
 
 describe("RoleService Tests", () => {
@@ -268,12 +273,39 @@ describe("RoleService Tests", () => {
       };
 
       mockPrisma.customRole.findUnique.mockResolvedValue(mockRoleWithUsers);
+      mockPrisma.$executeRaw.mockResolvedValue(1);
 
       const result = await roleService.deleteRole("role-1");
 
       expect(result).toEqual({ success: true });
-      expect(mockPrisma.customRole.delete).toHaveBeenCalledWith({
-        where: { id: "role-1" },
+      expect(mockPrisma.$executeRaw).toHaveBeenCalled();
+    });
+
+    it("refuses when the row survived because something took a reference", async () => {
+      // Nothing deleted means the statement's own condition found a holder
+      // that the check above it did not, so the refusal has to name what holds
+      // the role now rather than report a success nobody performed.
+      mockPrisma.customRole.findUnique.mockResolvedValue({
+        id: "role-1",
+        name: "Data Analyst",
+        organizationId: "org-123",
+        kind: "custom",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        assignedUsers: [],
+      });
+      // Per-call values, not defaults: `clearAllMocks` between tests clears
+      // calls but keeps implementations, so a `mockResolvedValue` here would
+      // still be in force for every test after this one.
+      mockPrisma.$executeRaw.mockResolvedValueOnce(0);
+      // Counted twice: once by the check before the delete, which has to pass
+      // for the statement to run at all, and once after it removed nothing.
+      mockPrisma.roleBinding.count
+        .mockResolvedValueOnce(0)
+        .mockResolvedValueOnce(1);
+
+      await expect(roleService.deleteRole("role-1")).rejects.toMatchObject({
+        code: "custom_role_in_use",
       });
     });
 
