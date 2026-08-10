@@ -2,7 +2,12 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { AcquireAbortedError } from "@langwatch/clickhouse-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClickHouseOverloadedError } from "~/server/app-layer/traces/errors";
-import { MIN_QUEUE_DEPTH, withStatementLimit } from "../statementLimit";
+import { CLICKHOUSE_REQUEST_TIMEOUT_MS } from "../managedClient";
+import {
+  MIN_QUEUE_DEPTH,
+  STATEMENT_WAIT_TIMEOUT_MS,
+  withStatementLimit,
+} from "../statementLimit";
 
 /**
  * A stand-in for the driver that lets a test decide when each statement
@@ -259,6 +264,95 @@ describe("withStatementLimit", () => {
 
         await expect(abandoned).rejects.toBeInstanceOf(AcquireAbortedError);
         expect(driver.started).toBe(1);
+
+        driver.releaseAll();
+        await admitted;
+      });
+    });
+
+    /**
+     * The queue was bounded by depth but not by time. A statement could wait
+     * for as long as everything ahead of it took and then still spend the
+     * driver's full request timeout on the wire — which is how a 46-second
+     * failure was assembled out of two limits, neither of which was 46 seconds.
+     */
+    describe("when no slot arrives before the wait runs out", () => {
+      /** @scenario a statement that waits too long is refused, not left waiting */
+      it("refuses it as overload rather than waiting indefinitely", async () => {
+        const driver = deferrableClient();
+        const limited = withStatementLimit({
+          client: driver.client,
+          maxConcurrent: 1,
+          instance,
+          waitTimeoutMs: 20,
+        });
+
+        const admitted = limited.query({ query: "SELECT 1" });
+        const waiting = limited.query({ query: "SELECT 2" });
+
+        await expect(waiting).rejects.toBeInstanceOf(ClickHouseOverloadedError);
+
+        // The one already running is untouched — only the wait was bounded.
+        expect(driver.started).toBe(1);
+
+        driver.releaseAll();
+        await admitted;
+      });
+
+      it("keeps the production bound well inside the request timeout", () => {
+        // The two limits compound: a statement pays the wait and then the wire.
+        expect(STATEMENT_WAIT_TIMEOUT_MS).toBeLessThan(
+          CLICKHOUSE_REQUEST_TIMEOUT_MS,
+        );
+      });
+    });
+
+    describe("when a slot arrives before the wait runs out", () => {
+      it("runs the statement normally", async () => {
+        const driver = deferrableClient();
+        const limited = withStatementLimit({
+          client: driver.client,
+          maxConcurrent: 1,
+          instance,
+        });
+
+        const first = limited.query({ query: "SELECT 1" });
+        const second = limited.query({ query: "SELECT 2" });
+        await settleMicrotasks();
+
+        driver.releaseAll();
+        await settleMicrotasks();
+        driver.releaseAll();
+
+        await expect(first).resolves.toEqual({ ok: true });
+        await expect(second).resolves.toEqual({ ok: true });
+      });
+    });
+
+    /**
+     * A caller cancelling its own request is not the server being overloaded,
+     * and must keep surfacing as the cancellation it is.
+     */
+    describe("when the caller aborts while a wait timeout is also armed", () => {
+      it("still reports the abort rather than overload", async () => {
+        const driver = deferrableClient();
+        const limited = withStatementLimit({
+          client: driver.client,
+          maxConcurrent: 1,
+          instance,
+        });
+
+        const admitted = limited.query({ query: "SELECT 1" });
+        const controller = new AbortController();
+        const abandoned = limited.query({
+          query: "SELECT 2",
+          abort_signal: controller.signal,
+        });
+        await settleMicrotasks();
+
+        controller.abort();
+
+        await expect(abandoned).rejects.toBeInstanceOf(AcquireAbortedError);
 
         driver.releaseAll();
         await admitted;

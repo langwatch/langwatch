@@ -4,6 +4,21 @@
  */
 
 /**
+ * Where a cause is attached on a record that is NOT at error level.
+ *
+ * A record we chose to log at warn should not carry a key called `error`,
+ * which is the loudest possible claim that it failed. `severity_text` carries
+ * the level we meant; the payload should not argue with it.
+ *
+ * It lives here rather than beside `logHttpRequest` because `logger.ts` has to
+ * register a serializer for it and cannot import from `request/requestLogging`
+ * without a cycle. Both ends must agree on the name: pino applies serializers
+ * by exact key, so a field named here and not registered there is emitted as a
+ * bare `Error` and loses its message and stack entirely.
+ */
+export const REQUEST_CAUSE_FIELD = "requestError";
+
+/**
  * OpenTelemetry span attribute keys used across LangWatch services.
  */
 export const OTEL_ATTR = {

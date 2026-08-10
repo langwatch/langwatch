@@ -10,6 +10,7 @@ export {
   DEFAULT_SERVICE_NAME,
   INVALID_TRACE_ID,
   OTEL_ATTR,
+  REQUEST_CAUSE_FIELD,
   TRACER_NAMES,
 } from "./constants";
 export type {
@@ -30,3 +31,9 @@ export {
   logHttpRequest,
   type RequestLogData,
 } from "./request/requestLogging";
+export {
+  MAX_VALIDATION_ISSUES,
+  validationMeta,
+  type ValidationIssueMeta,
+  type ValidationMeta,
+} from "./validation/validationMeta";
