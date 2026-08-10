@@ -59,3 +59,26 @@ Feature: Organization REST API
     When I fetch the organization
     Then the response contains neither the single sign-on domain nor the provider
     And an update that tries to set them leaves both unchanged
+
+  # ============================================================================
+  # Version namespaces
+  # ============================================================================
+  #
+  # One handler answers on three paths: the dated namespace an integration
+  # pins itself to, the moving latest alias, and the bare path the reference
+  # documents. The response says which one the caller took, so a client that
+  # believed it was pinned can tell that it is not.
+
+  @integration
+  Scenario: The organization endpoint answers on its dated, latest and bare paths
+    When I fetch the organization through the dated version namespace
+    Then the response status is 200
+    And the response names that version and reports it as stable
+    When I fetch the organization through the latest namespace
+    Then the response status is 200
+    And the response reports the version as latest
+    When I fetch the organization through the bare path
+    Then the response status is 200
+    And the response names no version and reports it as unversioned
+    When I fetch the organization through a version namespace that does not exist
+    Then the response status is 404

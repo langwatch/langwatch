@@ -173,6 +173,7 @@ describe("Feature: Organization REST API", () => {
   });
 
   describe("when the same endpoint is addressed through its version namespaces", () => {
+    /** @scenario The organization endpoint answers on its dated, latest and bare paths */
     it("serves the dated, latest and bare paths, with only the bare one undated", async () => {
       // The versioned namespaces address the family root with a trailing
       // slash (the framework's canonical dated URL shape).
