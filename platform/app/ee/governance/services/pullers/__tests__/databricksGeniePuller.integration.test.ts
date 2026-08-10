@@ -67,6 +67,7 @@ import {
 import { ensureHiddenGovernanceProject } from "../../governanceProject.service";
 import {
   DATABRICKS_GENIE_ADAPTER_ID,
+  type DatabricksGeniePullConfig,
   DatabricksGeniePuller,
 } from "../databricksGenie.puller";
 import { type PulledUsageDispatcher, runIngestionPull } from "../pullerWorker";
@@ -130,6 +131,8 @@ function decodeCursor(cursor: string | null): {
   sinceMs: number;
   spaceId: string | null;
   conversationId: string | null;
+  sweepHadGap: boolean;
+  spaceSetFingerprint: string | null;
   sweepStartedAtMs: number | null;
 } {
   if (!cursor) throw new Error("expected a cursor");
@@ -137,6 +140,8 @@ function decodeCursor(cursor: string | null): {
     sinceMs: number;
     spaceId: string | null;
     conversationId: string | null;
+    sweepHadGap: boolean;
+    spaceSetFingerprint: string | null;
     sweepStartedAtMs: number | null;
   };
 }
@@ -504,15 +509,28 @@ async function startFixtureServer(params: {
    */
   conversationsStatus?: (spaceId: string) => number | undefined;
   messagesStatus?: (conversationId: string) => number | undefined;
+  /**
+   * Reorders the space listing. The endpoint documents no ordering guarantee,
+   * so the sort test uses this to return a different order on each run and
+   * prove the walk imposes its own.
+   */
+  spacesOrder?: (spaceIds: string[]) => string[];
 }): Promise<{
   baseUrl: string;
   conversationRequests: string[];
+  /** Space ids in the order their conversations were asked for. */
+  conversationSpaceIds: string[];
+  /** Space ids in the order the SERVER handed them to the walk. */
+  spacesServed: string[];
   /** Requests per path prefix, for asserting a walk did not spin. */
   requestCounts: Map<string, number>;
   close: () => Promise<void>;
 }> {
   const { workspace } = params;
   const conversationRequests: string[] = [];
+  /** Space ids in the order their conversations were asked for. */
+  const conversationSpaceIds: string[] = [];
+  const spacesServed: string[] = [];
   const requestCounts = new Map<string, number>();
   /** One conversation per page, so paging is exercised with tiny fixtures. */
   const CONVERSATION_PAGE = 1;
@@ -542,10 +560,14 @@ async function startFixtureServer(params: {
     const send = (body: unknown) => res.end(JSON.stringify(body));
 
     if (url.pathname === "/api/2.0/genie/spaces") {
+      const ids = params.spacesOrder
+        ? params.spacesOrder(Object.keys(SPACE_TITLES))
+        : Object.keys(SPACE_TITLES);
+      if (spacesServed.length === 0) spacesServed.push(...ids);
       send({
-        spaces: Object.entries(SPACE_TITLES).map(([space_id, title]) => ({
+        spaces: ids.map((space_id) => ({
           space_id,
-          title,
+          title: SPACE_TITLES[space_id] ?? null,
         })),
         next_page_token: null,
       });
@@ -558,6 +580,8 @@ async function startFixtureServer(params: {
       const spaceId = conversations[1]!;
       params.onBeforeSpace?.(spaceId);
       conversationRequests.push(url.search);
+      if (!url.searchParams.get("page_token"))
+        conversationSpaceIds.push(spaceId);
 
       const forcedConversations = params.conversationsStatus?.(spaceId);
       if (forcedConversations !== undefined) {
@@ -648,6 +672,8 @@ async function startFixtureServer(params: {
   return {
     baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
     conversationRequests,
+    conversationSpaceIds,
+    spacesServed,
     requestCounts,
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   };
@@ -1312,19 +1338,24 @@ describe("given the directory fails while the sweep is running", () => {
 });
 
 /**
- * A failure and a budget cut in the SAME run.
+ * A gap and the watermark.
  *
- * Each on its own was already covered; the loss only exists in their product.
- * A unit that fails in isolation is deliberately walked past, so if the budget
- * then dies further along, a resume marker pointing at where it stopped leaves
- * the failed unit unread for the rest of the sweep — and the sweep that later
- * completes advances the watermark over its messages. The resume point must
- * therefore be the EARLIEST unfinished unit, not the last one touched.
+ * The sweep deliberately walks past a unit it cannot read, so one unreadable
+ * space cannot cost the workspace the others. The resume point therefore moves
+ * BEYOND the hole, and nothing in the position alone remembers the hole was
+ * left — which is why the cursor carries `sweepHadGap`. These tests pin both
+ * halves: the window must not advance over a gap, and the gap must not stop the
+ * rest of the workspace from being swept.
+ *
+ * The cut is driven by `maxRequests`, not by wall-clock. "The budget runs out
+ * at the Nth request" is then a counted fact rather than a race, so these
+ * cannot pass vacuously on a slow runner.
  */
-describe("given a unit fails and the budget then runs out later in the same run", () => {
-  function fourConversationWorkspace() {
+describe("given the sweep walked past something it could not read", () => {
+  const CONVERSATIONS = [1, 2, 3, 4];
+
+  function gapWorkspace() {
     const alphaMs = Date.UTC(2026, 0, 6, 9, 0, 0);
-    const ids = [1, 2, 3, 4];
     const conversations: Record<
       string,
       Array<{
@@ -1333,14 +1364,14 @@ describe("given a unit fails and the budget then runs out later in the same run"
         created_timestamp: number;
       }>
     > = {
-      "space-solo": ids.map((n) => ({
+      "space-solo": CONVERSATIONS.map((n) => ({
         conversation_id: `conv-s-${n}`,
         title: `Conversation ${n}`,
         created_timestamp: alphaMs,
       })),
     };
     const messages: Record<string, Array<ReturnType<typeof message>>> = {};
-    for (const n of ids) {
+    for (const n of CONVERSATIONS) {
       messages[`conv-s-${n}`] = [
         message({
           id: `msg-s-${n}`,
@@ -1356,24 +1387,48 @@ describe("given a unit fails and the budget then runs out later in the same run"
     return { conversations, messages, alphaMs, betaMs: alphaMs };
   }
 
-  describe("when the failure came before the conversation it stopped on", () => {
-    it("resumes at the failed conversation, not the one it stopped on", async () => {
-      const workspace = fourConversationWorkspace();
+  /** Runs until the sweep drains, or gives up loudly. */
+  async function sweepToCompletion(params: {
+    adapter: DatabricksGeniePuller;
+    config: DatabricksGeniePullConfig;
+    emitted: Set<string>;
+    /** Continue an in-flight sweep rather than starting one. */
+    from?: string | null;
+    /** Every cursor written along the way, so a test can assert mid-sweep. */
+    seen?: Array<ReturnType<typeof decodeCursor>>;
+  }): Promise<{ drained: ReturnType<typeof decodeCursor>; cursor: string }> {
+    let cursor: string | null = params.from ?? null;
+    for (let run = 0; run < 30; run += 1) {
+      const result = await params.adapter.runOnce(
+        { cursor, credentials: { token: "fixture-token" } },
+        params.config,
+      );
+      for (const event of result.events) {
+        params.emitted.add(event.source_event_id);
+      }
+      cursor = result.cursor;
+      const decoded = decodeCursor(cursor);
+      params.seen?.push(decoded);
+      if (decoded.spaceId === null)
+        return { drained: decoded, cursor: cursor! };
+    }
+    throw new Error("sweep never drained");
+  }
+
+  describe("when the sweep finishes anyway", () => {
+    it("holds the window rather than moving it over the hole", async () => {
+      const workspace = gapWorkspace();
+      let failing = true;
       const fixture = await startFixtureServer({
         workspace,
-        // The second conversation fails in isolation; the third is slow enough
-        // to burn the deadline, so the budget dies at the fourth's turn.
         messagesStatus: (conversationId) =>
-          conversationId === "conv-s-2" ? 429 : undefined,
-        onMessages: async (conversationId) => {
-          if (conversationId === "conv-s-3") {
-            await new Promise((resolve) => setTimeout(resolve, 1_200));
-          }
-        },
+          conversationId === "conv-s-2" && failing ? 429 : undefined,
       });
 
       try {
-        const adapter = new DatabricksGeniePuller();
+        // Small enough that the sweep spans several runs, so the gap has to
+        // survive being carried across them.
+        const adapter = new DatabricksGeniePuller({ maxRequests: 9 });
         const config = adapter.validateConfig({
           adapter: DATABRICKS_GENIE_ADAPTER_ID,
           workspaceUrl: fixture.baseUrl,
@@ -1381,67 +1436,143 @@ describe("given a unit fails and the budget then runs out later in the same run"
           startingAt: "2020-01-01T00:00:00.000Z",
           schedule: "*/15 * * * *",
         });
+        const startedAt = Date.parse("2020-01-01T00:00:00.000Z");
+        const emitted = new Set<string>();
 
-        const first = await adapter.runOnce(
-          {
-            cursor: null,
-            credentials: { token: "fixture-token" },
-            deadlineMs: Date.now() + 900,
-          },
+        const seen: Array<ReturnType<typeof decodeCursor>> = [];
+        const { drained, cursor: drainedCursor } = await sweepToCompletion({
+          adapter,
           config,
-        );
-        const cursor = decodeCursor(first.cursor);
+          emitted,
+          seen,
+        });
 
-        // The assertion that bites. Resuming at conv-s-4 would step over
-        // conv-s-2 for the rest of the sweep, and the watermark would then
-        // move past it.
-        expect(cursor.conversationId).toBe("conv-s-2");
-        expect(cursor.sinceMs).toBe(Date.parse("2020-01-01T00:00:00.000Z"));
+        // The gap must be RECORDED while the sweep is still in flight — that
+        // is the field doing the work. Asserting it on the drained cursor
+        // proves nothing, since a finished sweep always clears it.
+        expect(seen.length).toBeGreaterThan(1);
+        expect(seen.some((c) => c.spaceId !== null && c.sweepHadGap)).toBe(
+          true,
+        );
+
+        // The assertion that bites. The sweep finished, but it never read
+        // conv-s-2 — moving the window here would drop that message for good.
+        expect(drained.sinceMs).toBe(startedAt);
+
+        // Liveness: everything AFTER the hole was still swept. A resume point
+        // pinned at the failure would starve these.
+        expect(emitted).toContain("msg-s-3");
+        expect(emitted).toContain("msg-s-4");
+
+        // And once the conversation heals, the held window means the message is
+        // still inside it and finally lands.
+        failing = false;
+        const healed = new Set<string>();
+        // Continue from the cursor phase 1 actually wrote — starting fresh
+        // would pass even if phase 1 had wrongly advanced the window.
+        const { drained: after } = await sweepToCompletion({
+          adapter,
+          config,
+          emitted: healed,
+          from: drainedCursor,
+        });
+        expect(healed).toContain("msg-s-2");
+        // No gap this time, so the window is finally allowed to move.
+        expect(after.sinceMs).toBeGreaterThan(startedAt);
       } finally {
         await fixture.close();
       }
-    }, 60_000);
+    }, 120_000);
   });
 
-  describe("when the failed space came before the space it stopped on", () => {
-    it("resumes at the failed space, not the one it stopped on", async () => {
+  describe("when a whole space stays unreadable", () => {
+    it("keeps sweeping the spaces behind it instead of starving them", async () => {
       const workspace = createFixtureWorkspace();
       const fixture = await startFixtureServer({
         workspace,
-        // space-alpha sorts first and fails in isolation; space-beta is slow
-        // enough that the budget dies before space-orphan's turn.
+        // space-alpha sorts first and never recovers.
         conversationsStatus: (spaceId) =>
           spaceId === "space-alpha" ? 403 : undefined,
-        onMessages: async () => {
-          await new Promise((resolve) => setTimeout(resolve, 700));
-        },
       });
+
+      try {
+        // Three requests is deliberate: spaces list, space-alpha's 403, then
+        // space-beta's conversation listing — and the budget dies before
+        // beta's messages, so a resume point MUST be written. At a larger
+        // budget the sweep drains in one run, no resume point is ever
+        // recorded, and the test would pass against the starving version too.
+        const adapter = new DatabricksGeniePuller({ maxRequests: 3 });
+        const config = adapter.validateConfig({
+          adapter: DATABRICKS_GENIE_ADAPTER_ID,
+          workspaceUrl: fixture.baseUrl,
+          spaceIds: ["space-alpha", "space-beta"],
+          startingAt: "2020-01-01T00:00:00.000Z",
+          schedule: "*/15 * * * *",
+        });
+        const startedAt = Date.parse("2020-01-01T00:00:00.000Z");
+        const emitted = new Set<string>();
+
+        const { drained } = await sweepToCompletion({
+          adapter,
+          config,
+          emitted,
+        });
+
+        // The space behind the permanently broken one is still read. Resuming
+        // AT the failure would pin the sweep there and this would never arrive.
+        expect(emitted).toContain("msg-beta-1");
+        // ...and the window stays put for as long as the hole is there.
+        expect(drained.sinceMs).toBe(startedAt);
+      } finally {
+        await fixture.close();
+      }
+    }, 120_000);
+  });
+});
+
+/**
+ * A resume position with no sweep anchor.
+ *
+ * Cursors written before the anchor existed have exactly this shape. Honouring
+ * the position while stamping a fresh anchor would skip every space before it
+ * and then move the window from the new anchor — losing everything skipped.
+ */
+describe("given a cursor carrying a position but no sweep anchor", () => {
+  describe("when the puller reads it", () => {
+    it("ignores the position and sweeps the workspace from the top", async () => {
+      const workspace = createFixtureWorkspace();
+      const fixture = await startFixtureServer({ workspace });
 
       try {
         const adapter = new DatabricksGeniePuller();
         const config = adapter.validateConfig({
           adapter: DATABRICKS_GENIE_ADAPTER_ID,
           workspaceUrl: fixture.baseUrl,
-          spaceIds: ["space-alpha", "space-beta", "space-orphan"],
+          spaceIds: ["space-alpha", "space-beta"],
           startingAt: "2020-01-01T00:00:00.000Z",
           schedule: "*/15 * * * *",
         });
 
-        const first = await adapter.runOnce(
+        const result = await adapter.runOnce(
           {
-            cursor: null,
+            // The pre-anchor shape: a position, no sweepStartedAtMs.
+            cursor: JSON.stringify({
+              sinceMs: Date.parse("2020-01-01T00:00:00.000Z"),
+              spaceId: "space-beta",
+            }),
             credentials: { token: "fixture-token" },
-            deadlineMs: Date.now() + 500,
           },
           config,
         );
-        const cursor = decodeCursor(first.cursor);
 
-        // Resuming at space-orphan would leave space-alpha unread for the rest
-        // of the sweep, and the completing sweep would move the watermark past
-        // everything in it.
-        expect(cursor.spaceId).toBe("space-alpha");
-        expect(cursor.sinceMs).toBe(Date.parse("2020-01-01T00:00:00.000Z"));
+        const emitted = new Set(
+          result.events.map((event) => event.source_event_id),
+        );
+        // space-alpha sorts BEFORE the stale position. Honouring the position
+        // would skip it entirely and the completing sweep would then move the
+        // window past its messages.
+        expect(emitted).toContain("msg-alpha-1");
+        expect(emitted).toContain("msg-beta-1");
       } finally {
         await fixture.close();
       }
@@ -1449,6 +1580,58 @@ describe("given a unit fails and the budget then runs out later in the same run"
   });
 });
 
+/**
+ * The space walk's order is ours, not the workspace's.
+ *
+ * Resuming skips everything before the resume point, which is only sound if a
+ * space cannot move across it between runs — and this endpoint carries no
+ * ordering guarantee.
+ */
+describe("given the workspace lists its spaces in a different order each run", () => {
+  describe("when a sweep resumes", () => {
+    it("walks them in a stable order so a resume point cannot be jumped", async () => {
+      const workspace = createFixtureWorkspace();
+      const fixture = await startFixtureServer({
+        workspace,
+        // Hand them back REVERSED, which an endpoint with no documented order
+        // is entitled to do from one run to the next.
+        spacesOrder: (ids) => [...ids].reverse(),
+      });
+
+      try {
+        const adapter = new DatabricksGeniePuller();
+        const config = adapter.validateConfig({
+          adapter: DATABRICKS_GENIE_ADAPTER_ID,
+          workspaceUrl: fixture.baseUrl,
+          // Discovery path — the only one where the server's order reaches us.
+          spaceIds: [],
+          startingAt: "2020-01-01T00:00:00.000Z",
+          schedule: "*/15 * * * *",
+        });
+
+        await adapter.runOnce(
+          { cursor: null, credentials: { token: "fixture-token" } },
+          config,
+        );
+
+        // The assertion that bites: the walk order is OURS. Take the server's
+        // order and a resume point means a different thing on every run, so a
+        // space can sit after it once and before it next time — read never,
+        // and then dropped when the sweep completes.
+        const walked = fixture.conversationSpaceIds;
+        expect(walked.length).toBeGreaterThan(1);
+        expect(walked).toEqual([...walked].sort());
+        // ...and the server really did hand them over in the other order, so
+        // the sort above is what produced this and not the fixture.
+        expect(fixture.spacesServed).toEqual(
+          [...fixture.spacesServed].sort().reverse(),
+        );
+      } finally {
+        await fixture.close();
+      }
+    }, 60_000);
+  });
+});
 /**
  * One space bigger than a whole run's budget.
  *
@@ -1586,6 +1769,155 @@ describe("given one space too large for a single run's budget", () => {
         await fixture.close();
       }
     }, 120_000);
+  });
+});
+
+/**
+ * The unit of `created_timestamp` is not documented, and the two candidates
+ * fail in opposite directions. Databricks' REST reference and its Genie guide
+ * both example the field as `1719769718` — ten digits, seconds — while the rest
+ * of the platform (Jobs, Dashboards) stamps milliseconds.
+ *
+ * Reading seconds as milliseconds is the dangerous half: every message lands in
+ * January 1970, sits behind a first run's `now − 30 days` watermark, and the
+ * source reports nothing at all with no error anywhere. So the adapter reads
+ * either unit rather than betting on one, and this pins both.
+ */
+describe("given Databricks stamps created_timestamp in seconds", () => {
+  /** Straight out of the published example response. */
+  const DOCUMENTED_SECONDS = 1_719_769_718;
+
+  let workspace: FixtureWorkspace;
+  let fixture: Awaited<ReturnType<typeof startFixtureServer>>;
+
+  beforeAll(async () => {
+    workspace = createFixtureWorkspace();
+    // One message restamped in the wire format the docs publish. Everything
+    // else in the fixture stays in milliseconds, so this run proves the two
+    // units survive side by side rather than proving a global switch.
+    workspace.messages["conv-beta-1"]![0]!.created_timestamp =
+      DOCUMENTED_SECONDS;
+    fixture = await startFixtureServer({ workspace });
+  });
+
+  afterAll(async () => {
+    await fixture.close();
+  });
+
+  describe("when the sweep reads that message", () => {
+    it("places it in 2024 rather than nineteen days after the epoch", async () => {
+      const adapter = new DatabricksGeniePuller();
+      const config = adapter.validateConfig({
+        adapter: DATABRICKS_GENIE_ADAPTER_ID,
+        workspaceUrl: fixture.baseUrl,
+        spaceIds: ["space-beta"],
+        // Before the documented instant, so the message is inside the window
+        // when read correctly. Read as milliseconds it is 1970-01-20, which is
+        // behind ANY watermark — including this one.
+        startingAt: "2024-06-01T00:00:00.000Z",
+        schedule: "*/15 * * * *",
+      });
+
+      const result = await adapter.runOnce(
+        { cursor: null, credentials: { token: "fixture-token" } },
+        config,
+      );
+
+      const beta = result.events.find(
+        (e) => e.source_event_id === "msg-beta-1",
+      );
+      // The assertion that bites: on the old code there is no event at all,
+      // because 1.7e9 milliseconds is behind the configured watermark.
+      expect(beta).toBeDefined();
+      expect(beta!.event_timestamp).toBe("2024-06-30T17:48:38.000Z");
+    }, 60_000);
+  });
+});
+
+/**
+ * Genie fills `attachments` progressively — a message can be read back with the
+ * question but without the generated SQL, which is the artefact this adapter
+ * exists to capture. Both sinks replace on the message id, so a second read
+ * corrects the first; the risk is that no second read ever happens, because a
+ * completed sweep moves the watermark past a message that was never finished.
+ */
+describe("given a message still being answered when the sweep reads it", () => {
+  let workspace: FixtureWorkspace;
+  let fixture: Awaited<ReturnType<typeof startFixtureServer>>;
+
+  beforeAll(async () => {
+    workspace = createFixtureWorkspace();
+    const inFlight = workspace.messages["conv-beta-1"]![0]!;
+    // Mid-flight, exactly as Databricks serves it: the question is there, the
+    // warehouse has not answered, so no query attachment exists yet.
+    inFlight.status = "EXECUTING_QUERY";
+    inFlight.attachments = [];
+    fixture = await startFixtureServer({ workspace });
+  });
+
+  afterAll(async () => {
+    await fixture.close();
+  });
+
+  describe("when it completes after that run", () => {
+    it("holds the watermark so the generated SQL is still picked up", async () => {
+      const adapter = new DatabricksGeniePuller();
+      const config = adapter.validateConfig({
+        adapter: DATABRICKS_GENIE_ADAPTER_ID,
+        workspaceUrl: fixture.baseUrl,
+        spaceIds: ["space-beta"],
+        startingAt: "2020-01-01T00:00:00.000Z",
+        schedule: "*/15 * * * *",
+      });
+      const credentials = { token: "fixture-token" };
+
+      const first = await adapter.runOnce(
+        { cursor: null, credentials },
+        config,
+      );
+
+      // The record lands immediately — a question asked is a governance fact
+      // whether or not the warehouse has answered — but with no SQL on it.
+      const early = first.events.find(
+        (e) => e.source_event_id === "msg-beta-1",
+      );
+      expect(early).toBeDefined();
+      expect(early!.extra?.generatedSql).toBe("");
+
+      // The assertion that bites. The sweep read every space and every
+      // conversation, so on the old code it is "complete" and the watermark
+      // moves past this message for good. (The flag itself is not asserted:
+      // it is scoped to the sweep in flight and a drained sweep clears it, so
+      // the watermark is the only durable evidence the hold happened.)
+      const held = decodeCursor(first.cursor);
+      expect(held.sinceMs).toBe(Date.parse("2020-01-01T00:00:00.000Z"));
+
+      // Databricks finishes the answer between the two runs.
+      const settled = workspace.messages["conv-beta-1"]![0]!;
+      settled.status = "COMPLETED";
+      settled.attachments = [
+        sqlAttachment("late-beta-1", "SELECT `pickup_zip` FROM `trips`", 9),
+      ];
+
+      const second = await adapter.runOnce(
+        { cursor: first.cursor, credentials },
+        config,
+      );
+
+      const corrected = second.events.find(
+        (e) => e.source_event_id === "msg-beta-1",
+      );
+      expect(corrected).toBeDefined();
+      expect(corrected!.extra?.generatedSql).toBe(
+        "SELECT `pickup_zip` FROM `trips`",
+      );
+
+      // Nothing is unsettled any more, so the window is finally allowed to move.
+      const done = decodeCursor(second.cursor);
+      expect(done.sinceMs).toBeGreaterThan(
+        Date.parse("2020-01-01T00:00:00.000Z"),
+      );
+    }, 60_000);
   });
 });
 

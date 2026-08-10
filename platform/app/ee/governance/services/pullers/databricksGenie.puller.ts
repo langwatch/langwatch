@@ -17,8 +17,10 @@
  * numeric author id into a person. A declarative field mapping has nowhere to
  * put a join.
  *
- * Three things about the upstream API that are load-bearing, each verified
- * against a live workspace rather than read off the docs:
+ * Three things about the upstream API that are load-bearing. The live evidence
+ * tier at the bottom of the integration suite is what settles them against a
+ * real workspace; it is skipped without a credential, so where a claim below
+ * rests on the docs alone it says so:
  *
  *   `include_all=true` is NOT optional. Without it the conversations endpoint
  *   returns only the CALLER'S OWN conversations. A governance puller that
@@ -34,11 +36,17 @@
  *   an approximation of what the warehouse actually charged. Claiming `exact`
  *   would assert we hold the invoice for a question we can only see half of.
  *
- *   A message is immutable, so restatement never happens here. The dimensions
- *   are the coordinates of the message itself and nothing about the author, so
- *   an identity that resolves differently on a later pull (a backfilled SCIM
- *   `externalId`, a renamed account) re-labels the record instead of minting a
- *   second one.
+ *   A message is NOT immutable while it is being answered. Databricks fills
+ *   `attachments` progressively, so a message read at `IN_PROGRESS` or
+ *   `EXECUTING_QUERY` can carry the question without the generated SQL. The
+ *   record is keyed on the message id and both sinks replace on it, so a later
+ *   read overwrites rather than duplicating — but only if a later read happens,
+ *   which is why an unsettled message holds the watermark (`isSettling`).
+ *
+ *   The dimensions are the coordinates of the message itself and nothing about
+ *   the author, so an identity that resolves differently on a later pull (a
+ *   backfilled SCIM `externalId`, a renamed account) re-labels the record
+ *   instead of minting a second one.
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -103,6 +111,69 @@ export type DatabricksGeniePullConfig = z.infer<
 const WATERMARK_LAG_MS = 5 * 60 * 1000;
 
 /**
+ * Anything below this is epoch SECONDS; anything above it is epoch
+ * MILLISECONDS. `1e11` splits them with no overlap that can occur in practice:
+ * as milliseconds it is 1973-03-03, as seconds it is the year 5138.
+ *
+ * The unit is not documented. Databricks' own reference and its Genie guide
+ * both example `created_timestamp` as `1719769718` — ten digits, seconds — while
+ * most other Databricks APIs (Jobs, Dashboards) stamp milliseconds. We could
+ * not settle it against a live workspace, and the failure mode of guessing
+ * wrong is the one this adapter exists to avoid: a first run's watermark is
+ * `now − 30 days`, so seconds read as milliseconds land in January 1970, sit
+ * behind every watermark, and the source reports zero messages forever without
+ * a single error. Detecting the unit costs one comparison and cannot be wrong
+ * for any timestamp this century.
+ */
+const EPOCH_SECONDS_CEILING = 1e11;
+
+/** Databricks' integer timestamp, in whichever unit it arrived, as epoch ms. */
+function toEpochMs(value: number): number {
+  return value < EPOCH_SECONDS_CEILING ? value * 1000 : value;
+}
+
+/**
+ * Statuses that mean the message will not change again.
+ *
+ * Genie populates `attachments` PROGRESSIVELY: a message is answerable while it
+ * is still `PENDING_WAREHOUSE` or `EXECUTING_QUERY`, and the generated SQL —
+ * the artefact this adapter exists to capture — may not be there yet. Reading
+ * one mid-flight and letting the watermark move past it loses that SQL
+ * permanently, because nothing ever asks for the message again.
+ *
+ * An UNRECOGNISED non-empty status counts as non-terminal on purpose. A status
+ * Databricks adds later is far more likely to be another in-flight state than a
+ * new way of being finished, and being wrong in this direction costs a re-read
+ * where the other direction costs the record.
+ *
+ * A message with no status at all is left alone: some responses omit it, and
+ * treating absent as in-flight would hold the watermark on every sweep forever.
+ */
+const TERMINAL_MESSAGE_STATUSES = new Set([
+  "COMPLETED",
+  "FAILED",
+  "CANCELLED",
+  "QUERY_RESULT_EXPIRED",
+]);
+
+/**
+ * How long a message is given to settle before the sweep stops waiting for it.
+ *
+ * Holding the watermark is what makes an in-flight message get re-read, and a
+ * message that never reaches a terminal status would hold it forever — turning
+ * a bounded re-read into a permanent one over the whole window. After this it
+ * is taken as it stands: whatever attachments it had are what we keep.
+ */
+const PENDING_SETTLE_GRACE_MS = 60 * 60 * 1000;
+
+/** Whether this message may still gain the SQL we are here to record. */
+function isSettling(status: string | null, createdMs: number): boolean {
+  if (!status) return false;
+  if (TERMINAL_MESSAGE_STATUSES.has(status)) return false;
+  return Date.now() - createdMs < PENDING_SETTLE_GRACE_MS;
+}
+
+/**
  * The durable cursor.
  *
  * `sinceMs` is the watermark: a message is new when it was created after it.
@@ -125,6 +196,40 @@ const cursorSchema = z.object({
    * picks up where the last one stopped.
    */
   conversationId: z.string().nullable().default(null),
+  /**
+   * Whether anything was SKIPPED OVER earlier in the sweep now in flight.
+   *
+   * This is what separates "where do I carry on from" from "was this sweep
+   * whole", and the two must not be the same answer. A space that 403s is
+   * deliberately walked past so one unreadable space cannot cost the workspace
+   * the others — but the resume point then moves beyond it, and once the sweep
+   * finishes, nothing in the position alone remembers that a hole was left. The
+   * watermark would advance over it.
+   *
+   * Making the resume point itself hang back at the hole fixes the loss and
+   * buys starvation: a permanently unreadable space would pin the sweep there
+   * forever and every space behind it would stop being read at all. So the
+   * position keeps moving, and this flag — carried for as long as the sweep is
+   * in flight — holds the watermark instead. A sweep with a gap finishes, keeps
+   * its window, and starts over; nothing is lost and nothing is starved.
+   */
+  sweepHadGap: z.boolean().default(false),
+  /**
+   * Fingerprint of the space set the in-flight sweep is walking.
+   *
+   * Resuming skips every space before the resume point on the assumption that
+   * an earlier run of this sweep already read them. That assumption breaks the
+   * moment the resolved set GAINS a space sorting before the point — an admin
+   * adding one to `spaceIds`, or a permission grant making one visible to
+   * discovery. It would be skipped for the rest of the sweep, and the sweep
+   * would then complete with no gap recorded and move the watermark over
+   * everything in it.
+   *
+   * So the set is fingerprinted. A sweep that resumes into a different set is
+   * not a resumption at all: the position is dropped and the sweep restarts
+   * from the top, off the unchanged watermark, which re-reads everything.
+   */
+  spaceSetFingerprint: z.string().nullable().default(null),
   /**
    * When the sweep currently IN FLIGHT began, or null when none is.
    *
@@ -196,7 +301,13 @@ function withoutOrphanedResume(cursor: GenieCursor): GenieCursor {
     { cursor },
     "databricks genie cursor carries a resume position with no sweep anchor; restarting the sweep from the top",
   );
-  return { ...cursor, spaceId: null, conversationId: null };
+  return {
+    ...cursor,
+    spaceId: null,
+    conversationId: null,
+    sweepHadGap: false,
+    spaceSetFingerprint: null,
+  };
 }
 
 function parseCursor(
@@ -220,6 +331,8 @@ function parseCursor(
     sinceMs: Number.isFinite(sinceMs) ? sinceMs : defaultSinceMs(),
     spaceId: null,
     conversationId: null,
+    sweepHadGap: false,
+    spaceSetFingerprint: null,
     sweepStartedAtMs: null,
   };
 }
@@ -361,15 +474,21 @@ function genieIdentityFromScimUser(
  */
 class RunBudget {
   private requests = 0;
+  private readonly maxRequests: number;
 
-  constructor(private readonly deadlineMs: number | undefined) {}
+  constructor(
+    private readonly deadlineMs: number | undefined,
+    maxRequests?: number,
+  ) {
+    this.maxRequests = maxRequests ?? MAX_REQUESTS_PER_RUN;
+  }
 
   spend(): void {
     this.requests += 1;
   }
 
   exhausted(): boolean {
-    if (this.requests >= MAX_REQUESTS_PER_RUN) return true;
+    if (this.requests >= this.maxRequests) return true;
     return this.deadlineMs !== undefined && Date.now() > this.deadlineMs;
   }
 }
@@ -377,12 +496,18 @@ class RunBudget {
 /**
  * What one sweep read, and whether it read all of it.
  *
- * `complete` is the only thing the watermark is allowed to depend on, and it
- * is false for every reason a sweep might have left something behind: the
- * request budget ran out, the deadline hit, a space returned 403, one
- * conversation 429'd. They differ in cause and not in consequence — data we did
- * not fetch — so they collapse to one flag rather than a taxonomy the caller
- * would have to re-derive the same answer from.
+ * TWO flags gate the watermark, and it needs both:
+ *
+ *   `complete` — the walk read everything it REACHED. False when the budget
+ *   ran out, the deadline hit, or a listing was truncated; in every one of
+ *   those cases the walk stopped where it was and the resume point says where.
+ *
+ *   `hadGap` — the walk reached PAST something it could not read. The resume
+ *   point cannot express this, because the position moved beyond the hole.
+ *
+ * A sweep is whole only when it is complete AND had no gap. `hadGap` is
+ * sweep-scoped here, not run-scoped: it is seeded from the in-flight cursor,
+ * so a space skipped in run 1 still holds the watermark when run 4 finishes.
  */
 interface SweepResult {
   events: NormalizedPullEvent[];
@@ -391,6 +516,17 @@ interface SweepResult {
   resumeSpaceId: string | null;
   /** Where inside that space to start, or null to take it from the top. */
   resumeConversationId: string | null;
+  /**
+   * Whether this run walked PAST something it could not read.
+   *
+   * Distinct from `complete`, which also covers the ordinary "ran out of
+   * budget, will carry on next run" case. A gap is the case the resume point
+   * cannot express, because the position moved beyond the hole — see
+   * `cursorSchema.sweepHadGap`.
+   */
+  hadGap: boolean;
+  /** The space set this sweep is walking, for the next run to compare against. */
+  spaceSetFingerprint: string;
 }
 
 /** One page of a Databricks list endpoint, and whether more were left unread. */
@@ -417,18 +553,28 @@ interface PagedRead<T> {
 function spaceWalkPlan({
   spaces,
   resumeSpaceId,
+  resumeFingerprint,
 }: {
   spaces: PagedRead<z.infer<typeof spaceSchema>>;
   resumeSpaceId: string | null;
+  resumeFingerprint: string | null;
 }): {
   ordered: Array<z.infer<typeof spaceSchema>>;
   startAt: number;
   resumable: boolean;
+  fingerprint: string;
 } {
   const ordered = [...spaces.items].sort((a, b) =>
     a.space_id < b.space_id ? -1 : a.space_id > b.space_id ? 1 : 0,
   );
-  const resumable = spaces.complete;
+  const fingerprint = ordered.map((s) => s.space_id).join("\u0000");
+  // A set that changed under the sweep invalidates the position outright — see
+  // `cursorSchema.spaceSetFingerprint`. Deletion alone is already safe (the
+  // `Math.max` below restarts from the top), but an ADDITION sorting before the
+  // resume point would be skipped and then dropped.
+  const resumable =
+    spaces.complete &&
+    (resumeFingerprint === null || resumeFingerprint === fingerprint);
   // An id no longer in the list means the space was deleted since the cursor
   // was written; starting over only ever re-reads, and the watermark is held.
   const startAt =
@@ -438,7 +584,7 @@ function spaceWalkPlan({
           0,
         )
       : 0;
-  return { ordered, startAt, resumable };
+  return { ordered, startAt, resumable, fingerprint };
 }
 
 /**
@@ -487,29 +633,7 @@ function conversationWalkPlan({
 }
 
 /**
- * Remembers the FIRST thing a walk did not finish.
- *
- * Both loops in this file need the same rule and get it wrong the same way
- * without it: a unit that fails in isolation is walked past deliberately, so
- * the unit the budget finally stops on is not necessarily the earliest one
- * still owed. Resuming at the later one silently abandons the earlier, and the
- * sweep that eventually completes moves the watermark over it.
- */
-class FirstUnfinished<T> {
-  private value: T | null = null;
-
-  note(candidate: T): void {
-    this.value ??= candidate;
-  }
-
-  /** The earliest unfinished unit, or `fallback` when nothing failed yet. */
-  resolve(fallback: T): T {
-    return this.value ?? fallback;
-  }
-}
-
-/**
- * The result for a sweep that stopped early, owing the given space.
+ * The result for a sweep that stopped early, on the given space.
  *
  * The resume point is dropped when the space listing was not resumable, which
  * restarts the sweep from the top rather than resuming into a position that was
@@ -517,18 +641,24 @@ class FirstUnfinished<T> {
  */
 function sweptUpTo({
   events,
-  resume,
-  plan,
+  space,
+  at,
+  hadGap,
+  spacePlan,
 }: {
   events: NormalizedPullEvent[];
-  resume: { space: z.infer<typeof spaceSchema>; at: string | null };
-  plan: { resumable: boolean };
+  space: z.infer<typeof spaceSchema>;
+  at: string | null;
+  hadGap: boolean;
+  spacePlan: { resumable: boolean; fingerprint: string };
 }): SweepResult {
   return {
     events,
     complete: false,
-    resumeSpaceId: plan.resumable ? resume.space.space_id : null,
-    resumeConversationId: plan.resumable ? resume.at : null,
+    resumeSpaceId: spacePlan.resumable ? space.space_id : null,
+    resumeConversationId: spacePlan.resumable ? at : null,
+    hadGap,
+    spaceSetFingerprint: spacePlan.fingerprint,
   };
 }
 
@@ -542,16 +672,21 @@ function sweptUpTo({
 function stoppedAt({
   items,
   conversation,
-  plan,
+  hadGap,
+  conversationPlan,
 }: {
   items: NormalizedPullEvent[];
   conversation: z.infer<typeof conversationSchema>;
-  plan: { resumable: boolean };
+  hadGap: boolean;
+  conversationPlan: { resumable: boolean };
 }): SpaceRead {
   return {
     items,
     complete: false,
-    resumeConversationId: plan.resumable ? conversation.conversation_id : null,
+    resumeConversationId: conversationPlan.resumable
+      ? conversation.conversation_id
+      : null,
+    hadGap,
   };
 }
 
@@ -566,8 +701,12 @@ interface SpaceRead {
    * whose conversation LISTING was itself cut short reports `complete: false`
    * with a null resume point, because a partial list has no trustworthy
    * position in it to resume from.
+   *
+   * `hadGap` says the walk carried on past a conversation it could not read,
+   * which the resume point cannot express — see `cursorSchema.sweepHadGap`.
    */
   resumeConversationId: string | null;
+  hadGap: boolean;
 }
 
 /**
@@ -600,6 +739,25 @@ export class DatabricksGeniePuller
 {
   readonly id: string = DATABRICKS_GENIE_ADAPTER_ID;
 
+  /**
+   * Requests one run may spend before handing the rest to the next.
+   *
+   * Production takes `MAX_REQUESTS_PER_RUN`. Tests lower it so "the budget runs
+   * out at the Nth request" is a counted fact rather than a race against
+   * wall-clock — the only way to drive a resume path deterministically. It sits
+   * here rather than on `PullRunOptions` because no other adapter honours it,
+   * and a knob on the shared contract that five of six adapters ignore is a
+   * promise the next adapter author would reasonably believe.
+   */
+  private readonly maxRequests: number;
+
+  constructor(options?: { maxRequests?: number }) {
+    this.maxRequests = Math.max(
+      1,
+      options?.maxRequests ?? MAX_REQUESTS_PER_RUN,
+    );
+  }
+
   validateConfig(config: unknown): DatabricksGeniePullConfig {
     return databricksGeniePullConfigSchema.parse(config);
   }
@@ -616,7 +774,7 @@ export class DatabricksGeniePuller
     }
 
     const cursor = parseCursor(options.cursor, config);
-    const budget = new RunBudget(options.deadlineMs);
+    const budget = new RunBudget(options.deadlineMs, this.maxRequests);
     // Stamped BEFORE the first request when a FRESH sweep begins, and carried
     // unchanged through every run that resumes it. The next watermark is
     // derived from this instant, so anything created while the sweep is
@@ -651,24 +809,7 @@ export class DatabricksGeniePuller
 
     return {
       events: sweep.events,
-      cursor: encode({
-        sinceMs: nextWatermark({
-          previousMs: cursor.sinceMs,
-          sweepStartedAtMs,
-          complete: sweep.complete,
-        }),
-        spaceId: sweep.resumeSpaceId,
-        // Meaningless without a space to resume into, so it is cleared with it
-        // rather than left behind to be matched against some later sweep's
-        // space by accident.
-        conversationId:
-          sweep.resumeSpaceId === null ? null : sweep.resumeConversationId,
-        // Held only while the sweep is still in flight. Cleared the moment it
-        // stops resuming, so the next run stamps a fresh anchor rather than
-        // inheriting a stale one and re-reading from it forever.
-        sweepStartedAtMs:
-          sweep.resumeSpaceId === null ? null : sweepStartedAtMs,
-      }),
+      cursor: encode(nextCursor({ previous: cursor, sweep, sweepStartedAtMs })),
       errorCount: 0,
     };
   }
@@ -710,20 +851,19 @@ export class DatabricksGeniePuller
     const spaces = await this.resolveSpaces({ config, token, options, budget });
     let complete = spaces.complete;
 
-    const plan = spaceWalkPlan({ spaces, resumeSpaceId: cursor.spaceId });
+    const spacePlan = spaceWalkPlan({
+      spaces,
+      resumeSpaceId: cursor.spaceId,
+      resumeFingerprint: cursor.spaceSetFingerprint,
+    });
+    // Seeded from the sweep already in flight, so this means "this SWEEP walked
+    // past something", not "this run did". The resume point keeps moving
+    // forward so the rest of the workspace still gets swept; this is what stops
+    // the watermark once the sweep finally finishes.
+    let hadGap = cursor.sweepHadGap;
 
-    // Where the next run picks up: the earliest space this sweep did not
-    // finish, NOT the one the budget happened to stop on. They differ whenever
-    // a space is walked past — one 403s in isolation and a later one runs out
-    // of budget — and resuming at the later one abandons the earlier for the
-    // rest of the sweep.
-    const owed = new FirstUnfinished<{
-      space: z.infer<typeof spaceSchema>;
-      at: string | null;
-    }>();
-
-    for (let i = plan.startAt; i < plan.ordered.length; i += 1) {
-      const space = plan.ordered[i]!;
+    for (let i = spacePlan.startAt; i < spacePlan.ordered.length; i += 1) {
+      const space = spacePlan.ordered[i]!;
       // Only the space the cursor actually stopped in inherits the conversation
       // resume point. Every space after it is taken from the top.
       const resumeConversationId =
@@ -736,8 +876,10 @@ export class DatabricksGeniePuller
         // an earlier run already made inside it.
         return sweptUpTo({
           events,
-          resume: owed.resolve({ space, at: resumeConversationId }),
-          plan,
+          space,
+          at: resumeConversationId,
+          hadGap,
+          spacePlan,
         });
       }
 
@@ -752,24 +894,22 @@ export class DatabricksGeniePuller
         resumeConversationId,
       });
       events.push(...read.items);
-      if (!read.complete) {
-        complete = false;
-        // `read.resumeConversationId` narrows a re-read of this space to the
-        // conversation it stopped on, which is what lets a space bigger than one
-        // run's whole budget finish across several runs. It is null for an
-        // isolated failure, which correctly restarts the space from the top.
-        owed.note({ space, at: read.resumeConversationId });
-      }
+      complete = complete && read.complete;
+      // A gap inside the space, or this whole space unreadable. Either way the
+      // sweep is about to move past something it never saw.
+      hadGap = hadGap || read.hadGap;
 
-      // Out of budget with something unfinished — stop, and resume at the
-      // earliest space still owed rather than this one. An isolated failure
-      // with budget left falls through and keeps going, so one unreadable
-      // space cannot wedge the sweep before the rest of the workspace.
+      // Out of budget with this space unfinished — resume ON it, so its tail is
+      // re-read rather than half-skipped. `read.resumeConversationId` narrows
+      // that re-read to where it stopped, which is what lets a space bigger
+      // than one run's whole budget finish across several runs.
       if (!read.complete && budget.exhausted()) {
         return sweptUpTo({
           events,
-          resume: owed.resolve({ space, at: read.resumeConversationId }),
-          plan,
+          space,
+          at: read.resumeConversationId,
+          hadGap,
+          spacePlan,
         });
       }
     }
@@ -779,6 +919,8 @@ export class DatabricksGeniePuller
       complete,
       resumeSpaceId: null,
       resumeConversationId: null,
+      hadGap,
+      spaceSetFingerprint: spacePlan.fingerprint,
     };
   }
 
@@ -831,9 +973,19 @@ export class DatabricksGeniePuller
       space,
     });
     if (!conversations)
-      return { items: [], complete: false, resumeConversationId: null };
+      // The whole space is unreadable. The sweep carries on to the others, so
+      // this is a gap by definition.
+      return {
+        items: [],
+        complete: false,
+        resumeConversationId: null,
+        hadGap: true,
+      };
 
-    const plan = conversationWalkPlan({ conversations, resumeConversationId });
+    const conversationPlan = conversationWalkPlan({
+      conversations,
+      resumeConversationId,
+    });
     const walked = await this.walkConversations({
       config,
       token,
@@ -842,7 +994,7 @@ export class DatabricksGeniePuller
       space,
       sinceMs,
       identities,
-      plan,
+      conversationPlan,
     });
 
     // A truncated LISTING keeps the space incomplete even when everything the
@@ -870,7 +1022,7 @@ export class DatabricksGeniePuller
     space,
     sinceMs,
     identities,
-    plan,
+    conversationPlan,
   }: {
     config: DatabricksGeniePullConfig;
     token: string;
@@ -879,65 +1031,120 @@ export class DatabricksGeniePuller
     space: z.infer<typeof spaceSchema>;
     sinceMs: number;
     identities: Map<number, GenieIdentity>;
-    plan: ReturnType<typeof conversationWalkPlan>;
+    conversationPlan: ReturnType<typeof conversationWalkPlan>;
   }): Promise<SpaceRead> {
     const events: NormalizedPullEvent[] = [];
     let complete = true;
-    // The earliest conversation this walk did not finish. Same argument as the
-    // space loop one level up.
-    const owed = new FirstUnfinished<z.infer<typeof conversationSchema>>();
+    // Set when the walk carries on past a conversation it could not read.
+    let hadGap = false;
 
-    for (let i = plan.startAt; i < plan.ordered.length; i += 1) {
-      const conversation = plan.ordered[i]!;
+    for (
+      let i = conversationPlan.startAt;
+      i < conversationPlan.ordered.length;
+      i += 1
+    ) {
+      const conversation = conversationPlan.ordered[i]!;
       if (budget.exhausted()) {
         return stoppedAt({
           items: events,
-          conversation: owed.resolve(conversation),
-          plan,
+          conversation,
+          hadGap,
+          conversationPlan,
         });
       }
 
-      const read = await this.isolate({
-        what: "messages",
-        context: {
-          spaceId: space.space_id,
-          conversationId: conversation.conversation_id,
-        },
-        run: () =>
-          this.conversationMessages({
-            config,
-            token,
-            options,
-            budget,
-            space,
-            conversation,
-            sinceMs,
-            identities,
-          }),
+      const step = await this.readConversation({
+        config,
+        token,
+        options,
+        budget,
+        space,
+        conversation,
+        sinceMs,
+        identities,
       });
 
-      if (read) events.push(...read.items);
-      // Null is an isolated failure on this one conversation; false means its
-      // pages were cut short. Both leave the space incomplete.
-      if (!read?.complete) {
-        complete = false;
-        owed.note(conversation);
-      }
+      events.push(...step.events);
+      complete = complete && !step.unfinished;
+      // Both hold the watermark, for opposite reasons: `failed` is something we
+      // could not read, `pending` is something we read too early.
+      hadGap = hadGap || step.failed || step.pending;
 
-      // Out of budget with something unfinished — stop, and resume at the
-      // earliest conversation still owed rather than this one. An isolated
-      // failure with budget still left falls through and keeps going, so one
-      // broken conversation cannot wedge the whole space.
-      if (!read?.complete && budget.exhausted()) {
+      // Out of budget with this conversation unfinished — resume ON it so its
+      // tail is re-read. An isolated failure with budget still left falls
+      // through and keeps going, so one broken conversation cannot wedge the
+      // space; `hadGap` is what stops the watermark for it instead.
+      if (step.unfinished && budget.exhausted()) {
         return stoppedAt({
           items: events,
-          conversation: owed.resolve(conversation),
-          plan,
+          conversation,
+          hadGap,
+          conversationPlan,
         });
       }
     }
 
-    return { items: events, complete, resumeConversationId: null };
+    return { items: events, complete, resumeConversationId: null, hadGap };
+  }
+
+  /**
+   * One conversation folded into the walk: what it produced, and how it ended.
+   *
+   * Isolated — a single conversation the credential cannot see, or one that
+   * 429s, must not cost the space the rest of its conversations. `failed` is
+   * that case and becomes a gap, which holds the watermark. `unfinished` also
+   * covers a clean budget cut partway through its pages, which is NOT a gap
+   * because the walk stops right there rather than stepping over anything.
+   */
+  private async readConversation({
+    config,
+    token,
+    options,
+    budget,
+    space,
+    conversation,
+    sinceMs,
+    identities,
+  }: {
+    config: DatabricksGeniePullConfig;
+    token: string;
+    options: PullRunOptions;
+    budget: RunBudget;
+    space: z.infer<typeof spaceSchema>;
+    conversation: z.infer<typeof conversationSchema>;
+    sinceMs: number;
+    identities: Map<number, GenieIdentity>;
+  }): Promise<{
+    events: NormalizedPullEvent[];
+    unfinished: boolean;
+    failed: boolean;
+    /** It was read whole, but something in it may still change. */
+    pending: boolean;
+  }> {
+    const read = await this.isolate({
+      what: "messages",
+      context: {
+        spaceId: space.space_id,
+        conversationId: conversation.conversation_id,
+      },
+      run: () =>
+        this.conversationMessages({
+          config,
+          token,
+          options,
+          budget,
+          space,
+          conversation,
+          sinceMs,
+          identities,
+        }),
+    });
+    return {
+      events: read?.items ?? [],
+      unfinished: read === null || !read.complete,
+      failed: read === null,
+      pending: read?.pending ?? false,
+    };
   }
 
   /**
@@ -1069,7 +1276,7 @@ export class DatabricksGeniePuller
     conversation: z.infer<typeof conversationSchema>;
     sinceMs: number;
     identities: Map<number, GenieIdentity>;
-  }): Promise<PagedRead<NormalizedPullEvent>> {
+  }): Promise<PagedRead<NormalizedPullEvent> & { pending: boolean }> {
     const messages = await this.paginate({
       config,
       token,
@@ -1083,20 +1290,28 @@ export class DatabricksGeniePuller
     });
 
     const events: NormalizedPullEvent[] = [];
+    let pending = false;
     for (const message of messages.items) {
-      const createdMs = message.created_timestamp;
+      const raw = message.created_timestamp;
       // A message with no timestamp cannot be placed against the watermark, and
       // emitting it would either re-emit it on every future sweep or file it
       // under `now`. Skipping it loses one row; the alternatives corrupt the
       // window for every row after it.
-      if (createdMs === null || !Number.isFinite(createdMs)) {
+      if (raw === null || !Number.isFinite(raw)) {
         logger.warn(
           { adapter: this.id, messageId: message.message_id },
           "genie message has no created_timestamp; skipping",
         );
         continue;
       }
+      const createdMs = toEpochMs(raw);
       if (createdMs <= sinceMs) continue;
+
+      // Emitted either way — a question asked is a governance fact the moment
+      // it is asked, and the OCSF sink replaces on message id, so the settled
+      // version overwrites this one. What `pending` buys is the guarantee that
+      // there IS a next look: it holds the watermark so the sweep comes back.
+      pending = pending || isSettling(message.status, createdMs);
 
       events.push(
         this.messageEvent({
@@ -1115,7 +1330,7 @@ export class DatabricksGeniePuller
         }),
       );
     }
-    return { items: events, complete: messages.complete };
+    return { items: events, complete: messages.complete, pending };
   }
 
   /**
@@ -1407,4 +1622,51 @@ export class DatabricksGeniePuller
 
 function encode(cursor: GenieCursor): string {
   return JSON.stringify(cursor);
+}
+
+/**
+ * The cursor one run hands to the next.
+ *
+ * The whole in-flight/finished distinction lives here: a sweep that still owes
+ * a space keeps its position, its anchor and its gap flag; a sweep that is done
+ * drops all three so the next run starts clean.
+ */
+function nextCursor({
+  previous,
+  sweep,
+  sweepStartedAtMs,
+}: {
+  previous: GenieCursor;
+  sweep: SweepResult;
+  sweepStartedAtMs: number;
+}): GenieCursor {
+  // `sweep.hadGap` is already sweep-scoped — it was seeded from this cursor —
+  // so there is nothing to fold here. One name, one meaning, one place it
+  // accumulates.
+  const stillSweeping = sweep.resumeSpaceId !== null;
+
+  return {
+    // A sweep that walked past something it never read is not whole, no matter
+    // how tidily it finished. Holding the window costs a re-read of the same
+    // period next sweep; advancing it would drop whatever was in the hole,
+    // permanently.
+    sinceMs: nextWatermark({
+      previousMs: previous.sinceMs,
+      sweepStartedAtMs,
+      complete: sweep.complete && !sweep.hadGap,
+    }),
+    spaceId: sweep.resumeSpaceId,
+    // Meaningless without a space to resume into, so it is cleared with it
+    // rather than left behind to be matched against some later sweep's space
+    // by accident.
+    conversationId: stillSweeping ? sweep.resumeConversationId : null,
+    // Carried only while the sweep is still in flight; a finished sweep starts
+    // the next one clean.
+    sweepHadGap: stillSweeping ? sweep.hadGap : false,
+    // Pinned to the position; a finished sweep starts the next one clean.
+    spaceSetFingerprint: stillSweeping ? sweep.spaceSetFingerprint : null,
+    // Held only while the sweep is still in flight, so the next run stamps a
+    // fresh anchor rather than inheriting a stale one and re-reading forever.
+    sweepStartedAtMs: stillSweeping ? sweepStartedAtMs : null,
+  };
 }
