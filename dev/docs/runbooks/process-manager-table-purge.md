@@ -14,19 +14,35 @@
 > backlog in a single pass while somebody is watching the instance, which leaves
 > the sweep with only the interim to absorb.
 
+## Already executed
+
+This purge ran against production on 2026-08-09, owner-approved, ahead of the
+deploy. It deleted 460,594 dispatched outbox rows and 1,423,423 inbox rows in
+`ctid` batches of 10,000 with 700 ms between them, and `VACUUM (ANALYZE)`
+completed cleanly on both tables. Free space on `langwatch-pg` went from 2.76 GiB
+to 3.08 GiB, which is above where it started: the flood rows sat at the physical
+end of the heap, so the vacuum truncated the trailing pages back to the
+filesystem rather than only marking them reusable.
+
+The backlog is therefore gone. The sweep's first wake finds roughly a day of
+rows, and its ramp is defence in depth for a backlog that builds later, such as
+the reaper being disabled for a month and switched back on.
+
+Keep the rest of this document as the procedure for that case, and as the record
+of what was run.
+
 ## When to run
 
-Ideally once, immediately before the deploy that carries the retention sweep.
-This is an accelerator, not a prerequisite: the sweep ramps its own budget, so a
-deploy that lands first, or a purge that fails halfway, leaves the backlog to
-drain over about a day rather than leaving the database exposed. Running the
-purge first is still worth it:
+Once, immediately before the deploy that carries the retention sweep. This is an
+accelerator, not a prerequisite: the sweep ramps its own budget, so a deploy that
+lands first, or a purge that fails halfway, leaves the backlog to drain over
+about a day rather than leaving the database exposed. Running the purge first is
+still worth it:
 
 - The purge does the bulk work with `ctid` batches, which need no index. The
-  index builds in step 5 then have only the few surviving live rows to sort
-  and write, instead of two million dead ones. (The heap files stay their old
-  size, since a plain `VACUUM` only marks pages reusable, but the entries an
-  index build actually processes are the live tuples.)
+  index builds in step 5 then have only the few surviving live rows to sort and
+  write, instead of two million dead ones, whether or not the vacuum handed any
+  pages back to the filesystem.
 - The sweep's first tick after deploy then has only the interim backlog to
   drain, which its bounded batches handle comfortably.
 
@@ -101,7 +117,7 @@ plain `VACUUM (ANALYZE)` on both tables. `RETENTION_DAYS`, `BATCH_SIZE`,
 `SLEEP_MS` and `MAX_BATCHES` are env overrides.
 
 The loop also stops early once a table hits `MAX_BATCHES` (default 10,000
-batches, or 100M rows — far above any expected backlog) and warns rather than
+batches, or 100M rows, far above any expected backlog) and warns rather than
 fails. If that warning appears, eligible rows were left behind: run the script
 again, or raise `MAX_BATCHES`.
 
@@ -136,11 +152,19 @@ history, and pending and dead outbox rows are never touched. The tighter
 24-hour steady state for dispatched rows arrives later, once the deploy's
 hourly sweep takes over with its own windows.
 
-Expect the reported **file sizes to stay the same**. That is the intended
-outcome, not a failed purge: a plain `VACUUM` marks pages reusable rather than
-returning them to the filesystem, so Postgres refills them with new rows
-instead of extending the files. The goal is for growth to stop, not for the
-numbers to shrink.
+Do not read the **file sizes** as the verdict either way. A plain `VACUUM` marks
+pages reusable rather than handing them back, except for empty pages at the very
+end of the heap, which it truncates back to the filesystem. So the files shrink
+only to the extent that the deleted rows happened to sit at the end, and hold
+their size when live rows are interleaved with them. Both are a successful
+purge: the goal is that growth stops and Postgres refills its own pages instead
+of extending the files.
+
+The 2026-08-09 run landed on the lucky side of that. The flood rows were the most
+recent ones, so they sat at the end of the heap and the truncation returned more
+space than the run started with (2.76 GiB free to 3.08 GiB). Do not plan on
+repeating it: a backlog that accumulated alongside normal traffic is interleaved
+with live rows and will not truncate.
 
 To confirm the space really is reusable rather than merely still allocated:
 
