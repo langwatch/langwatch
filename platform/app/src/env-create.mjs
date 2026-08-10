@@ -301,6 +301,13 @@ export function createEnvConfig() {
       RESEND_API_KEY: z.string().optional(),
       S3_KEY_SALT: z.string().optional(),
       IS_SAAS: z.boolean().optional(),
+      // Instance-wide bearer credential for the self-hosted organization
+      // provisioning API (/api/organizations). Absent (the default) the
+      // family answers 404; it is also absent-by-construction on SaaS, where
+      // the route gate ignores the variable entirely. 32 characters minimum,
+      // the same floor as the gateway secrets: one value provisions
+      // organizations across the whole instance.
+      LANGWATCH_INSTANCE_ADMIN_API_KEY: z.string().min(32).optional(),
       // Browser tracing (ADR-058). Off unless explicitly enabled: it adds
       // frontend telemetry volume, and the ingest route it exports to is
       // inert without OTEL_EXPORTER_OTLP_ENDPOINT anyway.
@@ -551,6 +558,10 @@ export function createEnvConfig() {
       IS_SAAS:
         process.env.IS_SAAS === "1" ||
         process.env.IS_SAAS?.toLowerCase() === "true",
+      // Blank means unset, so a templated .env line with no value cannot take
+      // the whole deployment down over an optional credential.
+      LANGWATCH_INSTANCE_ADMIN_API_KEY:
+        process.env.LANGWATCH_INSTANCE_ADMIN_API_KEY || undefined,
       RUM_ENABLED:
         process.env.RUM_ENABLED === "1" ||
         process.env.RUM_ENABLED?.toLowerCase() === "true",

@@ -650,238 +650,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/model-defaults": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Snapshot of the default-model cascade for this project: effective resolution per role, plus the configs the caller can read. */
-        get: operations["getApiModel-defaults"];
-        put?: never;
-        /** @description Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope. */
-        post: operations["postApiModel-defaults"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/model-defaults/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** @description Update a config's JSON payload and/or its scope attachments. Sending `scopes: []` deletes the config. */
-        put: operations["putApiModel-defaultsById"];
-        post?: never;
-        /** @description Delete a default-model config. Scope attachments cascade. */
-        delete: operations["deleteApiModel-defaultsById"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/teams": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description List all non-archived teams for the organization (paginated) */
-        get: operations["getApiTeams"];
-        put?: never;
-        /** @description Create a new team that can group projects and members */
-        post: operations["postApiTeams"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/teams/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Get a team by its id */
-        get: operations["getApiTeamsById"];
-        put?: never;
-        post?: never;
-        /** @description Archive a team (soft-delete) */
-        delete: operations["deleteApiTeamsById"];
-        options?: never;
-        head?: never;
-        /** @description Update a team by its id */
-        patch: operations["patchApiTeamsById"];
-        trace?: never;
-    };
-    "/api/teams/{id}/members": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description List members of a team */
-        get: operations["getApiTeamsByIdMembers"];
-        put?: never;
-        /** @description Add a member to a team */
-        post: operations["postApiTeamsByIdMembers"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/teams/{id}/members/{userId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** @description Remove a member from a team */
-        delete: operations["deleteApiTeamsByIdMembersByUserId"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/teams/{id}/projects": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description List projects in a team */
-        get: operations["getApiTeamsByIdProjects"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/groups": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description List all groups for the organization */
-        get: operations["getApiGroups"];
-        put?: never;
-        /** @description Create a new group */
-        post: operations["postApiGroups"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/groups/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Get a group with members and bindings */
-        get: operations["getApiGroupsById"];
-        put?: never;
-        post?: never;
-        /** @description Delete a group */
-        delete: operations["deleteApiGroupsById"];
-        options?: never;
-        head?: never;
-        /** @description Rename a group */
-        patch: operations["patchApiGroupsById"];
-        trace?: never;
-    };
-    "/api/groups/{id}/members": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description List members of a group */
-        get: operations["getApiGroupsByIdMembers"];
-        put?: never;
-        /** @description Add a member to a group */
-        post: operations["postApiGroupsByIdMembers"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/groups/{id}/members/{userId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** @description Remove a member from a group */
-        delete: operations["deleteApiGroupsByIdMembersByUserId"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/groups/{id}/bindings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description List role bindings for a group */
-        get: operations["getApiGroupsByIdBindings"];
-        put?: never;
-        /** @description Add a role binding to a group */
-        post: operations["postApiGroupsByIdBindings"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/groups/{id}/bindings/{bindingId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** @description Remove a role binding from a group */
-        delete: operations["deleteApiGroupsByIdBindingsByBindingId"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/agents": {
         parameters: {
             query?: never;
@@ -934,7 +702,7 @@ export interface paths {
         put?: never;
         /**
          * Create an API key
-         * @description Create a new API key. For service keys, pass keyType:"service". Optionally scope to specific projects via projectIds (ADMIN on each). Omit projectIds for full org access. The plaintext token is returned once — store it securely.
+         * @description Create a new API key. For service keys, pass keyType:"service". Optionally scope to specific projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId to mint the key for another member, and permissionMode:"restricted" with a permissions list to grant exactly those permissions. Minting a service key or a key for another member requires organization admin rights. The plaintext token is returned once — store it securely.
          */
         post: operations["createApiKey"];
         delete?: never;
@@ -950,7 +718,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get an API key
+         * @description Read one API key by id, including its role bindings, permission mode and explicit permissions. Returns your own keys; organization admins may read any key in the organization. The secret is never returned. An id that does not exist, belongs to another organization, or belongs to another member all answer 404 api_key_not_found, so the response cannot be used to probe for keys.
+         */
+        get: operations["getApiKey"];
         put?: never;
         post?: never;
         /**
@@ -960,7 +732,11 @@ export interface paths {
         delete: operations["revokeApiKey"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update an API key
+         * @description Update an API key's name, description, permission mode, permissions or bindings. Every field is optional; bindings are replaced outright, and the response is exactly what a subsequent GET returns. You may update your own keys; organization admins may update any key in the organization. Bindings can never exceed the access of the member the key belongs to. The token itself never changes.
+         */
+        patch: operations["updateApiKey"];
         trace?: never;
     };
     "/api/analytics/timeseries": {
@@ -2370,6 +2146,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/model-defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Snapshot of the default-model cascade for this project: effective resolution per role, plus the configs the caller can read. */
+        get: operations["getApiModel-defaults"];
+        put?: never;
+        /** @description Create a default-model config attached to one or more scopes. JSON keys may be roles (DEFAULT, FAST, LANGY, EMBEDDINGS) or registered feature keys; missing keys inherit from a higher scope. */
+        post: operations["postApiModel-defaults"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/model-defaults/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Update a config's JSON payload and/or its scope attachments. Sending `scopes: []` deletes the config. */
+        put: operations["putApiModel-defaultsById"];
+        post?: never;
+        /** @description Delete a default-model config. Scope attachments cascade. */
+        delete: operations["deleteApiModel-defaultsById"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/model-providers": {
         parameters: {
             query?: never;
@@ -2456,6 +2268,453 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/organization": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read the organization profile: name, slug, support contact, presence and trace sharing settings, and the S3 storage shape. The single sign-on fields and the S3 secret are never returned. */
+        get: operations["getOrganization"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** @description Update the organization profile. Partial: only the fields present are written, and the response is exactly what a subsequent GET returns. */
+        patch: operations["updateOrganization"];
+        trace?: never;
+    };
+    "/api/organization/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the organization's members with their organization role and disabled status. Disabled members are included only when includeDisabled=true. */
+        get: operations["listOrganizationMembers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organization/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read one member, including the teams they reach through team-scoped role bindings. Personal workspaces are not listed: they are not access an administrator manages. */
+        get: operations["getOrganizationMember"];
+        put?: never;
+        post?: never;
+        /** @description Remove a member from the organization and every team in it. The member the credential acts as cannot remove themselves. */
+        delete: operations["removeOrganizationMember"];
+        options?: never;
+        head?: never;
+        /** @description Change a member's organization role, or disable / re-enable their membership. Send exactly one of role or disabled. Re-enabling consumes a seat, so it is checked against the plan. */
+        patch: operations["updateOrganizationMember"];
+        trace?: never;
+    };
+    "/api/organization/members/{userId}/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The member's full access breakdown: organization role, group memberships with their bindings, and direct bindings, each with the permissions it grants and the scope it grants them on. */
+        get: operations["getOrganizationMemberAccess"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organization/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List pending invites. Each carries its invite code and acceptance link, because a provisioning run with no email provider still has to hand the person something to open. */
+        get: operations["listOrganizationInvites"];
+        put?: never;
+        /** @description Create up to 50 invites in one batch, each with team assignments that may carry a custom role. Validation is strict: a team or custom role that cannot be assigned refuses the batch rather than silently granting less than was asked. emailNotSent reports, per invite, whether the invite email could be delivered. */
+        post: operations["createOrganizationInvites"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organization/invites/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Revoke a pending invite. An invite id from another organization, or one already revoked, answers 404. */
+        delete: operations["revokeOrganizationInvite"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List organizations
+         * @description Self-hosted only. Lists every organization on this instance, newest first.
+         */
+        get: operations["listOrganizations"];
+        put?: never;
+        /**
+         * Create an organization
+         * @description Self-hosted only. Creates an organization with a default team and returns an organization-scoped admin API key, so provisioning can continue through the management APIs without a browser step: the instance key creates the organization, the returned key does everything else. The slug is the natural key; a taken slug answers 409 organization_slug_taken.
+         */
+        post: operations["provisionOrganization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/organizations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get an organization
+         * @description Self-hosted only. Reads one organization's summary by id.
+         */
+        get: operations["getOrganizationById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/role-bindings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the organization's role bindings, each naming its principal (user, group or API key), role and scope. Filter by principal or scope; totalCount counts the filtered set. */
+        get: operations["listRoleBindings"];
+        put?: never;
+        /** @description Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization, and an identical binding answers 409 role_binding_already_exists. */
+        post: operations["createRoleBinding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/role-bindings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Delete a role binding. An id that does not exist in the caller's organization answers 404 role_binding_not_found. */
+        delete: operations["deleteRoleBinding"];
+        options?: never;
+        head?: never;
+        /** @description Change a binding's role (and custom role). The principal and scope are the binding's identity and do not change; create a new binding instead. */
+        patch: operations["updateRoleBinding"];
+        trace?: never;
+    };
+    "/api/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the organization's custom roles with their permission sets. */
+        get: operations["listRoles"];
+        put?: never;
+        /** @description Create a custom role from resource:action permission keys. The name is unique within the organization; a taken name answers 409 custom_role_name_taken. */
+        post: operations["createRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/roles/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The permission catalog custom roles are built from: every resource with its actions, annotated with whether the resource only takes effect at organization scope (such a permission cannot be granted by a team- or project-scoped binding). */
+        get: operations["listRolePermissions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/roles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read one custom role. An id from another organization answers 404 custom_role_not_found. */
+        get: operations["getRole"];
+        put?: never;
+        post?: never;
+        /** @description Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding, answers 409 custom_role_in_use with the counts in meta. */
+        delete: operations["deleteRole"];
+        options?: never;
+        head?: never;
+        /** @description Update a custom role. Partial: only the fields present are written; a permissions list replaces the set outright. */
+        patch: operations["updateRole"];
+        trace?: never;
+    };
+    "/api/scim-tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the organization's SCIM bearer tokens: id, description, creation time and last use. Token values and hashes are never returned; the value exists only in the create response, once. */
+        get: operations["listScimTokens"];
+        put?: never;
+        /** @description Mint a SCIM bearer token for this organization's /api/scim/v2 endpoints. The token value is returned once, here, and never again; store it in the identity provider immediately. */
+        post: operations["createScimToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim-tokens/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Revoke a SCIM token so it stops verifying immediately. An unknown or already-revoked id answers 404 scim_token_not_found. */
+        delete: operations["revokeScimToken"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim/v2/ServiceProviderConfig": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the SCIM service provider configuration
+         * @description What this SCIM implementation supports (RFC 7643 section 5), which is how an identity provider decides what it may call: PATCH and filtering are supported, bulk operations, sorting, ETags and password change are not. Unauthenticated, because a provider reads it while being configured, before a token exists.
+         */
+        get: operations["scimGetServiceProviderConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim/v2/ResourceTypes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the SCIM resource types
+         * @description The resources this service provisions, User and Group, each naming the endpoint and the schema URN that serves it (RFC 7643 section 6). Unauthenticated, like the rest of SCIM discovery.
+         */
+        get: operations["scimListResourceTypes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim/v2/Schemas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the SCIM resource schemas
+         * @description The attribute definitions for the User and Group resources (RFC 7643 section 7), which an identity provider reads to build its attribute mapping. A LangWatch group is an access group: its membership drives role bindings, and it is not a team. Unauthenticated, like the rest of SCIM discovery.
+         */
+        get: operations["scimListSchemas"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim/v2/Users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List provisioned users
+         * @description The members of the organization the token belongs to, as SCIM users. One filter expression is understood, `userName eq "someone@example.com"`, matched against the member's email without regard to case.
+         */
+        get: operations["scimListUsers"];
+        put?: never;
+        /**
+         * Provision a user
+         * @description Adds a member to the organization, creating the LangWatch account when the email is new. Someone who already has an account is added and reactivated rather than refused, which is what lets a directory sync be re-run without special-casing the people it already knows. New members join with the MEMBER role at organization scope. `costCenter` on the enterprise user extension assigns their department, creating that department on first use.
+         */
+        post: operations["scimCreateUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim/v2/Users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a provisioned user
+         * @description Reads one member of the organization the token belongs to. An id that is not a member answers 404, whether or not it names a LangWatch account elsewhere.
+         */
+        get: operations["scimGetUser"];
+        /**
+         * Replace a provisioned user
+         * @description Replaces the member's attributes with the body. It is a whole-resource write, so an attribute the identity provider leaves out is reset rather than kept: omitting `active` reactivates the member. Send PATCH instead to change one attribute.
+         */
+        put: operations["scimReplaceUser"];
+        post?: never;
+        /**
+         * Deprovision a user
+         * @description Removes the member from the organization, drops the role bindings they held there, and deactivates their account. The LangWatch user record itself is kept, so past traces, evaluations and audit entries stay attributable.
+         */
+        delete: operations["scimDeleteUser"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a provisioned user
+         * @description Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `replace` of `active` (deactivating or reactivating the account), of `userName`, and of `name.givenName` / `name.familyName`, written either as an operation path or as keys inside a value object; and `add`, `replace` or `remove` of the enterprise `costCenter`, which reassigns the member's department. Operations outside that set are accepted and change nothing, so a provider sending its full patch set is never rejected.
+         */
+        patch: operations["scimPatchUser"];
+        trace?: never;
+    };
+    "/api/scim/v2/Groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List provisioned groups
+         * @description The organization's SCIM-provisioned access groups. Groups created in LangWatch itself are not listed: the directory sees what it provisioned, and nothing else. One filter expression is understood, `displayName eq "Engineering"`, matched without regard to case.
+         */
+        get: operations["scimListGroups"];
+        put?: never;
+        /**
+         * Provision a group
+         * @description Creates an access group. Members are given as LangWatch user ids, the same ids the Users endpoints return; an id that is not a member of the organization is skipped rather than failing the call, so a group can be provisioned before everyone in it is. Granting the group access is a separate step: a group carries no permissions until a role binding is created for it.
+         */
+        post: operations["scimCreateGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scim/v2/Groups/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a provisioned group
+         * @description Reads one provisioned group and its members. A group that exists but was created in LangWatch rather than provisioned is not readable here.
+         */
+        get: operations["scimGetGroup"];
+        /**
+         * Replace a provisioned group
+         * @description Replaces the group's display name and its membership with the body. Membership is a whole-resource write: a member absent from `members` is removed from the group, and omitting `members` empties it. Role bindings granted to the group are untouched.
+         */
+        put: operations["scimReplaceGroup"];
+        post?: never;
+        /**
+         * Deprovision a group
+         * @description Deletes the group along with its memberships and every role binding granted through it, so the access it carried is revoked with it. The members themselves keep their organization membership and any access they hold directly.
+         */
+        delete: operations["scimDeleteGroup"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a provisioned group
+         * @description Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `add` of members, `remove` of members (named by a value filter on the path, as Entra ID writes it, or in the operation value), `replace` of `displayName`, and `replace` of the whole member list. Operations outside that set are accepted and change nothing.
+         */
+        patch: operations["scimPatchGroup"];
         trace?: never;
     };
     "/api/scenario-events": {
@@ -2776,6 +3035,202 @@ export interface paths {
         /** @description Trigger a suite run. Schedules scenario executions for all active scenarios × targets × repeatCount. */
         post: operations["postApiSuitesByIdRun"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all non-archived teams for the organization (paginated) */
+        get: operations["getApiTeams"];
+        put?: never;
+        /** @description Create a new team that can group projects and members */
+        post: operations["postApiTeams"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/teams/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a team by its id */
+        get: operations["getApiTeamsById"];
+        put?: never;
+        post?: never;
+        /** @description Archive a team (soft-delete) */
+        delete: operations["deleteApiTeamsById"];
+        options?: never;
+        head?: never;
+        /** @description Update a team by its id */
+        patch: operations["patchApiTeamsById"];
+        trace?: never;
+    };
+    "/api/teams/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List members of a team */
+        get: operations["getApiTeamsByIdMembers"];
+        put?: never;
+        /** @description Add a member to a team */
+        post: operations["postApiTeamsByIdMembers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/teams/{id}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Remove a member from a team */
+        delete: operations["deleteApiTeamsByIdMembersByUserId"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/teams/{id}/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List projects in a team */
+        get: operations["getApiTeamsByIdProjects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all groups for the organization */
+        get: operations["getApiGroups"];
+        put?: never;
+        /** @description Create a new group */
+        post: operations["postApiGroups"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a group with members and bindings */
+        get: operations["getApiGroupsById"];
+        put?: never;
+        post?: never;
+        /** @description Delete a group */
+        delete: operations["deleteApiGroupsById"];
+        options?: never;
+        head?: never;
+        /** @description Rename a group */
+        patch: operations["patchApiGroupsById"];
+        trace?: never;
+    };
+    "/api/groups/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List members of a group */
+        get: operations["getApiGroupsByIdMembers"];
+        put?: never;
+        /** @description Add a member to a group */
+        post: operations["postApiGroupsByIdMembers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Remove a member from a group */
+        delete: operations["deleteApiGroupsByIdMembersByUserId"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}/bindings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List role bindings for a group */
+        get: operations["getApiGroupsByIdBindings"];
+        put?: never;
+        /** @description Add a role binding to a group */
+        post: operations["postApiGroupsByIdBindings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groups/{id}/bindings/{bindingId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Remove a role binding from a group */
+        delete: operations["deleteApiGroupsByIdBindingsByBindingId"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3571,646 +4026,6 @@ export interface operations {
             };
         };
     };
-    "getApiModel-defaults": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        scope: {
-                            projectId: string;
-                            teamId: string | null;
-                            organizationId: string | null;
-                            organizationName: string | null;
-                        };
-                        effective: {
-                            DEFAULT: {
-                                model: string;
-                                source: string;
-                                scope: string | null;
-                            } | null;
-                            FAST: {
-                                model: string;
-                                source: string;
-                                scope: string | null;
-                            } | null;
-                            EMBEDDINGS: {
-                                model: string;
-                                source: string;
-                                scope: string | null;
-                            } | null;
-                        };
-                        configs: {
-                            id: string;
-                            config: {
-                                [key: string]: string;
-                            };
-                            scopes: {
-                                /** @enum {string} */
-                                type: "ORGANIZATION" | "TEAM" | "PROJECT";
-                                id: string;
-                                name: string;
-                            }[];
-                            createdAt: string;
-                            updatedAt: string;
-                        }[];
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    "postApiModel-defaults": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    config: {
-                        [key: string]: string;
-                    };
-                    scopes: {
-                        /** @enum {string} */
-                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-                        scopeId: string;
-                    }[];
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id: string;
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    "putApiModel-defaultsById": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    config?: {
-                        [key: string]: string;
-                    };
-                    scopes?: {
-                        /** @enum {string} */
-                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-                        scopeId: string;
-                    }[];
-                };
-            };
-        };
-        responses: {
-            /** @description Updated */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    "deleteApiModel-defaultsById": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Deleted */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-        };
-    };
-    getApiTeams: {
-        parameters: {
-            query?: {
-                page?: number;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    postApiTeams: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    name: string;
-                };
-            };
-        };
-        responses: never;
-    };
-    getApiTeamsById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    deleteApiTeamsById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    patchApiTeamsById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    name?: string;
-                };
-            };
-        };
-        responses: never;
-    };
-    getApiTeamsByIdMembers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    postApiTeamsByIdMembers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    userId: string;
-                    /**
-                     * @default MEMBER
-                     * @enum {string}
-                     */
-                    role?: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-                };
-            };
-        };
-        responses: never;
-    };
-    deleteApiTeamsByIdMembersByUserId: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                userId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    getApiTeamsByIdProjects: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    getApiGroups: {
-        parameters: {
-            query?: {
-                page?: number;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    postApiGroups: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    name: string;
-                    bindings?: {
-                        /** @enum {string} */
-                        role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-                        customRoleId?: string;
-                        /** @enum {string} */
-                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-                        scopeId: string;
-                    }[];
-                    memberIds?: string[];
-                };
-            };
-        };
-        responses: never;
-    };
-    getApiGroupsById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    deleteApiGroupsById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    patchApiGroupsById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    name: string;
-                };
-            };
-        };
-        responses: never;
-    };
-    getApiGroupsByIdMembers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    postApiGroupsByIdMembers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    userId: string;
-                };
-            };
-        };
-        responses: never;
-    };
-    deleteApiGroupsByIdMembersByUserId: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                userId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    getApiGroupsByIdBindings: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
-    postApiGroupsByIdBindings: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    /** @enum {string} */
-                    role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
-                    customRoleId?: string;
-                    /** @enum {string} */
-                    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-                    scopeId: string;
-                };
-            };
-        };
-        responses: never;
-    };
-    deleteApiGroupsByIdBindingsByBindingId: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                bindingId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: never;
-    };
     getApiAgents: {
         parameters: {
             query?: {
@@ -4351,10 +4166,23 @@ export interface operations {
                     description?: string;
                     /** @description ISO 8601 timestamp after which the key stops working */
                     expiresAt?: string;
+                    /** @description Organization admins only: the member who owns the key and whose access caps it. Defaults to the caller. */
+                    assignedToUserId?: string;
+                    /**
+                     * @description 'all' and 'readonly' take their meaning from the bindings alone; 'restricted' additionally requires an explicit permissions list.
+                     * @default all
+                     * @enum {string}
+                     */
+                    permissionMode?: "all" | "readonly" | "restricted";
+                    /** @description Restricted mode only: the exact resource:action permissions the key's CUSTOM bindings grant. */
+                    permissions?: string[];
                     /** @description What this key may do, and where. Required for a personal key. */
                     bindings?: {
-                        /** @enum {string} */
-                        role: "ADMIN" | "MEMBER" | "VIEWER";
+                        /**
+                         * @description CUSTOM grants exactly the listed permissions and requires permissionMode 'restricted'.
+                         * @enum {string}
+                         */
+                        role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
                         /** @enum {string} */
                         scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
                         scopeId: string;
@@ -4390,15 +4218,95 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Requested binding exceeds the creator's own permissions, or scope does not belong to this organization */
+            /** @description Requested binding exceeds the creator's own permissions, or the scope does not belong to this organization (api_key_scope_violation); a service key or a key for another member was requested without organization admin rights (insufficient_permissions) */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description Validation error (missing name, empty bindings, etc.) */
+            /** @description Validation error, for example a missing name or empty bindings (validation_error), or a name LangWatch reserves for its own keys (api_key_reserved_name) */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getApiKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description API key ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The API key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id?: string;
+                        name?: string;
+                        description?: string | null;
+                        /** @enum {string} */
+                        keyType?: "personal" | "service";
+                        /** @description The member who owns the key; null for a service key. */
+                        assignedToUserId?: string | null;
+                        createdByUserId?: string | null;
+                        /** @enum {string} */
+                        permissionMode?: "all" | "readonly" | "restricted";
+                        /** @description The resource:action permissions a restricted key grants. Empty for the other modes. */
+                        permissions?: string[];
+                        /** Format: date-time */
+                        createdAt?: string;
+                        /** Format: date-time */
+                        expiresAt?: string | null;
+                        /** Format: date-time */
+                        lastUsedAt?: string | null;
+                        /** Format: date-time */
+                        revokedAt?: string | null;
+                        roleBindings?: {
+                            id?: string;
+                            /** @enum {string} */
+                            role?: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                            /** @enum {string} */
+                            scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+                            scopeId?: string;
+                        }[];
+                        bindings?: {
+                            /** @enum {string} */
+                            role?: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                            /** @enum {string} */
+                            scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+                            scopeId?: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Invalid or missing API key token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient permissions (requires organization:view) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description API key not found (api_key_not_found) */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4436,22 +4344,141 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Not authorized to revoke this API key (owned by another user) */
+            /** @description Not authorized to revoke this API key, which belongs to another member (api_key_not_owned) */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description API key not found */
+            /** @description API key not found (api_key_not_found) */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description API key is already revoked */
+            /** @description API key is already revoked (api_key_already_revoked) */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateApiKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description API key ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    description?: string | null;
+                    /**
+                     * @description 'all' and 'readonly' take their meaning from the bindings alone; 'restricted' additionally requires an explicit permissions list.
+                     * @enum {string}
+                     */
+                    permissionMode?: "all" | "readonly" | "restricted";
+                    /** @description Restricted mode only: the exact resource:action permissions the key's CUSTOM bindings grant. */
+                    permissions?: string[];
+                    /** @description Replaces the key's bindings outright. Whatever is accepted here is exactly what a subsequent GET returns. */
+                    bindings?: {
+                        /**
+                         * @description CUSTOM grants exactly the listed permissions and requires permissionMode 'restricted'.
+                         * @enum {string}
+                         */
+                        role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description The updated API key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id?: string;
+                        name?: string;
+                        description?: string | null;
+                        /** @enum {string} */
+                        keyType?: "personal" | "service";
+                        /** @description The member who owns the key; null for a service key. */
+                        assignedToUserId?: string | null;
+                        createdByUserId?: string | null;
+                        /** @enum {string} */
+                        permissionMode?: "all" | "readonly" | "restricted";
+                        /** @description The resource:action permissions a restricted key grants. Empty for the other modes. */
+                        permissions?: string[];
+                        /** Format: date-time */
+                        createdAt?: string;
+                        /** Format: date-time */
+                        expiresAt?: string | null;
+                        /** Format: date-time */
+                        lastUsedAt?: string | null;
+                        /** Format: date-time */
+                        revokedAt?: string | null;
+                        roleBindings?: {
+                            id?: string;
+                            /** @enum {string} */
+                            role?: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                            /** @enum {string} */
+                            scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+                            scopeId?: string;
+                        }[];
+                        bindings?: {
+                            /** @enum {string} */
+                            role?: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                            /** @enum {string} */
+                            scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+                            scopeId?: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Invalid or missing API key token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Insufficient permissions (requires organization:manage), the requested binding exceeds the key owner's own permissions, or the scope does not belong to this organization (api_key_scope_violation) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description API key not found, or not yours to edit (api_key_not_found) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description API key is already revoked (api_key_already_revoked) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation error, for example restricted mode without a permissions list (validation_error) */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5157,6 +5184,7 @@ export interface operations {
                             cacheCreationTokens: number;
                             totalTokens: number;
                             costUsd: number | null;
+                            tokensKnown: boolean;
                         }[];
                     };
                 };
@@ -9566,7 +9594,7 @@ export interface operations {
                         scope_type: "organization" | "team" | "project";
                         scope_id: string;
                     }[];
-                    /** @description Where the key's traces and costs land. Omit it and the destination stays exactly where it is, scope edits included. A value moves it, validated the way create validates it. Explicit null does not clear it: it asks for the destination to be worked out again from what the key is now, under the same rules create uses. It lands on the key's single project scope when it has exactly one, and is refused with `gateway_trace_project_ambiguous` when it has none to take and the organization has projects that could have been named. */
+                    /** @description Where the key's traces and costs land. Omit it and the destination stays exactly where it is, scope edits included. A value moves it, validated the way create validates it. Explicit null does not clear it: it asks for the destination to be worked out again from what the key is now, under the same rules create uses. It lands on the key's single project scope when exactly one names a live project, and otherwise on the organization's oldest live governance project when there are no other live projects to choose from. An organization with live projects that could have been named refuses with `gateway_trace_project_ambiguous`, and one with no governance project to fall back on refuses with `trace_project_required`. */
                     trace_project_id?: string | null;
                     routing_policy_id?: string | null;
                     /** @enum {string} */
@@ -15921,6 +15949,344 @@ export interface operations {
             };
         };
     };
+    "getApiModel-defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        scope: {
+                            projectId: string;
+                            teamId: string | null;
+                            organizationId: string | null;
+                            organizationName: string | null;
+                        };
+                        effective: {
+                            DEFAULT: {
+                                model: string;
+                                source: string;
+                                scope: string | null;
+                            } | null;
+                            FAST: {
+                                model: string;
+                                source: string;
+                                scope: string | null;
+                            } | null;
+                            EMBEDDINGS: {
+                                model: string;
+                                source: string;
+                                scope: string | null;
+                            } | null;
+                        };
+                        configs: {
+                            id: string;
+                            config: {
+                                [key: string]: string;
+                            };
+                            scopes: {
+                                /** @enum {string} */
+                                type: "ORGANIZATION" | "TEAM" | "PROJECT";
+                                id: string;
+                                name: string;
+                            }[];
+                            createdAt: string;
+                            updatedAt: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "postApiModel-defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    config: {
+                        [key: string]: string;
+                    };
+                    scopes: {
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "putApiModel-defaultsById": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    config?: {
+                        [key: string]: string;
+                    };
+                    scopes?: {
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Updated */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "deleteApiModel-defaultsById": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
     "getApiModel-providers": {
         parameters: {
             query?: never;
@@ -16793,6 +17159,2322 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        slug: string;
+                        supportContact: string | null;
+                        presenceEnabled: boolean;
+                        traceSharingEnabled: boolean;
+                        /** @enum {string|null} */
+                        primaryIntent: "AGENT_GOVERNANCE" | "LLM_OPS" | null;
+                        s3Endpoint: string | null;
+                        s3AccessKeyId: string | null;
+                        s3Bucket: string | null;
+                        createdAt: string;
+                        updatedAt: string;
+                    };
+                };
+            };
+        };
+    };
+    updateOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    supportContact?: string | null;
+                    presenceEnabled?: boolean;
+                    traceSharingEnabled?: boolean;
+                    /** @enum {string|null} */
+                    primaryIntent?: "AGENT_GOVERNANCE" | "LLM_OPS" | null;
+                    s3Endpoint?: string | null;
+                    s3AccessKeyId?: string | null;
+                    s3SecretAccessKey?: string | null;
+                    s3Bucket?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        slug: string;
+                        supportContact: string | null;
+                        presenceEnabled: boolean;
+                        traceSharingEnabled: boolean;
+                        /** @enum {string|null} */
+                        primaryIntent: "AGENT_GOVERNANCE" | "LLM_OPS" | null;
+                        s3Endpoint: string | null;
+                        s3AccessKeyId: string | null;
+                        s3Bucket: string | null;
+                        createdAt: string;
+                        updatedAt: string;
+                    };
+                };
+            };
+        };
+    };
+    listOrganizationMembers: {
+        parameters: {
+            query?: {
+                includeDisabled?: "true" | "false";
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        members: {
+                            userId: string;
+                            /** @enum {string} */
+                            role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                            disabled: boolean;
+                            disabledAt: string | null;
+                            createdAt: string;
+                            updatedAt: string;
+                            user: {
+                                id: string;
+                                name: string | null;
+                                email: string | null;
+                            };
+                        }[];
+                        totalCount: number;
+                    };
+                };
+            };
+        };
+    };
+    getOrganizationMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        userId: string;
+                        /** @enum {string} */
+                        role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                        disabled: boolean;
+                        disabledAt: string | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        user: {
+                            id: string;
+                            name: string | null;
+                            email: string | null;
+                        };
+                        teams: {
+                            teamId: string;
+                            teamName: string;
+                            /** @enum {string} */
+                            role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                            customRoleId: string | null;
+                            customRoleName: string | null;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    removeOrganizationMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: true;
+                    };
+                };
+            };
+        };
+    };
+    updateOrganizationMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    role?: "ADMIN" | "MEMBER" | "EXTERNAL";
+                    disabled?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        userId: string;
+                        /** @enum {string} */
+                        role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                        disabled: boolean;
+                        disabledAt: string | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        user: {
+                            id: string;
+                            name: string | null;
+                            email: string | null;
+                        };
+                        teamsLeftWithoutAdmin?: {
+                            id: string;
+                            name: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    getOrganizationMemberAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        user: {
+                            id: string;
+                            name: string | null;
+                            email: string | null;
+                            orgRole: string;
+                            orgRolePermissions: string[];
+                        };
+                        groups: {
+                            id: string;
+                            name: string;
+                            slug: string;
+                            scimSource: string | null;
+                            bindings: {
+                                id: string;
+                                role: string;
+                                customRoleName: string | null;
+                                /** @enum {string} */
+                                scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                                scopeId: string;
+                                scopeName: string | null;
+                                permissions: string[];
+                            }[];
+                        }[];
+                        directBindings: {
+                            id: string;
+                            role: string;
+                            customRoleName: string | null;
+                            /** @enum {string} */
+                            scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                            scopeId: string;
+                            scopeName: string | null;
+                            permissions: string[];
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    listOrganizationInvites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        invites: {
+                            id: string;
+                            email: string;
+                            /** @enum {string} */
+                            role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                            status: string;
+                            expiration: string | null;
+                            inviteCode: string;
+                            inviteUrl: string;
+                            teams: {
+                                teamId: string;
+                                role: string;
+                                customRoleId: string | null;
+                            }[];
+                            createdAt: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    createOrganizationInvites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    invites: {
+                        /** Format: email */
+                        email: string;
+                        /** @enum {string} */
+                        role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                        teams: {
+                            teamId: string;
+                            /** @enum {string} */
+                            role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                            customRoleId?: string;
+                        }[];
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        invites: {
+                            id: string;
+                            email: string;
+                            /** @enum {string} */
+                            role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                            status: string;
+                            expiration: string | null;
+                            inviteCode: string;
+                            inviteUrl: string;
+                            teams: {
+                                teamId: string;
+                                role: string;
+                                customRoleId: string | null;
+                            }[];
+                            createdAt: string;
+                            emailNotSent: boolean;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    revokeOrganizationInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: true;
+                    };
+                };
+            };
+        };
+    };
+    listOrganizations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Organizations on this instance */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        organizations?: {
+                            id?: string;
+                            name?: string;
+                            slug?: string;
+                            /** Format: date-time */
+                            createdAt?: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Invalid instance administrator credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Organization provisioning is not available: the instance administrator key is not configured, this is a cloud deployment, or (on GET /{id}) the organization does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    provisionOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name: string;
+                    slug?: string;
+                    adminApiKeyName?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Organization created. adminApiKey.token is the bootstrap credential and is only shown once. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        organization?: {
+                            id?: string;
+                            name?: string;
+                            slug?: string;
+                        };
+                        team?: {
+                            id?: string;
+                            name?: string;
+                            slug?: string;
+                        };
+                        adminApiKey?: {
+                            id?: string;
+                            /** @description Plaintext organization admin API key (sk-lw-...). Store securely: shown only once. */
+                            token?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Invalid instance administrator credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Organization provisioning is not available: the instance administrator key is not configured, this is a cloud deployment, or (on GET /{id}) the organization does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description An organization with this slug already exists (organization_slug_taken) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description The request body did not match the schema, for example a slug that is not lowercase letters, numbers and single hyphens */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getOrganizationById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Organization ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The organization */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        organization?: {
+                            id?: string;
+                            name?: string;
+                            slug?: string;
+                            /** Format: date-time */
+                            createdAt?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Invalid instance administrator credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Organization provisioning is not available: the instance administrator key is not configured, this is a cloud deployment, or (on GET /{id}) the organization does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable machine-readable code, e.g. organization_slug_taken */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    listRoleBindings: {
+        parameters: {
+            query?: {
+                userId?: string;
+                groupId?: string;
+                apiKeyId?: string;
+                scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+                scopeId?: string;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        bindings: {
+                            id: string;
+                            principal: {
+                                /** @enum {string} */
+                                type: "user" | "group" | "apiKey";
+                                id: string;
+                                name: string | null;
+                            };
+                            /** @enum {string} */
+                            role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                            customRoleId: string | null;
+                            customRoleName: string | null;
+                            /** @enum {string} */
+                            scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                            scopeId: string;
+                            scopeName: string | null;
+                            createdAt: string;
+                        }[];
+                        totalCount: number;
+                    };
+                };
+            };
+        };
+    };
+    createRoleBinding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    userId?: string;
+                    groupId?: string;
+                    apiKeyId?: string;
+                    /** @enum {string} */
+                    role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                    customRoleId?: string;
+                    /** @enum {string} */
+                    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                    scopeId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        principal: {
+                            /** @enum {string} */
+                            type: "user" | "group" | "apiKey";
+                            id: string;
+                            name: string | null;
+                        };
+                        /** @enum {string} */
+                        role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                        customRoleId: string | null;
+                        customRoleName: string | null;
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                        scopeName: string | null;
+                        createdAt: string;
+                        hasLegacyAccessNotice?: boolean;
+                    };
+                };
+            };
+        };
+    };
+    deleteRoleBinding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: true;
+                    };
+                };
+            };
+        };
+    };
+    updateRoleBinding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                    customRoleId?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        principal: {
+                            /** @enum {string} */
+                            type: "user" | "group" | "apiKey";
+                            id: string;
+                            name: string | null;
+                        };
+                        /** @enum {string} */
+                        role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                        customRoleId: string | null;
+                        customRoleName: string | null;
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                        scopeName: string | null;
+                        createdAt: string;
+                    };
+                };
+            };
+        };
+    };
+    listRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        roles: {
+                            id: string;
+                            name: string;
+                            description: string | null;
+                            permissions: string[];
+                            createdAt: string;
+                            updatedAt: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    createRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name: string;
+                    description?: string;
+                    permissions: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        description: string | null;
+                        permissions: string[];
+                        createdAt: string;
+                        updatedAt: string;
+                    };
+                };
+            };
+        };
+    };
+    listRolePermissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        resources: {
+                            resource: string;
+                            organizationExclusive: boolean;
+                            actions: string[];
+                            permissions: string[];
+                        }[];
+                        actions: string[];
+                    };
+                };
+            };
+        };
+    };
+    getRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        description: string | null;
+                        permissions: string[];
+                        createdAt: string;
+                        updatedAt: string;
+                    };
+                };
+            };
+        };
+    };
+    deleteRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: true;
+                    };
+                };
+            };
+        };
+    };
+    updateRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    description?: string | null;
+                    permissions?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        description: string | null;
+                        permissions: string[];
+                        createdAt: string;
+                        updatedAt: string;
+                    };
+                };
+            };
+        };
+    };
+    listScimTokens: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        tokens: {
+                            id: string;
+                            description: string | null;
+                            createdAt: string;
+                            lastUsedAt: string | null;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    createScimToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    description?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        token: string;
+                        description: string | null;
+                    };
+                };
+            };
+        };
+    };
+    revokeScimToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        success: true;
+                    };
+                };
+            };
+        };
+    };
+    scimGetServiceProviderConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The supported capabilities. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        documentationUri?: string;
+                        patch?: {
+                            supported?: boolean;
+                        };
+                        bulk?: {
+                            supported?: boolean;
+                            maxOperations?: number;
+                            maxPayloadSize?: number;
+                        };
+                        filter?: {
+                            supported?: boolean;
+                            maxResults?: number;
+                        };
+                        changePassword?: {
+                            supported?: boolean;
+                        };
+                        sort?: {
+                            supported?: boolean;
+                        };
+                        etag?: {
+                            supported?: boolean;
+                        };
+                        authenticationSchemes?: {
+                            type?: string;
+                            name?: string;
+                            description?: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    scimListResourceTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The User and Group resource types. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description How many resources match, before pagination. */
+                        totalResults?: number;
+                        startIndex?: number;
+                        itemsPerPage?: number;
+                        Resources?: {
+                            /** @description The SCIM schema URNs this resource conforms to. */
+                            schemas?: string[];
+                            id?: string;
+                            name?: string;
+                            endpoint?: string;
+                            /** @description The URN of the schema this resource type is defined by. */
+                            schema?: string;
+                            meta?: {
+                                resourceType?: string;
+                                location?: string;
+                            };
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    scimListSchemas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The User and Group schema definitions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description How many resources match, before pagination. */
+                        totalResults?: number;
+                        startIndex?: number;
+                        itemsPerPage?: number;
+                        Resources?: {
+                            /** @description The SCIM schema URNs this resource conforms to. */
+                            schemas?: string[];
+                            /** @description The schema URN. */
+                            id?: string;
+                            name?: string;
+                            description?: string;
+                            /** @description The attribute definitions, in the shape RFC 7643 section 7 gives them. */
+                            attributes?: Record<string, never>[];
+                            meta?: {
+                                resourceType?: string;
+                                location?: string;
+                            };
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    scimListUsers: {
+        parameters: {
+            query?: {
+                /** @description A SCIM filter. Only `userName eq "..."` is applied; anything else is ignored and the full page is returned. */
+                filter?: string;
+                /** @description 1-based index of the first resource to return. Anything that does not parse as a positive integer is read as 1. */
+                startIndex?: number;
+                /** @description How many resources to return, capped at 100 (the `filter.maxResults` ServiceProviderConfig publishes). Anything that does not parse as a positive integer is read as 100, and anything above 100 is served as 100. */
+                count?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of provisioned users. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description How many resources match, before pagination. */
+                        totalResults?: number;
+                        startIndex?: number;
+                        itemsPerPage?: number;
+                        Resources?: {
+                            /** @description The SCIM schema URNs this resource conforms to. */
+                            schemas?: string[];
+                            /** @description The LangWatch user id. Use it as the resource id in later calls, and as a member value on a group. */
+                            id?: string;
+                            /**
+                             * Format: email
+                             * @description The member's email address, which is their login.
+                             */
+                            userName?: string;
+                            name?: {
+                                givenName?: string;
+                                familyName?: string;
+                            };
+                            emails?: {
+                                /** Format: email */
+                                value?: string;
+                                primary?: boolean;
+                                type?: string;
+                            }[];
+                            /** @description False once the account is deactivated. */
+                            active?: boolean;
+                            meta?: {
+                                resourceType?: string;
+                                /** Format: date-time */
+                                created?: string;
+                                /** Format: date-time */
+                                lastModified?: string;
+                            };
+                        }[];
+                    };
+                };
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimCreateUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The provisioned user. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The LangWatch user id. Use it as the resource id in later calls, and as a member value on a group. */
+                        id?: string;
+                        /**
+                         * Format: email
+                         * @description The member's email address, which is their login.
+                         */
+                        userName?: string;
+                        name?: {
+                            givenName?: string;
+                            familyName?: string;
+                        };
+                        emails?: {
+                            /** Format: email */
+                            value?: string;
+                            primary?: boolean;
+                            type?: string;
+                        }[];
+                        /** @description False once the account is deactivated. */
+                        active?: boolean;
+                        meta?: {
+                            resourceType?: string;
+                            /** Format: date-time */
+                            created?: string;
+                            /** Format: date-time */
+                            lastModified?: string;
+                        };
+                    };
+                };
+            };
+            /** @description The request body is not JSON, or does not match the SCIM schema for this operation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description A member with this userName already exists in the organization. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimGetUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The LangWatch user id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The LangWatch user id. Use it as the resource id in later calls, and as a member value on a group. */
+                        id?: string;
+                        /**
+                         * Format: email
+                         * @description The member's email address, which is their login.
+                         */
+                        userName?: string;
+                        name?: {
+                            givenName?: string;
+                            familyName?: string;
+                        };
+                        emails?: {
+                            /** Format: email */
+                            value?: string;
+                            primary?: boolean;
+                            type?: string;
+                        }[];
+                        /** @description False once the account is deactivated. */
+                        active?: boolean;
+                        meta?: {
+                            resourceType?: string;
+                            /** Format: date-time */
+                            created?: string;
+                            /** Format: date-time */
+                            lastModified?: string;
+                        };
+                    };
+                };
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description No such member in this organization. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimReplaceUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The LangWatch user id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The updated user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The LangWatch user id. Use it as the resource id in later calls, and as a member value on a group. */
+                        id?: string;
+                        /**
+                         * Format: email
+                         * @description The member's email address, which is their login.
+                         */
+                        userName?: string;
+                        name?: {
+                            givenName?: string;
+                            familyName?: string;
+                        };
+                        emails?: {
+                            /** Format: email */
+                            value?: string;
+                            primary?: boolean;
+                            type?: string;
+                        }[];
+                        /** @description False once the account is deactivated. */
+                        active?: boolean;
+                        meta?: {
+                            resourceType?: string;
+                            /** Format: date-time */
+                            created?: string;
+                            /** Format: date-time */
+                            lastModified?: string;
+                        };
+                    };
+                };
+            };
+            /** @description The request body is not JSON, or does not match the SCIM schema for this operation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description No such member in this organization. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimDeleteUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The LangWatch user id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deprovisioned. No body. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description No such member in this organization. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimPatchUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The LangWatch user id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The updated user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The LangWatch user id. Use it as the resource id in later calls, and as a member value on a group. */
+                        id?: string;
+                        /**
+                         * Format: email
+                         * @description The member's email address, which is their login.
+                         */
+                        userName?: string;
+                        name?: {
+                            givenName?: string;
+                            familyName?: string;
+                        };
+                        emails?: {
+                            /** Format: email */
+                            value?: string;
+                            primary?: boolean;
+                            type?: string;
+                        }[];
+                        /** @description False once the account is deactivated. */
+                        active?: boolean;
+                        meta?: {
+                            resourceType?: string;
+                            /** Format: date-time */
+                            created?: string;
+                            /** Format: date-time */
+                            lastModified?: string;
+                        };
+                    };
+                };
+            };
+            /** @description The request body is not JSON, or does not match the SCIM schema for this operation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description No such member in this organization. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimListGroups: {
+        parameters: {
+            query?: {
+                /** @description A SCIM filter. Only `displayName eq "..."` is applied; anything else is ignored and the full page is returned. */
+                filter?: string;
+                /** @description 1-based index of the first resource to return. Anything that does not parse as a positive integer is read as 1. */
+                startIndex?: number;
+                /** @description How many resources to return, capped at 100 (the `filter.maxResults` ServiceProviderConfig publishes). Anything that does not parse as a positive integer is read as 100, and anything above 100 is served as 100. */
+                count?: number;
+                /** @description Comma-separated attribute names to leave out of the response. Only `members` is honoured, and it is what lets a directory page through groups without pulling every membership. */
+                excludedAttributes?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of provisioned groups. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description How many resources match, before pagination. */
+                        totalResults?: number;
+                        startIndex?: number;
+                        itemsPerPage?: number;
+                        Resources?: {
+                            /** @description The SCIM schema URNs this resource conforms to. */
+                            schemas?: string[];
+                            /** @description The LangWatch group id. */
+                            id?: string;
+                            displayName?: string;
+                            /** @description Omitted when the request excluded the members attribute. Each value is a LangWatch user id. */
+                            members?: {
+                                value?: string;
+                                display?: string;
+                            }[];
+                            meta?: {
+                                resourceType?: string;
+                                /** Format: date-time */
+                                created?: string;
+                                /** Format: date-time */
+                                lastModified?: string;
+                            };
+                        }[];
+                    };
+                };
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimCreateGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The provisioned group. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The LangWatch group id. */
+                        id?: string;
+                        displayName?: string;
+                        /** @description Omitted when the request excluded the members attribute. Each value is a LangWatch user id. */
+                        members?: {
+                            value?: string;
+                            display?: string;
+                        }[];
+                        meta?: {
+                            resourceType?: string;
+                            /** Format: date-time */
+                            created?: string;
+                            /** Format: date-time */
+                            lastModified?: string;
+                        };
+                    };
+                };
+            };
+            /** @description The request body is not JSON, or does not match the SCIM schema for this operation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description A provisioned group with this displayName already exists in the organization. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimGetGroup: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated attribute names to leave out of the response. Only `members` is honoured, and it is what lets a directory page through groups without pulling every membership. */
+                excludedAttributes?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The LangWatch group id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The group. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The LangWatch group id. */
+                        id?: string;
+                        displayName?: string;
+                        /** @description Omitted when the request excluded the members attribute. Each value is a LangWatch user id. */
+                        members?: {
+                            value?: string;
+                            display?: string;
+                        }[];
+                        meta?: {
+                            resourceType?: string;
+                            /** Format: date-time */
+                            created?: string;
+                            /** Format: date-time */
+                            lastModified?: string;
+                        };
+                    };
+                };
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description No such group in this organization. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimReplaceGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The LangWatch group id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The updated group. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The LangWatch group id. */
+                        id?: string;
+                        displayName?: string;
+                        /** @description Omitted when the request excluded the members attribute. Each value is a LangWatch user id. */
+                        members?: {
+                            value?: string;
+                            display?: string;
+                        }[];
+                        meta?: {
+                            resourceType?: string;
+                            /** Format: date-time */
+                            created?: string;
+                            /** Format: date-time */
+                            lastModified?: string;
+                        };
+                    };
+                };
+            };
+            /** @description The request body is not JSON, or does not match the SCIM schema for this operation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description No such group in this organization. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimDeleteGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The LangWatch group id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deprovisioned. No body. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description No such group in this organization. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+        };
+    };
+    scimPatchGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The LangWatch group id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The updated group. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The LangWatch group id. */
+                        id?: string;
+                        displayName?: string;
+                        /** @description Omitted when the request excluded the members attribute. Each value is a LangWatch user id. */
+                        members?: {
+                            value?: string;
+                            display?: string;
+                        }[];
+                        meta?: {
+                            resourceType?: string;
+                            /** Format: date-time */
+                            created?: string;
+                            /** Format: date-time */
+                            lastModified?: string;
+                        };
+                    };
+                };
+            };
+            /** @description The request body is not JSON, or does not match the SCIM schema for this operation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The Authorization header is missing, is not a bearer token, or names a token this deployment does not know. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description The token is valid but the organization's plan no longer includes SCIM provisioning. Entitlement is checked on every call, so a directory connection stops the moment the Enterprise plan lapses. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
+                    };
+                };
+            };
+            /** @description No such group in this organization. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/scim+json": {
+                        /** @description The SCIM schema URNs this resource conforms to. */
+                        schemas?: string[];
+                        /** @description The HTTP status, as a string. */
+                        status?: string;
+                        detail?: string;
                     };
                 };
             };
@@ -19683,6 +22365,308 @@ export interface operations {
                 };
             };
         };
+    };
+    getApiTeams: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiTeams: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiTeamsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    deleteApiTeamsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    patchApiTeamsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name?: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiTeamsByIdMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiTeamsByIdMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    userId: string;
+                    /**
+                     * @default MEMBER
+                     * @enum {string}
+                     */
+                    role?: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                };
+            };
+        };
+        responses: never;
+    };
+    deleteApiTeamsByIdMembersByUserId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    getApiTeamsByIdProjects: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    getApiGroups: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiGroups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name: string;
+                    bindings?: {
+                        /** @enum {string} */
+                        role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                        customRoleId?: string;
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                        scopeId: string;
+                    }[];
+                    memberIds?: string[];
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiGroupsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    deleteApiGroupsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    patchApiGroupsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    getApiGroupsByIdMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiGroupsByIdMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    userId: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    deleteApiGroupsByIdMembersByUserId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    getApiGroupsByIdBindings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
+    };
+    postApiGroupsByIdBindings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                    customRoleId?: string;
+                    /** @enum {string} */
+                    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                    scopeId: string;
+                };
+            };
+        };
+        responses: never;
+    };
+    deleteApiGroupsByIdBindingsByBindingId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                bindingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: never;
     };
     postApiTracesSearch: {
         parameters: {

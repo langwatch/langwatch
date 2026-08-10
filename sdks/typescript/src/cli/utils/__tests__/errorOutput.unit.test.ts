@@ -30,7 +30,9 @@ const handledError = ({
   meta = { id: "sales-q3" } as Record<string, unknown>,
   traceId = "4bf92f3577b34da6a3ce929d0e0e4736" as string | undefined,
   traceUrl = undefined as string | undefined,
-  reasons = undefined as { kind: string }[] | undefined,
+  reasons = undefined as
+    | { kind: string; meta?: Record<string, unknown> }[]
+    | undefined,
   suggestions = undefined as string[] | undefined,
   docUrl = undefined as string | undefined,
 } = {}) =>
@@ -481,6 +483,37 @@ describe("given two concurrent daemon requests in one window", () => {
       } finally {
         chalk.level = savedLevel;
       }
+    });
+  });
+});
+
+describe("given a validation failure with one reason per rejected field", () => {
+  describe("when it is rendered for a human", () => {
+    it("names the field and what was wrong with it", () => {
+      const rendered = renderErrorForHumans(
+        readCommandError(
+          handledError({
+            code: "validation_error",
+            message: "The request did not pass validation",
+            httpStatus: 422,
+            meta: {},
+            reasons: [
+              {
+                kind: "schema_failure",
+                meta: {
+                  field: "name",
+                  type: "too_small",
+                  message: "String must contain at least 1 character(s)",
+                },
+              },
+            ],
+          }),
+        ),
+      );
+
+      expect(rendered).toContain("caused by");
+      expect(rendered).toContain("name");
+      expect(rendered).toContain("String must contain at least 1 character(s)");
     });
   });
 });

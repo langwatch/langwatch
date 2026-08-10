@@ -2,6 +2,7 @@ import { generate } from "@langwatch/ksuid";
 import {
   type Organization,
   type OrganizationInvite,
+  type OrganizationUser,
   OrganizationUserRole,
   type Prisma,
   type PrismaClient,
@@ -10,18 +11,46 @@ import {
 import type { JsonArray } from "@prisma/client/runtime/library";
 import { nanoid } from "nanoid";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { isCustomRole } from "../api/enterprise";
 import { LimitExceededError } from "../license-enforcement/errors";
 import { RoleService } from "../role/role.service";
+import {
+  CustomRoleIdRequiredError,
+  CustomRoleNotAssignableError,
+} from "../role-bindings/errors";
 import {
   AlreadyOrganizationMemberError,
   DuplicateInviteError,
   InviteNotFoundError,
   InviteNotReadyError,
   OrganizationNotFoundError,
+  TeamNotInOrganizationError,
 } from "./errors";
 
 /** Duration in milliseconds before an invite expires (48 hours). */
 export const INVITE_EXPIRATION_MS = 2 * 24 * 60 * 60 * 1000;
+
+/**
+ * Ceiling on the batch-invite transaction, derived from the work it holds:
+ * the batch endpoint accepts 50 invites and {@link InviteService.persistInvites}
+ * issues one duplicate check and one insert per invite on the single
+ * connection an interactive transaction owns, so 100 sequential indexed
+ * statements. At 200ms apiece, which is already an unhappy database, that is
+ * 20 seconds; Prisma's 5s default fails the whole batch with P2028 well before
+ * a large batch is unhealthy.
+ *
+ * Not larger, because the transaction pins one pool connection for its whole
+ * life: this number is the cap on how long one batch may hold a connection,
+ * not a target. A batch that reaches it is failing for a real reason.
+ */
+const INVITE_BATCH_TXN_TIMEOUT_MS = 20_000;
+
+/**
+ * How long to wait for a connection before starting. Raised from Prisma's 2s
+ * default for the same reason the dataset mutations raise it: a busy pool
+ * should not fail a batch before it has done any work.
+ */
+const INVITE_BATCH_TXN_MAX_WAIT_MS = 10_000;
 
 /** Mapping from organization roles to default team roles. */
 export const ORGANIZATION_TO_TEAM_ROLE_MAP: Record<
@@ -37,15 +66,19 @@ import { createLogger } from "@langwatch/observability";
 import { TeamUserRole } from "@prisma/client";
 import { env } from "~/env.mjs";
 import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
-import type { Session } from "~/server/auth";
 import { getApp } from "../app-layer/app";
-import type { PlanProvider } from "../app-layer/subscription/plan-provider";
+import type {
+  PlanProvider,
+  PlanProviderUser,
+} from "../app-layer/subscription/plan-provider";
 import {
   type ILicenseEnforcementRepository,
   LicenseEnforcementRepository,
 } from "../license-enforcement/license-enforcement.repository";
 import { isViewOnlyCustomRole } from "../license-enforcement/member-classification";
 import { sendInviteEmail } from "../mailer/inviteEmail";
+import { assertNoPersonalTeamScope } from "../role-bindings/personal-team-scope";
+import { buildInviteAcceptUrl } from "./invite-link";
 
 const logger = createLogger("langwatch:invites");
 
@@ -174,6 +207,30 @@ interface CreateAdminInviteInput {
 }
 
 /**
+ * One requested invite for the {@link InviteService.createInvites}
+ * orchestrator. `teams` carries either built-in team roles, `CUSTOM` with a
+ * `customRoleId`, or the `custom:{roleId}` string form the invite form sends;
+ * `teamIds` is the legacy comma-separated form that assigns the default team
+ * role for the organization role.
+ */
+interface CreateInvitesInviteInput {
+  email: string;
+  role: OrganizationUserRole;
+  teamIds?: string;
+  teams?: Array<{
+    teamId: string;
+    role: TeamUserRole | string;
+    customRoleId?: string;
+  }>;
+}
+
+/** The validated team side of one requested invite. */
+interface ResolvedInviteTeams {
+  teamAssignments: TeamAssignmentInput[];
+  teamIdsString: string;
+}
+
+/**
  * Input for creating a member invite request (WAITING_APPROVAL status).
  */
 interface CreateMemberInviteRequestInput {
@@ -246,6 +303,11 @@ export class InviteService {
    * Validates that an invite can be created:
    * - No duplicate invitations across PENDING, WAITING_APPROVAL, and PAYMENT_PENDING statuses
    * - Returns the existing invite if a duplicate is found (null if no duplicate)
+   *
+   * Case-insensitive on the address, like the membership check next door and
+   * like `acceptInvite`'s own comparison: an exact match would let
+   * `Alice@acme.com` and `alice@acme.com` both become pending invites for one
+   * person, who could then accept both.
    */
   async checkDuplicateInvite({
     email,
@@ -256,7 +318,7 @@ export class InviteService {
   }): Promise<OrganizationInvite | null> {
     return this.prisma.organizationInvite.findFirst({
       where: {
-        email,
+        email: { equals: email.trim(), mode: "insensitive" },
         organizationId,
         status: { in: ["PENDING", "WAITING_APPROVAL", "PAYMENT_PENDING"] },
         OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
@@ -334,7 +396,7 @@ export class InviteService {
       role: OrganizationUserRole;
       teams?: Array<{ customRoleId?: string }>;
     }>;
-    user: Session["user"];
+    user?: PlanProviderUser;
   }): Promise<void> {
     const subscriptionLimits = await this.planProvider.getActivePlan({
       organizationId,
@@ -409,9 +471,6 @@ export class InviteService {
   async createAdminInviteRecord(
     input: CreateAdminInviteInput,
   ): Promise<{ invite: OrganizationInvite; organization: Organization }> {
-    this.assertAssignmentsWithinInvitedSeat(input);
-    const inviteCode = nanoid();
-
     const organization = await this.prisma.organization.findFirst({
       where: { id: input.organizationId },
     });
@@ -420,10 +479,30 @@ export class InviteService {
       throw new OrganizationNotFoundError();
     }
 
-    const savedInvite = await this.prisma.organizationInvite.create({
+    return { invite: await this.createInviteRow(input), organization };
+  }
+
+  /**
+   * The pending invite row itself, with no organization lookup attached.
+   *
+   * Split out so a batch that has already loaded the organization writes each
+   * row without re-reading it: {@link persistInvites} runs inside an
+   * interactive transaction holding one connection, where fifty invites meant
+   * fifty redundant reads of a row the caller was already holding.
+   */
+  private async createInviteRow(
+    input: CreateAdminInviteInput,
+  ): Promise<OrganizationInvite> {
+    // Every writer of a pending invite passes through here, including the
+    // batch path, so the seat rule is checked here rather than once per
+    // caller: a Lite Member invited through the batch endpoint would
+    // otherwise be promised a team role their seat cannot hold.
+    this.assertAssignmentsWithinInvitedSeat(input);
+
+    return this.prisma.organizationInvite.create({
       data: {
         email: input.email,
-        inviteCode,
+        inviteCode: nanoid(),
         expiration: new Date(Date.now() + INVITE_EXPIRATION_MS),
         organizationId: input.organizationId,
         teamIds: input.teamIds,
@@ -435,8 +514,6 @@ export class InviteService {
         status: "PENDING",
       },
     });
-
-    return { invite: savedInvite, organization };
   }
 
   /**
@@ -462,6 +539,516 @@ export class InviteService {
       logger.error({ error }, "Failed to send invite email");
       return { emailNotSent: true };
     }
+  }
+
+  /**
+   * The whole admin batch-invite flow in one place: membership and licence
+   * checks, team and custom-role validation, duplicate handling, transactional
+   * creation, then email delivery with per-invite `emailNotSent` reporting.
+   *
+   * `validation` picks what happens to an invite that names an invalid team
+   * or custom role. The invite form keeps `"lenient"`, which drops the
+   * offending assignment or invite the way the tRPC router always has; the
+   * API surface uses `"strict"`, which refuses the batch loudly, because a
+   * provisioning tool that is silently given less than it asked for believes
+   * the grant took effect.
+   */
+  async createInvites({
+    organizationId,
+    invites,
+    user,
+    validation,
+  }: {
+    organizationId: string;
+    invites: CreateInvitesInviteInput[];
+    user?: PlanProviderUser;
+    validation: "strict" | "lenient";
+  }): Promise<{
+    organization: Organization & { members: OrganizationUser[] };
+    invites: Array<{ invite: OrganizationInvite; emailNotSent: boolean }>;
+  }> {
+    const prisma = this.requireRootClient();
+    const isStrict = validation === "strict";
+
+    const organization = await prisma.organization.findFirst({
+      where: { id: organizationId },
+      include: { members: true },
+    });
+    if (!organization) {
+      throw new OrganizationNotFoundError();
+    }
+
+    // Before anything is written: inviting someone who is already a member
+    // used to succeed silently, adding a pending invite beside the membership
+    // it duplicated. Checked ahead of the licence limit so an admin who is at
+    // their seat cap is told the real reason rather than being sold an
+    // upgrade for a seat they already own.
+    await this.assertNotAlreadyMembers({
+      emails: invites.map((invite) => invite.email),
+      organizationId,
+    });
+
+    await this.checkLicenseLimits({
+      organizationId,
+      newInvites: invites.map((invite) => ({
+        role: invite.role,
+        teams: invite.teams,
+      })),
+      user,
+    });
+
+    // Read-only validation outside the transaction.
+    const preparedInvites = await Promise.all(
+      invites.map((invite) =>
+        this.prepareInvite({ organizationId, invite, isStrict }),
+      ),
+    );
+    const validInvites = preparedInvites.filter(
+      (invite): invite is NonNullable<typeof invite> => invite !== null,
+    );
+
+    // A personal workspace passes plain team validation because it does
+    // belong to the organization, but an invite accepted against it would
+    // hand a second person the workspace its owner was promised privacy in.
+    // Refused loudly on every path, lenient mode included: this is an
+    // invariant, not a strictness option (issue #6338).
+    await assertNoPersonalTeamScope({
+      client: prisma,
+      scopes: validInvites.flatMap(
+        (invite) =>
+          invite.teamAssignments?.map((assignment) => ({
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: assignment.teamId,
+          })) ?? [],
+      ),
+    });
+
+    // Phase 1: DB operations in a transaction, no side effects.
+    const createdRecords = await prisma.$transaction(
+      (tx) =>
+        this.persistInvites({
+          tx,
+          invites: validInvites,
+          organization,
+          isStrict,
+        }),
+      {
+        timeout: INVITE_BATCH_TXN_TIMEOUT_MS,
+        maxWait: INVITE_BATCH_TXN_MAX_WAIT_MS,
+      },
+    );
+
+    // Phase 2: emails outside the transaction, so a provider failure can
+    // never roll back a committed invite.
+    const results = await Promise.all(
+      createdRecords.map(async (record) => {
+        const { emailNotSent } = await this.trySendInviteEmail({
+          email: record.invite.email,
+          organization: record.organization,
+          inviteCode: record.invite.inviteCode,
+        });
+        return { invite: record.invite, emailNotSent };
+      }),
+    );
+
+    return { organization, invites: results };
+  }
+
+  /**
+   * Writes the prepared invites inside the caller's transaction, skipping the
+   * ones an existing invite already covers (or refusing them in strict mode).
+   *
+   * One invite at a time: an interactive transaction holds a single
+   * connection, so a parallel fan-out would not run in parallel anyway, and it
+   * would let two invites for the same address in one batch both read "no
+   * duplicate" and both be written.
+   *
+   * `organization` is the row the caller already loaded, paired with every
+   * invite for the email phase, so a fifty-invite batch does not re-read it
+   * fifty times on the transaction's one connection.
+   */
+  private async persistInvites({
+    tx,
+    invites,
+    organization,
+    isStrict,
+  }: {
+    tx: Prisma.TransactionClient;
+    invites: CreateAdminInviteInput[];
+    organization: Organization;
+    isStrict: boolean;
+  }): Promise<
+    Array<{ invite: OrganizationInvite; organization: Organization }>
+  > {
+    const txInviteService = InviteService.create(tx, {
+      planProvider: this.planProvider,
+    });
+    const records: Array<{
+      invite: OrganizationInvite;
+      organization: Organization;
+    }> = [];
+
+    for (const invite of invites) {
+      const existingInvite = await txInviteService.checkDuplicateInvite({
+        email: invite.email,
+        organizationId: invite.organizationId,
+      });
+
+      if (existingInvite) {
+        if (isStrict) {
+          throw new DuplicateInviteError(invite.email);
+        }
+        continue;
+      }
+
+      records.push({
+        invite: await txInviteService.createInviteRow(invite),
+        organization,
+      });
+    }
+
+    return records;
+  }
+
+  /**
+   * Validates and normalizes one requested invite into the record shape
+   * `createAdminInviteRecord` persists. Returns null when lenient validation
+   * drops the invite entirely (no valid teams, blank email, or an invalid
+   * custom role).
+   */
+  private async prepareInvite({
+    organizationId,
+    invite,
+    isStrict,
+  }: {
+    organizationId: string;
+    invite: CreateInvitesInviteInput;
+    isStrict: boolean;
+  }): Promise<CreateAdminInviteInput | null> {
+    const resolvedTeams = await this.resolveInviteTeams({
+      organizationId,
+      invite,
+      isStrict,
+    });
+    if (!resolvedTeams) {
+      return null;
+    }
+
+    const email = invite.email.trim();
+    if (!email) {
+      return null;
+    }
+
+    return {
+      // Stored trimmed, because the reads look the address up as it was
+      // typed: `checkDuplicateInvite` and `findPendingByOrgAndEmail` both miss
+      // a row written as " a@b.com ", so the duplicate check never fires and
+      // SSO onboarding never finds the invite it should adopt.
+      email,
+      role: invite.role,
+      organizationId,
+      teamIds: resolvedTeams.teamIdsString,
+      teamAssignments:
+        resolvedTeams.teamAssignments.length > 0
+          ? resolvedTeams.teamAssignments
+          : undefined,
+    };
+  }
+
+  /**
+   * The team side of one requested invite, from whichever form the request
+   * used: explicit team role entries, or the legacy comma-separated team id
+   * list. Returns null when the invite names no teams at all, or when
+   * lenient validation drops it entirely.
+   */
+  private async resolveInviteTeams({
+    organizationId,
+    invite,
+    isStrict,
+  }: {
+    organizationId: string;
+    invite: CreateInvitesInviteInput;
+    isStrict: boolean;
+  }): Promise<ResolvedInviteTeams | null> {
+    if (invite.teams && invite.teams.length > 0) {
+      return this.resolveExplicitInviteTeams({
+        organizationId,
+        teams: invite.teams,
+        isStrict,
+      });
+    }
+    if (invite.teamIds?.trim()) {
+      return this.resolveLegacyInviteTeams({
+        organizationId,
+        teamIds: invite.teamIds,
+        role: invite.role,
+        isStrict,
+      });
+    }
+    return null;
+  }
+
+  /**
+   * Resolves explicit team role entries: the teams must belong to the
+   * organization, custom-role forms are normalized, and the custom roles
+   * must be assignable. Returns null when lenient validation drops the
+   * invite (no valid teams, or an invalid custom role).
+   */
+  private async resolveExplicitInviteTeams({
+    organizationId,
+    teams,
+    isStrict,
+  }: {
+    organizationId: string;
+    teams: NonNullable<CreateInvitesInviteInput["teams"]>;
+    isStrict: boolean;
+  }): Promise<ResolvedInviteTeams | null> {
+    const teamIds = teams.map((team) => team.teamId);
+    const validTeamIds = await this.validateTeamIds({
+      teamIds,
+      organizationId,
+    });
+
+    if (isStrict) {
+      this.assertAllTeamIdsValid({ requestedTeamIds: teamIds, validTeamIds });
+    }
+    if (validTeamIds.length === 0) {
+      return null;
+    }
+
+    const teamAssignments = this.normalizeTeamAssignments({
+      teams,
+      validTeamIds,
+      isStrict,
+    });
+
+    const customRolesValid = await this.validateInviteCustomRoles({
+      organizationId,
+      teamAssignments,
+      isStrict,
+    });
+    if (!customRolesValid) {
+      return null;
+    }
+
+    return { teamAssignments, teamIdsString: validTeamIds.join(",") };
+  }
+
+  /**
+   * Resolves the legacy comma-separated team id form: each valid team gets
+   * the default team role for the invite's organization role. Returns null
+   * when lenient validation leaves no valid teams.
+   */
+  private async resolveLegacyInviteTeams({
+    organizationId,
+    teamIds,
+    role,
+    isStrict,
+  }: {
+    organizationId: string;
+    teamIds: string;
+    role: OrganizationUserRole;
+    isStrict: boolean;
+  }): Promise<ResolvedInviteTeams | null> {
+    const teamIdArray = teamIds
+      .split(",")
+      .map((teamId) => teamId.trim())
+      .filter(Boolean);
+
+    const validTeamIds = await this.validateTeamIds({
+      teamIds: teamIdArray,
+      organizationId,
+    });
+
+    if (isStrict) {
+      this.assertAllTeamIdsValid({
+        requestedTeamIds: teamIdArray,
+        validTeamIds,
+      });
+    }
+    if (validTeamIds.length === 0) {
+      return null;
+    }
+
+    return {
+      teamAssignments: validTeamIds.map((teamId) => ({
+        teamId,
+        role: ORGANIZATION_TO_TEAM_ROLE_MAP[role],
+      })),
+      teamIdsString: validTeamIds.join(","),
+    };
+  }
+
+  /** Refuses the first requested team id that is not in the organization. */
+  private assertAllTeamIdsValid({
+    requestedTeamIds,
+    validTeamIds,
+  }: {
+    requestedTeamIds: string[];
+    validTeamIds: string[];
+  }): void {
+    const invalidTeamId = requestedTeamIds.find(
+      (teamId) => !validTeamIds.includes(teamId),
+    );
+    if (invalidTeamId) {
+      throw new TeamNotInOrganizationError(invalidTeamId);
+    }
+  }
+
+  /**
+   * Narrows explicit team role entries to valid teams only, folding the
+   * `custom:{roleId}` string form and `CUSTOM` into TeamUserRole.CUSTOM. An
+   * assignment naming a custom role without its id is refused in strict
+   * mode and dropped in lenient mode.
+   */
+  private normalizeTeamAssignments({
+    teams,
+    validTeamIds,
+    isStrict,
+  }: {
+    teams: NonNullable<CreateInvitesInviteInput["teams"]>;
+    validTeamIds: string[];
+    isStrict: boolean;
+  }): TeamAssignmentInput[] {
+    return teams
+      .filter((team) => validTeamIds.includes(team.teamId))
+      .map((team) => {
+        const isCustomString =
+          typeof team.role === "string" && isCustomRole(team.role);
+        const isCustom = isCustomString || team.role === TeamUserRole.CUSTOM;
+        return {
+          teamId: team.teamId,
+          role: isCustom ? TeamUserRole.CUSTOM : (team.role as TeamUserRole),
+          customRoleId:
+            isCustom && team.customRoleId ? team.customRoleId : undefined,
+        };
+      })
+      .filter((team) => {
+        if (team.role === TeamUserRole.CUSTOM && !team.customRoleId) {
+          if (isStrict) {
+            throw new CustomRoleIdRequiredError();
+          }
+          return false;
+        }
+        return true;
+      });
+  }
+
+  /**
+   * True when every custom role named by these assignments is assignable in
+   * this organization. In strict mode an invalid custom role is refused
+   * instead; in lenient mode the caller drops the whole invite.
+   */
+  private async validateInviteCustomRoles({
+    organizationId,
+    teamAssignments,
+    isStrict,
+  }: {
+    organizationId: string;
+    teamAssignments: TeamAssignmentInput[];
+    isStrict: boolean;
+  }): Promise<boolean> {
+    const customRoleIds = teamAssignments
+      .filter((team) => team.customRoleId)
+      .map((team) => team.customRoleId!);
+    if (customRoleIds.length === 0) {
+      return true;
+    }
+
+    // Through the role service, which is where assignability is defined: an
+    // invite validated against a different rule than `applyInvite` applies
+    // would be accepted here and silently dropped on acceptance.
+    const roleService = this.roleService ?? new RoleService(this.prisma);
+    const validCustomRoleIds = new Set(
+      await roleService.filterAssignableRoleIds({
+        roleIds: customRoleIds,
+        organizationId,
+      }),
+    );
+    const invalidRoleId = customRoleIds.find(
+      (id) => !validCustomRoleIds.has(id),
+    );
+    if (invalidRoleId) {
+      if (isStrict) {
+        throw new CustomRoleNotAssignableError(invalidRoleId);
+      }
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Pending and approval-waiting invites with the acceptance link each one
+   * carries. The link is included because a provisioning tool with no email
+   * provider configured has no other way to hand the invite to the person.
+   */
+  async listInvites({ organizationId }: { organizationId: string }): Promise<
+    Array<
+      OrganizationInvite & {
+        inviteUrl: string;
+        requestedByUser: {
+          id: string;
+          name: string | null;
+          email: string | null;
+        } | null;
+      }
+    >
+  > {
+    const invites = await this.prisma.organizationInvite.findMany({
+      where: {
+        organizationId,
+        status: { in: ["PENDING", "WAITING_APPROVAL"] },
+        OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
+      },
+      include: {
+        requestedByUser: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return invites.map((invite) => ({
+      ...invite,
+      inviteUrl: buildInviteAcceptUrl(invite.inviteCode),
+    }));
+  }
+
+  /**
+   * Deletes a pending invite. Organization-scoped: an invite id from another
+   * organization reads as not found, never as someone else's invite.
+   */
+  async revokeInvite({
+    organizationId,
+    inviteId,
+  }: {
+    organizationId: string;
+    inviteId: string;
+  }): Promise<{ success: true }> {
+    const invite = await this.prisma.organizationInvite.findFirst({
+      where: { id: inviteId, organizationId },
+      select: { id: true },
+    });
+    if (!invite) {
+      throw new InviteNotFoundError("Invitation not found");
+    }
+    await this.prisma.organizationInvite.delete({
+      where: { id: invite.id, organizationId },
+    });
+    return { success: true };
+  }
+
+  /**
+   * The orchestrators open their own transaction, so they cannot run on a
+   * `TransactionClient`; everything else in this service can.
+   */
+  private requireRootClient(): PrismaClient {
+    if (!("$transaction" in this.prisma)) {
+      throw new Error(
+        "This orchestration requires a root Prisma client, not a transaction client",
+      );
+    }
+    return this.prisma;
   }
 
   /**

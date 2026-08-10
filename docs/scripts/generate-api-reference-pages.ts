@@ -286,6 +286,96 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Manage groups: named sets of members that carry role bindings and can hold a per-member spend allowance.",
   },
   {
+    name: "Organization",
+    dirName: "organization",
+    // Members and invites live under this prefix but read as families of their
+    // own, so they carry longer prefixes below and win ownership of their paths.
+    pathPrefixes: ["/api/organization"],
+    overviewDescription:
+      "Read and update the organization the calling credential belongs to: its name, support contact, presence and trace sharing settings, and its stored-object storage.",
+  },
+  {
+    name: "Members",
+    dirName: "members",
+    pathPrefixes: ["/api/organization/members"],
+    overviewDescription:
+      "Manage the people in the organization: list them, read one with the teams they reach, change an organization role, disable or re-enable access, remove someone, and read the full breakdown of what a member can reach.",
+  },
+  {
+    name: "Invites",
+    dirName: "invites",
+    pathPrefixes: ["/api/organization/invites"],
+    overviewDescription:
+      "Invite people into the organization in batches, with the teams and roles they land on, and list or revoke the invites still waiting to be accepted.",
+  },
+  {
+    name: "Roles",
+    dirName: "roles",
+    pathPrefixes: ["/api/roles"],
+    overviewDescription:
+      "Build custom roles out of the permission catalog and keep them up to date. A role is a named set of resource and action permissions that a role binding then grants to someone, somewhere.",
+    // The catalog comes first because it is where the permission keys a role is
+    // built from come from, and the overview walks a reader in that order.
+    endpointOrder: [
+      "GET /api/roles/permissions",
+      "GET /api/roles",
+      "POST /api/roles",
+      "GET /api/roles/{id}",
+      "PATCH /api/roles/{id}",
+      "DELETE /api/roles/{id}",
+    ],
+  },
+  {
+    name: "Role Bindings",
+    dirName: "role-bindings",
+    pathPrefixes: ["/api/role-bindings"],
+    overviewDescription:
+      "Grant a role to one principal, a user, a group or an API key, at one scope: the organization, a team, or a single project. Role bindings are how every kind of access in LangWatch is expressed.",
+  },
+  {
+    name: "SCIM Tokens",
+    dirName: "scim-tokens",
+    pathPrefixes: ["/api/scim-tokens"],
+    overviewDescription:
+      "Mint, list and revoke the bearer tokens an identity provider uses to reach the SCIM endpoints. Token values are shown once, when they are created, and never again.",
+  },
+  {
+    name: "SCIM",
+    dirName: "scim",
+    pathPrefixes: ["/api/scim/v2"],
+    overviewDescription:
+      "The SCIM 2.0 endpoints an identity provider calls to provision and deprovision users and groups. Point Okta, Entra ID or any other SCIM 2.0 provider at this base URL with a SCIM token.",
+    // Discovery first, then the two resource types whole, because a provider
+    // reads the service provider configuration before it calls anything else,
+    // and the default sort would interleave Users and Groups.
+    endpointOrder: [
+      "GET /api/scim/v2/ServiceProviderConfig",
+      "GET /api/scim/v2/ResourceTypes",
+      "GET /api/scim/v2/Schemas",
+      "GET /api/scim/v2/Users",
+      "POST /api/scim/v2/Users",
+      "GET /api/scim/v2/Users/{id}",
+      "PUT /api/scim/v2/Users/{id}",
+      "PATCH /api/scim/v2/Users/{id}",
+      "DELETE /api/scim/v2/Users/{id}",
+      "GET /api/scim/v2/Groups",
+      "POST /api/scim/v2/Groups",
+      "GET /api/scim/v2/Groups/{id}",
+      "PUT /api/scim/v2/Groups/{id}",
+      "PATCH /api/scim/v2/Groups/{id}",
+      "DELETE /api/scim/v2/Groups/{id}",
+    ],
+  },
+  {
+    name: "Organizations (Self-Hosted)",
+    dirName: "organizations",
+    // Plural, and a different family from `/api/organization`: this one
+    // authenticates against the instance, before any organization exists.
+    pathPrefixes: ["/api/organizations"],
+    overviewDescription:
+      "Create organizations on a self-hosted instance with an instance administrator credential, and read the ones already there. This is where an infrastructure-as-code run starts, because it hands back the first organization admin API key.",
+  },
+  {
     name: "API Keys",
     dirName: "api-keys",
     pathPrefixes: ["/api/api-keys"],
@@ -512,6 +602,76 @@ function main() {
     console.error(
       "  2. add a SKIP_PATHS entry whose reason says why it is deliberately undocumented, either a retired surface or a live surface not yet documented in the API reference."
     );
+    process.exit(1);
+  }
+
+  // An `endpointOrder` key only sorts the group that declares it, so a key is
+  // invisible unless it names an operation THAT group owns: the sort silently
+  // falls back to the default for it. A drifted path parameter name, a casing
+  // slip, or a key naming a sibling group's path therefore reshuffles the
+  // sidebar with no diagnostic at all, which is exactly what a hand-written
+  // key list is prone to. The two failures get separate reports because their
+  // remedies differ: one is a typo, the other is a key in the wrong group.
+  const specOperations = new Set<string>();
+  const operationOwner = new Map<string, EndpointGroup>();
+  const groupOperations = new Map<EndpointGroup, Set<string>>(
+    ENDPOINT_GROUPS.map((group) => [group, new Set<string>()])
+  );
+  for (const [apiPath, methods] of Object.entries(spec.paths)) {
+    const owner = owners.get(apiPath);
+    for (const method of Object.keys(methods)) {
+      if (!METHOD_ORDER.includes(method)) continue;
+      const key = `${method.toUpperCase()} ${apiPath}`;
+      specOperations.add(key);
+      if (owner) {
+        operationOwner.set(key, owner);
+        groupOperations.get(owner)?.add(key);
+      }
+    }
+  }
+
+  const unknownOrder: string[] = [];
+  const misownedOrder: string[] = [];
+  for (const group of ENDPOINT_GROUPS) {
+    for (const key of group.endpointOrder ?? []) {
+      if (groupOperations.get(group)?.has(key)) continue;
+      if (!specOperations.has(key)) {
+        unknownOrder.push(`${group.name}: ${key}`);
+        continue;
+      }
+      const owner = operationOwner.get(key);
+      misownedOrder.push(
+        `${group.name}: ${key} (${
+          owner ? `owned by ${owner.name}` : "excluded by SKIP_PATHS"
+        })`
+      );
+    }
+  }
+
+  if (unknownOrder.length > 0) {
+    const noun = unknownOrder.length === 1 ? "key matches" : "keys match";
+    console.error(
+      `ERROR: ${unknownOrder.length} endpointOrder ${noun} no operation in the spec:`
+    );
+    for (const entry of unknownOrder.sort()) console.error(`  ${entry}`);
+    console.error(
+      "\nSpell the METHOD and path exactly as the spec does, path parameter names and casing included, or drop the key from endpointOrder in docs/scripts/generate-api-reference-pages.ts."
+    );
+  }
+  if (misownedOrder.length > 0) {
+    const noun =
+      misownedOrder.length === 1
+        ? "key names an operation"
+        : "keys name operations";
+    console.error(
+      `ERROR: ${misownedOrder.length} endpointOrder ${noun} the declaring group does not own, so the key sorts nothing:`
+    );
+    for (const entry of misownedOrder.sort()) console.error(`  ${entry}`);
+    console.error(
+      "\nMove the key to the group that owns the path, widen that group's pathPrefixes, or drop the key from endpointOrder in docs/scripts/generate-api-reference-pages.ts. A path excluded by SKIP_PATHS gets no page at all, so it can never be ordered."
+    );
+  }
+  if (unknownOrder.length > 0 || misownedOrder.length > 0) {
     process.exit(1);
   }
 

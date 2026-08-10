@@ -289,13 +289,15 @@ describe("organization.setMemberDisabled", () => {
       // Driven at the repository, where the guard lives: routing it through
       // the caller would trip the permission check first (the only remaining
       // admin cannot disable themselves) and prove nothing about the guard.
+      // The guard raises the registered handled code; the tRPC boundary maps
+      // its 400 to BAD_REQUEST for procedure callers.
       await expect(
         repo.setMemberDisabled({
           organizationId,
           userId: adminUserId,
           disabled: true,
         }),
-      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      ).rejects.toMatchObject({ code: "cannot_disable_last_admin" });
 
       // And the admin is genuinely still standing.
       expect(

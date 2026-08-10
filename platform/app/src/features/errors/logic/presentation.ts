@@ -711,6 +711,33 @@ const presentations = {
     title: "Custom role not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
+  custom_role_name_taken: {
+    title: "That role name is already in use",
+    describe: () =>
+      "Role names are unique in an organization. Pick a different name, or edit the existing role.",
+  },
+  custom_role_name_reserved: {
+    title: "That role name is reserved",
+    describe: () =>
+      'Names starting with "apikey:" are managed by LangWatch. Pick a different name.',
+  },
+  custom_role_in_use: {
+    title: "This role is still in use",
+    describe: () =>
+      "Remove its member assignments and role bindings first, then delete it.",
+  },
+  custom_role_id_required: {
+    title: "Pick the custom role to use",
+    describe: () =>
+      "A custom role binding needs the role's id. Choose one, then try again.",
+  },
+  custom_role_not_assignable: {
+    // Covers a role from another organization and an API key's system role
+    // alike, deliberately: saying which would confirm what exists outside
+    // the caller's organization.
+    title: "That role can't be used here",
+    describe: () => "Pick one of this organization's own custom roles.",
+  },
   team_not_found: {
     title: "Team not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
@@ -719,6 +746,15 @@ const presentations = {
     title: "That person isn't on this team",
     describe: () =>
       "They may have been removed since this page loaded. Reload to see who's on it.",
+  },
+  team_member_already_added: {
+    title: "They already hold that role here",
+    describe: () =>
+      "Nothing to add. Give them a different role on the team, or leave the one they have.",
+  },
+  team_name_taken: {
+    title: "A team here already has that name",
+    describe: () => "Pick a name no other team in this organization uses.",
   },
   lite_member_restricted: {
     title: "Your account doesn't include this",
@@ -798,6 +834,160 @@ const presentations = {
         ? `${email} is already a member. Change their role from the members list instead.`
         : "Change their role from the members list instead.";
     },
+  },
+
+  // ---- members, invites, role bindings (management surface) ----
+  member_not_found: {
+    title: "Member not found",
+    describe: () =>
+      "They may have been removed since this page loaded. Reload to see the members list.",
+  },
+  cannot_disable_self: {
+    // A deliberate refusal, not a mistake to correct: the guard exists so an
+    // organization cannot lock itself out through its own administrator.
+    title: "You can't disable your own membership",
+    describe: () => "Ask another organization admin to make this change.",
+  },
+  cannot_demote_last_admin: {
+    // Same lockout wall as disabling the last admin: with no admin remaining,
+    // nobody can sign in and undo the change.
+    title: "That would leave the organization without an admin",
+    describe: () =>
+      "This member is the only organization admin. Make somebody else an admin first, then change this member's role.",
+  },
+  cannot_disable_last_admin: {
+    // Same lockout wall seen from the other side: this member is the only
+    // administrator left, so the remedy is to appoint another one first.
+    title: "That would leave the organization without an admin",
+    describe: () =>
+      "This member is the only active organization admin. Make somebody else an admin first, then disable them.",
+  },
+  cannot_remove_last_admin: {
+    // The third face of the same lockout wall: removal is the irreversible
+    // one, so it gets the same refusal disabling and demoting do.
+    title: "That would leave the organization without an admin",
+    describe: () =>
+      "This member is the only active organization admin. Make somebody else an admin first, then remove them.",
+  },
+  cannot_remove_self: {
+    title: "You can't remove yourself from the organization",
+    describe: () => "Ask another organization admin to make this change.",
+  },
+  member_seat_limit_reached: {
+    title: "All member seats are in use",
+    describe: () =>
+      "Free a seat by disabling a membership, or upgrade the plan to add more.",
+  },
+  duplicate_invite: {
+    title: "They already have an invite",
+    describe: (error) => {
+      const email = str(error, "email", "");
+      return email
+        ? `${email} already has a pending invite. Revoke it first to send a new one.`
+        : "A pending invite for this address already exists. Revoke it first to send a new one.";
+    },
+  },
+  invite_not_found: {
+    title: "Invite not found",
+    describe: () =>
+      "It may have been revoked or already accepted. Reload to see the pending invites.",
+  },
+  team_not_in_organization: {
+    title: "That team isn't in this organization",
+    describe: () => "Pick a team that belongs to this organization.",
+  },
+  user_not_in_organization: {
+    title: "They're not in this organization",
+    describe: () =>
+      "Only current members can be added here. Invite them to the organization first.",
+  },
+  group_not_in_organization: {
+    title: "That group isn't in this organization",
+    describe: () => "Pick a group that belongs to this organization.",
+  },
+  group_not_found: {
+    title: "Group not found",
+    describe: () =>
+      "It may have been deleted, or the id may belong to another organization.",
+  },
+  group_member_already_added: {
+    title: "They're already in this group",
+    describe: () => "Nothing to do: the group already grants them its access.",
+  },
+  scim_managed_group: {
+    // The group, its name and its membership come from the directory on every
+    // sync, so a change made here is not merely refused, it would be undone.
+    title: "Your identity provider manages this group",
+    describe: () =>
+      "Rename it, change its members or remove it in the directory that provisions it; changes made here would be overwritten on the next sync.",
+  },
+  api_key_not_in_organization: {
+    title: "That API key isn't in this organization",
+    describe: () => "Pick an API key that belongs to this organization.",
+  },
+  scope_not_in_organization: {
+    // Names the KIND of scope, never the id: the id belongs to a record in
+    // another organization, which is exactly what this guard refuses to
+    // confirm the existence of. Same rule as `gateway_scope_org_mismatch`.
+    title: "That scope isn't in this organization",
+    describe: (error) => {
+      const scopeType = str(error, "scopeType", "");
+      return scopeType
+        ? `Pick a ${scopeType.toLowerCase()} that belongs to this organization.`
+        : "Pick a scope that belongs to this organization.";
+    },
+  },
+  role_binding_not_found: {
+    title: "Role binding not found",
+    describe: () =>
+      "It may have been removed already. Reload to see the current bindings.",
+  },
+  role_binding_already_exists: {
+    title: "That role is already bound",
+    describe: () =>
+      "An identical binding already exists, so there's nothing to add.",
+  },
+  role_binding_principal_invalid: {
+    title: "Choose who this role applies to",
+    describe: () => "Bind it to exactly one user, group, or API key.",
+  },
+  org_exclusive_permission_scope: {
+    // The permission key is the caller's own input, so naming it back is what
+    // lets them find the offending entry in a role with a dozen permissions.
+    title: "That permission is organization-wide only",
+    describe: (error) => {
+      const permission = str(error, "permission", "");
+      return permission
+        ? `"${permission}" only takes effect at organization scope. Bind it there instead.`
+        : "It only takes effect at organization scope. Bind it there instead.";
+    },
+  },
+  organization_slug_taken: {
+    title: "That organization slug is already in use",
+    describe: () =>
+      "Pick a different slug, or leave it out to generate one from the name.",
+  },
+  scim_token_not_found: {
+    title: "SCIM token not found",
+    describe: () =>
+      "It may already be revoked. Reload to see the current tokens.",
+  },
+  insufficient_permissions: {
+    // Names the permission when the server sent one, for the same reason
+    // `project_permission_denied` does: "ask an admin for access" is an
+    // errand with no address, whereas the exact grant can be forwarded as-is.
+    title: "You don't have permission to do this",
+    describe: (error) => {
+      const permission = str(error, "required_permission", "");
+      return permission
+        ? `Ask an organization admin to grant you "${permission}".`
+        : "Ask an organization admin for access.";
+    },
+  },
+  enterprise_plan_required: {
+    title: "This needs the Enterprise plan",
+    describe: () =>
+      "Your organization's plan doesn't include this. Talk to your account team about upgrading.",
   },
   project_permission_denied: {
     // Names the permission when the server sent one: "ask an admin for access"

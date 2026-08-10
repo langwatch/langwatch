@@ -79,7 +79,7 @@ import {
   INGEST_KEY_PREFIX,
 } from "../src/server/api-key/api-key-token.utils";
 import { modelProviders } from "../src/server/modelProviders/registry";
-import { CUSTOM_ROLE_KIND } from "../src/server/role/repositories/role.repository";
+import { CUSTOM_ROLE_KIND } from "../src/server/role/role-kind";
 import { encrypt } from "../src/utils/encryption";
 import { seedDemoPlatform } from "./seed-demo-platform";
 
