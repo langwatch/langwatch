@@ -130,10 +130,10 @@ Feature: Staged automation authoring drawer
     the case that matters, because a limit email asks the customer to narrow a
     condition and that drawer cannot edit a query at all.
 
-    @unit
+    @integration
     Scenario: A link issued before the drawer changed still opens the automation
       Given a link that names the drawer the API used to hand out
-      When the app resolves that name
+      When the app resolves that URL
       Then it opens the automation authoring drawer
 
   Rule: Notifications configure templates; actions configure destinations
