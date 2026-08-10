@@ -8,6 +8,9 @@ Provides:
   created by this session that were not cleaned up by their per-test teardown.
 - tag_factory: function-scoped fixture that creates prompt tags and deletes
   them on teardown (issue #3108).
+- _session_tag_registry: session-scoped safety-net that deletes any tags
+  created by this session that were not cleaned up by their per-test
+  teardown, and reports created-versus-cleaned so a leak is visible (#4126).
 """
 
 import logging
@@ -16,6 +19,8 @@ from typing import Any, Callable, List
 import pytest
 
 import langwatch
+
+from tag_registry import SessionTagRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +71,7 @@ def _delete_prompt_with_narrow_handling(prompt_id: str, context: str) -> None:
         )
 
 
-def _delete_tag_with_narrow_handling(name: str, context: str) -> None:
+def _delete_tag_with_narrow_handling(name: str, context: str) -> bool:
     """
     Delete a single tag, distinguishing 404 (already gone) from real errors.
 
@@ -78,6 +83,13 @@ def _delete_tag_with_narrow_handling(name: str, context: str) -> None:
     (e.g. ``test_delete_tag_cascades_to_assignments``).
 
     Never raises — callers iterate lists and must clean up all remaining names.
+
+    Returns ``True`` when the tag is confirmed gone, which includes the 404
+    case: something else removed it, and either way nothing is left behind.
+    ``False`` means this call gave up and the tag is still out there.  Callers
+    that only need cleanup can ignore the result; the session registry counts
+    it, because a teardown that gave up and one that worked are otherwise
+    indistinguishable, which is how 167 orphan tags accumulated unnoticed.
     """
     try:
         langwatch.prompts.tags.delete(name)
@@ -86,6 +98,7 @@ def _delete_tag_with_narrow_handling(name: str, context: str) -> None:
             context,
             extra={"tag_name": name},
         )
+        return True
     except ValueError as exc:
         if str(exc).startswith("Prompt not found"):
             logger.debug(
@@ -93,13 +106,14 @@ def _delete_tag_with_narrow_handling(name: str, context: str) -> None:
                 context,
                 extra={"tag_name": name},
             )
-        else:
-            logger.warning(
-                "%s: failed to delete tag (ValueError: %s), continuing cleanup",
-                context,
-                exc,
-                extra={"tag_name": name},
-            )
+            return True
+        logger.warning(
+            "%s: failed to delete tag (ValueError: %s), continuing cleanup",
+            context,
+            exc,
+            extra={"tag_name": name},
+        )
+        return False
     except Exception as exc:  # noqa: BLE001 - teardown must never raise.
         logger.warning(
             "%s: failed to delete tag (%s: %s), continuing cleanup",
@@ -108,6 +122,7 @@ def _delete_tag_with_narrow_handling(name: str, context: str) -> None:
             exc,
             extra={"tag_name": name},
         )
+        return False
 
 
 @pytest.fixture(scope="session")
@@ -185,23 +200,82 @@ def prompt_factory(_session_prompt_registry: List[str]) -> Callable[..., Any]:
             pass  # already removed or never added (shouldn't happen)
 
 
+@pytest.fixture(scope="session")
+def _session_tag_registry() -> SessionTagRegistry:
+    """
+    Session-scoped safety-net registry of all tags created this session.
+
+    Mirrors ``_session_prompt_registry``: the function-scoped ``tag_factory``
+    appends here in addition to its own per-test list, so a per-test teardown
+    that never ran (SIGKILL, CI timeout, process kill between create and
+    delete) still has a second chance at session end.
+
+    Like the prompt registry it is collision-free: it names only tags this
+    session created, so a concurrent run against the same tenant is untouched.
+    """
+    registry = SessionTagRegistry()
+    yield registry
+
+    if registry.pending:
+        logger.info(
+            "_session_tag_registry: sweeping %d tag(s) left in session registry",
+            len(registry.pending),
+        )
+        registry.sweep(_delete_tag_with_narrow_handling, "_session_tag_registry")
+
+    # Unconditional: a run that leaked nothing has to say so, or a silent
+    # session is ambiguous between "clean" and "the report never ran".
+    logger.info(
+        "_session_tag_registry: created %d tags, cleaned up %d, leaked %d",
+        registry.created,
+        registry.cleaned,
+        registry.leaked,
+    )
+
+
+class _TagFactory:
+    """
+    Callable returned by the ``tag_factory`` fixture.
+
+    ``factory(name)`` creates and tracks a tag.  ``factory.track(name)`` tracks
+    one that already exists, which is what a rename needs: the tag the org ends
+    up holding is not the one that was created, and only the test knows the new
+    name.
+    """
+
+    def __init__(self, registry: SessionTagRegistry) -> None:
+        self._registry = registry
+        self.tracked_names: List[str] = []
+
+    def __call__(self, name: str) -> Any:
+        tag = langwatch.prompts.tags.create(name)
+        self.track(name)
+        return tag
+
+    def track(self, name: str) -> None:
+        self.tracked_names.append(name)
+        self._registry.track(name)
+
+
 @pytest.fixture
-def tag_factory() -> Callable[[str], Any]:
+def tag_factory(_session_tag_registry: SessionTagRegistry) -> Callable[[str], Any]:
     """
     Function-scoped factory fixture for creating prompt tags with guaranteed cleanup.
 
     Returns a callable that accepts a tag ``name`` and creates it via
     ``langwatch.prompts.tags.create(name)``.  Every tag created through the
-    factory is deleted during fixture teardown, even when the test body raises.
+    factory is deleted during fixture teardown, even when the test body raises,
+    and is registered with the session-scoped safety net in case that teardown
+    never runs at all.
+
+    Use ``tag_factory.track(name)`` for a tag the test caused to exist without
+    creating it directly, such as the target of a rename.
     """
-    tracked_names: List[str] = []
+    factory = _TagFactory(_session_tag_registry)
 
-    def _create(name: str) -> Any:
-        tag = langwatch.prompts.tags.create(name)
-        tracked_names.append(name)
-        return tag
+    yield factory
 
-    yield _create
-
-    for name in tracked_names:
-        _delete_tag_with_narrow_handling(name, "tag_factory")
+    # Teardown runs even when the test body raised.
+    for name in factory.tracked_names:
+        if _delete_tag_with_narrow_handling(name, "tag_factory"):
+            _session_tag_registry.mark_cleaned(name)
