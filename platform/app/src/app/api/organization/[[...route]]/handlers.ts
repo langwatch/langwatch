@@ -272,8 +272,18 @@ export const listInvitesHandler = async (
   c: Context,
   { app }: { app: OrganizationFamilyApp },
 ) => {
+  const organizationId = organizationOf(c).id;
   const invites = await app.invites.listInvites({
-    organizationId: organizationOf(c).id,
+    organizationId,
+  });
+  // The invite wire carries the addresses plus the acceptance code and link,
+  // so reading the list discloses more than the member directory read above
+  // and leaves the same trace.
+  emitManagementAudit({
+    c,
+    organizationId,
+    action: "management.invite.list",
+    args: { returned: invites.length },
   });
   return { invites: invites.map(inviteWire) };
 };

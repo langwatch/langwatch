@@ -140,6 +140,7 @@ describe("Feature: Organization members and invites REST API", () => {
   afterAll(async () => {
     try {
       await cleanupTestRows(prisma, [
+        ["auditLog", { organizationId: seeded?.organization.id }],
         ["organizationInvite", { organizationId: seeded?.organization.id }],
         ["roleBinding", { organizationId: seeded?.organization.id }],
         ["apiKey", { organizationId: seeded?.organization.id }],
@@ -600,6 +601,29 @@ describe("Feature: Organization members and invites REST API", () => {
       expect(invite.role).toBe("MEMBER");
       expect(invite.inviteCode).toBeTruthy();
       expect(invite.inviteUrl).toContain(invite.inviteCode);
+    });
+
+    it("records the read, because the list hands out acceptance codes", async () => {
+      const response = await app.request("/api/organization/invites", {
+        headers: authHeaders(),
+      });
+      expect(response.status).toBe(200);
+      const listed = (await response.json()).invites.length;
+
+      // The audit write is fire-and-forget, so the response does not wait on it.
+      await vi.waitFor(async () => {
+        const recorded = await prisma.auditLog.findFirst({
+          where: {
+            organizationId: seeded.organization.id,
+            action: "management.invite.list",
+          },
+          orderBy: { createdAt: "desc" },
+        });
+        expect(recorded).not.toBeNull();
+        expect((recorded?.args as { returned?: number } | null)?.returned).toBe(
+          listed,
+        );
+      });
     });
 
     /** @scenario Creating invites assigns teams including a custom role */

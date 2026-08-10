@@ -338,6 +338,65 @@ describe("serviceBasePathsOf", () => {
     });
   });
 
+  describe("when a brace sits inside a string or a comment", () => {
+    it("reads the name past a closing brace written inside a description", () => {
+      // The `}` closes nothing, but counted as code it ends the config before
+      // the name, and a service whose base path cannot be derived takes every
+      // route it serves out of the coverage gate without a word.
+      const source = [
+        FRAMEWORK_IMPORT,
+        'createService({ description: "answers 200 } always", name: "roles" });',
+      ].join("\n");
+
+      expect(serviceBasePathsOf(source)).toEqual(["/api/roles"]);
+    });
+
+    it("reads the name past an opening brace written inside a description", () => {
+      const source = [
+        FRAMEWORK_IMPORT,
+        'createService({ name: "roles", description: "the { opens nothing" });',
+      ].join("\n");
+
+      expect(serviceBasePathsOf(source)).toEqual(["/api/roles"]);
+    });
+
+    it("reads the name past a brace written inside a comment", () => {
+      const source = [
+        FRAMEWORK_IMPORT,
+        "createService({",
+        "  // the } here closes no object",
+        '  name: "roles",',
+        "});",
+      ].join("\n");
+
+      expect(serviceBasePathsOf(source)).toEqual(["/api/roles"]);
+    });
+
+    it("reads the name past a brace written inside a block comment", () => {
+      const source = [
+        FRAMEWORK_IMPORT,
+        "createService({",
+        "  /* the } here closes no object */",
+        '  name: "roles",',
+        "});",
+      ].join("\n");
+
+      expect(serviceBasePathsOf(source)).toEqual(["/api/roles"]);
+    });
+
+    it("still reads only the service's own name past a quoted brace", () => {
+      const source = [
+        FRAMEWORK_IMPORT,
+        "createService({",
+        '  _legacy: { name: "legacy", note: "keeps } working" },',
+        '  name: "roles",',
+        "});",
+      ].join("\n");
+
+      expect(serviceBasePathsOf(source)).toEqual(["/api/roles"]);
+    });
+  });
+
   describe("when a test defines its own helper called createService", () => {
     /** @scenario "A test helper named createService declares no service" */
     it("declares no service, because the framework is not in the file", () => {

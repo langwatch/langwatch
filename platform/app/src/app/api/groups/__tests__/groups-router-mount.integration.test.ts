@@ -108,16 +108,20 @@ describe("Feature: Groups REST API through the composed router", () => {
     }
   });
 
-  /** @scenario The groups API is reachable through the composed router */
-  it("resolves GET /api/groups instead of 404ing", async () => {
-    const api = createApiRouter();
-    const res = await api.request("/api/groups", {
-      headers: { Authorization: `Bearer ${patToken}` },
-    });
+  describe("given an entitled organization and an organization-scoped key", () => {
+    describe("when the composed router is asked for the groups collection", () => {
+      /** @scenario The groups API is reachable through the composed router */
+      it("resolves GET /api/groups instead of 404ing", async () => {
+        const api = createApiRouter();
+        const res = await api.request("/api/groups", {
+          headers: { Authorization: `Bearer ${patToken}` },
+        });
 
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.data).toBeDefined();
-    expect(body.pagination).toBeDefined();
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.data).toBeDefined();
+        expect(body.pagination).toBeDefined();
+      });
+    });
   });
 });

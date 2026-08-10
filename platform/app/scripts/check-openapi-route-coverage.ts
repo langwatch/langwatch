@@ -227,9 +227,10 @@ export interface CoverageResult {
    * path so an older client gets an answer instead of a 404, and there is no
    * handler behind it for the generator to describe. It therefore cannot be
    * published at all, which makes an UNPUBLISHED entry for it a written reason
-   * for something the route's own shape already says. The bucket accounts for
-   * them instead, and stays visible so a tombstone that should have been
-   * deleted is not silently free.
+   * for something the route's own shape already says: such an entry excuses
+   * nothing and is reported stale. The bucket accounts for them instead, and
+   * stays visible so a tombstone that should have been deleted is not silently
+   * free.
    */
   withdrawn: RegisteredRoute[];
   /** Entries that excused no undocumented route, so they have to go. */
@@ -262,8 +263,14 @@ export function auditCoverage({
     (route) => !documented.has(route.key),
   );
 
+  // A tombstone is accounted for by its own shape, so it never counts as the
+  // route an UNPUBLISHED entry was written for. Letting it count would leave a
+  // redundant entry earning its keep off a route that can never be published,
+  // and the ratchet would stop being one.
+  const publishable = missing.filter((route) => route.withdrawn !== true);
+
   const used = new Set<Exclusion>();
-  const unexcused = missing.filter((route) => {
+  const unexcused = publishable.filter((route) => {
     const excusing = exclusions.filter((exclusion) =>
       excludes({ exclusion, key: route.key }),
     );
@@ -275,10 +282,8 @@ export function auditCoverage({
     a.key.localeCompare(b.key);
 
   return {
-    unexplained: unexcused
-      .filter((route) => route.withdrawn !== true)
-      .sort(byKeyOrder),
-    withdrawn: unexcused
+    unexplained: unexcused.sort(byKeyOrder),
+    withdrawn: missing
       .filter((route) => route.withdrawn === true)
       .sort(byKeyOrder),
     stale: exclusions.filter((exclusion) => !used.has(exclusion)),

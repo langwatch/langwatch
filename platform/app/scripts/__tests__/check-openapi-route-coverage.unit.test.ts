@@ -266,7 +266,11 @@ describe("auditCoverage", () => {
       expect(result.documented).toBe(0);
     });
 
-    it("leaves it out of the bucket once an exclusion already explains it", () => {
+    it("keeps it in the bucket and reports the exclusion written for it as stale", () => {
+      // The tombstone is accounted for by its own shape, so an entry whose
+      // only match is one excuses nothing. Counting it as used would let a
+      // redundant entry outlive the route it was written for, which is the
+      // one thing the ratchet exists to stop.
       const entry: Exclusion = {
         match: "/api/roles",
         category: "internal",
@@ -278,7 +282,28 @@ describe("auditCoverage", () => {
         exclusions: [entry],
       });
 
-      expect(result.withdrawn).toEqual([]);
+      expect(result.withdrawn.map((r) => r.key)).toEqual([
+        "GET /api/roles/{id}/legacy",
+      ]);
+      expect(result.stale).toEqual([entry]);
+    });
+
+    it("still lets a live route under the same prefix keep the entry earning", () => {
+      const entry: Exclusion = {
+        match: "/api/roles",
+        category: "internal",
+        why: "example",
+      };
+
+      const result = audit({
+        routes: [
+          route({ key: "GET /api/roles/{id}/legacy", withdrawn: true }),
+          route({ key: "GET /api/roles/{id}/internal" }),
+        ],
+        exclusions: [entry],
+      });
+
+      expect(result.unexplained).toEqual([]);
       expect(result.stale).toEqual([]);
     });
   });

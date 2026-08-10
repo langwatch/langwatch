@@ -254,11 +254,12 @@ export function serviceBasePathsOf(source: string): string[] {
  * `_legacy` block or a middleware option cannot be read as the service's own.
  */
 function createServiceConfigs(source: string): string[] {
+  const isCode = codePositions(source);
   const configs: string[] = [];
 
   for (const match of source.matchAll(CREATE_SERVICE_CALL)) {
     const opening = match.index + match[0].length - 1;
-    const closing = closingBraceIndex({ source, opening });
+    const closing = closingBraceIndex({ source, isCode, opening });
     if (closing === -1) {
       throw new Error(
         `A createService config at offset ${opening} has no balanced closing brace, ` +
@@ -266,7 +267,12 @@ function createServiceConfigs(source: string): string[] {
           `would drop out of the coverage gate unseen.`,
       );
     }
-    configs.push(topLevelOf(source.slice(opening, closing + 1)));
+    configs.push(
+      topLevelOf({
+        literal: source.slice(opening, closing + 1),
+        isCode: isCode.slice(opening, closing + 1),
+      }),
+    );
   }
 
   const calls = [...source.matchAll(ANY_CREATE_SERVICE_CALL)].length;
@@ -282,43 +288,137 @@ function createServiceConfigs(source: string): string[] {
   return configs;
 }
 
+/**
+ * Which characters of `text` are code rather than the inside of a string
+ * literal or a comment.
+ *
+ * Brace counting has to consult this. A `}` in a description or in a comment
+ * closes nothing, but read as the end of a `createService` config it truncates
+ * the config before its `name:`, and `serviceBasePathsOf` then derives no base
+ * path and every route of that service leaves the coverage gate unseen. An
+ * unpaired `{` is the same failure wearing the loud costume: the scan runs off
+ * the end of the file and reports an imbalance that is not there.
+ *
+ * A template literal counts as one opaque string, `${...}` included. Its braces
+ * pair up inside it either way, so skipping the lot keeps the count right
+ * without parsing an expression.
+ */
+function codePositions(text: string): boolean[] {
+  const isCode = new Array<boolean>(text.length).fill(true);
+  let index = 0;
+
+  while (index < text.length) {
+    const end = endOfNonCodeSpan({ text, start: index });
+    if (end === index) {
+      index++;
+      continue;
+    }
+    for (let at = index; at < end; at++) isCode[at] = false;
+    index = end;
+  }
+
+  return isCode;
+}
+
+/**
+ * Index just past the comment or string literal starting at `start`, or `start`
+ * itself when the character there is code.
+ */
+function endOfNonCodeSpan({
+  text,
+  start,
+}: {
+  text: string;
+  start: number;
+}): number {
+  const character = text[start];
+  const next = text[start + 1];
+
+  if (character === "/" && next === "/") {
+    const newline = text.indexOf("\n", start);
+    return newline === -1 ? text.length : newline;
+  }
+  if (character === "/" && next === "*") {
+    const close = text.indexOf("*/", start + 2);
+    return close === -1 ? text.length : close + 2;
+  }
+  if (character === '"' || character === "'" || character === "`") {
+    return endOfStringLiteral({ text, start });
+  }
+
+  return start;
+}
+
+/** Index just past the string or template literal opening at `start`. */
+function endOfStringLiteral({
+  text,
+  start,
+}: {
+  text: string;
+  start: number;
+}): number {
+  const quote = text[start];
+
+  for (let index = start + 1; index < text.length; index++) {
+    const character = text[index];
+    if (character === "\\") {
+      index++;
+      continue;
+    }
+    if (character === quote) return index + 1;
+  }
+
+  return text.length;
+}
+
+/** What a character does to the brace depth: +1, -1, or nothing. */
+function braceDepthChange(character: string | undefined): number {
+  if (character === "{") return 1;
+  if (character === "}") return -1;
+  return 0;
+}
+
 /** Index of the `}` closing the `{` at `opening`, or -1 when it is unbalanced. */
 function closingBraceIndex({
   source,
+  isCode,
   opening,
 }: {
   source: string;
+  isCode: boolean[];
   opening: number;
 }): number {
   let depth = 0;
 
   for (let index = opening; index < source.length; index++) {
-    const character = source[index];
-    if (character === "{") depth++;
-    else if (character === "}") {
-      depth--;
-      if (depth === 0) return index;
-    }
+    if (!isCode[index]) continue;
+    const change = braceDepthChange(source[index]);
+    if (change === 0) continue;
+    depth += change;
+    if (depth === 0) return index;
   }
 
   return -1;
 }
 
 /** An object literal reduced to the text of its own keys. */
-function topLevelOf(literal: string): string {
+function topLevelOf({
+  literal,
+  isCode,
+}: {
+  literal: string;
+  isCode: boolean[];
+}): string {
   let depth = 0;
   let kept = "";
 
-  for (const character of literal) {
-    if (character === "{") {
-      depth++;
+  for (let index = 0; index < literal.length; index++) {
+    const change = isCode[index] ? braceDepthChange(literal[index]) : 0;
+    if (change !== 0) {
+      depth += change;
       continue;
     }
-    if (character === "}") {
-      depth--;
-      continue;
-    }
-    if (depth === 1) kept += character;
+    if (depth === 1) kept += literal[index];
   }
 
   return kept;
