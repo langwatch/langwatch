@@ -9,11 +9,15 @@ Spec: specs/teams/sdk-teams-and-projects.feature
 """
 
 import json
+from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 import pytest
 
+import langwatch
+import langwatch.projects as projects_module
+import langwatch.teams as teams_module
 from langwatch.api_errors import LangWatchApiNotFoundError
 from langwatch.projects import ProjectsFacade
 from langwatch.teams import TeamsFacade
@@ -57,6 +61,27 @@ def numbered(pages: List[Dict[str, Any]]):
         return httpx.Response(200, json=pages[len(seen_pages) - 1])
 
     return handler, seen_pages
+
+
+# @scenario "Teams and projects are reachable from the SDK entry point"
+def test_teams_and_projects_resolve_from_the_package_entry_point(monkeypatch):
+    # The package resolves a facade the first time its name is read and caches
+    # the result, so a wrong module path or class name in the registry only
+    # fails when a caller reaches for it. Reading both names here is what
+    # holds that wiring.
+    instance = SimpleNamespace(
+        rest_api_client=FakeRestClient(lambda _: httpx.Response(200, json={}))
+    )
+    for module in (teams_module, projects_module):
+        monkeypatch.setattr(module, "ensure_setup", lambda: None)
+        monkeypatch.setattr(module, "get_instance", lambda: instance)
+    for name in ("teams", "projects"):
+        monkeypatch.delitem(vars(langwatch), name, raising=False)
+
+    assert isinstance(langwatch.teams, TeamsFacade)
+    assert isinstance(langwatch.projects, ProjectsFacade)
+    assert "teams" in langwatch.__all__
+    assert "projects" in langwatch.__all__
 
 
 # @scenario "Creating a team from the SDK returns the team with its slug"
