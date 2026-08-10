@@ -5372,7 +5372,7 @@ Eight rows, top to bottom:
 |---|---|---|
 | Request health | rate, p50/p95/p99, error % | primary SLI row; everything else is causal |
 | Provider health | circuit state, upstream latency, fallback count | which provider is degrading and how often we're saved by fallback |
-| Auth cache | L1 hit rate, L2 hit rate, resolve-key RPS | cache degradation = spike in control-plane load |
+| Auth cache | hit rate, resolve-key RPS | cache degradation = spike in control-plane load |
 | Budgets | blocks by scope | which scope is actually rejecting traffic |
 | Guardrails | verdicts by direction, blocks by direction | catches both legit policy enforcement and regressions |
 | Streaming | active streams, usage-warning rate | streams that never reported usage = cost blind spot |
@@ -5521,12 +5521,11 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards �
     },
     {
       "type": "timeseries",
-      "title": "L1 + L2 hit rate",
+      "title": "Auth cache hit rate",
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 23, "w": 12, "h": 7 },
       "targets": [
-        { "expr": "sum(rate(gateway_auth_cache_hits_total{namespace=\"$namespace\", tier=\"l1\"}[$__rate_interval])) / sum(rate(gateway_auth_cache_lookups_total{namespace=\"$namespace\"}[$__rate_interval]))", "legendFormat": "L1 hit rate" },
-        { "expr": "sum(rate(gateway_auth_cache_hits_total{namespace=\"$namespace\", tier=\"l2_redis\"}[$__rate_interval])) / sum(rate(gateway_auth_cache_lookups_total{namespace=\"$namespace\"}[$__rate_interval]))", "legendFormat": "L2 hit rate" }
+        { "expr": "sum(rate(gateway_auth_cache_hits_total{namespace=\"$namespace\", tier=\"l1\"}[$__rate_interval])) / sum(rate(gateway_auth_cache_lookups_total{namespace=\"$namespace\"}[$__rate_interval]))", "legendFormat": "hit rate" }
       ],
       "fieldConfig": { "defaults": { "unit": "percentunit" } }
     },
@@ -5739,7 +5738,7 @@ When a page fires, the engineer lands on the dashboard, narrows the cause to a r
 
 ## Skipping panels you don't have metrics for
 
-The default deployment ships without an L2 Redis tier, so the L2 hit-rate line sits flat at zero, harmless. If you haven't enabled `networkPolicy`, the provider egress row doesn't need a custom panel since flow is unchanged. The JSON uses `label_values(...)` so missing labels degrade gracefully rather than breaking the dashboard.
+If you haven't enabled `networkPolicy`, the provider egress row doesn't need a custom panel since flow is unchanged. The JSON uses `label_values(...)` so missing labels degrade gracefully rather than breaking the dashboard.
 
 ## See also
 
@@ -6863,7 +6862,7 @@ The three log lines form a ladder operators read in order:
 **Customer-facing behaviour during the grace window:**
 
 - Requests against any VK that resolved successfully **before** the outage continue to work transparently.
-- Requests against any VK **never seen by this pod** (cold) still fail, the gateway has no bundle to fall back to. Today's mitigation is Redis L2 (`GATEWAY_REDIS_URL`): HPA-scaled pods inherit the warm set from L2 even while the control plane is unreachable. (`GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` is a planned v1.1 enhancement to also pre-warm L1 from a `/bootstrap` snapshot on startup; the flag is reserved in env wiring but has no Go-side implementation today, so setting it is currently a no-op.)
+- Requests against any VK **never seen by this pod** (cold) still fail, the gateway has no bundle to fall back to. The cache is per pod, so a pod added during the outage starts cold. (`GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` is a planned enhancement to pre-warm the cache from a `/bootstrap` snapshot on startup; the flag is reserved in env wiring but has no Go-side implementation today, so setting it is currently a no-op.)
 - Requests against any VK whose JWT was **revoked just before the outage** but the revocation `/changes` event hadn't propagated yet, these stay served until the cache entry crosses its hard cap. Acceptable trade-off for the grace; auth rejections from a healthy CP still evict instantly via `auth_cache_hard_evict reason=auth_rejection`.
 
 **Tune:**
@@ -6893,10 +6892,9 @@ The gateway is a cache of the control plane, so a surprising amount continues to
 
 | Component down | Customer impact | How long gateway stays up | Notes |
 |---|---|---|---|
-| LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default 21600, 6 h) of stale-while-error; Redis L2 extends coverage to cold-for-pod VKs | Spend accounting is unaffected: cost rides the spend commands the gateway spools, and the ledger catches up once the control plane returns. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
+| LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default 21600, 6 h) of stale-while-error; a VK the pod has never resolved is not covered | Spend accounting is unaffected: cost rides the spend commands the gateway spools, and the ledger catches up once the control plane returns. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
 | One upstream provider | None for VKs with fallback; 502/504 for VKs without | Indefinite, circuit breaker + fallback chain absorb it | `gateway_circuit_state{credential_id}` shows which provider is down |
-| Redis L2 cache | +~30 ms on cold-for-pod VKs | Indefinite, L1 + `/resolve-key` cover the miss | Fail-open by design (poison entries `DEL`, network errors log and miss) |
-| Gateway pod (crash, eviction) | None, HPA replaces, PDB holds ≥ 2 replicas | N/A | Stateless; new pod warms from Redis L2 + `/bootstrap` |
+| Gateway pod (crash, eviction) | Streams in flight on that pod are cut; other requests retry onto a surviving replica | N/A | Stateless; the replacement pod warms from the control plane on its first request per key. The PDB (`minAvailable: 1` by default, against 2 replicas) only bounds voluntary disruptions like a drain, so it does not apply to a crash |
 
 For multi-region deployments with shared control plane: a gateway region down is handled by Route53 latency-based failover. See [Scaling → Regional placement](/ai-gateway/self-hosting/scaling#regional-placement).
 
@@ -8960,7 +8958,7 @@ The gateway serves `GET /metrics` on its main HTTP port (`5563` by default, the 
 | `gateway_auth_cache_lookups_total` | counter | none | Hits plus misses |
 | `gateway_auth_cache_size` | gauge | `tier` | Entries currently held |
 
-`tier` is `l1` (in-process) or `l2_redis`. Only `l1` is populated in the default deployment, which ships without an L2 Redis tier.
+`tier` is always `l1`: the auth cache is an in-process LRU, private to each pod.
 
 ### Governance
 
@@ -9179,7 +9177,7 @@ The LangWatch AI Gateway replaces every direct provider call with a single call 
                                                                      ▼
                                                 ┌───────────────────────────────────┐
                                                 │   LangWatch AI Gateway (Go)       │
-                                                │   - auth / JWT cache (L1+L2)      │
+                                                │   - auth / JWT cache (in-process) │
                                                 │   - virtual-key resolution        │
                                                 │   - budget pre-check              │
                                                 │   - guardrail pre-call            │
@@ -11207,7 +11205,7 @@ Signature verification happens **before** the timestamp check to avoid a secret-
 
 Once a VK is resolved, the gateway caches a short-lived JWT (15 min TTL) containing the minimum claims needed to authorize: `{vk_id, project_id, team_id, org_id, principal_id, revision, iat, exp, iss, aud}`. The full VK config is fetched separately with ETag revalidation so cache entries are invalidated atomically on any edit.
 
-**Never** persisted to disk. Every replica's L1 cache is in memory; the optional L2 Redis is also in-memory.
+**Never** persisted to disk, and never shared: the cache is in memory, private to each replica.
 
 ## Tenant isolation
 
@@ -11286,7 +11284,7 @@ ClickHouse:
 
 In a self-hosted deployment, the gateway and control plane both run in your infrastructure. Data never leaves your cluster except on outbound calls to LLM providers. You own every secret, every KMS key, every audit log, and every trace.
 
-The gateway Helm chart ships a deny-by-default `NetworkPolicy` (opt-in) that locks lateral traffic, only `ingress-nginx` and Prometheus can reach the pod, and egress is limited to DNS, the control plane, Redis (if configured), OTLP (if configured), and provider upstream IPs. The operator debug surface (pprof) is loopback-bound by default and unreachable over any Service; deployments that need direct access can bind non-loopback with a required bearer token, the gateway refuses to start in the bind-public-without-token configuration. See [Self-Hosting → Helm → NetworkPolicy](/ai-gateway/self-hosting/helm#networkpolicy) and [Self-Hosting → Helm → Admin listener](/ai-gateway/self-hosting/helm#admin-listener).
+The gateway Helm chart ships a deny-by-default `NetworkPolicy` (opt-in) that locks lateral traffic, only `ingress-nginx` and Prometheus can reach the pod, and egress is limited to DNS, the control plane, OTLP (if configured), and provider upstream IPs. There is no operator debug surface to lock down: the gateway binary exposes no admin or pprof listener, and the chart's `gateway.admin.*` keys are forward-compat surface that nothing reads. The planned listener is loopback-bound by default, with a required bearer token and a startup refusal for the bind-public-without-token configuration. See [Self-Hosting → Helm → NetworkPolicy](/ai-gateway/self-hosting/helm#networkpolicy) and [Self-Hosting → Helm → Admin listener](/ai-gateway/self-hosting/helm#admin-listener).
 
 See [Self-Hosting → Helm](/ai-gateway/self-hosting/helm) for the deployment topology.
 
@@ -11358,7 +11356,9 @@ All three are a plain count of seconds, not a duration string: `300`, not `5m`.
 |----------------------------------------------|----------------|----------------------------------------------------------------------------------------------|
 | `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`    | `300` (5m)     | Per-failure soft-expiry extension during a control-plane outage.                             |
 | `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`   | `21600` (6h)   | Outage cap measured from JWT exp. A negative value disables stale-while-error.                |
-| `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS`   | `60`           | How stale a cached key's config (credentials, base URLs, routing) can get before a background re-fetch. A negative value disables the refresh. |
+| `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS`   | `60`           | How stale a cached key's config (credentials, base URLs, routing) can get before a background revalidation. A negative value disables the refresh. |
+
+The config refresh is conditional whenever the gateway has a version token to offer: it sends back the token the control plane stamped on the config it holds, and a key nobody changed is confirmed with a 304 instead of materialized and sent again. A key that did change still answers 200 with the whole bundle, which is the point of the refresh, so the saving is on the keys nobody edited. Since most keys are not edited in any given interval, lowering the TTL mostly buys revision lookups rather than bundles. The exception is a config the gateway holds no token for, which is what a response that arrived without an `ETag` leaves behind: that one is refreshed unconditionally and costs a full bundle every interval, so a proxy that strips `ETag` gives the saving up entirely.
 
 See [Auth Cache Architecture](/ai-gateway/observability#auth-cache-architecture) for the design and the [Production runbook → Control-plane outage](/ai-gateway/cookbooks/production-runbook#recipe-8--control-plane-outage--stale-while-error) for the operator playbook.
 
@@ -11442,7 +11442,7 @@ Canonical names always win when both are set. The aliases are scheduled for remo
 
 ## Forward-compat values.yaml knobs (v1.1)
 
-Several knobs are exposed in `charts/gateway/values.yaml` but the v1 gateway code does not yet read them. Setting them today is a no-op, they are documented in `values.yaml` so operator runbooks built ahead of v1.1 don't need rewriting. See [Scaling, Future tunables](/ai-gateway/self-hosting/scaling#future-tunables-forward-compat-in-valuesyaml) for the full list (cache LRU sizing, Redis L2, Bifrost pool sizing, admin, pprof listener, guardrail timeouts, startup netcheck).
+Several knobs are exposed in `charts/gateway/values.yaml` but the v1 gateway code does not yet read them. Setting them today is a no-op, they are documented in `values.yaml` so operator runbooks built ahead of v1.1 don't need rewriting. See [Scaling, Future tunables](/ai-gateway/self-hosting/scaling#future-tunables-forward-compat-in-valuesyaml) for the full list (cache LRU sizing, Bifrost pool sizing, admin, pprof listener, guardrail timeouts, startup netcheck).
 
 ---
 
@@ -11817,7 +11817,7 @@ readinessProbe:
 
 - **Per-provider live health.** If OpenAI is rate-limiting, the gateway still serves and falls back per the VK's configured chain. Reporting `not_ready` for one upstream would amplify the incident.
 - **The control plane.** A control-plane blip is a degradation the auth cache is built to absorb: warm keys keep serving from the in-process cache. Failing readiness on it would drop every replica from the load balancer at once and turn that degradation into a total outage. Control-plane reachability is reported on `/health` instead, where it informs a status page rather than gating traffic.
-- **Redis L2.** The current gateway has no Redis client; the auth cache is in-process LRU.
+- **Any shared cache.** The gateway has no Redis client; the auth cache is an in-process LRU, private to the pod.
 - **PostgreSQL.** The gateway never talks to Postgres directly; the control plane mediates persistence.
 
 The blast-radius of readiness is specifically: "is this pod still meant to serve traffic?", and the only condition today is `MarkDraining`.
@@ -12043,7 +12043,7 @@ helm upgrade --install langwatch langwatch/langwatch \
 
 ## Env vars wired by the chart
 
-Source of truth: `charts/gateway/templates/configmap.yaml` (commit `d14576b1e`) and `charts/gateway/templates/deployment.yaml`. The chart wires only the env vars the Go gateway actually reads, knobs in `values.yaml` that don't appear here are forward-compat surface for v1.1 (e.g. `cache.bootstrapAllKeys`, `admin.*`, `redis.url`) and are silently ignored by the running binary. The canonical names are derived by `services/aigateway/config.go` `pkg/config.Hydrate`, which walks the Config struct's `env:"…"` tags and joins parent/child with `_`.
+Source of truth: `charts/gateway/templates/configmap.yaml` (commit `d14576b1e`) and `charts/gateway/templates/deployment.yaml`. The chart wires only the env vars the Go gateway actually reads, knobs in `values.yaml` that don't appear here are forward-compat surface for v1.1 (e.g. `cache.bootstrapAllKeys`, `admin.*`) and are silently ignored by the running binary. The canonical names are derived by `services/aigateway/config.go` `pkg/config.Hydrate`, which walks the Config struct's `env:"…"` tags and joins parent/child with `_`.
 
 | Env var | Source | Purpose |
 |---|---|---|
@@ -12056,7 +12056,7 @@ Source of truth: `charts/gateway/templates/configmap.yaml` (commit `d14576b1e`) 
 | `LW_GATEWAY_JWT_SECRET` | Secret `secrets.existingSecretName` | HS256 for resolve-key JWT |
 | `LW_GATEWAY_JWT_SECRET_PREVIOUS` | Secret (only when `secrets.jwtSecretPreviousKey` is set) | Retired key during rotation overlap |
 
-The deployment template intentionally does not inject `GATEWAY_REDIS_URL`, `GATEWAY_ADMIN_AUTH_TOKEN`, or `GATEWAY_OTEL_DEFAULT_AUTH_TOKEN`, the v1 gateway has no Redis client, admin/pprof listener, or OTLP auth-token field on its config struct, and silently dropping them at the env-var layer would mislead operators. OTLP authentication for self-hosters is delivered via `OTEL_OTLP_HEADERS` (e.g. `Authorization=Bearer …`) on the OTel config struct in `pkg/config/otel.go`. See `charts/gateway/templates/deployment.yaml` for the rationale comment.
+The deployment template intentionally does not inject `GATEWAY_ADMIN_AUTH_TOKEN` or `GATEWAY_OTEL_DEFAULT_AUTH_TOKEN`, the gateway has no admin/pprof listener and no OTLP auth-token field on its config struct, and silently dropping them at the env-var layer would mislead operators. OTLP authentication for self-hosters is delivered via `OTEL_OTLP_HEADERS` (e.g. `Authorization=Bearer …`) on the OTel config struct in `pkg/config/otel.go`. See `charts/gateway/templates/deployment.yaml` for the rationale comment.
 
 ## Secret rotation
 
@@ -12111,13 +12111,13 @@ Clients reach the gateway via the Ingress (`gateway.your-corp.com`) on port 443.
 
 ## Scaling
 
-See [Scaling](/ai-gateway/self-hosting/scaling) for HPA configuration, replica sizing, and Redis L2 cache guidance. Quick summary: the gateway is stateless and horizontally scalable; the chart's HPA defaults to 2-10 replicas at 70% CPU plus a custom `lw_gateway_rps` metric (requires Prometheus-adapter). In-flight streaming requests pin to a single replica, so HPA should scale on smoothed signals rather than chasing spikes.
+See [Scaling](/ai-gateway/self-hosting/scaling) for HPA configuration and replica sizing. Quick summary: the gateway is stateless and horizontally scalable; the chart's HPA defaults to 2-10 replicas at 70% CPU plus a custom `lw_gateway_rps` metric (requires Prometheus-adapter). In-flight streaming requests pin to a single replica, so HPA should scale on smoothed signals rather than chasing spikes.
 
 ## High availability
 
 - Run ≥2 replicas with a PodDisruptionBudget (chart default `minAvailable: 1`) so rolling updates don't remove every pod simultaneously.
 - The auth-cache stale-while-error grace window (`LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`, `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`) keeps replicas serving with cached VK bundles when the control plane is briefly offline. See [Auth-cache stale-while-error](/ai-gateway/self-hosting/config#auth-cache) for the soft/hard-grace knobs.
-- The Redis L2 cache (`gateway.redis.url`) is **forward-compat surface today**: the v1 gateway has no Redis client, so this knob is a no-op. v1.1 will wire it for replica-warm-up on HPA scale-out. Don't rely on it for cold-start coverage in v1; the auth-cache grace window is the only operational backstop.
+- The auth cache is per pod. A replica added by HPA scale-out warms from the control plane on its first request per key, the same first-request cost every replica pays after a rolling deploy, and the grace window above is the operational backstop for a control plane that is unreachable.
 
 ## Monitoring
 
@@ -12274,13 +12274,12 @@ gateway:
 - `ingress-nginx` namespace → port `5563` (customer traffic via your Ingress).
 - `monitoring` namespace Prometheus pod → port `5563` `/metrics`.
 
-Everything else is rejected, including traffic from other namespaces, lateral pod-to-pod dials, and direct NodePort hits. The pprof admin listener is loopback-bound on `127.0.0.1:6060` and is unaffected by `NetworkPolicy` because `kubectl port-forward` tunnels through the Kubernetes API server, not the pod network.
+Everything else is rejected, including traffic from other namespaces, lateral pod-to-pod dials, and direct NodePort hits. The v1 binary opens no admin or pprof listener at all, so there is nothing extra on the pod to reach; the planned listener binds `127.0.0.1:6060` and would be unaffected by `NetworkPolicy` anyway, because `kubectl port-forward` tunnels through the Kubernetes API server rather than the pod network.
 
 **Egress**:
 
 - DNS to `kube-system` on TCP+UDP `:53` (ordering matters, DNS rule MUST come first or other rules fail to resolve hostnames).
 - Control plane (`langwatch-app` label selector) on port `5560` for `/resolve-key`, `/config`, `/changes`, `/budget`, `/guardrail`. Matches the langwatch chart's `langwatch-app` Service (app=5560, nlp=5561, langevals=5562, gateway=5563).
-- Redis on `:6379`, only rendered when `gateway.redis.url` is set.
 - OTLP `:4318`, only rendered when `gateway.networkPolicy.egressToOTLP` is non-empty.
 - Provider upstreams on `:443`, default `any IP EXCEPT RFC1918` (10/8, 172.16/12, 192.168/16). Teams with explicit compliance posture should override `egressToProviders` with a concrete CIDR allowlist.
 
@@ -12405,14 +12404,14 @@ Notable omissions:
 - **`writeTimeout` is NOT exposed.** It would bound the whole response, which terminates long SSE streams (reasoning models, Claude thinking traces) at the cap. Per-chunk streaming deadlines live in the dispatcher, not here. If you're behind an ingress that enforces its own `proxy_read_timeout`, match it there instead.
 - **`idleTimeout` MUST exceed your nginx-ingress `keepalive_timeout`** (typical 75 s). If the gateway closes first, nginx's pool has dead sockets and a request fails mid-flight. The chart default 120 s is safe under the typical 75 s nginx value; if you run a custom ingress with a longer keepalive, bump this value proportionally.
 
-All three timeouts apply to the public listener and the admin listener identically.
+All three timeouts apply to the public listener, which is the only listener the v1 binary opens. They will cover the [admin listener](#admin-listener) identically once it ships.
 
 ## Chart and data-plane CI
 
 The upstream repo runs a dedicated `gateway-ci` workflow against every PR that touches `services/gateway/**` or `charts/gateway/**` (paths-filter gated so unrelated PRs don't trigger it). What it guarantees on the chart you're installing:
 
 - **Go data plane**: `go mod verify`, `go vet`, `go build`, `go test -count=1 -race ./...` across all 14 internal packages. Benchmarks compile under `-run=^$ -benchtime=1x` so Go API drift fails fast without adding benchmark noise to PR logs.
-- **Helm chart**: `helm lint` + two `helm template` renders, one with defaults (must render zero `NetworkPolicy` objects), one with `networkPolicy.enabled=true` + `redis.url=redis://…` (must render exactly one). Both invariants are asserted explicitly; violating either fails the job.
+- **Helm chart**: `helm lint` + two `helm template` renders, one with defaults (must render zero `NetworkPolicy` objects), one with `networkPolicy.enabled=true` (must render exactly one). Both invariants are asserted explicitly; violating either fails the job.
 
 Jobs are timeout-capped (15 m, 10 m) and use concurrency cancellation on force-push, so a runaway test can't burn runner minutes.
 
@@ -12425,7 +12424,7 @@ Gateway and control plane are versioned in **lockstep**: release-please bumps bo
 1. `helm diff upgrade langwatch langwatch/langwatch -f values.yaml --version <new>` to preview the change set.
 2. `helm upgrade langwatch langwatch/langwatch -f values.yaml --version <new>`. The umbrella's `langwatch-app` and gateway Deployments roll concurrently, both use Kubernetes' standard `RollingUpdate` strategy and the chart does not enforce ordering. Safety during the overlap window is handled by the dual-key signature contract documented under [Secret rotation](#secret-rotation): the new control-plane image accepts both old and new signatures, so a brief window where gateway pods on the new image talk to control-plane pods still on the old image (or vice versa) does not break authentication. If you want to enforce ordering for an extra-cautious rollout, run `helm upgrade ... --set gateway.enabled=false` first to roll the app alone, then re-enable the gateway in a second `helm upgrade`, but for the standard upgrade path the dual-key contract is what makes the concurrent roll safe.
 3. Monitor `gateway_provider_duration_seconds` and `gateway_http_requests_total{status=~"5.."}` for ~30 min.
-4. Roll back via `helm rollback langwatch <revision>` if anomalies appear, the gateway's cache survives restarts and requests resume immediately. Both sub-charts roll back together.
+4. Roll back via `helm rollback langwatch <revision>` if anomalies appear. Each replaced gateway pod starts with an empty auth cache and warms from the control plane on its first request per key, the same cost every rolling update pays. Both sub-charts roll back together.
 
 ---
 
@@ -12656,7 +12655,7 @@ There are no current `LW_GATEWAY_UPSTREAM_*` env vars to tune the transport dire
 
 There is no boot-time cache warm-up in the current gateway. The `auth_cache_warm` readiness probe was removed because it created a chicken-and-egg with `/startupz` (the warm-up itself called the control plane, which couldn't accept traffic until *its* startup gate flipped). Instead the resolver warms organically on the first request per VK; an unwarmed gateway adds at most one extra ~50–200 ms control-plane round-trip on cold-cache requests. Subsequent requests hit the in-process cache and skip the round-trip entirely until the cache entry's soft-expiry passes.
 
-The cache is in-process and per-replica. Replicas warm independently; there is no cross-replica L2 cache in the current gateway. A Bootstrap-pull design that pre-loads keys before flipping `/startupz` to 200 is tracked under `specs/ai-gateway/auth-cache.feature` for v1.1+ when tenant key counts make the first-request tax visible at scale.
+The cache is in-process and per-replica. Replicas warm independently; there is no cross-replica cache, by design. A Bootstrap-pull design that pre-loads keys before flipping `/startupz` to 200 is tracked under `specs/ai-gateway/auth-cache.feature` for v1.1+ when tenant key counts make the first-request tax visible at scale.
 
 ## Blue-green, canary
 
@@ -12736,7 +12735,6 @@ Several knobs are exposed in `charts/gateway/values.yaml` that the v1 gateway co
 - `cache.lruSize`, explicit auth-cache LRU bound (default 50,000)
 - `cache.refreshInterval`, `cache.jwtRefreshThreshold`, proactive auth-cache refresh cadence
 - `cache.bootstrapAllKeys`, full prefetch on boot (enterprise tier; control plane must support the bulk endpoint)
-- `redis.url`, `redis.existingSecretName`, L2 auth cache shared across replicas
 - `bifrost.poolSize`, `bifrost.streamBufferSize`, Bifrost-side connection sizing
 - `admin.addr`, `admin.existingAuthSecretName`, operator pprof, debug listener
 - `guardrails.preTimeout`, `guardrails.postTimeout`, `guardrails.streamChunkWindow`, guardrail evaluation budgets
@@ -13306,7 +13304,7 @@ kubectl logs -n langwatch "$POD" | grep -E 'dns resolution failed|tcp dial faile
 **Root cause:** cold start + auth cache miss. New replica's L1 cache is empty; first unknown-VK request triggers a `/resolve-key` round-trip.
 
 **Fix:**
-- Enable Redis L2 (`GATEWAY_REDIS_URL`), new replicas warm from Redis instead of control plane.
+- Expect it. The auth cache is per pod, so a new replica warms from the control plane on its first request for each key, exactly as every replica does after a rolling deploy.
 - Ensure pod readiness probe waits for the long-poll loop to be running (`/readyz` handles this correctly by default).
 - `GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` is a planned v1.1 enhancement that would pre-warm the L1 LRU with every active VK on startup; the flag is reserved in env wiring but currently has no Go-side implementation, so setting it does not help today.
 
@@ -13648,7 +13646,7 @@ The first time the gateway sees a presented VK:
 
 1. Calls `/internal/gateway/resolve-key` on the LangWatch control-plane → receives a signed JWT (15-minute TTL) with identity claims (`vk_id`, `project_id`, `principal_id`, etc.) plus a `revision` number.
 2. Calls `/internal/gateway/config/:vk_id` (with `If-None-Match: <revision>` on subsequent fetches) → receives the fat config (providers, fallback, guardrails, budgets).
-3. Caches both in-memory (L1 LRU) and optionally in Redis (L2, shared across gateway pods).
+3. Caches both in an in-memory LRU, private to that gateway pod.
 4. Subscribes to `/internal/gateway/changes?since=<revision>` long-poll, on any mutation to any VK, the gateway invalidates and re-fetches.
 
 Subsequent requests with the same VK are served entirely from cache. JWT verification is local (HS256 shared secret); no control-plane round-trip on the hot path.

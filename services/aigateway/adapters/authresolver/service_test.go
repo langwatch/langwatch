@@ -60,80 +60,8 @@ func (f *fakeResolver) ResolveKey(_ context.Context, _ string) (*domain.Bundle, 
 	return r.bundle, r.err
 }
 
-func (f *fakeResolver) FetchConfig(_ context.Context, _ string) (domain.BundleConfig, error) {
-	return domain.BundleConfig{}, nil
-}
-
-// fakeL2 is an in-memory stand-in for the shared cache tier every gateway
-// node reads, so a test can prove an invalidation reaches further than the
-// node that saw the event. delErr makes the store unreachable; failNthBatch
-// fails one batch (1-based) and lets the others through, which is how a
-// partial outage looks. batches records what each DeleteMany was handed.
-type fakeL2 struct {
-	mu           sync.Mutex
-	entries      map[string]CachedBundle
-	delErr       error
-	failNthBatch int
-	batches      [][]string
-}
-
-func newFakeL2() *fakeL2 {
-	return &fakeL2{entries: make(map[string]CachedBundle)}
-}
-
-func (f *fakeL2) Get(_ context.Context, hash string) (*CachedBundle, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	cached, ok := f.entries[hash]
-	if !ok {
-		return nil, nil
-	}
-	return &cached, nil
-}
-
-func (f *fakeL2) Set(_ context.Context, hash string, cached CachedBundle) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.entries[hash] = cached
-}
-
-func (f *fakeL2) DeleteMany(_ context.Context, hashes []string) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.batches = append(f.batches, append([]string(nil), hashes...))
-	if f.delErr != nil {
-		return f.delErr
-	}
-	if f.failNthBatch == len(f.batches) {
-		return errors.New("shared cache dropped this batch")
-	}
-	for _, hash := range hashes {
-		delete(f.entries, hash)
-	}
-	return nil
-}
-
-func (f *fakeL2) has(hash string) bool {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	_, ok := f.entries[hash]
-	return ok
-}
-
-func (f *fakeL2) len() int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return len(f.entries)
-}
-
-func (f *fakeL2) batchSizes() []int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	sizes := make([]int, 0, len(f.batches))
-	for _, batch := range f.batches {
-		sizes = append(sizes, len(batch))
-	}
-	return sizes
+func (f *fakeResolver) FetchConfig(_ context.Context, _, _ string) (domain.ConfigFetchResult, error) {
+	return domain.ConfigFetchResult{}, nil
 }
 
 // changeKindEnumRe pulls the body out of the control plane's enum block.
@@ -179,22 +107,6 @@ func changeKindsFromSchema(t *testing.T) []string {
 	return kinds
 }
 
-// l2Key is the shared-tier key for a raw virtual key, the one Resolve computes.
-func l2Key(rawKey string) string {
-	h := hashKey(rawKey)
-	return string(h[:])
-}
-
-// seedBothTiers primes L1 and the shared tier with the same bundle, the state
-// a node is in after it has served a request for that key.
-func seedBothTiers(svc *Service, l2 *fakeL2, rawKey string, bundle *domain.Bundle) {
-	svc.storeL1(hashKey(rawKey), bundle)
-	l2.Set(context.Background(), l2Key(rawKey), CachedBundle{
-		Bundle:          bundle,
-		ConfigFetchedAt: time.Now(),
-	})
-}
-
 func newService(t *testing.T, opts Options) (*Service, *observer.ObservedLogs) {
 	t.Helper()
 	core, logs := observer.New(zap.WarnLevel)
@@ -221,7 +133,7 @@ func freshBundle(vkID string, exp time.Time) *domain.Bundle {
 func seedExpiredEntry(t *testing.T, svc *Service, rawKey, vkID string, staleness time.Duration) {
 	t.Helper()
 	originalExp := time.Now().Add(-staleness)
-	svc.storeL1(hashKey(rawKey), freshBundle(vkID, originalExp))
+	svc.storeL1(hashKey(rawKey), freshBundle(vkID, originalExp), "")
 }
 
 // --- AuthRejection class -----------------------------------------------------
@@ -410,14 +322,14 @@ func TestApplyChange_ModelProviderUpdatedEvictsMatchingModelProvider(t *testing.
 			ID:         "model-provider-1",
 			ProviderID: domain.ProviderOpenAI,
 		}}},
-	})
+	}, "")
 	svc.storeL1(otherKey, &domain.Bundle{
 		VirtualKeyID: "vk-other",
 		Config: domain.BundleConfig{Credentials: []domain.Credential{{
 			ID:         "model-provider-2",
 			ProviderID: domain.ProviderOpenAI,
 		}}},
-	})
+	}, "")
 
 	svc.applyChange("", CacheChange{
 		Kind:            ChangeKindProviderBindingUpdated,
@@ -436,8 +348,7 @@ func TestApplyChange_ModelProviderUpdatedEvictsMatchingModelProvider(t *testing.
 
 func TestApplyChange_BudgetMutationWithoutProjectIDEvictsOrganization(t *testing.T) {
 	resolver := &fakeResolver{}
-	l2 := newFakeL2()
-	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver, L2: l2})
+	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
 
 	for _, kind := range []string{
 		ChangeKindBudgetCreated,
@@ -445,22 +356,17 @@ func TestApplyChange_BudgetMutationWithoutProjectIDEvictsOrganization(t *testing
 		ChangeKindBudgetDeleted,
 	} {
 		t.Run(kind, func(t *testing.T) {
-			matchingRaw := "vk-lw-budget-matching-" + kind
-			otherRaw := "vk-lw-budget-other-" + kind
-			seedBothTiers(svc, l2, matchingRaw, &domain.Bundle{OrganizationID: "org-1"})
-			seedBothTiers(svc, l2, otherRaw, &domain.Bundle{OrganizationID: "org-2"})
+			matchingKey := hashKey("vk-lw-budget-matching-" + kind)
+			otherKey := hashKey("vk-lw-budget-other-" + kind)
+			svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"}, "")
+			svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"}, "")
 
 			svc.applyChange("org-1", CacheChange{Kind: kind})
 
-			_, isMatchingPresent := svc.l1.Get(hashKey(matchingRaw))
-			_, isOtherPresent := svc.l1.Get(hashKey(otherRaw))
+			_, isMatchingPresent := svc.l1.Get(matchingKey)
+			_, isOtherPresent := svc.l1.Get(otherKey)
 			assert.False(t, isMatchingPresent, "budget changes must evict the polled organization")
 			assert.True(t, isOtherPresent, "other organizations must remain cached")
-			// The shared tier is the half a single node's eviction cannot
-			// fix by itself: leave the bundle there and the next request
-			// rehydrates the budget the event just changed.
-			assert.False(t, l2.has(l2Key(matchingRaw)), "budget changes must drop the shared tier's copy too")
-			assert.True(t, l2.has(l2Key(otherRaw)), "other organizations must remain in the shared tier")
 		})
 	}
 }
@@ -477,8 +383,8 @@ func TestApplyChange_VkDisableAndEnableEvictTheKey(t *testing.T) {
 		t.Run(kind, func(t *testing.T) {
 			matchingKey := hashKey("vk-lw-lifecycle-matching-" + kind)
 			otherKey := hashKey("vk-lw-lifecycle-other-" + kind)
-			svc.storeL1(matchingKey, &domain.Bundle{VirtualKeyID: "vk-flipped"})
-			svc.storeL1(otherKey, &domain.Bundle{VirtualKeyID: "vk-untouched"})
+			svc.storeL1(matchingKey, &domain.Bundle{VirtualKeyID: "vk-flipped"}, "")
+			svc.storeL1(otherKey, &domain.Bundle{VirtualKeyID: "vk-untouched"}, "")
 
 			svc.applyChange("org-1", CacheChange{Kind: kind, VirtualKeyID: "vk-flipped"})
 
@@ -497,8 +403,8 @@ func TestApplyChange_RoutingPolicyUpdatedEvictsOrganization(t *testing.T) {
 
 	matchingKey := hashKey("vk-lw-policy-matching")
 	otherKey := hashKey("vk-lw-policy-other")
-	svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"})
-	svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"})
+	svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"}, "")
+	svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"}, "")
 
 	svc.applyChange("org-1", CacheChange{Kind: ChangeKindRoutingPolicyUpdated})
 
@@ -515,8 +421,8 @@ func TestApplyChange_RoutingPolicyDeletedEvictsOrganization(t *testing.T) {
 
 	matchingKey := hashKey("vk-lw-policy-deleted-matching")
 	otherKey := hashKey("vk-lw-policy-deleted-other")
-	svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"})
-	svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"})
+	svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"}, "")
+	svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"}, "")
 
 	svc.applyChange("org-1", CacheChange{Kind: ChangeKindRoutingPolicyDeleted})
 
@@ -539,8 +445,8 @@ func TestApplyChange_CacheRuleMutationEvictsOrganization(t *testing.T) {
 		t.Run(kind, func(t *testing.T) {
 			matchingKey := hashKey("vk-lw-cache-rule-matching-" + kind)
 			otherKey := hashKey("vk-lw-cache-rule-other-" + kind)
-			svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"})
-			svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"})
+			svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"}, "")
+			svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"}, "")
 
 			svc.applyChange("org-1", CacheChange{Kind: kind})
 
@@ -552,58 +458,10 @@ func TestApplyChange_CacheRuleMutationEvictsOrganization(t *testing.T) {
 	}
 }
 
-// --- Invalidation reaches the shared tier ------------------------------------
+// --- Grace-window classification ---------------------------------------------
 
-/** @scenario "a change event drops the entry from the shared cache tier too" */
-func TestApplyChange_RoutingPolicyUpdate_EvictsBothTiers(t *testing.T) {
-	l2 := newFakeL2()
-	exp := time.Now().Add(1 * time.Hour)
-	resolver := &fakeResolver{returns: []resolverReturn{{bundle: freshBundle("vk-policy", exp)}}}
-	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver, L2: l2})
-
-	invalidatedRaw := "vk-lw-policy-shared"
-	invalidated := &domain.Bundle{VirtualKeyID: "vk-policy", OrganizationID: "org-1", ExpiresAt: exp}
-	invalidated.Config.AllowedModels = []string{"model-from-the-old-policy"}
-	seedBothTiers(svc, l2, invalidatedRaw, invalidated)
-	otherRaw := "vk-lw-policy-shared-other"
-	seedBothTiers(svc, l2, otherRaw, &domain.Bundle{OrganizationID: "org-2", ExpiresAt: exp})
-
-	svc.applyChange("org-1", CacheChange{Kind: ChangeKindRoutingPolicyUpdated})
-
-	_, isPresentInL1 := svc.l1.Get(hashKey(invalidatedRaw))
-	assert.False(t, isPresentInL1, "the polled organization must be evicted locally")
-	assert.False(t, l2.has(l2Key(invalidatedRaw)), "and dropped from the shared tier")
-	assert.True(t, l2.has(l2Key(otherRaw)), "other organizations must stay in the shared tier")
-
-	// The whole point of the deletion: without it this request finds the
-	// invalidated bundle in the shared tier and puts it straight back, so the
-	// policy the event announced never takes effect on this node.
-	got, err := svc.Resolve(context.Background(), invalidatedRaw)
-	require.NoError(t, err)
-	assert.Empty(t, got.Config.AllowedModels, "the next request must re-resolve, not rehydrate the invalidated bundle")
-	assert.Equal(t, int64(1), resolver.calls.Load(), "the evicted key must reach the control plane")
-}
-
-/** @scenario "a shared tier that cannot be reached does not hold up the local eviction" */
-func TestApplyChange_SharedTierUnreachable_StillEvictsLocallyAndReports(t *testing.T) {
-	l2 := newFakeL2()
-	l2.delErr = errors.New("shared cache unreachable")
-	resolver := &fakeResolver{}
-	svc, logs := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver, L2: l2})
-
-	rawKey := "vk-lw-shared-tier-down"
-	seedBothTiers(svc, l2, rawKey, &domain.Bundle{OrganizationID: "org-1"})
-
-	svc.applyChange("org-1", CacheChange{Kind: ChangeKindCacheRuleUpdated})
-
-	_, isPresent := svc.l1.Get(hashKey(rawKey))
-	assert.False(t, isPresent, "an unreachable shared tier must not hold up the local eviction")
-	assert.Len(t, logs.FilterMessage("auth_cache_l2_delete_failed").All(), 1,
-		"a shared-tier deletion that failed must be reported, it leaves that copy stale until the config TTL")
-}
-
-/** @scenario "the grace window classifies a cached bundle the same way on both tiers" */
-func TestResolve_HardGrace_ClassifiesABundleTheSameOnBothTiers(t *testing.T) {
+/** @scenario "the grace window moves the hard cap, not the bundle's own expiry" */
+func TestResolve_HardGrace_MovesTheCapNotTheExpiry(t *testing.T) {
 	const cachedCred = "cred-from-cache"
 	const freshCred = "cred-from-control-plane"
 
@@ -616,8 +474,8 @@ func TestResolve_HardGrace_ClassifiesABundleTheSameOnBothTiers(t *testing.T) {
 	}{
 		// A bundle inside its own expiry serves untouched, whatever the cap
 		// is doing. The negative case is the one that used to diverge: the
-		// cap sits an hour in the PAST, so a tier that tested the cap first
-		// threw away a credential that had not expired.
+		// cap sits an hour in the PAST, so testing the cap first threw away a
+		// credential that had not expired.
 		{"a positive grace serves a bundle inside its expiry", time.Hour, 10 * time.Minute, cachedCred, 0},
 		{"a zero grace takes the default and serves it", 0, 10 * time.Minute, cachedCred, 0},
 		{"a negative grace still serves a bundle inside its expiry", -time.Hour, 10 * time.Minute, cachedCred, 0},
@@ -628,98 +486,32 @@ func TestResolve_HardGrace_ClassifiesABundleTheSameOnBothTiers(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			for _, tier := range []string{"L1", "L2"} {
-				t.Run(tier, func(t *testing.T) {
-					l2 := newFakeL2()
-					fresh := freshBundle("vk_fresh", time.Now().Add(1*time.Hour))
-					fresh.Credentials = []domain.Credential{{ID: freshCred}}
-					fetcher := &fakeConfigFetcher{
-						cfg: domain.BundleConfig{Credentials: []domain.Credential{{ID: freshCred}}},
-					}
-					fetcher.returns = []resolverReturn{{bundle: fresh}}
-					svc, _ := newService(t, Options{
-						Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher, L2: l2,
-						HardGrace: tc.hardGrace, RefreshThreshold: time.Second,
-					})
-
-					rawKey := "vk-lw-grace-" + tier + "-" + tc.name
-					cached := freshBundle("vk_cached", time.Now().Add(tc.expiresIn))
-					cached.Credentials = []domain.Credential{{ID: cachedCred}}
-					if tier == "L1" {
-						svc.storeL1(hashKey(rawKey), cached)
-					} else {
-						l2.Set(context.Background(), l2Key(rawKey), CachedBundle{
-							Bundle:          cached,
-							ConfigFetchedAt: time.Now(),
-						})
-					}
-
-					got, err := svc.Resolve(context.Background(), rawKey)
-
-					require.NoError(t, err)
-					require.NotNil(t, got)
-					assert.Equal(t, tc.wantCred, got.Credentials[0].ID,
-						"a cold tier must reach the same verdict a warm one does")
-					assert.Equal(t, tc.wantCalls, fetcher.calls.Load(),
-						"and must consult the control plane exactly as often")
-				})
+			fresh := freshBundle("vk_fresh", time.Now().Add(1*time.Hour))
+			fresh.Credentials = []domain.Credential{{ID: freshCred}}
+			fetcher := &fakeConfigFetcher{
+				cfg: domain.BundleConfig{Credentials: []domain.Credential{{ID: freshCred}}},
 			}
+			fetcher.returns = []resolverReturn{{bundle: fresh}}
+			svc, _ := newService(t, Options{
+				Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher,
+				HardGrace: tc.hardGrace, RefreshThreshold: time.Second,
+			})
+
+			rawKey := "vk-lw-grace-" + tc.name
+			cached := freshBundle("vk_cached", time.Now().Add(tc.expiresIn))
+			cached.Credentials = []domain.Credential{{ID: cachedCred}}
+			svc.storeL1(hashKey(rawKey), cached, "")
+
+			got, err := svc.Resolve(context.Background(), rawKey)
+
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			assert.Equal(t, tc.wantCred, got.Credentials[0].ID,
+				"the grace window must not decide whether a bundle inside its own expiry is servable")
+			assert.Equal(t, tc.wantCalls, fetcher.calls.Load(),
+				"and must not change how often the control plane is consulted")
 		})
 	}
-}
-
-/** @scenario "a key revoked during the grace window is refused on a node whose own tier is cold" */
-func TestResolve_L2Hit_SoftExpiredBundleRevokedUpstream_IsRefusedNotServed(t *testing.T) {
-	l2 := newFakeL2()
-	resolver := &fakeResolver{returns: []resolverReturn{
-		{err: herr.New(context.Background(), domain.ErrKeyRevoked, nil)},
-	}}
-	svc, _ := newService(t, Options{
-		Resolver: resolver, ConfigFetcher: resolver, L2: l2, HardGrace: time.Hour,
-	})
-
-	// Past its JWT exp but inside the grace window: the state where serving
-	// what the store handed back would let a revoked key keep working on
-	// every node that had not cached it yet.
-	rawKey := "vk-lw-shared-tier-revoked"
-	stale := freshBundle("vk_revoked", time.Now().Add(-30*time.Second))
-	stale.Credentials = []domain.Credential{{ID: "cred-revoked"}}
-	l2.Set(context.Background(), l2Key(rawKey), CachedBundle{Bundle: stale, ConfigFetchedAt: time.Now()})
-
-	got, err := svc.Resolve(context.Background(), rawKey)
-
-	require.ErrorIs(t, err, domain.ErrKeyRevoked)
-	assert.Nil(t, got, "a revoked key must not be served from the shared tier")
-	assert.Equal(t, int64(1), resolver.calls.Load(),
-		"the control plane has to be asked before a soft-expired bundle serves, on this tier as on L1")
-	_, isPresent := svc.l1.Peek(hashKey(rawKey))
-	assert.False(t, isPresent, "the rejected entry must not be left behind in L1")
-}
-
-/** @scenario "a soft-expired shared-tier bundle still serves when the control plane is only unreachable" */
-func TestResolve_L2Hit_SoftExpiredBundleTransportFailure_ServesStale(t *testing.T) {
-	l2 := newFakeL2()
-	resolver := &fakeResolver{returns: []resolverReturn{
-		{err: herr.New(context.Background(), domain.ErrAuthUpstream, nil)},
-	}}
-	svc, logs := newService(t, Options{
-		Resolver: resolver, ConfigFetcher: resolver, L2: l2, HardGrace: time.Hour,
-	})
-
-	rawKey := "vk-lw-shared-tier-stale-serve"
-	stale := freshBundle("vk_stale_serve", time.Now().Add(-30*time.Second))
-	stale.Credentials = []domain.Credential{{ID: "cred-known-good"}}
-	l2.Set(context.Background(), l2Key(rawKey), CachedBundle{Bundle: stale, ConfigFetchedAt: time.Now()})
-
-	got, err := svc.Resolve(context.Background(), rawKey)
-
-	require.NoError(t, err)
-	require.NotNil(t, got)
-	assert.Equal(t, "cred-known-good", got.Credentials[0].ID,
-		"asking the control plane first must not cost a warm-start node its stale-while-error fallback")
-	assert.Equal(t, int64(1), resolver.calls.Load())
-	assert.NotEmpty(t, logs.FilterMessage("auth_cache_refresh_transport_failure").All(),
-		"the failed refresh has to be visible to an operator")
 }
 
 /** @scenario "every kind the control plane can emit is acted on or ignored on purpose" */
@@ -734,7 +526,7 @@ func TestApplyChange_EveryKindTheControlPlaneCanEmitIsAccountedFor(t *testing.T)
 			svc.storeL1(hashKey("vk-lw-accounted-"+kind), &domain.Bundle{
 				OrganizationID: "org-1",
 				VirtualKeyID:   "vk-accounted",
-			})
+			}, "")
 
 			svc.applyChange("org-1", CacheChange{
 				Kind:            kind,
@@ -746,56 +538,6 @@ func TestApplyChange_EveryKindTheControlPlaneCanEmitIsAccountedFor(t *testing.T)
 				"a kind the control plane can emit is either acted on or ignored by name; reaching the unknown-kind warn makes a routine event look like an incident")
 		})
 	}
-}
-
-/** @scenario "a bundle past its hard cap is never served from the shared tier" */
-func TestResolve_L2Hit_BundlePastHardCapIsAMissNotAServe(t *testing.T) {
-	l2 := newFakeL2()
-	resolver := &fakeResolver{returns: []resolverReturn{
-		{bundle: freshBundle("vk_resolved_fresh", time.Now().Add(1*time.Hour))},
-	}}
-	svc, _ := newService(t, Options{
-		Resolver: resolver, ConfigFetcher: resolver, L2: l2, HardGrace: time.Minute,
-	})
-
-	// The interface promises no expiry filtering, so a store is free to hand
-	// back anything it still holds. This one does, which leaves the guard in
-	// serveFromL2 as the only thing between a long-dead bundle and the caller.
-	rawKey := "vk-lw-shared-tier-hard-expired"
-	dead := freshBundle("vk_dead", time.Now().Add(-2*time.Hour))
-	dead.Credentials = []domain.Credential{{ID: "cred-dead"}}
-	l2.Set(context.Background(), l2Key(rawKey), CachedBundle{Bundle: dead, ConfigFetchedAt: time.Now()})
-
-	got, err := svc.Resolve(context.Background(), rawKey)
-	require.NoError(t, err)
-	assert.Equal(t, "vk_resolved_fresh", got.VirtualKeyID, "a bundle past its hard cap must not be served")
-	assert.Equal(t, int64(1), resolver.calls.Load(), "the request must resolve fresh instead")
-}
-
-/** @scenario "a shared-tier batch that fails does not take the rest of the eviction with it" */
-func TestApplyChange_LargeEviction_ChunksAndContinuesPastAFailedBatch(t *testing.T) {
-	l2 := newFakeL2()
-	l2.failNthBatch = 1
-	resolver := &fakeResolver{}
-	svc, logs := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver, L2: l2})
-
-	const cachedKeys = l2DeleteChunkSize*2 + 40
-	for i := 0; i < cachedKeys; i++ {
-		seedBothTiers(svc, l2, fmt.Sprintf("vk-lw-bulk-%04d", i), &domain.Bundle{OrganizationID: "org-1"})
-	}
-
-	svc.applyChange("org-1", CacheChange{Kind: ChangeKindRoutingPolicyUpdated})
-
-	assert.Equal(t, 0, svc.l1.Len(), "every bundle in the polled organization leaves L1")
-	assert.Equal(t, []int{l2DeleteChunkSize, l2DeleteChunkSize, 40}, l2.batchSizes(),
-		"an org-wide eviction goes out in chunks, one round trip each, not one per key")
-	assert.Equal(t, l2DeleteChunkSize, l2.len(),
-		"only the failed batch survives; a batch that fails must not abandon the batches after it")
-
-	warnings := logs.FilterMessage("auth_cache_l2_delete_failed").All()
-	require.Len(t, warnings, 1, "one warn for the whole eviction, not one per key")
-	assert.Equal(t, int64(l2DeleteChunkSize), warnings[0].ContextMap()["failed"])
-	assert.Equal(t, int64(cachedKeys), warnings[0].ContextMap()["total"])
 }
 
 /** @scenario "the evict log names the change kind that caused it" */
@@ -819,7 +561,7 @@ func TestApplyChange_EvictLogNamesTheChangeKind(t *testing.T) {
 			svc.storeL1(hashKey("vk-lw-reason-"+tc.kind), &domain.Bundle{
 				OrganizationID: "org-1",
 				VirtualKeyID:   "vk-reason",
-			})
+			}, "")
 
 			svc.applyChange("org-1", CacheChange{Kind: tc.kind, VirtualKeyID: "vk-reason"})
 
@@ -831,60 +573,6 @@ func TestApplyChange_EvictLogNamesTheChangeKind(t *testing.T) {
 	}
 }
 
-/** @scenario "rehydrating from the shared tier keeps the config's real age" */
-func TestResolve_L2Hit_KeepsTheConfigFetchTimeItWasStoredWith(t *testing.T) {
-	rawKey := "vk-lw-shared-tier-age"
-
-	t.Run("when the shared entry's config is older than the TTL", func(t *testing.T) {
-		l2 := newFakeL2()
-		fetcher := &fakeConfigFetcher{cfg: domain.BundleConfig{Credentials: []domain.Credential{{ID: "cred-fresh"}}}}
-		svc, _ := newService(t, Options{
-			Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher, L2: l2,
-			ConfigTTL: 60 * time.Second, RefreshThreshold: time.Second,
-		})
-		bundle := freshBundle("vk_shared_age", time.Now().Add(1*time.Hour))
-		bundle.Credentials = []domain.Credential{{ID: "cred-old"}}
-		l2.Set(context.Background(), l2Key(rawKey), CachedBundle{
-			Bundle:          bundle,
-			ConfigFetchedAt: time.Now().Add(-2 * time.Minute),
-		})
-
-		got, err := svc.Resolve(context.Background(), rawKey)
-		require.NoError(t, err)
-		assert.Equal(t, "cred-old", got.Credentials[0].ID, "the triggering request still serves what the shared tier held")
-		// Stamping the rehydrate moment instead would leave this entry
-		// looking fresh for another full TTL, so config staleness could
-		// reach twice the TTL and an eviction could be undone by it.
-		assert.Eventually(t, func() bool { return fetcher.fetches.Load() == 1 }, 2*time.Second, 10*time.Millisecond,
-			"a rehydrated entry past its config TTL must refresh rather than restart the clock")
-	})
-
-	t.Run("when the shared entry's config is inside the TTL", func(t *testing.T) {
-		l2 := newFakeL2()
-		fetcher := &fakeConfigFetcher{}
-		svc, _ := newService(t, Options{
-			Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher, L2: l2,
-			ConfigTTL: 60 * time.Second, RefreshThreshold: time.Second,
-		})
-		fetchedAt := time.Now().Add(-5 * time.Second)
-		l2.Set(context.Background(), l2Key(rawKey), CachedBundle{
-			Bundle:          freshBundle("vk_shared_age_fresh", time.Now().Add(1*time.Hour)),
-			ConfigFetchedAt: fetchedAt,
-		})
-
-		_, err := svc.Resolve(context.Background(), rawKey)
-		require.NoError(t, err)
-
-		e, ok := svc.l1.Peek(hashKey(rawKey))
-		require.True(t, ok, "the rehydrated bundle must land in L1")
-		e.mu.Lock()
-		storedFetchedAt := e.configFetchedAt
-		e.mu.Unlock()
-		assert.True(t, storedFetchedAt.Equal(fetchedAt), "L1 must inherit the shared tier's config-fetch time")
-		assert.Equal(t, int64(0), fetcher.fetches.Load(), "config inside the TTL must not be refetched")
-	})
-}
-
 // --- Background refresh classification --------------------------------------
 
 func TestRefreshBackground_TransportFailure_BumpsSoft(t *testing.T) {
@@ -894,7 +582,7 @@ func TestRefreshBackground_TransportFailure_BumpsSoft(t *testing.T) {
 	rawKey := "vk-lw-bgtransport"
 	// Seed an entry near soft expiry but not past it (so background path is invoked).
 	originalExp := time.Now().Add(30 * time.Second)
-	svc.storeL1(hashKey(rawKey), freshBundle("vk_bgtransport", originalExp))
+	svc.storeL1(hashKey(rawKey), freshBundle("vk_bgtransport", originalExp), "")
 
 	beforeE, _ := svc.l1.Get(hashKey(rawKey))
 	_, beforeSoft, _ := beforeE.snapshot()
@@ -929,7 +617,7 @@ func TestRefreshBackground_AuthRejection_EvictsEntry(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
 	rawKey := "vk-lw-bgrevoked"
 	originalExp := time.Now().Add(30 * time.Second)
-	svc.storeL1(hashKey(rawKey), freshBundle("vk_bgrevoked", originalExp))
+	svc.storeL1(hashKey(rawKey), freshBundle("vk_bgrevoked", originalExp), "")
 
 	svc.refreshBackground(rawKey, hashKey(rawKey))
 
@@ -1058,7 +746,9 @@ func init() {
 
 // --- ConfigTTL refresh --------------------------------------------------------
 
-// fakeConfigFetcher returns a programmable config, counting calls.
+// fakeConfigFetcher returns a programmable config, counting calls. It always
+// answers with the config, never a "still current" confirmation; the
+// conditional half of the endpoint is exercised by etagConfigFetcher below.
 type fakeConfigFetcher struct {
 	fakeResolver
 	cfg     domain.BundleConfig
@@ -1066,9 +756,12 @@ type fakeConfigFetcher struct {
 	fetches atomic.Int64
 }
 
-func (f *fakeConfigFetcher) FetchConfig(_ context.Context, _ string) (domain.BundleConfig, error) {
+func (f *fakeConfigFetcher) FetchConfig(_ context.Context, _, _ string) (domain.ConfigFetchResult, error) {
 	f.fetches.Add(1)
-	return f.cfg, f.cfgErr
+	if f.cfgErr != nil {
+		return domain.ConfigFetchResult{}, f.cfgErr
+	}
+	return domain.ConfigFetchResult{Config: f.cfg}, nil
 }
 
 // backdateConfig makes the L1 entry's config look older than the TTL.
@@ -1103,7 +796,7 @@ func TestResolve_FreshEntry_ConfigPastTTL_RefreshesConfigInBackground(t *testing
 	rawKey := "vk-lw-cfgttl_001"
 	bundle := freshBundle("vk_cfg_001", time.Now().Add(1*time.Hour))
 	bundle.Credentials = []domain.Credential{{ID: "cred-old"}}
-	svc.storeL1(hashKey(rawKey), bundle)
+	svc.storeL1(hashKey(rawKey), bundle, "")
 	backdateConfig(t, svc, rawKey, 2*time.Minute)
 
 	got, err := svc.Resolve(context.Background(), rawKey)
@@ -1144,7 +837,7 @@ func TestResolve_FreshEntry_ConfigTTLDisabled_NeverRefreshes(t *testing.T) {
 	})
 
 	rawKey := "vk-lw-cfgttl_002"
-	svc.storeL1(hashKey(rawKey), freshBundle("vk_cfg_002", time.Now().Add(1*time.Hour)))
+	svc.storeL1(hashKey(rawKey), freshBundle("vk_cfg_002", time.Now().Add(1*time.Hour)), "")
 	backdateConfig(t, svc, rawKey, 10*time.Minute)
 
 	if _, err := svc.Resolve(context.Background(), rawKey); err != nil {
@@ -1156,9 +849,10 @@ func TestResolve_FreshEntry_ConfigTTLDisabled_NeverRefreshes(t *testing.T) {
 	}
 }
 
+/** @scenario "a refresh the control plane cannot answer leaves the cached config serving" */
 func TestResolve_FreshEntry_ConfigRefreshFailure_KeepsStaleAndWaitsFullTTL(t *testing.T) {
 	fetcher := &fakeConfigFetcher{cfgErr: errors.New("control plane down")}
-	svc, _ := newService(t, Options{
+	svc, logs := newService(t, Options{
 		Resolver:         &fetcher.fakeResolver,
 		ConfigFetcher:    fetcher,
 		ConfigTTL:        60 * time.Second,
@@ -1168,7 +862,7 @@ func TestResolve_FreshEntry_ConfigRefreshFailure_KeepsStaleAndWaitsFullTTL(t *te
 	rawKey := "vk-lw-cfgttl_003"
 	bundle := freshBundle("vk_cfg_003", time.Now().Add(1*time.Hour))
 	bundle.Credentials = []domain.Credential{{ID: "cred-old"}}
-	svc.storeL1(hashKey(rawKey), bundle)
+	svc.storeL1(hashKey(rawKey), bundle, "")
 	e := backdateConfig(t, svc, rawKey, 2*time.Minute)
 
 	if _, err := svc.Resolve(context.Background(), rawKey); err != nil {
@@ -1206,6 +900,11 @@ func TestResolve_FreshEntry_ConfigRefreshFailure_KeepsStaleAndWaitsFullTTL(t *te
 	if n := fetcher.fetches.Load(); n != 1 {
 		t.Fatalf("expected exactly one fetch until next TTL, got %d", n)
 	}
+	// A safety net that quietly stops working is worse than one that fails
+	// loudly: the config keeps serving either way, and the warn is the only
+	// thing telling an operator the staleness bound is no longer held.
+	assert.Len(t, logs.FilterMessage("config_ttl_refresh_failed").All(), 1,
+		"a refresh the control plane could not answer must be reported")
 }
 
 // blockingConfigFetcher blocks inside FetchConfig until released, so a test
@@ -1218,11 +917,11 @@ type blockingConfigFetcher struct {
 	fetches atomic.Int64
 }
 
-func (f *blockingConfigFetcher) FetchConfig(_ context.Context, _ string) (domain.BundleConfig, error) {
+func (f *blockingConfigFetcher) FetchConfig(_ context.Context, _, _ string) (domain.ConfigFetchResult, error) {
 	f.fetches.Add(1)
 	f.started <- struct{}{}
 	<-f.release
-	return f.cfg, nil
+	return domain.ConfigFetchResult{Config: f.cfg}, nil
 }
 
 // Regression: a background ConfigTTL refresh must not resurrect an entry that
@@ -1249,7 +948,7 @@ func TestResolve_ConfigRefresh_EvictedMidFetch_NotResurrected(t *testing.T) {
 	h := hashKey(rawKey)
 	bundle := freshBundle("vk_cfg_race", time.Now().Add(1*time.Hour))
 	bundle.Credentials = []domain.Credential{{ID: "cred-old"}}
-	svc.storeL1(h, bundle)
+	svc.storeL1(h, bundle, "")
 	e := backdateConfig(t, svc, rawKey, 2*time.Minute)
 
 	// Triggering request serves the stale bundle and kicks off the refresh.
@@ -1299,7 +998,7 @@ func TestApplyChange_UnhandledKindIsReported(t *testing.T) {
 	svc, logs := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
 
 	key := hashKey("vk-lw-unhandled-kind")
-	svc.storeL1(key, &domain.Bundle{OrganizationID: "org-1"})
+	svc.storeL1(key, &domain.Bundle{OrganizationID: "org-1"}, "")
 
 	svc.applyChange("org-1", CacheChange{Kind: "SOMETHING_THIS_BUILD_PREDATES"})
 
@@ -1311,4 +1010,161 @@ func TestApplyChange_UnhandledKindIsReported(t *testing.T) {
 	warnings := logs.FilterMessage("auth_cache_change_unhandled").All()
 	assert.Len(t, warnings, 1, "an unhandled kind must be reported once")
 	assert.Equal(t, "SOMETHING_THIS_BUILD_PREDATES", warnings[0].ContextMap()["kind"])
+}
+
+// --- Conditional config refresh -----------------------------------------------
+
+// etagConfigFetcher answers the config endpoint the way the control plane
+// does (contract §4.2): an If-None-Match that matches the key's current
+// revision is confirmed without a body, anything else gets the config and the
+// revision it was materialized at. The revision moves through edit(), so a
+// test can change a key between refreshes. Locked because the staleness
+// refresh runs on its own goroutine.
+type etagConfigFetcher struct {
+	fakeResolver
+
+	mu       sync.Mutex
+	revision string
+	cred     string
+	// dropETag models a response that carries no ETag header, which leaves
+	// the caller with no token to revalidate against next time.
+	dropETag bool
+	conds    []string
+}
+
+func (f *etagConfigFetcher) FetchConfig(_ context.Context, _, ifNoneMatch string) (domain.ConfigFetchResult, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.conds = append(f.conds, ifNoneMatch)
+	if ifNoneMatch != "" && ifNoneMatch == f.revision {
+		return domain.ConfigFetchResult{ETag: f.revision, NotModified: true}, nil
+	}
+	res := domain.ConfigFetchResult{
+		Config: domain.BundleConfig{Credentials: []domain.Credential{{ID: f.cred}}},
+	}
+	if !f.dropETag {
+		res.ETag = f.revision
+	}
+	return res, nil
+}
+
+// edit moves the key to a new revision carrying a new credential, the way an
+// admin mutation on the control plane does.
+func (f *etagConfigFetcher) edit(revision, cred string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.revision, f.cred = revision, cred
+}
+
+// conditionals reports the If-None-Match each fetch carried, in order.
+func (f *etagConfigFetcher) conditionals() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.conds...)
+}
+
+// awaitConfigRefresh blocks until the background config refresh the last
+// Resolve kicked off has finished. tryBeginConfigRefresh claims the slot
+// before the goroutine starts, so the flag is already set by the time Resolve
+// returns, and clearing it is the goroutine's last act.
+func awaitConfigRefresh(t *testing.T, e *entry) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		e.mu.Lock()
+		defer e.mu.Unlock()
+		return !e.configRefreshing
+	}, 2*time.Second, 5*time.Millisecond, "the background config refresh never finished")
+}
+
+// newETagService wires a service around an etagConfigFetcher whose key starts
+// at the given revision, and warms one cache entry through the cold path so
+// the entry carries whatever ETag that fetch came back with.
+func newETagService(t *testing.T, fetcher *etagConfigFetcher, rawKey string) (*Service, *entry) {
+	t.Helper()
+	fetcher.returns = []resolverReturn{{bundle: freshBundle("vk_etag", time.Now().Add(1*time.Hour))}}
+	svc, _ := newService(t, Options{
+		Resolver:         &fetcher.fakeResolver,
+		ConfigFetcher:    fetcher,
+		ConfigTTL:        60 * time.Second,
+		RefreshThreshold: time.Second,
+	})
+	_, err := svc.Resolve(context.Background(), rawKey)
+	require.NoError(t, err)
+	e, ok := svc.l1.Peek(hashKey(rawKey))
+	require.True(t, ok, "the cold resolve must leave an entry behind")
+	return svc, e
+}
+
+/** @scenario "the staleness refresh revalidates instead of re-downloading" */
+func TestResolve_ConfigTTLRefresh_IsConditional(t *testing.T) {
+	t.Run("when nothing about the key changed", func(t *testing.T) {
+		fetcher := &etagConfigFetcher{revision: "42", cred: "cred-current"}
+		rawKey := "vk-lw-etag-unchanged"
+		svc, e := newETagService(t, fetcher, rawKey)
+
+		backdateConfig(t, svc, rawKey, 2*time.Minute)
+		got, err := svc.Resolve(context.Background(), rawKey)
+		require.NoError(t, err)
+		awaitConfigRefresh(t, e)
+
+		assert.Equal(t, []string{"", "42"}, fetcher.conditionals(),
+			"the cold fetch has nothing to offer; the safety-net refresh offers the revision that fetch came back with")
+		assert.Equal(t, "cred-current", got.Credentials[0].ID)
+		live, ok := svc.l1.Peek(hashKey(rawKey))
+		require.True(t, ok)
+		assert.Same(t, e, live, "a confirmation replaces nothing; the entry that was serving keeps serving")
+		assert.Equal(t, "cred-current", live.bundle.Credentials[0].ID)
+		// The clock restarts on a confirmation, not just on a download: the
+		// config was checked against the control plane and found current, so
+		// re-asking on the very next request would spend a round trip to
+		// learn the same thing.
+		assert.False(t, live.configStale(60*time.Second),
+			"a confirmed config is as fresh as a downloaded one")
+	})
+
+	t.Run("when the key's config changed", func(t *testing.T) {
+		fetcher := &etagConfigFetcher{revision: "42", cred: "cred-old"}
+		rawKey := "vk-lw-etag-changed"
+		svc, e := newETagService(t, fetcher, rawKey)
+
+		fetcher.edit("43", "cred-new")
+		backdateConfig(t, svc, rawKey, 2*time.Minute)
+		_, err := svc.Resolve(context.Background(), rawKey)
+		require.NoError(t, err)
+		awaitConfigRefresh(t, e)
+
+		live, ok := svc.l1.Peek(hashKey(rawKey))
+		require.True(t, ok)
+		assert.Equal(t, "cred-new", live.bundle.Credentials[0].ID,
+			"a revision the control plane has moved past must bring the new config in")
+		assert.Equal(t, "43", live.currentConfigETag(),
+			"and the entry must carry the new revision, or the next refresh revalidates against a dead one")
+
+		// Third pass: the new revision is what gets offered from here on.
+		backdateConfig(t, svc, rawKey, 2*time.Minute)
+		_, err = svc.Resolve(context.Background(), rawKey)
+		require.NoError(t, err)
+		awaitConfigRefresh(t, live)
+		assert.Equal(t, []string{"", "42", "43"}, fetcher.conditionals())
+	})
+
+	t.Run("when the control plane sent no version token", func(t *testing.T) {
+		fetcher := &etagConfigFetcher{revision: "42", cred: "cred-current", dropETag: true}
+		rawKey := "vk-lw-etag-absent"
+		svc, e := newETagService(t, fetcher, rawKey)
+
+		assert.Empty(t, e.currentConfigETag(), "there is no token to remember")
+
+		backdateConfig(t, svc, rawKey, 2*time.Minute)
+		_, err := svc.Resolve(context.Background(), rawKey)
+		require.NoError(t, err)
+		awaitConfigRefresh(t, e)
+
+		assert.Equal(t, []string{"", ""}, fetcher.conditionals(),
+			"with no token to offer, the refresh goes out unconditional rather than inventing one")
+		live, ok := svc.l1.Peek(hashKey(rawKey))
+		require.True(t, ok)
+		assert.Equal(t, "cred-current", live.bundle.Credentials[0].ID,
+			"and it comes back with the config, so the entry is never left without one")
+	})
 }

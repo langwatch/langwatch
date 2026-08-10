@@ -105,6 +105,28 @@ type BundleConfig struct {
 	RoutingMode string
 }
 
+// ConfigFetchResult is one answer from the control plane's virtual-key config
+// endpoint. That endpoint is conditional (contract §4.2): a caller that sends
+// back the ETag it already holds is answered 304 with no body, which means
+// "what you have is still current" and not "this key has no config". The
+// distinction is its own field rather than an empty Config because collapsing
+// the two would let a revalidation silently strip a key of its credentials.
+type ConfigFetchResult struct {
+	// Config is the freshly materialized config. Empty and meaningless when
+	// NotModified is set.
+	Config BundleConfig
+
+	// ETag is the version token the control plane stamped on this config, to
+	// be sent as If-None-Match on the next fetch. Empty when the response
+	// carried none, which makes the next fetch unconditional rather than
+	// sending a token the control plane never issued.
+	ETag string
+
+	// NotModified is the control plane confirming the caller's ETag is still
+	// current, so the caller keeps the config it already has.
+	NotModified bool
+}
+
 // Routing modes carried on the bundle wire (contract §4.2 routing_mode).
 const (
 	RoutingModeNone        = "none"

@@ -1,16 +1,18 @@
 Feature: Gateway auth cache — hot path is zero RTT after first hit
 
   # All scenarios in this file describe auth-cache behaviour in the Go
-  # gateway data plane (services/aigateway/). Three-tier cache, JWT
+  # gateway data plane (services/aigateway/). One cache tier, JWT
   # refresh, stale-on-failure fallback — none of this lives in the
   # TypeScript control plane. The parity check only scans TS test roots,
   # so these are aspirational at this layer; verified end-to-end via
   # Go integration tests in services/aigateway/.
 
   The gateway is in the hot path of every LLM request. Auth cannot add
-  measurable latency. We keep a three-tier cache (in-mem LRU → optional
-  Redis L2 → background refresh + optional bootstrap-pull) and verify the
-  JWT locally on every request (no control-plane round trip post-warmup).
+  measurable latency. Each pod keeps one in-memory LRU, refreshed in the
+  background, and verifies the JWT locally on every request (no
+  control-plane round trip post-warmup). The cache is per pod on purpose:
+  a shared tier buys a warm start that a rolling deploy already pays for
+  anyway, and costs an invalidation path that has to reach it.
 
   See contract.md §4.1 (resolve-key), §4.2 (config fetch), §4.3 (changes
   long-poll), §9 (cache strategy).
@@ -110,7 +112,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
     credentials must never be cached or served: dispatch would answer the
     terminal no_provider_configured 400 — telling an org with perfectly good
     keys to go add a provider API key — and the poisoned bundle would keep
-    that answer alive until expiry, on every node sharing the cache.
+    that answer alive until it expires.
 
     @unit
     Scenario: config fetch fails on a cold miss -> retryable error, nothing cached
@@ -118,7 +120,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       But the config fetch fails with a transport error
       When I send a request with that VK
       Then the request is rejected with error.type "auth_upstream_unavailable" (503, retryable)
-      And no bundle is cached in L1 or L2
+      And no bundle is cached
       And the next request retries the control plane and succeeds once it recovers
 
     @unit
@@ -192,7 +194,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Given the cache holds an entry whose JWT is 30 seconds from expiring
       And the control plane returns 403 Forbidden
       When the near-expiry background refresh fires
-      Then the entry is evicted from L1 (and L2 if configured)
+      Then the entry is evicted from the cache
       And the next request with that VK calls /resolve-key fresh and is rejected
 
   Rule: Short-lived JWT is refreshed before expiry
@@ -203,7 +205,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       When I send a request with that VK
       Then the gateway serves from cache immediately (zero added latency)
       And a background goroutine calls /resolve-key for a fresh JWT
-      And the replacement bundle is stored in L1 (and L2 if configured)
+      And the replacement bundle is stored in the cache
 
   Rule: Revocation propagates within 60 seconds via long-poll /changes
 
@@ -321,104 +323,77 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then no change event is appended
       And already-issued keys keep the policy they were issued against
 
-  Rule: Invalidation reaches every cache tier, not just the node that saw the event
-    L1 is one node's own copy; L2 is the copy every node shares. Dropping an
-    entry from L1 alone is undone by the very next request, which finds the
-    invalidated bundle in the shared tier and puts it straight back, so the
-    mutation the event announced does not take effect until the config TTL
-    expires. The rehydrate also has to carry the config's real age: stamping
-    it as freshly fetched restarts the staleness clock, so an entry most of
-    the way through its TTL comes back with a whole new one and staleness can
-    reach twice the TTL. This holds for every change kind, not only the
-    newest ones.
+  Rule: The config safety net revalidates, it does not re-download
+    The change feed is how a config edit reaches a running gateway. The config
+    TTL is the safety net under it, for the mutations that emit no event, and a
+    safety net fires mostly when nothing is wrong: almost every time it runs,
+    the key is exactly as it was. So it asks rather than downloads. The control
+    plane already versions each key's config with an ETag it derives from the
+    key's revision, which every mutation bumps, and answers 304 to a matching
+    If-None-Match. The gateway keeps that ETag beside the cached bundle and
+    offers it back, so an unchanged key costs a revision lookup instead of a
+    whole bundle materialized, serialized and parsed, on every cached key, every
+    TTL, on every pod.
 
-    A bundle rehydrated from the shared tier gets exactly the treatment an
-    entry already in the node's own tier would get in the same state. A node
-    with a cold cache must not be the weaker door: if the bundle is past its
-    JWT expiry, the control plane is asked before anything is served, so a
-    key revoked during the grace window is refused rather than getting one
-    more request through.
-
-    @unit
-    Scenario: a change event drops the entry from the shared cache tier too
-      Given a bundle is cached in both the node's own tier and the shared tier
-      When the change feed reports a mutation that invalidates it
-      Then the bundle is gone from both tiers
-      And the next request for that key re-resolves against the control plane
-      And bundles for other organizations stay in both tiers
+    A confirmation is worth as much as a download: the config was checked
+    against the control plane and found current, so it restarts the staleness
+    clock. What it must never do is answer with less than it was asked for. A
+    304 to a request that offered no ETag confirms nothing, and an error or an
+    unreadable answer leaves the cached config in place rather than replacing it
+    with an empty one.
 
     @unit
-    Scenario: a shared tier that cannot be reached does not hold up the local eviction
-      Given a bundle is cached in both tiers
-      And the shared tier is unreachable
-      When the change feed reports a mutation that invalidates it
-      Then the entry is still evicted from the node's own tier
-      And the failed deletion is reported, since that copy stays stale until the config TTL
+    Scenario: the staleness refresh revalidates instead of re-downloading
+      Given a cached bundle whose config the control plane served with a version token
+      When the config TTL elapses and the safety net runs
+      Then the refresh offers that token back to the control plane
+      And a key nobody changed is confirmed rather than sent again
+      And the confirmed entry keeps serving its credentials with its staleness clock restarted
+      And a key that did change comes back with the new config and the new token, which the next refresh offers in turn
+      And a response that carried no token leaves the next refresh unconditional
 
     @unit
-    Scenario: a shared-tier batch that fails does not take the rest of the eviction with it
-      Given an organization with more cached bundles than fit in one deletion batch
-      And the shared tier drops one batch and accepts the others
-      When the change feed reports a mutation that invalidates the organization
-      Then the entries in the batches that were accepted are gone from the shared tier
-      And the eviction is reported once with how many entries were left behind
+    Scenario: a refresh the control plane cannot answer leaves the cached config serving
+      Given a cached bundle whose config has crossed the TTL
+      And the control plane cannot answer the refresh
+      When the safety net runs
+      Then the bundle keeps serving the credentials it already had
+      And the failed attempt is reported
+      And the next attempt waits a full TTL rather than retrying on every request
 
     @unit
-    Scenario: the grace window classifies a cached bundle the same way on both tiers
+    Scenario: an answer the gateway cannot read is a failed refresh, not an empty config
+      Given the control plane answers the refresh with a body the gateway cannot parse
+      When the safety net runs
+      Then the answer is treated as a failure
+      And no config is taken from it, so a working bundle is never replaced by an empty one
+      And no version token is stored from it, so the next refresh does not revalidate against one
+
+  Rule: The grace window moves the hard cap, not the bundle's own expiry
+    LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS sets how far past its JWT expiry
+    a cached bundle may keep serving while the control plane is unreachable,
+    and a negative value opts out by putting that cap BEFORE the expiry. What
+    it must never do is decide whether a bundle inside its own expiry is
+    servable: an unexpired bundle serves from cache wherever the cap sits, and
+    an expired one goes to the control plane first. Reading the cap before the
+    expiry gets the negative setting backwards and throws away credentials
+    that are perfectly good.
+
+    @unit
+    Scenario: the grace window moves the hard cap, not the bundle's own expiry
       Given a cached bundle and a configured grace window
-      When the same request is answered from the node's own tier and from the shared tier in turn
-      Then both tiers reach the same verdict
-      And both consult the control plane exactly as often
-      And a bundle inside its own expiry is still served when the grace window is negative, since that setting moves the cap, not the expiry
-
-    @unit
-    Scenario: a key revoked during the grace window is refused on a node whose own tier is cold
-      Given the shared tier holds a bundle past its JWT expiry but inside the grace window
-      And the key has been revoked since that bundle was cached
-      When a node whose own tier is empty serves a request with that key
-      Then the control plane is asked before anything is served
-      And the request is rejected as revoked
-      And nothing is left cached for that key
-
-    @unit
-    Scenario: a soft-expired shared-tier bundle still serves when the control plane is only unreachable
-      Given the shared tier holds a bundle past its JWT expiry but inside the grace window
-      And the control plane is unreachable
-      When a node whose own tier is empty serves a request with that key
-      Then the cached bundle and its credentials are served
-      And the failed refresh is reported
-
-    @unit
-    Scenario: a bundle past its hard cap is never served from the shared tier
-      Given the shared tier hands back a bundle whose hard expiry has passed
-      When a node whose own tier is empty serves a request with that key
-      Then the expired bundle is not served
-      And the request resolves against the control plane instead
-
-    @unit
-    Scenario: rehydrating from the shared tier keeps the config's real age
-      Given the shared tier holds a bundle whose config was fetched longer ago than the config TTL
-      When a node whose own tier is empty serves a request with that key
-      Then the cached bundle is served
-      And its config is refreshed rather than treated as freshly fetched
-      And a shared entry whose config is still inside the TTL is not refetched
-
-  Rule: L2 Redis cache warms new gateway nodes
-
-    @integration @unimplemented
-    Scenario: new gateway pod reads a cached bundle from Redis instead of calling /resolve-key
-      Given Redis is configured and pod A has cached VK "vk-lw-..." for 3 minutes
-      When pod B receives its first request with that VK
-      Then pod B finds the bundle in Redis (L2 hit)
-      And pod B populates its own L1
-      And pod B does NOT call /resolve-key
-      And the Redis value expires at the JWT's exp
+      When a request is answered from the cache
+      Then a bundle inside its own expiry is served without consulting the control plane, whether the window is positive, zero or negative
+      And a bundle past its own expiry goes to the control plane before it serves
 
   Rule: Bootstrap-pull enables gateway to serve when control plane is cold
 
+    # The flag is named the way contract.md §6 and §9 name it. Nothing reads
+    # it yet, so the point of naming it here is that this file and the
+    # contract agree on one name rather than two.
     @integration @unimplemented
     Scenario: enterprise bootstrap-all pulls every non-revoked VK on startup
-      Given GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true
+      Given LW_GATEWAY_BOOTSTRAP_PULL=true
       And the control plane has 250 active VKs
       When the gateway starts
       Then the gateway calls GET /internal/gateway/bootstrap (paginated)

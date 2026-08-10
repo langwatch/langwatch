@@ -188,7 +188,7 @@ The first time the gateway sees a presented VK:
 
 1. Calls `/internal/gateway/resolve-key` on the LangWatch control-plane → receives a signed JWT (15-minute TTL) with identity claims (`vk_id`, `project_id`, `principal_id`, etc.) plus a `revision` number.
 2. Calls `/internal/gateway/config/:vk_id` (with `If-None-Match: <revision>` on subsequent fetches) → receives the fat config (providers, fallback, guardrails, budgets).
-3. Caches both in-memory (L1 LRU) and optionally in Redis (L2, shared across gateway pods).
+3. Caches both in an in-memory LRU, private to that gateway pod.
 4. Subscribes to `/internal/gateway/changes?since=<revision>` long-poll, on any mutation to any VK, the gateway invalidates and re-fetches.
 
 Subsequent requests with the same VK are served entirely from cache. JWT verification is local (HS256 shared secret); no control-plane round-trip on the hot path.

@@ -257,31 +257,64 @@ func (c *Client) PollChanges(ctx context.Context, organizationID, since string) 
 }
 
 // FetchConfig retrieves the VK's full config from the control plane.
-func (c *Client) FetchConfig(ctx context.Context, vkID string) (domain.BundleConfig, error) {
+//
+// Conditional when ifNoneMatch is non-empty: the ETag goes back as
+// If-None-Match and a 304 is reported as NotModified rather than a config.
+// The control plane keys that ETag off the virtual key's revision, which every
+// mutation bumps (contract §4.2), so revalidating a key nobody touched costs a
+// revision lookup instead of materializing the whole bundle again. An empty
+// ifNoneMatch asks for the config outright.
+//
+// Anything other than a well-formed 200 or a 304 answering our own
+// If-None-Match is an error: a caller must never take a surprising response
+// as permission to keep serving config it cannot vouch for.
+func (c *Client) FetchConfig(ctx context.Context, vkID, ifNoneMatch string) (domain.ConfigFetchResult, error) {
 	endpoint, _ := url.JoinPath(c.baseURL, "/api/internal/gateway/config", url.PathEscape(vkID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return domain.BundleConfig{}, err
+		return domain.ConfigFetchResult{}, err
+	}
+	if ifNoneMatch != "" {
+		req.Header.Set("If-None-Match", ifNoneMatch)
 	}
 	c.setCommonHeaders(req)
 	c.sign(req, nil)
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return domain.BundleConfig{}, err
+		return domain.ConfigFetchResult{}, err
 	}
 	defer func() { _ = resp.Body.Close() }()
-	body, _ := io.ReadAll(resp.Body)
+	body, readErr := io.ReadAll(resp.Body)
 
+	// A 304 can only answer a conditional request, so it can only mean the
+	// ETag we sent is still current. The result carries that same ETag back:
+	// a body-less response is no basis for adopting a different one, which
+	// would pin the caller to config it never fetched.
+	if ifNoneMatch != "" && resp.StatusCode == http.StatusNotModified {
+		return domain.ConfigFetchResult{ETag: ifNoneMatch, NotModified: true}, nil
+	}
 	if resp.StatusCode != http.StatusOK {
-		return domain.BundleConfig{}, fmt.Errorf("config fetch returned %d", resp.StatusCode)
+		return domain.ConfigFetchResult{}, fmt.Errorf("config fetch returned %d", resp.StatusCode)
+	}
+	// A read that ended in an error leaves the response's integrity unknown,
+	// and the bytes that did arrive parsing is not evidence to the contrary:
+	// a prefix can be a complete JSON object while the message it was cut out
+	// of never arrived whole. Config is only worth caching when the whole
+	// answer was seen, the more so because accepting it stamps the server's
+	// ETag on it, and every later refresh then revalidates against a token
+	// vouching for a response this node never fully read.
+	if readErr != nil {
+		return domain.ConfigFetchResult{}, fmt.Errorf("config fetch body: %w", readErr)
 	}
 
 	var wire configWire
 	if err := json.Unmarshal(body, &wire); err != nil {
-		return domain.BundleConfig{}, err
+		return domain.ConfigFetchResult{}, err
 	}
-	return wire.toDomain(), nil
+	// A response with no ETag header stores none, so the next fetch goes out
+	// unconditional and gets the config outright.
+	return domain.ConfigFetchResult{Config: wire.toDomain(), ETag: resp.Header.Get("ETag")}, nil
 }
 
 // BudgetBucketSpend reads the current-period spend for one attributed-user
