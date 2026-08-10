@@ -119,6 +119,18 @@ Feature: Redacting secrets from traces
   # per pass stays bounded and no region goes unscanned.
 
   @unit
+  Scenario: A credential straddling a slice boundary is still redacted
+    Given a payload larger than the scan budget with a credential on the boundary
+    When the text is redacted
+    Then the credential is replaced rather than split across two slices
+
+  @unit
+  Scenario: A PEM block straddling a slice boundary is still redacted
+    Given a payload larger than the scan budget with a PEM block on the boundary
+    When the text is redacted
+    Then the block is replaced whole
+
+  @unit
   Scenario: A payload past the scan budget is still scanned
     Given a payload larger than the scan budget with a credential inside it
     When the text is redacted
@@ -197,6 +209,51 @@ Feature: Redacting secrets from traces
     Given a bare environment variable name
     When the text is redacted
     Then the name is left as written
+
+  # The cue layer was blind twice over. It read attribute names on separators
+  # only, so every camelCase and PascalCase name was one opaque word and none of
+  # them fired, including AWS Secrets Manager's own `SecretString`. And it
+  # accepted only `:` and `=` as a separator, so `Authorization <token>` was
+  # missed. Whitespace is accepted now on a higher bar: the value has to look
+  # like key material in its own right, because accepting it on the same terms
+  # as `:` matched thousands of ordinary sentences.
+  #
+  # Bare `key` and `token` still need a qualifying word in front, so an
+  # `idempotency_key` and a count of `input_tokens` stay readable.
+
+  @unit
+  Scenario: A camelCase credential name is recognised
+    Given an attribute whose camelCase name says it holds a credential
+    When the name is checked
+    Then it is recognised as sensitive
+
+  @unit
+  Scenario: An ordinary name containing key or token is not a credential
+    Given an attribute named for an identifier or a count
+    When the name is checked
+    Then it is not treated as sensitive
+
+  @unit
+  Scenario: A credential after a whitespace separator is redacted
+    Given a credential word followed by key material with only a space between
+    When the text is redacted
+    Then the credential is replaced
+
+  @unit
+  Scenario: Prose following a credential word is left alone
+    Given an ordinary sentence containing a credential word
+    When the text is redacted
+    Then the sentence is left as written
+
+  # Span content arrives JSON-encoded, so a literal two-character escape sits
+  # inside the text. A value allowed to run through one crossed logical lines
+  # and slipped past the guards that recognise an environment reference.
+
+  @unit
+  Scenario: A JSON-escaped newline does not extend a credential value
+    Given a payload where a credential word is followed by an environment reference and an escaped newline
+    When the text is redacted
+    Then the environment reference is left as written
 
   # Catching it at authorship as well as at match time. An over-broad secret
   # pattern used to be waved through on the reasoning that it "only

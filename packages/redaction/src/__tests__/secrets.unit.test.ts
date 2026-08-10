@@ -116,6 +116,33 @@ describe("redactSecretsInText", () => {
       expect(redactedCount).toBe(1);
       expect(text.endsWith(" [SECRET] tail")).toBe(true);
     });
+
+    // A boundary landing mid-token would be the same leak the slicing exists
+    // to close: neither half matches, so the credential passes through in two
+    // readable pieces. Cuts land on whitespace, so walking a key across the
+    // boundary region must never produce one.
+    /** @scenario "A credential straddling a slice boundary is still redacted" */
+    it("never splits a credential across two slices", () => {
+      const survived = [-40, -20, -1, 0, 1, 20, 40]
+        .map((offset) => {
+          const filler = "x ".repeat((250_000 + offset) / 2);
+          return `${filler}AKIAIOSFODNN7EXAMPLE tail`;
+        })
+        .filter((input) => redact(input).text.includes("AKIAIOSFODNN7EXAMPLE"));
+      expect(survived).toEqual([]);
+    });
+
+    // A PEM block spans newlines by design, so whitespace alone does not keep
+    // it whole; an unterminated BEGIN pulls its END into the same slice.
+    /** @scenario "A PEM block straddling a slice boundary is still redacted" */
+    it("keeps a PEM block whole across a boundary", () => {
+      const pem =
+        "-----BEGIN PRIVATE KEY-----\n" +
+        "MIIEvQIBADANBgkqh\n".repeat(40) +
+        "-----END PRIVATE KEY-----";
+      const input = `${"z ".repeat(124_995)}${pem} tail`;
+      expect(redact(input).text).not.toContain("MIIEvQIBADANBgkqh");
+    });
   });
 
   describe("given a modern base64url provider key", () => {
@@ -689,6 +716,94 @@ describe("overBroadSecretPatternProbe", () => {
       expect(overBroadSecretPatternProbe("(?<=the )user")).toBe(
         "the user asked the agent to summarise the meeting notes",
       );
+    });
+  });
+});
+
+describe("isSensitiveAttributeKey, given a camelCase name", () => {
+  // The separator-only rule was blind to every camelCase and PascalCase name,
+  // which is most of them in a JSON payload. `SecretString` is AWS Secrets
+  // Manager's own field for the secret itself.
+  describe("when the name says it holds a credential", () => {
+    /** @scenario "A camelCase credential name is recognised" */
+    it("recognises it", () => {
+      const missed = [
+        "signingSecret",
+        "bearerToken",
+        "webhookSecret",
+        "masterKey",
+        "encryptionKey",
+        "SecretAccessKey",
+        "AccessKeyId",
+        "SecretString",
+        "SecretBinary",
+        "AuthorizationToken",
+        "PasswordHash",
+        "verificationToken",
+        "rootPassword",
+        "credentialsJson",
+      ].filter((name) => !isSensitiveAttributeKey(name));
+      expect(missed).toEqual([]);
+    });
+  });
+
+  describe("when the name merely contains key or token", () => {
+    // Bare `key` and `token` are far more often an id or a count, so they need
+    // a qualifying word in front before they name a credential.
+    /** @scenario "An ordinary name containing key or token is not a credential" */
+    it("leaves it alone", () => {
+      const fired = [
+        "idempotency_key",
+        "partition_key",
+        "cacheKey",
+        "sortKey",
+        "primaryKey",
+        "gen_ai.usage.input_tokens",
+        "tokenCount",
+        "keyboardLayout",
+      ].filter((name) => isSensitiveAttributeKey(name));
+      expect(fired).toEqual([]);
+    });
+  });
+});
+
+describe("redactSecretsInText, given a whitespace separator", () => {
+  describe("when the value looks like key material", () => {
+    /** @scenario "A credential after a whitespace separator is redacted" */
+    it("redacts it", () => {
+      expect(redact(`Authorization ${BODY.slice(0, 30)}`).redactedCount).toBe(1);
+      expect(redact(`api key ${HEX}`).text).toBe("api key [SECRET]");
+    });
+  });
+
+  describe("when the words after it are ordinary prose", () => {
+    // Accepting whitespace on the same terms as `:` matched thousands of prose
+    // spans on a real corpus. The value has to look like key material itself.
+    /** @scenario "Prose following a credential word is left alone" */
+    it("leaves the sentence intact", () => {
+      const prose = [
+        "a bare digest of an API key is offline-checkable against a list",
+        "the Authorization header is attacker-controlled and can be killed",
+        "the secret sauce here is careful measurement of everything",
+        "your password should be long and memorable and never reused",
+      ];
+      const mangled = prose.filter((line) => redact(line).text !== line);
+      expect(mangled).toEqual([]);
+    });
+  });
+
+  describe("when the payload carries a JSON-escaped newline", () => {
+    // Span content arrives JSON-encoded, so a literal two-character `\n` sits
+    // in the text. A value running through one crossed logical lines and got
+    // past the `$VAR` and code-expression guards.
+    /** @scenario "A JSON-escaped newline does not extend a credential value" */
+    it("stops the value at the escape, as it does at a real newline", () => {
+      const escaped = String.raw`api_key = $OPENAI_API_KEY
+next line here`;
+      expect(redact(escaped).text).toBe(escaped);
+      const terraform =
+        "github_token_secret = local.github_token_secret_name";
+      expect(redact(terraform).text).toBe(terraform);
     });
   });
 });

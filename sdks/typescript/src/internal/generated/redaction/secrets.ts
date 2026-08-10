@@ -418,6 +418,37 @@ function isCredentialValue(value: string): boolean {
   return shannonEntropyBits(value) >= CONTEXT_VALUE_MIN_ENTROPY;
 }
 
+/** A dotted or dashed version string, which follows a keyword often enough. */
+const VERSION_STRING_REGEX = /^v?\d+(?:[._-]\d+)+/;
+
+const LOOSE_VALUE_MIN_LENGTH = 20;
+const LOOSE_VALUE_MIN_ENTROPY = 3.4;
+
+/**
+ * The bar a value has to clear when the separator was only whitespace.
+ *
+ * `key: <value>` is a statement about the value; `key <value>` is usually a
+ * sentence. Accepting the loose separator on the same terms as the strict one
+ * matched 5,816 further spans across 309 distinct shapes on a real corpus, and
+ * most of them were prose. Requiring the value to look like key material in its
+ * own right, rather than merely following a credential word, brings that to 338
+ * spans over 19 shapes at roughly 87% precision.
+ *
+ * "Looks like key material" is deliberately narrow: a long hex or base32 run,
+ * or a mixed body carrying both digits and same-case letters. An English word
+ * clears none of them.
+ */
+function isKeyMaterial(value: string): boolean {
+  if (value.length < LOOSE_VALUE_MIN_LENGTH) return false;
+  if (!isCredentialValue(value)) return false;
+  if (VERSION_STRING_REGEX.test(value)) return false;
+  if (shannonEntropyBits(value) < LOOSE_VALUE_MIN_ENTROPY) return false;
+  if (/^[0-9a-f]{32,}$/i.test(value)) return true;
+  if (/^[A-Z2-7]{32,}={0,6}$/.test(value)) return true;
+  const { lower, upper, digit } = countCharClasses(value);
+  return digit >= 2 && (lower >= 2 || upper >= 2);
+}
+
 /**
  * Words that introduce a credential, allowing the compound spellings that show
  * up in prose, environment files and JSON alike (`api key`, `API_KEY`,
@@ -578,19 +609,35 @@ const VALUE_RULES: ValueRule[] = [
     // One capture for everything that introduces the value, one for the value
     // itself, so the replacement puts the sentence back and swaps only the
     // credential.
-    // The separator is `:` or `=` only. `key is <value>` was accepted too, and
-    // across a 236 MB corpus of real traces it caught zero credentials while
-    // being the sole source of English-prose redactions: "a bare digest of an
-    // API key is offline-checkable" lost the words after "key is", and so did
-    // "the Authorization header is attacker-controlled". A cue that only ever
-    // fires on prose is not a cue.
+    // `key is <value>` was accepted as a separator too, and across a 236 MB
+    // corpus of real traces it caught zero credentials while being the sole
+    // source of English-prose redactions: "a bare digest of an API key is
+    // offline-checkable" lost the words after "key is". A cue that only ever
+    // fires on prose is not a cue, so the strict separator is `:` or `=`.
+    //
+    // A whitespace separator is accepted on a HIGHER bar instead of not at
+    // all, because `Authorization <token>` and `key <token>` do carry real
+    // credentials. Ungated it matched 5,816 further spans over 309 shapes,
+    // mostly prose; gated on the value looking like key material in its own
+    // right it matches 338 over 19 at roughly 87% precision.
+    //
+    // The value class excludes backslash. Span content arrives JSON-encoded,
+    // so a literal two-character `\n` sits inside the text; letting a value run
+    // through one carried it across logical lines and past the `$VAR` and
+    // code-expression guards, which is why `api_key = $OPENAI_API_KEY` was kept
+    // with a real newline and redacted with an escaped one.
     regex: new RegExp(
       `((?:^|[\\W_])(?:${CREDENTIAL_KEYWORD})(?:\\s+[A-Za-z]{1,8}){0,2}["'\`]?` +
-        `\\s*[:=]{1,2}\\s*["'\`]?)` +
-        `([^\\s"'\`,;<>(){}\\[\\]]{${CONTEXT_VALUE_MIN_LENGTH},})`,
+        `(?:\\s*[:=]{1,2}\\s*|[ \\t?-]+)["'\`]?)` +
+        `([^\\s"'\`,;<>(){}\\[\\]\\\\]{${CONTEXT_VALUE_MIN_LENGTH},})`,
       "gi",
     ),
-    accept: (groups) => isCredentialValue(groups[2] ?? ""),
+    accept: (groups) => {
+      const introduction = groups[1] ?? "";
+      const value = groups[2] ?? "";
+      const strict = /[:=]\s*["'`]?$/.test(introduction);
+      return strict ? isCredentialValue(value) : isKeyMaterial(value);
+    },
     render: (_m, introduction) => `${introduction}${REPLACEMENT}`,
   },
 ];
@@ -609,8 +656,81 @@ export const BUILTIN_SECRET_RULES: readonly {
 const SENSITIVE_KEY_REGEX =
   /(?:^|[._-])(?:password|passwd|pwd|secret|api[_-]?key|apikey|access[_-]?token|auth[_-]?token|authorization|auth|bearer|credentials?|private[_-]?key|client[_-]?secret|db[_-]?password|connection[_-]?string|session[_-]?token|refresh[_-]?token|set[_-]?cookie|cookie|x-api-key)(?:$|[._-])/i;
 
+/**
+ * Nouns that name a credential on their own, whatever sits beside them.
+ * `key` and `token` are deliberately absent: bare, they are far more often an
+ * `idempotency_key`, a `partition_key` or a count of `input_tokens`.
+ */
+const CREDENTIAL_NOUNS = new Set([
+  "password",
+  "passwd",
+  "pwd",
+  "secret",
+  "authorization",
+  "auth",
+  "bearer",
+  "credential",
+  "credentials",
+  "cookie",
+]);
+
+/**
+ * Words that turn a bare `key` or `token` into a credential. Without one,
+ * `key` and `token` stay ordinary: this is what separates `encryptionKey` and
+ * `AccessKeyId` from `idempotency_key` and `cacheKey`.
+ */
+const CREDENTIAL_QUALIFIERS = new Set([
+  "master",
+  "encryption",
+  "signing",
+  "private",
+  "access",
+  "api",
+  "auth",
+  "secret",
+  "refresh",
+  "session",
+  "bearer",
+  "verification",
+  "webhook",
+  "client",
+  "service",
+  "personal",
+  "root",
+  "admin",
+]);
+
+/**
+ * Split an attribute name into words, on separators AND on CamelCase
+ * boundaries.
+ *
+ * The separator-only rule this backs was blind to every camelCase and
+ * PascalCase name, which is most of them in a JSON payload: `signingSecret`,
+ * `bearerToken`, `SecretAccessKey` and AWS Secrets Manager's own `SecretString`
+ * all read as one opaque word and none of them fired.
+ */
+function tokenizeAttributeName(name: string): string[] {
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
+    .map((token) => token.toLowerCase());
+}
+
+/** Does this name say, in any of its words, that it holds a credential? */
+function namesACredential(name: string): boolean {
+  const tokens = tokenizeAttributeName(name);
+  return tokens.some((token, index) => {
+    if (CREDENTIAL_NOUNS.has(token)) return true;
+    if (token !== "key" && token !== "token") return false;
+    const previous = tokens[index - 1];
+    return previous !== undefined && CREDENTIAL_QUALIFIERS.has(previous);
+  });
+}
+
 export function isSensitiveAttributeKey(key: string): boolean {
-  return SENSITIVE_KEY_REGEX.test(key);
+  return SENSITIVE_KEY_REGEX.test(key) || namesACredential(key);
 }
 
 /**
@@ -783,16 +903,50 @@ function sliceForScan(text: string): string[] {
   const slices: string[] = [];
   let start = 0;
   while (start < text.length) {
-    let end = Math.min(start + MAX_SCAN_LENGTH, text.length);
-    if (end < text.length) {
-      const newline = text.lastIndexOf("\n", end);
-      if (newline > start + MAX_SCAN_LENGTH / 2) end = newline;
-    }
+    const end = sliceEndAfter(text, start);
     slices.push(text.slice(start, end));
     start = end;
   }
   return slices;
 }
+
+/**
+ * Where the slice starting at `start` may end WITHOUT splitting a credential.
+ *
+ * A boundary that lands mid-token is the same leak this slicing exists to
+ * close: neither half matches any rule, so the credential passes through in two
+ * readable pieces. Every cut therefore lands on whitespace, which no
+ * single-line credential contains, and if the window holds no whitespace at all
+ * the cut moves forward to the next one rather than falling inside the run.
+ *
+ * A PEM block is the exception that whitespace alone does not cover, since it
+ * spans newlines by design. An unterminated `-----BEGIN` pulls its `-----END`
+ * into the same slice.
+ */
+function sliceEndAfter(text: string, start: number): number {
+  const target = Math.min(start + MAX_SCAN_LENGTH, text.length);
+  if (target >= text.length) return text.length;
+
+  let end = target;
+  const lastSpace = text.slice(start, target).search(/\s(?=\S*$)/);
+  if (lastSpace > 0) {
+    end = start + lastSpace;
+  } else {
+    // The whole window is one unbroken run; do not cut into it.
+    const next = text.slice(target).search(/\s/);
+    end = next === -1 ? text.length : target + next;
+  }
+
+  const begin = text.lastIndexOf(PEM_BEGIN, end);
+  if (begin >= start && text.indexOf(PEM_END, begin) >= end) {
+    const close = text.indexOf(PEM_END, begin);
+    end = close === -1 ? text.length : close + PEM_END.length;
+  }
+  return end;
+}
+
+const PEM_BEGIN = "-----BEGIN";
+const PEM_END = "-----END";
 
 export function redactSecretsInText({
   text,
