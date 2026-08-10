@@ -50,6 +50,18 @@ vi.mock("~/server/mailer/inviteEmail", () => ({
   sendInviteEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
+// Pin the email-provider configuration so `emailNotSent` reads the same on
+// every machine. The service skips delivery outright when no provider key is
+// configured, so without this the flag reports the runner's environment rather
+// than the outcome of the send.
+vi.mock("../../../../env.mjs", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../../../../env.mjs")>();
+  return {
+    ...original,
+    env: { ...original.env, SENDGRID_API_KEY: "test-sendgrid-key" },
+  };
+});
+
 import { app } from "../[[...route]]/app";
 
 describe("Feature: Organization members and invites REST API", () => {

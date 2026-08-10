@@ -18,14 +18,13 @@ import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-
-import { UNPUBLISHED } from "../openapi-route-exclusions";
 import {
   apiBasePathsOf,
   collectRouteRegistrations,
   honoPathToTemplate,
   joinRoutePath,
 } from "../lib/hono-route-table";
+import { UNPUBLISHED } from "../openapi-route-exclusions";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LANGWATCH_ROOT = resolve(__dirname, "../..");
