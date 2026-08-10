@@ -145,41 +145,47 @@ describe("EventRepositoryClickHouse read projections", () => {
     upToEventId: "evt",
   };
 
-  describe("when any of the three reads runs", () => {
-    it("projects every column the record mapper reads", async () => {
-      const client = createMockClient({});
-      const repository = new EventRepositoryClickHouse(async () => client);
+  describe("given the three reads that rehydrate an event record", () => {
+    describe("when any of them runs", () => {
+      it("projects every column the record mapper reads", async () => {
+        const client = createMockClient({});
+        const repository = new EventRepositoryClickHouse(async () => client);
 
-      await repository.getEventRecords("tenant", "trace", "id");
-      await repository.getEventRecordsUpTo(upToRequest);
-      await repository.getEventRecordsUpToPaged({
-        ...upToRequest,
-        after: undefined,
-        limit: 10,
+        await repository.getEventRecords("tenant", "trace", "id");
+        await repository.getEventRecordsUpTo(upToRequest);
+        await repository.getEventRecordsUpToPaged({
+          ...upToRequest,
+          after: undefined,
+          limit: 10,
+        });
+
+        for (let call = 0; call < 3; call++) {
+          expect(queryOf({ client, call })).toContain(EVENT_LOG_SELECT_COLUMNS);
+        }
       });
-
-      for (let call = 0; call < 3; call++) {
-        expect(queryOf({ client, call })).toContain(EVENT_LOG_SELECT_COLUMNS);
-      }
     });
-  });
 
-  describe("when a stored event carries a version", () => {
-    it("keeps the version on the record every read returns", async () => {
-      const client = createMockClient({});
-      const repository = new EventRepositoryClickHouse(async () => client);
+    describe("when a stored event carries a version", () => {
+      it("keeps the version on the record every read returns", async () => {
+        const client = createMockClient({});
+        const repository = new EventRepositoryClickHouse(async () => client);
 
-      const [plain] = await repository.getEventRecords("tenant", "trace", "id");
-      const [upTo] = await repository.getEventRecordsUpTo(upToRequest);
-      const [paged] = await repository.getEventRecordsUpToPaged({
-        ...upToRequest,
-        after: undefined,
-        limit: 10,
+        const [plain] = await repository.getEventRecords(
+          "tenant",
+          "trace",
+          "id",
+        );
+        const [upTo] = await repository.getEventRecordsUpTo(upToRequest);
+        const [paged] = await repository.getEventRecordsUpToPaged({
+          ...upToRequest,
+          after: undefined,
+          limit: 10,
+        });
+
+        expect(plain?.EventVersion).toBe("2025-12-14");
+        expect(upTo?.EventVersion).toBe("2025-12-14");
+        expect(paged?.EventVersion).toBe("2025-12-14");
       });
-
-      expect(plain?.EventVersion).toBe("2025-12-14");
-      expect(upTo?.EventVersion).toBe("2025-12-14");
-      expect(paged?.EventVersion).toBe("2025-12-14");
     });
   });
 });
