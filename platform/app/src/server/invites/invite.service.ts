@@ -66,7 +66,6 @@ import { createLogger } from "@langwatch/observability";
 import { TeamUserRole } from "@prisma/client";
 import { env } from "~/env.mjs";
 import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
-import type { Session } from "~/server/auth";
 import { getApp } from "../app-layer/app";
 import type {
   PlanProvider,

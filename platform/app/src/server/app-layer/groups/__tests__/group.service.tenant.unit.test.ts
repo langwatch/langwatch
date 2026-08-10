@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import type { RoleService } from "~/server/role";
-import { UserNotInOrganizationError } from "../errors";
 import { GroupRestService } from "../group.service";
 import type { GroupRepository } from "../repositories/group.repository";
 
