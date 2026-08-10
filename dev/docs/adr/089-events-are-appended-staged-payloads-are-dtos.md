@@ -8,7 +8,7 @@
 
 ## Context
 
-The event-sourcing layer had exactly one noun for a versioned, typed payload: `Event`. The log stores events. Projections fold events. Process managers consume events. And the routing seam's `stage` hook was typed to return events — so anything a subscriber needed carried on its queue had to wear the `Event` brand, whether or not it would ever reach the log.
+The event-sourcing layer had exactly one noun for a versioned, typed payload: `Event`. The log stores events. Projections fold events. Process managers consume events. And the routing seam's `stage` hook was typed to return events — so anything a subscriber needed to carry on its queue had to wear the `Event` brand, even when it would never reach the log.
 
 The codebase paid for that missing distinction for three generations. Reactors consumed events non-durably and were retired. ADR-069's claim-check, `span_referenced`, was a "valid Event brand" that its own docblock had to disclaim: *"never appended to the event log"* — and to keep the type system honest, a parallel registry had to be invented for it (`TRACE_PROCESSING_STAGING_EVENT_TYPES`, "staging-only brands … registered solely so a `stage` hook can return them as well-typed Events"). The bounded-derivation work then added `span_facts_lifted` to the same class, with the same disclaiming docblock.
 
@@ -27,8 +27,10 @@ Deliberately **no `EnvelopeSchema`**. A shared base class for staged payloads wa
 The consumers of the log, exhaustively:
 
 - **projection** (fold / map / postgres) — a pure function of the log; replayable; version-gated (ADR-066).
-- **process manager** — consumes events, issues commands through the durable outbox; not replayed.
-- **eventsub** — at-least-once queue consumer for side effects; not replayed; everything it is handed beyond the event itself is a staged payload.
+- **process manager** — consumes events, issues commands through the durable outbox; not replayed from `event_log`.
+- **eventsub** — at-least-once queue consumer for side effects; not replayed from `event_log`; everything it is handed beyond the event itself is a staged payload.
+
+"Not replayed" throughout this ADR means *not re-driven from `event_log`*. It is not a claim that a handler runs once: eventsub is at-least-once, so queue redelivery and retries remain ordinary, which is why a durable record like `span_facts_contributed` is idempotency-keyed. Nor does Redis persistence make a staged payload a replay source — a redelivered job is the same hop happening again, not history being re-read.
 
 The rule: **a type extends `EventSchema` if and only if it is appended to `event_log`.** Where a `stage` hook swaps an event for a staged payload, the seam is typed as that union explicitly — there is no registry that launders payloads into events.
 
