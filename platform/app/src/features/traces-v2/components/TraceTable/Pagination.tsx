@@ -1,8 +1,9 @@
-import { Button, Flex, IconButton, Skeleton, Text } from "@chakra-ui/react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import type React from "react";
+import { Pagination as PaginationBar } from "~/components/ui/Pagination";
+import { TRACE_LIST_MAX_OFFSET_ROWS } from "~/shared/traces/listWindow";
 import type { PageCursor } from "../../stores/filterStore";
 import { useFilterStore } from "../../stores/filterStore";
+import { useViewStore } from "../../stores/viewStore";
 import { useTraceTableScrollElement } from "./scrollContext";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250, 500, 1000] as const;
@@ -15,12 +16,11 @@ interface PaginationProps {
   /** What one row is, for the totals copy: "traces" (default) or "sessions". */
   itemNoun?: string;
   /**
-   * Renders a placeholder bar in place of the rows-per-page selector +
-   * "Page X of Y" copy while data is loading, so the pagination row
-   * doesn't pop in when the first page resolves. Back/forward arrows
-   * keep rendering — their disabled state doesn't change between
-   * loading and loaded for the initial page, and they anchor the
-   * visual end of the row.
+   * Renders a placeholder bar in place of the page description while data is
+   * loading, so the pagination row doesn't pop in when the first page
+   * resolves. The pager keeps rendering; its disabled state doesn't change
+   * between loading and loaded for the initial page, and it anchors the row's
+   * height.
    */
   isLoading?: boolean;
   /** Prevent page-racing only while a different page key is replacing data. */
@@ -34,32 +34,38 @@ interface PaginationProps {
   maxPageSize?: number;
 }
 
-const PageSizeSelector: React.FC<{
-  options: readonly number[];
-  selected: number;
-  onSelect: (size: number) => void;
-}> = ({ options, selected, onSelect }) => (
-  <Flex align="center" gap={0.5}>
-    <Text textStyle="xs" color="fg.subtle" flexShrink={0}>
-      Rows
-    </Text>
-    {options.map((size) => (
-      <Button
-        key={size}
-        variant="ghost"
-        size="2xs"
-        color={selected === size ? "fg" : "fg.subtle"}
-        fontWeight={selected === size ? "semibold" : "normal"}
-        onClick={() => onSelect(size)}
-        paddingX={1.5}
-        minWidth="auto"
-      >
-        {size}
-      </Button>
-    ))}
-  </Flex>
-);
+/**
+ * Which page numbers the sessions lens can open. `tracesV2.sessions` reads by
+ * cursor alone, so a page is reachable only once something has handed us the
+ * cursor that enters it: the first batch, any batch already walked, the one on
+ * screen, and the one the current batch's cursor points at.
+ */
+function reachableWithCursorsOnly({
+  page,
+  currentPage,
+  pageCursors,
+  nextCursor,
+}: {
+  page: number;
+  currentPage: number;
+  pageCursors: Record<number, PageCursor | null>;
+  nextCursor: PageCursor | null;
+}): boolean {
+  if (page === 1 || page === currentPage) return true;
+  if (pageCursors[page] !== undefined) return true;
+  return page === currentPage + 1 && nextCursor !== null;
+}
 
+/**
+ * Store-driven pagination for the trace table: translates the filter store's
+ * page state into the shared bar's props, one translation per lens.
+ *
+ * The flat lens's endpoint falls back to an offset read when no cursor is
+ * passed, so every page number is jumpable; the cursor is still used for the
+ * one step the current batch already knows about, which keeps sequential
+ * paging keyset-fast. The sessions lens has no offset path at all, so it
+ * offers only the pages a cursor can reach.
+ */
 export const Pagination: React.FC<PaginationProps> = ({
   totalHits,
   nextCursor = null,
@@ -71,9 +77,11 @@ export const Pagination: React.FC<PaginationProps> = ({
 }) => {
   const page = useFilterStore((s) => s.page);
   const pageSize = useFilterStore((s) => s.pageSize);
+  const pageCursors = useFilterStore((s) => s.pageCursors);
   const setPage = useFilterStore((s) => s.setPage);
   const setPageCursor = useFilterStore((s) => s.setPageCursor);
   const setPageSize = useFilterStore((s) => s.setPageSize);
+  const cursorOnly = useViewStore((s) => s.grouping) === "by-conversation";
   const scrollElement = useTraceTableScrollElement();
 
   // The size the data source actually pages by, which is what the range
@@ -85,77 +93,59 @@ export const Pagination: React.FC<PaginationProps> = ({
       ? PAGE_SIZE_OPTIONS.filter((size) => size <= maxPageSize)
       : PAGE_SIZE_OPTIONS;
 
-  const safePage = Math.max(page, 1);
-  const rangeStart = (safePage - 1) * effectivePageSize + 1;
-  const rangeEnd = rangeStart + Math.max(visibleCount - 1, 0);
+  const currentPage = Math.max(page, 1);
   // A background refresh of the CURRENT page must not lock navigation. On a
   // busy live project SSE can keep `isFetching` true almost continuously;
-  // disabling Next for that signal made pagination appear broken. Only a key
-  // transition (React Query is showing previous-page data) is a page lock.
+  // disabling the pager for that signal made pagination appear broken. Only a
+  // key transition (React Query is showing previous-page data) is a page lock.
   const busy = isLoading || isTransitioning;
 
-  const goToPrevious = () => {
-    if (busy) return;
-    setPage(Math.max(safePage - 1, 1));
+  const goToPage = (nextPage: number) => {
+    if (busy || nextPage === currentPage) return;
+    // The batch on screen already carries the cursor that enters the one after
+    // it, so a step forward stays on the keyset path; every other jump reads
+    // by position.
+    if (nextPage === currentPage + 1 && nextCursor) {
+      setPageCursor({ page: nextPage, cursor: nextCursor });
+    }
+    setPage(nextPage);
     scrollElement?.scrollTo({ top: 0, behavior: "auto" });
   };
-
-  const goToNext = () => {
-    if (busy || !nextCursor) return;
-    setPageCursor({ page: safePage + 1, cursor: nextCursor });
-    setPage(safePage + 1);
-    scrollElement?.scrollTo({ top: 0, behavior: "auto" });
-  };
-
-  if (!isLoading && totalHits === 0) return null;
 
   return (
-    <Flex
-      align="center"
-      justify="flex-end"
-      gap={3}
-      paddingX={2}
-      paddingY={1.5}
-      borderTopWidth="1px"
-      borderColor="border.muted"
-      bg="bg.surface"
-      flexShrink={0}
-    >
-      {isLoading ? (
-        <Skeleton height="14px" width="240px" borderRadius="sm" />
-      ) : (
-        <>
-          <PageSizeSelector
-            options={sizeOptions}
-            selected={effectivePageSize}
-            onSelect={setPageSize}
-          />
-          <Text textStyle="xs" color="fg.subtle">
-            {totalHits.toLocaleString()} {itemNoun} · showing {rangeStart}–
-            {rangeEnd}
-          </Text>
-        </>
-      )}
-      <Flex gap={1}>
-        <IconButton
-          aria-label="Previous page"
-          variant="ghost"
-          size="xs"
-          disabled={busy || safePage <= 1}
-          onClick={goToPrevious}
-        >
-          <ChevronLeft size={12} />
-        </IconButton>
-        <IconButton
-          aria-label="Next page"
-          variant="ghost"
-          size="xs"
-          disabled={busy || !nextCursor}
-          onClick={goToNext}
-        >
-          <ChevronRight size={12} />
-        </IconButton>
-      </Flex>
-    </Flex>
+    <PaginationBar
+      page={currentPage}
+      pageSize={effectivePageSize}
+      totalCount={totalHits}
+      unitLabel={itemNoun}
+      visibleCount={visibleCount}
+      pageSizeOptions={sizeOptions}
+      isLoading={isLoading}
+      navDisabled={isTransitioning}
+      canGoNext={cursorOnly ? nextCursor !== null : undefined}
+      isPageReachable={
+        cursorOnly
+          ? (candidate) =>
+              reachableWithCursorsOnly({
+                page: candidate,
+                currentPage,
+                pageCursors,
+                nextCursor,
+              })
+          : // A numbered jump reads by position, and the server refuses
+            // position reads past the window. Deeper pages stay reachable the
+            // way the sessions lens reaches everything: with a cursor.
+            (candidate) =>
+              candidate * effectivePageSize <= TRACE_LIST_MAX_OFFSET_ROWS ||
+              reachableWithCursorsOnly({
+                page: candidate,
+                currentPage,
+                pageCursors,
+                nextCursor,
+              })
+      }
+      onPageChange={goToPage}
+      onPageSizeChange={setPageSize}
+    />
   );
 };

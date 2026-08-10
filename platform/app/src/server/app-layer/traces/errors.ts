@@ -133,6 +133,25 @@ export class TimeRangeTooWideError extends HandledError {
   }
 }
 
+export class PageTooDeepError extends HandledError {
+  declare readonly code: "page_too_deep";
+
+  constructor(maxRows: number) {
+    const base = remediation("page_too_deep");
+    super(
+      "page_too_deep",
+      `Pages past the first ${maxRows} rows cannot be opened by number. Narrow the range, or page forward.`,
+      {
+        httpStatus: 422,
+        meta: { maxRows },
+        ...(base.tips ? { tips: base.tips } : {}),
+        ...(base.docsUrl ? { docsUrl: base.docsUrl } : {}),
+      },
+    );
+    this.name = "PageTooDeepError";
+  }
+}
+
 export class ClickHouseUnavailableError extends HandledError {
   declare readonly code: "clickhouse_unavailable";
 

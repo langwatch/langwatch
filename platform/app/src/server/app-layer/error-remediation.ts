@@ -75,6 +75,12 @@ const registry = {
   time_range_too_wide: {
     tips: ["Query in smaller windows and paginate through the results"],
   },
+  page_too_deep: {
+    tips: [
+      "Narrow the time range or filters so the page falls inside the window",
+      "Walk forward page by page, which has no depth limit",
+    ],
+  },
   clickhouse_unavailable: {
     tips: [
       "This is a temporary platform issue — retry in a few seconds",

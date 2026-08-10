@@ -1,18 +1,17 @@
 import {
-  Badge,
   Box,
+  Button,
   Heading,
   HStack,
   Skeleton,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ExternalLink } from "lucide-react";
 import numeral from "numeral";
 import type React from "react";
 
+import { GitHub } from "~/components/icons/GitHub";
 import { Drawer } from "~/components/ui/drawer";
-import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
 import { CostBreakdownTooltipContent } from "~/features/traces-v2/components/shared/CostBreakdownTooltip";
 import {
@@ -21,7 +20,7 @@ import {
 } from "~/features/traces-v2/utils/formatters";
 import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
-
+import { PullRequestStatusBadge } from "./PullRequestStatusBadge";
 import { ContributorsSection } from "./pullRequestDetail/ContributorsSection";
 import {
   type DetailPayload,
@@ -29,6 +28,7 @@ import {
 } from "./pullRequestDetail/detailPayload";
 import { ModelsSection } from "./pullRequestDetail/ModelsSection";
 import { SessionsSection } from "./pullRequestDetail/SessionsSection";
+import { derivePullRequestStatus } from "./pullRequestStatus";
 import { formatShortDate } from "./shortDate";
 
 /**
@@ -45,22 +45,6 @@ import { formatShortDate } from "./shortDate";
  *
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
-
-type PullRequestStatus = "open" | "draft" | "merged" | "closed";
-
-const STATUS_LABELS: Record<PullRequestStatus, string> = {
-  open: "Open",
-  draft: "Draft",
-  merged: "Merged",
-  closed: "Closed",
-};
-
-const STATUS_PALETTES: Record<PullRequestStatus, string> = {
-  open: "green",
-  draft: "gray",
-  merged: "orange",
-  closed: "red",
-};
 
 export interface PullRequestDetailDrawerProps {
   projectId: string;
@@ -100,42 +84,49 @@ export function PullRequestDetailDrawer({
     >
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <VStack align="start" gap={1} width="full">
-            <HStack gap={2}>
-              <Text fontSize="sm" fontFamily="mono" color="fg.muted">
-                #{number}
-              </Text>
-              {detail ? (
-                <Badge
-                  size="sm"
-                  colorPalette={STATUS_PALETTES[statusOf(detail.pullRequest)]}
-                >
-                  {STATUS_LABELS[statusOf(detail.pullRequest)]}
-                </Badge>
-              ) : null}
-            </HStack>
-            <Heading size="md">
-              {detail?.pullRequest.title || repositoryFullName}
-            </Heading>
-            <HStack gap={3}>
+          <HStack align="start" width="full" gap={3}>
+            <VStack align="start" gap={1} flex={1} minWidth={0}>
+              <HStack gap={2}>
+                <Text fontSize="sm" fontFamily="mono" color="fg.muted">
+                  #{number}
+                </Text>
+                {detail ? (
+                  <PullRequestStatusBadge
+                    status={derivePullRequestStatus({
+                      state: detail.pullRequest.state,
+                      isDraft: detail.pullRequest.isDraft,
+                      prMergedAtMs: detail.pullRequest.prMergedAtMs,
+                    })}
+                    source="payload"
+                  />
+                ) : null}
+              </HStack>
+              <Heading size="md">
+                {detail?.pullRequest.title || repositoryFullName}
+              </Heading>
               <Text fontSize="xs" fontFamily="mono" color="fg.subtle">
                 {repositoryFullName}
               </Text>
-              {detail ? (
-                <Link
+            </VStack>
+            {detail ? (
+              <Button
+                asChild
+                flexShrink={0}
+                bg={{ base: "gray.900", _dark: "gray.100" }}
+                color={{ base: "white", _dark: "gray.900" }}
+                _hover={{ bg: { base: "gray.800", _dark: "gray.200" } }}
+              >
+                <a
                   href={detail.pullRequest.htmlUrl}
-                  isExternal
-                  color="blue.fg"
-                  fontSize="xs"
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
-                  <HStack gap={1}>
-                    <Text>Open on GitHub</Text>
-                    <ExternalLink size={12} />
-                  </HStack>
-                </Link>
-              ) : null}
-            </HStack>
-          </VStack>
+                  <GitHub size={16} />
+                  Open on GitHub
+                </a>
+              </Button>
+            ) : null}
+          </HStack>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
@@ -161,16 +152,6 @@ export function PullRequestDetailDrawer({
       </Drawer.Content>
     </Drawer.Root>
   );
-}
-
-/** The stored snapshot's own reading of where the pull request stands. */
-function statusOf(
-  pullRequest: DetailPayload["pullRequest"],
-): PullRequestStatus {
-  if (pullRequest.prMergedAtMs !== null) return "merged";
-  if (pullRequest.prClosedAtMs !== null) return "closed";
-  if (pullRequest.isDraft) return "draft";
-  return "open";
 }
 
 const Stat: React.FC<{ label: string; children: React.ReactNode }> = ({

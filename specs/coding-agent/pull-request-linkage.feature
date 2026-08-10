@@ -13,6 +13,9 @@
 #   platform/app/src/pages/me/pull-requests.tsx                                        (the personal Pull Requests page)
 #   platform/app/src/components/me/PullRequestsTable.tsx                               (the table)
 #   platform/app/src/components/me/PullRequestDetailDrawer.tsx                          (one pull request in full)
+#   platform/app/src/components/me/PullRequestStatusBadge.tsx                           (a status drawn the way GitHub draws it)
+#   platform/app/src/components/me/usePullRequestSort.ts                                (the table's order, and the way back to it)
+#   platform/app/src/components/me/AgentLabel.tsx                                       (an assistant named like its product)
 #
 # Related specs:
 #   specs/coding-agent/session-git-context.feature   , where the repo+branch identity comes from
@@ -171,6 +174,17 @@ Rule: The Pull Requests page prices each pull request's lifetime
     Given a session whose repository no installation covers
     When the Pull Requests page lists it
     Then an organization manager is offered to link that repository
+
+  # The row is where the reader notices the gap, so it is where the fix is
+  # offered: sending them to a settings page to find out what was missing puts
+  # the answer two navigations away from the question.
+  @integration
+  Scenario: An uncovered repository invites linking right on its row
+    Given a listed branch whose repository no installation covers
+    When an organization manager reads the row
+    Then the invitation to link that repository sits on the row itself
+    And a member without that permission finds it disabled, and is told to ask an administrator
+    And choosing the disabled invitation opens nothing
 
   @unit
   Scenario: One repository reported with two host spellings stays one repository
@@ -336,6 +350,53 @@ Rule: Each pull request reports what every model consumed
     When the per-model totals are read
     Then only the model calls contribute tokens
 
+  # The per-call totals and the session's own record of which models it ran are
+  # written by different carriers, so a session can have one and not the other.
+  # A row that plainly ran a model must never report that it ran none.
+
+  @unit
+  Scenario: A pull request reports its models even without per-call data
+    Given a pull request whose sessions recorded their models but logged no model calls
+    When the pull request usage is read
+    Then the row names those models
+    And the row reports no per-model tokens
+
+  @unit
+  Scenario: Per-call model data wins over the recorded names
+    Given a pull request whose sessions both recorded their models and logged model calls
+    When the pull request usage is read
+    Then the row reports each model's tokens rather than names alone
+
+  @integration
+  Scenario: The detail names the models even without per-call data
+    Given a pull request whose sessions recorded their models but logged no model calls
+    When the detail is opened
+    Then the models section names them instead of saying there is no model data
+
+  @unit
+  Scenario: A branch rollup carries the models its sessions ran
+    Given a branch with no pull request whose sessions recorded two models
+    When the personal usage is read
+    Then the branch rollup names both of them
+
+  @unit
+  Scenario: A branch whose sessions recorded no model reports none
+    Given a branch with no pull request whose sessions recorded no model
+    When the personal usage is read
+    Then the branch rollup names no model
+
+  @integration
+  Scenario: A branch row reports the models its sessions ran
+    Given a listed branch whose sessions ran two models
+    When the table is read
+    Then the row names the leading model and counts the rest
+
+  @unit
+  Scenario: A row with only model names sorts by them
+    Given rows whose models come from per-call totals and from recorded names
+    When the table is sorted by model
+    Then both kinds of row take their place by the model they name
+
 Rule: The pull request detail answers with facts and never with content
 
   @unit
@@ -350,6 +411,28 @@ Rule: The pull request detail answers with facts and never with content
     Given sessions with titles and transcripts
     When the pull request detail is read
     Then each session carries its start time, contributor, agent, tokens and cost only
+
+  # A reader knows their assistants by the names their makers gave them, not by
+  # the spelling that happened to arrive on the wire.
+  @integration
+  Scenario: The detail names each agent like its product, with its mark
+    Given a pull request worked on by two different assistants
+    When the detail lists them
+    Then each is named the way its own product is named
+    And each name carries that assistant's mark
+
+  @unit
+  Scenario: An agent slug resolves to its product name
+    Given the name an assistant reported for itself
+    When it is resolved for a reader
+    Then it reads as the product's own name rather than as the reported spelling
+
+  @integration
+  Scenario: The detail's GitHub button opens the pull request in a new tab
+    Given an open pull request detail
+    When its GitHub button is chosen
+    Then the pull request opens on GitHub in a new tab
+    And the detail stays where it was
 
 Rule: The Pull Requests table compares a row against the page it is on
 
@@ -432,6 +515,148 @@ Rule: The Pull Requests table compares a row against the page it is on
     Given a page of pull requests carrying comparisons
     When the keyboard focus lands on a numeric column
     Then that column's comparison opens
+
+Rule: The table reads a pull request's status the way GitHub writes it
+
+  # A reader arrives here from GitHub and goes straight back to it, so a status
+  # they already know by its color should not have to be learned twice. Merged
+  # is purple, open is green, closed is red and a draft is gray, the same four
+  # answers, drawn the same way, on both sides of the trip.
+
+  @integration
+  Scenario: A pull request's status carries GitHub's own color and mark
+    Given a merged, an open, a closed and a draft pull request
+    When the table shows their status
+    Then merged is purple and carries the merge mark
+    And open is green, closed is red and draft is gray
+    And each is drawn solid rather than as an outline
+
+  @unit
+  Scenario: The stored snapshot derives merged, closed, draft and open
+    Given stored pull requests that were merged, closed without merging, left in draft and left open
+    When each row's status is derived from what was stored
+    Then the merged one reads merged and the closed one reads closed
+    And the draft one reads draft and the last one reads open
+
+  # Waiting for GitHub to leave the whole column blank would make the page look
+  # broken for as long as the round trip takes, and the stored answer is right
+  # for almost every row almost all of the time.
+  @integration
+  Scenario: A status shows from the stored snapshot before GitHub answers, and the live answer takes over
+    Given a listed pull request whose live status has not arrived yet
+    When the table draws its status
+    Then the stored snapshot's status is shown straight away
+    And the live answer replaces it once GitHub responds
+
+  @integration
+  Scenario: A branch with no pull request says No PR yet in the status column
+    Given a listed branch with no pull request
+    When the table draws its status
+    Then the status column says No PR yet
+    And nothing about it reads as a pull request state
+
+  @integration
+  Scenario: The detail tells the same status story as the list
+    Given a listed pull request drawn with its status
+    When its detail is opened
+    Then the detail reports the same status, drawn the same way
+
+Rule: The table lists the most recently active work first
+
+  # "Last update" is our own answer rather than GitHub's: it is when the work
+  # this page prices last ran. A pull request nobody has pushed to in a week can
+  # still have had a session on it this morning, and that session is the reason
+  # the reader came.
+
+  @unit
+  Scenario: A pull request's last update is the latest session across every counted project
+    Given a pull request whose sessions ran in the viewer's own project and a teammate's
+    When the Pull Requests page lists it
+    Then its last update is the most recent of all of those sessions
+    And a session that started earlier but kept running later counts by when it last ran
+
+  @unit
+  Scenario: A branch's last update is the latest of its own sessions
+    Given a branch with no pull request whose sessions ran at different times
+    When the Pull Requests page lists it
+    Then its last update is the most recent of the viewer's own sessions on it
+    And a teammate's session elsewhere does not move it
+
+  @unit
+  Scenario: Rows order by their last update by default, pull requests and branches together
+    Given listed pull requests and branches with no pull request
+    When the table is first drawn
+    Then the rows read most recently updated first
+    And a branch takes its place among the pull requests rather than after them
+
+  @unit
+  Scenario: A recent update reads as time ago and an older one as a date
+    Given a row updated hours ago and a row updated months ago
+    When the table draws their last update
+    Then the recent one reads as how long ago it was
+    And the older one reads as its date
+
+Rule: Every column sorts, and sorting always has a way back
+
+  # A reader who cannot undo a sort has to guess which column the page opened
+  # on, so the third click is what makes trying the first one free.
+
+  @unit
+  Scenario: A numeric column sorts largest first on the first click
+    Given a page of rows carrying numbers
+    When a numeric column's heading is chosen
+    Then the largest value leads
+
+  @unit
+  Scenario: A text column sorts A to Z on the first click
+    Given a page of rows carrying names
+    When a text column's heading is chosen
+    Then the names read A to Z
+
+  @unit
+  Scenario: A second click flips the order and a third returns to the default
+    Given a column the reader has already sorted
+    When its heading is chosen twice more
+    Then the second choice reverses the order
+    And the third leaves the table in the order it opened in
+
+  @unit
+  Scenario: Status sorts by the stored snapshot and branches rank last
+    Given listed pull requests in different states and a branch with no pull request
+    When the status column is sorted
+    Then the pull requests order by the status that was stored for them
+    And the branch with no pull request comes last, whichever way the column is sorted
+
+  @integration
+  Scenario: Sorting is operable from the keyboard and announced to assistive readers
+    Given a page of pull requests
+    When the keyboard focus lands on a column heading
+    Then that column can be sorted without a pointer
+    And the column being sorted and the direction it is sorted in are both announced
+
+Rule: The list narrows by search and by period
+
+  @integration
+  Scenario: Search matches number, title, branch and repository regardless of case
+    Given listed rows differing in number, title, branch and repository
+    When a search term is typed in any casing
+    Then every row matching it on any of those four stays listed
+    And the rest leave the list
+
+  @integration
+  Scenario: A period keeps only rows whose last update falls inside it
+    Given rows last updated at different times
+    When a period is chosen
+    Then only the rows last updated inside it are listed
+
+  # The page prices whole pull request lifetimes, so opening it on a window
+  # would hide the long-lived ones and understate the ones it still showed.
+  @integration
+  Scenario: The period starts at all time and can return to it
+    Given the Pull Requests page as it first opens
+    When the period is read
+    Then it covers all time
+    And a narrower period can be widened back to all time
 
 Rule: The organization-wide usage read is RBAC-scoped and numbers only
 

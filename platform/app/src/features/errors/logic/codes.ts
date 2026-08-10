@@ -181,6 +181,7 @@ export const APP_ERROR_CODES = [
   "organization_not_found",
   "organization_not_found_for_team",
   "organization_slug_taken",
+  "page_too_deep",
   "personal_project_key_required",
   "personal_usage_key_mismatch",
   "personal_workspace_not_managed_here",
