@@ -224,6 +224,7 @@ function mappedRow(over: Record<string, unknown> & CostOverrides = {}) {
     cacheCreationTokens: 4_000,
     totalTokens: 10_000,
     modelBreakdown: [],
+    modelNames: [],
     contributorsSummary: [],
     ...over,
     ...costSplit({ over, defaultCostUsd: 12.5 }),
@@ -239,6 +240,7 @@ function unlinkedRow(over: Record<string, unknown> & CostOverrides = {}) {
     lastActivityAtMs: LONG_AGO,
     sessionsCount: 3,
     totalTokens: 1_240_000,
+    modelNames: [],
     repoCovered: false,
     ...over,
     ...costSplit({ over, defaultCostUsd: 4.25 }),
@@ -688,6 +690,23 @@ describe("the personal Pull Requests table", () => {
       // No badge at all: an absent pull request has no state to report, and a
       // gray "Draft" or "Closed" would be a claim about one that never existed.
       expect(document.querySelector("[data-status]")).toBeNull();
+    });
+
+    /** @scenario "A branch row reports the models its sessions ran" */
+    it("names the models its sessions ran", () => {
+      pinUsage({
+        rows: [],
+        unlinked: [
+          unlinkedRow({ modelNames: ["claude-opus-5", "claude-haiku-4-5"] }),
+        ],
+        connection: { connected: true, installUrl: INSTALL_URL },
+      });
+
+      renderTable();
+
+      // The leading model, and the count of the rest, exactly as a mapped row
+      // reads: a branch has no per-call totals, not no models.
+      expect(screen.getByText("claude-opus-5 +1")).toBeInTheDocument();
     });
   });
 

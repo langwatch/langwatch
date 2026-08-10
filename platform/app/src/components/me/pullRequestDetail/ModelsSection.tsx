@@ -9,20 +9,33 @@ import {
 import { type DetailPayload, MISSING_VALUE } from "./detailPayload";
 import { EmptySection, Section } from "./Section";
 
-/** What each model consumed, with a bar scaled to the heaviest of them. */
+/**
+ * What each model consumed, with a bar scaled to the heaviest of them.
+ *
+ * When no per-call totals exist the section still names the models the
+ * sessions recorded, without bars: there is nothing to scale them against, and
+ * a bar drawn over an unknown split would be a claim we cannot make.
+ */
 export const ModelsSection: React.FC<{
   models: DetailPayload["modelBreakdown"];
-}> = ({ models }) => {
+  names: DetailPayload["modelNames"];
+}> = ({ models, names }) => {
   const peak = models.reduce(
     (max, model) => Math.max(max, model.totalTokens),
     0,
   );
   return (
     <Section title="Models">
-      {models.length === 0 ? (
-        <EmptySection>
-          No per-call model data for this pull request yet
-        </EmptySection>
+      {models.length === 0 && names.length === 0 ? (
+        <EmptySection>No model data for this pull request yet</EmptySection>
+      ) : models.length === 0 ? (
+        <VStack align="stretch" gap={2}>
+          {names.map((name) => (
+            <Text key={name} fontSize="sm" truncate>
+              {name}
+            </Text>
+          ))}
+        </VStack>
       ) : (
         <VStack align="stretch" gap={3}>
           {models.map((model) => (

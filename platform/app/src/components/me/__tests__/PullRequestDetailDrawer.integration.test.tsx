@@ -122,6 +122,7 @@ function detailPayload(over: Record<string, unknown> = {}) {
         costUsd: 10,
       },
     ],
+    modelNames: ["claude-fable-5"],
     sessions: [
       {
         sessionId: "session-a",
@@ -379,7 +380,12 @@ describe("the pull request detail drawer", () => {
   describe("given a pull request nothing has run on yet", () => {
     it("says so in each section rather than showing empty tables", () => {
       pinDetail(
-        detailPayload({ contributors: [], modelBreakdown: [], sessions: [] }),
+        detailPayload({
+          contributors: [],
+          modelBreakdown: [],
+          modelNames: [],
+          sessions: [],
+        }),
       );
 
       renderDrawer();
@@ -388,8 +394,28 @@ describe("the pull request detail drawer", () => {
         screen.getAllByText("No sessions ran on this pull request yet"),
       ).toHaveLength(2);
       expect(
-        screen.getByText("No per-call model data for this pull request yet"),
+        screen.getByText("No model data for this pull request yet"),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("given a pull request whose sessions logged no per-call model data", () => {
+    /** @scenario "The detail names the models even without per-call data" */
+    it("names the models rather than claiming there is no model data", () => {
+      pinDetail(
+        detailPayload({
+          modelBreakdown: [],
+          modelNames: ["claude-opus-5", "gpt-5"],
+        }),
+      );
+
+      renderDrawer();
+
+      expect(screen.getByText("claude-opus-5")).toBeInTheDocument();
+      expect(screen.getByText("gpt-5")).toBeInTheDocument();
+      expect(
+        screen.queryByText("No model data for this pull request yet"),
+      ).not.toBeInTheDocument();
     });
   });
 

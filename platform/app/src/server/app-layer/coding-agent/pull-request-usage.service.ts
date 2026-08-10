@@ -230,6 +230,8 @@ export interface PersonalPullRequestRow extends PullRequestIdentity, CostSplit {
   cacheCreationTokens: number;
   totalTokens: number;
   modelBreakdown: ModelUsage[];
+  /** Which models ran, when no per-call breakdown exists. See {@link modelNamesFor}. */
+  modelNames: string[];
   contributorsSummary: ContributorSummary[];
 }
 
@@ -242,6 +244,12 @@ export interface UnlinkedBranchRollup extends CostSplit {
   lastActivityAtMs: number;
   sessionsCount: number;
   totalTokens: number;
+  /**
+   * Which models ran. A branch row has names only: the per-call breakdown is
+   * read for the mapped pull requests, and asking for it again per unlinked
+   * branch would be a second query for a strictly weaker answer.
+   */
+  modelNames: string[];
   /** Whether the organization's connection reaches this repository at all. */
   repoCovered: boolean;
 }
@@ -273,6 +281,8 @@ export interface PullRequestDetail {
   totals: PullRequestUsageTotals;
   contributors: PullRequestUsageRow[];
   modelBreakdown: ModelUsage[];
+  /** Which models ran, when no per-call breakdown exists. See {@link modelNamesFor}. */
+  modelNames: string[];
   sessions: PullRequestSessionFact[];
 }
 
@@ -307,6 +317,8 @@ export interface PersonalSessionLookup {
       cacheReadTokens: number;
       cacheCreationTokens: number;
       costUsd: number;
+      /** The models the session's own rollup recorded. */
+      models: string[];
     }>
   >;
 }
@@ -405,6 +417,7 @@ export class PullRequestUsageService {
       totals: totalsOf(gathered.rows),
       contributors: gathered.rows,
       modelBreakdown: gathered.modelBreakdown,
+      modelNames: gathered.modelNames,
       sessions: [...gathered.sessions]
         .sort((a, b) => b.startedAtMs - a.startedAtMs)
         .slice(0, DETAIL_SESSIONS_LIMIT)
@@ -600,6 +613,7 @@ export class PullRequestUsageService {
           modelTotals,
           costProjects,
         }),
+        modelNames: modelNamesFor(attached),
         contributorsSummary: contributorsSummaryFor({
           sessions: attached,
           projects,
@@ -614,6 +628,7 @@ export class PullRequestUsageService {
     sessions: CodingAgentBranchSessionRow[];
     rows: PullRequestUsageRow[];
     modelBreakdown: ModelUsage[];
+    modelNames: string[];
   }> {
     const target = await this.deps.pullRequests.findByNumber({
       organizationId: query.organizationId,
@@ -628,7 +643,13 @@ export class PullRequestUsageService {
       });
     }
 
-    const empty = { target, sessions: [], rows: [], modelBreakdown: [] };
+    const empty = {
+      target,
+      sessions: [],
+      rows: [],
+      modelBreakdown: [],
+      modelNames: [],
+    };
     if (query.permittedProjectIds.length === 0) return empty;
 
     // Every pull request the branch ever hosted, because the tenure rule needs
@@ -685,6 +706,7 @@ export class PullRequestUsageService {
         modelTotals,
         costProjects,
       }),
+      modelNames: modelNamesFor(attached),
     };
   }
 }
@@ -975,6 +997,30 @@ function modelBreakdownFor({
   return [...byModel.values()].sort((a, b) => b.totalTokens - a.totalTokens);
 }
 
+/**
+ * Which models ran, from the session rollup rather than the per-call events.
+ *
+ * The two stores are fed by different carriers: the session fold consumes
+ * spans, logs and metrics, while the per-call events table is log-driven only
+ * and records nothing for an agent with no log carrier. Such a session has
+ * tokens and model names on its rollup row and no per-call row at all, so the
+ * breakdown alone reports it as having no model while the names sit in the
+ * same read the tokens came from.
+ *
+ * The rollup carries a SET of names and no per-model split, so this answers
+ * "which models" and never "how much each". That is why it is a fallback for
+ * an empty breakdown rather than a replacement for one.
+ */
+function modelNamesFor(sessions: Array<{ models: string[] }>): string[] {
+  const names = new Set<string>();
+  for (const session of sessions) {
+    for (const model of session.models) {
+      if (model !== "") names.add(model);
+    }
+  }
+  return [...names].sort();
+}
+
 /** Who worked on a pull request, largest contribution first. */
 function contributorsSummaryFor({
   sessions,
@@ -1029,6 +1075,7 @@ interface PersonalRepositoryGroup {
     cacheReadTokens: number;
     cacheCreationTokens: number;
     costUsd: number;
+    models: string[];
   }>;
 }
 
@@ -1072,6 +1119,7 @@ function groupSessionsByRepository(
       cacheReadTokens: session.cacheReadTokens,
       cacheCreationTokens: session.cacheCreationTokens,
       costUsd: session.costUsd,
+      models: session.models,
     });
     groups.set(key, group);
   }
@@ -1104,6 +1152,7 @@ function unlinkedRollupsFor({
     lastActivityAtMs: latestActivityAtMs(branchSessions),
     sessionsCount: branchSessions.length,
     totalTokens: branchSessions.reduce((sum, s) => sum + tokensOf(s), 0),
+    modelNames: modelNamesFor(branchSessions),
     costUsd: sumOf(branchSessions, "costUsd"),
     billedCostUsd: branchSessions
       .filter((session) => !nonBillableAgents.has(session.agent))

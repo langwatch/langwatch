@@ -33,6 +33,7 @@ function row(
     lastActivityAtMs: 1_000,
     sessionsCount: 1,
     modelBreakdown: [{ model: "claude-fable-5" }],
+    modelNames: [],
     totalTokens: 1_000,
     costUsd: 1,
     ...over,
@@ -329,6 +330,24 @@ describe("the Pull Requests table order", () => {
           }),
         ),
       ).toEqual(["alpha", "zeta", "no-model"]);
+    });
+
+    /** @scenario "A row with only model names sorts by them" */
+    it("orders a row that has names but no per-call breakdown among the rest", () => {
+      const rows = [
+        row({ headBranch: "zeta", modelBreakdown: [{ model: "zeta-1" }] }),
+        branchRow({ headBranch: "named", modelNames: ["Alpha-1"] }),
+        branchRow({ headBranch: "no-model" }),
+      ];
+
+      expect(
+        orderOf(
+          sortPullRequestRows({
+            rows,
+            sort: { column: "models", direction: "asc" },
+          }),
+        ),
+      ).toEqual(["named", "zeta", "no-model"]);
     });
   });
 

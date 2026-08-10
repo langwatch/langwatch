@@ -350,6 +350,53 @@ Rule: Each pull request reports what every model consumed
     When the per-model totals are read
     Then only the model calls contribute tokens
 
+  # The per-call totals and the session's own record of which models it ran are
+  # written by different carriers, so a session can have one and not the other.
+  # A row that plainly ran a model must never report that it ran none.
+
+  @unit
+  Scenario: A pull request reports its models even without per-call data
+    Given a pull request whose sessions recorded their models but logged no model calls
+    When the pull request usage is read
+    Then the row names those models
+    And the row reports no per-model tokens
+
+  @unit
+  Scenario: Per-call model data wins over the recorded names
+    Given a pull request whose sessions both recorded their models and logged model calls
+    When the pull request usage is read
+    Then the row reports each model's tokens rather than names alone
+
+  @integration
+  Scenario: The detail names the models even without per-call data
+    Given a pull request whose sessions recorded their models but logged no model calls
+    When the detail is opened
+    Then the models section names them instead of saying there is no model data
+
+  @unit
+  Scenario: A branch rollup carries the models its sessions ran
+    Given a branch with no pull request whose sessions recorded two models
+    When the personal usage is read
+    Then the branch rollup names both of them
+
+  @unit
+  Scenario: A branch whose sessions recorded no model reports none
+    Given a branch with no pull request whose sessions recorded no model
+    When the personal usage is read
+    Then the branch rollup names no model
+
+  @integration
+  Scenario: A branch row reports the models its sessions ran
+    Given a listed branch whose sessions ran two models
+    When the table is read
+    Then the row names the leading model and counts the rest
+
+  @unit
+  Scenario: A row with only model names sorts by them
+    Given rows whose models come from per-call totals and from recorded names
+    When the table is sorted by model
+    Then both kinds of row take their place by the model they name
+
 Rule: The pull request detail answers with facts and never with content
 
   @unit

@@ -85,6 +85,7 @@ function personalSessionRow(
     cacheReadTokens: 20,
     cacheCreationTokens: 10,
     costUsd: 1.5,
+    models: ["claude-opus-5"],
     ...over,
   };
 }
@@ -578,6 +579,88 @@ describe("PullRequestUsageService", () => {
         startedAtFromMs: number;
       };
       expect(Number.isFinite(call.startedAtFromMs)).toBe(true);
+    });
+  });
+
+  describe("given a pull request whose sessions logged no per-call model data", () => {
+    /** @scenario "A pull request reports its models even without per-call data" */
+    it("reports the models its sessions recorded", async () => {
+      const { service } = personalServiceWith({
+        pullRequests: [pullRequestRow()],
+        personalSessions: [personalSessionRow({ sessionId: "mine" })],
+        organizationSessions: [
+          sessionRow({ sessionId: "mine", models: ["claude-opus-5"] }),
+          sessionRow({
+            sessionId: "theirs",
+            models: ["claude-opus-5", "gpt-5"],
+          }),
+        ],
+        // The per-call table is fed by a carrier these sessions never used.
+        modelTotals: [],
+      });
+
+      const usage = await service.getForPersonalProject(PERSONAL_QUERY);
+
+      expect(usage.rows[0]?.modelBreakdown).toEqual([]);
+      expect(usage.rows[0]?.modelNames).toEqual(["claude-opus-5", "gpt-5"]);
+    });
+
+    /** @scenario "Per-call model data wins over the recorded names" */
+    it("still reports the per-call breakdown when there is one", async () => {
+      const { service } = personalServiceWith({
+        pullRequests: [pullRequestRow()],
+        personalSessions: [personalSessionRow({ sessionId: "mine" })],
+        organizationSessions: [
+          sessionRow({ sessionId: "mine", models: ["claude-opus-5"] }),
+        ],
+        modelTotals: [
+          modelTotalsRow({ sessionId: "mine", model: "claude-opus-5" }),
+        ],
+      });
+
+      const usage = await service.getForPersonalProject(PERSONAL_QUERY);
+
+      expect(usage.rows[0]?.modelBreakdown.map((each) => each.model)).toEqual([
+        "claude-opus-5",
+      ]);
+      expect(usage.rows[0]?.modelNames).toEqual(["claude-opus-5"]);
+    });
+  });
+
+  describe("given a branch with no pull request whose sessions ran a model", () => {
+    /** @scenario "A branch rollup carries the models its sessions ran" */
+    it("reports them on the branch rollup", async () => {
+      const { service } = personalServiceWith({
+        pullRequests: [],
+        personalSessions: [
+          personalSessionRow({ sessionId: "mine", models: ["claude-opus-5"] }),
+          personalSessionRow({
+            sessionId: "mine-2",
+            models: ["claude-opus-5", "claude-haiku-4-5"],
+          }),
+        ],
+      });
+
+      const usage = await service.getForPersonalProject(PERSONAL_QUERY);
+
+      expect(usage.unlinked[0]?.modelNames).toEqual([
+        "claude-haiku-4-5",
+        "claude-opus-5",
+      ]);
+    });
+
+    /** @scenario "A branch whose sessions recorded no model reports none" */
+    it("reports no models when its sessions recorded none", async () => {
+      const { service } = personalServiceWith({
+        pullRequests: [],
+        personalSessions: [
+          personalSessionRow({ sessionId: "mine", models: [] }),
+        ],
+      });
+
+      const usage = await service.getForPersonalProject(PERSONAL_QUERY);
+
+      expect(usage.unlinked[0]?.modelNames).toEqual([]);
     });
   });
 
