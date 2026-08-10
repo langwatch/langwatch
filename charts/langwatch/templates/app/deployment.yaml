@@ -72,6 +72,11 @@ spec:
     spec:
       # The app does not call the Kubernetes API, so don't mount the SA token.
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
+      # The app runs the same shutdown budget as the workers, because it can be
+      # the process hosting the worker stack (the `all` process role) and its
+      # entrypoint watchdog is the same one. Even web-only, the drain finishes
+      # in well under this — the grace period is a ceiling, not a wait.
+      terminationGracePeriodSeconds: {{ include "langwatch.terminationGracePeriod" (dict "component" .Values.app "name" "app") }}
       # Pod security context - https://kubespec.dev/v1/Pod#spec.securityContext
       securityContext:
         {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.app) | nindent 8 }}
@@ -124,6 +129,7 @@ spec:
               protocol: TCP
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
+            {{- include "langwatch.shutdownEnv" (dict "component" .Values.app "name" "app") | nindent 12 }}
 
             # Names this process in telemetry. It becomes the OTel resource
             # `service.name` and the `service` field on every stdout log line,

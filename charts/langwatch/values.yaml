@@ -155,6 +155,15 @@ app:
   ## @param app.replicaCount [default: 1] Number of application replicas.
   replicaCount: 1
 
+  # Shutdown budget — same shape and the same rule as workers.* below. The app
+  # shares the workers' entrypoint watchdog and can host the worker stack
+  # itself (the `all` process role), so it is sized the same way. A web-only
+  # pod drains in well under this; the grace period is a ceiling, not a wait.
+  ## @param app.shutdownDrainSeconds [default: 25] Seconds the queue may spend draining in-flight jobs on shutdown.
+  shutdownDrainSeconds: 25
+  ## @param app.terminationGracePeriodSeconds [default: 55] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.
+  terminationGracePeriodSeconds: 55
+
   # Kubernetes service configuration
   # See: https://kubespec.dev/v1/Service
   ## @extra app.service Service configuration for the app.
@@ -822,6 +831,24 @@ workers:
   # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
   ## @param workers.replicaCount [default: 1] Number of worker replicas.
   replicaCount: 1
+
+  # Shutdown budget. shutdownDrainSeconds is how long the GroupQueue may wait
+  # for in-flight jobs to finish their ClickHouse writes; it must match the
+  # app's own SHUTDOWN_DRAIN_TIMEOUT_MS, which the chart sets from this value.
+  #
+  # terminationGracePeriodSeconds is the kubelet's SIGKILL clock and must cover
+  # the drain plus 5s for App.close, 15s for process teardown and 10s of
+  # kubelet slack — so at least shutdownDrainSeconds + 30. Because it is set
+  # here, raising shutdownDrainSeconds alone always fails the render: raise
+  # both together. The chart refuses rather than installing a release the
+  # kubelet kills mid-drain. Both must be whole numbers of seconds greater
+  # than zero — a quoted or fractional value is rejected, because Helm's `int`
+  # would silently turn it into a zero budget.
+  # See: https://kubespec.dev/v1/Pod#spec.terminationGracePeriodSeconds
+  ## @param workers.shutdownDrainSeconds [default: 25] Seconds the queue may spend draining in-flight jobs on shutdown.
+  shutdownDrainSeconds: 25
+  ## @param workers.terminationGracePeriodSeconds [default: 55] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.
+  terminationGracePeriodSeconds: 55
 
   # Resource requirements for worker pods
   # Workers are CPU/memory intensive for processing evaluations and trace collection

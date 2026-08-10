@@ -12,6 +12,8 @@ import {
   isRedisCommandTracingEnabled,
   redisInstrumentationConfig,
 } from "./instrumentation.redis";
+// Dependency-free by design — safe on the boot path, before the app graph.
+import { registerTelemetryFlush } from "./server/shutdown/telemetry";
 
 const isEnvTrue = (value: string | undefined) => value === "true";
 
@@ -94,7 +96,7 @@ if (explicitEndpoint || langwatchTracingEnabled) {
     }
   }
 
-  setupObservability({
+  const observability = setupObservability({
     langwatch: langwatchTracingEnabled ? undefined : "disabled",
     attributes: {
       "service.name": process.env.OTEL_SERVICE_NAME ?? "langwatch-app",
@@ -111,7 +113,16 @@ if (explicitEndpoint || langwatchTracingEnabled) {
     resource: detectResources({
       detectors: [awsEksDetector, envDetector],
     }),
-    advanced: {},
+    advanced: {
+      // The SDK otherwise registers its own SIGTERM/SIGINT handlers that call
+      // process.exit(0) as soon as its OTel flush resolves — a second or two
+      // into a shutdown, killing a queue drain that is entitled to 25s. Node
+      // runs every listener for a signal, so this is not a race we could win
+      // by ordering: whoever calls exit() first ends the process. Its flush is
+      // registered as a shutdown phase below instead, so telemetry is still
+      // exported but never decides when the process dies.
+      disableAutoShutdown: true,
+    },
     spanProcessors: spanProcessors,
     logRecordProcessors: logRecordProcessors,
     textMapPropagator: new CompositePropagator({
@@ -133,6 +144,16 @@ if (explicitEndpoint || langwatchTracingEnabled) {
       new RuntimeNodeInstrumentation(),
       ...(redisCommandTracingEnabled ? [redisInstrumentation()] : []),
     ],
+  });
+
+  // Replaces the exit-on-flush the SDK does by default (disabled above): the
+  // same flush, run as the last phase of the one graceful-shutdown sequence,
+  // with no opinion about when the process should end.
+  registerTelemetryFlush({
+    name: "observability-sdk",
+    run: async () => {
+      await observability.shutdown();
+    },
   });
 } else {
   // Silence here is ambiguous: "deliberately off" and "the deploy forgot the
@@ -190,11 +211,15 @@ if (explicitEndpoint && isEnvTrue(process.env.OTEL_METRICS_ENABLED)) {
     name: process.env.OTEL_SERVICE_NAME ?? "langwatch-app",
   }).start();
 
-  // The graceful-shutdown path (start.ts / workers.ts) calls process.exit(0)
-  // without waiting on this provider, so the last periodic export can be
-  // dropped. Race a best-effort flush against that exit.
-  const flushMetricsOnExit = () =>
-    void meterProvider.forceFlush().catch(() => {});
-  process.on("SIGTERM", flushMetricsOnExit);
-  process.on("SIGINT", flushMetricsOnExit);
+  // Registered as a shutdown phase rather than a signal handler of its own.
+  // Node runs every listener for a signal, so handling SIGTERM here raced the
+  // graceful-shutdown path instead of participating in it, and the last
+  // periodic export was dropped whenever the exit won. Now the runner flushes
+  // this after the work has drained. See server/shutdown/telemetry.ts.
+  registerTelemetryFlush({
+    name: "metrics",
+    run: async () => {
+      await meterProvider.forceFlush();
+    },
+  });
 }
