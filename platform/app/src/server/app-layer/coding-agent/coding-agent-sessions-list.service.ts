@@ -361,7 +361,7 @@ const keyOf = (drive: BranchDrive): string =>
 
 /** A (session, branch) pair's own id, for the one-answer-per-id rule. */
 const driveKeyOf = (drive: BranchDrive): string =>
-  `${drive.sessionId} ${drive.headBranch}`;
+  `${drive.sessionId}\u0000${drive.headBranch}`;
 
 /**
  * The stored row as the screen reads it. Empty strings stay empty strings for
