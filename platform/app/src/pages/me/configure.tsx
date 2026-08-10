@@ -6,12 +6,14 @@ import {
   HStack,
   Input,
   Spacer,
+  Tabs,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { Copy, Laptop, Monitor, Server } from "lucide-react";
 import { useState } from "react";
 import { AvatarUploadControl } from "~/components/me/avatar/AvatarUploadControl";
+import { DevicesPanel } from "~/components/me/DevicesPanel";
 import { HomePagePicker } from "~/components/me/HomePagePicker";
 import MyLayout from "~/components/me/MyLayout";
 import { PersonalOtlpEndpointPanel } from "~/components/me/PersonalOtlpEndpointPanel";
@@ -55,6 +57,7 @@ function MySettingsPage() {
     baseUrl: string;
   } | null>(null);
   const [pendingRevokeId, setPendingRevokeId] = useState<string | null>(null);
+  const [credentialsTab, setCredentialsTab] = useState("keys");
 
   const utils = api.useUtils();
   const issueMutation = api.personalVirtualKeys.issuePersonal.useMutation({
@@ -219,9 +222,10 @@ function MySettingsPage() {
         </SectionCard>
 
         <SectionCard
-          title="Personal Virtual Keys"
-          description="These keys let your CLI tools (Claude Code, Cursor, etc.) talk to LangWatch."
+          title="Personal credentials"
+          description="The keys your tools (Claude Code, Cursor, and the rest) use to reach LangWatch, and the devices your CLI is signed in on. Revoke anything that is stale, lost or compromised."
           action={
+            credentialsTab === "keys" &&
             !showAddForm && (
               <Button
                 size="sm"
@@ -233,81 +237,98 @@ function MySettingsPage() {
             )
           }
         >
-          {revealedSecret && (
-            <RevealedSecretBanner
-              secret={revealedSecret}
-              onDismiss={() => setRevealedSecret(null)}
-            />
-          )}
+          <Tabs.Root
+            value={credentialsTab}
+            onValueChange={(event) => setCredentialsTab(event.value)}
+            colorPalette="blue"
+          >
+            <Tabs.List marginBottom={3}>
+              <Tabs.Trigger value="keys">Virtual keys</Tabs.Trigger>
+              <Tabs.Trigger value="devices">Devices</Tabs.Trigger>
+            </Tabs.List>
 
-          {showAddForm && (
-            <Box
-              borderWidth="1px"
-              borderColor="border.muted"
-              borderRadius="sm"
-              padding={3}
-              marginBottom={3}
-            >
-              <VStack align="stretch" gap={2}>
-                <Text fontSize="sm" fontWeight="medium">
-                  New personal key
-                </Text>
-                <Input
-                  placeholder="e.g. jane-laptop-2"
-                  size="sm"
-                  value={newKeyLabel}
-                  onChange={(e) => setNewKeyLabel(e.target.value)}
+            <Tabs.Content value="keys">
+              {revealedSecret && (
+                <RevealedSecretBanner
+                  secret={revealedSecret}
+                  onDismiss={() => setRevealedSecret(null)}
                 />
-                <Text fontSize="xs" color="fg.muted">
-                  Lowercase letters, numbers, dash, underscore. The secret is
-                  shown once on creation.
-                </Text>
-                <HStack gap={2}>
-                  <Button
-                    size="sm"
-                    onClick={onIssue}
-                    loading={issueMutation.isPending}
-                    disabled={!newKeyLabel.trim()}
-                  >
-                    Create key
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setShowAddForm(false);
-                      setNewKeyLabel("");
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </HStack>
-              </VStack>
-            </Box>
-          )}
+              )}
 
-          {ctx.apiKeys.length === 0 ? (
-            <Text fontSize="sm" color="fg.muted">
-              No personal keys yet. Run <code>langwatch login</code> in your
-              terminal to issue your first one.
-            </Text>
-          ) : (
-            <VStack align="stretch" gap={2}>
-              {ctx.apiKeys.map((key) => (
-                <ApiKeyRow
-                  key={key.id}
-                  apiKey={key}
-                  isPendingRevoke={pendingRevokeId === key.id}
-                  isRevoking={
-                    revokeMutation.isPending && pendingRevokeId === key.id
-                  }
-                  onRequestRevoke={() => setPendingRevokeId(key.id)}
-                  onCancelRevoke={() => setPendingRevokeId(null)}
-                  onConfirmRevoke={() => onRevoke(key.id)}
-                />
-              ))}
-            </VStack>
-          )}
+              {showAddForm && (
+                <Box
+                  borderWidth="1px"
+                  borderColor="border.muted"
+                  borderRadius="sm"
+                  padding={3}
+                  marginBottom={3}
+                >
+                  <VStack align="stretch" gap={2}>
+                    <Text fontSize="sm" fontWeight="medium">
+                      New personal key
+                    </Text>
+                    <Input
+                      placeholder="e.g. jane-laptop-2"
+                      size="sm"
+                      value={newKeyLabel}
+                      onChange={(e) => setNewKeyLabel(e.target.value)}
+                    />
+                    <Text fontSize="xs" color="fg.muted">
+                      Lowercase letters, numbers, dash, underscore. The secret
+                      is shown once on creation.
+                    </Text>
+                    <HStack gap={2}>
+                      <Button
+                        size="sm"
+                        onClick={onIssue}
+                        loading={issueMutation.isPending}
+                        disabled={!newKeyLabel.trim()}
+                      >
+                        Create key
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setShowAddForm(false);
+                          setNewKeyLabel("");
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </HStack>
+                  </VStack>
+                </Box>
+              )}
+
+              {ctx.apiKeys.length === 0 ? (
+                <Text fontSize="sm" color="fg.muted">
+                  No personal keys yet. Run <code>langwatch login</code> in your
+                  terminal to issue your first one.
+                </Text>
+              ) : (
+                <VStack align="stretch" gap={2}>
+                  {ctx.apiKeys.map((key) => (
+                    <ApiKeyRow
+                      key={key.id}
+                      apiKey={key}
+                      isPendingRevoke={pendingRevokeId === key.id}
+                      isRevoking={
+                        revokeMutation.isPending && pendingRevokeId === key.id
+                      }
+                      onRequestRevoke={() => setPendingRevokeId(key.id)}
+                      onCancelRevoke={() => setPendingRevokeId(null)}
+                      onConfirmRevoke={() => onRevoke(key.id)}
+                    />
+                  ))}
+                </VStack>
+              )}
+            </Tabs.Content>
+
+            <Tabs.Content value="devices">
+              <DevicesPanel />
+            </Tabs.Content>
+          </Tabs.Root>
         </SectionCard>
 
         {ctx.organizationId ? (

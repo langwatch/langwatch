@@ -266,12 +266,15 @@ export interface PersonalPullRequestUsage {
 }
 
 /**
- * One session as the detail lists it: FACTS ONLY.
+ * One session as the detail lists it: facts, plus the one-line title the agent
+ * generated for the session.
  *
- * There is deliberately no title and no content here. A session's title is
- * derived content and is gated behind the content permissions on the session
- * surfaces; this payload answers "what did this pull request consume", which
- * needs none of it. A test pins this row's key set so a title cannot be added
+ * The title is the only conversation-derived value on this payload, and it is
+ * here because a list of anonymous rows makes a reader open each one to find
+ * out which is which. It rides ungated to the read boundary, which blanks it
+ * for every session whose PROJECT this reader may not read the captured
+ * content of: the detail spans an organization, and content visibility is a
+ * project's own. A test pins this row's key set, so nothing else joins it
  * without somebody deciding to disclose it.
  */
 export interface PullRequestSessionFact extends ContributorIdentity {
@@ -280,6 +283,8 @@ export interface PullRequestSessionFact extends ContributorIdentity {
   agent: string;
   totalTokens: number;
   costUsd: number | null;
+  /** Null when the session never generated one. */
+  title: string | null;
 }
 
 export interface PullRequestDetail {
@@ -405,7 +410,8 @@ export class PullRequestUsageService {
 
   /**
    * The same pull request, plus who worked on it and which sessions ran, for
-   * the detail surface. Facts only: see {@link PullRequestSessionFact}.
+   * the detail surface. See {@link PullRequestSessionFact} for what a session
+   * carries, and where its title is decided.
    */
   async getPullRequestDetail(
     query: PullRequestUsageQuery,
@@ -434,6 +440,7 @@ export class PullRequestUsageService {
           agent: session.agent,
           totalTokens: tokensOf(session),
           costUsd: costProjects.has(session.tenantId) ? session.costUsd : null,
+          title: session.title === "" ? null : session.title,
         })),
     };
   }

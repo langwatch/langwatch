@@ -6,8 +6,10 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import type React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useConversationTurns } from "../../hooks/useConversationTurns";
+import { useDrawerStore } from "../../stores/drawerStore";
 import { useFilterStore } from "../../stores/filterStore";
 import type { LensConfig } from "../../stores/viewStore";
 import { mapTraceListPayload } from "../../utils/mapTraceListPayload";
@@ -27,13 +29,13 @@ import { VirtualSpacer } from "./VirtualSpacer";
 const CONVERSATION_MIN_WIDTH = "1000px";
 
 // Stable reference so RegistryRow's prop memo doesn't re-render every row
-// each parent render. The expanded session's header row shares this
+// each parent render. The expanded conversation's header row shares this
 // recessed surface with its turn rows.
 const EXPANDED_ROW_BG = { surface: EXPANDED_BG, firstCell: EXPANDED_BG_CSS };
 
 interface ConversationLensBodyProps {
   /**
-   * Server-grouped session rows (specs/traces-v2/sessions-lens.feature):
+   * Server-grouped conversation rows (specs/traces-v2/sessions-lens.feature):
    * every total is the TRUE rollup over the whole time range, already in
    * lens sort order. Rows arrive without turn traces; the expanded row's
    * turns load lazily below.
@@ -50,8 +52,9 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
 }) => {
   const pageSize = useFilterStore((s) => s.pageSize);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const openLatestTrace = useOpenLatestTrace();
 
-  // Turn rows for the one expanded session, fetched on demand: the session
+  // Turn rows for the one expanded conversation, fetched on demand: the
   // rollup is a GROUP BY, so the row itself carries no per-trace data. Same
   // conversation-scoped query the drawer's Conversation tab uses.
   const expandedTurnsQuery = useConversationTurns(
@@ -112,7 +115,7 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
   });
   const virtualItems = virtualizer.getVirtualItems();
 
-  if (!isLoading && groups.length === 0) return <NoSessionsMessage />;
+  if (!isLoading && groups.length === 0) return <NoConversationsMessage />;
 
   const toggleExpanded = (id: string) =>
     setExpandedKey((prev) => (prev === id ? null : id));
@@ -141,6 +144,17 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
               !isLoading && expandedKey === row.original.conversationId
             }
             expandedBg={EXPANDED_ROW_BG}
+            // A click on the row opens the conversation's latest trace; the
+            // chevron is what expands its turns inline (RegistryRow prefers
+            // `onSelect` for the row click, and the chevron stops
+            // propagation). A conversation the read named no trace for keeps
+            // expanding on click rather than becoming dead surface: only
+            // sample-preview rows and skeletons lack one.
+            onSelect={
+              isLoading || !row.original.lastTraceId
+                ? undefined
+                : () => openLatestTrace(row.original)
+            }
             onToggleExpand={
               isLoading
                 ? undefined
@@ -155,13 +169,43 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
   );
 };
 
-const NoSessionsMessage: React.FC = () => (
+/**
+ * Open a conversation's most recent trace in the trace drawer.
+ *
+ * The light path on purpose: a conversation row is a rollup, not a trace, so
+ * there is no row data to seed the drawer's caches with the way the trace lens
+ * does. The store push before the route change is what lets the drawer's hooks
+ * render against the right trace on the very next frame; the drawer fetches
+ * the rest itself.
+ */
+function useOpenLatestTrace(): (group: ConversationGroup) => void {
+  const { openDrawer } = useDrawer();
+
+  return useCallback(
+    (group: ConversationGroup) => {
+      const traceId = group.lastTraceId;
+      if (!traceId) return;
+      const occurredAtMs = group.latestTimestamp;
+      useDrawerStore.getState().openTrace(traceId, occurredAtMs);
+      openDrawer("traceV2Details", {
+        traceId,
+        // `t` (timestamp) is the partition-pruning hint the drawer's reads
+        // take, so opening on a conversation's last activity does not walk
+        // every weekly partition by id.
+        t: String(occurredAtMs),
+      });
+    },
+    [openDrawer],
+  );
+}
+
+const NoConversationsMessage: React.FC = () => (
   <Flex align="center" justify="center" padding={8} direction="column" gap={2}>
     <Text color="fg.muted" textStyle="sm">
-      No sessions found.
+      No conversations found.
     </Text>
     <Text textStyle="xs" color="fg.subtle">
-      Sessions appear once your traces are grouped into conversations.
+      Conversations appear once your traces carry a conversation id.
     </Text>
   </Flex>
 );

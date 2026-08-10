@@ -375,11 +375,16 @@ function TerminalModePane({ trace }: { trace: TraceHeader }) {
       resetKeys={[trace.traceId]}
     >
       <Box flex={1} minHeight={0}>
+        {/* Keyed by trace: stepping to a sibling turn with J/K opens a
+            different point in the session, so the turns walked back from the
+            old one are not this one's history. */}
         <TerminalTab
+          key={trace.traceId}
           projectId={project?.id ?? ""}
           traceId={trace.traceId}
           occurredAtMs={trace.timestamp}
           sessionName={trace.traceName?.trim() || trace.name?.trim() || null}
+          conversationId={trace.conversationId ?? null}
         />
       </Box>
     </IsolatedErrorBoundary>

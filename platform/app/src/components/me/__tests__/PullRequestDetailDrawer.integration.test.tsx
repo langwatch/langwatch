@@ -123,19 +123,24 @@ function detailPayload(over: Record<string, unknown> = {}) {
         tokensKnown: true,
       },
     ],
-    sessions: [
-      {
-        sessionId: "session-a",
-        startedAtMs: Date.parse("2026-07-01T10:30:00Z"),
-        projectId: "project-1",
-        projectSlug: "riley-personal",
-        contributorLabel: "Riley Chase",
-        contributorIsProject: false,
-        agent: "claude_code",
-        totalTokens: 4_000,
-        costUsd: 5,
-      },
-    ],
+    sessions: [sessionFact()],
+    ...over,
+  };
+}
+
+/** One session line of the detail, filled in around whatever a case pins. */
+function sessionFact(over: Record<string, unknown> = {}) {
+  return {
+    sessionId: "session-a",
+    startedAtMs: Date.parse("2026-07-01T10:30:00Z"),
+    projectId: "project-1",
+    projectSlug: "riley-personal",
+    contributorLabel: "Riley Chase",
+    contributorIsProject: false,
+    agent: "claude_code",
+    totalTokens: 4_000,
+    costUsd: 5,
+    title: null as string | null,
     ...over,
   };
 }
@@ -207,6 +212,7 @@ describe("the pull request detail drawer", () => {
     });
 
     /** @scenario "The detail carries its contributors, models and sessions" */
+    /** @scenario "The drawer names who worked on the pull request" */
     it("shows the header, the totals, the contributors, the models and the sessions", () => {
       renderDrawer();
 
@@ -237,8 +243,7 @@ describe("the pull request detail drawer", () => {
       expect(screen.getByText("8.0K tokens")).toBeInTheDocument();
     });
 
-    /** @scenario "The sessions list never carries a session title" */
-    it("lists a session by its facts and never by a title", () => {
+    it("lists a session by its facts", () => {
       renderDrawer();
 
       expect(screen.getAllByText("Claude Code").length).toBeGreaterThan(0);
@@ -248,9 +253,30 @@ describe("the pull request detail drawer", () => {
         ),
       ).not.toBeNull();
       expect(screen.getByText("$5.00")).toBeInTheDocument();
-      // Nothing that could be a session's own title reaches the reader: the
-      // read carries none, and this drawer renders only what it carries.
+      // The session id is a handle onto the transcript, and the drawer renders
+      // only what the read carries, which is not that.
       expect(document.body.textContent).not.toContain("session-a");
+    });
+  });
+
+  describe("given a pull request whose sessions include one with a title and one without", () => {
+    /** @scenario "The drawer names each session by its title, or says it has none" */
+    it("names the titled session and calls the other untitled", () => {
+      pinDetail(
+        detailPayload({
+          sessions: [
+            sessionFact({ title: "Add the sessions screen" }),
+            sessionFact({ sessionId: "session-b", title: null }),
+          ],
+        }),
+      );
+
+      renderDrawer();
+
+      expect(screen.getByText("Add the sessions screen")).toBeInTheDocument();
+      // A session with no title, and one whose title this reader may not see,
+      // read the same way: the row is still worth listing for what it cost.
+      expect(screen.getByText("Untitled session")).toBeInTheDocument();
     });
   });
 

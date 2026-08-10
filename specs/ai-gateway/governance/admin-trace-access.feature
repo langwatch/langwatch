@@ -173,7 +173,7 @@ Feature: Admin trace access — bird's-eye drill-in with persistent 'viewing as'
       | /settings/*          | org-scope admin config            |
       | /me                  | personal-self                     |
       | /me/settings         | personal-self config              |
-      | /me/devices          | personal-self                     |
+      | /me/sessions         | personal-self                     |
       | /ops/*               | platform-internal admin           |
     Then the AdminViewingAsBanner DOES NOT render on any of those
         routes (regardless of the still-resolved sticky-team-context

@@ -353,6 +353,25 @@ describe("SessionGroupsClickHouseRepository", () => {
     });
   });
 
+  describe("given a session whose traces were captured at different times", () => {
+    /** @scenario The rollup names each session's most recent trace */
+    it("names the latest trace of every session row", async () => {
+      const page = await repository.findSessionGroups(query());
+
+      const alpha = page.rows.find(
+        (row) => row.conversationId === SESSION_ALPHA,
+      )!;
+      const beta = page.rows.find(
+        (row) => row.conversationId === SESSION_BETA,
+      )!;
+
+      // Alpha's newest trace is the one at baseMs - 100s, beta's at
+      // baseMs - 50s: the id has to follow the last activity, not insert order.
+      expect(alpha.lastTraceId).toBe(`${tag}-alpha-3`);
+      expect(beta.lastTraceId).toBe(`${tag}-beta-2`);
+    });
+  });
+
   describe("given a trace summary re-projected with a newer version", () => {
     /** @scenario A re-projected trace is only counted once in its session rollup */
     it("counts the latest version only", async () => {

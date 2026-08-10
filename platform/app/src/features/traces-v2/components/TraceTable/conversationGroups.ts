@@ -20,6 +20,13 @@ export interface ConversationGroup {
   evalsPassedCount: number;
   evalsFailedCount: number;
   worstStatus: TraceStatus;
+  /**
+   * The conversation's most recent trace, the one a click on the row opens.
+   * Server rows always name it; page-local groups built client-side (sample
+   * preview) and skeleton rows leave it out, and their rows expand on click
+   * instead.
+   */
+  lastTraceId?: string | null;
   latestTimestamp: number;
   earliestTimestamp: number;
   lastMessage: string;

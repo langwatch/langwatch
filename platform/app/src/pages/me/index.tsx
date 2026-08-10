@@ -328,9 +328,14 @@ function MyUsagePage() {
         <SectionCard
           title="Coding-agent usage (last 30 days)"
           action={
-            <Link href="/me/pull-requests" fontSize="sm" color="blue.fg">
-              View pull requests
-            </Link>
+            <HStack gap={4}>
+              <Link href="/me/sessions" fontSize="sm" color="blue.fg">
+                View sessions
+              </Link>
+              <Link href="/me/pull-requests" fontSize="sm" color="blue.fg">
+                View pull requests
+              </Link>
+            </HStack>
           }
         >
           {personalProjectId ? (

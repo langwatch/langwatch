@@ -39,6 +39,7 @@ import type {
 } from "./automations/trigger-template.service";
 import type { BroadcastService } from "./broadcast/broadcast.service";
 import type { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
+import type { CodingAgentSessionsListService } from "./coding-agent/coding-agent-sessions-list.service";
 import type { PullRequestUsageService } from "./coding-agent/pull-request-usage.service";
 import type { AppConfig } from "./config";
 import type { DspyStepService } from "./dspy-steps/dspy-step.service";
@@ -256,6 +257,8 @@ export interface AppDependencies {
   /** ADR-056: read side of the coding-agent session aggregate. */
   codingAgents: {
     sessions: CodingAgentSessionService;
+    /** The Sessions screen's list, joined to the pull requests each drove. */
+    sessionsList: CodingAgentSessionsListService;
     /** What a pull request cost in assistant usage, RBAC-scoped. */
     pullRequestUsage: PullRequestUsageService;
   };

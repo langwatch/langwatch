@@ -16,6 +16,7 @@ import type {
   MetricFactsContributedEvent,
   SpanFactsContributedEvent,
 } from "../../schemas/events";
+import { MAX_SET } from "../../services/coding-agent-session.derivation";
 import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   CodingAgentSessionFoldProjection,
@@ -489,6 +490,74 @@ describe("CodingAgentSessionFoldProjection", () => {
       expect(state.gitBranch).toBe("feat/git-context");
     });
 
+    /** @scenario Every branch a session reports joins its branch set, first seen first */
+    it("keeps every branch it drove, oldest first, alongside the current one", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({ facts: contextFacts() }),
+        state,
+      );
+      state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          facts: contextFacts({ "vcs.ref.head.name": "feat/sessions-screen" }),
+          timeMs: 2_500,
+        }),
+        state,
+      );
+
+      expect(state.gitBranches).toEqual(["main", "feat/sessions-screen"]);
+      // The scalar stays the present tense: the branch the session is in.
+      expect(state.gitBranch).toBe("feat/sessions-screen");
+    });
+
+    /** @scenario A branch reported twice joins the set once */
+    it("names a branch once however often the session returns to it", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      for (const [index, branch] of [
+        "main",
+        "feat/a",
+        "main",
+        "feat/a",
+      ].entries()) {
+        state = projection.handleCodingAgentSessionLogFactsContributed(
+          logFactsEvent({
+            facts: contextFacts({ "vcs.ref.head.name": branch }),
+            timeMs: 1_000 + index * 500,
+          }),
+          state,
+        );
+      }
+
+      expect(state.gitBranches).toEqual(["main", "feat/a"]);
+      expect(state.gitBranch).toBe("feat/a");
+    });
+
+    /** @scenario The branch set stops growing at its bound */
+    it("holds the first branches it saw once the set is full", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+
+      for (let index = 0; index < MAX_SET + 10; index++) {
+        state = projection.handleCodingAgentSessionLogFactsContributed(
+          logFactsEvent({
+            facts: contextFacts({ "vcs.ref.head.name": `feat/${index}` }),
+            timeMs: 1_000 + index,
+          }),
+          state,
+        );
+      }
+
+      expect(state.gitBranches).toHaveLength(MAX_SET);
+      expect(state.gitBranches[0]).toBe("feat/0");
+      expect(state.gitBranches).not.toContain(`feat/${MAX_SET}`);
+      // The bound caps the SET, never the current branch.
+      expect(state.gitBranch).toBe(`feat/${MAX_SET + 9}`);
+    });
+
     /** @scenario A session context event from Codex folds its git identity */
     /** @scenario A session context event from opencode folds its git identity */
     it.each([
@@ -778,9 +847,44 @@ describe("CodingAgentSessionFoldProjection", () => {
       expect(bare.repositoryHost).toBe("");
       expect(bare.gitBranch).toBe("");
       expect(bare.title).toBe("");
+      expect(bare.gitBranches).toEqual([]);
       expect(codingAgentSessionStateFromRow(bare).repositoryHost).toBeNull();
       expect(codingAgentSessionStateFromRow(bare).gitBranch).toBeNull();
       expect(codingAgentSessionStateFromRow(bare).title).toBeNull();
+      expect(codingAgentSessionStateFromRow(bare).gitBranches).toEqual([]);
+    });
+
+    it("writes every branch the session drove, and decodes them back", () => {
+      const projection = makeProjection();
+      let state = initStateOf(projection);
+      for (const [index, branch] of ["main", "feat/two"].entries()) {
+        state = projection.handleCodingAgentSessionLogFactsContributed(
+          logFactsEvent({
+            facts: {
+              "event.name": "langwatch.session_context",
+              "vcs.repository.owner": "acme",
+              "vcs.repository.name": "widgets",
+              "vcs.ref.head.name": branch,
+            },
+            timeMs: 1_000 + index * 500,
+          }),
+          state,
+        );
+      }
+
+      const row = projectCodingAgentSessionToRow({
+        state,
+        tenantId: "tenant-1",
+        sessionId: SESSION_ID,
+        version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
+      });
+
+      expect(row.gitBranches).toEqual(["main", "feat/two"]);
+      expect(row.gitBranch).toBe("feat/two");
+      expect(codingAgentSessionStateFromRow(row).gitBranches).toEqual([
+        "main",
+        "feat/two",
+      ]);
     });
   });
 });

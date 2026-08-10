@@ -1,4 +1,4 @@
-import { Table } from "@chakra-ui/react";
+import { Table, Text } from "@chakra-ui/react";
 import type React from "react";
 
 import { ListTable } from "~/components/ui/ListTable";
@@ -14,10 +14,13 @@ import { type DetailPayload, MISSING_VALUE } from "./detailPayload";
 import { EmptySection, Section } from "./Section";
 
 /**
- * The sessions that ran on the pull request, by their facts alone: start time,
- * contributor, agent, tokens and cost. Never a session's title or any of its
- * content, which is gated on the session surfaces that own it; the read behind
- * this drawer carries none.
+ * The sessions that ran on the pull request: the title the agent generated for
+ * each one, then its start time, contributor, agent, tokens and cost.
+ *
+ * The title is the only conversation-derived value here, and the read decides
+ * whether this reader gets it, per the project each session ran in. A session
+ * with none, and a session whose title this reader may not see, both read as
+ * untitled: the row is still worth listing for what it consumed.
  */
 export const SessionsSection: React.FC<{
   sessions: DetailPayload["sessions"];
@@ -29,6 +32,7 @@ export const SessionsSection: React.FC<{
       <ListTable size="sm" containerProps={{ overflowX: "auto" }}>
         <Table.Header>
           <Table.Row>
+            <Table.ColumnHeader>Session</Table.ColumnHeader>
             <Table.ColumnHeader>Started</Table.ColumnHeader>
             <Table.ColumnHeader>Contributor</Table.ColumnHeader>
             <Table.ColumnHeader>Agent</Table.ColumnHeader>
@@ -39,6 +43,13 @@ export const SessionsSection: React.FC<{
         <Table.Body>
           {sessions.map((session) => (
             <Table.Row key={session.sessionId}>
+              <Table.Cell fontSize="sm">
+                {session.title ?? (
+                  <Text as="span" color="fg.muted">
+                    Untitled session
+                  </Text>
+                )}
+              </Table.Cell>
               <Table.Cell fontSize="sm" whiteSpace="nowrap">
                 {formatShortDate({ timestampMs: session.startedAtMs })}{" "}
                 {new Date(session.startedAtMs).toLocaleTimeString(undefined, {

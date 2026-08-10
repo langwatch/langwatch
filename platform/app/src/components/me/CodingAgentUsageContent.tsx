@@ -4,6 +4,8 @@ import numeral from "numeral";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { api } from "~/utils/api";
 
+import { formatDurationSeconds } from "./duration";
+
 /**
  * The personal coding-agent usage figures (ADR-056, personal-usage.feature):
  * cost, tokens, active time and session count over the trailing window, with
@@ -83,7 +85,7 @@ export function CodingAgentUsageContent({ projectId }: { projectId: string }) {
         />
         <Stat
           label="Active time"
-          value={formatDuration(totals.activeTimeSec)}
+          value={formatDurationSeconds(totals.activeTimeSec)}
         />
       </SimpleGrid>
       {produced.length > 0 && (
@@ -117,15 +119,4 @@ function Stat({ label, value }: { label: string; value: string }) {
       </Text>
     </Box>
   );
-}
-
-/** Whole-second duration as "45s" / "12m" / "3h 20m". */
-function formatDuration(totalSeconds: number): string {
-  const seconds = Math.round(totalSeconds);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  const remMinutes = minutes % 60;
-  return remMinutes > 0 ? `${hours}h ${remMinutes}m` : `${hours}h`;
 }

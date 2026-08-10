@@ -61,6 +61,7 @@ function sessionRow(
     models: ["claude-fable-5"],
     userId: "user-abc",
     gitBranch: "feat/linkage",
+    title: "Fix the flaky fold test",
     ...over,
   };
 }
@@ -717,7 +718,7 @@ describe("PullRequestUsageService", () => {
       expect(usage.rows[0]?.costUsd).toBeCloseTo(1.5);
     });
 
-    /** @scenario "A row names who worked on the pull request" */
+    /** @scenario "The drawer names who worked on the pull request" */
     it("names each contributor once and how many sessions they ran", async () => {
       const { service } = personalServiceWith({
         pullRequests: [pullRequestRow()],
@@ -1072,17 +1073,27 @@ describe("PullRequestUsageService", () => {
       ]);
     });
 
-    /** @scenario "The sessions list never carries a session title" */
-    it("carries facts about each session and nothing else", async () => {
+    /** @scenario "The sessions list names each session by its generated title" */
+    it("names each session by its title, alongside its facts", async () => {
       const { service } = serviceWith({
         pullRequests: [pullRequestRow()],
-        sessions: [sessionRow()],
+        sessions: [
+          sessionRow(),
+          sessionRow({ sessionId: "session-b", title: "" }),
+        ],
       });
 
       const detail = await service.getPullRequestDetail(QUERY);
 
-      // The session row's own key set, pinned. A title added here would be a
-      // disclosure nobody decided on.
+      expect(detail.sessions[0]?.title).toBe("Fix the flaky fold test");
+      // A session that never generated one says so with null rather than an
+      // empty string, so a reader renders absence instead of a blank cell.
+      expect(detail.sessions[1]?.title).toBeNull();
+
+      // The session row's own key set, pinned. Anything else added here would
+      // be a disclosure nobody decided on; the title is the one piece of
+      // conversation-derived content on the payload, and the read boundary
+      // decides whether this reader gets it.
       expect(Object.keys(detail.sessions[0]!).sort()).toEqual([
         "agent",
         "contributorIsProject",
@@ -1092,6 +1103,7 @@ describe("PullRequestUsageService", () => {
         "projectSlug",
         "sessionId",
         "startedAtMs",
+        "title",
         "totalTokens",
       ]);
     });
