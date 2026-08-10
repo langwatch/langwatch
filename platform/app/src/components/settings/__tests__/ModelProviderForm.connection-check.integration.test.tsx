@@ -4,7 +4,8 @@
  * The credential check offered inside the model-provider drawer, exercised
  * through the real form tree.
  *
- * Covers @unit scenarios from specs/model-providers/credential-validation.feature.
+ * Covers @integration scenarios from
+ * specs/model-providers/credential-validation.feature.
  *
  * Only the boundaries are stubbed — the tRPC client, the drawer, org context,
  * feature flags, the toaster. Everything that decides whether the control is
@@ -117,20 +118,21 @@ const primeQueries = makePrimeQueries({
   projectListQuery: mockListAllForProjectForFrontendQuery,
 });
 
+const drawer = (props: { modelProviderId?: string; providerKey?: string }) => (
+  <Wrapper>
+    <EditModelProviderForm
+      projectId="proj-1"
+      organizationId="org-1"
+      providerKey={props.providerKey ?? "openai"}
+      modelProviderId={props.modelProviderId}
+    />
+  </Wrapper>
+);
+
 const renderDrawer = (props: {
   modelProviderId?: string;
   providerKey?: string;
-}) =>
-  render(
-    <Wrapper>
-      <EditModelProviderForm
-        projectId="proj-1"
-        organizationId="org-1"
-        providerKey={props.providerKey ?? "openai"}
-        modelProviderId={props.modelProviderId}
-      />
-    </Wrapper>,
-  );
+}) => render(drawer(props));
 
 const checkButton = () =>
   screen.queryByRole("button", { name: "Test connection" });
@@ -206,12 +208,14 @@ describe("Feature: checking a credential from the drawer it was typed into", () 
       });
     });
 
-    it("becomes usable when the pair is completed", async () => {
-      await userEvent.type(inputFor("GEMINI_API_KEY"), "a-real-key");
-      await userEvent.type(inputFor("GEMINI_PROJECT"), "my-project");
-      await userEvent.type(inputFor("GEMINI_LOCATION"), "us-central1");
+    describe("when the pair is completed", () => {
+      it("becomes usable", async () => {
+        await userEvent.type(inputFor("GEMINI_API_KEY"), "a-real-key");
+        await userEvent.type(inputFor("GEMINI_PROJECT"), "my-project");
+        await userEvent.type(inputFor("GEMINI_LOCATION"), "us-central1");
 
-      await waitFor(() => expect(checkButton()).toBeEnabled());
+        await waitFor(() => expect(checkButton()).toBeEnabled());
+      });
     });
   });
 
@@ -344,36 +348,78 @@ describe("Feature: checking a credential from the drawer it was typed into", () 
       });
     });
 
-    /** @scenario "A result disappears when I change the credential" */
-    it("drops the verdict as soon as the credential changes", async () => {
-      await userEvent.type(inputFor("OPENAI_API_KEY"), "sk-typed-just-now");
-      await userEvent.click(checkButton()!);
-      expect(await screen.findByText("Connection works")).toBeTruthy();
+    describe("when I change the credential after being told it works", () => {
+      /** @scenario "A result disappears when I change the credential" */
+      it("drops the verdict as soon as the credential changes", async () => {
+        await userEvent.type(inputFor("OPENAI_API_KEY"), "sk-typed-just-now");
+        await userEvent.click(checkButton()!);
+        expect(await screen.findByText("Connection works")).toBeTruthy();
 
-      await userEvent.type(inputFor("OPENAI_API_KEY"), "-edited");
+        await userEvent.type(inputFor("OPENAI_API_KEY"), "-edited");
 
-      await waitFor(() =>
-        expect(screen.queryByText("Connection works")).toBeNull(),
-      );
+        await waitFor(() =>
+          expect(screen.queryByText("Connection works")).toBeNull(),
+        );
+      });
     });
 
-    /** @scenario "A result still in flight when I change the credential is discarded" */
-    it("discards an answer that arrives after the credential has changed", async () => {
-      // The case the test above cannot reach, because a resolved mock lands
-      // before the edit. Here the answer is held open across the edit, which is
-      // where the guard either works or silently does nothing: a verdict about
-      // the previous credential reappearing is a success claim about a key that
-      // is no longer on screen.
+    describe("when I change the credential before the answer arrives", () => {
+      /** @scenario "A result still in flight when I change the credential is discarded" */
+      it("discards the answer", async () => {
+        // The case the test above cannot reach, because a resolved mock lands
+        // before the edit. Here the answer is held open across the edit, which
+        // is where the guard either works or silently does nothing: a verdict
+        // about the previous credential reappearing is a success claim about a
+        // key that is no longer on screen.
+        let answer: (value: unknown) => void = () => undefined;
+        mockValidateApiKeyMutation.mockImplementation(
+          () => new Promise((resolve) => (answer = resolve)),
+        );
+
+        await userEvent.type(inputFor("OPENAI_API_KEY"), "sk-typed-just-now");
+        await userEvent.click(checkButton()!);
+        expect(await screen.findByText("Testing…")).toBeTruthy();
+
+        await userEvent.type(inputFor("OPENAI_API_KEY"), "-edited");
+
+        await act(async () => {
+          answer({ outcome: "verified", valid: true });
+          await Promise.resolve();
+        });
+
+        expect(screen.queryByText("Connection works")).toBeNull();
+      });
+    });
+  });
+
+  describe("given two saved rows that look identical on screen", () => {
+    /** @scenario "A result still in flight when I move to another provider is discarded" */
+    it("does not land the first row's verdict on the second", async () => {
+      // Both rows render the masked placeholder and the same endpoint, so what
+      // is on screen is character-for-character identical. Only the row
+      // identity separates them, which is why it has to be part of what the
+      // guard compares — otherwise a verdict about one is indistinguishable
+      // from a verdict about the other, and lands on whichever is open.
+      const storedRow = () =>
+        keyedRow({
+          providerKey: "openai",
+          apiKey: "OPENAI_API_KEY",
+          baseUrl: "OPENAI_BASE_URL",
+          storedBaseUrl: "https://saved.example.com/v1",
+        });
+      primeQueries([storedRow(), { ...storedRow(), id: "row-openai-second" }]);
+
       let answer: (value: unknown) => void = () => undefined;
-      mockValidateApiKeyMutation.mockImplementation(
+      mockTestConnection.mockImplementation(
         () => new Promise((resolve) => (answer = resolve)),
       );
 
-      await userEvent.type(inputFor("OPENAI_API_KEY"), "sk-typed-just-now");
+      const view = render(drawer({ modelProviderId: "row-openai" }));
       await userEvent.click(checkButton()!);
       expect(await screen.findByText("Testing…")).toBeTruthy();
 
-      await userEvent.type(inputFor("OPENAI_API_KEY"), "-edited");
+      // The customer moves to the other row before the answer arrives.
+      view.rerender(drawer({ modelProviderId: "row-openai-second" }));
 
       await act(async () => {
         answer({ outcome: "verified", valid: true });

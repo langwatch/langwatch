@@ -68,9 +68,21 @@ export function useCredentialCheck({
    *
    * `useCredentialProbeGate` makes the same argument for the save-time probe.
    */
+  /**
+   * What a verdict is about: the credentials on screen *and* the row they
+   * belong to.
+   *
+   * The row has to be in here rather than beside it. Two saved rows show the
+   * same masked placeholder and can carry the same endpoint, so what is on
+   * screen is identical for both and the credentials alone cannot tell them
+   * apart. Clearing on one key while stamping the guard with another means a
+   * check still in flight when the drawer moves to the second row survives the
+   * clear and reports the first row's answer about the second — indeed exactly
+   * the failure this guard exists to prevent, wearing a different hat.
+   */
   const credentialsFingerprint = useMemo(
-    () => JSON.stringify(customKeys),
-    [customKeys],
+    () => JSON.stringify({ modelProviderId, customKeys }),
+    [customKeys, modelProviderId],
   );
 
   /**
@@ -88,7 +100,7 @@ export function useCredentialCheck({
   useEffect(() => {
     latestFingerprint.current = credentialsFingerprint;
     setState(undefined);
-  }, [credentialsFingerprint, modelProviderId]);
+  }, [credentialsFingerprint]);
 
   /**
    * Ask whichever route can answer about what is on screen.

@@ -654,6 +654,17 @@ Feature: Credential Validation
     Then the answer is discarded when it arrives
     And I am not told the connection works
 
+  # Two saved providers show the same hidden credential and can carry the same
+  # endpoint, so what is on screen cannot tell them apart. Only the provider
+  # being edited can.
+
+  @integration
+  Scenario: A result still in flight when I move to another provider is discarded
+    Given I have asked for a check from the drawer and the answer has not arrived
+    When I start editing a different provider whose settings look the same
+    Then the answer is discarded when it arrives
+    And I am not told the connection works
+
   @unit
   Scenario: Repeated checks are limited however they are made
     Given I have checked connections many times in quick succession
