@@ -14,6 +14,39 @@ import type { ColumnSortState } from "./columnSort";
  * chevron: without it someone could sort the table by keyboard and have no way
  * to learn that they had.
  */
+/**
+ * The chevron: solid and pointing the way the column is ordered when it is the
+ * one in force, faint and downward on every other sortable column so a reader
+ * can tell which headings do something without hovering each one.
+ */
+function SortIndicator({ direction }: { direction: "asc" | "desc" | null }) {
+  if (direction === null) {
+    return (
+      <Icon
+        data-sort-hint
+        boxSize="12px"
+        color="fg.muted"
+        opacity={0.35}
+        flexShrink={0}
+        transition="opacity 0.1s ease"
+      >
+        <ChevronDown />
+      </Icon>
+    );
+  }
+  return (
+    <Icon boxSize="12px" color="fg" flexShrink={0}>
+      {direction === "asc" ? <ChevronUp /> : <ChevronDown />}
+    </Icon>
+  );
+}
+
+/** What `aria-sort` has to say for a reader who cannot see the chevron. */
+function ariaSortFor(direction: "asc" | "desc" | null) {
+  if (direction === null) return "none" as const;
+  return direction === "asc" ? ("ascending" as const) : ("descending" as const);
+}
+
 export function SortableColumnHeader<Column extends string>({
   label,
   column,
@@ -28,16 +61,11 @@ export function SortableColumnHeader<Column extends string>({
   align?: "start" | "end";
 }) {
   const active = sort.column === column;
+  const direction = active ? sort.direction : null;
 
   return (
     <Table.ColumnHeader
-      aria-sort={
-        active
-          ? sort.direction === "asc"
-            ? "ascending"
-            : "descending"
-          : "none"
-      }
+      aria-sort={ariaSortFor(direction)}
       // The band and the darker label do the highlighting. Weight is left to
       // the table's own heading style, which is already bold: overriding it
       // here made the sorted column read LIGHTER than the rest.
@@ -69,22 +97,7 @@ export function SortableColumnHeader<Column extends string>({
         css={{ "&:hover [data-sort-hint]": { opacity: 0.85 } }}
       >
         {label}
-        {active ? (
-          <Icon boxSize="12px" color="fg" flexShrink={0}>
-            {sort.direction === "asc" ? <ChevronUp /> : <ChevronDown />}
-          </Icon>
-        ) : (
-          <Icon
-            data-sort-hint
-            boxSize="12px"
-            color="fg.muted"
-            opacity={0.35}
-            flexShrink={0}
-            transition="opacity 0.1s ease"
-          >
-            <ChevronDown />
-          </Icon>
-        )}
+        <SortIndicator direction={direction} />
       </Button>
     </Table.ColumnHeader>
   );

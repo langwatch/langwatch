@@ -20,16 +20,23 @@ import { usePersonalContext } from "./usePersonalContext";
  * Spec: specs/ai-gateway/governance/sessions-and-devices.feature.
  */
 export function DevicesPanel() {
-  const { organizationId } = usePersonalContext();
+  // `organizationId` falls back to a placeholder while the organization is
+  // still loading, so it is never falsy and cannot gate anything. `ready` is
+  // what actually says the session and organization have arrived; without it
+  // the list query fires against the placeholder and its empty result renders
+  // as "No devices signed in", which tells the reader nothing is signed in
+  // when the truth is that nothing is known yet.
+  const { organizationId, ready } = usePersonalContext();
   const [pendingRevokeId, setPendingRevokeId] = useState<number | null>(null);
   const [isPendingRevokeAll, setIsPendingRevokeAll] = useState(false);
 
   const sessionsQuery = api.personalSessions.list.useQuery(
-    { organizationId: organizationId ?? "" },
-    { enabled: !!organizationId },
+    { organizationId },
+    { enabled: ready },
   );
   const revocation = useDeviceRevocation({
     organizationId,
+    isReady: ready,
     onDeviceRevoked: () => setPendingRevokeId(null),
     onEveryDeviceRevoked: () => setIsPendingRevokeAll(false),
   });
@@ -59,7 +66,7 @@ export function DevicesPanel() {
         />
       )}
 
-      {sessionsQuery.isLoading ? (
+      {!ready || sessionsQuery.isLoading ? (
         <Text fontSize="sm" color="fg.muted" paddingY={8}>
           Loading devices…
         </Text>
@@ -98,10 +105,12 @@ export function DevicesPanel() {
  */
 function useDeviceRevocation({
   organizationId,
+  isReady,
   onDeviceRevoked,
   onEveryDeviceRevoked,
 }: {
-  organizationId: string | undefined;
+  organizationId: string;
+  isReady: boolean;
   onDeviceRevoked: () => void;
   onEveryDeviceRevoked: () => void;
 }) {
@@ -141,11 +150,11 @@ function useDeviceRevocation({
     isRevokingDevice: revokeMutation.isPending,
     isRevokingEveryDevice: revokeAllMutation.isPending,
     revokeDevice: (sessionStartedAtMs: number) => {
-      if (!organizationId) return;
+      if (!isReady) return;
       revokeMutation.mutate({ organizationId, sessionStartedAtMs });
     },
     revokeEveryDevice: () => {
-      if (!organizationId) return;
+      if (!isReady) return;
       revokeAllMutation.mutate({ organizationId });
     },
   };
@@ -173,12 +182,12 @@ function RevokeAllConfirmation({
       gap={2}
       paddingY={2}
       paddingX={3}
-      backgroundColor="red.50"
+      backgroundColor="red.subtle"
       borderRadius="sm"
       borderWidth="1px"
-      borderColor="red.300"
+      borderColor="red.emphasized"
     >
-      <Text fontSize="xs" color="red.700" flex={1}>
+      <Text fontSize="xs" color="red.fg" flex={1}>
         Revoke every device on your account? You'll need to re-run{" "}
         <code>langwatch login</code> on each device after this.
       </Text>
@@ -260,7 +269,7 @@ function DeviceRow({
       align="stretch"
       gap={2}
       borderWidth="1px"
-      borderColor={isPendingRevoke ? "red.300" : "border.muted"}
+      borderColor={isPendingRevoke ? "red.emphasized" : "border.muted"}
       borderRadius="sm"
       padding={3}
     >
@@ -305,10 +314,10 @@ function DeviceRow({
           gap={2}
           paddingY={2}
           paddingX={3}
-          backgroundColor="red.50"
+          backgroundColor="red.subtle"
           borderRadius="sm"
         >
-          <Text fontSize="xs" color="red.700" flex={1}>
+          <Text fontSize="xs" color="red.fg" flex={1}>
             Revoke this device? The CLI on {session.hostname ?? "this device"}{" "}
             will start failing immediately.
           </Text>
