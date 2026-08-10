@@ -7546,7 +7546,7 @@ harness, not parallel code path).
   — configuration entity (already shipped, unchanged).
 - [`activity-monitor.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/activity-monitor.feature)
   — admin UI contract (already shipped; pipeline section adds in C1).
-- [`architecture.md`](./architecture.md) — top-level governance
+- [Governance architecture](/ai-gateway/governance/architecture) — top-level governance
   architecture; this doc is the activity-monitor deep-dive linked
   from the "Activity Monitor (Tier C/D)" block.
 
@@ -8200,9 +8200,9 @@ docs/ai-gateway/self-hosting/                        # Operator docs
   — admin-side IngestionSource setup forms + lifecycle.
 - [`personal-keys-deployment.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/self-hosting/personal-keys-deployment.feature)
   — self-host deployment contract for the personal-keys flow.
-- [`admin-setup.mdx`](./admin-setup.mdx) — admin's day-1 walkthrough.
-- [`personal-keys.mdx`](./personal-keys.mdx) — end-user dev story.
-- [`routing-policies.mdx`](./routing-policies.mdx) — RoutingPolicy concepts.
+- [Admin setup](/ai-gateway/governance/admin-setup) — admin's day-1 walkthrough.
+- [Personal keys](/ai-gateway/governance/personal-keys) — end-user dev story.
+- [Routing policies](/ai-gateway/governance/routing-policies) — RoutingPolicy concepts.
 
 ---
 
