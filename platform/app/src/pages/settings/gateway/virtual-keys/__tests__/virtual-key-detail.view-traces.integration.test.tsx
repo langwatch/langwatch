@@ -173,50 +173,61 @@ describe("View traces on the virtual key page", () => {
   afterEach(cleanup);
 
   describe("given a trace destination that is live and reachable", () => {
-    /** @scenario View traces opens the key's destination filtered to that key */
-    it("links to the destination's trace explorer filtered to the key", () => {
-      render(<VirtualKeyDetailPage />, { wrapper: Wrapper });
+    describe("when the key's page is opened", () => {
+      /** @scenario View traces opens the key's destination filtered to that key */
+      it("links to the destination's trace explorer filtered to the key", () => {
+        render(<VirtualKeyDetailPage />, { wrapper: Wrapper });
 
-      const href =
-        screen
-          .getByTestId("vk-view-traces")
-          .closest("a")
-          ?.getAttribute("href") ?? "";
-      expect(href.startsWith(`/${PROJECT_SLUG}/traces#all-traces?`)).toBe(true);
-      expect(href).toContain(encodeURIComponent(`"${VK_ID}"`));
+        const href =
+          screen
+            .getByTestId("vk-view-traces")
+            .closest("a")
+            ?.getAttribute("href") ?? "";
+        expect(href.startsWith(`/${PROJECT_SLUG}/traces#all-traces?`)).toBe(
+          true,
+        );
+        expect(href).toContain(encodeURIComponent(`"${VK_ID}"`));
+      });
     });
   });
 
   describe("given a key with no trace destination", () => {
-    /** @scenario View traces is absent when the key has no trace destination */
-    it("renders no View traces button", () => {
-      detail.value = keyDetail({ traceProjectId: null });
+    describe("when the key's page is opened", () => {
+      /** @scenario View traces is absent when the key has no trace destination */
+      it("renders no View traces button", () => {
+        detail.value = keyDetail({ traceProjectId: null });
 
-      render(<VirtualKeyDetailPage />, { wrapper: Wrapper });
+        render(<VirtualKeyDetailPage />, { wrapper: Wrapper });
 
-      expect(screen.queryByTestId("vk-view-traces")).toBeNull();
+        expect(screen.queryByTestId("vk-view-traces")).toBeNull();
+      });
     });
   });
 
   describe("given a trace destination that was deleted", () => {
-    /** @scenario View traces is absent when the trace destination was deleted */
-    it("keeps the Deleted badge and renders no View traces button", () => {
-      detail.value = keyDetail({ traceProjectArchived: true });
+    describe("when the key's page is opened", () => {
+      /** @scenario View traces is absent when the trace destination was deleted */
+      it("keeps the Deleted badge and renders no View traces button", () => {
+        detail.value = keyDetail({ traceProjectArchived: true });
 
-      render(<VirtualKeyDetailPage />, { wrapper: Wrapper });
+        render(<VirtualKeyDetailPage />, { wrapper: Wrapper });
 
-      expect(screen.getByTestId("vk-trace-destination-deleted")).toBeTruthy();
-      expect(screen.queryByTestId("vk-view-traces")).toBeNull();
+        expect(screen.getByTestId("vk-trace-destination-deleted")).toBeTruthy();
+        expect(screen.queryByTestId("vk-view-traces")).toBeNull();
+      });
     });
   });
 
   describe("given a destination on a team the viewer does not belong to", () => {
-    it("renders no View traces button", () => {
-      detail.value = keyDetail({ traceProjectId: "project-elsewhere" });
+    describe("when the key's page is opened", () => {
+      /** @scenario View traces is absent when the destination sits on a team I cannot open */
+      it("renders no View traces button", () => {
+        detail.value = keyDetail({ traceProjectId: "project-elsewhere" });
 
-      render(<VirtualKeyDetailPage />, { wrapper: Wrapper });
+        render(<VirtualKeyDetailPage />, { wrapper: Wrapper });
 
-      expect(screen.queryByTestId("vk-view-traces")).toBeNull();
+        expect(screen.queryByTestId("vk-view-traces")).toBeNull();
+      });
     });
   });
 });

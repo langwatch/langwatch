@@ -157,48 +157,59 @@ describe("View traces row action", () => {
   afterEach(cleanup);
 
   describe("given a key whose trace destination is live and reachable", () => {
-    /** @scenario View traces opens the key's destination filtered to that key */
-    it("navigates to the destination's trace explorer filtered to the key", async () => {
-      await openRowActions();
+    describe("when View traces is chosen from the row actions", () => {
+      /** @scenario View traces opens the key's destination filtered to that key */
+      it("navigates to the destination's trace explorer filtered to the key", async () => {
+        await openRowActions();
 
-      await userEvent.click(screen.getByText("View traces"));
+        await userEvent.click(screen.getByText("View traces"));
 
-      expect(routerPush).toHaveBeenCalledTimes(1);
-      const href = String(routerPush.mock.calls[0]?.[0]);
-      expect(href.startsWith(`/${PROJECT_SLUG}/traces#all-traces?`)).toBe(true);
-      expect(href).toContain(encodeURIComponent(`"${VK_ID}"`));
+        expect(routerPush).toHaveBeenCalledTimes(1);
+        const href = String(routerPush.mock.calls[0]?.[0]);
+        expect(href.startsWith(`/${PROJECT_SLUG}/traces#all-traces?`)).toBe(
+          true,
+        );
+        expect(href).toContain(encodeURIComponent(`"${VK_ID}"`));
+      });
     });
   });
 
   describe("given a key with no trace destination", () => {
-    /** @scenario View traces is absent when the key has no trace destination */
-    it("offers no View traces action", async () => {
-      listRows.value = [keyRow({ traceProjectId: null })];
+    describe("when the row actions are opened", () => {
+      /** @scenario View traces is absent when the key has no trace destination */
+      it("offers no View traces action", async () => {
+        listRows.value = [keyRow({ traceProjectId: null })];
 
-      await openRowActions();
+        await openRowActions();
 
-      expect(screen.queryByText("View traces")).toBeNull();
+        expect(screen.queryByText("View traces")).toBeNull();
+      });
     });
   });
 
   describe("given a key whose trace destination was deleted", () => {
-    /** @scenario View traces is absent when the trace destination was deleted */
-    it("offers no View traces action", async () => {
-      listRows.value = [keyRow({ traceProjectArchived: true })];
+    describe("when the row actions are opened", () => {
+      /** @scenario View traces is absent when the trace destination was deleted */
+      it("offers no View traces action", async () => {
+        listRows.value = [keyRow({ traceProjectArchived: true })];
 
-      await openRowActions();
+        await openRowActions();
 
-      expect(screen.queryByText("View traces")).toBeNull();
+        expect(screen.queryByText("View traces")).toBeNull();
+      });
     });
   });
 
   describe("given a destination on a team the viewer does not belong to", () => {
-    it("offers no View traces action", async () => {
-      listRows.value = [keyRow({ traceProjectId: "project-elsewhere" })];
+    describe("when the row actions are opened", () => {
+      /** @scenario View traces is absent when the destination sits on a team I cannot open */
+      it("offers no View traces action", async () => {
+        listRows.value = [keyRow({ traceProjectId: "project-elsewhere" })];
 
-      await openRowActions();
+        await openRowActions();
 
-      expect(screen.queryByText("View traces")).toBeNull();
+        expect(screen.queryByText("View traces")).toBeNull();
+      });
     });
   });
 });

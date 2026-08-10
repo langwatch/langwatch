@@ -153,6 +153,13 @@ Feature: AI Gateway — Virtual Keys
     Then "View traces" is not offered
     And the trace destination is still badged as deleted
 
+  @integration
+  Scenario: View traces is absent when the destination sits on a team I cannot open
+    Given virtual key "prod-key" files its traces into the project "web-app"
+    And I am not a member of the team that holds "web-app"
+    When I look at the actions for "prod-key"
+    Then "View traces" is not offered
+
   # ============================================================================
   # Create-drawer capability preview (Lane B iter 23) — minimum-viable
   # creation surface with a read-only preview of advanced settings.

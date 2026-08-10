@@ -146,12 +146,22 @@ def walk_numbered_pages(
     what keeps a route that answers past the end from looping. Whole pages
     rather than rows, matching the cursor walk, so a caller can fold
     whatever else rides on the page.
+
+    A page whose ``data`` is missing or is not a list raises RuntimeError
+    here rather than reaching the caller, where reading the rows off it
+    would fail as a bare KeyError or TypeError with nothing naming the
+    malformed answer.
     """
     page_number = 1
     seen = 0
     while page_number <= MAX_CURSOR_WALK_PAGES:
         page = fetch_page(page_number)
-        rows = page.get("data") or []
+        rows = page.get("data")
+        if not isinstance(rows, list):
+            raise RuntimeError(
+                "the endpoint answered a page whose data is "
+                f"{type(rows).__name__} rather than a list of rows"
+            )
         yield page
         seen += len(rows)
         total = (page.get("pagination") or {}).get("total")

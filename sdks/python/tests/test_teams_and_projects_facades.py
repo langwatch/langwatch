@@ -111,6 +111,17 @@ def test_teams_list_walks_every_page():
     assert seen_pages == ["1", "2"]
 
 
+def test_list_rejects_a_page_whose_data_is_not_a_list():
+    # Named at the walk rather than left to surface from inside the caller's
+    # loop, where reading the rows off the page fails as a bare KeyError or
+    # TypeError with nothing pointing at the malformed answer.
+    handler, _ = numbered([{"pagination": {"page": 1, "limit": 50, "total": 1}}])
+    facade = TeamsFacade(FakeRestClient(handler))
+
+    with pytest.raises(RuntimeError, match="rather than a list of rows"):
+        facade.list()
+
+
 # @scenario "Creating a project from the SDK returns the service API key minted with it"
 def test_projects_create_serves_the_service_api_key():
     handler, calls = recorder(
