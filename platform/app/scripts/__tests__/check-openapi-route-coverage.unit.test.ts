@@ -525,15 +525,40 @@ const appDerivedPrefixes = (source: string): string[] => {
   return [...(block ?? "").matchAll(/"([^"]+)"/g)].map((match) => match[1]!);
 };
 
-/** Every app identifier the generator asks `generateSpecs` for. */
+/**
+ * Every app identifier the generator asks `generateSpecs` for.
+ *
+ * The identifier is followed by either the closing paren or a comma: a family
+ * that declares its own security scheme passes spec options as a second
+ * argument, and those are exactly the families most worth checking.
+ */
 const mergedApps = (source: string): string[] =>
   [
     ...new Set(
-      [...source.matchAll(/generateSpecs\(\s*([A-Za-z0-9_]+)\s*\)/g)].map(
+      [...source.matchAll(/generateSpecs\(\s*([A-Za-z0-9_]+)\s*[,)]/g)].map(
         (match) => match[1]!,
       ),
     ),
   ].sort();
+
+const APP_ROOT = resolve(dirname(GENERATOR_PATH), "../..");
+
+/** The `tsconfig.json` path aliases an app import can be written through. */
+const ALIASES: ReadonlyArray<readonly [string, string]> = [
+  ["@ee/", "ee/"],
+  ["~/", "src/"],
+];
+
+/** One import specifier as an absolute file, alias or relative. */
+const specifierFile = (specifier: string): string => {
+  for (const [alias, directory] of ALIASES) {
+    if (specifier.startsWith(alias)) {
+      return `${resolve(APP_ROOT, directory + specifier.slice(alias.length))}.ts`;
+    }
+  }
+
+  return `${resolve(dirname(GENERATOR_PATH), specifier)}.ts`;
+};
 
 /** Where each of those identifiers is imported from, as an absolute file. */
 const importedFiles = (source: string): Map<string, string> => {
@@ -542,7 +567,7 @@ const importedFiles = (source: string): Map<string, string> => {
   for (const match of source.matchAll(
     /import\s*\{\s*app as ([A-Za-z0-9_]+)\s*\}\s*from\s*"([^"]+)"/g,
   )) {
-    files.set(match[1]!, `${resolve(dirname(GENERATOR_PATH), match[2]!)}.ts`);
+    files.set(match[1]!, specifierFile(match[2]!));
   }
 
   return files;
@@ -607,6 +632,13 @@ describe("APP_DERIVED_PREFIXES", () => {
     // A renamed or wrapped `generateSpecs(...)` call site would empty this
     // list, and every check below would then pass against nothing.
     expect(mergedApps(source).length).toBeGreaterThan(0);
+
+    // A call form the pattern cannot read is worse than an empty list: it
+    // drops one family and leaves the rest passing, which is silent. Every
+    // call site has to yield an identifier.
+    expect(mergedApps(source)).toHaveLength(
+      [...source.matchAll(/generateSpecs\(/g)].length,
+    );
 
     expect(
       mergedApps(source).filter((identifier) => !files.has(identifier)),

@@ -42,10 +42,14 @@ Feature: API keys management REST API
     Then the response contains only the keys that credential may see
     And the other member's key is absent
 
+  # A personal workspace holds exactly one member, its owner, and a key that
+  # owner owns is that owner acting programmatically, so it keeps reaching their
+  # own workspace. What the refusal exists to stop is a second principal getting
+  # in: a key owned by anybody else, or a service key owned by nobody at all.
   @integration
   Scenario: An API key cannot be bound into a personal workspace
     Given a member has a personal workspace in the organization
-    When I create a key bound to that personal workspace
+    When I create a key of my own bound to that member's personal workspace
     Then the request is refused with code personal_workspace_not_managed_here and status 403
     And no key is created
 

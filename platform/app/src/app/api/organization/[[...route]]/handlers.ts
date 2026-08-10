@@ -297,6 +297,12 @@ export const createInvitesHandler = async (
       ...(actorUserId ? { user: { id: actorUserId } } : {}),
       validation: "strict",
     });
+    // The invitee addresses are the subject of the record, not incidental
+    // context: "who was granted a way into this organization" is the question
+    // this entry exists to answer, and an invite id answers it only for as
+    // long as the invite row survives. The record adds no exposure, since the
+    // same addresses are listed by `GET /api/organization/invites` to the same
+    // organization-scoped credentials.
     emitManagementAudit({
       c,
       organizationId: organization.id,

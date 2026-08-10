@@ -20,6 +20,8 @@ Authorization: Bearer sk-lw-<id>_<secret>
 
 Reading your own keys needs `organization:view`. Creating, updating and revoking need `organization:manage`. Reading or listing keys that belong to somebody else needs `organization:manage` **and** organization administrator membership.
 
+Service keys are the exception, because they belong to nobody. A member credential with `organization:view` sees the organization's service keys in its own listing and may read one by id: administrator membership is what minting a service key takes, not what reading one takes. A service credential acts as nobody and so owns no keys at all, which makes its only listing the organization-wide one, and that needs `organization:manage`.
+
 ## Endpoints
 
 | Method | Path | Description |
