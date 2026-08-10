@@ -123,17 +123,29 @@ describe("redactSecretsInText", () => {
     // boundary region must never produce one.
     /** @scenario "A credential straddling a slice boundary is still redacted" */
     it("never splits a credential across two slices", () => {
-      const survived = [-40, -20, -1, 0, 1, 20, 40]
-        .map((offset) => {
-          const filler = "x ".repeat((250_000 + offset) / 2);
-          return `${filler}AKIAIOSFODNN7EXAMPLE tail`;
-        })
-        .filter((input) => redact(input).text.includes("AKIAIOSFODNN7EXAMPLE"));
-      expect(survived).toEqual([]);
+      const results = [-40, -20, -1, 0, 1, 20, 40].map((offset) => {
+        const filler = "x ".repeat((250_000 + offset) / 2);
+        const { text, redactedCount } = redact(
+          `${filler}AKIAIOSFODNN7EXAMPLE tail`,
+        );
+        return { offset, redactedCount, survived: text.includes("AKIAIOSFO") };
+      });
+      expect(results.filter((r) => r.survived)).toEqual([]);
+      // Exactly one replacement everywhere: a split would give zero, and a
+      // double-counted overlap would give two.
+      expect(results.filter((r) => r.redactedCount !== 1)).toEqual([]);
     });
 
     // A PEM block spans newlines by design, so whitespace alone does not keep
     // it whole; an unterminated BEGIN pulls its END into the same slice.
+    // A run with no whitespace at all must still terminate and stay bounded:
+    // hunting forward forever for a cut point would rebuild the unbounded scan
+    // the budget exists to prevent.
+    it("stays bounded when the payload carries no whitespace", () => {
+      const unbroken = "x".repeat(1_000_000);
+      expect(redact(unbroken).text).toBe(unbroken);
+    });
+
     /** @scenario "A PEM block straddling a slice boundary is still redacted" */
     it("keeps a PEM block whole across a boundary", () => {
       const pem =
@@ -141,7 +153,9 @@ describe("redactSecretsInText", () => {
         "MIIEvQIBADANBgkqh\n".repeat(40) +
         "-----END PRIVATE KEY-----";
       const input = `${"z ".repeat(124_995)}${pem} tail`;
-      expect(redact(input).text).not.toContain("MIIEvQIBADANBgkqh");
+      const { text, redactedCount } = redact(input);
+      expect(text).not.toContain("MIIEvQIBADANBgkqh");
+      expect(redactedCount).toBe(1);
     });
   });
 

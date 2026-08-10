@@ -973,9 +973,18 @@ function sliceEndAfter(text: string, start: number): number {
   if (lastSpace > 0) {
     end = start + lastSpace;
   } else {
-    // The whole window is one unbroken run; do not cut into it.
-    const next = text.slice(target).search(/\s/);
-    end = next === -1 ? text.length : target + next;
+    // The whole window is one unbroken run, so cutting at `target` would land
+    // mid-token. Look ahead for the whitespace that ends the run, but only so
+    // far: past this much the run is an order of magnitude longer than any
+    // credential, and cutting inside it cannot split one. Without the cap a
+    // payload carrying no whitespace at all would come back as a single slice,
+    // which is the unbounded scan the budget exists to prevent.
+    const lookahead = text.slice(target, target + SAFE_CUT_LOOKAHEAD);
+    const next = lookahead.search(/\s/);
+    end =
+      next === -1
+        ? Math.min(target + SAFE_CUT_LOOKAHEAD, text.length)
+        : target + next;
   }
 
   const begin = text.lastIndexOf(PEM_BEGIN, end);
@@ -985,6 +994,13 @@ function sliceEndAfter(text: string, start: number): number {
   }
   return end;
 }
+
+/**
+ * How far past the budget a cut may hunt for whitespace. Comfortably longer
+ * than any credential this file matches, so a run that outlasts it can be cut
+ * without splitting one.
+ */
+const SAFE_CUT_LOOKAHEAD = 4_096;
 
 const PEM_BEGIN = "-----BEGIN";
 const PEM_END = "-----END";
