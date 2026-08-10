@@ -101,6 +101,40 @@ describe("resolveShutdownBudget", () => {
         vi.stubEnv("ENVIRONMENT", "local");
         expect(resolveShutdownBudget().queueDrainMs).toBe(5_000);
       });
+
+      // The margin is pinned across layers above; the drain itself needs the
+      // same treatment, or the chart can keep sizing pods for 25s after this
+      // module moves to 30s and every assertion still passes.
+      /** @scenario The chart is sized for the same production drain the code uses */
+      it("agrees with the chart's default drain and its suite", () => {
+        vi.stubEnv("SHUTDOWN_DRAIN_TIMEOUT_MS", "");
+        vi.stubEnv("NODE_ENV", "production");
+        vi.stubEnv("ENVIRONMENT", "");
+        const drainSeconds = resolveShutdownBudget().queueDrainMs / 1000;
+
+        const read = (p: string) => readFileSync(resolve(REPO_ROOT, p), "utf8");
+
+        const values = read("charts/langwatch/values.yaml");
+        const declared = [
+          ...values.matchAll(/^\s+shutdownDrainSeconds:\s*(\d+)/gm),
+        ].map((m) => Number(m[1]));
+        // One per component (app, workers) — both must match, and there must
+        // be at least one, or a rename would make this vacuous.
+        expect(declared.length).toBeGreaterThan(0);
+        for (const value of declared) expect(value).toBe(drainSeconds);
+
+        const suite = read("charts/langwatch/tests/workers-shutdown.sh");
+        expect(Number(suite.match(/DRAIN_SECONDS=(\d+)/)?.[1])).toBe(
+          drainSeconds,
+        );
+
+        const helpers = read("charts/langwatch/templates/_helpers.tpl");
+        for (const [, fallback] of helpers.matchAll(
+          /shutdownDrainSeconds"?\s+"fallback"\s+(\d+)/g,
+        )) {
+          expect(Number(fallback)).toBe(drainSeconds);
+        }
+      });
     });
   });
 

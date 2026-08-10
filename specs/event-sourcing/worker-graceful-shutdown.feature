@@ -173,10 +173,19 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
   @unit @shutdown-ordering
   Scenario: A hung drain cannot hold the process open forever
     Given an App whose event-sourcing consumer never finishes draining
+    And the process is terminating
     When the App is closed
     Then the close gives up on the drain after a bounded wait
     But it leaves the connections alone, because that drain is still running
     So that giving up never becomes the severing it exists to prevent
+
+  @unit @shutdown-ordering
+  Scenario: A hung drain in a process that is not terminating still releases its handles
+    Given an App whose event-sourcing consumer never finishes draining
+    And the process is staying up, as when tests reset the App between files
+    When the App is closed
+    Then the connections are closed anyway
+    So that nothing else has to reclaim handles no dying process will free
 
   # Error classification — the shutdown abort must be retryable
 

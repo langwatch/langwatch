@@ -430,8 +430,10 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
       // App.close bounds it from the inside.
       {
         name: "app",
-        timeoutMs: SHUTDOWN_BUDGET.processDeadlineMs,
-        run: async () => await getApp().close(),
+        // See workers.ts: below the watchdog on purpose, so this bound can
+        // actually fire before the process deadline does.
+        timeoutMs: SHUTDOWN_BUDGET.appCloseMs + 5_000,
+        run: async () => await getApp().close({ terminating: true }),
       },
       { name: "posthog", run: async () => await shutdownPostHog() },
     ],

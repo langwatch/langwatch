@@ -147,13 +147,45 @@ describe("App.close", () => {
             ],
           });
 
-          const closing = app.close();
+          const closing = app.close({ terminating: true });
           // Advancing by the shared budget rather than a literal keeps this
           // honest if the drain budget is ever retuned.
           await vi.advanceTimersByTimeAsync(SHUTDOWN_BUDGET.appCloseMs);
           await expect(closing).resolves.toBeUndefined();
 
           expect(closed).toEqual([]);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      // resetApp() is the other caller and does NOT terminate: its own comment
+      // says orphaned closeable handles keep vitest's fork worker from exiting
+      // between files. Skipping the closeables there would leak Redis and
+      // Prisma, so the skip is gated on `terminating` rather than applied to
+      // every caller.
+      /** @scenario A hung drain in a process that is not terminating still releases its handles */
+      it("closes the connections anyway when the process is staying up", async () => {
+        vi.useFakeTimers();
+        try {
+          const closed: string[] = [];
+          const app = appWith({
+            eventSourcingClose: () => new Promise<void>(() => undefined),
+            closeables: [
+              {
+                name: "redis",
+                close: async () => {
+                  closed.push("redis");
+                },
+              },
+            ],
+          });
+
+          const closing = app.close();
+          await vi.advanceTimersByTimeAsync(SHUTDOWN_BUDGET.appCloseMs);
+          await closing;
+
+          expect(closed).toEqual(["redis"]);
         } finally {
           vi.useRealTimers();
         }

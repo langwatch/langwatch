@@ -51,10 +51,14 @@ installShutdownHandlers((signal) => ({
     // See specs/event-sourcing/worker-graceful-shutdown.feature.
     {
       name: "app",
-      timeoutMs: SHUTDOWN_BUDGET.processDeadlineMs,
+      // App.close bounds the drain itself at appCloseMs; this leaves room on
+      // top for the transports to close. Deliberately BELOW the runner's
+      // watchdog (processDeadlineMs) — set equal to it, this bound could never
+      // fire first and would be decoration.
+      timeoutMs: SHUTDOWN_BUDGET.appCloseMs + 5_000,
       run: async () => {
         const { getApp } = await import("./server/app-layer/app");
-        await getApp().close();
+        await getApp().close({ terminating: true });
       },
     },
   ],

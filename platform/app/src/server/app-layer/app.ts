@@ -184,11 +184,23 @@ export class App {
    * shutdown timeout, and SHUTDOWN_BUDGET.appCloseMs is the backstop for
    * anything that escapes it. Both come from server/shutdown/budget.ts, which
    * derives them from one number so this backstop cannot end up shorter than
-   * the drain it is supposed to outlive. A drain that hangs must not strand
-   * the connections — Kubernetes answers a missed grace period with SIGKILL,
-   * which is the ungraceful shutdown this method exists to avoid.
+   * the drain it is supposed to outlive.
+   *
+   * `terminating` says whether the process is on its way out. It changes only
+   * one thing — what to do when the drain times out — but the two callers need
+   * opposite answers. A terminating process can leave the transports to its
+   * own teardown, because closing them under a drain that is still running is
+   * the severing this method exists to prevent. resetApp() is the other
+   * caller and does NOT terminate: it relies on the closeables running to stop
+   * Redis and Prisma handles leaking into the next test file, so it must close
+   * them even then. Defaulting to false keeps the safe answer for anyone who
+   * does not think about it.
    */
-  async close(): Promise<void> {
+  async close({
+    terminating = false,
+  }: {
+    terminating?: boolean;
+  } = {}): Promise<void> {
     if (this._eventSourcing) {
       const eventSourcing = this._eventSourcing;
       const outcome = await settleWithTimeout({
@@ -196,7 +208,7 @@ export class App {
         timeoutMs: SHUTDOWN_BUDGET.appCloseMs,
       });
 
-      if (outcome.status === "timeout") {
+      if (outcome.status === "timeout" && terminating) {
         // Still running. Closing the transports now would sever exactly the
         // in-flight statements this method exists to protect, reproducing the
         // incident on the timeout path. Leave them to process teardown: the
@@ -208,6 +220,14 @@ export class App {
           "EventSourcing drain did not finish in time; leaving connections to process exit rather than severing in-flight work",
         );
         return;
+      }
+
+      if (outcome.status === "timeout") {
+        // Not terminating, so nothing else will reclaim these handles.
+        logger.error(
+          { timeoutMs: SHUTDOWN_BUDGET.appCloseMs },
+          "EventSourcing drain did not finish in time; closing connections anyway because this process is not shutting down",
+        );
       }
 
       if (outcome.status === "failed") {

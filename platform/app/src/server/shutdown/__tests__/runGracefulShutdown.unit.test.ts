@@ -251,7 +251,10 @@ describe("installShutdownHandlers", () => {
           process.emit("SIGTERM");
           process.emit("SIGINT");
           process.emit("SIGTERM");
-          await new Promise((r) => setTimeout(r, 10));
+          // Polled rather than slept on: the sequence is async, and a fixed
+          // delay can expire before exit(0) lands, which would fail here for
+          // timing rather than for behaviour.
+          await vi.waitFor(() => expect(exit).toHaveBeenCalled());
 
           expect(runs).toBe(1);
           expect(exit).toHaveBeenCalledTimes(1);
