@@ -36,7 +36,7 @@ Service keys are the exception, because they belong to nobody. A member credenti
 
 `GET /api/api-keys/{id}` and `PATCH /api/api-keys/{id}` return the same body, and it contains every field a write accepts. `bindings` comes back in exactly the shape `POST` and `PATCH` take, so comparing what you asked for against what the key has is a comparison rather than a translation. The secret itself is never returned: it exists only in the create response.
 
-A key you do not own is readable only with organization administrator membership plus `organization:manage`. Without both, the id answers 404 rather than 403, because a 403 would confirm the key exists.
+A personal key belonging to somebody else is readable only with organization administrator membership plus `organization:manage`. Without both, the id answers 404 rather than 403, because a 403 would confirm the key exists. Service keys are the exception described above: a member credential with `organization:view` reads one by id.
 
 ## Updating
 

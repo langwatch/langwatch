@@ -36,7 +36,7 @@ Authorization: Bearer sk-lw-<id>_<secret>
 | `PATCH` | `/api/role-bindings/{id}` | Change the role a binding grants |
 | `DELETE` | `/api/role-bindings/{id}` | Delete a binding |
 
-`GET` filters on `userId`, `groupId`, `apiKeyId`, `scopeType` and `scopeId`, and pages with `offset` and `limit`. `totalCount` counts the filtered set, not the organization.
+`GET` filters on `userId`, `groupId`, `apiKeyId`, `scopeType` and `scopeId`, and pages with `offset` and `limit`. `limit` defaults to 50 and cannot exceed 200. `totalCount` counts the filtered set, not the organization.
 
 ## Scopes
 
@@ -79,9 +79,9 @@ curl -X POST https://app.langwatch.ai/api/role-bindings \
   }'
 ```
 
-## `legacyAccessNotice`
+## `hasLegacyAccessNotice`
 
-A create response can carry `legacyAccessNotice: true`. It means this is the person's first explicit binding, and until now their access came from plain team membership, which this write switches off. Nothing failed, and nothing is blocked: it is there so a tool can tell an operator that this user's access is now described entirely by bindings.
+A create response can carry `hasLegacyAccessNotice: true`. It means this is the person's first explicit binding, and until now their access came from plain team membership, which this write switches off. Nothing failed, and nothing is blocked: it is there so a tool can tell an operator that this user's access is now described entirely by bindings.
 
 ## Errors
 

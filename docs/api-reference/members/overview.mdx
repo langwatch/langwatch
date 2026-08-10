@@ -46,7 +46,7 @@ Re-enabling a member takes a seat back, so it is checked against your plan and c
 ## Guard rails
 
 - The member the credential acts as cannot remove or disable themselves: `cannot_remove_self` and `cannot_disable_self`.
-- The last active administrator cannot be disabled or demoted: `cannot_disable_last_admin` and `cannot_demote_last_admin`. An organization with nobody who can administer it cannot be recovered from inside the product.
+- The last active administrator cannot be disabled, demoted, or removed: `cannot_disable_last_admin`, `cannot_demote_last_admin`, and `cannot_remove_last_admin`. An organization with nobody who can administer it cannot be recovered from inside the product, and removal is the only one of the three that cannot be undone.
 - A `PATCH` carries exactly one of `role` or `disabled`. Sending both, or neither, is a `validation_error`.
 - Personal workspaces are not organization access, so they are not listed on a member and cannot be managed here.
 - Changing a role can leave a team with no administrator. The response reports those teams in `teamsLeftWithoutAdmin` so the caller can fix it rather than discovering it later.

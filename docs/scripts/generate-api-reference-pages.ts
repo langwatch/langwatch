@@ -605,31 +605,73 @@ function main() {
     process.exit(1);
   }
 
-  // An `endpointOrder` key that names no operation is invisible: the sort
-  // silently falls back to the default for it. A drifted path parameter name
-  // or a casing slip therefore reshuffles the sidebar with no diagnostic at
-  // all, which is exactly what a hand-written key list is prone to.
-  const specOperations = new Set(
-    Object.entries(spec.paths).flatMap(([apiPath, methods]) =>
-      Object.keys(methods)
-        .filter((method) => METHOD_ORDER.includes(method))
-        .map((method) => `${method.toUpperCase()} ${apiPath}`)
-    )
+  // An `endpointOrder` key only sorts the group that declares it, so a key is
+  // invisible unless it names an operation THAT group owns: the sort silently
+  // falls back to the default for it. A drifted path parameter name, a casing
+  // slip, or a key naming a sibling group's path therefore reshuffles the
+  // sidebar with no diagnostic at all, which is exactly what a hand-written
+  // key list is prone to. The two failures get separate reports because their
+  // remedies differ: one is a typo, the other is a key in the wrong group.
+  const specOperations = new Set<string>();
+  const operationOwner = new Map<string, EndpointGroup>();
+  const groupOperations = new Map<EndpointGroup, Set<string>>(
+    ENDPOINT_GROUPS.map((group) => [group, new Set<string>()])
   );
-  const unresolvedOrder = ENDPOINT_GROUPS.flatMap((group) =>
-    (group.endpointOrder ?? [])
-      .filter((key) => !specOperations.has(key))
-      .map((key) => `${group.name}: ${key}`)
-  );
-  if (unresolvedOrder.length > 0) {
-    const noun = unresolvedOrder.length === 1 ? "key matches" : "keys match";
+  for (const [apiPath, methods] of Object.entries(spec.paths)) {
+    const owner = owners.get(apiPath);
+    for (const method of Object.keys(methods)) {
+      if (!METHOD_ORDER.includes(method)) continue;
+      const key = `${method.toUpperCase()} ${apiPath}`;
+      specOperations.add(key);
+      if (owner) {
+        operationOwner.set(key, owner);
+        groupOperations.get(owner)?.add(key);
+      }
+    }
+  }
+
+  const unknownOrder: string[] = [];
+  const misownedOrder: string[] = [];
+  for (const group of ENDPOINT_GROUPS) {
+    for (const key of group.endpointOrder ?? []) {
+      if (groupOperations.get(group)?.has(key)) continue;
+      if (!specOperations.has(key)) {
+        unknownOrder.push(`${group.name}: ${key}`);
+        continue;
+      }
+      const owner = operationOwner.get(key);
+      misownedOrder.push(
+        `${group.name}: ${key} (${
+          owner ? `owned by ${owner.name}` : "excluded by SKIP_PATHS"
+        })`
+      );
+    }
+  }
+
+  if (unknownOrder.length > 0) {
+    const noun = unknownOrder.length === 1 ? "key matches" : "keys match";
     console.error(
-      `ERROR: ${unresolvedOrder.length} endpointOrder ${noun} no operation in the spec:`
+      `ERROR: ${unknownOrder.length} endpointOrder ${noun} no operation in the spec:`
     );
-    for (const entry of unresolvedOrder.sort()) console.error(`  ${entry}`);
+    for (const entry of unknownOrder.sort()) console.error(`  ${entry}`);
     console.error(
       "\nSpell the METHOD and path exactly as the spec does, path parameter names and casing included, or drop the key from endpointOrder in docs/scripts/generate-api-reference-pages.ts."
     );
+  }
+  if (misownedOrder.length > 0) {
+    const noun =
+      misownedOrder.length === 1
+        ? "key names an operation"
+        : "keys name operations";
+    console.error(
+      `ERROR: ${misownedOrder.length} endpointOrder ${noun} the declaring group does not own, so the key sorts nothing:`
+    );
+    for (const entry of misownedOrder.sort()) console.error(`  ${entry}`);
+    console.error(
+      "\nMove the key to the group that owns the path, widen that group's pathPrefixes, or drop the key from endpointOrder in docs/scripts/generate-api-reference-pages.ts. A path excluded by SKIP_PATHS gets no page at all, so it can never be ordered."
+    );
+  }
+  if (unknownOrder.length > 0 || misownedOrder.length > 0) {
     process.exit(1);
   }
 

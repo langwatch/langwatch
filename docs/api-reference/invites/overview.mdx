@@ -61,6 +61,7 @@ The refusals to expect:
 | `duplicate_invite` | 409 | An invite for that address is already pending |
 | `member_seat_limit_reached` | 403 | The batch would take the organization past its seats |
 | `team_not_in_organization` | 422 | A `teamId` belongs to another organization |
+| `personal_workspace_not_managed_here` | 403 | A `teamId` names somebody's personal workspace, which is not shareable |
 | `custom_role_id_required` | 422 | A team assignment names a custom role without a `customRoleId` |
 | `custom_role_not_assignable` | 422 | The custom role cannot be handed out on that team |
 
