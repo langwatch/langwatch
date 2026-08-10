@@ -162,77 +162,13 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
         return;
       }
 
-      // Neither staged shape. Before treating this as a full event, establish
-      // that it IS one: a payload of some other type is a shape this build
-      // cannot read — almost certainly staged by a newer worker mid-rollout —
-      // and returning here would COMPLETE the job with no throw, no retry and
-      // no counter, silently dropping that span's facts. Refusing it is the
-      // whole reason the deploy-order rule is enforceable (ADR-069).
-      if (!isSpanReceivedEvent(event)) {
-        throw new Error(
-          `codingAgentSpanFactsDispatch cannot read staged payload of type "${String((event as { type?: unknown }).type)}"; refusing it into the queue's retry rather than completing it. A newer build likely staged it — drain with a build that knows the shape.`,
-        );
-      }
-
-      // The type says `span_received`, so read the body before the name gate
-      // answers for it. The gate's `false` means "an event I decline", and a
-      // body with no span object would reach that answer for the wrong reason
-      // — unreadable, not declined — and complete silently. This cannot fire
-      // for a job this seam minted: `enqueue.filter` already found a listed
-      // span name on `data.span`, so an absent span means the payload came
-      // from somewhere this build does not know.
-      if (!hasReadableSpanBody(event)) {
-        throw new Error(
-          `codingAgentSpanFactsDispatch cannot read the staged "span_received" body (trace ${String(event.aggregateId)}): no span object on it. Refusing it into the queue's retry rather than completing it.`,
-        );
-      }
-
-      // Full-event job: a pre-reference release staged it, or the seam could
-      // not reference the span. Gate, normalize and lift inline — identical to
-      // the pre-reference handler. A span_received carrying a readable span
-      // this subscriber declines is a legitimate quiet completion, not an
-      // unreadable shape — a build that poisons the queue with every ordinary
-      // span is worse than the loss this refusal prevents.
-      if (!isCodingAgentSpan(event)) return;
-
-      // Normalization is a pure function of the span's own bytes, so a body it
-      // cannot read will fail identically on every redelivery. Throwing would
-      // spend all 25 attempts re-deriving the same failure and then park the
-      // TRACE's group — losing every other span's facts in that group to save
-      // one span that was never recoverable. That is the blocked-group class
-      // this whole change removes, so an unreadable body completes quietly and
-      // loudly instead: logged for an operator, not retried.
-      //
-      // This is the only path a span reaches after the seam already failed to
-      // lift it (`makeSpanFactsLiftedPayload` stages the full event on a
-      // normalizer throw), which is exactly why it must not throw here too.
-      let span: NormalizedSpan;
-      try {
-        span = normalization.normalizeSpanReceived(
-          event.tenantId,
-          event.data.span,
-          event.data.resource,
-          event.data.instrumentationScope,
-        );
-      } catch (error) {
-        logger.error(
-          {
-            tenantId: String(event.tenantId),
-            traceId: String(event.aggregateId),
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "codingAgentSpanFactsDispatch: span body failed normalization; completing without contributing rather than blocking the trace's group",
-        );
-        return;
-      }
-
-      await deps.contributeSpanFacts(
-        liftContribution({
-          span,
-          tenantId: event.tenantId,
-          occurredAt: event.occurredAt,
-        }),
-      );
+      // Neither staged shape — the remaining one is a whole event.
+      await handleFullEvent({
+        event,
+        normalization,
+        isCodingAgentSpan,
+        contributeSpanFacts: deps.contributeSpanFacts,
+      });
     },
   };
 }
@@ -253,6 +189,112 @@ function hasReadableSpanBody(event: SpanReceivedEvent): boolean {
   // `typeof [] === "object"`, and an array has no `name`, so an array body
   // would reach the gate and be declined as an ordinary span.
   return typeof span === "object" && span !== null && !Array.isArray(span);
+}
+
+/**
+ * The full-event path: a job carrying the whole `span_received`, staged by a
+ * pre-derivation release or by a seam that could not lift the span.
+ *
+ * Split out of `handle` so that function stays what it reads as — a dispatcher
+ * over the three staged shapes — rather than a dispatcher with one shape's
+ * implementation inlined into it.
+ */
+async function handleFullEvent({
+  event,
+  normalization,
+  isCodingAgentSpan,
+  contributeSpanFacts,
+}: {
+  event: TraceProcessingEvent;
+  normalization: SpanNormalizationPipelineService;
+  isCodingAgentSpan: (
+    event: TraceProcessingEvent,
+  ) => event is SpanReceivedEvent;
+  contributeSpanFacts: (data: ContributeSpanFactsCommandData) => Promise<void>;
+}): Promise<void> {
+  // Before treating this as a full event, establish that it IS one: a payload
+  // of some other type is a shape this build cannot read — almost certainly
+  // staged by a newer worker mid-rollout — and returning here would COMPLETE
+  // the job with no throw, no retry and no counter, silently dropping that
+  // span's facts. Refusing it is the whole reason the deploy-order rule is
+  // enforceable (ADR-069).
+  if (!isSpanReceivedEvent(event)) {
+    throw new Error(
+      `codingAgentSpanFactsDispatch cannot read staged payload of type "${String((event as { type?: unknown }).type)}"; refusing it into the queue's retry rather than completing it. A newer build likely staged it — drain with a build that knows the shape.`,
+    );
+  }
+
+  // The type says `span_received`, so read the body before the name gate
+  // answers for it. The gate's `false` means "an event I decline", and a body
+  // with no span object would reach that answer for the wrong reason —
+  // unreadable, not declined — and complete silently. This cannot fire for a
+  // job this seam minted: `enqueue.filter` already found a listed span name on
+  // `data.span`, so an absent span means the payload came from somewhere this
+  // build does not know.
+  if (!hasReadableSpanBody(event)) {
+    throw new Error(
+      `codingAgentSpanFactsDispatch cannot read the staged "span_received" body (trace ${String(event.aggregateId)}): no span object on it. Refusing it into the queue's retry rather than completing it.`,
+    );
+  }
+
+  // A span_received carrying a readable span this subscriber declines is a
+  // legitimate quiet completion, not an unreadable shape — a build that
+  // poisons the queue with every ordinary span is worse than the loss this
+  // refusal prevents.
+  if (!isCodingAgentSpan(event)) return;
+
+  const span = normalizeOrReport({ event, normalization });
+  if (span === null) return;
+
+  await contributeSpanFacts(
+    liftContribution({
+      span,
+      tenantId: event.tenantId,
+      occurredAt: event.occurredAt,
+    }),
+  );
+}
+
+/**
+ * Normalizes a full event's span, or reports the failure and yields `null`.
+ *
+ * Normalization is a pure function of the span's own bytes, so a body it cannot
+ * read fails identically on every redelivery. Throwing would spend all 25
+ * attempts re-deriving the same failure and then park the TRACE's group —
+ * losing every other span's facts in that group to save one span that was never
+ * recoverable. That is the blocked-group class this whole change removes, so an
+ * unreadable body completes quietly and loudly instead: logged for an operator,
+ * not retried.
+ *
+ * This is the only path such a span can reach, because the seam already failed
+ * to lift it (`makeSpanFactsLiftedPayload` stages the full event on a
+ * normalizer throw) — which is exactly why it must not throw here too.
+ */
+function normalizeOrReport({
+  event,
+  normalization,
+}: {
+  event: SpanReceivedEvent;
+  normalization: SpanNormalizationPipelineService;
+}): NormalizedSpan | null {
+  try {
+    return normalization.normalizeSpanReceived(
+      event.tenantId,
+      event.data.span,
+      event.data.resource,
+      event.data.instrumentationScope,
+    );
+  } catch (error) {
+    logger.error(
+      {
+        tenantId: String(event.tenantId),
+        traceId: String(event.aggregateId),
+        error: error instanceof Error ? error.message : String(error),
+      },
+      "codingAgentSpanFactsDispatch: span body failed normalization; completing without contributing rather than blocking the trace's group",
+    );
+    return null;
+  }
 }
 
 /**
