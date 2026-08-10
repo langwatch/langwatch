@@ -173,6 +173,7 @@ describe("extractTrackedEventsFromSpan", () => {
         event_type: "thumbs_up_down",
         metrics: { vote: 1 },
         event_details: { feedback: "great answer" },
+        occurrenceIndex: 0,
       });
     });
   });
@@ -238,7 +239,22 @@ describe("extractTrackedEventsFromSpan", () => {
         event_type: "waited_to_finish",
         metrics: {},
         event_details: {},
+        occurrenceIndex: 0,
       });
+    });
+  });
+
+  describe("given a span whose first feedback event is unusable", () => {
+    it("numbers the reconstructed events by their position in the span", () => {
+      const span = makeOtlpSpan([
+        { metrics: { vote: 1 } },
+        { type: "thumbs_up_down", metrics: { vote: 1 } },
+      ]);
+
+      const result = extractTrackedEventsFromSpan(span);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]?.occurrenceIndex).toBe(1);
     });
   });
 
@@ -391,6 +407,43 @@ describe("trackedEventSync reactor", () => {
       );
 
       expect(deps.recordTrackedEvent).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("when the span carries two feedback events of the same type", () => {
+    it("records both under distinct event ids", async () => {
+      const reactor = createTrackedEventSyncReactor(deps);
+      const span = makeOtlpSpan([
+        { type: "thumbs_up_down", metrics: { vote: 1 } },
+        { type: "thumbs_up_down", metrics: { vote: -1 } },
+      ]);
+
+      await reactor.handle(
+        createSpanReceivedEvent(span),
+        createContext(createFoldState()),
+      );
+
+      expect(deps.recordTrackedEvent).toHaveBeenCalledTimes(2);
+      const calls = vi.mocked(deps.recordTrackedEvent).mock.calls;
+      expect(calls[0]![0].eventId).not.toBe(calls[1]![0].eventId);
+      expect(calls[0]![0].body.metrics).toEqual({ vote: 1 });
+      expect(calls[1]![0].body.metrics).toEqual({ vote: -1 });
+    });
+
+    it("keeps each event id stable across a replay", async () => {
+      const reactor = createTrackedEventSyncReactor(deps);
+      const span = makeOtlpSpan([
+        { type: "thumbs_up_down", metrics: { vote: 1 } },
+        { type: "thumbs_up_down", metrics: { vote: -1 } },
+      ]);
+      const event = createSpanReceivedEvent(span);
+
+      await reactor.handle(event, createContext(createFoldState()));
+      await reactor.handle(event, createContext(createFoldState()));
+
+      const calls = vi.mocked(deps.recordTrackedEvent).mock.calls;
+      expect(calls[0]![0].eventId).toBe(calls[2]![0].eventId);
+      expect(calls[1]![0].eventId).toBe(calls[3]![0].eventId);
     });
   });
 

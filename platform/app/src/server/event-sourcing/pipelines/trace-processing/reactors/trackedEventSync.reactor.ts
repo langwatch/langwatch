@@ -37,12 +37,21 @@ const DETAILS_PREFIX = "event.details.";
 
 /**
  * One reconstructed tracked-event payload, shaped like the REST
- * `POST /api/events/track` body so it can flow through the same ingestion path.
+ * `POST /api/events/track` body so it can flow through the same ingestion path,
+ * plus the occurrence ordinal that separates two feedback events of the same
+ * type on one span.
  */
 export interface ReconstructedTrackedEvent {
   event_type: string;
   metrics: Record<string, number>;
   event_details: Record<string, string>;
+  /**
+   * Index of the source event within the span's own `events` list. That list is
+   * fixed for a given span, so the ordinal is stable across replays — unlike a
+   * running counter over the reconstructed subset, which would shift whenever a
+   * preceding event started or stopped passing reconstruction.
+   */
+  occurrenceIndex: number;
 }
 
 /**
@@ -76,21 +85,27 @@ export interface TrackedEventSyncReactorDeps {
 
 /**
  * Deterministic event id so a replayed span re-records the same tracked event
- * rather than duplicating it. Keyed on (trace, span, event type) — a span may
- * carry at most one feedback event per type.
+ * rather than duplicating it. Keyed on (trace, span, event type, occurrence
+ * ordinal): nothing stops a span carrying two `langwatch.event` entries of the
+ * same type, and without the ordinal both would hash to one id, so idempotent
+ * recording would collapse them into a single tracked event. The ordinal is the
+ * event's index within the span's own event list, which is fixed for a given
+ * span and therefore identical on every replay.
  */
 function deterministicEventId({
   traceId,
   spanId,
   eventType,
+  occurrenceIndex,
 }: {
   traceId: string;
   spanId: string;
   eventType: string;
+  occurrenceIndex: number;
 }): string {
   const hash = crypto
     .createHash("sha256")
-    .update(`${traceId}:${spanId}:${eventType}`)
+    .update(`${traceId}:${spanId}:${eventType}:${occurrenceIndex}`)
     .digest("hex");
   return `event_sha_${hash.slice(0, 32)}`;
 }
@@ -181,9 +196,13 @@ function collectDetailAttribute({
  * `langwatch.event` span event's attributes. Returns undefined when the event
  * carries no usable `event.type`, so the caller drops it.
  */
-function reconstructTrackedEvent(
-  event: OtlpSpanEvent,
-): ReconstructedTrackedEvent | undefined {
+function reconstructTrackedEvent({
+  event,
+  occurrenceIndex,
+}: {
+  event: OtlpSpanEvent;
+  occurrenceIndex: number;
+}): ReconstructedTrackedEvent | undefined {
   let eventType: string | undefined;
   const metrics: Record<string, number> = {};
   const eventDetails: Record<string, string> = {};
@@ -209,6 +228,7 @@ function reconstructTrackedEvent(
     event_type: eventType,
     metrics,
     event_details: eventDetails,
+    occurrenceIndex,
   };
 }
 
@@ -229,10 +249,10 @@ export function extractTrackedEventsFromSpan(
 
   if (span.name === TRACK_EVENT_SPAN_NAME) return events;
 
-  for (const event of span.events ?? []) {
+  for (const [occurrenceIndex, event] of (span.events ?? []).entries()) {
     if (event.name !== FEEDBACK_EVENT_NAME) continue;
 
-    const reconstructed = reconstructTrackedEvent(event);
+    const reconstructed = reconstructTrackedEvent({ event, occurrenceIndex });
     if (reconstructed !== undefined) events.push(reconstructed);
   }
 
@@ -352,6 +372,7 @@ async function recordReconstructedEvent({
     traceId,
     spanId,
     eventType: trackedEvent.event_type,
+    occurrenceIndex: trackedEvent.occurrenceIndex,
   });
 
   try {

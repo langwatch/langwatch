@@ -609,6 +609,10 @@ func TestGenAIOperationFromPath(t *testing.T) {
 		{"/api/embed", semconv.GenAIOperationNameEmbeddings},
 		{"/api/embeddings", semconv.GenAIOperationNameEmbeddings},
 		{"/api/unknown", semconv.GenAIOperationNameKey.String("unknown")},
+		// "/api" and "/api/" are incomplete API paths carrying no operation
+		// segment, so they report "unknown" rather than the prefix itself.
+		{"/api", semconv.GenAIOperationNameKey.String("unknown")},
+		{"/api/", semconv.GenAIOperationNameKey.String("unknown")},
 		// An empty path is not a chat: it reports "unknown" exactly as any other
 		// path no extractor recognizes does.
 		{"", semconv.GenAIOperationNameKey.String("unknown")},

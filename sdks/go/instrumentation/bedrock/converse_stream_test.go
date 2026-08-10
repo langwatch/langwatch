@@ -304,7 +304,6 @@ func TestConverseStream_CtxCancel_FinalisesSpan(t *testing.T) {
 // goroutine is not leaked for the rest of the run.
 type blockingStreamReader struct {
 	first     types.ConverseStreamOutput
-	closed    bool
 	done      chan struct{}
 	closeOnce sync.Once
 }
@@ -332,7 +331,6 @@ func (b *blockingStreamReader) Events() <-chan types.ConverseStreamOutput {
 }
 
 func (b *blockingStreamReader) Close() error {
-	b.closed = true
 	b.closeOnce.Do(func() { close(b.done) })
 	return nil
 }

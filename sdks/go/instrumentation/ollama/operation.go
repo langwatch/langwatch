@@ -17,8 +17,13 @@ func genAIOperationFromPath(urlPath string) attribute.KeyValue {
 	segments := strings.Split(strings.Trim(urlPath, "/"), "/")
 
 	var operationSegment string
-	if len(segments) >= 2 && segments[0] == "api" {
-		operationSegment = segments[1]
+	if len(segments) > 0 && segments[0] == "api" {
+		// "/api" and "/api/" carry no operation segment at all; leaving the
+		// segment empty reports them as "unknown" rather than as an "api"
+		// operation that does not exist.
+		if len(segments) >= 2 {
+			operationSegment = segments[1]
+		}
 	} else if len(segments) > 0 {
 		operationSegment = segments[len(segments)-1]
 	}

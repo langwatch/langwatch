@@ -228,11 +228,11 @@ func (a *messagesStreamAccumulator) Finish(span *langwatch.Span, capture langwat
 	// point marks the span as failed. Record it last, after the partial output
 	// and usage, which stay on the span as evidence of how far the call got.
 	//
-	// SetStatus is the right call to make and is kept, but note it is currently
-	// swallowed: the otelhttp base sets codes.Ok when the 200 headers arrive,
-	// and the OpenTelemetry SDK will not downgrade Ok to Error. Until the base
-	// defers that Ok for streamed bodies, error.type and the exception event are
-	// what actually reach the consumer.
+	// The shared otelhttp tracer withholds codes.Ok for a streamed response
+	// precisely so this can land: OTel treats Ok as final and will not downgrade
+	// it to Error, so an Ok stamped when the 200 headers arrived would swallow
+	// the failure the stream reports later. Because it is deferred, SetStatus
+	// here takes effect alongside error.type and the exception event.
 	if a.failed() {
 		err := &streamError{errType: a.errType, message: a.errMsg}
 		span.SetStatus(codes.Error, err.Error())
