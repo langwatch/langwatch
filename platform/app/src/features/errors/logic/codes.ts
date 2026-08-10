@@ -246,6 +246,7 @@ export const APP_ERROR_CODES = [
   "trace_not_found",
   "trace_project_required",
   "trace_sharing_disabled",
+  "trigger_filters_required",
   // Also a Go code, with copy already written under the shared/transport
   // heading — an app-level subclass raises it too (`ee/admin/routes/admin.ts`),
   // and the scan is right to insist it be listed here as well.

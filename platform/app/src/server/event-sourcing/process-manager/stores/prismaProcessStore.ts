@@ -464,4 +464,69 @@ export class PrismaProcessStore implements ProcessStore {
     `;
     return affected;
   }
+
+  // The three batched sweeps below share one shape: pick at most `limit` ids
+  // with a bounded SELECT, then delete exactly those. Putting the LIMIT in a
+  // subquery rather than on the DELETE is what keeps one statement's lock
+  // footprint bounded — an unbounded `DELETE ... WHERE age < x` against
+  // millions of rows holds row locks for the whole scan and is exactly the
+  // shape that made the pre-existing single-process prune unusable at volume.
+  //
+  // All three are cross-tenant by design (see the port docs), so each carries
+  // the multitenancy guard's sanctioned `-- @tenancy:` marker, the same opt-out
+  // `deleteDispatchedBefore` above already uses.
+
+  async deleteDispatchedOutboxBatch(params: {
+    before: number;
+    limit: number;
+  }): Promise<number> {
+    if (params.limit <= 0) return 0;
+    return await this.prisma.$executeRaw`
+      DELETE FROM "ProcessManagerOutbox"
+      WHERE "id" IN (
+        SELECT "id" FROM "ProcessManagerOutbox"
+        WHERE "status" = 'dispatched'::"ProcessManagerOutboxStatus"
+          AND "dispatchedAt" < ${asDate(params.before)}
+        LIMIT ${params.limit}
+      )
+      -- @tenancy: process-manager retention sweep, dispatched outbox (system-owned maintenance)
+    `;
+  }
+
+  async deleteDeadOutboxBatch(params: {
+    before: number;
+    limit: number;
+  }): Promise<number> {
+    if (params.limit <= 0) return 0;
+    // Dead rows carry no `deadAt`; `updatedAt` is stamped by the markFailed
+    // that retired them, so it IS the moment the row became a failure record.
+    // No new index: `dead` is a rare status, so the existing
+    // (status, nextAttemptAt, leasedUntil) index already makes this selective.
+    return await this.prisma.$executeRaw`
+      DELETE FROM "ProcessManagerOutbox"
+      WHERE "id" IN (
+        SELECT "id" FROM "ProcessManagerOutbox"
+        WHERE "status" = 'dead'::"ProcessManagerOutboxStatus"
+          AND "updatedAt" < ${asDate(params.before)}
+        LIMIT ${params.limit}
+      )
+      -- @tenancy: process-manager retention sweep, dead outbox (system-owned maintenance)
+    `;
+  }
+
+  async deleteConsumedInboxBatch(params: {
+    before: number;
+    limit: number;
+  }): Promise<number> {
+    if (params.limit <= 0) return 0;
+    return await this.prisma.$executeRaw`
+      DELETE FROM "ProcessManagerInbox"
+      WHERE "id" IN (
+        SELECT "id" FROM "ProcessManagerInbox"
+        WHERE "consumedAt" < ${asDate(params.before)}
+        LIMIT ${params.limit}
+      )
+      -- @tenancy: process-manager retention sweep, consumed inbox (system-owned maintenance)
+    `;
+  }
 }

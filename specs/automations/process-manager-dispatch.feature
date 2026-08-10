@@ -64,11 +64,21 @@ Feature: Automation dispatch on the process-manager substrate
     Then one persist intent exists per trace
     And each intent retries independently of the other
 
+  # The flush record is a log line, so it must cost about as much as a log
+  # line. Keying it on a cumulative counter made every entry unique, which
+  # defeated the outbox's own dedup and wrote one durable row per overflowed
+  # match: a single day of one project's storm produced 119,665 rows whose
+  # entire content was "we flushed early again". Keying it on the trigger and
+  # the minute of event time coalesces a storm into at most one row per trigger
+  # per minute, and the payload still carries the running total so the storm
+  # rate is recoverable from any single row.
+  @unit
   Scenario: Pending matches are bounded without losing matches
     Given a match storm larger than the pending-match bound
     When the storm is consumed
     Then the oldest matches are dispatched immediately instead of being dropped
     And the early flush is logged with a count
+    And at most one overflow entry is written per trigger per minute
 
   Scenario: Pending settlement survives queue loss
     Given a trigger match has committed into settlement process state
