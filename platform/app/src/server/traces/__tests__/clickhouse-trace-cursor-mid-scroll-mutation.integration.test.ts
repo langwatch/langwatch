@@ -258,13 +258,23 @@ describe("updated-axis scroll when a trace is modified mid-pagination", () => {
       });
     });
 
-    // The snapshot bound is expressed in UpdatedAt, and a backdated write is by
-    // definition indistinguishable from a version that was always there —
-    // nothing in the row records when it was written. So this case is a known
-    // residual, documented rather than silently omitted. Closing it needs a
-    // separate write-time column, which is a schema change and its own work.
-    describe("when a backdated write places it above the cursor", () => {
-      it("still drops the trace — known limitation of the snapshot bound", async () => {
+    // A characterisation test for an input the ingest path cannot currently
+    // produce, NOT a known gap in the fix.
+    //
+    // The snapshot bound is expressed in UpdatedAt, so it cannot tell a version
+    // just written with a past timestamp from one that was always there. That
+    // would matter if anything backdated UpdatedAt — and nothing does:
+    // abstractFoldProjection stamps `Math.max(Date.now(), prev + 1)`, forced
+    // monotonic (projections/abstractFoldProjection.ts), and
+    // trace-summary.clickhouse.repository.ts is the only writer of the column.
+    // Event occurrence time lives in LastEventOccurredAt, a separate column, so
+    // a late or replayed event still moves UpdatedAt forward.
+    //
+    // This test exists to catch that changing: if a bulk import or backfill
+    // ever writes a chosen UpdatedAt, it starts failing and the assumption
+    // above needs revisiting rather than quietly rotting.
+    describe("when a write is backdated above the cursor", () => {
+      it("drops the trace — the bound cannot see write time, and nothing backdates", async () => {
         const page1 = await fetchPage(backdatedTenant);
         expect(traceIdsOf(page1)).toEqual([backdated.a, backdated.b]);
 
@@ -282,9 +292,9 @@ describe("updated-axis scroll when a trace is modified mid-pagination", () => {
           [backdated.a, backdated.b, backdated.c].sort(),
         );
 
-        // Asserting CURRENT behaviour, not desired behaviour. If this starts
-        // failing, the backdated case has been fixed and this should become a
-        // positive assertion instead.
+        // Asserting CURRENT behaviour against an unreachable input. A failure
+        // here means something started backdating UpdatedAt — go read why
+        // before changing this assertion.
         expect(seen).not.toContain(backdated.d);
       });
     });
