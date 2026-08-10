@@ -38,7 +38,10 @@ import {
   parseVirtualKeyConfig,
   virtualKeyConfigSchema,
 } from "~/server/gateway/virtualKey.config";
-import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
+import {
+  loadTraceDestinationFacts,
+  toVirtualKeyCamelDto,
+} from "~/server/gateway/virtualKey.dto";
 import {
   VirtualKeyService,
   virtualKeyBudgetInputSchema,
@@ -100,10 +103,16 @@ export const virtualKeysRouter = createTRPCRouter({
         ctx.session.user.id,
       );
       const service = VirtualKeyService.create(ctx.prisma);
-      const keys = await service.getAll(input.organizationId);
-      return keys
-        .filter((vk) => isVisibleToMembership(membership, vk.scopes))
-        .map(toVirtualKeyCamelDto);
+      const keys = (await service.getAll(input.organizationId)).filter((vk) =>
+        isVisibleToMembership(membership, vk.scopes),
+      );
+      // One read of the destinations for the whole page: a listing must not
+      // cost a query per key to say where each one's traffic goes.
+      const facts = await loadTraceDestinationFacts({
+        client: ctx.prisma,
+        virtualKeys: keys,
+      });
+      return keys.map((vk) => toVirtualKeyCamelDto({ virtualKey: vk, facts }));
     }),
 
   get: protectedProcedure
@@ -113,7 +122,13 @@ export const virtualKeysRouter = createTRPCRouter({
       // A key the caller can't see is indistinguishable from one that
       // doesn't exist — same NOT_FOUND, no existence leak.
       const vk = await requireVisibleVk(ctx, input.organizationId, input.id);
-      return toVirtualKeyCamelDto(vk);
+      return toVirtualKeyCamelDto({
+        virtualKey: vk,
+        facts: await loadTraceDestinationFacts({
+          client: ctx.prisma,
+          virtualKeys: [vk],
+        }),
+      });
     }),
 
   /**
@@ -344,7 +359,16 @@ export const virtualKeysRouter = createTRPCRouter({
         config: input.config,
         actorUserId: ctx.session.user.id,
       });
-      return { virtualKey: toVirtualKeyCamelDto(virtualKey), secret };
+      return {
+        virtualKey: toVirtualKeyCamelDto({
+          virtualKey,
+          facts: await loadTraceDestinationFacts({
+            client: ctx.prisma,
+            virtualKeys: [virtualKey],
+          }),
+        }),
+        secret,
+      };
     }),
 
   update: protectedProcedure
@@ -447,7 +471,13 @@ export const virtualKeysRouter = createTRPCRouter({
         config: input.config,
         actorUserId: ctx.session.user.id,
       });
-      return toVirtualKeyCamelDto(updated);
+      return toVirtualKeyCamelDto({
+        virtualKey: updated,
+        facts: await loadTraceDestinationFacts({
+          client: ctx.prisma,
+          virtualKeys: [updated],
+        }),
+      });
     }),
 
   rotate: protectedProcedure
@@ -470,7 +500,16 @@ export const virtualKeysRouter = createTRPCRouter({
         organizationId: input.organizationId,
         actorUserId: ctx.session.user.id,
       });
-      return { virtualKey: toVirtualKeyCamelDto(virtualKey), secret };
+      return {
+        virtualKey: toVirtualKeyCamelDto({
+          virtualKey,
+          facts: await loadTraceDestinationFacts({
+            client: ctx.prisma,
+            virtualKeys: [virtualKey],
+          }),
+        }),
+        secret,
+      };
     }),
 
   revoke: protectedProcedure
@@ -493,7 +532,13 @@ export const virtualKeysRouter = createTRPCRouter({
         organizationId: input.organizationId,
         actorUserId: ctx.session.user.id,
       });
-      return toVirtualKeyCamelDto(updated);
+      return toVirtualKeyCamelDto({
+        virtualKey: updated,
+        facts: await loadTraceDestinationFacts({
+          client: ctx.prisma,
+          virtualKeys: [updated],
+        }),
+      });
     }),
 
   disable: protectedProcedure
@@ -517,7 +562,13 @@ export const virtualKeysRouter = createTRPCRouter({
         actorUserId: ctx.session.user.id,
         reason: input.reason ?? null,
       });
-      return toVirtualKeyCamelDto(updated);
+      return toVirtualKeyCamelDto({
+        virtualKey: updated,
+        facts: await loadTraceDestinationFacts({
+          client: ctx.prisma,
+          virtualKeys: [updated],
+        }),
+      });
     }),
 
   enable: protectedProcedure
@@ -540,6 +591,12 @@ export const virtualKeysRouter = createTRPCRouter({
         organizationId: input.organizationId,
         actorUserId: ctx.session.user.id,
       });
-      return toVirtualKeyCamelDto(updated);
+      return toVirtualKeyCamelDto({
+        virtualKey: updated,
+        facts: await loadTraceDestinationFacts({
+          client: ctx.prisma,
+          virtualKeys: [updated],
+        }),
+      });
     }),
 });

@@ -2577,10 +2577,22 @@ model VirtualKey {
   principalUserId String?
   principalUser   User?   @relation("PrincipalScopedVirtualKeys", fields: [principalUserId], references: [id], onDelete: SetNull)
 
-  // Where this key's traces and costs land, for keys whose access scopes
-  // do not name a single project (org- and team-owned keys). Deliberately
-  // NOT a VirtualKeyScope row: scope rows grant access and visibility,
-  // and the trace destination must grant neither.
+  // Where this key's traces and costs land. Decided once, when the key is
+  // written, and stored: it used to be derived on every read by trying this
+  // column, then the key's single project scope, then the organization's
+  // governance project, which is three lookups that each had to remember
+  // that a deleted project is not a destination.
+  //
+  // Deliberately NOT a VirtualKeyScope row: scope rows grant access and
+  // visibility, and the trace destination must grant neither. Editing the
+  // scopes therefore does not move it.
+  //
+  // Nullable at the database level, and the invariant that every key
+  // written carries a destination is enforced in the app. A NOT NULL would
+  // fail a self-hosted migration on an organization whose data predates
+  // governance projects, where there is genuinely nothing to write; those
+  // keys read as null, the gateway skips span export rather than failing,
+  // and the next edit of the key is refused until it is given a home.
   traceProjectId String?
 
   // Slim config blob - per-key state only. The "gateway-config bundle"

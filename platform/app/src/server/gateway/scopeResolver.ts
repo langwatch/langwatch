@@ -23,27 +23,15 @@
  *
  * Used by the gateway-config materialiser to assemble the flat
  * `providers[]` array the Go dispatcher reads on every request.
+ *
+ * The second half of the file answers a different question about the same
+ * key: where its traces and costs land. That one is stored on the key rather
+ * than derived, so what lives here is the write-time decision that fills the
+ * column and the read that follows it.
  */
-import type { ModelProvider, Prisma, PrismaClient, Team } from "@prisma/client";
+import type { ModelProvider, Prisma, PrismaClient } from "@prisma/client";
 
 import type { ScopeInput, VirtualKeyWithScopes } from "./virtualKey.repository";
-
-/**
- * The two fields trace-project resolution actually reads. Narrower than
- * `VirtualKeyWithScopes` so a drawer draft (no key row yet) satisfies it
- * structurally; if resolution ever needs another field of the key, the
- * draft call sites stop compiling instead of silently passing undefined.
- */
-export type TraceProjectInput = {
-  organizationId: string;
-  scopes: ScopeInput[];
-  /**
-   * The explicit destination an org- or team-owned key carries. Stored
-   * apart from the access scopes because scope rows grant visibility and
-   * operate rights, and the trace destination must grant neither.
-   */
-  traceProjectId?: string | null;
-};
 
 export type EligibleModelProvider = ModelProvider;
 
@@ -156,290 +144,225 @@ function parseModelProviderIds(raw: unknown): string[] {
 }
 
 /**
- * Resolve the project whose API key the gateway should use as
- * `X-Auth-Token` when exporting OTLP spans for this VK's traffic. Rules:
+ * Where a virtual key's traces and costs land.
  *
- *   - PROJECT-scoped VK with exactly one PROJECT scope -> that project.
- *   - Otherwise (TEAM/ORG-scoped, or PROJECT-scoped at multiple projects,
- *     which is rare but valid) -> the org's `internal_governance` project
- *     so spans land in the AI Governance ingestion inbox alongside the
- *     receiver-side spans. Same project_id that ingestion-sources point
- *     at, so a single trace-search filter surfaces both VK spans and
- *     receiver spans.
- *   - Org has no `internal_governance` project (older self-hosted deploys
- *     pre-governance) -> null. The materialiser then null-stamps
- *     `project_id` / `project_otlp_token` in the bundle and the gateway
- *     skips span export rather than 500-ing.
- *
- * An archived project answers at none of the three stages. Project deletion
- * is soft, so without that the destination a customer deleted would go on
- * receiving their traces and carrying their spend.
- *
- * Null is a read-path tolerance for keys that already exist, not a shape
- * new writes may take: VirtualKeyService refuses create/update when this
- * resolves null (`trace_project_required`), because dropped traces mean
- * spend no budget can ever see.
+ * This is a stored fact on the key, not a derivation. It is decided once at
+ * write time by `decideTraceDestination` and read back by following the
+ * pointer. The chain it replaced (explicit, then single project scope, then
+ * governance) answered on every read, which meant three lookups that each had
+ * to remember that a deleted project is not a destination, and a key whose
+ * answer could change because somebody edited a different screen.
  */
-export async function resolveTraceProject(
-  prisma: PrismaClient,
-  vk: TraceProjectInput,
-  tx?: Prisma.TransactionClient,
-): Promise<TraceProject | null> {
-  const [resolved] = await resolveTraceProjects(prisma, [vk], tx);
-  return resolved ?? null;
-}
-
 export type TraceProject = {
   id: string;
   teamId: string;
   apiKey: string;
-  /**
-   * Which rule answered. Callers that only need the destination ignore it;
-   * write-path validation reads it, because `governance_fallback` is the
-   * one answer the key itself never asked for, and telling that apart from
-   * a destination the creator actually chose is the whole question.
-   */
-  source: TraceProjectSource;
+  /** Set when the customer deleted the project; deletion is soft. */
+  archivedAt: Date | null;
 };
 
-export type TraceProjectSource =
-  | "explicit"
-  | "project_scope"
-  | "governance_fallback";
+type ProjectClient = PrismaClient | Prisma.TransactionClient;
+
+const TRACE_PROJECT_FIELDS = {
+  id: true,
+  teamId: true,
+  apiKey: true,
+  archivedAt: true,
+} as const;
 
 /**
- * The rule that will answer for this key, read off the key alone.
+ * The project a key's stored pointer names, followed as-is.
  *
- * The paired async resolver returns the rule that DID answer, which needs
- * the database. The two agree except when the destination a key names has
- * since been deleted or archived: this reports `explicit`, because that is
- * what the key says, while resolution falls through to the key's scope and
- * then to governance. Reporting the key's own claim is the useful answer
- * for a caller auditing configuration, and the gone project is visible to
- * them as a `trace_project_id` they cannot fetch.
- *
- * Pure on purpose: a key listing renders hundreds of rows and must not
- * resolve a destination per row to describe one.
+ * Deliberately not archived-aware: the write path refuses a destination that
+ * is deleted, and once a key is running, a deletion performed on a different
+ * screen must not reroute its traffic or take it down. The spans keep landing
+ * where they have always landed, the data is intact, and it reappears if the
+ * customer restores the project. The state is surfaced instead, on the key.
  */
-export function traceProjectSourceFor(
-  vk: TraceProjectInput,
-): TraceProjectSource {
-  if (vk.traceProjectId) return "explicit";
-  const projectScopes = vk.scopes.filter((s) => s.scopeType === "PROJECT");
-  return projectScopes.length === 1 ? "project_scope" : "governance_fallback";
-}
-
-/**
- * `resolveTraceProject` for many keys at once, answering in a fixed number
- * of queries instead of up to three per key.
- *
- * Returns one entry per input, in the order given. The stages run only when
- * some key still needs them, so resolving a single key costs exactly what
- * the one-key call always cost; an organization with hundreds of keys costs
- * the same three queries as one with two.
- *
- * Every rule lives here and nowhere else. Reach checking, config
- * materialisation and key validation all have to agree on where a key's
- * traces land, and a second implementation of "explicit, then unique scope,
- * then governance" is exactly how they would stop agreeing.
- */
-export async function resolveTraceProjects(
-  prisma: PrismaClient,
-  vks: TraceProjectInput[],
-  tx?: Prisma.TransactionClient,
-): Promise<(TraceProject | null)[]> {
-  const client = tx ?? prisma;
-  if (vks.length === 0) return [];
-
-  const organizationIds = [...new Set(vks.map((vk) => vk.organizationId))];
-  const resolved = new Array<TraceProject | null>(vks.length).fill(null);
-  let pending = vks.map((_, index) => index);
-
-  const settle = (
-    source: TraceProjectSource,
-    pick: (index: number) => ProjectRow | undefined,
-  ) => {
-    pending = pending.filter((index) => {
-      const hit = pick(index);
-      if (!hit) return true;
-      resolved[index] = { ...hit, source };
-      return false;
-    });
-  };
-
-  const byOrgAndId = await explicitDestinations(client, {
-    vks,
-    indices: pending,
-    organizationIds,
-  });
-  settle("explicit", (index) => {
-    const vk = vks[index]!;
-    if (!vk.traceProjectId) return undefined;
-    return byOrgAndId.get(orgScopedKey(vk.organizationId, vk.traceProjectId));
-  });
-
-  const uniqueScopeIds = uniqueProjectScopeIds(vks, pending);
-  const byId = await scopedDestinations(client, uniqueScopeIds);
-  settle("project_scope", (index) => {
-    const scopeId = uniqueScopeIds.get(index);
-    return scopeId ? byId.get(scopeId) : undefined;
-  });
-
-  // Whatever is left falls back to the org's governance project, so its
-  // spans land in the AI Governance inbox alongside the receiver-side ones.
-  // An organization without one (older self-hosted deploys) answers null,
-  // and the materialiser then skips span export rather than failing.
-  if (pending.length > 0) {
-    const governance = await governanceProjectByOrg(client, organizationIds);
-    settle("governance_fallback", (index) =>
-      governance.get(vks[index]!.organizationId),
-    );
-  }
-
-  return resolved;
-}
-
-/** A project row as the lookups return it, before a rule claims it. */
-type ProjectRow = { id: string; teamId: string; apiKey: string };
-
-/**
- * The explicit trace destinations, keyed by organization and id. Org-pinned
- * because the column is request-supplied: a stray id must fall through to
- * the key's scope rather than land this organization's traces in another
- * tenant's project.
- */
-async function explicitDestinations(
+export async function traceProjectFor(
   client: ProjectClient,
-  args: {
-    vks: TraceProjectInput[];
-    indices: number[];
-    organizationIds: string[];
-  },
-): Promise<Map<string, ProjectRow>> {
-  const ids = args.indices
-    .map((index) => args.vks[index]!.traceProjectId)
-    .filter((id): id is string => typeof id === "string" && id.length > 0);
+  traceProjectId: string | null | undefined,
+): Promise<TraceProject | null> {
+  if (!traceProjectId) return null;
+  return await client.project.findUnique({
+    where: { id: traceProjectId },
+    select: TRACE_PROJECT_FIELDS,
+  });
+}
+
+/**
+ * `traceProjectFor` for many keys at once, in one query. Used wherever a
+ * listing has to say where each of an organization's keys sends its traffic;
+ * an organization running a project per customer has hundreds of keys, and
+ * this must not be a query per row.
+ */
+export async function traceProjectsByIds(
+  client: ProjectClient,
+  traceProjectIds: (string | null | undefined)[],
+): Promise<Map<string, TraceProject>> {
+  const ids = [
+    ...new Set(
+      traceProjectIds.filter(
+        (id): id is string => typeof id === "string" && id.length > 0,
+      ),
+    ),
+  ];
   if (ids.length === 0) return new Map();
-  return await projectsByOrgAndId(client, {
-    ids,
-    organizationIds: args.organizationIds,
-  });
-}
-
-/** The one PROJECT access scope a key has, for the keys that have exactly one. */
-function uniqueProjectScopeIds(
-  vks: TraceProjectInput[],
-  indices: number[],
-): Map<number, string> {
-  const byIndex = new Map<number, string>();
-  for (const index of indices) {
-    const projectScopes = vks[index]!.scopes.filter(
-      (s) => s.scopeType === "PROJECT",
-    );
-    if (projectScopes.length === 1) {
-      byIndex.set(index, projectScopes[0]!.scopeId);
-    }
-  }
-  return byIndex;
-}
-
-/**
- * Projects named by a key's single access scope. Deliberately not
- * org-pinned, matching the one-key lookup this replaced: a scope row is
- * validated against the organization when it is written. Archived projects
- * are skipped, so a key scoped to a project the customer deleted falls
- * through to governance instead of tracing into it.
- */
-async function scopedDestinations(
-  client: ProjectClient,
-  scopeIdByIndex: Map<number, string>,
-): Promise<Map<string, ProjectRow>> {
-  if (scopeIdByIndex.size === 0) return new Map();
   const rows = await client.project.findMany({
-    where: {
-      id: { in: [...new Set(scopeIdByIndex.values())] },
-      archivedAt: null,
-    },
-    select: { id: true, teamId: true, apiKey: true },
+    where: { id: { in: ids } },
+    select: TRACE_PROJECT_FIELDS,
   });
   return new Map(rows.map((row) => [row.id, row]));
 }
 
-type ProjectClient = PrismaClient | Prisma.TransactionClient;
-
-async function projectsByOrgAndId(
-  client: ProjectClient,
-  args: { ids: string[]; organizationIds: string[] },
-): Promise<Map<string, ProjectRow>> {
-  const rows: Array<ProjectRow & { team: Pick<Team, "organizationId"> }> =
-    await client.project.findMany({
-      where: {
-        id: { in: [...new Set(args.ids)] },
-        team: { organizationId: { in: args.organizationIds } },
-        // An archived project is a project the customer deleted, so it is
-        // not a place their traces or their spend may go. Constraining the
-        // id and the organization alone let an archived destination answer
-        // as `explicit`, which is the write-path refusal not firing and the
-        // gateway going on exporting into it.
-        archivedAt: null,
-      },
-      select: {
-        id: true,
-        teamId: true,
-        apiKey: true,
-        team: { select: { organizationId: true } },
-      },
-    });
-  return new Map(
-    rows.map((row) => [
-      orgScopedKey(row.team.organizationId, row.id),
-      { id: row.id, teamId: row.teamId, apiKey: row.apiKey },
-    ]),
-  );
-}
+/**
+ * What a key being written should store as its trace destination. Narrower
+ * than `VirtualKeyWithScopes` so a drawer draft (no key row yet) satisfies it
+ * structurally; if the decision ever needs another field of the key, the
+ * draft call sites stop compiling instead of silently passing undefined.
+ */
+export type TraceDestinationInput = {
+  organizationId: string;
+  scopes: ScopeInput[];
+  /**
+   * The destination the caller named, if any. Stored apart from the access
+   * scopes because scope rows grant visibility and operate rights, and the
+   * trace destination must grant neither.
+   */
+  traceProjectId?: string | null;
+};
 
 /**
- * Oldest live governance project per organization, matching the one-key
- * rule. An archived one is passed over for the next, and an organization
- * whose governance projects are all archived answers as one that never had
- * one: null, and the gateway skips span export.
+ * The answer, or the reason there is none. A discriminated result rather than
+ * a throw because the same decision runs on two paths with two duties: the
+ * write path turns each refusal into its own customer-facing error, and the
+ * create drawer previews the destination for a draft and must render a
+ * "cannot be saved yet" state rather than blow up mid-render.
  */
-async function governanceProjectByOrg(
+export type TraceDestinationDecision =
+  | { outcome: "resolved"; project: TraceProject }
+  /** The destination named is not a live project of this organization. */
+  | { outcome: "unknown" }
+  /**
+   * Nothing was named, nothing can be taken from the scopes, and the
+   * organization has real projects that could have been named.
+   */
+  | { outcome: "ambiguous"; projectScopeCount: number }
+  /** Nothing was named and the organization has no governance project. */
+  | { outcome: "no_destination" };
+
+/**
+ * Decide, once, where a key's traces and costs will land.
+ *
+ * Four cases, in order:
+ *
+ *   1. A named destination: a live project of this organization, or the key
+ *      is refused. Falling through to a later case would save the key with
+ *      its traffic attributed to a project its own `trace_project_id` denies.
+ *   2. Exactly one PROJECT access scope naming a live project: that project.
+ *      It is the only destination the key could mean.
+ *   3. Neither, while the organization has real projects to choose from:
+ *      refused as ambiguous. The governance inbox would keep the spend
+ *      visible and put it under a project nobody named, so every project
+ *      budget the creator had in mind counts none of this key's traffic.
+ *   4. Neither, and there is nothing else to name: the organization's oldest
+ *      live governance project, so the key's spans land in the AI Governance
+ *      inbox alongside the receiver-side ones. An organization without one
+ *      (older self-hosted deploys) has no destination to give.
+ *
+ * Rules 3 and 4 are the same shape seen against different data, which is why
+ * they answer here together rather than in a caller that would have to
+ * re-count the organization's projects to tell them apart.
+ */
+export async function decideTraceDestination(
   client: ProjectClient,
-  organizationIds: string[],
-): Promise<Map<string, ProjectRow>> {
-  const rows: Array<ProjectRow & { team: Pick<Team, "organizationId"> }> =
-    await client.project.findMany({
-      where: {
-        kind: "internal_governance",
-        team: { organizationId: { in: organizationIds } },
-        archivedAt: null,
-      },
-      select: {
-        id: true,
-        teamId: true,
-        apiKey: true,
-        team: { select: { organizationId: true } },
-      },
-      orderBy: { createdAt: "asc" },
+  input: TraceDestinationInput,
+): Promise<TraceDestinationDecision> {
+  if (input.traceProjectId) {
+    const named = await liveProjectInOrganization(client, {
+      organizationId: input.organizationId,
+      projectId: input.traceProjectId,
     });
-  const byOrg = new Map<string, ProjectRow>();
-  for (const row of rows) {
-    if (byOrg.has(row.team.organizationId)) continue;
-    byOrg.set(row.team.organizationId, {
-      id: row.id,
-      teamId: row.teamId,
-      apiKey: row.apiKey,
-    });
+    return named
+      ? { outcome: "resolved", project: named }
+      : { outcome: "unknown" };
   }
-  return byOrg;
+
+  const projectScopes = input.scopes.filter((s) => s.scopeType === "PROJECT");
+  if (projectScopes.length === 1) {
+    const scoped = await liveProjectInOrganization(client, {
+      organizationId: input.organizationId,
+      projectId: projectScopes[0]!.scopeId,
+    });
+    if (scoped) return { outcome: "resolved", project: scoped };
+  }
+
+  // The governance project answers first, so an organization that has none
+  // is told it has no destination at all rather than told to choose between
+  // projects it could name: "there is nowhere for this key's traces to go"
+  // is the more useful half of the truth, and it is the one an operator has
+  // to act on.
+  const governance = await oldestGovernanceProject(
+    client,
+    input.organizationId,
+  );
+  if (!governance) return { outcome: "no_destination" };
+
+  // An organization whose only live project IS the governance one is left
+  // alone: there would be nothing else to pick, and refusing the key for not
+  // choosing between no options helps nobody. A deleted project is not an
+  // option either, which is why this counts only live ones.
+  const alternatives = await client.project.count({
+    where: {
+      team: { organizationId: input.organizationId },
+      kind: { not: "internal_governance" },
+      archivedAt: null,
+    },
+  });
+  return alternatives > 0
+    ? { outcome: "ambiguous", projectScopeCount: projectScopes.length }
+    : { outcome: "resolved", project: governance };
 }
 
 /**
- * Project ids are globally unique, but the explicit-destination lookup is
- * org-pinned on purpose, so the map has to be keyed by the pair or a
- * cross-tenant id would read as a hit for whichever org asked.
+ * A project of this organization that the customer has not deleted.
+ *
+ * The one validation lookup the write path has. Org-pinned because the id is
+ * request-supplied: without it a stray id would land this organization's
+ * traces, and its spend, in another tenant's project. Archived-aware because
+ * a deleted project is a place the customer removed, not a destination.
  */
-function orgScopedKey(organizationId: string, projectId: string): string {
-  return `${organizationId}:${projectId}`;
+async function liveProjectInOrganization(
+  client: ProjectClient,
+  args: { organizationId: string; projectId: string },
+): Promise<TraceProject | null> {
+  return await client.project.findFirst({
+    where: {
+      id: args.projectId,
+      team: { organizationId: args.organizationId },
+      archivedAt: null,
+    },
+    select: TRACE_PROJECT_FIELDS,
+  });
+}
+
+/**
+ * The organization's oldest live governance project. An archived one is
+ * passed over for the next, and an organization whose governance projects are
+ * all deleted answers as one that never had any.
+ */
+async function oldestGovernanceProject(
+  client: ProjectClient,
+  organizationId: string,
+): Promise<TraceProject | null> {
+  return await client.project.findFirst({
+    where: {
+      kind: "internal_governance",
+      team: { organizationId },
+      archivedAt: null,
+    },
+    select: TRACE_PROJECT_FIELDS,
+    // Ties on createdAt break on id so two callers pick the same project.
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+  });
 }

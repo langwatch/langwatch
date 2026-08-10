@@ -54,10 +54,10 @@ type BundleConfig struct {
 	CacheRules []CacheRule
 
 	// TraceProjectID is the project customer traces are EXPORTED to. It is NOT
-	// necessarily the VK's own project: resolveTraceProject (control plane) falls
-	// back to the organization's internal_governance project whenever the VK is
-	// not scoped to exactly one project, so this can name a different project on
-	// a different team than Bundle.ProjectID.
+	// necessarily the VK's own project: the control plane stores a destination on
+	// the key when it is created, and a key shared across a team or organization
+	// is given the organization's internal_governance project, so this can name a
+	// different project on a different team than Bundle.ProjectID.
 	//
 	// It is materialized in the SAME config payload as ProjectOTLPToken, so the
 	// two always describe one project. Pair the token with THIS field and never

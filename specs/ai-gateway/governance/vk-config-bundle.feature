@@ -138,74 +138,69 @@ Feature: AI Gateway — Virtual Key /config bundle materialisation
     And the entries are sorted by `scope_type` ascending then `scope_id` ascending for determinism
 
   # ============================================================================
-  # JWT trace project_id claim (locked decision #2 + internal_governance fallback)
+  # JWT trace project_id claim
   # ============================================================================
 
-  ## Resolution rule (locked, S1 materialiser):
-  ##   (a) VK has exactly one PROJECT-scope row              → that project's id
-  ##   (b) VK has zero or >1 PROJECT-scope rows               → org's `internal_governance` project id
-  ##   (c) (b) AND org has no `internal_governance` project   → null (bundle omits the claim, no 500)
+  ## The claim is the destination stored on the key, read back. It is decided
+  ## once, when the key is written, by the rules in
+  ## specs/ai-gateway/virtual-key-creation.feature, and nothing on this path
+  ## re-derives it:
+  ##   (a) the key's stored destination        → that project's id
+  ##   (b) the key has none                    → the claim is present and null (no 500)
   ##
-  ## Why (b): TEAM/ORG-scoped VKs still need somewhere to file their spans so that
-  ## a single "AI Governance" trace-search filter surfaces all VK + receiver traffic
-  ## in one place. The `internal_governance` project is the same one AI Governance
-  ## ingestion-sources point at, so trace search semantics are consistent across
-  ## the governance surface.
+  ## Why a shared key still gets one: TEAM/ORG-owned VKs need somewhere to file
+  ## their spans so that a single "AI Governance" trace-search filter surfaces
+  ## all VK + receiver traffic in one place. Creation gives them the org's
+  ## `internal_governance` project when there is nothing else to name, which is
+  ## the same project AI Governance ingestion-sources point at, so trace search
+  ## semantics are consistent across the governance surface.
   ##
-  ## Why (c) is null and not 500: older self-hosted deployments pre-governance
-  ## may not have an `internal_governance` project. The bundle nulling the claim
-  ## (instead of erroring) is forward-compatible — those deployments simply
-  ## won't see TEAM/ORG-scoped VK spans in any project filter, which matches
-  ## their existing behavior. Per @alexis A1 + @sergey S1 lockstep.
+  ## Why (b) is null and not 500: older self-hosted deployments pre-governance
+  ## may have keys written when there was no `internal_governance` project to
+  ## give them. The bundle nulling the claim (instead of erroring) is
+  ## forward-compatible: those deployments simply won't see those VKs' spans in
+  ## any project filter, which matches their existing behavior.
 
-  Scenario: JWT project_id is set when VK has exactly one PROJECT scope
-    Given a VirtualKey "vk_one_project" scoped to PROJECT "demo"
+  Scenario: JWT project_id is the destination stored on the key
+    Given a VirtualKey "vk_one_project" whose traces land in project "demo"
     When /resolve-key returns the signed JWT
     Then the JWT claim `project_id` equals "demo"
     And traces from this VK's requests land in project "demo" trace search
 
-  Scenario: JWT project_id falls back to internal_governance project for ORG-scoped VK
+  Scenario: A shared key carries the governance project it was given at creation
     Given organization "acme" has an `internal_governance` project with id "proj_int_gov_acme"
-    And a VirtualKey "vk_org_scoped" scoped to ORGANIZATION "acme" (no PROJECT row)
+    And a VirtualKey "vk_org_scoped" scoped to ORGANIZATION "acme" that named no destination
     When /resolve-key returns the signed JWT
     Then the JWT claim `project_id` equals "proj_int_gov_acme"
     And traces from this VK's requests land in project "internal_governance" trace search
-    And the span carries `langwatch.project_id_source = "internal_governance_fallback"` so reviewers can tell it wasn't pinned by the VK directly
 
-  Scenario: JWT project_id falls back to internal_governance project for TEAM-scoped VK
-    Given organization "acme" has an `internal_governance` project with id "proj_int_gov_acme"
-    And a VirtualKey "vk_team_scoped" scoped to TEAM "platform" (no PROJECT row)
-    When /resolve-key returns the signed JWT
-    Then the JWT claim `project_id` equals "proj_int_gov_acme"
-
-  Scenario: JWT project_id falls back to internal_governance for multi-PROJECT VK (no single project owns it)
-    Given organization "acme" has an `internal_governance` project with id "proj_int_gov_acme"
-    And a VirtualKey "vk_multi_project" scoped to PROJECT "demo" AND PROJECT "ml-prod"
-    When /resolve-key returns the signed JWT
-    Then the JWT claim `project_id` equals "proj_int_gov_acme"
-    # Pre-fallback semantics would null the claim and drop the trace from every
-    # per-project filter. The fallback keeps governance trace search coherent
-    # even for unusual VK shapes.
-
-  Scenario: Bundle nulls project_id when VK has non-PROJECT scope AND org has no internal_governance project
+  Scenario: Bundle nulls project_id when the key has no stored destination
     Given organization "legacy_self_hosted" has NO `internal_governance` project
-    And a VirtualKey "vk_legacy_org_scoped" scoped to ORGANIZATION "legacy_self_hosted"
+    And a VirtualKey "vk_legacy_org_scoped" written before it had a destination to store
     When /resolve-key returns the signed JWT
     Then the JWT claim `project_id` is null
     And the /config bundle responds 200 (no 500)
-    And the span carries `langwatch.project_id_source = "unresolved"` for diagnosis
-    # Older self-hosted deployments without governance-stack provisioning hit this
-    # path. They were never able to file these spans into a per-project view
-    # under the legacy model either, so this is behaviorally compatible.
+    # Older self-hosted deployments without governance-stack provisioning hit
+    # this path. They were never able to file these spans into a per-project
+    # view under the legacy model either, so this is behaviorally compatible.
 
-  Scenario: internal_governance project assignment is independent of VK scope rows
+  Scenario: Editing a key's scopes does not move the project_id claim
     Given organization "acme" has an `internal_governance` project
     And a VirtualKey "vk_org" scoped to ORGANIZATION "acme"
     When the org admin adds a new TEAM scope row to "vk_org"
     Then `VirtualKey.revision` increments
-    But the JWT `project_id` claim still equals the internal_governance project id
-    # The fallback is driven by "no exactly-one PROJECT row", not by what
-    # specific scopes the VK has. Adding ORG/TEAM rows doesn't move project_id.
+    But the JWT `project_id` claim still equals the destination stored on the key
+    # The destination is a decision the key carries, not one its access scopes
+    # imply, so adding or removing scopes cannot move where its spend is counted.
+
+  Scenario: A destination the customer deleted still receives the key's traces
+    Given a VirtualKey "vk_doomed" whose stored destination has since been deleted
+    When /resolve-key returns the signed JWT
+    Then the JWT claim `project_id` still equals that project
+    And the /config bundle responds 200 (no 500)
+    # Deletion is soft, so the spans stay whole and reappear if the customer
+    # restores the project. Rerouting would scatter one key's history across
+    # two projects for an act performed on a different screen.
 
   # ============================================================================
   # Revision bumps invalidate auth-cache

@@ -91,6 +91,9 @@ describe("GatewayBudgetService — PRINCIPAL cascade", () => {
         hashedSecret: `hash-${ns}`,
         displayPrefix: `vk-lw-${ns.slice(0, 4)}`,
         createdById: ACTOR_ID,
+        // The destination is stored on the key rather than taken from its
+        // scope, so a row written straight to PG has to carry it.
+        traceProjectId: PROJECT_ID,
         scopes: {
           create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
         },

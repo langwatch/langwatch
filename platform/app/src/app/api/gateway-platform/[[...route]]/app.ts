@@ -68,7 +68,12 @@ import {
   parseVirtualKeyConfig,
   virtualKeyConfigSchema,
 } from "~/server/gateway/virtualKey.config";
-import { toVirtualKeySnakeDto } from "~/server/gateway/virtualKey.dto";
+import {
+  loadTraceDestinationFacts,
+  toVirtualKeySnakeDto,
+  type VirtualKeySnakeDto,
+} from "~/server/gateway/virtualKey.dto";
+import type { VirtualKeyWithScopes } from "~/server/gateway/virtualKey.repository";
 // GatewayProviderCredentialService removed in iter 110; /providers REST
 // routes return 410 Gone until A3 lands the ModelProvider-backed
 // replacement surface (current proposal: fold into /model-providers).
@@ -151,13 +156,16 @@ const virtualKeyDtoSchema = z.object({
   purpose: z.enum(["user", "langy"]),
   display_prefix: z.string(),
   principal_user_id: z.string().nullable(),
-  // Where an org- or team-owned key's traces and costs land. Not a
-  // scope: it grants no access to the key.
-  trace_project_id: z.string().nullable(),
-  trace_project_source: z
-    .enum(["explicit", "project_scope", "governance_fallback"])
+  trace_project_id: z
+    .string()
+    .nullable()
     .describe(
-      "Which rule puts this key's traces and costs where they go: `explicit` is the `trace_project_id` on the key, `project_scope` is its single project scope, and `governance_fallback` means the key names no destination and its spend is attributed to the organization's hidden governance project. Only the first two name a project the key itself chose, so a `governance_fallback` key is counted by no project budget a reader would think to look at. New keys can no longer be written in that shape.",
+      "The project this key's traces and costs land in, which is the project its spend is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it, so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only on a key created before this was stored, in an organization that had no governance project to fall back to; those keys export no spans until they are given a destination.",
+    ),
+  trace_project_archived: z
+    .boolean()
+    .describe(
+      "True when the project in `trace_project_id` has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Nothing else on the key says the destination is gone.",
     ),
   /** The caller's own id for this key, unique within the organization. */
   external_id: z.string().nullable(),
@@ -466,8 +474,11 @@ const createVirtualKeySchema = z.object({
    */
   scopes: z.array(scopeWireSchema).min(1).optional(),
   /**
-   * Explicit trace destination for org- and team-owned keys. NOT a
-   * scope: it grants no visibility and no operate rights on the key.
+   * Where this key's traces and costs land. NOT a scope: it grants no
+   * visibility and no operate rights on the key. Omit it and the
+   * destination is taken from the key's single project scope, or from the
+   * organization's governance project when there is nothing else to name.
+   * Either way the answer is stored on the key.
    */
   trace_project_id: z.string().nullable().optional(),
   routing_policy_id: z.string().nullable().optional(),
@@ -492,7 +503,13 @@ const updateVirtualKeySchema = z.object({
   name: z.string().min(1).max(128).optional(),
   description: z.string().nullable().optional(),
   scopes: z.array(scopeWireSchema).min(1).optional(),
-  trace_project_id: z.string().nullable().optional(),
+  trace_project_id: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "Where the key's traces and costs land. Omit it and the destination stays exactly where it is, scope edits included. A value moves it, validated the way create validates it. Explicit null does not clear it: it asks for the destination to be worked out again from what the key is now, under the same rules create uses. It lands on the key's single project scope when exactly one names a live project, and otherwise on the organization's oldest live governance project when there are no other live projects to choose from. An organization with live projects that could have been named refuses with `gateway_trace_project_ambiguous`, and one with no governance project to fall back on refuses with `trace_project_required`.",
+    ),
   routing_policy_id: z.string().nullable().optional(),
   routing_mode: routingModeWireSchema.optional(),
   /** Undefined leaves the key's cap alone; a value upserts it; null archives it. */
@@ -593,7 +610,32 @@ const createBudgetSchema = z.object({
     ),
 });
 
-const toVkDto = toVirtualKeySnakeDto;
+/**
+ * The published shape of one key. Async because `trace_project_archived` is a
+ * fact about the project row rather than the key row, and a key goes on
+ * sending its traces to a project the customer deleted, so nothing else the
+ * caller can read says the destination is gone.
+ */
+async function toVkDto(vk: VirtualKeyWithScopes): Promise<VirtualKeySnakeDto> {
+  return toVirtualKeySnakeDto({
+    virtualKey: vk,
+    facts: await loadTraceDestinationFacts({
+      client: prisma,
+      virtualKeys: [vk],
+    }),
+  });
+}
+
+/** `toVkDto` for a page, in one read of the destinations however long it is. */
+async function toVkDtos(
+  vks: VirtualKeyWithScopes[],
+): Promise<VirtualKeySnakeDto[]> {
+  const facts = await loadTraceDestinationFacts({
+    client: prisma,
+    virtualKeys: vks,
+  });
+  return vks.map((vk) => toVirtualKeySnakeDto({ virtualKey: vk, facts }));
+}
 
 type GatewayContext = Context<{ Variables: AuthMiddlewareVariables }>;
 
@@ -892,9 +934,9 @@ secured.access(apiKeyPermission("virtualKeys:view")).get(
     // cursor therefore advances over rows READ, so a page can be shorter than
     // `limit` without meaning the walk is done.
     return c.json({
-      data: rows
-        .filter((vk) => isVisibleToMembership(membership, vk.scopes))
-        .map(toVkDto),
+      data: await toVkDtos(
+        rows.filter((vk) => isVisibleToMembership(membership, vk.scopes)),
+      ),
       next_cursor: nextPageCursor(rows, page.data.limit, (vk) => [
         vk.createdAt.getTime(),
         vk.id,
@@ -1021,7 +1063,7 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
           // use, so the secret has to transit the receipt.
           return {
             status: 201,
-            body: { virtual_key: toVkDto(virtualKey), secret },
+            body: { virtual_key: await toVkDto(virtualKey), secret },
           };
         },
       });
@@ -1066,7 +1108,7 @@ secured.access(apiKeyPermission("virtualKeys:view")).get(
         membershipForApiCaller(project),
         { id, organizationId },
       );
-      return c.json({ virtual_key: toVkDto(vk) });
+      return c.json({ virtual_key: await toVkDto(vk) });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1174,7 +1216,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
   describeRoute({
     summary: "Update virtual key",
     description:
-      "Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.",
+      "Partial update: send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope, and does NOT move where the key's traces and costs land: send `trace_project_id` for that, validated the way create validates it; explicit null re-resolves it under the create-time rules rather than clearing it. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.",
     tags: ["Virtual Keys"],
     responses: {
       ...canonicalBaseResponses,
@@ -1227,7 +1269,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
         externalId: body.data.external_id,
         metadata: body.data.metadata,
       });
-      return c.json({ virtual_key: toVkDto(updated) });
+      return c.json({ virtual_key: await toVkDto(updated) });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1276,7 +1318,7 @@ secured.access(apiKeyPermission("virtualKeys:rotate")).post(
         organizationId,
         actorUserId,
       });
-      return c.json({ virtual_key: toVkDto(virtualKey), secret });
+      return c.json({ virtual_key: await toVkDto(virtualKey), secret });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1346,7 +1388,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).post(
         actorUserId,
         reason: body.data.reason ?? null,
       });
-      return c.json({ virtual_key: toVkDto(updated) });
+      return c.json({ virtual_key: await toVkDto(updated) });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1390,7 +1432,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).post(
         organizationId,
         actorUserId,
       });
-      return c.json({ virtual_key: toVkDto(updated) });
+      return c.json({ virtual_key: await toVkDto(updated) });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -1434,7 +1476,7 @@ secured.access(apiKeyPermission("virtualKeys:delete")).post(
         organizationId,
         actorUserId,
       });
-      return c.json({ virtual_key: toVkDto(updated) });
+      return c.json({ virtual_key: await toVkDto(updated) });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }

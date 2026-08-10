@@ -130,6 +130,9 @@ describe("given per-person and group budgets in an organization", () => {
         displayPrefix: "vk-lw-xxxxxxx",
         principalUserId: MEMBER_ID,
         createdById: MEMBER_ID,
+        // The destination is stored on the key rather than taken from its
+        // scope, so a row written straight to PG has to carry it.
+        traceProjectId: PROJECT_ID,
         scopes: { create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }] },
       },
     });
@@ -142,6 +145,7 @@ describe("given per-person and group budgets in an organization", () => {
         hashedSecret: `hash-${SHARED_VK_ID}`,
         displayPrefix: "vk-lw-yyyyyyy",
         createdById: SHARED_OWNER_ID,
+        traceProjectId: PROJECT_ID,
         scopes: { create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }] },
       },
     });

@@ -29,10 +29,7 @@ import {
   resolveApplicableBudgets,
 } from "./budgetResolution.service";
 import { GatewayCacheRuleService } from "./cacheRule.service";
-import {
-  eligibleModelProvidersForVk,
-  resolveTraceProject,
-} from "./scopeResolver";
+import { eligibleModelProvidersForVk, traceProjectFor } from "./scopeResolver";
 import { parseVirtualKeyConfig } from "./virtualKey.config";
 import type { VirtualKeyWithScopes } from "./virtualKey.repository";
 
@@ -217,7 +214,7 @@ export class GatewayConfigMaterialiser {
       this.prisma,
       vk,
     );
-    const traceProject = await resolveTraceProject(this.prisma, vk);
+    const traceProject = await traceProjectFor(this.prisma, vk.traceProjectId);
     const budgets = await this.applicableBudgets(vk, traceProject);
     const spendByBudgetId = await this.loadCurrentSpend(vk, budgets);
     const cacheRules = await this.applicableCacheRules(vk.organizationId);
