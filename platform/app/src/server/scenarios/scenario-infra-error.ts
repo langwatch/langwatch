@@ -57,8 +57,18 @@ export interface ScenarioErrorEnvelope {
 /** Longest message we keep for the generic fallback; raw dumps get trimmed. */
 const MAX_GENERIC_MESSAGE_LENGTH = 300;
 
-/** Shown when the raw error is empty, or is nothing but runtime noise. */
+/** Shown when there is no raw error at all — nothing ever reported a reason. */
 const GENERIC_FAILURE_MESSAGE = "The simulation failed before it could run.";
+
+/**
+ * Shown when there IS a raw error but none of it can be shown safely.
+ *
+ * Deliberately not GENERIC_FAILURE_MESSAGE: that one asserts the run never
+ * started, which is false for a failure suppressed mid-run and lands in the
+ * verdict a customer reads. A vaguer true sentence beats a precise false one.
+ */
+const UNREADABLE_FAILURE_MESSAGE =
+  "The simulation failed, but it didn't report a reason we can show.";
 
 /** Case-insensitive substring test that tolerates undefined. */
 function contains(haystack: string, needle: string): boolean {
@@ -101,7 +111,9 @@ const NOISE_LINE_PATTERNS: RegExp[] = [
   /^\^+$/,
   /^throw\s/,
   /^Require stack:/i,
-  /^-\s*[/\\]/,
+  // A `Require stack:` entry is a bare path and nothing else. Without the
+  // end anchor this also ate prose bullets like "- /webhooks/agent is down".
+  /^-\s*[/\\]\S*$/,
   /^[/\\][^\s]*$/,
   /^Node\.js\s+v?\d/i,
 ];
@@ -112,19 +124,32 @@ function isNoiseLine(line: string): boolean {
 }
 
 /**
- * Anything that betrays where our code lives or how it is built: an
- * interpreter source location, a stack frame, or an absolute filesystem path.
+ * Anything that betrays where OUR code lives or how it is built: an
+ * interpreter source location, a stack frame, our container root, or our build
+ * tree and bundle filenames.
  *
  * This is the final guard on the generic bucket — the line filter above works
  * by enumeration, and enumeration always lags the next crash shape, so a
- * candidate that still matches here is dropped for the generic sentence rather
- * than shown. The path pattern needs the slash to start the line or follow
- * whitespace/a quote, which is why a URL's `https://host/v1/x` never trips it.
+ * candidate that still matches here is dropped for a generic sentence rather
+ * than shown.
+ *
+ * These name our own artefacts deliberately. An earlier cut matched ANY
+ * two-segment slash path, which also swallowed the single most diagnostic
+ * string the runner produces — the HTTP adapter's
+ * `HTTP 502: … from <url> (request-id: …): <body>` (http-agent.adapter.ts).
+ * That line is all the customer's own data, so suppressing it cost them the
+ * status, the URL, the request id and their own error body to hide nothing.
+ * A path is only an internal when it is ours.
  */
 const INTERNALS_PATTERNS: RegExp[] = [
-  /node:internal/,
-  /\bat\s+\S+\s+\(/,
-  /(?:^|[\s'"(])[/\\][\w.-]+[/\\][\w.-]+/,
+  /\bnode:[a-z_]+/,
+  // `at Foo (…)` and `at async Foo.bar (…)` — the async form has an extra
+  // token, which a fixed `\S+\s+\(` shape missed.
+  /\bat\s+(?:async\s+)?\S+\s*\(/,
+  /(?:^|[\s'"(])\/app\//,
+  /(?:^|[\s'"(/\\])(?:dist|node_modules)[/\\]/,
+  /\bscenario-child-process\b/,
+  /\.cjs\b/,
 ];
 
 /** True when a candidate message would expose our internals to the user. */
@@ -132,29 +157,55 @@ function exposesInternals(message: string): boolean {
   return INTERNALS_PATTERNS.some((pattern) => pattern.test(message));
 }
 
+/** Net bracket depth a line opens (negative when it closes more than it opens). */
+function bracketDelta(line: string): number {
+  return (
+    (line.match(/[{[]/g)?.length ?? 0) - (line.match(/[}\]]/g)?.length ?? 0)
+  );
+}
+
 /**
  * The first line of a crash dump that reads as a human explanation.
  *
  * Node prints the error's own properties as a brace block under the stack
  * (`{ code: 'MODULE_NOT_FOUND', requireStack: [ '/app/…' ] }`). Skipping only
- * the opening brace would leave its inner lines as candidates, so depth is
- * tracked and the block skipped whole.
+ * the opening brace would leave its inner lines as candidates, so the block is
+ * skipped whole by depth.
+ *
+ * A block opens ONLY on a line that starts with `{`, which is how Node prints
+ * it. Counting brackets on every line instead let a stray `[` in prose — or
+ * the truncated JSON the HTTP adapter's body preview can emit — open a block
+ * that never closed, swallowing the real sentence underneath it.
  */
 function findMeaningfulLine(text: string): string | undefined {
+  const lines = text.split("\n").map((line) => line.trim());
+
   let depth = 0;
-  for (const rawLine of text.split("\n")) {
-    const line = rawLine.trim();
-    const insideBlock = depth > 0;
-    depth = Math.max(
-      0,
-      depth +
-        (line.match(/[{[]/g)?.length ?? 0) -
-        (line.match(/[}\]]/g)?.length ?? 0),
-    );
-    if (insideBlock || line.startsWith("{") || line.length === 0) continue;
-    if (!isNoiseLine(line)) return line;
+  let endedInsideBlock = false;
+  for (const line of lines) {
+    if (depth > 0) {
+      depth = Math.max(0, depth + bracketDelta(line));
+      endedInsideBlock = depth > 0;
+      continue;
+    }
+    if (line.startsWith("{")) {
+      depth = Math.max(0, bracketDelta(line));
+      endedInsideBlock = depth > 0;
+      continue;
+    }
+    if (line.length === 0 || isNoiseLine(line)) continue;
+    return line;
   }
-  return undefined;
+
+  // A block that never closed ate the rest of the dump. That happens for real:
+  // the HTTP adapter truncates response bodies mid-string, so unbalanced JSON
+  // arrives as a matter of course. Rescan without depth — still skipping lines
+  // that open an object, so a balanced block's innards can't surface — rather
+  // than lose a genuine sentence sitting under the truncation.
+  if (!endedInsideBlock) return undefined;
+  return lines.find(
+    (line) => line.length > 0 && !line.startsWith("{") && !isNoiseLine(line),
+  );
 }
 
 /**
@@ -188,26 +239,39 @@ interface ClassificationRule {
   build: (text: string) => ScenarioErrorEnvelope;
 }
 
-/**
- * Markers that only an uncaught Node crash prints: a loader frame, the
- * `Require stack:` list, or an internal module frame.
- *
- * The module-resolution words on their own don't identify the process that
- * died — a customer's own Node agent can fail with `Cannot find module` and
- * have that text surface through the adapter. Telling them "this is a fault on
- * our side" would then be worse than saying nothing, so the runner rule needs
- * one of these too, and a bare sentence falls through to the generic bucket
- * where the customer's own text is passed on unchanged.
- */
+/** Markers that only an uncaught Node crash prints. */
 const NODE_CRASH_MARKERS = [
   "node:internal/modules",
   "Require stack:",
   "at Module._",
 ];
 
-/** True when the blob is a Node process's own crash dump. */
-function isNodeCrashDump(text: string): boolean {
-  return NODE_CRASH_MARKERS.some((marker) => contains(text, marker));
+/**
+ * The wrapper `scenario.processor.ts` puts on a child that exited non-zero
+ * WITHOUT reporting a structured error — which is exactly the case where our
+ * own runner died before it could say anything. When the runner does report
+ * (an adapter failure, a judge error), its own text is used and this wrapper
+ * never appears.
+ */
+const CHILD_EXIT_WRAPPER = /Child process exited with code \d+/i;
+
+/**
+ * True when OUR runner process died in Node's module loader.
+ *
+ * Both halves are load-bearing. A Node crash dump says a Node process failed
+ * to load something, not WHICH process: `http-agent.adapter.ts` embeds the
+ * customer's HTTP response body verbatim in the error it throws, so a customer
+ * agent that boots with its own `Cannot find module` — stack frames,
+ * `Require stack:` and all — reaches this classifier looking identical.
+ * Claiming "the fault is on our side" for their missing dependency would send
+ * them looking in the wrong place, so the crash must ALSO carry the wrapper
+ * only our own dead child gets.
+ */
+function isOurRunnerCrash(text: string): boolean {
+  return (
+    CHILD_EXIT_WRAPPER.test(text) &&
+    NODE_CRASH_MARKERS.some((marker) => contains(text, marker))
+  );
 }
 
 /**
@@ -296,7 +360,7 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
       "ERR_REQUIRE_ESM",
       "ERR_DLOPEN_FAILED",
     ],
-    alsoRequires: isNodeCrashDump,
+    alsoRequires: isOurRunnerCrash,
     build: () => ({
       code: ScenarioInfraErrorCode.RunnerUnavailable,
       message:
@@ -357,7 +421,7 @@ export function classifyScenarioInfraError(
 
   return {
     code: ScenarioInfraErrorCode.Infra,
-    message: summarize(text) ?? GENERIC_FAILURE_MESSAGE,
+    message: summarize(text) ?? UNREADABLE_FAILURE_MESSAGE,
   };
 }
 

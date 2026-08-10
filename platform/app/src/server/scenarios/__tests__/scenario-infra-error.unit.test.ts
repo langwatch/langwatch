@@ -205,35 +205,82 @@ describe("classifyScenarioInfraError", () => {
       // buildFailureResults() puts this string in the run's `reasoning`, which
       // is what the customer report showed the loader dump in. Pinned exactly,
       // because the whole point of the fix is the words the customer reads.
-      const { message } = classifyScenarioInfraError(moduleNotFoundDump);
-      expect(message).toBe(
+      expect(classifyScenarioInfraError(moduleNotFoundDump).message).toBe(
         "The simulation runner couldn't start, so the scenario never ran.",
       );
-      expect(message).not.toContain("pino");
-      expect(message).not.toContain("MODULE_NOT_FOUND");
     });
 
+    // Every case carries the child-exit wrapper, because that is what marks
+    // the dead process as ours.
     it.each([
-      "Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod'\n    at Module._load (node:internal/modules/cjs/loader:1294:5)",
-      "Error: Cannot find module '../dist/index.js'\nRequire stack:\n- /app/dist/server/workers.cjs",
-      "Error [ERR_REQUIRE_ESM]: require() of ES Module not supported\n    at Module._compile (node:internal/modules/cjs/loader:1871:14)",
-      "Error: ERR_DLOPEN_FAILED: invalid ELF header\n    at Module._extensions..node (node:internal/modules/cjs/loader:1928:18)",
-    ])("classifies a %s crash as runner-unavailable", (raw) => {
+      [
+        "a missing ESM package",
+        "Child process exited with code 1: Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod'\n    at Module._load (node:internal/modules/cjs/loader:1294:5)",
+      ],
+      [
+        "a missing relative module",
+        "Child process exited with code 1: Error: Cannot find module '../dist/index.js'\nRequire stack:\n- /app/dist/server/workers.cjs",
+      ],
+      [
+        "an ESM/CJS mismatch",
+        "Child process exited with code 1: Error [ERR_REQUIRE_ESM]: require() of ES Module not supported\n    at Module._compile (node:internal/modules/cjs/loader:1871:14)",
+      ],
+      [
+        "a native addon that won't load",
+        "Child process exited with code 1: Error: ERR_DLOPEN_FAILED: invalid ELF header\n    at Module._extensions..node (node:internal/modules/cjs/loader:1928:18)",
+      ],
+    ])("classifies %s as runner-unavailable", (_label, raw) => {
       expect(classifyScenarioInfraError(raw).code).toBe(
         ScenarioInfraErrorCode.RunnerUnavailable,
       );
     });
+  });
 
+  describe("when the crash text came from the customer's own agent", () => {
     /** @scenario "A customer's own module error is not blamed on our runner" */
-    it("does not claim our runner failed when the words came from the agent", () => {
-      // A customer's Node agent can fail this way and have the text surface
-      // through the adapter. Blaming our deployment would send them looking in
-      // the wrong place, so without a Node crash dump around it this stays in
-      // the generic bucket with their own wording intact.
+    it("does not blame our runner for the agent's missing dependency", () => {
+      // The real shape, not a toy: http-agent.adapter.ts embeds the customer's
+      // HTTP response body verbatim, so their agent's own boot crash arrives
+      // here looking exactly like ours — frames, Require stack and all. What
+      // separates them is the child-exit wrapper, which only our dead child
+      // gets. Telling them the fault is on our side would send them looking in
+      // the wrong place for their own missing `stripe`.
+      const agentBodyThroughAdapter = [
+        "HTTP 500: Internal Server Error from https://acme.example.com/agent (request-id: abc-123): Error: Cannot find module 'stripe'",
+        "Require stack:",
+        "- /srv/customer-agent/handlers/pay.js",
+        "    at Module._resolveFilename (node:internal/modules/cjs/loader:1517:15)",
+      ].join("\n");
+
+      const result = classifyScenarioInfraError(agentBodyThroughAdapter);
+
+      expect(result.code).not.toBe(ScenarioInfraErrorCode.RunnerUnavailable);
+      expect(result.hint ?? "").not.toMatch(/fault on our side/i);
+    });
+
+    it("does not blame our runner for a bare module sentence either", () => {
       const agentReply = "Cannot find module 'my-tools/pricing'";
       const result = classifyScenarioInfraError(agentReply);
       expect(result.code).toBe(ScenarioInfraErrorCode.Infra);
       expect(result.message).toBe(agentReply);
+    });
+  });
+
+  describe("when the agent's own failure text contains a path", () => {
+    /** @scenario "The agent's own failure text survives the internals guard" */
+    it.each([
+      [
+        "the adapter's HTTP envelope",
+        "HTTP 502: Bad Gateway from https://acme.example.com/agent (request-id: none): upstream /srv/agent/app.py raised ValueError",
+      ],
+      ["an unknown route", "unknown route /v2/chat"],
+      ["a provider endpoint", "POST /v1/chat/completions returned 400"],
+      ["a rate limit", "Rate limited on /v1/messages, retry after 30s"],
+      ["a require-stack lookalike bullet", "- /webhooks/agent is unreachable"],
+    ])("passes %s through untouched", (_label, raw) => {
+      // A path is only an internal when it is OURS. These are all the
+      // customer's own data and the most diagnostic thing they get.
+      expect(classifyScenarioInfraError(raw).message).toBe(raw);
     });
   });
 
@@ -258,7 +305,41 @@ describe("classifyScenarioInfraError", () => {
       const result = classifyScenarioInfraError(framesOnly);
       expect(result.code).toBe(ScenarioInfraErrorCode.Infra);
       expectNoInternals(result.message);
-      expect(result.message).toBe("The simulation failed before it could run.");
+      // NOT "failed before it could run" — that asserts the run never started,
+      // which is false for anything suppressed mid-run.
+      expect(result.message).toBe(
+        "The simulation failed, but it didn't report a reason we can show.",
+      );
+    });
+
+    it.each([
+      [
+        "a bundle-relative frame",
+        "Error thrown in dist/server/workers.cjs:80978",
+      ],
+      [
+        "an async stack frame",
+        "Caused by: at async Foo.bar (dist/server/x.js:1:1)",
+      ],
+      [
+        "our runner bundle by name",
+        "TypeError: x is not a function (scenario-child-process.cjs:80978:27)",
+      ],
+    ])("suppresses %s, which carries no leading slash", (_label, raw) => {
+      expectNoInternals(classifyScenarioInfraError(raw).message);
+    });
+
+    it("does not let an unbalanced bracket swallow the real sentence", () => {
+      // The HTTP adapter truncates response bodies mid-string, so unbalanced
+      // JSON reaches this classifier as a matter of course. A block may only
+      // open on a line that STARTS with `{`; a stray bracket must not.
+      const truncated = [
+        'Child process exited with code 1: {"partial": [',
+        "The judge could not parse the agent's reply.",
+      ].join("\n");
+      expect(classifyScenarioInfraError(truncated).message).toBe(
+        "The judge could not parse the agent's reply.",
+      );
     });
 
     it("still keeps a real sentence buried in a crash dump", () => {

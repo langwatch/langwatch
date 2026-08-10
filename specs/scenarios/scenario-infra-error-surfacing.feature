@@ -56,33 +56,46 @@ Feature: Scenario infrastructure error surfacing and empty-response state
   # A runner that can't boot — a module missing from the production bundle, a
   # native addon that won't load, an ESM/CJS mismatch — used to reach the user
   # as Node's raw loader dump: the interpreter's own source path, the stack
-  # frames, and the absolute path of our bundle inside the container. The cause
-  # is always our deployment, never the customer's scenario, so it gets a named
-  # code that says exactly that.
+  # frames, and the absolute path of our bundle inside the container. When the
+  # process that died is ours, the cause is our deployment rather than the
+  # customer's scenario, so it gets a named code that says exactly that.
   @unit
   Scenario: A runner that fails to boot becomes a named runner-unavailable error
-    Given a scenario run failed with Node's module-loader crash dump
+    Given a scenario run whose own child process died with Node's module-loader crash dump
     When the failure is classified
     Then the handled error code is "scenario_runner_unavailable"
     And the message does not contain a raw stack trace
     And the message does not name an internal file path
     And the hint says the fault is on our side
 
-  # The module-resolution wording alone doesn't say whose process died: a
-  # customer's own Node agent can fail the same way and have the text reach us
-  # through the adapter. Blaming our deployment would send them looking in the
-  # wrong place, so the runner code needs an actual Node crash dump around it.
+  # A Node crash dump says a Node process failed to load something, not WHICH
+  # process. The HTTP adapter embeds the customer's response body verbatim, so
+  # an agent that boots with its own missing dependency arrives looking
+  # identical — frames, require stack and all. Only our own child carries the
+  # runner's exit wrapper, and that is what separates the two. Claiming the
+  # fault is ours would send them looking anywhere but their own code.
   @unit
   Scenario: A customer's own module error is not blamed on our runner
-    Given a scenario run failed with an agent reply mentioning "Cannot find module" and no crash dump
+    Given an agent replied with its own module-loader crash and our runner exited cleanly
     When the failure is classified
-    Then the handled error code is "scenario_infra_error"
-    And the message keeps the agent's own wording
+    Then the handled error code is not "scenario_runner_unavailable"
+    And the hint does not claim the fault is on our side
+
+  # A path is only an internal when it is ours. Suppressing every path also
+  # suppressed the adapter's HTTP envelope — status, URL, request id and the
+  # agent's own error body — which is the most diagnostic thing a customer
+  # gets, and none of it ours to hide.
+  @unit
+  Scenario: The agent's own failure text survives the internals guard
+    Given a scenario run failed with an agent message naming a route or a path of its own
+    When the failure is classified
+    Then the message keeps the agent's own wording
 
   # Defence in depth for the generic bucket: even an unclassified crash must
   # never surface a stack frame, an interpreter source location, or a bundle
-  # path. When nothing but runtime noise is left, the user gets a plain
-  # sentence instead.
+  # path — including the bundle-relative ones that carry no leading slash.
+  # When nothing readable is left, the user gets a plain sentence that does not
+  # claim to know when the run failed.
   @unit
   Scenario: An unclassified crash dump degrades to a plain sentence
     Given a scenario run failed with a raw error containing only stack frames and interpreter paths
@@ -90,6 +103,7 @@ Feature: Scenario infrastructure error surfacing and empty-response state
     Then the handled error code is "scenario_infra_error"
     And the message does not contain a raw stack trace
     And the message does not name an internal file path
+    And the message does not claim the run failed before it started
 
   # A model pinned to the codex provider refused for the requesting feature
   # (issue #6634's coding-assistant-surfaces backstop, see
