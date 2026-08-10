@@ -422,7 +422,7 @@ function VirtualKeyDetailPage() {
                       <Code fontSize="xs">{vk.routingPolicyId}</Code>
                     ) : (
                       <Text fontSize="sm" color="fg.muted">
-                        default cascade — all eligible providers in priority
+                        default cascade, all eligible providers in priority
                         order
                       </Text>
                     )}
