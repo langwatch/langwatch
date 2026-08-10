@@ -56,6 +56,14 @@ Feature: CI checkouts leave the marketing media on the server
     # says what we drop and lets everything else through by default.
 
   @unit
+  Scenario: A cone-mode value that is neither true nor false fails the check
+    Given a checkout step whose sparse-checkout-cone-mode is a typo
+    Then the guard reports it separately from a missing setting
+    # `sparse-checkout-cone-mode: flase` used to read as an explicit false and
+    # satisfy the check — the guard passing on exactly the class of mistake it
+    # exists to catch.
+
+  @unit
   Scenario: The exclusions are root-anchored
     Given a checkout step that excludes "assets"
     Then it excludes only the repository-root "assets/"

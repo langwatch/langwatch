@@ -26,9 +26,31 @@ Feature: One Go version, stated once
     Given the root go.mod declares the repository's Go version
 
   @unit
-  Scenario: Every Go toolchain reference in the repo agrees
+  Scenario: Every non-exempt Go toolchain reference in the repo agrees
     Given the guard runs against the repository
     Then it reports no disagreement
+
+  @unit
+  Scenario: A child module on a different version fails the check
+    Given a non-root go.mod declaring a different version
+    Then the guard names the module and both versions
+    # The guard first read only the root module, which meant
+    # infra/clickhouse-serverless could drift straight back and the exemption
+    # list below was never consulted at runtime at all.
+
+  @unit
+  Scenario: A workflow that sets up Go without naming a module fails the check
+    Given a setup-go step with neither go-version nor go-version-file
+    Then the guard reports that it uses the action's default toolchain
+    # Neither key is a third source of truth, and a silent one: the version
+    # becomes whatever the action currently ships.
+
+  @unit
+  Scenario: A lowercase or indented FROM is still checked
+    Given a Dockerfile written as "from golang:..." or with a leading indent
+    Then the guard still compares its version
+    # Dockerfile instructions are case-insensitive, so an uppercase-only,
+    # column-zero pattern let a valid spelling drift unchecked.
 
   @unit
   Scenario: The workspace and the root module must agree
@@ -48,7 +70,7 @@ Feature: One Go version, stated once
     # image quietly stops matching the module without any file changing.
 
   @unit
-  Scenario: A workflow states the version by reading the module
+  Scenario: A workflow pinning Go with a literal fails the check
     Given a workflow step that sets up Go with a version literal
     Then the guard tells it to use go-version-file instead
 

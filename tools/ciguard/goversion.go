@@ -30,12 +30,17 @@ var GoDockerfileRoots = []string{"infra", "services", "platform", "tools"}
 // ExemptModules are modules that deliberately do not track the root version,
 // each with the reason. An exemption is a decision, so it carries one.
 var ExemptModules = map[string]string{
-	"sdks/go/go.mod": "published SDK: its go directive is the floor consumers must meet, and raising it drops support for anyone below. sdk-go-ci and sdk-go-cd build it standalone with GOWORK=off precisely so that stays true.",
+	"sdks/go/go.mod":          "published SDK: its go directive is the floor consumers must meet, and raising it drops support for anyone below. sdk-go-ci and sdk-go-cd build it standalone with GOWORK=off precisely so that stays true.",
+	"sdks/go/examples/go.mod": "compiled against the published SDK at its own floor, and deliberately outside the workspace (see go.work) so it resolves the SDK by relative replace. Raising it here would test the examples on a Go the SDK does not require.",
+	"sdks/go/e2e/go.mod":      "same as sdks/go/examples: outside the workspace by design, pinned to the SDK's floor rather than the repo's.",
 }
 
 var (
 	goDirectivePattern = regexp.MustCompile(`(?m)^go\s+(\d+\.\d+(?:\.\d+)?)\s*$`)
-	golangImagePattern = regexp.MustCompile(`(?m)^FROM\s+(?:--platform=\S+\s+)?golang:(\S+)`)
+	// Case-insensitive with optional indent: the Dockerfile spec treats
+	// instructions case-insensitively, so `from golang:1.26.1` is valid and
+	// an uppercase-only, column-zero pattern would let it drift unchecked.
+	golangImagePattern = regexp.MustCompile(`(?mi)^\s*FROM\s+(?:--platform=\S+\s+)?golang:(\S+)`)
 	fullVersionPattern = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
 )
 
@@ -70,6 +75,12 @@ func GoVersion(repoRoot string) ([]string, error) {
 			"go.work says %s, go.mod says %s — the workspace and the root module must agree", got, want))
 	}
 
+	modules, err := goChildModules(repoRoot, want)
+	if err != nil {
+		return nil, err
+	}
+	problems = append(problems, modules...)
+
 	literals, err := goVersionLiterals(repoRoot)
 	if err != nil {
 		return nil, err
@@ -82,6 +93,72 @@ func GoVersion(repoRoot string) ([]string, error) {
 	}
 
 	return append(problems, images...), nil
+}
+
+// goChildModules compares every non-root go.mod against the root version.
+//
+// Without this the guard read the root module and nothing else, so
+// infra/clickhouse-serverless/go.mod could drift straight back to 1.26.1
+// unnoticed — and ExemptModules, which exists to let sdks/go keep its floor,
+// was never consulted at runtime at all.
+func goChildModules(repoRoot, want string) ([]string, error) {
+	paths, err := childModulePaths(repoRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	var problems []string
+	for _, path := range paths {
+		if _, exempt := ExemptModules[path]; exempt {
+			continue
+		}
+
+		contents, err := os.ReadFile(filepath.Join(repoRoot, path))
+		if err != nil {
+			return nil, err
+		}
+		got := goDirective(string(contents))
+		if got != want {
+			problems = append(problems, fmt.Sprintf(
+				"%s declares Go %s, go.mod says %s — add it to ExemptModules with a reason if that is deliberate",
+				path, got, want))
+		}
+	}
+
+	return problems, nil
+}
+
+func childModulePaths(repoRoot string) ([]string, error) {
+	var paths []string
+
+	err := filepath.WalkDir(repoRoot, func(path string, entry fs.DirEntry, err error) error {
+		switch {
+		case err != nil && os.IsNotExist(err):
+			return fs.SkipDir
+		case err != nil:
+			return err
+		case entry.IsDir() && isSkippedDir(entry.Name()):
+			return fs.SkipDir
+		case entry.IsDir() || entry.Name() != "go.mod":
+			return nil
+		}
+
+		rel, relErr := filepath.Rel(repoRoot, path)
+		if relErr != nil {
+			return relErr
+		}
+		if rel != "go.mod" {
+			paths = append(paths, filepath.ToSlash(rel))
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(paths)
+
+	return paths, nil
 }
 
 // goVersionLiterals finds workflows that restate the version rather than
@@ -104,17 +181,32 @@ func workflowLiterals(workflow *ciscan.Workflow) []string {
 	var problems []string
 	for _, job := range workflow.JobNames() {
 		for _, step := range workflow.Jobs[job].Steps {
-			literal, ok := step.StringWith("go-version")
-			if !ok || !strings.HasPrefix(step.Uses, "actions/setup-go@") {
+			if !strings.HasPrefix(step.Uses, "actions/setup-go@") {
 				continue
 			}
-			problems = append(problems, fmt.Sprintf(
-				"%s job %q pins Go with a literal (%s) — use go-version-file so it follows the module",
-				workflow.Path, job, literal))
+			problems = append(problems, setupGoStep(workflow.Path, job, step)...)
 		}
 	}
 
 	return problems
+}
+
+func setupGoStep(path, job string, step ciscan.Step) []string {
+	if literal, ok := step.StringWith("go-version"); ok {
+		return []string{fmt.Sprintf(
+			"%s job %q pins Go with a literal (%s) — use go-version-file so it follows the module",
+			path, job, literal)}
+	}
+
+	// Neither key means setup-go installs its own default, which is whatever
+	// the action currently ships — a third source of truth, and a silent one.
+	if file, ok := step.StringWith("go-version-file"); !ok || strings.TrimSpace(file) == "" {
+		return []string{fmt.Sprintf(
+			"%s job %q sets up Go without go-version-file, so it uses the action's default toolchain rather than the module's",
+			path, job)}
+	}
+
+	return nil
 }
 
 func goDockerfileImages(repoRoot, want string) ([]string, error) {

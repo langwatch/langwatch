@@ -37,7 +37,7 @@ func agreeingRepo(t *testing.T, overrides map[string]string) string {
 	return root
 }
 
-// @scenario "Every Go toolchain reference in the repo agrees"
+// @scenario "Every non-exempt Go toolchain reference in the repo agrees"
 func TestGoVersionAcceptsAnAgreeingRepo(t *testing.T) {
 	problems, err := ciguard.GoVersion(agreeingRepo(t, nil))
 
@@ -78,7 +78,7 @@ func TestGoVersionRejectsAFloatingBaseImage(t *testing.T) {
 	assert.Contains(t, problems[0], "floating tag")
 }
 
-// @scenario "A workflow states the version by reading the module"
+// @scenario "A workflow pinning Go with a literal fails the check"
 func TestGoVersionReportsAWorkflowPinningALiteral(t *testing.T) {
 	problems, err := ciguard.GoVersion(agreeingRepo(t, map[string]string{
 		".github/workflows/go-ci.yaml": "jobs:\n  build:\n    steps:\n      - uses: actions/setup-go@v7\n        with:\n          go-version: '1.25'\n",
@@ -89,12 +89,58 @@ func TestGoVersionReportsAWorkflowPinningALiteral(t *testing.T) {
 	assert.Contains(t, problems[0], "pins Go with a literal")
 }
 
-// @scenario "The published SDK keeps its own floor"
-func TestGoVersionExemptsThePublishedSDKWithAReason(t *testing.T) {
-	reason, ok := ciguard.ExemptModules["sdks/go/go.mod"]
+// @scenario "A child module on a different version fails the check"
+func TestGoVersionReportsAChildModuleOnADifferentVersion(t *testing.T) {
+	problems, err := ciguard.GoVersion(agreeingRepo(t, map[string]string{
+		"infra/clickhouse-serverless/go.mod": "module y\n\ngo 1.26.1\n",
+	}))
 
-	require.True(t, ok, "the SDK's deliberate floor must be recorded as an exemption")
-	assert.Contains(t, strings.ToLower(reason), "floor")
+	require.NoError(t, err)
+	require.Len(t, problems, 1)
+	assert.Contains(t, problems[0], "infra/clickhouse-serverless/go.mod declares Go 1.26.1")
+}
+
+// @scenario "The published SDK keeps its own floor"
+//
+// Asserts the exemption CHANGES the outcome. The previous version of this
+// test read the reason string out of the map and asserted it contained the
+// word "floor" — which passed whether or not GoVersion consulted the map at
+// all, and it did not: child modules were never scanned.
+func TestGoVersionExemptsThePublishedSDKFromTheRootVersion(t *testing.T) {
+	root := agreeingRepo(t, map[string]string{
+		"sdks/go/go.mod": "module sdk\n\ngo 1.25.0\n",
+	})
+
+	problems, err := ciguard.GoVersion(root)
+
+	require.NoError(t, err)
+	assert.Empty(t, problems, "the SDK's floor is exempt and must not be reported")
+
+	reason, ok := ciguard.ExemptModules["sdks/go/go.mod"]
+	require.True(t, ok)
+	assert.Contains(t, strings.ToLower(reason), "floor", "an exemption must record why")
+}
+
+// @scenario "A workflow that sets up Go without naming a module fails the check"
+func TestGoVersionReportsSetupGoWithoutAVersionFile(t *testing.T) {
+	problems, err := ciguard.GoVersion(agreeingRepo(t, map[string]string{
+		".github/workflows/go-ci.yaml": "jobs:\n  build:\n    steps:\n      - uses: actions/setup-go@v7\n",
+	}))
+
+	require.NoError(t, err)
+	require.Len(t, problems, 1)
+	assert.Contains(t, problems[0], "without go-version-file")
+}
+
+// @scenario "A lowercase or indented FROM is still checked"
+func TestGoVersionChecksALowercaseFromInstruction(t *testing.T) {
+	problems, err := ciguard.GoVersion(agreeingRepo(t, map[string]string{
+		"infra/docker/Dockerfile.svc": "  from golang:1.26.1-alpine AS build\n",
+	}))
+
+	require.NoError(t, err)
+	require.Len(t, problems, 1)
+	assert.Contains(t, problems[0], "builds with Go 1.26.1")
 }
 
 func TestGoVersionHoldsInTheLiveRepo(t *testing.T) {

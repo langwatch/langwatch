@@ -144,8 +144,23 @@ func (s Step) StringWith(key string) (string, bool) {
 	}
 }
 
-// BoolWith reads a `with:` value as a bool, accepting the string form too.
-func (s Step) BoolWith(key string) (value bool, present bool) {
+// Has reports whether the step declares the key at all, regardless of whether
+// the value parses.
+func (s Step) Has(key string) bool {
+	_, ok := s.With[key]
+
+	return ok
+}
+
+// BoolWith reads a `with:` value as a bool, accepting YAML's unquoted form and
+// the quoted string form.
+//
+// `valid` is false for anything that is not recognizably true or false —
+// including a typo like `flase`. Returning "present, and false" for a typo is
+// how a guard silently passes: `sparse-checkout-cone-mode: flase` would have
+// read as an explicit false and satisfied the cone-mode check, in a guard
+// whose entire job is catching that class of mistake.
+func (s Step) BoolWith(key string) (value bool, valid bool) {
 	raw, ok := s.With[key]
 	if !ok {
 		return false, false
@@ -155,9 +170,16 @@ func (s Step) BoolWith(key string) (value bool, present bool) {
 	case bool:
 		return typed, true
 	case string:
-		return strings.EqualFold(typed, "true"), true
+		switch {
+		case strings.EqualFold(typed, "true"):
+			return true, true
+		case strings.EqualFold(typed, "false"):
+			return false, true
+		default:
+			return false, false
+		}
 	default:
-		return false, true
+		return false, false
 	}
 }
 

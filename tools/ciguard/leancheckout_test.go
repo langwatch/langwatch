@@ -123,6 +123,19 @@ func TestLeanCheckoutRejectsNegationUnderConeMode(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "cone mode does not honor negation")
 }
 
+// @scenario "A cone-mode value that is neither true nor false fails the check"
+func TestLeanCheckoutRejectsAnUnparseableConeModeValue(t *testing.T) {
+	root := writeWorkflows(t, map[string]string{
+		ciguard.LeanCheckoutWorkflows[0]: strings.Replace(leanJob,
+			"sparse-checkout-cone-mode: false", "sparse-checkout-cone-mode: flase", 1),
+	})
+
+	problems, err := ciguard.LeanCheckout(root)
+
+	require.NoError(t, err)
+	assert.Contains(t, strings.Join(problems, "\n"), "neither true nor false")
+}
+
 // @scenario "The exclusions are root-anchored"
 func TestLeanCheckoutRejectsAnUnanchoredExclusion(t *testing.T) {
 	root := writeWorkflows(t, map[string]string{
