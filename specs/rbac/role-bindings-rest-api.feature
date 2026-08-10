@@ -61,6 +61,16 @@ Feature: Role bindings REST API
     And naming both a user and a group is refused the same way
     And no binding is created either time
 
+  # The three principals answer the same way when they are not ours: the id is
+  # a field in the request, not the resource the request addresses, so it is a
+  # rejected value rather than a missing thing.
+  @integration
+  Scenario: Binding an API key from another organization is refused
+    Given an API key exists in another organization
+    When I bind that key as a viewer on one of my projects
+    Then the request is refused with code api_key_not_in_organization and status 422
+    And no binding is created
+
   @integration
   Scenario: Binding to a scope from another organization is refused
     Given a team exists in another organization

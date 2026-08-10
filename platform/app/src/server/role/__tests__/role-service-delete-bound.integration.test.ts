@@ -134,6 +134,57 @@ describe("RoleService.deleteRole, given a role referenced by role bindings", () 
     ).not.toBeNull();
   });
 
+  it("refuses at the storage layer when the only holder is in another organization", async () => {
+    // There are no database foreign keys, so a binding can point at a role
+    // across organizations. A reference check scoped to this organization
+    // would not see it, delete the role, and leave the binding dangling on
+    // the built-in permission bag.
+    const foreignOrganization = await prisma.organization.create({
+      data: { name: "Foreign Org", slug: `--test-foreign-${ns}` },
+    });
+    const role = await prisma.customRole.create({
+      data: {
+        name: `cross-org-role-${ns}`,
+        organizationId: testOrganization.id,
+        permissions: ["project:view"],
+        kind: "custom",
+      },
+    });
+    const bindingId = generate(KSUID_RESOURCES.ROLE_BINDING).toString();
+    await prisma.roleBinding.create({
+      data: {
+        id: bindingId,
+        organizationId: foreignOrganization.id,
+        userId,
+        role: TeamUserRole.CUSTOM,
+        customRoleId: role.id,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: foreignOrganization.id,
+      },
+    });
+
+    try {
+      const repository = new RoleRepository(prisma);
+
+      await expect(
+        repository.deleteIfUnused({
+          roleId: role.id,
+          organizationId: testOrganization.id,
+        }),
+      ).resolves.toBe(false);
+
+      expect(
+        await prisma.customRole.findUnique({ where: { id: role.id } }),
+      ).not.toBeNull();
+    } finally {
+      await cleanupTestRows(prisma, [
+        ["roleBinding", { id: bindingId }],
+        ["customRole", { id: role.id }],
+        ["organization", { id: foreignOrganization.id }],
+      ]);
+    }
+  });
+
   it("still deletes a role nothing references", async () => {
     const unboundRole = await prisma.customRole.create({
       data: {

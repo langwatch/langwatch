@@ -81,11 +81,17 @@ function buildApp(options: {
 }
 
 const RESOLVED_TOKEN = {
-  type: "apiKey",
-  apiKeyId: "key_1",
-  userId: "user_1",
-  organizationId: ORGANIZATION.id,
+  ok: true,
+  resolved: {
+    type: "apiKey",
+    apiKeyId: "key_1",
+    userId: "user_1",
+    organizationId: ORGANIZATION.id,
+  },
 };
+
+/** A token that resolves to no organization: unknown, revoked, or malformed. */
+const UNUSABLE_CREDENTIAL = { ok: false, reason: "unusable_credential" };
 
 beforeEach(() => {
   resolveOrgOnly.mockReset();
@@ -126,7 +132,7 @@ describe("createOrgAuthMiddleware", () => {
 
   describe("given a token the resolver does not recognise", () => {
     beforeEach(() => {
-      resolveOrgOnly.mockResolvedValue(null);
+      resolveOrgOnly.mockResolvedValue(UNUSABLE_CREDENTIAL);
     });
 
     it("responds 401 with the legacy body in the default mode", async () => {
@@ -137,10 +143,13 @@ describe("createOrgAuthMiddleware", () => {
       });
 
       expect(res.status).toBe(401);
+      // Deliberately vague: naming the credential class here would say
+      // "Project API keys cannot be used here" at a typo and at a revoked key
+      // too, and would confirm to an unauthenticated caller which secrets
+      // exist. The wrong-class refusal below is the one that names them.
       expect(await res.json()).toEqual({
         error: "Unauthorized",
-        message:
-          "Invalid credentials. Organization-level endpoints require an admin API key created in Settings > API Keys. Project API keys cannot be used here.",
+        message: "Invalid credentials.",
       });
     });
 
@@ -157,6 +166,37 @@ describe("createOrgAuthMiddleware", () => {
       expect(caught).toHaveLength(1);
       expect((caught[0] as HandledError).code).toBe("invalid_credentials");
       expect((caught[0] as HandledError).httpStatus).toBe(401);
+    });
+  });
+
+  describe("given a working key of the wrong credential class", () => {
+    beforeEach(() => {
+      resolveOrgOnly.mockResolvedValue({
+        ok: false,
+        reason: "wrong_credential_class",
+      });
+    });
+
+    it("throws credential_class_mismatch carrying the two classes in throw mode", async () => {
+      const { app, caught } = buildApp({
+        prisma: buildPrisma(ORGANIZATION),
+        refusals: "throw",
+      });
+
+      await app.request("/probe", {
+        headers: { Authorization: "Bearer sk-lw-project-key" },
+      });
+
+      expect(caught).toHaveLength(1);
+      const error = caught[0] as HandledError;
+      expect(error.code).toBe("credential_class_mismatch");
+      expect(error.httpStatus).toBe(401);
+      // The context is what makes the refusal actionable, and dropping it in
+      // one mode leaves the two modes describing the same refusal differently.
+      expect(error.meta).toEqual({
+        required: "organization_api_key",
+        presented: "project_api_key",
+      });
     });
   });
 

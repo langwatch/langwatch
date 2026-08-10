@@ -423,7 +423,7 @@ export class OrganizationService {
   async listProvisioningSummaries(): Promise<
     OrganizationProvisioningSummary[]
   > {
-    return this.repo.listProvisioningSummaries();
+    return this.repo.findAllProvisioningSummaries();
   }
 
   /**
@@ -567,7 +567,7 @@ export class OrganizationService {
     offset?: number;
     limit?: number;
   }): Promise<{ members: OrganizationMemberSummary[]; totalCount: number }> {
-    return this.repo.listMembers({
+    return this.repo.findAllMembers({
       organizationId: params.organizationId,
       includeDisabled: params.includeDisabled ?? false,
       offset: params.offset ?? 0,

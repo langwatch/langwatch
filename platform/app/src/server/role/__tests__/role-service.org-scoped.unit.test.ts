@@ -5,7 +5,7 @@
  * organization up front, so these lookups must never return or affect
  * another organization's role.
  */
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RoleService } from "../role.service";
 
@@ -195,6 +195,66 @@ describe("RoleService org-scoped variants", () => {
           meta: expect.objectContaining({ bindingCount: 1 }),
         });
       });
+    });
+
+    describe("when another caller deleted the same role first", () => {
+      it("answers not found rather than an in-use refusal naming nothing", async () => {
+        // The lookup finds the role; the re-read after the failed delete
+        // finds it gone, which is what says another caller removed it in
+        // between. A 409 here would list zero users and zero bindings for a
+        // role that no longer exists.
+        prisma.customRole.findFirst
+          .mockResolvedValueOnce(storedRole)
+          .mockResolvedValueOnce(null);
+        prisma.roleBinding.count.mockResolvedValue(0);
+        prisma.teamUser.count.mockResolvedValue(0);
+        prisma.$executeRaw.mockResolvedValue(0);
+
+        await expect(
+          service.deleteRoleForOrg({ roleId: "cr_1", organizationId: "org_1" }),
+        ).rejects.toMatchObject({ code: "custom_role_not_found" });
+      });
+    });
+  });
+
+  describe("when the update loses a race on a unique index", () => {
+    it("reports the duplicate name for a conflict on the name index", async () => {
+      prisma.customRole.findFirst.mockResolvedValue(storedRole);
+      prisma.customRole.findUnique.mockResolvedValue(null);
+      prisma.customRole.update.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError("conflict", {
+          code: "P2002",
+          clientVersion: "5.7.1",
+          meta: { target: ["organizationId", "name"] },
+        }),
+      );
+
+      await expect(
+        service.updateRoleForOrg({
+          roleId: "cr_1",
+          organizationId: "org_1",
+          params: { name: "reviewers" },
+        }),
+      ).rejects.toMatchObject({ code: "custom_role_name_taken" });
+    });
+
+    it("lets a conflict on an unrelated index through unchanged", async () => {
+      prisma.customRole.findFirst.mockResolvedValue(storedRole);
+      prisma.customRole.findUnique.mockResolvedValue(null);
+      const unrelated = new Prisma.PrismaClientKnownRequestError("conflict", {
+        code: "P2002",
+        clientVersion: "5.7.1",
+        meta: { target: ["organizationId", "externalId"] },
+      });
+      prisma.customRole.update.mockRejectedValue(unrelated);
+
+      await expect(
+        service.updateRoleForOrg({
+          roleId: "cr_1",
+          organizationId: "org_1",
+          params: { description: "anything" },
+        }),
+      ).rejects.toBe(unrelated);
     });
   });
 });

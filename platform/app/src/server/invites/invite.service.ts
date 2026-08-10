@@ -30,6 +30,28 @@ import {
 /** Duration in milliseconds before an invite expires (48 hours). */
 export const INVITE_EXPIRATION_MS = 2 * 24 * 60 * 60 * 1000;
 
+/**
+ * Ceiling on the batch-invite transaction, derived from the work it holds:
+ * the batch endpoint accepts 50 invites and {@link InviteService.persistInvites}
+ * issues one duplicate check and one insert per invite on the single
+ * connection an interactive transaction owns, so 100 sequential indexed
+ * statements. At 200ms apiece, which is already an unhappy database, that is
+ * 20 seconds; Prisma's 5s default fails the whole batch with P2028 well before
+ * a large batch is unhealthy.
+ *
+ * Not larger, because the transaction pins one pool connection for its whole
+ * life: this number is the cap on how long one batch may hold a connection,
+ * not a target. A batch that reaches it is failing for a real reason.
+ */
+const INVITE_BATCH_TXN_TIMEOUT_MS = 20_000;
+
+/**
+ * How long to wait for a connection before starting. Raised from Prisma's 2s
+ * default for the same reason the dataset mutations raise it: a busy pool
+ * should not fail a batch before it has done any work.
+ */
+const INVITE_BATCH_TXN_MAX_WAIT_MS = 10_000;
+
 /** Mapping from organization roles to default team roles. */
 export const ORGANIZATION_TO_TEAM_ROLE_MAP: Record<
   OrganizationUserRole,
@@ -510,13 +532,18 @@ export class InviteService {
     });
 
     // Phase 1: DB operations in a transaction, no side effects.
-    const createdRecords = await prisma.$transaction((tx) =>
-      this.persistInvites({
-        tx,
-        invites: validInvites,
-        organization,
-        isStrict,
-      }),
+    const createdRecords = await prisma.$transaction(
+      (tx) =>
+        this.persistInvites({
+          tx,
+          invites: validInvites,
+          organization,
+          isStrict,
+        }),
+      {
+        timeout: INVITE_BATCH_TXN_TIMEOUT_MS,
+        maxWait: INVITE_BATCH_TXN_MAX_WAIT_MS,
+      },
     );
 
     // Phase 2: emails outside the transaction, so a provider failure can
@@ -615,12 +642,17 @@ export class InviteService {
       return null;
     }
 
-    if (!invite.email.trim()) {
+    const email = invite.email.trim();
+    if (!email) {
       return null;
     }
 
     return {
-      email: invite.email,
+      // Stored trimmed, because the reads look the address up as it was
+      // typed: `checkDuplicateInvite` and `findPendingByOrgAndEmail` both miss
+      // a row written as " a@b.com ", so the duplicate check never fires and
+      // SSO onboarding never finds the invite it should adopt.
+      email,
       role: invite.role,
       organizationId,
       teamIds: resolvedTeams.teamIdsString,

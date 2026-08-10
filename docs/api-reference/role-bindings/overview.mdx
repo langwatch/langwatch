@@ -90,7 +90,7 @@ A create response can carry `hasLegacyAccessNotice: true`. It means this is the 
 | `role_binding_principal_invalid` | 422 | Not exactly one of `userId`, `groupId`, `apiKeyId` |
 | `user_not_in_organization` | 422 | The user is not a member here |
 | `group_not_in_organization` | 422 | The group belongs to another organization |
-| `api_key_not_found` | 404 | No such API key in this organization |
+| `api_key_not_in_organization` | 422 | The API key belongs to another organization |
 | `scope_not_in_organization` | 422 | The team or project belongs to another organization |
 | `custom_role_id_required` | 422 | Role is `CUSTOM` with no `customRoleId` |
 | `custom_role_not_assignable` | 422 | That custom role cannot be granted here |

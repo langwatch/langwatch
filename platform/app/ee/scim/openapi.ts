@@ -299,9 +299,9 @@ const PAGINATION_PARAMETERS: ParameterSpec[] = [
     name: "count",
     in: "query",
     required: false,
-    schema: { type: "integer", default: 100 },
+    schema: { type: "integer", default: 100, maximum: 100 },
     description:
-      "How many resources to return. Anything that does not parse as a positive integer is read as 100.",
+      "How many resources to return, capped at 100 (the `filter.maxResults` ServiceProviderConfig publishes). Anything that does not parse as a positive integer is read as 100, and anything above 100 is served as 100.",
   },
 ];
 

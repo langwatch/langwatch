@@ -271,6 +271,11 @@ export class OrgAuthRefusedError extends HandledError {
       // A refusal is the credential's problem; anything 5xx reaching here is
       // not, and must not be logged as routine customer noise.
       fault: refusal.status >= 500 ? "platform" : "customer",
+      // The refusal's client-readable context travels in both modes or the
+      // two disagree: `credential_class_mismatch` carries the class a route
+      // needs against the one that arrived, which is what tells a caller to
+      // swap the key rather than hunt a typo.
+      ...(refusal.meta ? { meta: refusal.meta } : {}),
     });
     this.name = "OrgAuthRefusedError";
   }

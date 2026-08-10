@@ -7,11 +7,7 @@ import {
   TeamUserRole,
 } from "@prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
-
-export const CUSTOM_ROLE_KIND = {
-  CUSTOM: "custom",
-  SYSTEM_API_KEY: "system_api_key",
-} as const;
+import { CUSTOM_ROLE_KIND } from "../role-kind";
 
 export type RolePrismaDelegate = PrismaClient | Prisma.TransactionClient;
 
@@ -78,6 +74,24 @@ export class RoleRepository {
     });
   }
 
+  /**
+   * The permission lists of these user-created roles, for callers that have to
+   * inspect what a role grants before a binding to it is written.
+   */
+  async findAssignablePermissionsByIds(
+    roleIds: string[],
+    organizationId: string,
+  ) {
+    return this.prisma.customRole.findMany({
+      where: {
+        id: { in: roleIds },
+        organizationId,
+        kind: CUSTOM_ROLE_KIND.CUSTOM,
+      },
+      select: { id: true, permissions: true },
+    });
+  }
+
   async findByIdWithUsers(roleId: string) {
     return this.prisma.customRole.findUnique({
       where: { id: roleId },
@@ -115,6 +129,14 @@ export class RoleRepository {
     });
   }
 
+  /**
+   * The role bindings in this organization that reference this role.
+   *
+   * Organization-scoped because the tenancy middleware requires it of every
+   * `RoleBinding` query. `deleteIfUnused` asks a wider question in raw SQL, so
+   * a count of zero here does not mean the delete will go through; see
+   * `RoleService.deleteRoleRow`, which settles that by re-reading the role.
+   */
   async countRoleBindings({
     roleId,
     organizationId,
@@ -143,6 +165,12 @@ export class RoleRepository {
    * reference instead of refusing. One statement leaves nothing to interleave
    * with, and a delete that finds a holder leaves the role standing for the
    * caller to refuse over.
+   *
+   * The role row is scoped to the organization; the reference checks are not.
+   * There are no database foreign keys here, so a binding in another
+   * organization can point at this role, and an organization-scoped check
+   * would delete the role out from under it and leave a dangling reference
+   * that silently resolves to the built-in permission bag.
    */
   async deleteIfUnused({
     roleId,
@@ -156,9 +184,7 @@ export class RoleRepository {
       WHERE "id" = ${roleId}
         AND "organizationId" = ${organizationId}
         AND NOT EXISTS (
-          SELECT 1 FROM "RoleBinding"
-          WHERE "customRoleId" = ${roleId}
-            AND "organizationId" = ${organizationId}
+          SELECT 1 FROM "RoleBinding" WHERE "customRoleId" = ${roleId}
         )
         AND NOT EXISTS (
           SELECT 1 FROM "TeamUser" WHERE "assignedRoleId" = ${roleId}

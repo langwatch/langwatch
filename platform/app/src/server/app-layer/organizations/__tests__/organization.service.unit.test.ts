@@ -53,7 +53,7 @@ describe("OrganizationService", () => {
     getOrganizationForBilling: vi.fn(),
     createAndAssign: vi.fn(),
     createForProvisioning: vi.fn(),
-    listProvisioningSummaries: vi.fn(),
+    findAllProvisioningSummaries: vi.fn(),
     findProvisioningSummaryById: vi.fn(),
     deleteProvisionedOrganization: vi.fn(),
     getAllForUser: vi.fn(),
@@ -61,7 +61,7 @@ describe("OrganizationService", () => {
     getMemberById: vi.fn(),
     getAllMembers: vi.fn(),
     findMembership: vi.fn(),
-    listMembers: vi.fn(),
+    findAllMembers: vi.fn(),
     findMemberTeamBindings: vi.fn(),
     findSettingsById: vi.fn(),
     updateSettings: vi.fn(),
@@ -343,6 +343,10 @@ describe("OrganizationService", () => {
           userId: "user-456",
           disabled: true,
         });
+        // Disabling frees a seat, so consulting the seat limit here would
+        // refuse the very action that makes room. Named, or a regression that
+        // adds the check still passes this test.
+        expect(mockCheckLimit).not.toHaveBeenCalled();
       });
     });
 

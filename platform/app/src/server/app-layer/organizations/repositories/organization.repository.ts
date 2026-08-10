@@ -382,7 +382,7 @@ export interface OrganizationRepository {
   ): Promise<CreateAndAssignResult>;
 
   /** Every organization on the instance, newest first. Instance-admin only. */
-  listProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]>;
+  findAllProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]>;
 
   findProvisioningSummaryById(
     organizationId: string,
@@ -427,7 +427,7 @@ export interface OrganizationRepository {
   }): Promise<OrganizationMemberSummary | null>;
 
   /** Paginated membership list for the management surface. */
-  listMembers(params: {
+  findAllMembers(params: {
     organizationId: string;
     includeDisabled: boolean;
     offset: number;
@@ -582,7 +582,7 @@ export class NullOrganizationRepository implements OrganizationRepository {
     };
   }
 
-  async listProvisioningSummaries(): Promise<
+  async findAllProvisioningSummaries(): Promise<
     OrganizationProvisioningSummary[]
   > {
     return [];
@@ -634,7 +634,7 @@ export class NullOrganizationRepository implements OrganizationRepository {
     return null;
   }
 
-  async listMembers(_params: {
+  async findAllMembers(_params: {
     organizationId: string;
     includeDisabled: boolean;
     offset: number;

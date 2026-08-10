@@ -60,6 +60,7 @@ describe("Feature: Role bindings REST API", () => {
   // cleanup an undefined filter, which Prisma would treat as unfiltered.
   let foreignOrgId: string | undefined;
   let foreignTeamId: string;
+  let foreignApiKeyId: string;
 
   const authHeaders = () => ({
     Authorization: `Bearer ${seeded.adminToken}`,
@@ -176,6 +177,15 @@ describe("Feature: Role bindings REST API", () => {
       },
     });
     foreignTeamId = foreignTeam.id;
+    const foreignApiKey = await prisma.apiKey.create({
+      data: {
+        name: `RB Foreign Key ${ns}`,
+        organizationId: foreignOrg.id,
+        lookupId: `--test-rb-foreign-lookup-${ns}`,
+        hashedSecret: `--test-rb-foreign-secret-${ns}`,
+      },
+    });
+    foreignApiKeyId = foreignApiKey.id;
   });
 
   afterAll(async () => {
@@ -193,7 +203,10 @@ describe("Feature: Role bindings REST API", () => {
         ["project", { team: { organizationId: seeded?.organization.id } }],
         ["team", { organizationId: seeded?.organization.id }],
         ...(foreignOrgId
-          ? ([["team", { organizationId: foreignOrgId }]] as const)
+          ? ([
+              ["apiKey", { organizationId: foreignOrgId }],
+              ["team", { organizationId: foreignOrgId }],
+            ] as const)
           : []),
         ["organizationUser", { organizationId: seeded?.organization.id }],
         ["user", { email: { endsWith: `-${ns}@example.com` } }],
@@ -403,6 +416,23 @@ describe("Feature: Role bindings REST API", () => {
       expect((await two.json()).code).toBe("role_binding_principal_invalid");
 
       expect(await countBindings()).toBe(before);
+    });
+
+    /** @scenario Binding an API key from another organization is refused */
+    it("refuses a foreign API key the same way as a foreign user or group", async () => {
+      const where = { organizationId: seeded.organization.id };
+      const before = await prisma.roleBinding.count({ where });
+
+      const response = await postBinding({
+        apiKeyId: foreignApiKeyId,
+        role: "VIEWER",
+        scopeType: "PROJECT",
+        scopeId: projectId,
+      });
+
+      expect(response.status).toBe(422);
+      expect((await response.json()).code).toBe("api_key_not_in_organization");
+      expect(await prisma.roleBinding.count({ where })).toBe(before);
     });
 
     /** @scenario Binding to a scope from another organization is refused */

@@ -216,6 +216,16 @@ Feature: Groups REST API
     Then the foreign role contributes no permissions
     And the member's access is what their own organization granted them
 
+  # An API key's private permission role backs only the key it was minted for.
+  # A binding from one key to another key's role would otherwise read that
+  # role's permissions straight onto the wrong key, so the resolver refuses it
+  # at read time as well as at write time.
+  @unit
+  Scenario: A poisoned cross-key binding does not inherit the other key's permissions
+    Given a binding from one API key that names another key's private role
+    When that key's permissions are resolved
+    Then the other key's private role contributes no permissions
+
   @integration
   Scenario: The groups API is reachable through the composed router
     When I send GET /api/groups with an organization credential

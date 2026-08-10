@@ -25,7 +25,7 @@ const DISCOVERY_PATHS = [
   "/api/scim/v2/ServiceProviderConfig",
   "/api/scim/v2/ResourceTypes",
   "/api/scim/v2/Schemas",
-];
+] as const;
 
 describe("Feature: SCIM 2.0 is published in the API reference", () => {
   describe("given the SCIM discovery endpoints", () => {

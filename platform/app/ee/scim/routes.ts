@@ -150,6 +150,16 @@ async function parseJsonBody(c: Context): Promise<unknown | null> {
 }
 
 /**
+ * The largest page any list endpoint serves, and the number
+ * ServiceProviderConfig publishes as `filter.maxResults`. Both read it from
+ * here so the document cannot promise a cap the handlers do not apply: a
+ * `/Groups` page expands every membership unless `excludedAttributes=members`
+ * is sent, so an uncapped `count` is one request that pulls the whole
+ * directory.
+ */
+const MAX_PAGE_SIZE = 100;
+
+/**
  * A SCIM pagination query value. RFC 7644 counts from 1 and the published
  * reference says anything that is not a positive integer falls back, so a
  * negative number is a fallback rather than an offset the store would read
@@ -158,6 +168,11 @@ async function parseJsonBody(c: Context): Promise<unknown | null> {
 function positiveIntegerQuery(raw: string | undefined, fallback: number) {
   const parsed = parseInt(raw ?? "", 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/** A requested page size, clamped to the advertised maximum. */
+function pageSizeQuery(raw: string | undefined) {
+  return Math.min(positiveIntegerQuery(raw, MAX_PAGE_SIZE), MAX_PAGE_SIZE);
 }
 
 // ── ServiceProviderConfig ────────────────────────────────────────────
@@ -175,7 +190,7 @@ secured
         documentationUri: "https://docs.langwatch.ai/scim",
         patch: { supported: true },
         bulk: { supported: false, maxOperations: 0, maxPayloadSize: 0 },
-        filter: { supported: true, maxResults: 100 },
+        filter: { supported: true, maxResults: MAX_PAGE_SIZE },
         changePassword: { supported: false },
         sort: { supported: false },
         etag: { supported: false },
@@ -369,7 +384,7 @@ secured
 
     const filter = c.req.query("filter") ?? undefined;
     const startIndex = positiveIntegerQuery(c.req.query("startIndex"), 1);
-    const count = positiveIntegerQuery(c.req.query("count"), 100);
+    const count = pageSizeQuery(c.req.query("count"));
 
     const result = await scimService.listUsers({
       organizationId,
@@ -524,7 +539,7 @@ secured
       organizationId,
       filter: c.req.query("filter") ?? undefined,
       startIndex: positiveIntegerQuery(c.req.query("startIndex"), 1),
-      count: positiveIntegerQuery(c.req.query("count"), 100),
+      count: pageSizeQuery(c.req.query("count")),
       excludeMembers: excludedAttributes.includes("members"),
     });
 

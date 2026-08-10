@@ -13,7 +13,7 @@ import {
 } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
-import type { RoleService } from "~/server/role/role.service";
+import { RoleService } from "~/server/role/role.service";
 import { RoleBindingService } from "../role-binding.service";
 
 const validateScopeInOrg = vi.fn();
@@ -47,10 +47,6 @@ const repository = {
   validateScopeInOrg,
 } as unknown as RoleBindingRepository;
 
-const roleService = {
-  filterAssignableRoleIds,
-} as unknown as RoleService;
-
 let service: RoleBindingService;
 
 beforeEach(() => {
@@ -64,6 +60,13 @@ beforeEach(() => {
   bindingFindFirst.mockResolvedValue(null);
   bindingUpdate.mockResolvedValue({ id: "binding_1" });
   customRoleFindMany.mockResolvedValue([]);
+  // A real RoleService over the same mocked client: the org-exclusive scope
+  // guard lives there and reads `customRole.findMany`, so a hand-written
+  // double would pin the delegation rather than the rule.
+  const roleService = new RoleService(prisma);
+  vi.spyOn(roleService, "filterAssignableRoleIds").mockImplementation(
+    filterAssignableRoleIds as unknown as RoleService["filterAssignableRoleIds"],
+  );
   service = new RoleBindingService(prisma, repository, roleService);
 });
 
@@ -96,12 +99,15 @@ describe("RoleBindingService create", () => {
   });
 
   describe("when the principal is an API key", () => {
-    it("rejects a key from another organization as not found", async () => {
+    it("rejects a key from another organization as a rejected value, not a missing resource", async () => {
       apiKeyFindFirst.mockResolvedValue(null);
 
       await expect(
         service.create({ ...bindingInput, apiKeyId: "foreign_key" }),
-      ).rejects.toMatchObject({ code: "api_key_not_found" });
+      ).rejects.toMatchObject({
+        code: "api_key_not_in_organization",
+        httpStatus: 422,
+      });
 
       expect(apiKeyFindFirst).toHaveBeenCalledWith(
         expect.objectContaining({

@@ -10,19 +10,15 @@ import { TRPCError } from "@trpc/server";
 import {
   getOrganizationRolePermissions,
   getTeamRolePermissions,
-  isOrgExclusivePermission,
-  type Permission,
 } from "~/server/api/rbac";
-import { ApiKeyNotFoundError } from "~/server/api-key/errors";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
-import { CUSTOM_ROLE_KIND } from "~/server/role/repositories/role.repository";
 import type { RoleService } from "~/server/role/role.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
+  ApiKeyNotInOrganizationError,
   CustomRoleIdRequiredError,
   CustomRoleNotAssignableError,
   GroupNotInOrganizationError,
-  OrgExclusivePermissionScopeError,
   RoleBindingAlreadyExistsError,
   RoleBindingNotFoundError,
   RoleBindingPrincipalInvalidError,
@@ -92,6 +88,29 @@ export class RoleBindingService {
   ) {}
 
   /**
+   * Whether this user's access so far derives ONLY from legacy shared-team
+   * membership: no explicit binding anywhere in the organization, but TeamUser
+   * rows on shared teams. Creating their first binding switches that fallback
+   * off (see `checkPermissionFromBindings` and the resolver's legacy ceiling),
+   * so callers can say so before it happens.
+   */
+  async wouldFirstBindingDisableLegacyAccess({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<boolean> {
+    const [bindingCount, legacyCount] = await Promise.all([
+      this.prisma.roleBinding.count({ where: { organizationId, userId } }),
+      this.prisma.teamUser.count({
+        where: { userId, team: { organizationId, isPersonal: false } },
+      }),
+    ]);
+    return bindingCount === 0 && legacyCount > 0;
+  }
+
+  /**
    * Validates the role side of a batch of binding writes, in order: a CUSTOM
    * role needs its id, the custom roles must be assignable in this
    * organization, and none of them may carry an organization-exclusive
@@ -124,7 +143,7 @@ export class RoleBindingService {
       organizationId,
       customRoleIds: [...new Set(customBindings.map((b) => b.customRoleId))],
     });
-    await this.assertNoOrgExclusivePermissionsBelowOrgScope({
+    await this.roleService.assertNoOrgExclusivePermissionsBelowOrgScope({
       organizationId,
       customBindings,
     });
@@ -150,61 +169,6 @@ export class RoleBindingService {
     const notAssignable = customRoleIds.find((id) => !assignable.has(id));
     if (notAssignable) {
       throw new CustomRoleNotAssignableError(notAssignable);
-    }
-  }
-
-  /**
-   * A custom role that lists an organization-exclusive permission cannot be
-   * bound below organization scope. The read side already refuses to grant
-   * such a permission from a team or project binding; accepting the write
-   * anyway would store a grant that silently does nothing, which is worse
-   * than a refusal, because the admin believes it took effect.
-   */
-  private async assertNoOrgExclusivePermissionsBelowOrgScope({
-    organizationId,
-    customBindings,
-  }: {
-    organizationId: string;
-    customBindings: Array<{
-      customRoleId: string;
-      scopeType: RoleBindingScopeType;
-    }>;
-  }): Promise<void> {
-    const belowOrgScope = customBindings.filter(
-      (b) => b.scopeType !== RoleBindingScopeType.ORGANIZATION,
-    );
-    if (belowOrgScope.length === 0) return;
-
-    const roles = await this.prisma.customRole.findMany({
-      where: {
-        id: { in: [...new Set(belowOrgScope.map((b) => b.customRoleId))] },
-        organizationId,
-        kind: CUSTOM_ROLE_KIND.CUSTOM,
-      },
-      select: { id: true, permissions: true },
-    });
-    const permissionsByRoleId = new Map(
-      roles.map((role) => [
-        role.id,
-        Array.isArray(role.permissions)
-          ? role.permissions.filter(
-              (permission): permission is string =>
-                typeof permission === "string",
-            )
-          : [],
-      ]),
-    );
-    for (const binding of belowOrgScope) {
-      const permissions = permissionsByRoleId.get(binding.customRoleId) ?? [];
-      const orgExclusive = permissions.find((permission) =>
-        isOrgExclusivePermission(permission as Permission),
-      );
-      if (orgExclusive) {
-        throw new OrgExclusivePermissionScopeError(
-          orgExclusive,
-          binding.scopeType,
-        );
-      }
     }
   }
 
@@ -253,7 +217,7 @@ export class RoleBindingService {
         select: { id: true },
       });
       if (!apiKey) {
-        throw new ApiKeyNotFoundError(apiKeyId);
+        throw new ApiKeyNotInOrganizationError(apiKeyId);
       }
     }
   }

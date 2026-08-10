@@ -13,10 +13,8 @@ import {
   resolveApiKeyPermission,
   resolveLegacyCeiling,
 } from "~/server/rbac/role-binding-resolver";
-import {
-  CUSTOM_ROLE_KIND,
-  RoleRepository,
-} from "~/server/role/repositories/role.repository";
+import { RoleRepository } from "~/server/role/repositories/role.repository";
+import { CUSTOM_ROLE_KIND } from "~/server/role/role-kind";
 import { assertPersonalTeamScopesOwnedBy } from "~/server/role-bindings/personal-team-scope";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
@@ -234,6 +232,18 @@ export class ApiKeyService {
           scopeId: organizationId,
         },
       ];
+    }
+
+    // A personal key has no such default, and zero bindings means zero access:
+    // `resolveApiKeyPermission` asks the key's own bindings first and denies
+    // when there are none. Minting it would hand somebody a token that is
+    // authorized for nothing anywhere, with nothing along the way saying so.
+    // The REST schema refuses this with a field path; this is the backstop for
+    // every other caller.
+    if (userId && effectiveBindings.length === 0) {
+      throw new ApiKeyScopeViolationError(
+        "A personal API key needs at least one role binding",
+      );
     }
 
     // Ingestion-only keys (identified by ingestSourceType) carry the ik-lw-
@@ -1099,6 +1109,10 @@ export class ApiKeyService {
         }
       } catch (err) {
         if (!(err instanceof MalformedCustomRolePermissionsError)) throw err;
+        // Both ids are opaque row identifiers, deliberately logged: naming the
+        // role and the key whose permission set lost it is the only way an
+        // operator can find the corrupted row. No secret, token or address is
+        // derivable from either, and the key's own secret never reaches here.
         logger.warn(
           { err, customRoleId: role.id, apiKeyId: apiKey.id },
           "custom role has malformed permissions; omitted from the key's permission set",

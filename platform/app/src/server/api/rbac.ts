@@ -12,7 +12,7 @@ import {
 } from "~/server/app-layer/permissions/errors";
 import type { Session } from "~/server/auth";
 import { isAdmin } from "../../../ee/admin/isAdmin";
-import { CUSTOM_ROLE_KIND } from "../role/repositories/role.repository";
+import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 
 // ============================================================================
 // PERMISSION DEFINITIONS

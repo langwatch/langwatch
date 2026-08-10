@@ -98,6 +98,27 @@ export class GroupNotInOrganizationError extends HandledError {
 }
 
 /**
+ * The named API key is not one of this organization's.
+ *
+ * 422 like its two sibling principals rather than 404: the key is a field in
+ * the request, not the resource the request addresses, and the addressed
+ * resource here is the binding collection. Says nothing about whether the id
+ * exists in some other organization.
+ */
+export class ApiKeyNotInOrganizationError extends HandledError {
+  declare readonly code: "api_key_not_in_organization";
+
+  constructor(apiKeyId: string) {
+    super(
+      "api_key_not_in_organization",
+      "That API key does not belong to this organization",
+      { httpStatus: 422, meta: { apiKeyId } },
+    );
+    this.name = "ApiKeyNotInOrganizationError";
+  }
+}
+
+/**
  * The named scope (team or project) is not in the caller's organization.
  * Says the KIND of scope, never confirms the id exists elsewhere.
  */

@@ -496,7 +496,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
   }
 
-  async listProvisioningSummaries(): Promise<
+  async findAllProvisioningSummaries(): Promise<
     OrganizationProvisioningSummary[]
   > {
     return this.prisma.organization.findMany({
@@ -716,7 +716,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
   }
 
-  async listMembers(params: {
+  async findAllMembers(params: {
     organizationId: string;
     includeDisabled: boolean;
     offset: number;

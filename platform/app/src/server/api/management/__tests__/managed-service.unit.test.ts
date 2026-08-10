@@ -139,7 +139,7 @@ describe("createManagementService", () => {
     });
   });
 
-  describe("when an endpoint declares no guard", () => {
+  describe("given an endpoint declares no guard", () => {
     it("refuses to build rather than mounting an unclassified route", () => {
       const { service } = createManagementService({
         name: "toy-unguarded",

@@ -3,6 +3,8 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
 } from "@prisma/client";
+import { isOrgExclusivePermission, type Permission } from "~/server/api/rbac";
+import { OrgExclusivePermissionScopeError } from "~/server/role-bindings/errors";
 import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
 import {
   RoleDuplicateNameError,
@@ -16,10 +18,10 @@ import {
 } from "./errors";
 import {
   type CreateRoleParams,
-  CUSTOM_ROLE_KIND,
   RoleRepository,
   type UpdateRoleParams,
 } from "./repositories/role.repository";
+import { CUSTOM_ROLE_KIND } from "./role-kind";
 
 export class RoleService {
   private readonly repository: RoleRepository;
@@ -137,7 +139,11 @@ export class RoleService {
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
+        error.code === "P2002" &&
+        // Narrowed to the name index the docstring names, so a future
+        // constraint on CustomRole does not report an unrelated conflict as
+        // "a role with this name already exists".
+        String(error.meta?.target ?? "").includes("name")
       ) {
         throw new RoleDuplicateNameError();
       }
@@ -161,7 +167,10 @@ export class RoleService {
       organizationId: role.organizationId,
     });
     if (role.assignedUsers.length > 0 || bindingCount > 0) {
-      throw new RoleInUseError(role.assignedUsers.length, bindingCount);
+      throw new RoleInUseError({
+        userCount: role.assignedUsers.length,
+        bindingCount,
+      });
     }
   }
 
@@ -172,9 +181,20 @@ export class RoleService {
    * dangling reference falls back to the built-in permission bag rather than
    * failing, so nobody would see it happen.
    *
-   * Nothing deleted means something took a reference in between. The role is
-   * still standing, and the counts are re-read so the refusal names what holds
-   * it rather than what held it a moment ago.
+   * Nothing deleted has two causes, and they get different answers, settled by
+   * re-reading the role rather than by the counts. Something took a reference
+   * in between: the role is still standing, and the counts are re-read too so
+   * the refusal names what holds it rather than what held it a moment ago. Or
+   * a concurrent delete already removed the row, in which case the honest
+   * answer is that the role is gone, which is also the stable outcome a
+   * repeated delete needs.
+   *
+   * The counts cannot decide this on their own: the delete's condition spans
+   * every organization, while `countRoleBindings` is organization-scoped as
+   * the tenancy middleware requires, so a holder elsewhere reads as zero here.
+   * Under-reporting how many bindings hold a role is a worse refusal message;
+   * reporting "not found" for a role that is still there would be a wrong
+   * answer.
    */
   private async deleteRoleRow({
     roleId,
@@ -189,11 +209,15 @@ export class RoleService {
     });
     if (deleted) return;
 
-    const [userCount, bindingCount] = await Promise.all([
+    const [stillPresent, userCount, bindingCount] = await Promise.all([
+      this.repository.findCustomByIdInOrg({ roleId, organizationId }),
       this.repository.countAssignedUsers(roleId),
       this.repository.countRoleBindings({ roleId, organizationId }),
     ]);
-    throw new RoleInUseError(userCount, bindingCount);
+    if (!stillPresent) {
+      throw new RoleNotFoundError(roleId);
+    }
+    throw new RoleInUseError({ userCount, bindingCount });
   }
 
   /**
@@ -377,6 +401,62 @@ export class RoleService {
 
     if (invalid.length > 0) {
       throw new RoleNotAssignableError();
+    }
+  }
+
+  /**
+   * A custom role that lists an organization-exclusive permission cannot be
+   * bound below organization scope. The read side already refuses to grant
+   * such a permission from a team or project binding; accepting the write
+   * anyway would store a grant that silently does nothing, which is worse
+   * than a refusal, because the admin believes it took effect.
+   *
+   * Lives here rather than on one write path because every surface that binds
+   * a custom role has to apply it: direct role bindings, group bindings, and
+   * anything that follows them.
+   */
+  async assertNoOrgExclusivePermissionsBelowOrgScope({
+    organizationId,
+    customBindings,
+  }: {
+    organizationId: string;
+    customBindings: Array<{
+      customRoleId: string;
+      scopeType: RoleBindingScopeType;
+    }>;
+  }): Promise<void> {
+    const belowOrgScope = customBindings.filter(
+      (binding) => binding.scopeType !== RoleBindingScopeType.ORGANIZATION,
+    );
+    if (belowOrgScope.length === 0) return;
+
+    const roles = await this.repository.findAssignablePermissionsByIds(
+      [...new Set(belowOrgScope.map((binding) => binding.customRoleId))],
+      organizationId,
+    );
+    const permissionsByRoleId = new Map(
+      roles.map((role) => [
+        role.id,
+        Array.isArray(role.permissions)
+          ? role.permissions.filter(
+              (permission): permission is string =>
+                typeof permission === "string",
+            )
+          : [],
+      ]),
+    );
+
+    for (const binding of belowOrgScope) {
+      const permissions = permissionsByRoleId.get(binding.customRoleId) ?? [];
+      const orgExclusive = permissions.find((permission) =>
+        isOrgExclusivePermission(permission as Permission),
+      );
+      if (orgExclusive) {
+        throw new OrgExclusivePermissionScopeError(
+          orgExclusive,
+          binding.scopeType,
+        );
+      }
     }
   }
 

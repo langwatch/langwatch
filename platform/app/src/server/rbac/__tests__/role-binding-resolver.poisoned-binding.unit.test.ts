@@ -18,6 +18,10 @@ type StoredCustomRole = {
   organizationId: string;
   kind: string;
   permissions: string[];
+  /** Every API key holding a binding to this role. */
+  boundApiKeyIds?: string[];
+  /** Legacy `TeamUser.assignedRoleId` holders. */
+  assignedUserCount?: number;
 };
 
 type StoredBinding = {
@@ -45,6 +49,29 @@ const kindMatches = (
 const fieldMatches = (roleValue: string, whereValue: unknown): boolean =>
   whereValue === undefined || roleValue === whereValue;
 
+/** A `roleBindings: { every: { apiKeyId } }` / `assignedUsers: { none: {} }` clause. */
+type ExclusivityClause = {
+  roleBindings?: { every?: { apiKeyId?: string } };
+  assignedUsers?: { none?: Record<string, never> };
+};
+
+const exclusivityMatches = (
+  role: StoredCustomRole,
+  clause: ExclusivityClause,
+): boolean => {
+  const owner = clause.roleBindings?.every?.apiKeyId;
+  if (
+    owner !== undefined &&
+    !(role.boundApiKeyIds ?? []).every((id) => id === owner)
+  ) {
+    return false;
+  }
+  if (clause.assignedUsers?.none && (role.assignedUserCount ?? 0) > 0) {
+    return false;
+  }
+  return true;
+};
+
 function makePrisma({
   bindings,
   customRoles,
@@ -55,10 +82,31 @@ function makePrisma({
   const matches = (
     role: StoredCustomRole,
     where: Record<string, unknown>,
-  ): boolean =>
-    fieldMatches(role.id, where.id) &&
-    fieldMatches(role.organizationId, where.organizationId) &&
-    kindMatches(role.kind, where.kind as string | { not?: string } | undefined);
+  ): boolean => {
+    if (
+      !fieldMatches(role.id, where.id) ||
+      !fieldMatches(role.organizationId, where.organizationId) ||
+      !kindMatches(
+        role.kind,
+        where.kind as string | { not?: string } | undefined,
+      )
+    ) {
+      return false;
+    }
+    // The API-key arm sends an OR of "not a system role" and "a system role
+    // this key alone holds"; either branch satisfying it is a match.
+    const alternatives = where.OR as
+      | Array<Record<string, unknown> & ExclusivityClause>
+      | undefined;
+    if (!alternatives) return true;
+    return alternatives.some(
+      (alternative) =>
+        kindMatches(
+          role.kind,
+          alternative.kind as string | { not?: string } | undefined,
+        ) && exclusivityMatches(role, alternative),
+    );
+  };
 
   const lookup = async ({ where }: { where: Record<string, unknown> }) => {
     const found = customRoles.find((role) => matches(role, where));
@@ -145,6 +193,37 @@ describe("checkRoleBindingPermission, given a poisoned custom-role binding", () 
     });
   });
 
+  describe("when an API key's binding points at another key's system role", () => {
+    /** @scenario A poisoned cross-key binding does not inherit the other key's permissions */
+    it("denies the permission that key's private role carries", async () => {
+      const prisma = makePrisma({
+        bindings: [customBinding("role_system_other_key")],
+        customRoles: [
+          {
+            id: "role_system_other_key",
+            organizationId: ORG_ID,
+            kind: "system_api_key",
+            permissions: ["project:manage"],
+            // The role the resolver is asked about is held by its own key as
+            // well as by the poisoned binding, which is what makes it not
+            // exclusive to the caller.
+            boundApiKeyIds: ["apikey_2", API_KEY_ID],
+          },
+        ],
+      });
+
+      await expect(
+        checkRoleBindingPermission({
+          prisma,
+          principal: { type: "apiKey", id: API_KEY_ID },
+          organizationId: ORG_ID,
+          scope: teamScope,
+          permission: "project:manage",
+        }),
+      ).resolves.toBe(false);
+    });
+  });
+
   describe("when an API key's own binding points at its system role", () => {
     it("still grants the system role's permissions", async () => {
       const prisma = makePrisma({
@@ -155,6 +234,7 @@ describe("checkRoleBindingPermission, given a poisoned custom-role binding", () 
             organizationId: ORG_ID,
             kind: "system_api_key",
             permissions: ["project:view"],
+            boundApiKeyIds: [API_KEY_ID],
           },
         ],
       });

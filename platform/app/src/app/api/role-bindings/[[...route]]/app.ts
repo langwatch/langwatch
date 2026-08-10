@@ -163,29 +163,6 @@ const readBackBinding = async ({
   return bindingWire(row);
 };
 
-/**
- * Whether this user's access so far derives ONLY from legacy shared-team
- * membership: no explicit binding anywhere in the organization, but TeamUser
- * rows on shared teams. Creating their first binding switches that fallback
- * off (see `checkPermissionFromBindings` and the resolver's legacy ceiling),
- * so the response points it out.
- */
-const firstBindingDisablesLegacyAccess = async ({
-  organizationId,
-  userId,
-}: {
-  organizationId: string;
-  userId: string;
-}): Promise<boolean> => {
-  const [bindingCount, legacyCount] = await Promise.all([
-    prisma.roleBinding.count({ where: { organizationId, userId } }),
-    prisma.teamUser.count({
-      where: { userId, team: { organizationId, isPersonal: false } },
-    }),
-  ]);
-  return bindingCount === 0 && legacyCount > 0;
-};
-
 // ── handlers ─────────────────────────────────────────────────────────────────
 
 const listBindingsHandler = async (
@@ -222,7 +199,7 @@ const createBindingHandler = async (
 ) => {
   const organization = organizationOf(c);
   const hasLegacyAccessNotice = input.userId
-    ? await firstBindingDisablesLegacyAccess({
+    ? await app.roleBindings.wouldFirstBindingDisableLegacyAccess({
         organizationId: organization.id,
         userId: input.userId,
       })

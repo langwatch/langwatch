@@ -66,13 +66,22 @@ export class GroupRestService {
    * before anything persists: they must exist, belong to this organization,
    * and be user-created roles (an API key's private `system_api_key` role is
    * never assignable to a group). Same rule the tRPC group router applies.
+   *
+   * The scope matters as well as the role: an organization-exclusive
+   * permission never resolves from a team or project binding, so a group
+   * binding carrying one below organization scope is refused rather than
+   * stored as a grant that does nothing.
    */
   private async assertCustomRolesAssignable({
     organizationId,
     bindings,
   }: {
     organizationId: string;
-    bindings: Array<{ role: TeamUserRole; customRoleId?: string }>;
+    bindings: Array<{
+      role: TeamUserRole;
+      customRoleId?: string;
+      scopeType: RoleBindingScopeType;
+    }>;
   }): Promise<void> {
     const customBindings = bindings.filter(
       (binding) => binding.role === ("CUSTOM" as TeamUserRole),
@@ -92,6 +101,13 @@ export class GroupRestService {
         ),
       ],
       organizationId,
+    });
+    await this.roleService.assertNoOrgExclusivePermissionsBelowOrgScope({
+      organizationId,
+      customBindings: customBindings.map((binding) => ({
+        customRoleId: binding.customRoleId as string,
+        scopeType: binding.scopeType,
+      })),
     });
   }
 
@@ -357,7 +373,7 @@ export class GroupRestService {
 
     await this.assertCustomRolesAssignable({
       organizationId,
-      bindings: [{ role, customRoleId }],
+      bindings: [{ role, customRoleId, scopeType }],
     });
     await this.assertNoPersonalTeamScope([{ scopeType, scopeId }]);
 

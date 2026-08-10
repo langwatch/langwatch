@@ -890,6 +890,10 @@ const presentations = {
     title: "That group isn't in this organization",
     describe: () => "Pick a group that belongs to this organization.",
   },
+  api_key_not_in_organization: {
+    title: "That API key isn't in this organization",
+    describe: () => "Pick an API key that belongs to this organization.",
+  },
   scope_not_in_organization: {
     // Names the KIND of scope, never the id: the id belongs to a record in
     // another organization, which is exactly what this guard refuses to

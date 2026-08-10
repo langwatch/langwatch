@@ -36,7 +36,8 @@ const { mockSendInviteEmail } = vi.hoisted(() => ({
 }));
 
 // Never send real email from a test run; the dev environment can carry a
-// real provider key. The URL builder stays real so listInvites is exercised.
+// real provider key. Only `sendInviteEmail` is replaced; the rest of the
+// module keeps its real exports.
 vi.mock("../../mailer/inviteEmail", async (importOriginal) => {
   const original =
     await importOriginal<typeof import("../../mailer/inviteEmail")>();
@@ -347,6 +348,45 @@ describe("InviteService.createInvites", () => {
       expect(result.invites[0]!.invite.email).toBe(
         `fresh-lenient-${ns}@test.com`,
       );
+    });
+  });
+
+  describe("when the requested address carries surrounding whitespace", () => {
+    it("stores it trimmed, so the duplicate check and the pending lookup find it", async () => {
+      const address = `padded-${ns}@test.com`;
+
+      const result = await service.createInvites({
+        organizationId,
+        invites: [
+          {
+            email: `  ${address}  `,
+            role: OrganizationUserRole.MEMBER,
+            teams: [{ teamId: sharedTeamId, role: TeamUserRole.MEMBER }],
+          },
+        ],
+        validation: "strict",
+      });
+
+      expect(result.invites[0]!.invite.email).toBe(address);
+
+      // The two reads that would miss a padded row: SSO onboarding adopting a
+      // pending invite, and the duplicate guard on a second attempt.
+      await expect(
+        service.findPendingByOrgAndEmail({ organizationId, email: address }),
+      ).resolves.not.toBeNull();
+      await expect(
+        service.createInvites({
+          organizationId,
+          invites: [
+            {
+              email: address,
+              role: OrganizationUserRole.MEMBER,
+              teams: [{ teamId: sharedTeamId, role: TeamUserRole.MEMBER }],
+            },
+          ],
+          validation: "strict",
+        }),
+      ).rejects.toMatchObject({ code: "duplicate_invite" });
     });
   });
 

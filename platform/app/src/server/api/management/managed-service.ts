@@ -15,7 +15,7 @@
  * it is registered as a public endpoint with the reason written out, because it
  * serves nothing but a 404 for unknown version segments.
  */
-import { createService } from "@langwatch/api";
+import { createService, type MountedRoute } from "@langwatch/api";
 
 import { requireEnterprisePlanRest } from "~/app/api/middleware/enterprise-gate";
 import { requireOrgPermissionOrThrow } from "~/app/api/middleware/org-auth";
@@ -82,47 +82,7 @@ export function createManagementService({
     name,
     basePath,
     auth: createOrgAuthMiddleware({ prisma, refusals: "throw" }),
-    onRouteMounted: (route) => {
-      if (route.isNamespaceGuard) {
-        const policy = publicEndpoint(
-          "version-namespace guard: answers 404 for unknown version segments " +
-            "so they cannot fall through to a dynamic unversioned route; " +
-            "reads no data and takes no credential",
-        );
-        registerRoutePolicy({
-          method: route.method,
-          path: route.path,
-          policy,
-          family,
-          credentialClass: credentialClassFor({
-            scope: "organization",
-            policy,
-          }),
-        });
-        return;
-      }
-
-      const meta = route.config?.meta as ManagementEndpointMeta | undefined;
-      if (!meta?.policy) {
-        throw new Error(
-          `Management endpoint ${route.method.toUpperCase()} ${route.path} ` +
-            `declares no access policy; spread guard(permission) into its ` +
-            `endpoint config`,
-        );
-      }
-      registerRoutePolicy({
-        method: route.method,
-        path: route.path,
-        policy: meta.policy,
-        family,
-        // The whole family authenticates with an organization-scoped key, so
-        // the class is the one a SecuredApp on the organization scope derives.
-        credentialClass: credentialClassFor({
-          scope: "organization",
-          policy: meta.policy,
-        }),
-      });
-    },
+    onRouteMounted: (route) => registerMountedRoute({ route, family }),
   });
 
   const guard = (permission: Permission) => ({
@@ -134,4 +94,56 @@ export function createManagementService({
   });
 
   return { service, guard };
+}
+
+/**
+ * Puts one mount in the route-policy registry, refusing to classify a route
+ * that never declared a policy. Every mount the framework creates arrives
+ * here: each dated version, `latest`, the bare alias, withdrawn 410 tombstones
+ * (their inherited config carries the meta), and the two version-namespace
+ * guards.
+ */
+function registerMountedRoute({
+  route,
+  family,
+}: {
+  route: MountedRoute;
+  family: string;
+}): void {
+  if (route.isNamespaceGuard) {
+    const policy = publicEndpoint(
+      "version-namespace guard: answers 404 for unknown version segments " +
+        "so they cannot fall through to a dynamic unversioned route; " +
+        "reads no data and takes no credential",
+    );
+    registerRoutePolicy({
+      method: route.method,
+      path: route.path,
+      policy,
+      family,
+      credentialClass: credentialClassFor({ scope: "organization", policy }),
+    });
+    return;
+  }
+
+  const meta = route.config?.meta as ManagementEndpointMeta | undefined;
+  if (!meta?.policy) {
+    throw new Error(
+      `Management endpoint ${route.method.toUpperCase()} ${route.path} ` +
+        `declares no access policy; spread guard(permission) into its ` +
+        `endpoint config`,
+    );
+  }
+  registerRoutePolicy({
+    method: route.method,
+    path: route.path,
+    policy: meta.policy,
+    family,
+    // The whole family authenticates with an organization-scoped key, so the
+    // class is the one a SecuredApp on the organization scope derives.
+    credentialClass: credentialClassFor({
+      scope: "organization",
+      policy: meta.policy,
+    }),
+  });
 }
