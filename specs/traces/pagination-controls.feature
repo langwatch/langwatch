@@ -136,6 +136,19 @@ Feature: Traces tab pagination controls
     Then the scrollId is removed from the URL
     And the page size returns to the default of 25
 
+  # ─── Known Gap ──────────────────────────────────────────────────
+  #
+  # The scenario below describes behaviour the code does NOT have today, and is
+  # kept here as the requirement rather than deleted. Changing the search query
+  # resets the scroll; changing a FILTER does not — nothing outside
+  # NavigationFooter, MessagesTable and MessagesList touches `scrollId`, and no
+  # filter path clears it. Applying a filter mid-scroll therefore keeps a cursor
+  # pointing into the unfiltered ordering, so the list resumes partway down the
+  # filtered results instead of at the top.
+  #
+  # Pre-existing, and not caused by removing offset paging. Do not read this
+  # block as a description of what ships.
+
   @integration @unimplemented
   Scenario: Applying a filter starts the scroll over
     Given I have navigated forward at least once
