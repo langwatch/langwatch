@@ -23,6 +23,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { FlattenAnalyticsMetricsEnum } from "../../registry";
 import {
+  __testOnly__,
   buildTimeseriesQuery,
   TRACE_ATTRIBUTE_METRIC_COLUMNS,
 } from "../aggregation-builder";
@@ -30,18 +31,20 @@ import { fieldMappings } from "../field-mappings";
 import { resetParamCounter } from "../filter-translator";
 
 /**
- * Every `metadata.*` metric the analytics registry actually exposes whose
- * mapping resolves to the `Attributes` map. `metadata.labels` and
- * `metadata.prompt_ids` map to `Attributes` too but are group-by / filter
- * fields, not metrics, so they can never reach the outer aggregation this
- * suite is about — the hoist table still covers them, and the invariant below
- * is what keeps that true.
+ * The metrics whose translation actually emits a trace-level `Attributes` read
+ * — i.e. the ones that can reach the outer aggregation this suite is about.
+ * `metric-translator.ts` has a case for each (`translateMetadataMetric`).
+ *
+ * Deliberately NOT here, despite mapping to `Attributes` in `fieldMappings`:
+ * `metadata.customer_id` has no translator case, so it falls through to
+ * `count()` and would exercise an early return rather than an attribute read;
+ * `metadata.labels` and `metadata.prompt_ids` are group-by / filter fields
+ * rather than metrics (`metadata.labels` is in fact the group-by that puts
+ * these queries on the CTE path). All three are still covered by the hoist
+ * table, and the field-mapping invariant at the bottom is what keeps that
+ * honest.
  */
-const ATTRIBUTE_METRICS = [
-  "metadata.thread_id",
-  "metadata.user_id",
-  "metadata.customer_id",
-] as const;
+const ATTRIBUTE_METRICS = ["metadata.thread_id", "metadata.user_id"] as const;
 
 const baseInput = {
   projectId: "test-project",
@@ -51,10 +54,22 @@ const baseInput = {
   timeScale: 60,
 };
 
-/** Everything after the CTE closes — the scope where `ts` does not exist. */
+/**
+ * Everything after the CTE closes — the scope where `ts` does not exist.
+ *
+ * Anchored on `FROM deduped_traces` (as the sibling event-metric suite is) so
+ * a failed match cannot fail OPEN: an unanchored regex that missed would
+ * return `""`, and `expect("").not.toContain("ts.")` passes, which is a
+ * leak-detector that reports success when it cannot see.
+ */
 function outerQuery(sql: string): string {
-  const match = sql.match(/\)\s*SELECT([\s\S]+)$/);
-  return match?.[1] ?? "";
+  const match = sql.match(/\)\s*SELECT\s+([\s\S]+?)FROM\s+deduped_traces/i);
+  if (!match?.[1]) {
+    throw new Error(
+      "could not extract the outer SELECT — the assertion would have passed vacuously",
+    );
+  }
+  return match[1];
 }
 
 function buildGroupedByLabels(metric: string) {
@@ -99,11 +114,45 @@ describe("buildTimeseriesQuery()", () => {
 
       // The hoist is conditional: pushing every attribute read would widen the
       // dedup subquery with the wide Attributes map for every grouped query.
+      // `user_id` is the meaningful assertion — it is an attribute that CAN be
+      // hoisted, so it catches an over-broad hoist that the never-hoistable
+      // columns would not.
       it("hoists only the attribute the requested metric reads", () => {
         const { sql } = buildGroupedByLabels("metadata.thread_id");
 
+        expect(sql).toContain("AS trace_attr_thread_id");
+        expect(sql).not.toContain("AS trace_attr_user_id");
         expect(sql).not.toContain("AS trace_attr_customer_id");
-        expect(sql).not.toContain("AS trace_attr_prompt_ids");
+      });
+    });
+  });
+
+  // The guard relocation is the other half of the fix, and it needs its own
+  // test: every expression the SQL-shape cases above exercise now DOES rewrite,
+  // so the guard fires from either position and moving it back inside
+  // `if (rewritten !== selectExpression)` leaves them all green. The case that
+  // distinguishes the two positions — and the one that reached production — is
+  // the expression that matches NO substitution at all.
+  describe("given a metric expression no substitution matches", () => {
+    describe("when it is transformed for the dedup CTE", () => {
+      it("refuses it instead of emitting a ts reference the outer query cannot resolve", () => {
+        expect(() =>
+          __testOnly__.transformMetricForDedup(
+            "uniqIf(ts.SomeUnmappedColumn, ts.SomeUnmappedColumn != '') AS m",
+            "m",
+          ),
+        ).toThrow(/could not fully rewrite/);
+      });
+
+      // The partial-rewrite case the guard already covered from its old
+      // position, kept so a future refactor cannot trade one for the other.
+      it("refuses an expression only some of which rewrites", () => {
+        expect(() =>
+          __testOnly__.transformMetricForDedup(
+            "sum(ts.TotalCost + ts.SomeUnmappedColumn) AS m",
+            "m",
+          ),
+        ).toThrow(/could not fully rewrite/);
       });
     });
   });
@@ -120,7 +169,13 @@ describe("buildTimeseriesQuery()", () => {
           .filter(
             (mapping) =>
               mapping.table === "trace_summaries" &&
-              mapping.column.startsWith("Attributes["),
+              // `includes`, not `startsWith`: every mapping is a bare map read
+              // today, but one written as `toFloat64(Attributes['x'])` would
+              // slip past a prefix test and the invariant would still read
+              // green — reintroducing the very "someone must remember" gap
+              // this test exists to close. `SpanAttributes[` is excluded by
+              // the `trace_summaries` table check above.
+              mapping.column.includes("Attributes["),
           )
           .map((mapping) => {
             const key = mapping.column.match(/Attributes\['([^']+)'\]/);

@@ -2709,6 +2709,17 @@ function stripSelectExpressionAlias(
  * The outer query reads `FROM deduped_traces`, which has no `ts` alias in
  * scope, so ANY surviving `ts.` reference is invalid SQL. Throwing here turns a
  * ClickHouse error nobody can act on into one that names the fix.
+ *
+ * Scope note: this guards `ts` only. The same class of leak exists for `ss`
+ * (stored_spans) — a value-aggregated event metric such as
+ * `events.event_score / avg` under an event group-by still reaches the default
+ * return with `ss."Events.Name"` intact, and ClickHouse rejects it identically.
+ * That is a KNOWN, pre-existing limitation, deliberately left alone here and
+ * documented at `__tests__/event-metric-cte-scope.unit.test.ts` — rewriting a
+ * value aggregation to `uniqExact(trace_id)` would silently turn "average
+ * score" into "count of traces", which is worse than the error. Widening this
+ * guard to `ss` without first giving those metrics a real CTE column would
+ * convert that failure into a thrown build error, so it is a separate change.
  */
 function transformMetricForDedup(
   selectExpression: string,
