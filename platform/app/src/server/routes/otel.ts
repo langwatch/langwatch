@@ -232,7 +232,7 @@ function logCorrectedPath({
     c.req.header(OTLP_CORRECTED_PATH_HEADER),
   );
   if (!originalPath) return;
-  if (!correctedPathIsDueToLog(`${projectId} ${originalPath}`, Date.now()))
+  if (!correctedPathIsDueToLog(`${projectId}\u0000${originalPath}`, Date.now()))
     return;
 
   logger.warn(
