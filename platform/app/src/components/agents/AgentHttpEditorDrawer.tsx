@@ -146,7 +146,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
   const flowCallbacksForSave = getFlowCallbacks("agentHttpEditor");
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const onClose = props.onClose ?? closeDrawer;
   const onSave =

@@ -86,7 +86,7 @@ function DatasetsPage() {
   const { project } = useOrganizationTeamProject();
   const { isLiteMember } = useLiteMemberGuard();
   const router = useRouter();
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },

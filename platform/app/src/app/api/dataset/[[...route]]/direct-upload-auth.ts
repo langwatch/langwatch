@@ -19,8 +19,8 @@
  * and passes it in) since there is no `authMiddleware` to set `c.get("project")`.
  */
 
-import type { Project } from "@prisma/client";
 import type { Context } from "hono";
+import type { Project } from "~/generated/prisma/client";
 import { hasProjectPermission } from "~/server/api/rbac";
 import {
   apiKeyCeilingDenialResponse,

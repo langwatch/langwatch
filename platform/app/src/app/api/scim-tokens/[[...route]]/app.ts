@@ -11,9 +11,9 @@
 
 import { ScimTokenService } from "@ee/scim/scim-token.service";
 import type { BaseApp, VersionBuilder } from "@langwatch/api";
-import type { Organization } from "@prisma/client";
 import type { Context } from "hono";
 import { z } from "zod";
+import type { Organization } from "~/generated/prisma/client";
 import { emitManagementAudit } from "~/server/api/management/audit";
 import { createManagementService } from "~/server/api/management/managed-service";
 import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";

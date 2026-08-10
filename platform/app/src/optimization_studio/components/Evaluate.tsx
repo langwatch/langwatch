@@ -222,7 +222,7 @@ export function EvaluateModalContent({
   }, [evaluateOn, total, train.length, test.length]);
 
   const canSave = checkCanCommitNewVersion();
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
 
   const commitVersion = api.workflow.commitVersion.useMutation();
   const { startEvaluationExecution } = useEvaluationExecution();
@@ -411,7 +411,7 @@ export function EvaluateModalContent({
                   disabled={!!isDisabled}
                   loading={
                     isDatasetLoading ||
-                    commitVersion.isLoading ||
+                    commitVersion.isPending ||
                     evaluationState?.status === "waiting"
                   }
                 >

@@ -1,4 +1,6 @@
 import { generate } from "@langwatch/ksuid";
+import type { JsonArray } from "@prisma/client/runtime/client";
+import { nanoid } from "nanoid";
 import {
   type Organization,
   type OrganizationInvite,
@@ -7,9 +9,8 @@ import {
   type Prisma,
   type PrismaClient,
   RoleBindingScopeType,
-} from "@prisma/client";
-import type { JsonArray } from "@prisma/client/runtime/library";
-import { nanoid } from "nanoid";
+} from "~/generated/prisma/client";
+import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { isCustomRole } from "../api/enterprise";
 import { LimitExceededError } from "../license-enforcement/errors";
@@ -63,8 +64,8 @@ export const ORGANIZATION_TO_TEAM_ROLE_MAP: Record<
 } as const;
 
 import { createLogger } from "@langwatch/observability";
-import { TeamUserRole } from "@prisma/client";
 import { env } from "~/env.mjs";
+import { TeamUserRole } from "~/generated/prisma/client";
 import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
 import { getApp } from "../app-layer/app";
 import type {
@@ -1043,7 +1044,7 @@ export class InviteService {
    * `TransactionClient`; everything else in this service can.
    */
   private requireRootClient(): PrismaClient {
-    if (!("$transaction" in this.prisma)) {
+    if (!isRootPrismaClient(this.prisma)) {
       throw new Error(
         "This orchestration requires a root Prisma client, not a transaction client",
       );

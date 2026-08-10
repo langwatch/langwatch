@@ -1,5 +1,5 @@
-import type { Prisma } from "@prisma/client";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "~/server/api-key/reserved-names";
+import type { GuardMiddleware, GuardParams } from "./dbGuardMiddleware";
 
 /**
  * Organization-tenancy guard: the org-level mirror of guardProjectId.
@@ -34,10 +34,7 @@ type OrgScopedModelConfig = {
    * alike. Bounds that genuinely resolve a single row for any action (a parent
    * FK, a globally-unique secret) simply ignore the argument.
    */
-  extraBound?: (args: {
-    clause: unknown;
-    action: Prisma.MiddlewareParams["action"];
-  }) => boolean;
+  extraBound?: (args: { clause: unknown; action: string }) => boolean;
 };
 
 /**
@@ -418,11 +415,7 @@ const validateRecursive = (
   return false;
 };
 
-const _guardOrganizationId = ({
-  params,
-}: {
-  params: Prisma.MiddlewareParams;
-}) => {
+const _guardOrganizationId = ({ params }: { params: GuardParams }) => {
   const model = params.model;
   if (!model || !ORG_SCOPED_MODELS[model]) return;
 
@@ -481,7 +474,7 @@ const _guardOrganizationId = ({
   }
 };
 
-export const guardOrganizationId: Prisma.Middleware = async (params, next) => {
+export const guardOrganizationId: GuardMiddleware = async (params, next) => {
   _guardOrganizationId({ params });
   return next(params);
 };

@@ -15,10 +15,14 @@
  * writes with, and come back out through the same method the budgets list,
  * the detail page, and the management API all read.
  */
-import type { GatewayBudget, GatewayBudgetWindow } from "@prisma/client";
-import { Prisma } from "@prisma/client";
+
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type {
+  GatewayBudget,
+  GatewayBudgetWindow,
+} from "~/generated/prisma/client";
+import { Prisma } from "~/generated/prisma/client";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {

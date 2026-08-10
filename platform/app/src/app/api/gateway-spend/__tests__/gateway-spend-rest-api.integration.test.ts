@@ -7,15 +7,15 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { generate } from "@langwatch/ksuid";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   type Organization,
   OrganizationUserRole,
   type Project,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
 import {

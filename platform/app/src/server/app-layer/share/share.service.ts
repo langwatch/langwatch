@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { ShareLink, ShareVisibility } from "@prisma/client";
+import type { ShareLink, ShareVisibility } from "~/generated/prisma/client";
 import type { PinnedTraceService } from "~/server/data-retention/pinning/pinnedTrace.service";
 import {
   ShareLinkExhaustedError,

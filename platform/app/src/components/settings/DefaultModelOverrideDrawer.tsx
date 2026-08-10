@@ -110,7 +110,7 @@ interface Props {
 }
 
 export function DefaultModelOverrideDrawer({ editingId }: Props) {
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const saveMutation = api.modelProvider.saveDefaultModelsConfig.useMutation();
   const { project } = useOrganizationTeamProject();
   const { closeDrawer } = useDrawer();

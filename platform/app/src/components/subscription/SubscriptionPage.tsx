@@ -18,12 +18,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  OrganizationUserRole,
-  PricingModel,
-  Currency as PrismaCurrency,
-  TeamUserRole,
-} from "@prisma/client";
 import { ArrowRight, Check } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import SettingsLayout from "~/components/SettingsLayout";
@@ -32,6 +26,12 @@ import { Link } from "~/components/ui/link";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
+import {
+  OrganizationUserRole,
+  PricingModel,
+  Currency as PrismaCurrency,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   classifyMemberType,

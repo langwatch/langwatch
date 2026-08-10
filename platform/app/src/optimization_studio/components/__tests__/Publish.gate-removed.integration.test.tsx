@@ -59,7 +59,7 @@ vi.mock("~/utils/api", () => {
   });
   return {
     api: {
-      useContext: () => ({
+      useUtils: () => ({
         optimization: { getComponents: { invalidate: vi.fn() } },
       }),
       limits: {

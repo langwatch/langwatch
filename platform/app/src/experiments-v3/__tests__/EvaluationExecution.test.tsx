@@ -97,7 +97,7 @@ vi.mock("~/utils/api", () => ({
     // Batched name lookups (useTargetNames). No target here is a comparison
     // column, so every caller passes an empty variant list.
     useQueries: () => [],
-    useContext: () => ({
+    useUtils: () => ({
       agents: {
         getById: {
           fetch: vi.fn(),
