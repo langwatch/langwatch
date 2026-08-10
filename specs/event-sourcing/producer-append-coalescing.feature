@@ -5,6 +5,14 @@ Feature: High-fan-in producers coalesce their event-log appends
   table. A high-fan-in producer batches its appends into one insert per batch, so
   the event log stays off the per-item write path. (ADR-066, pillar 2.)
 
+  # Fan-in does not require a shard key or a declared serialization. When many
+  # items share one aggregate — every log record and metric exemplar correlated
+  # to a single trace — the DEFAULT group key is already the funnel: that
+  # aggregate's items drain through one consumer, one claim at a time, adding a
+  # part per item and holding a fleet slot per claim. Other aggregates are not
+  # queued behind it (they have their own groups); what they contend for is
+  # slots and merge headroom.
+
   Background:
     Given a command that appends one event per item it processes
 
@@ -44,36 +52,25 @@ Feature: High-fan-in producers coalesce their event-log appends
     When it records an action
     Then it appends immediately without waiting to batch
 
+  # Scoped to the grouping a producer DECLARES, because that is all the guard
+  # reads. The complement — a producer that declares nothing and funnels on the
+  # default aggregate key — is the scenario below, and it is not built.
   @unit
-  Scenario: an un-coalesced high-fan-in producer is visible, not silent
-    Given a high-fan-in producer that does not coalesce its appends
+  Scenario: an un-coalesced producer that declares its grouping is visible, not silent
+    Given a producer that serializes on an aggregate or names a shard key
+    And it does not coalesce its appends
     When its pipeline starts
     Then an operator-visible record names the producer, so the gap can be found and closed
 
-  # A producer does not have to name a shard or bucket to funnel. When many
-  # items share one aggregate — every log record and metric exemplar correlated
-  # to a single trace — the DEFAULT group key is the funnel, and a chatty trace
-  # parks thousands of items behind one consumer exactly as a hot shard would.
-  # Observed live: one trace's correlated log records at 2,275 pending on a
-  # single group, oldest 59 minutes, while every other trace's correlations
-  # waited behind it.
-  @unit
-  Scenario: an aggregate that many items share is a funnel too
-    Given a producer that names no group key of its own
-    And many items per aggregate rather than one per human action
-    When a burst of one aggregate's items is queued
-    Then they are appended as one batched insert per batch
-    And the aggregate's own fold stays ordered and exact
-
-  # The guard above reads a producer's declared grouping, so it recognises an
-  # explicit group key and an explicitly serialized aggregate — and misses the
-  # funnel that arrives by the default key, which is the shape that shipped
-  # un-coalesced. Fan-in per aggregate is a domain fact the registration site
-  # cannot infer, so closing this needs a signal a producer states rather than
-  # a broader reading of the ones it already has.
+  # Not built. Fan-in per aggregate is a domain fact the registration site
+  # cannot infer — every command groups on its aggregate by default, so
+  # flagging that alone would name one-per-human-action commands too. Closing
+  # this needs a signal a producer states about itself rather than a broader
+  # reading of the ones it already declares.
   @unit @unimplemented
   Scenario: a funnel on the default aggregate key is visible before it backs up
-    Given a high-fan-in producer that names no group key of its own
-    And that does not coalesce its appends
+    Given a producer whose items all belong to one aggregate
+    And nothing it declares splits them across consumers
+    And it does not coalesce its appends
     When its pipeline starts
     Then an operator-visible record names the producer, so the gap can be found and closed

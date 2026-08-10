@@ -324,26 +324,20 @@ export function createTraceProcessingPipeline(
       )
     : builder.withCommand("recordSpan", RecordSpanCommand, recordSpanOptions);
 
-  // ADR-066 pillar 2 for the two correlation commands: neither declares a group
-  // key, so both funnel a trace's every log record and metric exemplar through
-  // one group. See TRACE_CORRELATION_COALESCE_MAX_BATCH for why folding them is
-  // safe and why the bound is what it is.
-  const correlationOptions = {
-    coalesceMaxBatch: TRACE_CORRELATION_COALESCE_MAX_BATCH,
-  };
-
+  // ADR-066 pillar 2: both correlation commands funnel on the trace aggregate.
+  // See TRACE_CORRELATION_COALESCE_MAX_BATCH.
+  //
+  // A literal per registration, not one shared object: `recordSpanOptions`
+  // above is mutated after construction, so an options object here would invite
+  // the same treatment and silently apply one command's change to the other.
   return recordSpanBuilder
     .withCommand("assignTopic", AssignTopicCommand)
-    .withCommand(
-      "recordLogContribution",
-      RecordLogContributionCommand,
-      correlationOptions,
-    )
-    .withCommand(
-      "recordMetricCorrelation",
-      RecordMetricCorrelationCommand,
-      correlationOptions,
-    )
+    .withCommand("recordLogContribution", RecordLogContributionCommand, {
+      coalesceMaxBatch: TRACE_CORRELATION_COALESCE_MAX_BATCH,
+    })
+    .withCommand("recordMetricCorrelation", RecordMetricCorrelationCommand, {
+      coalesceMaxBatch: TRACE_CORRELATION_COALESCE_MAX_BATCH,
+    })
     .withCommand("resolveOrigin", ResolveOriginCommand)
     .withCommand("addAnnotation", AddAnnotationCommand)
     .withCommand("removeAnnotation", RemoveAnnotationCommand)

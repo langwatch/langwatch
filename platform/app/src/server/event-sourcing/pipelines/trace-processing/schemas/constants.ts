@@ -263,12 +263,17 @@ export const RECORD_SPAN_COALESCE_MAX_BATCH = 64;
  *
  * Both are keyed on the trace, so every log record and every metric exemplar
  * belonging to one trace funnels into a single queue group. A chatty agent
- * trace mints thousands of them, and without folding the group appends one tiny
- * event_log insert per item while every other trace waits its turn behind it.
- * That is the same funnel `recordSpan` has, arriving by the default aggregate
- * key rather than an explicit one — which is why the grouped-producer warning
- * at registration, which reads a producer's *declared* grouping, never named
- * these two.
+ * trace mints thousands of them, and without folding that group drains one
+ * claim at a time, appending a tiny event_log part per item and holding a fleet
+ * slot per claim. Other traces are not queued behind it — the group key is
+ * per-trace, so they have their own groups — but they contend for those slots
+ * and for the merge headroom the small parts consume.
+ *
+ * Neither command declares a group key, so both funnel by the DEFAULT aggregate
+ * key, exactly as unsharded `recordSpan` does. That is why the grouped-producer
+ * warning at registration never named them: it reads a producer's *declared*
+ * grouping (`serializeByAggregate` or an explicit `getGroupKey`) and a default
+ * key is neither.
  *
  * Safe to fold, on the same terms as their `log_processing` and
  * `metric_processing` counterparts: each handler derives its event from its own
@@ -282,8 +287,9 @@ export const RECORD_SPAN_COALESCE_MAX_BATCH = 64;
  * carry no more than the records they are derived from: a contribution holds
  * IO_PREVIEW_BYTES-capped previews where the canonical record holds the whole
  * body, and a correlation is a handful of scalars. The fat case is still bound
- * correctly — the drain's byte budget stops a batch of large previews before
- * this count does — so the count only has to stop a burst of small ones from
- * growing unboundedly.
+ * correctly — the drain weighs each job by the `s` payload size the envelope
+ * records before compression and offload, so a batch of maximal previews hits
+ * the 4 MiB byte budget at roughly 32 items, well before this count. The count
+ * only has to stop a burst of small ones from growing unboundedly.
  */
 export const TRACE_CORRELATION_COALESCE_MAX_BATCH = 256;
