@@ -1,12 +1,16 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   runGracefulShutdown,
   type ShutdownPhase,
 } from "../runGracefulShutdown";
+import { clearTelemetryFlushes, registerTelemetryFlush } from "../telemetry";
 
 function silentLogger() {
   return { info: vi.fn(), error: vi.fn() };
 }
+
+// The registry is process-global, so a test that registers must reset.
+afterEach(() => clearTelemetryFlushes());
 
 describe("runGracefulShutdown", () => {
   describe("given several teardown phases", () => {
@@ -59,6 +63,58 @@ describe("runGracefulShutdown", () => {
         expect(ran).toEqual(["app"]);
         expect(logger.error).toHaveBeenCalledWith(
           expect.objectContaining({ phase: "websockets" }),
+          expect.any(String),
+        );
+        expect(exit).toHaveBeenCalledWith(0);
+      });
+
+      // Telemetry has to describe the shutdown, so it flushes after the work
+      // is drained — not on a signal handler of its own, which is what the
+      // metrics provider and the langwatch SDK each used to do. The SDK went
+      // further and called process.exit(0) when its flush resolved, ending the
+      // process a second or two into a drain entitled to the full budget.
+      /** @scenario Telemetry flushes after the work, and never ends the process itself */
+      it("runs registered telemetry flushes last", async () => {
+        const order: string[] = [];
+        const exit = vi.fn() as unknown as (code: number) => never;
+        registerTelemetryFlush({
+          name: "sdk",
+          run: async () => void order.push("telemetry"),
+        });
+
+        await runGracefulShutdown({
+          signal: "SIGTERM",
+          logger: silentLogger(),
+          exit,
+          phases: [{ name: "app", run: () => void order.push("app") }],
+        });
+
+        expect(order).toEqual(["app", "telemetry"]);
+        // Exactly once, by the runner, after everything — not by a provider.
+        expect(exit).toHaveBeenCalledTimes(1);
+        expect(exit).toHaveBeenCalledWith(0);
+      });
+
+      /** @scenario A failing telemetry flush does not fail the shutdown */
+      it("logs a failing flush and still exits zero", async () => {
+        const exit = vi.fn() as unknown as (code: number) => never;
+        const logger = silentLogger();
+        registerTelemetryFlush({
+          name: "sdk",
+          run: async () => {
+            throw new Error("collector unreachable");
+          },
+        });
+
+        await runGracefulShutdown({
+          signal: "SIGTERM",
+          logger,
+          exit,
+          phases: [],
+        });
+
+        expect(logger.error).toHaveBeenCalledWith(
+          expect.objectContaining({ phase: "telemetry:sdk" }),
           expect.any(String),
         );
         expect(exit).toHaveBeenCalledWith(0);

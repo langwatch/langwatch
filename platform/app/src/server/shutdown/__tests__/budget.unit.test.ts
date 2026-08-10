@@ -58,6 +58,37 @@ describe("resolveShutdownBudget", () => {
     });
   });
 
+  describe("given no override", () => {
+    describe("when the budget is resolved", () => {
+      // The two numbers an operator actually asked for. Production gets a real
+      // drain; a developer waiting that long for Ctrl-C is worse than losing a
+      // job on a local queue.
+      /** @scenario The drain budget defaults to 25s in production and 5s in dev */
+      it("defaults to 25s, and 5s under a development environment", () => {
+        delete process.env.SHUTDOWN_DRAIN_TIMEOUT_MS;
+        const prevNodeEnv = process.env.NODE_ENV;
+        const prevEnvironment = process.env.ENVIRONMENT;
+        try {
+          process.env.NODE_ENV = "production";
+          delete process.env.ENVIRONMENT;
+          expect(resolveShutdownBudget().queueDrainMs).toBe(25_000);
+
+          process.env.NODE_ENV = "development";
+          expect(resolveShutdownBudget().queueDrainMs).toBe(5_000);
+
+          process.env.NODE_ENV = "production";
+          process.env.ENVIRONMENT = "local";
+          expect(resolveShutdownBudget().queueDrainMs).toBe(5_000);
+        } finally {
+          if (prevNodeEnv === void 0) delete process.env.NODE_ENV;
+          else process.env.NODE_ENV = prevNodeEnv;
+          if (prevEnvironment === void 0) delete process.env.ENVIRONMENT;
+          else process.env.ENVIRONMENT = prevEnvironment;
+        }
+      });
+    });
+  });
+
   describe("given a malformed override", () => {
     describe("when the budget is resolved", () => {
       /** @scenario A malformed drain override is refused, not silently defaulted */

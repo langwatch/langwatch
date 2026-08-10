@@ -8,14 +8,18 @@
 # the path, or an override that silently stops taking effect is only visible by
 # rendering.
 #
-# Why the number matters: SIGTERM starts a real drain in the worker, unlike a
+# Why the numbers matter: SIGTERM starts a real drain in the worker, unlike a
 # stateless web pod. The GroupQueue stops dispatching and waits for in-flight
-# jobs to finish their ClickHouse writes (20s budget in production, 25s
-# backstop in App.close), and process teardown follows that. Under the k8s
-# default of 30s the drain could be cut short by SIGKILL, severing in-flight
-# statements — which ClickHouse reports as `Broken pipe, while writing to
-# socket ... ParallelFormattingOutputFormat` and the worker reports as
-# `socket hang up`. See specs/event-sourcing/worker-graceful-shutdown.feature.
+# jobs to finish their ClickHouse writes (25s in production), and process
+# teardown follows that. Under the k8s default of 30s the drain could be cut
+# short by SIGKILL, severing in-flight statements — which ClickHouse reports as
+# `Broken pipe, while writing to socket ... ParallelFormattingOutputFormat` and
+# the worker reports as `socket hang up`.
+#
+# The suite asserts both halves of the pair: the pod's grace period, and the
+# SHUTDOWN_DRAIN_TIMEOUT_MS the process is given. Both come from one value, and
+# a process running a budget its pod was not sized for is the whole failure.
+# See specs/event-sourcing/worker-graceful-shutdown.feature.
 #
 # Scenario bindings use the same `@scenario` token as the bats suites,
 # expressed as a hash-comment above the test function it verifies — the next
@@ -32,7 +36,7 @@ cd "$(dirname "$0")/.."
 # The default drain budget (workers.shutdownDrainSeconds) and the fixed margin
 # above it: 5s for App.close, 15s for process teardown, 10s of kubelet slack.
 # Mirrors platform/app/src/server/shutdown/budget.ts.
-readonly DRAIN_SECONDS=20
+readonly DRAIN_SECONDS=25
 readonly REQUIRED_MARGIN_SECONDS=30
 
 # Secret autogen, so the chart's own secret validation lets a bare render
@@ -112,6 +116,38 @@ test_app_grace_period_covers_the_drain() {
   expect_covers_drain "app grace period" "app"
 }
 
+drain_env_of() {
+  printf '%s' "$1" | awk '
+    /name: SHUTDOWN_DRAIN_TIMEOUT_MS/ { want=1; next }
+    want && /value:/ { gsub(/"/,"",$2); print $2; want=0 }
+  ' | head -n 1
+}
+
+# The pod is sized for a drain the process must be told about. A process
+# running a budget its pod was not sized for is the drift this pair exists to
+# prevent — the kubelet SIGKILLs a drain the process still thinks it has time
+# for — so assert they came from the same value rather than merely both being
+# present.
+expect_drain_env_matches() {
+  local label="$1" component="$2" flags="$3" want="$4" block got
+  block=$(render_component "$component" "$BASE $flags")
+  got=$(drain_env_of "$block")
+  if [ "$got" != "$want" ]; then
+    fail "$label" "SHUTDOWN_DRAIN_TIMEOUT_MS is '${got:-<absent>}', expected $want"
+    return
+  fi
+  echo "ok   [$label] SHUTDOWN_DRAIN_TIMEOUT_MS=$got"
+}
+
+# @scenario "The process is told the same drain budget the pod is sized for"
+test_drain_env_matches_the_pod() {
+  expect_drain_env_matches "workers drain env" "workers" "" "$((DRAIN_SECONDS * 1000))"
+  expect_drain_env_matches "app drain env" "app" "" "$((DRAIN_SECONDS * 1000))"
+  expect_drain_env_matches "raised drain env" "workers" \
+    "--set workers.shutdownDrainSeconds=60 --set workers.terminationGracePeriodSeconds=90" \
+    "60000"
+}
+
 # @scenario "Operators can raise the grace period for a slower drain"
 test_grace_period_is_overridable() {
   local block got
@@ -133,7 +169,7 @@ test_grace_period_is_overridable() {
 test_short_grace_period_refuses_to_render() {
   expect_render_refused "short grace period" \
     "--set workers.terminationGracePeriodSeconds=30" \
-    "it needs at least 50"
+    "it needs at least 55"
 }
 
 # @scenario "Raising the drain budget alone refuses to render"
@@ -158,6 +194,7 @@ test_raising_both_together_renders() {
 
 test_workers_grace_period_covers_the_drain
 test_app_grace_period_covers_the_drain
+test_drain_env_matches_the_pod
 test_grace_period_is_overridable
 test_short_grace_period_refuses_to_render
 test_raised_drain_alone_refuses_to_render

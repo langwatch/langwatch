@@ -129,6 +129,7 @@ spec:
               protocol: TCP
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
+            {{- include "langwatch.shutdownEnv" (dict "component" .Values.app) | nindent 12 }}
 
             # Names this process in telemetry. It becomes the OTel resource
             # `service.name` and the `service` field on every stdout log line,

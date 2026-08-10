@@ -1230,9 +1230,21 @@ here, once, by name, so both consuming templates agree.
 
      Set shutdownDrainSeconds and the app's SHUTDOWN_DRAIN_TIMEOUT_MS together;
      this helper validates the pod against what the process will actually do. */}}
+{{/* The process side of the same number the pod is sized for.
+
+     Emitted per component rather than in sharedEnv because app and workers
+     each carry their own shutdownDrainSeconds, and a process told a budget its
+     pod was not sized for is exactly the drift this pair exists to prevent:
+     the kubelet SIGKILLs a drain the process still believes it has time for.
+     One value in values.yaml now drives both. */}}
+{{- define "langwatch.shutdownEnv" -}}
+- name: SHUTDOWN_DRAIN_TIMEOUT_MS
+  value: {{ mul (int (default 25 .component.shutdownDrainSeconds)) 1000 | quote }}
+{{- end -}}
+
 {{- define "langwatch.terminationGracePeriod" -}}
 {{- $component := .component -}}
-{{- $drain := int (default 20 $component.shutdownDrainSeconds) -}}
+{{- $drain := int (default 25 $component.shutdownDrainSeconds) -}}
 {{- $required := add $drain 30 -}}
 {{- $granted := int (default $required $component.terminationGracePeriodSeconds) -}}
 {{- if lt $granted $required -}}

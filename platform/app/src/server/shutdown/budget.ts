@@ -23,10 +23,14 @@
  */
 
 /** Time the GroupQueue may spend waiting for in-flight jobs to finish. */
-const DEFAULT_DRAIN_MS = 20_000;
+const DEFAULT_DRAIN_MS = 25_000;
 
-/** Dev drains near-instantly and a developer waiting 20s for Ctrl-C is worse. */
-const DEV_DRAIN_MS = 2_000;
+/**
+ * Dev drains near-instantly, and a developer waiting the full production
+ * budget for Ctrl-C is worse than losing a job on a local queue. Long enough
+ * to finish a real in-flight write, short enough not to be in the way.
+ */
+const DEV_DRAIN_MS = 5_000;
 
 /** Room for the rest of EventSourcing.close() once the queue itself is drained. */
 const APP_CLOSE_SLACK_MS = 5_000;

@@ -159,10 +159,10 @@ app:
   # shares the workers' entrypoint watchdog and can host the worker stack
   # itself (the `all` process role), so it is sized the same way. A web-only
   # pod drains in well under this; the grace period is a ceiling, not a wait.
-  ## @param app.shutdownDrainSeconds [default: 20] Seconds the queue may spend draining in-flight jobs on shutdown.
-  shutdownDrainSeconds: 20
-  ## @param app.terminationGracePeriodSeconds [default: 50] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.
-  terminationGracePeriodSeconds: 50
+  ## @param app.shutdownDrainSeconds [default: 25] Seconds the queue may spend draining in-flight jobs on shutdown.
+  shutdownDrainSeconds: 25
+  ## @param app.terminationGracePeriodSeconds [default: 55] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.
+  terminationGracePeriodSeconds: 55
 
   # Kubernetes service configuration
   # See: https://kubespec.dev/v1/Service
@@ -834,7 +834,7 @@ workers:
 
   # Shutdown budget. shutdownDrainSeconds is how long the GroupQueue may wait
   # for in-flight jobs to finish their ClickHouse writes; it must match the
-  # app's own SHUTDOWN_DRAIN_TIMEOUT_MS (default 20000).
+  # app's own SHUTDOWN_DRAIN_TIMEOUT_MS, which the chart sets from this value.
   #
   # terminationGracePeriodSeconds is the kubelet's SIGKILL clock and must cover
   # the drain plus 5s for App.close, 15s for process teardown and 10s of
@@ -842,10 +842,10 @@ workers:
   # derived; set explicitly it is validated, and the chart refuses to render
   # when it falls short rather than installing a release the kubelet kills
   # mid-drain. See: https://kubespec.dev/v1/Pod#spec.terminationGracePeriodSeconds
-  ## @param workers.shutdownDrainSeconds [default: 20] Seconds the queue may spend draining in-flight jobs on shutdown.
-  shutdownDrainSeconds: 20
-  ## @param workers.terminationGracePeriodSeconds [default: 50] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.
-  terminationGracePeriodSeconds: 50
+  ## @param workers.shutdownDrainSeconds [default: 25] Seconds the queue may spend draining in-flight jobs on shutdown.
+  shutdownDrainSeconds: 25
+  ## @param workers.terminationGracePeriodSeconds [default: 55] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.
+  terminationGracePeriodSeconds: 55
 
   # Resource requirements for worker pods
   # Workers are CPU/memory intensive for processing evaluations and trace collection

@@ -1,4 +1,5 @@
 import { SHUTDOWN_BUDGET } from "./budget";
+import { telemetryFlushes } from "./telemetry";
 
 /**
  * One shutdown implementation, shared by both entrypoints.
@@ -61,7 +62,19 @@ export async function runGracefulShutdown({
   // of the budget.
   deadline.unref();
 
-  for (const phase of phases) {
+  // Telemetry flushes last, so the spans and logs describing this shutdown are
+  // themselves exported. Appended here rather than by each caller: a provider
+  // that flushes on its own signal handler is racing this sequence, and one
+  // that calls process.exit() when its flush resolves wins the race.
+  const all = [
+    ...phases,
+    ...telemetryFlushes().map((f) => ({
+      name: `telemetry:${f.name}`,
+      run: f.run,
+    })),
+  ];
+
+  for (const phase of all) {
     try {
       await phase.run();
     } catch (error) {

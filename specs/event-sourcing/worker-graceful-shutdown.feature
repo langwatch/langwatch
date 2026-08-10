@@ -73,6 +73,13 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
     And that is the same margin the Helm guard validates against
 
   @unit @shutdown-budget
+  Scenario: The drain budget defaults to 25s in production and 5s in dev
+    Given no SHUTDOWN_DRAIN_TIMEOUT_MS override
+    When the shutdown budget is resolved
+    Then production gets 25 seconds
+    And a development or local environment gets 5 seconds
+
+  @unit @shutdown-budget
   Scenario: A malformed drain override is refused, not silently defaulted
     Given SHUTDOWN_DRAIN_TIMEOUT_MS is set to something that is not a positive number
     When the shutdown budget is resolved
@@ -99,6 +106,34 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
     Given a shutdown phase that never finishes
     When the deadline passes
     Then the process exits non-zero with a log line explaining the overrun
+
+  # Telemetry participates in the shutdown; it does not own it
+  #
+  # Node runs EVERY listener registered for a signal, so a telemetry provider
+  # that handles SIGTERM itself is racing the shutdown rather than taking part
+  # in it — and one that then calls process.exit() does not race it, it wins.
+  #
+  # Two did. The metrics MeterProvider registered SIGTERM/SIGINT for a
+  # best-effort flush, its own comment conceding it was racing the exit. Worse,
+  # the `langwatch` SDK's setupObservability() registers SIGTERM/SIGINT BY
+  # DEFAULT and calls process.exit(0) the moment its OTel flush resolves — a
+  # second or two into a shutdown, killing a drain entitled to the full 25s.
+  # The platform now constructs the SDK with disableAutoShutdown and registers
+  # both flushes as shutdown phases instead.
+
+  @unit @shutdown-runner
+  Scenario: Telemetry flushes after the work, and never ends the process itself
+    Given a registered telemetry flush
+    When a shutdown runs
+    Then the flush runs after every other phase
+    And the process is exited exactly once, by the shutdown runner
+
+  @unit @shutdown-runner
+  Scenario: A failing telemetry flush does not fail the shutdown
+    Given a telemetry flush that throws
+    When a shutdown runs
+    Then the failure is logged against that flush
+    And the process still exits zero
 
   # Shutdown ordering
 
@@ -180,6 +215,12 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
     Given the app Deployment is rendered
     Then it sets terminationGracePeriodSeconds
     And the value covers the drain budget plus thirty seconds
+
+  @regression @helm-grace-period
+  Scenario: The process is told the same drain budget the pod is sized for
+    Given the app and workers Deployments are rendered
+    Then each sets SHUTDOWN_DRAIN_TIMEOUT_MS from its own shutdownDrainSeconds
+    And raising shutdownDrainSeconds raises the variable with it
 
   @regression @helm-grace-period
   Scenario: Operators can raise the grace period for a slower drain

@@ -129,6 +129,7 @@ spec:
           args: ['run', 'start:workers']
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
+            {{- include "langwatch.shutdownEnv" (dict "component" .Values.workers) | nindent 12 }}
 
             # See the app deployment — named per role so worker telemetry is
             # separable from the app's.
