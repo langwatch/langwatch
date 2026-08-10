@@ -105,15 +105,29 @@ var selfIdentifyingVersionPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`langwatch/(?:langwatch|langwatch_nlp|langevals):(\d+\.\d+\.\d+)`),
 }
 
-// contextualVersionPatterns are version forms that mean a LangWatch release
-// only when a LangWatch chart or image is named nearby. On their own they are
-// generic: `--version 1.14.5` in a cert-manager example, or a `tag:` in any
-// values block, would otherwise be reported as drift and the author told to
-// change it to the LangWatch release — advice that would corrupt the page. A
+// releaseImages is the set of images whose tag tracks the chart's appVersion.
+// `langwatch/clickhouse-serverless` is deliberately absent: it is versioned
+// independently, so holding it to appVersion would report a correct reference as
+// drift and tell the author to break it.
+const releaseImages = `(?:langwatch|langwatch_nlp|langevals)`
+
+// imageTagPattern is an image tag in a Helm values block, `tag: "3.12.0"`.
+//
+// It is paired with its own `repository:` over a tight window rather than the
+// wider chart context, because a `tag:` belongs to the repository directly above
+// it. Judged against the wider context, a `tag: "0.2.0"` sitting under
+// `repository: langwatch/clickhouse-serverless` was reported as drift.
+var imageTagPattern = regexp.MustCompile(`^\s*tag:\s*"(\d+\.\d+\.\d+)"`)
+
+// releaseRepository is a `repository:` naming an image that tracks the release.
+var releaseRepository = regexp.MustCompile(`^\s*repository:\s*\S*langwatch/` + releaseImages + `\s*$`)
+
+// chartVersionPatterns are version forms that mean a LangWatch release only
+// when the surrounding lines are about the LangWatch chart. On their own they
+// are generic: `--version 1.14.5` in a cert-manager example would otherwise be
+// reported as drift, with a remedy telling the author to change it to ours. A
 // rule that fires on unrelated versions is a rule people switch off.
-var contextualVersionPatterns = []*regexp.Regexp{
-	// An image tag in a Helm values block, for example `tag: "3.12.0"`.
-	regexp.MustCompile(`^\s*tag:\s*"(\d+\.\d+\.\d+)"`),
+var chartVersionPatterns = []*regexp.Regexp{
 	// The shell variable the mirroring example sets: VERSION=3.12.0
 	regexp.MustCompile(`\bVERSION=(\d+\.\d+\.\d+)\b`),
 	// A pinned chart release: `helm upgrade langwatch langwatch/langwatch
@@ -125,20 +139,31 @@ var contextualVersionPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`^\s*targetRevision:\s*"?(\d+\.\d+\.\d+)"?`),
 }
 
-// langwatchContext marks a line as being about a LangWatch chart or image.
-var langwatchContext = regexp.MustCompile(
-	`langwatch/(?:langwatch|langwatch_nlp|langevals)\b` +
-		`|chart:\s*langwatch\b` +
-		`|repoURL:.*langwatch` +
-		`|repository:.*langwatch/`,
+// chartContext marks a line as being about the LangWatch chart or one of its
+// release-tracking images.
+//
+// Deliberately not `langwatch/langwatch` on its own: that appears in every
+// `github.com/langwatch/langwatch` source link in the docs, which would make
+// almost any page count as chart context.
+var chartContext = regexp.MustCompile(
+	// A tagged release image, including the mirroring loop's `langwatch/$image:`.
+	`langwatch/(?:` + releaseImages + `|\$\{?[a-z_]+\}?):` +
+		// A Helm chart reference: `helm upgrade langwatch langwatch/langwatch`.
+		`|helm\s+\S+\s+\S+\s+langwatch/langwatch\b` +
+		// An ArgoCD source.
+		`|chart:\s*langwatch\s*$` +
+		`|repoURL:\s*\S*langwatch\.github\.io`,
 )
 
-// contextWindow is how far either side of a version a LangWatch chart reference
-// may sit. It reaches both ways because the two real shapes differ: a `helm
+// chartContextRule reaches both ways because the real shapes differ: a `helm
 // upgrade langwatch langwatch/langwatch \` line precedes its `--version`
 // continuation, while the mirroring example sets `VERSION=` above the loop that
 // names the images.
-const contextWindow = 8
+var chartContextRule = contextRule{pattern: chartContext, window: 8}
+
+// releaseRepositoryRule stays tight: a `tag:` sits directly under the
+// `repository:` it belongs to.
+var releaseRepositoryRule = contextRule{pattern: releaseRepository, window: 3}
 
 // FindVersionRefs pulls every release version out of one page's contents.
 func FindVersionRefs(file, contents string) []VersionRef {
@@ -147,8 +172,11 @@ func FindVersionRefs(file, contents string) []VersionRef {
 	for i, line := range lines {
 		at := versionSite{file: file, index: i, line: line}
 		refs = at.append(refs, selfIdentifyingVersionPatterns)
-		if nearLangwatchChart(lines, i) {
-			refs = at.append(refs, contextualVersionPatterns)
+		if near(lines, i, chartContextRule) {
+			refs = at.append(refs, chartVersionPatterns)
+		}
+		if near(lines, i, releaseRepositoryRule) {
+			refs = at.append(refs, []*regexp.Regexp{imageTagPattern})
 		}
 	}
 	return refs
@@ -174,13 +202,21 @@ func (s versionSite) append(refs []VersionRef, patterns []*regexp.Regexp) []Vers
 	return refs
 }
 
-// nearLangwatchChart reports whether any line within contextWindow of lines[at]
-// names a LangWatch chart or image.
-func nearLangwatchChart(lines []string, at int) bool {
-	from := max(at-contextWindow, 0)
-	to := min(at+contextWindow, len(lines)-1)
+// contextRule is a pattern that qualifies a version, together with how far away
+// it may sit. The two travel together because the distance is a property of the
+// shape: a `tag:` sits right under its `repository:`, while a `--version` can be
+// several continuation lines from the chart it pins.
+type contextRule struct {
+	pattern *regexp.Regexp
+	window  int
+}
+
+// near reports whether any line within the rule's window of lines[at] matches.
+func near(lines []string, at int, rule contextRule) bool {
+	from := max(at-rule.window, 0)
+	to := min(at+rule.window, len(lines)-1)
 	for i := from; i <= to; i++ {
-		if langwatchContext.MatchString(lines[i]) {
+		if rule.pattern.MatchString(lines[i]) {
 			return true
 		}
 	}
