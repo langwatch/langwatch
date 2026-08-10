@@ -8,9 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // withGlobalProvider installs an in-memory-backed provider as the OTel global
@@ -53,6 +55,49 @@ func TestTracerFromProviderNilFallback(t *testing.T) {
 		spans := exporter.GetSpans()
 		require.Len(t, spans, 1)
 	})
+}
+
+func TestStartLeavesCallerOptionsIntact(t *testing.T) {
+	t.Run("it does not write the SDK attributes into the caller's backing array", func(t *testing.T) {
+		exporter := tracetest.NewInMemoryExporter()
+		provider := sdktrace.NewTracerProvider(
+			sdktrace.WithSpanProcessor(sdktrace.NewSimpleSpanProcessor(exporter)),
+		)
+		tracer := TracerFromProvider(provider, "aliasing")
+
+		// A caller keeping one option buffer and re-slicing it per span. The
+		// first Start receives buf[:1], whose spare capacity is buf[1] — still
+		// the caller's own option, and still due to be used.
+		buf := make([]trace.SpanStartOption, 2)
+		buf[0] = trace.WithAttributes(attribute.String("caller.first", "yes"))
+		buf[1] = trace.WithAttributes(attribute.String("caller.second", "yes"))
+
+		_, first := tracer.Start(context.Background(), "first", buf[:1]...)
+		first.End()
+
+		_, second := tracer.Start(context.Background(), "second", buf[1])
+		second.End()
+
+		spans := exporter.GetSpans()
+		require.Len(t, spans, 2)
+
+		firstAttrs := stubAttrs(spans[0])
+		assert.Equal(t, "yes", firstAttrs["caller.first"].AsString())
+		assert.Equal(t, "langwatch-sdk-go", firstAttrs[AttributeLangWatchSDKName].AsString())
+
+		secondAttrs := stubAttrs(spans[1])
+		assert.Equal(t, "yes", secondAttrs["caller.second"].AsString(),
+			"the first Start must not have overwritten buf[1] with the SDK attributes")
+		assert.Equal(t, "langwatch-sdk-go", secondAttrs[AttributeLangWatchSDKName].AsString())
+	})
+}
+
+func stubAttrs(stub tracetest.SpanStub) map[attribute.Key]attribute.Value {
+	attrs := make(map[attribute.Key]attribute.Value, len(stub.Attributes))
+	for _, kv := range stub.Attributes {
+		attrs[kv.Key] = kv.Value
+	}
+	return attrs
 }
 
 func TestWithActiveSpan(t *testing.T) {

@@ -329,6 +329,21 @@ func TestGenericStreamAccumulator(t *testing.T) {
 	assert.NotContains(t, attrs, outputKey)
 }
 
+// TestGenericStreamAccumulatorResponsesUsage covers the Responses-API usage
+// spelling. The non-streaming path already accepts input_tokens/output_tokens,
+// so a stream that uses the same spelling must not lose its token counts.
+func TestGenericStreamAccumulatorResponsesUsage(t *testing.T) {
+	span, exporter := newSpan(t)
+	acc := GenericExtractor{}.NewStreamAccumulator()
+	acc.Consume(`{"id":"resp_1","model":"gpt-4o","usage":{"input_tokens":11,"output_tokens":13,"total_tokens":24}}`)
+	acc.Finish(span, langwatch.DataCaptureAll)
+	span.End()
+
+	attrs := requireSingleSpanAttrs(t, exporter)
+	assert.Equal(t, int64(11), attrs[semconvGenAIUsageInputTokens].AsInt64())
+	assert.Equal(t, int64(13), attrs[semconvGenAIUsageOutputTokens].AsInt64())
+}
+
 func TestGenericExtractorRichBody(t *testing.T) {
 	t.Run("it extracts id, model, usage, finish reasons, status and output", func(t *testing.T) {
 		const body = `{"id":"gen-1","object":"unknown.thing","model":"some-model","system_fingerprint":"fp_x","usage":{"prompt_tokens":5,"completion_tokens":7,"total_tokens":12},"choices":[{"finish_reason":"stop"}],"status":"completed"}`

@@ -100,7 +100,9 @@ func ExampleEventsService_ThumbsUp() {
 	}
 
 	// A thumbs-down is symmetric:
-	_ = lw.Events.ThumbsDown(context.Background(), traceID, "wrong product recommended")
+	if err := lw.Events.ThumbsDown(context.Background(), traceID, "wrong product recommended"); err != nil {
+		log.Fatal(err)
+	}
 }
 
 // ExampleEvaluationsService_Create submits an evaluation against an existing

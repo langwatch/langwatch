@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func TestSetTypeAndModels(t *testing.T) {
@@ -51,6 +52,33 @@ func TestSetSelectedPromptOmitsZeroVersion(t *testing.T) {
 		assert.False(t, hasVersionNumber, "a zero VersionNumber must not be emitted")
 		_, hasVersionID := attrs[AttributeLangWatchPromptVersionID]
 		assert.False(t, hasVersionID, "an empty VersionID must not be emitted")
+	})
+
+	t.Run("an empty ID is omitted while the version fields still land", func(t *testing.T) {
+		attrs := recordSpan(t, func(s *Span) {
+			s.SetSelectedPrompt(SelectedPrompt{VersionID: "ver-1", VersionNumber: 6})
+		})
+		_, hasSelectedID := attrs[AttributeLangWatchPromptSelectedID]
+		assert.False(t, hasSelectedID, "an empty ID must not be emitted")
+		_, hasPromptID := attrs[AttributeLangWatchPromptID]
+		assert.False(t, hasPromptID, "an empty ID must not be emitted")
+		assert.Equal(t, "ver-1", attrs[AttributeLangWatchPromptVersionID].AsString())
+		assert.EqualValues(t, 6, attrs[AttributeLangWatchPromptVersionNumber].AsInt64())
+	})
+
+	t.Run("a fully zero SelectedPrompt writes nothing", func(t *testing.T) {
+		attrs := recordSpan(t, func(s *Span) {
+			s.SetSelectedPrompt(SelectedPrompt{})
+		})
+		for _, key := range []attribute.Key{
+			AttributeLangWatchPromptSelectedID,
+			AttributeLangWatchPromptID,
+			AttributeLangWatchPromptVersionID,
+			AttributeLangWatchPromptVersionNumber,
+		} {
+			_, has := attrs[key]
+			assert.Falsef(t, has, "%s must not be emitted", key)
+		}
 	})
 }
 

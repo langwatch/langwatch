@@ -11,11 +11,41 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
-// TestEndToEndPipeline exercises the whole SDK pipeline: a span is recorded
-// through a real TracerProvider + LangWatch tracer, then flows through a
-// FilteringExporter (filter + data-capture predicate) into an in-memory
-// exporter. It asserts content is stripped while structure survives.
-func TestEndToEndPipeline(t *testing.T) {
+// providerWith wires a real TracerProvider whose spans flow through fe into an
+// in-memory sink, so the pipeline under test is the production one: span
+// processor, filtering exporter, data capture, then export.
+func providerWith(t *testing.T, fe sdktrace.SpanExporter) *sdktrace.TracerProvider {
+	t.Helper()
+	provider := sdktrace.NewTracerProvider(
+		sdktrace.WithSpanProcessor(sdktrace.NewSimpleSpanProcessor(fe)),
+	)
+	t.Cleanup(func() { _ = provider.Shutdown(context.Background()) })
+	return provider
+}
+
+// emitRichLLMSpan records one LLM span carrying every category the data-capture
+// stage treats differently: content, retrieved context, structure, models,
+// metrics, usage, metadata and identity.
+func emitRichLLMSpan(t *testing.T, tracer *LangWatchTracer) {
+	t.Helper()
+	err := tracer.WithActiveSpan(context.Background(), "llm.generate", func(_ context.Context, span *Span) error {
+		span.SetType(SpanTypeLLM).
+			SetRequestModel("gpt-5-mini").
+			SetResponseModel("gpt-5-mini").
+			SetGenAIProvider("openai").
+			SetInputChatMessages([]ChatMessage{TextMessage(ChatRoleUser, "what is the capital of France?")}).
+			SetOutputText("Paris").
+			SetGenAIUsage(GenAIUsage{InputTokens: Int(12), OutputTokens: Int(1), TotalTokens: Int(13)}).
+			SetMetrics(SpanMetrics{Cost: Float64(0.0003)}).
+			SetTraceMetadata(attribute.String("feature", "geo-quiz")).
+			SetThreadID("thread-1").
+			SetRAGContext(SpanRAGContextChunk{DocumentID: "doc-1", Content: "Paris is the capital of France."})
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func TestEndToEndPipelineDataCapture(t *testing.T) {
 	t.Run("a predicate-driven none mode strips content but keeps structure end to end", func(t *testing.T) {
 		mem := tracetest.NewInMemoryExporter()
 
@@ -34,28 +64,7 @@ func TestEndToEndPipeline(t *testing.T) {
 			},
 		}, ExcludeHTTPRequests())
 
-		provider := sdktrace.NewTracerProvider(
-			sdktrace.WithSpanProcessor(sdktrace.NewSimpleSpanProcessor(fe)),
-		)
-		t.Cleanup(func() { _ = provider.Shutdown(context.Background()) })
-
-		tracer := TracerFromProvider(provider, "integration")
-
-		err := tracer.WithActiveSpan(context.Background(), "llm.generate", func(ctx context.Context, span *Span) error {
-			span.SetType(SpanTypeLLM).
-				SetRequestModel("gpt-5-mini").
-				SetResponseModel("gpt-5-mini").
-				SetGenAIProvider("openai").
-				SetInputChatMessages([]ChatMessage{TextMessage(ChatRoleUser, "what is the capital of France?")}).
-				SetOutputText("Paris").
-				SetGenAIUsage(GenAIUsage{InputTokens: Int(12), OutputTokens: Int(1), TotalTokens: Int(13)}).
-				SetMetrics(SpanMetrics{Cost: Float64(0.0003)}).
-				SetTraceMetadata(attribute.String("feature", "geo-quiz")).
-				SetThreadID("thread-1").
-				SetRAGContext(SpanRAGContextChunk{DocumentID: "doc-1", Content: "Paris is the capital of France."})
-			return nil
-		})
-		require.NoError(t, err)
+		emitRichLLMSpan(t, TracerFromProvider(providerWith(t, fe), "integration"))
 
 		spans := mem.GetSpans()
 		require.Len(t, spans, 1, "the single LLM span must reach the sink")
@@ -81,15 +90,12 @@ func TestEndToEndPipeline(t *testing.T) {
 		assert.Contains(t, keys, attribute.Key("gen_ai.response.model"))
 		assert.Contains(t, keys, attribute.Key("gen_ai.provider.name"))
 	})
+}
 
+func TestEndToEndPipelineHTTPFilter(t *testing.T) {
 	t.Run("an http span is filtered out before reaching the sink", func(t *testing.T) {
 		mem := tracetest.NewInMemoryExporter()
-		fe := NewFilteringExporter(mem, ExcludeHTTPRequests())
-
-		provider := sdktrace.NewTracerProvider(
-			sdktrace.WithSpanProcessor(sdktrace.NewSimpleSpanProcessor(fe)),
-		)
-		t.Cleanup(func() { _ = provider.Shutdown(context.Background()) })
+		provider := providerWith(t, NewFilteringExporter(mem, ExcludeHTTPRequests()))
 
 		// Emit an HTTP-shaped span from a net/http-named instrumentation scope.
 		httpTracer := provider.Tracer("net/http")

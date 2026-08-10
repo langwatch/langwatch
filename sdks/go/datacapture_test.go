@@ -13,7 +13,9 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// captureStub builds a span stub carrying input, output and non-content attrs.
+// captureStub pairs every content attribute the capture stage can strip with a
+// non-content one it must never touch, so a test that asserts stripping cannot
+// pass by simply dropping everything.
 func captureStub(spanType string) tracetest.SpanStub {
 	return tracetest.SpanStub{
 		Name:     "op",

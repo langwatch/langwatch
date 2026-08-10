@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"strings"
 
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.41.0"
 
@@ -415,7 +414,7 @@ func (a *responsesStreamAccumulator) Finish(span *langwatch.Span, capture langwa
 		}
 		span.SetStatus(codes.Error, msg)
 		if a.errCode != "" {
-			span.SetAttributes(attribute.String("error.type", a.errCode))
+			span.SetAttributes(semconv.ErrorTypeKey.String(a.errCode))
 		}
 	}
 }

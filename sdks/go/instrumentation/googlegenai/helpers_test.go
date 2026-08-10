@@ -16,6 +16,18 @@ import (
 	langwatch "github.com/langwatch/langwatch/sdks/go"
 )
 
+// looksLikeSSE reports whether a canned response body is an SSE stream. A frame
+// prefix is required rather than a substring search: an ordinary JSON body can
+// contain "data:" anywhere in its content and must still be served as JSON.
+func looksLikeSSE(body string) bool {
+	for line := range strings.SplitSeq(body, "\n") {
+		if strings.HasPrefix(strings.TrimLeft(line, "\r"), "data:") {
+			return true
+		}
+	}
+	return false
+}
+
 // mockRoundTripper returns a canned response for any request. It captures the
 // request URL and body so tests can assert on what genai actually sent, and
 // chooses the Content-Type from the response shape (SSE for streams).
@@ -39,7 +51,7 @@ func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 
 	contentType := m.contentType
 	if contentType == "" {
-		if strings.Contains(m.respBody, "data:") {
+		if looksLikeSSE(m.respBody) {
 			contentType = "text/event-stream"
 		} else {
 			contentType = "application/json"

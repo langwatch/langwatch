@@ -155,11 +155,35 @@ describe("SpanCostService — cache token rollup", () => {
       expect(result.cacheReadTokens).toBe(37127);
       expect(result.cacheCreationTokens).toBe(14);
     });
+  });
 
-    it("reports zero cache-read tokens when no cache keys are present", () => {
-      const result = service.extractCacheTokens(costedSpan());
+  describe("given a span carrying both the canonical key and the legacy alias", () => {
+    it("prefers the canonical dotted count over the legacy alias", () => {
+      const result = service.extractCacheTokens(
+        costedSpan({
+          spanAttributes: {
+            "gen_ai.usage.cache_read.input_tokens": 37127,
+            "gen_ai.usage.cached_tokens": 999,
+          },
+        }),
+      );
 
-      expect(result.cacheReadTokens).toBe(0);
+      expect(result.cacheReadTokens).toBe(37127);
+    });
+  });
+
+  describe("given a span whose canonical cache-read count is zero", () => {
+    it("falls back to the legacy alias and leaves cache-creation at zero", () => {
+      const result = service.extractCacheTokens(
+        costedSpan({
+          spanAttributes: {
+            "gen_ai.usage.cache_read.input_tokens": 0,
+            "gen_ai.usage.cached_tokens": 42,
+          },
+        }),
+      );
+
+      expect(result.cacheReadTokens).toBe(42);
       expect(result.cacheCreationTokens).toBe(0);
     });
   });

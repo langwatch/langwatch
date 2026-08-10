@@ -37,9 +37,8 @@ func TestSetGenAIRequestParams(t *testing.T) {
 		assert.Equal(t, []string{"\n\n"}, attrs["gen_ai.request.stop_sequences"].AsStringSlice())
 		assert.Equal(t, "high", attrs["gen_ai.request.reasoning_effort"].AsString())
 
-		// Unset params are omitted.
 		_, hasTopP := attrs[attribute.Key("gen_ai.request.top_p")]
-		assert.False(t, hasTopP)
+		assert.False(t, hasTopP, "an unset param must not be emitted at all")
 	})
 }
 

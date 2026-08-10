@@ -22,7 +22,7 @@ type optionsParams struct {
 	TopK        *float64 `json:"top_k"`
 	Seed        *int     `json:"seed"`
 	Stop        []string `json:"stop"`
-	// Penalties are recorded too when present.
+
 	FrequencyPenalty *float64 `json:"frequency_penalty"`
 	PresencePenalty  *float64 `json:"presence_penalty"`
 }

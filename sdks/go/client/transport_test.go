@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"math/rand"
 	"net/http"
@@ -206,6 +207,52 @@ func TestRetry(t *testing.T) {
 				"an idempotency-keyed write is retried")
 		})
 	})
+
+	t.Run("given an idempotent request whose body cannot be replayed", func(t *testing.T) {
+		t.Run("when the first attempt fails with 503", func(t *testing.T) {
+			// A streaming body has no GetBody, so a second attempt would send a
+			// body already drained by the first — a silently truncated write.
+			// Attempt it once and surface the 503 instead.
+			var calls int32
+			var mu sync.Mutex
+			var bodies []string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				atomic.AddInt32(&calls, 1)
+				raw, readErr := io.ReadAll(r.Body)
+				assert.NoError(t, readErr)
+				mu.Lock()
+				bodies = append(bodies, string(raw))
+				mu.Unlock()
+				w.WriteHeader(http.StatusServiceUnavailable)
+			}))
+			defer srv.Close()
+
+			d := &retryingDoer{
+				inner:        srv.Client(),
+				maxRetries:   2,
+				retryWaitMin: time.Millisecond,
+				retryWaitMax: 5 * time.Millisecond,
+				rand:         rand.New(rand.NewSource(1)),
+			}
+			// io.Reader that is not one of the shapes http.NewRequest can rewind,
+			// so GetBody stays nil.
+			req, err := http.NewRequestWithContext(context.Background(),
+				http.MethodPut, srv.URL, struct{ io.Reader }{strings.NewReader(`{"handle":"h"}`)})
+			require.NoError(t, err)
+			require.Nil(t, req.GetBody, "test premise: the body is not replayable")
+
+			resp, err := d.Do(req)
+			require.NoError(t, err)
+			defer func() { _ = resp.Body.Close() }()
+
+			assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
+			assert.Equal(t, int32(1), atomic.LoadInt32(&calls),
+				"a request with a non-replayable body is attempted once")
+			mu.Lock()
+			defer mu.Unlock()
+			assert.Equal(t, []string{`{"handle":"h"}`}, bodies)
+		})
+	})
 }
 
 func TestIsRetryableRequest(t *testing.T) {
@@ -272,6 +319,12 @@ func TestDecodeInto(t *testing.T) {
 			var apiErr *APIError
 			require.ErrorAs(t, err, &apiErr)
 			assert.Equal(t, http.StatusOK, apiErr.StatusCode)
+			// The status text alone ("200 OK") would describe a success; the
+			// message has to name the decode failure or it tells the caller
+			// nothing.
+			assert.Contains(t, apiErr.Message, "could not decode")
+			var syntaxErr *json.SyntaxError
+			assert.ErrorAs(t, err, &syntaxErr, "the decoder's error stays reachable via errors.As")
 		})
 	})
 }

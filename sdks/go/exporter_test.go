@@ -171,7 +171,6 @@ func TestBuildHeaders_WithProjectID(t *testing.T) {
 
 	assert.Equal(t, "Bearer pat-lw-secret", headers["Authorization"])
 	assert.Equal(t, "project-9", headers["X-Project-Id"])
-	// SDK identification headers are always present regardless of auth scheme.
 	assert.Equal(t, "langwatch-sdk-go", headers["x-langwatch-sdk-name"])
 	assert.Equal(t, "go", headers["x-langwatch-sdk-language"])
 	assert.Equal(t, Version, headers["x-langwatch-sdk-version"])
@@ -200,8 +199,8 @@ func TestExporterOption_WithDataCaptureFunc(t *testing.T) {
 
 	assert.True(t, cfg.dataCapture.enabled)
 	require.NotNil(t, cfg.dataCapture.predicate)
-	// The stored predicate is the one we supplied.
-	assert.Equal(t, DataCaptureInput, cfg.dataCapture.predicate(DataCaptureContext{}))
+	assert.Equal(t, DataCaptureInput, cfg.dataCapture.predicate(DataCaptureContext{}),
+		"the stored predicate must be the one supplied, not a default")
 }
 
 func TestNewExporter_InvalidEndpoint(t *testing.T) {
@@ -221,8 +220,18 @@ func TestNewDefaultExporter_Success(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, exporter)
 		require.NotNil(t, exporter.FilteringExporter)
-		// The prepended ExcludeHTTPRequests filter is present.
-		assert.GreaterOrEqual(t, len(exporter.filters), 1)
+		require.NotEmpty(t, exporter.filters)
+
+		// Exercise the configured filters rather than counting them: only
+		// behaviour distinguishes the HTTP exclusion from any other filter.
+		kept := applyFilters([]sdktrace.ReadOnlySpan{
+			richSpanStub("GET /api/users", "net/http", "span").Snapshot(),
+			richSpanStub("llm.chat", "openai", "llm").Snapshot(),
+		}, exporter.filters)
+
+		require.Len(t, kept, 1)
+		assert.Equal(t, "llm.chat", kept[0].Name(), "the HTTP-verb span must be excluded and the LLM span kept")
+
 		require.NoError(t, exporter.Shutdown(context.Background()))
 	})
 }
@@ -275,10 +284,8 @@ func TestFilteringExporter_FiltersAndDataCaptureTogether(t *testing.T) {
 		assert.Equal(t, "llm.chat", out[0].Name)
 
 		keys := keySet(out[0].Attributes)
-		// Content is stripped...
 		assert.NotContains(t, keys, AttributeLangWatchInput)
 		assert.NotContains(t, keys, AttributeLangWatchOutput)
-		// ...but structure and metrics survive.
 		assert.Contains(t, keys, AttributeLangWatchSpanType)
 		assert.Contains(t, keys, AttributeLangWatchMetrics)
 		assert.Contains(t, keys, attribute.Key("gen_ai.request.model"))

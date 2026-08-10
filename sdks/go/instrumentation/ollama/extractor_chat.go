@@ -101,10 +101,11 @@ func (chatExtractor) NewStreamAccumulator() otelhttp.StreamAccumulator {
 }
 
 // recordMessagesInput records the chat request messages as chat_messages,
-// decoding each Ollama message into a LangWatch ChatMessage so roles, content,
-// images and tool_calls are preserved structurally (tool-call arguments become
-// the canonical JSON-string Arguments). Falls back to a JSON value when the
-// payload cannot be represented as chat messages at all.
+// decoding each Ollama message into a LangWatch ChatMessage so roles, content
+// and tool_calls are preserved structurally (tool-call arguments become the
+// canonical JSON-string Arguments). Attached images are dropped — see
+// decodeInputMessage. Falls back to a JSON value when the payload cannot be
+// represented as chat messages at all.
 func recordMessagesInput(span *langwatch.Span, rawMessages json.RawMessage) {
 	var rawList []json.RawMessage
 	if err := json.Unmarshal(rawMessages, &rawList); err != nil || len(rawList) == 0 {
@@ -268,25 +269,7 @@ func (a *chatStreamAccumulator) Consume(line string) {
 		a.toolCalls = append(a.toolCalls, chunk.Message.ToolCalls...)
 		a.sawAnyOutput = true
 	}
-	// The final line carries the token counts; merge whenever present.
-	if chunk.PromptEvalCount > 0 {
-		a.metrics.PromptEvalCount = chunk.PromptEvalCount
-	}
-	if chunk.EvalCount > 0 {
-		a.metrics.EvalCount = chunk.EvalCount
-	}
-	if chunk.TotalDuration > 0 {
-		a.metrics.TotalDuration = chunk.TotalDuration
-	}
-	if chunk.LoadDuration > 0 {
-		a.metrics.LoadDuration = chunk.LoadDuration
-	}
-	if chunk.PromptEvalDuration > 0 {
-		a.metrics.PromptEvalDuration = chunk.PromptEvalDuration
-	}
-	if chunk.EvalDuration > 0 {
-		a.metrics.EvalDuration = chunk.EvalDuration
-	}
+	a.metrics.merge(chunk.metricsPayload)
 }
 
 func (a *chatStreamAccumulator) Finish(span *langwatch.Span, capture langwatch.DataCaptureMode) {

@@ -53,12 +53,14 @@ func (f *fakeExtractor) ExtractNonStreaming(span *langwatch.Span, raw []byte, _ 
 	span.SetOutputText(string(raw))
 }
 
-type fakeAccumulator struct{ finished bool }
+// finishes counts rather than flags: a second Finish would overwrite the span's
+// response attributes after it had already been ended, which a bool hides.
+type fakeAccumulator struct{ finishes int }
 
 func (a *fakeAccumulator) Consume(string)           {}
 func (a *fakeAccumulator) IsTerminal(s string) bool { return s == "[DONE]" }
 func (a *fakeAccumulator) Finish(span *langwatch.Span, _ langwatch.DataCaptureMode) {
-	a.finished = true
+	a.finishes++
 	span.SetResponseModel("fake-stream-model")
 }
 
@@ -145,7 +147,7 @@ func TestHandleStreaming(t *testing.T) {
 
 		spans := exp.GetSpans()
 		require.Len(t, spans, 1, "span ended exactly once via the streaming body")
-		assert.True(t, acc.finished, "the accumulator was finished exactly once by the streaming body")
+		assert.Equal(t, 1, acc.finishes, "the streaming body must finish the accumulator exactly once")
 		attrs := attrMap(spans[0])
 		assert.Equal(t, "fake-stream-model", attrs["gen_ai.response.model"].AsString())
 		// A streaming request records gen_ai.request.stream == true and a TTFT.

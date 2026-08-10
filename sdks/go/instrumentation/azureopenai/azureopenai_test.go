@@ -25,6 +25,18 @@ const (
 	azureAPIVersion = "2024-06-01"
 )
 
+// looksLikeSSE reports whether a canned response body is an SSE stream. A frame
+// prefix is required rather than a substring search: an ordinary JSON body can
+// contain "data:" anywhere in its content and must still be served as JSON.
+func looksLikeSSE(body string) bool {
+	for line := range strings.SplitSeq(body, "\n") {
+		if strings.HasPrefix(strings.TrimLeft(line, "\r"), "data:") {
+			return true
+		}
+	}
+	return false
+}
+
 // mockRoundTripper returns a canned response for any request, capturing the
 // request path so tests can confirm the Azure deployment rewrite reached the
 // transport. Mirrors instrumentation/openai/helpers_test.go.
@@ -45,7 +57,7 @@ func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 
 	contentType := m.contentType
 	if contentType == "" {
-		if strings.Contains(m.respBody, "data:") {
+		if looksLikeSSE(m.respBody) {
 			contentType = "text/event-stream"
 		} else {
 			contentType = "application/json"
@@ -65,8 +77,6 @@ func newMockClient(rt *mockRoundTripper) *http.Client {
 	return &http.Client{Transport: rt}
 }
 
-// newTestProvider returns an in-memory tracer provider and its exporter, with
-// cleanup registered on the test.
 func newTestProvider(t *testing.T) (*sdktrace.TracerProvider, *tracetest.InMemoryExporter) {
 	t.Helper()
 	exporter := tracetest.NewInMemoryExporter()
@@ -79,7 +89,6 @@ func newTestProvider(t *testing.T) (*sdktrace.TracerProvider, *tracetest.InMemor
 	return provider, exporter
 }
 
-// spanAttrs flattens a span's attributes into a map keyed by attribute key.
 func spanAttrs(span sdktrace.ReadOnlySpan) map[attribute.Key]attribute.Value {
 	out := make(map[attribute.Key]attribute.Value, len(span.Attributes()))
 	for _, kv := range span.Attributes() {
@@ -88,7 +97,6 @@ func spanAttrs(span sdktrace.ReadOnlySpan) map[attribute.Key]attribute.Value {
 	return out
 }
 
-// requireSingleSpan flushes and returns the single exported span.
 func requireSingleSpan(t *testing.T, provider *sdktrace.TracerProvider, exporter *tracetest.InMemoryExporter) sdktrace.ReadOnlySpan {
 	t.Helper()
 	require.NoError(t, provider.ForceFlush(t.Context()))

@@ -83,9 +83,13 @@ func NewTransportWithBase(base http.RoundTripper, opts ...Option) http.RoundTrip
 }
 
 // WrapClientConfig sets cc.HTTPClient to an *http.Client whose transport traces
-// genai's HTTP calls to LangWatch. An existing cc.HTTPClient's transport is
-// preserved as the base of the chain, so an already-customised client (timeouts,
-// proxies, Vertex auth, …) keeps its transport underneath the tracing layer.
+// genai's HTTP calls to LangWatch. An already-customised client keeps everything
+// it was configured with: its transport becomes the base of the chain, and its
+// Timeout, CheckRedirect and Jar — which live on the *http.Client rather than on
+// the transport — are carried over onto the replacement.
+//
+// The caller's own *http.Client is not mutated; only cc.HTTPClient is repointed,
+// so a client shared with other code keeps its untraced behaviour.
 //
 //	cc := &genai.ClientConfig{APIKey: key}
 //	googlegenai.WrapClientConfig(cc)
@@ -94,8 +98,12 @@ func WrapClientConfig(cc *genai.ClientConfig, opts ...Option) {
 	if cc == nil {
 		return
 	}
-	base := baseTransport(cc.HTTPClient)
-	cc.HTTPClient = &http.Client{Transport: NewTransportWithBase(base, opts...)}
+	traced := &http.Client{}
+	if cc.HTTPClient != nil {
+		*traced = *cc.HTTPClient
+	}
+	traced.Transport = NewTransportWithBase(baseTransport(cc.HTTPClient), opts...)
+	cc.HTTPClient = traced
 }
 
 // baseTransport extracts a usable base round tripper from a genai ClientConfig's

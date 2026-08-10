@@ -1,10 +1,13 @@
 package googlegenai
 
 import (
+	"errors"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -139,6 +142,39 @@ func TestWrapClientConfig(t *testing.T) {
 		require.NoError(t, resp.Body.Close())
 
 		assert.Equal(t, 1, base.hits, "the traced transport must delegate to the original base transport")
+	})
+
+	t.Run("it preserves the caller's client-level settings", func(t *testing.T) {
+		// Timeout, CheckRedirect and Jar live on *http.Client, not on the
+		// Transport, so replacing the client wholesale would silently discard
+		// them along with any deadline the caller depends on.
+		jar, err := cookiejar.New(nil)
+		require.NoError(t, err)
+		redirectErr := errors.New("no redirects")
+		cc := &genai.ClientConfig{APIKey: "k", HTTPClient: &http.Client{
+			Transport:     &baseMarkerTransport{},
+			Timeout:       42 * time.Second,
+			Jar:           jar,
+			CheckRedirect: func(*http.Request, []*http.Request) error { return redirectErr },
+		}}
+		WrapClientConfig(cc)
+		require.NotNil(t, cc.HTTPClient)
+
+		assert.Equal(t, 42*time.Second, cc.HTTPClient.Timeout)
+		assert.Same(t, jar, cc.HTTPClient.Jar)
+		require.NotNil(t, cc.HTTPClient.CheckRedirect)
+		assert.Equal(t, redirectErr, cc.HTTPClient.CheckRedirect(nil, nil))
+	})
+
+	t.Run("it leaves the caller's client untouched", func(t *testing.T) {
+		// Wrapping must not mutate the client the caller still holds a reference
+		// to; only cc.HTTPClient is repointed.
+		original := &http.Client{Transport: &baseMarkerTransport{}, Timeout: time.Second}
+		cc := &genai.ClientConfig{APIKey: "k", HTTPClient: original}
+		WrapClientConfig(cc)
+
+		assert.NotSame(t, original, cc.HTTPClient)
+		assert.IsType(t, &baseMarkerTransport{}, original.Transport)
 	})
 
 	t.Run("it is a no-op on a nil config", func(t *testing.T) {

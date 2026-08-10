@@ -5,8 +5,10 @@ import (
 	"time"
 )
 
-// Default configuration values. These mirror sensible production defaults and
-// can each be overridden via the corresponding Option.
+// Default configuration values. Not all of them have an Option: the timeout is
+// overridden by supplying your own http.Client via [WithHTTPClient], and the
+// backoff floor is fixed because [WithRetryWaitMax] already bounds what the
+// caller actually feels — the total wait.
 const (
 	// DefaultEndpoint is the LangWatch SaaS base URL used when neither
 	// [WithEndpoint] nor the LANGWATCH_ENDPOINT environment variable is set.

@@ -255,10 +255,16 @@ func (s *Span) SetParams(params map[string]any) *Span {
 
 // SetSelectedPrompt attaches a saved prompt to the trace, setting the prompt
 // identity attributes the trace UI reads for the "Open in Prompts" affordance.
+//
+// Zero-valued fields are left off the span entirely: an empty prompt id would
+// still render the affordance and then resolve to nothing.
 func (s *Span) SetSelectedPrompt(prompt SelectedPrompt) *Span {
-	attrs := []attribute.KeyValue{
-		AttributeLangWatchPromptSelectedID.String(prompt.ID),
-		AttributeLangWatchPromptID.String(prompt.ID),
+	attrs := make([]attribute.KeyValue, 0, 4)
+	if prompt.ID != "" {
+		attrs = append(attrs,
+			AttributeLangWatchPromptSelectedID.String(prompt.ID),
+			AttributeLangWatchPromptID.String(prompt.ID),
+		)
 	}
 	if prompt.VersionID != "" {
 		attrs = append(attrs, AttributeLangWatchPromptVersionID.String(prompt.VersionID))

@@ -42,7 +42,16 @@ type APIError struct {
 	// Body is the raw, undecoded response body. It is retained so callers can
 	// recover details the standard decoder did not surface.
 	Body []byte
+
+	// err is the underlying cause when the failure was produced by the SDK
+	// rather than by an API error payload — currently only a 2xx body that
+	// would not decode. Exposed through Unwrap so [errors.Is] reaches it.
+	err error
 }
+
+// Unwrap returns the underlying cause, if any, so [errors.Is] and [errors.As]
+// can reach past the APIError.
+func (e *APIError) Unwrap() error { return e.err }
 
 // Error implements the error interface, producing a message of the form
 // "langwatch: <Operation> failed: <StatusCode> <Message>".
@@ -65,6 +74,20 @@ func newAPIError(operation string, statusCode int, status string, body []byte) *
 		Message:    extractErrorMessage(body, status),
 		Operation:  operation,
 		Body:       body,
+	}
+}
+
+// newDecodeError builds an APIError for a success response whose body did not
+// decode. There is no error envelope to extract a message from, so the decoder's
+// own complaint becomes the message; without it the APIError would read as the
+// success status it carries ("200 OK") and say nothing about what went wrong.
+func newDecodeError(operation string, resp *http.Response, cause error) *APIError {
+	return &APIError{
+		StatusCode: resp.StatusCode,
+		Status:     resp.Status,
+		Message:    fmt.Sprintf("could not decode %s response body: %v", resp.Status, cause),
+		Operation:  operation,
+		err:        cause,
 	}
 }
 
@@ -123,10 +146,6 @@ func errorFieldAsString(raw json.RawMessage) string {
 	}
 	return ""
 }
-
-// statusErr is a sentinel returned for a given HTTP status, used only by the
-// Is* helpers via [errors.As] matching on the APIError's StatusCode. It is not
-// itself returned to callers.
 
 // IsNotFound reports whether err is an [*APIError] with HTTP status 404.
 func IsNotFound(err error) bool { return hasStatus(err, http.StatusNotFound) }

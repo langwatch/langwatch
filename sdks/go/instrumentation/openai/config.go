@@ -8,7 +8,6 @@ import (
 	langwatch "github.com/langwatch/langwatch/sdks/go"
 )
 
-// config is used to configure the middleware.
 type config struct {
 	tracerProvider oteltrace.TracerProvider
 	// dataCapture gates whether the middleware records input and/or output

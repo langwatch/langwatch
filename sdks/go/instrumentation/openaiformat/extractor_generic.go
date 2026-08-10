@@ -78,21 +78,7 @@ func (GenericExtractor) ExtractNonStreaming(span *langwatch.Span, raw []byte, ca
 
 	if usage, ok := body["usage"].(otelhttp.JSONObject); ok {
 		genUsage := langwatch.GenAIUsage{}
-		if v, ok := otelhttp.GetInt(usage, "prompt_tokens"); ok {
-			genUsage.InputTokens = langwatch.Int(v)
-		}
-		if v, ok := otelhttp.GetInt(usage, "input_tokens"); ok {
-			genUsage.InputTokens = langwatch.Int(v)
-		}
-		if v, ok := otelhttp.GetInt(usage, "completion_tokens"); ok {
-			genUsage.OutputTokens = langwatch.Int(v)
-		}
-		if v, ok := otelhttp.GetInt(usage, "output_tokens"); ok {
-			genUsage.OutputTokens = langwatch.Int(v)
-		}
-		if v, ok := otelhttp.GetInt(usage, "total_tokens"); ok {
-			genUsage.TotalTokens = langwatch.Int(v)
-		}
+		probeUsage(&genUsage, usage)
 		span.SetGenAIUsage(genUsage)
 	}
 
@@ -172,15 +158,29 @@ func (a *genericStreamAccumulator) Consume(dataLine string) {
 	}
 
 	if usage, ok := event["usage"].(otelhttp.JSONObject); ok {
-		if v, ok := otelhttp.GetInt(usage, "prompt_tokens"); ok {
-			a.usage.InputTokens = langwatch.Int(v)
+		probeUsage(&a.usage, usage)
+	}
+}
+
+// probeUsage folds an untyped usage block into dst, accepting both OpenAI usage
+// spellings: chat/completions reports prompt_tokens/completion_tokens, while the
+// Responses API reports input_tokens/output_tokens. Both the single-body and the
+// streamed paths go through here so a stream cannot silently lose the counts one
+// of them understands. A field absent from the block leaves dst untouched, which
+// is what lets a later chunk carrying only totals refine an earlier one.
+func probeUsage(dst *langwatch.GenAIUsage, usage otelhttp.JSONObject) {
+	for _, key := range []string{"prompt_tokens", "input_tokens"} {
+		if v, ok := otelhttp.GetInt(usage, key); ok {
+			dst.InputTokens = langwatch.Int(v)
 		}
-		if v, ok := otelhttp.GetInt(usage, "completion_tokens"); ok {
-			a.usage.OutputTokens = langwatch.Int(v)
+	}
+	for _, key := range []string{"completion_tokens", "output_tokens"} {
+		if v, ok := otelhttp.GetInt(usage, key); ok {
+			dst.OutputTokens = langwatch.Int(v)
 		}
-		if v, ok := otelhttp.GetInt(usage, "total_tokens"); ok {
-			a.usage.TotalTokens = langwatch.Int(v)
-		}
+	}
+	if v, ok := otelhttp.GetInt(usage, "total_tokens"); ok {
+		dst.TotalTokens = langwatch.Int(v)
 	}
 }
 

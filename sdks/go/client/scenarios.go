@@ -15,7 +15,9 @@ type ScenariosService struct {
 	client *Client
 }
 
-// Scenario is a simulation scenario as returned by the API.
+// Scenario is the saved definition a simulation runs against: the Situation the
+// simulated user starts from and the Criteria each run is judged on. Executions
+// of it are listed separately, via [ScenariosService.ListRuns].
 type Scenario struct {
 	ID          string   `json:"id"`
 	Name        string   `json:"name"`

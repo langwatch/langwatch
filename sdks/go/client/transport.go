@@ -109,13 +109,13 @@ type retryingDoer struct {
 }
 
 // Do executes req, retrying retryable failures up to maxRetries additional
-// times. The request body is buffered up front via GetBody so it can be replayed
-// on each attempt; requests without a replayable body are attempted once.
+// times.
 //
 // Requests that are not safe to replay ([isRetryableRequest]) are attempted
 // exactly once, whatever the response: replaying an unprotected POST risks a
 // duplicate write when the server completed the first attempt but the response
-// never reached us.
+// never reached us, and replaying a body the first attempt already drained
+// would silently send a truncated one.
 func (d *retryingDoer) Do(req *http.Request) (*http.Response, error) {
 	if !isRetryableRequest(req) {
 		return d.inner.Do(req)
@@ -125,9 +125,8 @@ func (d *retryingDoer) Do(req *http.Request) (*http.Response, error) {
 	var lastErr error
 
 	for attempt := 0; ; attempt++ {
-		// Replay the body on retries. http.NewRequestWithContext populates
-		// GetBody for in-memory bodies, which is exactly what the generated
-		// client produces.
+		// Rewind the body for each retry. isRetryableRequest has already
+		// established that a request carrying a body can produce a fresh one.
 		if attempt > 0 && req.GetBody != nil {
 			body, err := req.GetBody()
 			if err != nil {
@@ -223,12 +222,22 @@ func isIdempotentMethod(method string) bool {
 }
 
 // isRetryableRequest reports whether a request may be replayed after a transport
-// error or a retryable status. Idempotent methods always may. A non-idempotent
-// write (POST, PATCH) may only when it carries an [idempotencyKeyHeader], which
-// is what lets the server collapse the replay onto the original write instead of
-// performing it twice — without one, a retry can duplicate a prompt version, an
-// evaluation or a tracked event.
+// error or a retryable status. Two conditions must both hold.
+//
+// The method must be idempotent, or a non-idempotent write (POST, PATCH) must
+// carry an [idempotencyKeyHeader] — that is what lets the server collapse the
+// replay onto the original write instead of performing it twice; without one, a
+// retry can duplicate a prompt version, an evaluation or a tracked event.
+//
+// And the body must be replayable. http.NewRequestWithContext populates GetBody
+// for the in-memory bodies the generated client produces; an arbitrary streaming
+// io.Reader gets no GetBody, and the first attempt drains it, so a second
+// attempt would send an empty body and quietly overwrite the resource with
+// nothing.
 func isRetryableRequest(req *http.Request) bool {
+	if req.Body != nil && req.GetBody == nil {
+		return false
+	}
 	if isIdempotentMethod(req.Method) {
 		return true
 	}
@@ -316,7 +325,9 @@ func decodeInto(operation string, resp *http.Response, err error, out any) error
 		if errors.Is(jsonErr, io.EOF) {
 			return nil
 		}
-		return newAPIError(operation, resp.StatusCode, resp.Status, nil)
+		// There is no error envelope to mine for a message here — the failure is
+		// the decode itself, so that is what the caller needs to see.
+		return newDecodeError(operation, resp, jsonErr)
 	}
 	return nil
 }

@@ -180,24 +180,7 @@ func (a *generateStreamAccumulator) Consume(line string) {
 		a.toolCalls = append(a.toolCalls, chunk.ToolCalls...)
 		a.sawAnyOutput = true
 	}
-	if chunk.PromptEvalCount > 0 {
-		a.metrics.PromptEvalCount = chunk.PromptEvalCount
-	}
-	if chunk.EvalCount > 0 {
-		a.metrics.EvalCount = chunk.EvalCount
-	}
-	if chunk.TotalDuration > 0 {
-		a.metrics.TotalDuration = chunk.TotalDuration
-	}
-	if chunk.LoadDuration > 0 {
-		a.metrics.LoadDuration = chunk.LoadDuration
-	}
-	if chunk.PromptEvalDuration > 0 {
-		a.metrics.PromptEvalDuration = chunk.PromptEvalDuration
-	}
-	if chunk.EvalDuration > 0 {
-		a.metrics.EvalDuration = chunk.EvalDuration
-	}
+	a.metrics.merge(chunk.metricsPayload)
 }
 
 func (a *generateStreamAccumulator) Finish(span *langwatch.Span, capture langwatch.DataCaptureMode) {
