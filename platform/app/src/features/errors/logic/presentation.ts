@@ -1349,6 +1349,12 @@ const presentations = {
         : "Configure the destination first.";
     },
   },
+  trigger_filters_required: {
+    title: "This automation needs a condition",
+    describe: () =>
+      "Add a filter or a query that says which traces it is about. " +
+      "Without one it would fire on every single trace.",
+  },
 
   // ==========================================================================
   // Langy.

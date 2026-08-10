@@ -102,10 +102,6 @@ const FeatureFlagsDrawer = lazyDefault({
   factory: () => import("./drawers/FeatureFlagsDrawer"),
   key: "FeatureFlagsDrawer",
 });
-const EditAutomationFilterDrawer = lazyDefault({
-  factory: () => import("./EditAutomationFilterDrawer"),
-  key: "EditAutomationFilterDrawer",
-});
 const EditModelProviderDrawer = lazyDefault({
   factory: () => import("./EditModelProviderDrawer"),
   key: "EditModelProviderDrawer",
@@ -247,7 +243,13 @@ export const drawers = {
   llmModelCost: LLMModelCostDrawer,
   uploadCSV: UploadCSVDrawer,
   addOrEditDataset: AddOrEditDatasetDrawer,
-  editAutomationFilter: EditAutomationFilterDrawer,
+  // Serves URLs handed out before the authoring drawer replaced the filter-only
+  // one: the REST `platformUrl` field and the automation emails both used to
+  // name this drawer, and those links live in inboxes and in whatever callers
+  // stored the response. It points at the same drawer as `automation` so an old
+  // link opens the editor that can change a query condition, which the drawer
+  // it used to open could not do at all.
+  editAutomationFilter: AutomationDrawer,
   seriesFilters: SeriesFiltersDrawer,
   selectDataset: SelectDatasetDrawer,
   dashboardName: DashboardNameDrawer,

@@ -29,6 +29,14 @@ export type PlanInfo = {
    * licenses and subscriptions carry true.
    */
   webhookEndpointsEnabled?: boolean;
+  /**
+   * Per-contract override of the daily ceiling on confirmed persist dispatches
+   * an automation may make (dataset rows, annotation-queue items). Absent means
+   * the plan tier's default applies. This is the escape hatch for a customer
+   * whose legitimate volume is above their tier, so raising one account's
+   * ceiling never means loosening it for everyone.
+   */
+  maxTriggerPersistDispatchesPerDay?: number;
   usageUnit?: string;
   userPrice?: {
     USD: number;

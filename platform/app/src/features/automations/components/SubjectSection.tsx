@@ -1,4 +1,5 @@
 import {
+  Alert,
   Badge,
   Box,
   Button,
@@ -27,6 +28,7 @@ import {
 import { api } from "~/utils/api";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { queryIsStructurable } from "../logic/conditionQuery";
+import { type DailyCapAdvice, dailyCapAdvice } from "../logic/dailyCapAdvice";
 import {
   type AutomationDraft,
   filterQueryIsSet,
@@ -35,7 +37,7 @@ import {
   type ReportSourceKind,
   subjectIsSet,
 } from "../logic/draftReducer";
-import { estimateFiringRate } from "../logic/firingRate";
+import { estimateFiringRate, estimateRatePerDay } from "../logic/firingRate";
 import { deriveSeriesOptionsFromGraph } from "../logic/seriesOptions";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
@@ -258,7 +260,7 @@ function ReportSubject() {
                 dispatch({ type: "SET_FILTER_QUERY", value })
               }
               cadence={draft.notificationCadence}
-              batches
+              canBatch
               purpose="report"
             />
           </Field.Root>
@@ -370,7 +372,7 @@ function TraceSubject() {
       cadence={draft.notificationCadence}
       // Persist actions (dataset / annotation writes) fire per match; only
       // notify actions batch on the digest cadence.
-      batches={isNotifyAction(draft)}
+      canBatch={isNotifyAction(draft)}
     />
   );
 }
@@ -403,7 +405,7 @@ function TraceQuerySubject({
   query,
   onChange,
   cadence,
-  batches,
+  canBatch,
   /** A report runs on a schedule and sends the traces that matched in the
    *  window, so it reads as "which traces go in the report", and the per-trace
    *  firing-rate estimate ("about 6 times a day") does not apply to it. */
@@ -412,11 +414,12 @@ function TraceQuerySubject({
   query: string;
   onChange: (value: string) => void;
   cadence: NotificationCadence;
-  batches: boolean;
+  canBatch: boolean;
   purpose?: "automation" | "report";
 }) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
+  const draft = useDraft();
 
   // Debounce before hitting the preview endpoint so fluent typing stays local;
   // the window re-anchors to "now" each time the debounced query settles.
@@ -454,6 +457,35 @@ function TraceQuerySubject({
       refetchOnWindowFocus: false,
     },
   );
+
+  // The plan's daily ceiling on persist actions, read once and held: it moves
+  // only when the plan does, and a failed read simply means no advice below.
+  const capStatus = api.automation.getDailyCap.useQuery(
+    { projectId },
+    {
+      enabled: !!projectId,
+      staleTime: 10 * 60 * 1000,
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
+  );
+
+  // Advice, never a gate: this warns that the drafted condition would outrun
+  // the plan's daily ceiling, and every missing piece (no preview, no cap, an
+  // action the ceiling does not govern) simply produces nothing. Save is
+  // untouched either way.
+  const capAdvice = dailyCapAdvice({
+    action: draft.action,
+    matchesPerDay:
+      preview.data != null
+        ? estimateRatePerDay({
+            matchesLast7Days: preview.data.totalHits,
+            cadence,
+            canBatch,
+          })
+        : null,
+    cap: capStatus.data?.cap ?? null,
+  });
 
   // The builder is the default surface; Code is the raw-query escape hatch.
   // A query too rich for the builder (OR, grouping, free-text) can only live in
@@ -518,9 +550,10 @@ function TraceQuerySubject({
         totalHits={preview.data?.totalHits ?? null}
         sample={preview.data?.items ?? []}
         cadence={cadence}
-        batches={batches}
+        canBatch={canBatch}
         showFiringRate={purpose === "automation"}
         requireQuery={purpose === "automation"}
+        capAdvice={capAdvice}
       />
     </VStack>
   );
@@ -602,9 +635,10 @@ function TracePreview({
   totalHits,
   sample,
   cadence,
-  batches,
+  canBatch,
   showFiringRate,
   requireQuery,
+  capAdvice,
 }: {
   trimmed: string;
   fetching: boolean;
@@ -614,11 +648,13 @@ function TracePreview({
   totalHits: number | null;
   sample: PreviewTrace[];
   cadence: NotificationCadence;
-  batches: boolean;
+  canBatch: boolean;
   showFiringRate: boolean;
   /** An automation must be scoped — an empty query would act on every trace,
    *  so we say so rather than silently leaving Save disabled. */
   requireQuery: boolean;
+  /** Set when the estimate outruns the plan's daily ceiling, null otherwise. */
+  capAdvice: DailyCapAdvice | null;
 }) {
   if (trimmed.length === 0) {
     return (
@@ -653,7 +689,7 @@ function TracePreview({
   }
   const subtext =
     showFiringRate && totalHits !== null && totalHits > 0
-      ? estimateFiringRate({ matchesLast7Days: totalHits, cadence, batches })
+      ? estimateFiringRate({ matchesLast7Days: totalHits, cadence, canBatch })
       : "in the last 7 days";
   return (
     <Box
@@ -668,7 +704,7 @@ function TracePreview({
         align="baseline"
         paddingX={3}
         paddingY={2}
-        borderBottomWidth={sample.length > 0 ? "1px" : "0"}
+        borderBottomWidth={sample.length > 0 || capAdvice ? "1px" : "0"}
         borderColor="border"
       >
         {totalHits === 0 ? (
@@ -690,6 +726,10 @@ function TracePreview({
         {/* In-place refresh cue — never blanks the list. */}
         {fetching ? <Spinner size="xs" color="fg.subtle" /> : null}
       </HStack>
+      <DailyCapAdviceAlert
+        advice={capAdvice}
+        hasDividerBelow={sample.length > 0}
+      />
       {sample.length > 0 ? (
         <VStack
           align="stretch"
@@ -701,6 +741,59 @@ function TracePreview({
           ))}
         </VStack>
       ) : null}
+    </Box>
+  );
+}
+
+/**
+ * Advice, sitting right under the firing-rate line so it reads as a comment on
+ * that rate: the drafted condition would match more traces a day than the
+ * plan's daily action ceiling allows. It never blocks saving, and it is absent
+ * whenever the estimate, the ceiling, or the relevance of either is in doubt.
+ */
+function DailyCapAdviceAlert({
+  advice,
+  hasDividerBelow,
+}: {
+  advice: DailyCapAdvice | null;
+  hasDividerBelow: boolean;
+}) {
+  if (!advice) return null;
+  return (
+    <Box
+      paddingX={3}
+      paddingY={2}
+      borderBottomWidth={hasDividerBelow ? "1px" : "0"}
+      borderColor="border"
+    >
+      <Alert.Root
+        status="warning"
+        size="sm"
+        variant="subtle"
+        width="full"
+        data-testid="daily-cap-advice"
+      >
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Description textStyle="xs">
+            About {advice.perDay.toLocaleString()} matches a day is over your
+            plan&apos;s daily automation limit of {advice.cap.toLocaleString()}.
+            Matches past the limit are skipped for the rest of the day. Narrow
+            the condition so it selects fewer traces.
+          </Alert.Description>
+        </Alert.Content>
+        <Button
+          asChild
+          size="xs"
+          variant="outline"
+          bg="bg"
+          flexShrink={0}
+          alignSelf="center"
+          data-testid="daily-cap-advice-upgrade"
+        >
+          <a href="/settings/plans">Upgrade Plan</a>
+        </Button>
+      </Alert.Root>
     </Box>
   );
 }

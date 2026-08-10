@@ -147,6 +147,7 @@ import {
   MetricSeriesCatalogAppendStore,
   MetricTimeRollupAppendStore,
 } from "./pipelines/metric-processing/projections/stores";
+import { createProcessManagerMaintenancePipeline } from "./pipelines/process-manager-maintenance/pipeline";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
@@ -454,6 +455,27 @@ export class PipelineRegistry {
           sweep: () => blobSweeper.sweep(),
           deleteDispatchedBefore: (params) =>
             this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
+    // Retention for the process-manager substrate's own tables. Registered
+    // unconditionally and independently of any domain: it reaps by predicate
+    // across every processName, so no process manager has to opt in and none
+    // added later can be forgotten.
+    this.deps.eventSourcing.register(
+      createProcessManagerMaintenancePipeline({
+        retentionSweep: {
+          deleteDispatchedOutboxBatch: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedOutboxBatch(
+              params,
+            ),
+          deleteDeadOutboxBatch: (params) =>
+            this.deps.repositories.processStore.deleteDeadOutboxBatch(params),
+          deleteConsumedInboxBatch: (params) =>
+            this.deps.repositories.processStore.deleteConsumedInboxBatch(
+              params,
+            ),
         },
       }),
     );

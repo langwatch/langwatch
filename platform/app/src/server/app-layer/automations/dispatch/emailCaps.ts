@@ -20,8 +20,8 @@ const logger = createLogger("langwatch:outbox:emailHourlyCap");
  *   claim: cap-claimed:{dedupKey}      SET ... NX EX 2h
  *          won → INCR the counter; lost (retry) → GET the counter, no INCR
  *   key:   trigger-email-cap:{projectId}:{triggerId}:{floor(now / 1h)}
- *          INCR + EXPIRE 2h NX (set TTL only when absent, so it never slides
- *          but a transient first-hit failure can't leak an immortal key)
+ *          INCR + a 2h TTL applied only while the key has none, so it never
+ *          slides but a transient first-hit failure can't leak an immortal key
  *   allowed = count <= cap
  *
  * The fixed window's worst case (up to 2× burst across an hour boundary) is
@@ -81,6 +81,32 @@ const tenantClaimStore = new Map<string, number>();
  * a long-lived dev process with many (projectId, triggerId, hourBucket)
  * keys doesn't leak unbounded. Production uses Redis and never reaches here.
  */
+/**
+ * Applies the window TTL only while the key has none, so an existing window
+ * never slides and a transient first-hit EXPIRE failure is re-attempted by
+ * every later hit instead of leaking an immortal key. This is EXPIRE's NX
+ * option spelled out as a TTL guard, because the option itself needs Redis 7
+ * and self-hosted installs still run Redis 6.
+ *
+ * The read and the write go in one script so they cannot be interleaved: as
+ * two round trips, a caller that stalls between them re-applies the full
+ * duration on top of a window another caller already started, sliding it by
+ * however long the stall lasted. One key, so no Redis Cluster slot to share.
+ */
+const EXPIRE_IF_UNSET_SCRIPT = `
+if redis.call('TTL', KEYS[1]) < 0 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+`;
+
+async function expireIfUnset(
+  redis: NonNullable<typeof connection>,
+  key: string,
+  seconds: number,
+): Promise<void> {
+  await redis.eval(EXPIRE_IF_UNSET_SCRIPT, 1, key, String(seconds));
+}
+
 const MEMORY_GC_THRESHOLD = 1000;
 function sweepExpiredMemoryEntries(now: number): void {
   if (memoryStore.size >= MEMORY_GC_THRESHOLD) {
@@ -148,10 +174,7 @@ export async function consumeEmailCapSlot({
         return { allowed: count <= cap, count };
       }
       const count = await connection.incr(key);
-      // Always set TTL with NX semantics (only when no TTL exists yet) so a
-      // transient first-hit EXPIRE failure can't leave an immortal key — every
-      // subsequent hit re-attempts it without sliding an existing window.
-      await connection.expire(key, EXPIRE_SECONDS, "NX");
+      await expireIfUnset(connection, key, EXPIRE_SECONDS);
       return { allowed: count <= cap, count };
     } catch (error) {
       // A Redis blip must not let the cap silently fail open. The dispatcher
@@ -272,10 +295,7 @@ export async function consumeTenantEmailCapSlot({
         return { allowed: count <= cap, count };
       }
       const count = await connection.incrby(key, recipientCount);
-      // Always set TTL with NX semantics (only when no TTL exists yet) so a
-      // transient first-hit EXPIRE failure can't leave an immortal key — every
-      // subsequent hit re-attempts it without sliding an existing window.
-      await connection.expire(key, TENANT_EXPIRE_SECONDS, "NX");
+      await expireIfUnset(connection, key, TENANT_EXPIRE_SECONDS);
       return { allowed: count <= cap, count };
     } catch (error) {
       // A Redis blip must not let the cap fail open (the dispatcher would treat
