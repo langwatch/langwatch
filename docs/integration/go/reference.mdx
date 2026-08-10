@@ -176,7 +176,7 @@ The `LangWatchSpan` interface embeds the standard `trace.Span` and adds several 
   
   request := ChatRequest{
       Messages: []Message{{Role: "user", Content: "Hello"}},
-      Model: "gpt-4o-mini",
+      Model: "gpt-5-mini",
       Temperature: 0.7,
   }
   span.RecordInput(request)
@@ -207,7 +207,7 @@ The `LangWatchSpan` interface embeds the standard `trace.Span` and adds several 
   response := ChatResponse{
       Content: "The capital of France is Paris.",
       Tokens: 8,
-      Model: "gpt-4o-mini",
+      Model: "gpt-5-mini",
   }
   span.RecordOutput(response)
   ```
@@ -218,8 +218,8 @@ The `LangWatchSpan` interface embeds the standard `trace.Span` and adds several 
   
   **Example:**
   ```go
-  span.SetRequestModel("gpt-4o-mini")
-  span.SetRequestModel("claude-3-sonnet")
+  span.SetRequestModel("gpt-5-mini")
+  span.SetRequestModel("claude-sonnet-5")
   span.SetRequestModel("llama-3.1-8b")
   ```
 </ParamField>
@@ -661,7 +661,7 @@ func generateResponse(ctx context.Context, client *openai.Client, query string, 
 	defer span.End()
 
 	span.SetType(langwatch.SpanTypeLLM)
-	span.SetRequestModel("gpt-4o-mini")
+	span.SetRequestModel("gpt-5-mini")
 
 	// Prepare context for LLM
 	ragContext := "Context:\n" + documents[0] + "\n" + documents[1]

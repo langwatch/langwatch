@@ -92,7 +92,7 @@ graph LR
 | Tag | Description |
 |-----|-------------|
 | `latest` | Latest stable release |
-| `x.y.z` (e.g. `3.0.0`) | Specific version (recommended for production) |
+| `x.y.z` | A specific release, recommended for production — pick one from [Releases](https://github.com/langwatch/langwatch/releases) |
 | `local` | Built locally via `make images` (development only) |
 
 <Tip>
@@ -104,35 +104,31 @@ Pin to a specific version tag in production to prevent unexpected changes during
 For air-gapped or private environments, mirror the images to your own registry:
 
 ```bash
-# Pull from Docker Hub
-docker pull langwatch/langwatch:3.0.0
-docker pull langwatch/langwatch_nlp:3.0.0
-docker pull langwatch/langevals:3.0.0
+# The release you are mirroring. Every tag below follows it, so set it once.
+# Pick the version from https://github.com/langwatch/langwatch/releases
+VERSION=3.12.0
+REGISTRY=registry.example.com
 
-# Tag for your registry
-docker tag langwatch/langwatch:3.0.0 registry.example.com/langwatch/langwatch:3.0.0
-docker tag langwatch/langwatch_nlp:3.0.0 registry.example.com/langwatch/langwatch_nlp:3.0.0
-docker tag langwatch/langevals:3.0.0 registry.example.com/langwatch/langevals:3.0.0
-
-# Push
-docker push registry.example.com/langwatch/langwatch:3.0.0
-docker push registry.example.com/langwatch/langwatch_nlp:3.0.0
-docker push registry.example.com/langwatch/langevals:3.0.0
+for image in langwatch langwatch_nlp langevals; do
+  docker pull "langwatch/$image:$VERSION"
+  docker tag "langwatch/$image:$VERSION" "$REGISTRY/langwatch/$image:$VERSION"
+  docker push "$REGISTRY/langwatch/$image:$VERSION"
+done
 ```
 
-Then configure the Helm chart:
+Then configure the Helm chart, giving every tag the version you mirrored:
 
 ```yaml
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.0.0"
+    tag: "3.12.0"
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.0.0"
+    tag: "3.12.0"
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.0.0"
+    tag: "3.12.0"
 
 imagePullSecrets:
   - name: registry-credentials
