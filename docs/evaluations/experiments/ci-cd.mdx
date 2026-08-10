@@ -285,8 +285,8 @@ experiment = langwatch.experiment.init("model-comparison-ci")
 
 for idx, row in experiment.loop(dataset.iterrows()):
     def compare(idx, row):
-        # Test GPT-4
-        with experiment.target("gpt-5-mini", {"model": "gpt-5-mini", "temperature": 0.7}):
+        # Test the OpenAI model
+        with experiment.target("gpt-5-mini", {"model": "gpt-5-mini"}):
             response = call_openai("gpt-5-mini", row["input"])
             experiment.log_response(response)
             experiment.evaluate("ragas/faithfulness", index=idx, data={
@@ -295,9 +295,9 @@ for idx, row in experiment.loop(dataset.iterrows()):
                 "contexts": row["contexts"],
             })
 
-        # Test Claude
+        # Test the Anthropic model
         with experiment.target("claude-sonnet-5", {"model": "claude-sonnet-5"}):
-            response = call_anthropic(row["input"])
+            response = call_anthropic("claude-sonnet-5", row["input"])
             experiment.log_response(response)
             experiment.evaluate("ragas/faithfulness", index=idx, data={
                 "input": row["input"],
