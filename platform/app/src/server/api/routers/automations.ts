@@ -18,6 +18,7 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { DAILY_CAP_STATUS_MAX_TRIGGERS } from "~/features/automations/logic/dailyCapAdvice";
 import { getApp } from "~/server/app-layer/app";
 import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
 import { listSlackChannels } from "~/server/app-layer/automations/delivery/slackWebApi";
@@ -314,7 +315,7 @@ export const automationRouter = createTRPCRouter({
       const project = await getApp().projects.getById(input.projectId);
 
       if (!project) {
-        throw new Error(`Project with id ${input.projectId} not found`);
+        throw toTemplateTRPCError(new ProjectNotFoundError(input.projectId));
       }
 
       if (input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE) {
@@ -478,7 +479,7 @@ export const automationRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        triggerIds: z.array(z.string()).max(500),
+        triggerIds: z.array(z.string()).max(DAILY_CAP_STATUS_MAX_TRIGGERS),
       }),
     )
     .use(checkProjectPermission("triggers:view"))

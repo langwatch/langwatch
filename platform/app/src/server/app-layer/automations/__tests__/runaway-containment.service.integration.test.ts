@@ -55,6 +55,9 @@ describe("Feature: runaway automation containment", () => {
   /** Set to make `pauseTrigger` throw, standing in for a Prisma timeout. */
   let pauseFails = false;
   let pauseAttempts = 0;
+  /** Set to make the limit mail throw, standing in for an SMTP refusal. */
+  let mailFails = false;
+  let mailAttempts = 0;
 
   const projectId = () => project!.id;
 
@@ -73,6 +76,8 @@ describe("Feature: runaway automation containment", () => {
       },
       notificationRecipients: async () => ["admin@example.com"],
       sendLimitEmail: async ({ kind, skippedToday }) => {
+        mailAttempts++;
+        if (mailFails) throw new Error("smtp refused the connection");
         sentEmails.push({ kind, skippedToday });
       },
       // A real SET-NX has the same shape: true only for the first claimant.
@@ -80,6 +85,9 @@ describe("Feature: runaway automation containment", () => {
         if (claimed.has(key)) return false;
         claimed.add(key);
         return true;
+      },
+      releaseClaim: async (key) => {
+        claimed.delete(key);
       },
       projectName: async () => "Test project",
       automationUrl: async () => "https://app.example.test/automations",
@@ -170,6 +178,8 @@ describe("Feature: runaway automation containment", () => {
     claimed = new Set();
     pauseFails = false;
     pauseAttempts = 0;
+    mailFails = false;
+    mailAttempts = 0;
     vi.clearAllMocks();
   });
 
@@ -231,6 +241,35 @@ describe("Feature: runaway automation containment", () => {
 
       expect(sentEmails).toHaveLength(1);
       expect(sentEmails[0]).toMatchObject({ kind: "ceiling_reached" });
+    });
+
+    /** @scenario "A limit email that could not be sent is tried again" */
+    it("does not spend the day's one email on a send that failed", async () => {
+      const row = await storeTrigger();
+      const sharedDeps = deps();
+      const checkClaim = `automation-containment-check:${row.id}`;
+
+      mailFails = true;
+      await handlePersistCapBreach(sharedDeps, breach(summary(row), 101));
+      expect(sentEmails).toHaveLength(0);
+      expect(mailAttempts).toBe(1);
+
+      // The day-long claim is what makes the mail once-only, so holding it
+      // through a failed send would cost the customer the single message that
+      // explains why their automation stopped producing records.
+      claimed.delete(checkClaim);
+      mailFails = false;
+      await handlePersistCapBreach(sharedDeps, breach(summary(row), 102));
+
+      expect(sentEmails.map((email) => email.kind)).toEqual([
+        "ceiling_reached",
+      ]);
+
+      // And once it has landed, the claim holds again for the rest of the day.
+      claimed.delete(checkClaim);
+      await handlePersistCapBreach(sharedDeps, breach(summary(row), 103));
+
+      expect(sentEmails).toHaveLength(1);
     });
 
     /** @scenario "A breach storm measures the project's traffic once per window" */

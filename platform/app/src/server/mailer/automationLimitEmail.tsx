@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import {
   Button,
   Container,
@@ -8,6 +9,8 @@ import {
 } from "@react-email/components";
 import { render } from "@react-email/render";
 import { sendEmail } from "./emailSender";
+
+const logger = createLogger("langwatch:mailer:automationLimitEmail");
 
 export type AutomationLimitKind = "ceiling_reached" | "paused";
 
@@ -154,7 +157,7 @@ export const sendAutomationLimitEmail = async ({
   ...props
 }: AutomationLimitEmailProps & { to: string[] }) => {
   const html = await renderAutomationLimitEmail(props);
-  await Promise.all(
+  const results = await Promise.allSettled(
     to.map((recipient) =>
       sendEmail({
         to: recipient,
@@ -162,5 +165,30 @@ export const sendAutomationLimitEmail = async ({
         html,
       }),
     ),
+  );
+
+  const failures = results.filter((result) => result.status === "rejected");
+  if (failures.length === 0) return;
+
+  // The sends are independent, so one unroutable admin address must not decide
+  // that the rest of the organization hears nothing. Only a batch where nothing
+  // landed is a failure worth reporting upward, because the caller answers that
+  // by trying again, and trying again would mail the admins who did receive it
+  // a second time.
+  const reasons = failures.map((failure) =>
+    failure.reason instanceof Error
+      ? failure.reason.message
+      : String(failure.reason),
+  );
+  if (failures.length === to.length) {
+    throw new Error(
+      `Could not send the automation limit email to any of its ${to.length} ` +
+        `recipients: ${reasons.join("; ")}`,
+    );
+  }
+
+  logger.warn(
+    { failed: failures.length, recipients: to.length, reasons },
+    "Some automation limit emails could not be sent",
   );
 };

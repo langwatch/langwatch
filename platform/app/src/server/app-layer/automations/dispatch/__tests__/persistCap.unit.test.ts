@@ -149,13 +149,29 @@ describe("given a project on a plan", () => {
 
   describe("when the plan cannot be resolved", () => {
     it("falls back to the paid ceiling rather than throttling to nothing", async () => {
-      // Fails OPEN on purpose: over-throttling silently drops customer work
-      // that looked configured to happen, which is worse than one account
-      // running at the paid ceiling until the cache turns over.
+      // The fallback is open against the free tier, which is the common case.
       planMock.resolveOrganizationId.mockRejectedValue(new Error("no org"));
 
       expect(await resolvePersistDailyCap(PROJECT_ID)).toBe(
         env.TRIGGER_PERSIST_DAILY_CAP_PAID,
+      );
+    });
+
+    /** @scenario "A ceiling that could not be resolved is not remembered" */
+    it("does not cache the fallback, so the next dispatch resolves the real ceiling", async () => {
+      // The same fallback is CLOSED against the enterprise tier, at a tenth of
+      // its allowance, and over-ceiling matches are dropped terminally. Caching
+      // it would turn one failed read into ten minutes of an enterprise account
+      // silently losing nine tenths of its automation output.
+      planMock.resolveOrganizationId.mockRejectedValueOnce(new Error("blip"));
+      expect(await resolvePersistDailyCap(PROJECT_ID)).toBe(
+        env.TRIGGER_PERSIST_DAILY_CAP_PAID,
+      );
+
+      plan({ type: "ENTERPRISE" });
+
+      expect(await resolvePersistDailyCap(PROJECT_ID)).toBe(
+        env.TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE,
       );
     });
   });

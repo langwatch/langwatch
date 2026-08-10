@@ -4,11 +4,15 @@ import { RUNAWAY_PAUSE_REASON } from "~/features/automations/logic/pauseReasons"
 import {
   incrementAutomationAutoPausedTotal,
   incrementAutomationCeilingBreachTotal,
+  incrementAutomationContainmentFailedTotal,
 } from "~/server/metrics";
 import { isMatchEverythingTrigger } from "./matchEverything";
 import type { TriggerSummary } from "./repositories/trigger.repository";
 
 const logger = createLogger("langwatch:automations:runaway-containment");
+
+/** Which limit mail a breach produces: the ceiling was hit, or it was paused. */
+type LimitEmailKind = "ceiling_reached" | "paused";
 
 export { RUNAWAY_PAUSE_REASON };
 
@@ -72,6 +76,8 @@ export interface RunawayContainmentDeps {
    * so a failed write is retried in a minute rather than tomorrow.
    */
   claimOnce: (key: string, ttlSeconds?: number) => Promise<boolean>;
+  /** Drops a claim taken by `claimOnce`, so a later attempt can retake it. */
+  releaseClaim: (key: string) => Promise<void>;
   projectName: (projectId: string) => Promise<string>;
   automationUrl: (params: {
     projectId: string;
@@ -152,21 +158,60 @@ export async function handlePersistCapBreach(
     }
 
     // Throttled, not broken: tell them once today and leave it running.
-    if (
-      !(await deps.claimOnce(`automation-cap-mail:${trigger.id}:${dayBucket}`))
-    ) {
-      return;
-    }
-    await notify(deps, breach, "ceiling_reached");
+    await notifyOncePerDay({
+      deps,
+      breach,
+      kind: "ceiling_reached",
+      claimKey: `automation-cap-mail:${trigger.id}:${dayBucket}`,
+    });
   } catch (error) {
-    logger.warn(
+    incrementAutomationContainmentFailedTotal();
+    // Loud on purpose, and louder than the breach above. A breach means an
+    // automation is busy; this means the thing that answers a breach did not
+    // run, so the automation may still be pausing-worthy and unpaused, or
+    // stopped with nobody told. The dispatch it was watching is unaffected
+    // either way, which is the one part of this that is not a problem.
+    logger.error(
       {
         projectId,
         triggerId: trigger.id,
         error: error instanceof Error ? error.message : String(error),
       },
-      "Runaway containment failed; the dispatch it was watching is unaffected",
+      "Runaway containment failed; the automation was not contained",
     );
+  }
+}
+
+/**
+ * Sends one mail per trigger per day, and does not let a failed send buy the
+ * silence.
+ *
+ * The claim carries the whole UTC day, so holding it through a send that threw
+ * costs the customer the single mail explaining why their automation stopped
+ * producing records. Releasing it puts the mail back in reach of the next
+ * breach, which is already rate-limited to one containment evaluation per
+ * minute, so a persistently failing mailer retries at that pace rather than
+ * spamming. Same reasoning as the pause claim below: a day-long claim may only
+ * be held once the thing it dedupes has actually happened.
+ */
+async function notifyOncePerDay({
+  deps,
+  breach,
+  kind,
+  claimKey,
+}: {
+  deps: RunawayContainmentDeps;
+  breach: PersistCapBreach;
+  kind: LimitEmailKind;
+  claimKey: string;
+}): Promise<void> {
+  if (!(await deps.claimOnce(claimKey))) return;
+
+  try {
+    await notify(deps, breach, kind);
+  } catch (error) {
+    await deps.releaseClaim(claimKey);
+    throw error;
   }
 }
 
@@ -243,18 +288,18 @@ async function pauseAndNotify({
   // The mail is claimed for the day, and only after the pause has actually
   // landed. A customer who switches it back on and runs it away again the same
   // day is paused again, quietly, rather than mailed twice.
-  if (
-    !(await deps.claimOnce(`automation-pause-mail:${trigger.id}:${dayBucket}`))
-  ) {
-    return;
-  }
-  await notify(deps, breach, "paused");
+  await notifyOncePerDay({
+    deps,
+    breach,
+    kind: "paused",
+    claimKey: `automation-pause-mail:${trigger.id}:${dayBucket}`,
+  });
 }
 
 async function notify(
   deps: RunawayContainmentDeps,
   breach: PersistCapBreach,
-  kind: "ceiling_reached" | "paused",
+  kind: LimitEmailKind,
 ): Promise<void> {
   const { trigger, projectId } = breach;
   const to = await deps.notificationRecipients({

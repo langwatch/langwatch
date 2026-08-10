@@ -5,7 +5,10 @@ import type {
   WakeHandler,
 } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import { toSafeFailureDiagnostic } from "~/server/event-sourcing/process-manager/failureDiagnostic";
-import { incrementProcessManagerRetentionSweptRows } from "~/server/metrics";
+import {
+  incrementProcessManagerRetentionFailures,
+  incrementProcessManagerRetentionSweptRows,
+} from "~/server/metrics";
 
 const logger = createLogger("langwatch:process-manager:retention-sweep");
 
@@ -283,6 +286,7 @@ async function sweepFamily(
     incrementProcessManagerRetentionSweptRows(plan.family, rows);
     return rows;
   } catch (error) {
+    incrementProcessManagerRetentionFailures(plan.family);
     logger.error(
       { ...toSafeFailureDiagnostic(error), family: plan.family },
       "Process-manager retention sweep failed for one family",

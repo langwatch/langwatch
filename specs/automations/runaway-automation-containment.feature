@@ -102,6 +102,17 @@ Feature: Runaway automations are contained without punishing the customer
       When its trigger's daily ceiling is resolved
       Then the contract allowance wins over the plan tier default
 
+    # The fallback ceiling is generous against the free tier and mean against
+    # the enterprise one, where it is a tenth of the real allowance and every
+    # match above it is dropped for good. Caching it would turn one failed read
+    # into a whole cache window of an enterprise account quietly losing most of
+    # its automation output.
+    @unit
+    Scenario: A ceiling that could not be resolved is not remembered
+      Given a project whose plan cannot be read
+      When its ceiling is resolved again after the plan becomes readable
+      Then the second resolution returns the plan's real ceiling
+
     @unit
     Scenario: The ceiling resets at the start of the next UTC day
       Given a trigger that used its whole ceiling yesterday
@@ -143,6 +154,19 @@ Feature: Runaway automations are contained without punishing the customer
       Then exactly one breach email is sent for that trigger that day
       And it tells the customer to narrow the condition or raise the plan
 
+    # The claim that makes the mail once-only carries the whole day, so taking
+    # it and then failing to send costs the customer the single message that
+    # explains why their automation stopped producing records. The claim is
+    # given back on a failed send, and the containment rate limit in front of it
+    # means a persistently broken mailer retries at one attempt per minute
+    # rather than storming.
+    @integration
+    Scenario: A limit email that could not be sent is tried again
+      Given a trigger over its ceiling whose limit email fails to send
+      When another match breaches after the evaluation window
+      Then the email is attempted again
+      And it is still sent only once for the day after it lands
+
     # Every skipped match lands in containment, and the pause decision costs a
     # ClickHouse distinct-count over 24h of project traffic. The storm is
     # absorbed by a short claim BEFORE that query: one evaluation per trigger
@@ -178,6 +202,23 @@ Feature: Runaway automations are contained without punishing the customer
       Given an org admin who unsubscribed from this project's automations
       When the limit email is addressed
       Then that admin is not among the recipients
+
+    # The recipients are independent sends, so one unroutable address must not
+    # decide that the rest of the organization hears nothing. Only a batch where
+    # nothing landed is worth reporting upward, because the caller answers that
+    # by trying again.
+    @unit
+    Scenario: One undeliverable admin does not silence the others
+      Given a limit email whose recipients include one bad address
+      When the mail is sent
+      Then the other recipients still receive it
+      And the send is not reported as failed
+
+    @unit
+    Scenario: A limit email nobody received is reported as failed
+      Given a limit email that no recipient could be delivered
+      When the mail is sent
+      Then the send is reported as failed
 
     @unit
     Scenario: An unreadable suppression list still lets the mail out

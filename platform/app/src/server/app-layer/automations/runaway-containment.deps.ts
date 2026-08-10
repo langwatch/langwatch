@@ -50,7 +50,7 @@ async function claimOnce(
     } catch (error) {
       logger.warn(
         { key, error: error instanceof Error ? error.message : String(error) },
-        "Redis error claiming an automation containment notification — " +
+        "Redis error claiming an automation containment notification, " +
           "falling back to a per-worker claim",
       );
     }
@@ -61,6 +61,30 @@ async function claimOnce(
   if (existing !== undefined && existing > now) return false;
   claimMemory.set(key, now + ttlSeconds * 1000);
   return true;
+}
+
+/**
+ * Gives a claim back. Used when the thing the claim was meant to dedupe did not
+ * happen, so the next attempt can retake it rather than waiting out a TTL that
+ * can be a whole day.
+ *
+ * Both stores are cleared, not one: a claim can land in Redis and the release
+ * can arrive while Redis is unreachable, and the memory map is where this
+ * worker would then look.
+ */
+async function releaseClaim(key: string): Promise<void> {
+  if (connection) {
+    try {
+      await connection.del(key);
+    } catch (error) {
+      logger.warn(
+        { key, error: error instanceof Error ? error.message : String(error) },
+        "Redis error releasing an automation containment claim, the fleet " +
+          "keeps it until it expires",
+      );
+    }
+  }
+  claimMemory.delete(key);
 }
 
 export function defaultRunawayContainmentDeps({
@@ -146,6 +170,7 @@ export function defaultRunawayContainmentDeps({
     sendLimitEmail: (params) => sendAutomationLimitEmail(params),
 
     claimOnce,
+    releaseClaim,
 
     projectName: async (projectId) =>
       (await projects.getById(projectId))?.name ?? "your project",

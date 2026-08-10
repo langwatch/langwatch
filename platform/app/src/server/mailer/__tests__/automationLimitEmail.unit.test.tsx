@@ -146,5 +146,38 @@ describe("automationLimitEmail", () => {
         expect(sendEmail).not.toHaveBeenCalled();
       });
     });
+
+    describe("when one recipient cannot be delivered to", () => {
+      /** @scenario "One undeliverable admin does not silence the others" */
+      it("keeps the batch rather than failing it", async () => {
+        // The sends are independent, and the caller answers a failure by
+        // trying the whole batch again, which would mail the admins who did
+        // receive it twice.
+        vi.mocked(sendEmail).mockRejectedValueOnce(new Error("bad mailbox"));
+
+        await expect(
+          sendAutomationLimitEmail({
+            ...pausedProps,
+            to: ["a@example.com", "b@example.com"],
+          }),
+        ).resolves.toBeUndefined();
+
+        expect(sendEmail).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    describe("when no recipient can be delivered to", () => {
+      /** @scenario "A limit email nobody received is reported as failed" */
+      it("fails so the caller can try again", async () => {
+        vi.mocked(sendEmail).mockRejectedValue(new Error("smtp refused"));
+
+        await expect(
+          sendAutomationLimitEmail({
+            ...pausedProps,
+            to: ["a@example.com", "b@example.com"],
+          }),
+        ).rejects.toThrow(/any of its 2 recipients/);
+      });
+    });
   });
 });

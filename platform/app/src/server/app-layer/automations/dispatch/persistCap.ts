@@ -40,11 +40,12 @@ const FREE_PLAN_TYPES = new Set<string>([PlanTypes.FREE, PlanTypes.LAUNCH]);
  * Resolution order: a per-contract allowance on the plan wins, then the plan
  * tier's env-configured default.
  *
- * Fails OPEN, unlike the visibility window next door. Over-throttling an
- * automation silently drops customer work that looked like it was configured
- * to happen, which is worse than letting an unresolvable account run at the
- * paid ceiling for the ten minutes it takes the cache to turn over. The
- * retention sweep and the overflow fix already bound what that costs us.
+ * An unresolvable plan falls back to the paid ceiling, which is open relative
+ * to the free tier and closed relative to the enterprise one. That is why the
+ * fallback is NEVER cached: a cached guess would hold an enterprise account at
+ * a tenth of its allowance for the whole cache window, dropping confirmed
+ * matches terminally, on the strength of one failed read. Uncached, the guess
+ * costs one dispatch and the next one resolves the real ceiling.
  */
 export async function resolvePersistDailyCap(
   projectId: string,
@@ -52,27 +53,33 @@ export async function resolvePersistDailyCap(
   const cached = await capCache.get(projectId);
   if (cached !== undefined) return cached;
 
-  let cap = env.TRIGGER_PERSIST_DAILY_CAP_PAID;
   try {
     const organizationId = await resolveOrganizationId(projectId);
-    if (organizationId) {
-      cap = capForPlan(
-        await getApp().planProvider.getActivePlan({ organizationId }),
+    if (!organizationId) {
+      logger.warn(
+        { projectId },
+        "No organization for this project's automation ceiling, using the " +
+          "paid-tier ceiling for this dispatch",
       );
+      return env.TRIGGER_PERSIST_DAILY_CAP_PAID;
     }
+
+    const cap = capForPlan(
+      await getApp().planProvider.getActivePlan({ organizationId }),
+    );
+    await capCache.set(projectId, cap);
+    return cap;
   } catch (error) {
     logger.warn(
       {
         projectId,
         error: error instanceof Error ? error.message : String(error),
       },
-      "Could not resolve the plan for this project's automation ceiling — " +
-        "falling back to the paid-tier ceiling",
+      "Could not resolve the plan for this project's automation ceiling, " +
+        "using the paid-tier ceiling for this dispatch",
     );
+    return env.TRIGGER_PERSIST_DAILY_CAP_PAID;
   }
-
-  await capCache.set(projectId, cap);
-  return cap;
 }
 
 /** A contract allowance wins; otherwise the plan's tier decides. */

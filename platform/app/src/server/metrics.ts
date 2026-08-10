@@ -837,6 +837,23 @@ export const incrementProcessManagerRetentionSweptRows = (
   if (rows > 0) processManagerRetentionSweptRows.labels(family).inc(rows);
 };
 
+register.removeSingleMetric("process_manager_retention_failures_total");
+const processManagerRetentionFailures = new Counter({
+  name: "process_manager_retention_failures_total",
+  help: "Retention sweep runs that failed for one family",
+  labelNames: ["family"] as const,
+});
+
+/**
+ * Without this, a family that fails every hour and a family with nothing to
+ * sweep look identical on the swept-rows counter: both report zero. Silent
+ * retention failure is the exact shape of the incident this sweep exists to
+ * prevent, so it gets its own signal.
+ */
+export const incrementProcessManagerRetentionFailures = (
+  family: "dispatched_outbox" | "dead_outbox" | "inbox",
+) => processManagerRetentionFailures.labels(family).inc();
+
 // --- Automation volume and containment ---
 //
 // The split these carry IS the policy. `automation_match_records_total` is OUR
@@ -888,6 +905,15 @@ const automationAutoPausedTotal = new Counter({
 export const incrementAutomationAutoPausedTotal = (
   reason: AutomationPauseReason,
 ) => automationAutoPausedTotal.labels(reason).inc();
+
+register.removeSingleMetric("automation_containment_failed_total");
+const automationContainmentFailedTotal = new Counter({
+  name: "automation_containment_failed_total",
+  help: "Breaches where containment could not pause the automation or tell the customer",
+});
+
+export const incrementAutomationContainmentFailedTotal = () =>
+  automationContainmentFailedTotal.inc();
 
 register.removeSingleMetric("es_process_outbox_total");
 const esProcessOutboxTotal = new Counter({

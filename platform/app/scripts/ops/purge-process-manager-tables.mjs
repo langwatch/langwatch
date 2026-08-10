@@ -138,17 +138,31 @@ async function countEligible(target) {
  */
 async function purge(target) {
   let total = 0;
-  for (let batch = 0; batch < MAX_BATCHES; batch++) {
-    const deleted = await target.deleteBatch();
-    total += deleted;
-    if (deleted === 0) return total;
-    if (batch % 10 === 0) console.log(`  ... ${total} rows deleted so far`);
-    await sleep(SLEEP_MS);
+  try {
+    for (let batch = 0; batch < MAX_BATCHES; batch++) {
+      const deleted = await target.deleteBatch();
+      total += deleted;
+      if (deleted === 0) return total;
+      if (batch % 10 === 0) console.log(`  ... ${total} rows deleted so far`);
+      await sleep(SLEEP_MS);
+    }
+  } catch (error) {
+    // Whether to re-run from here is the operator's call, and it needs the
+    // count. Letting the throw carry the progress away makes a partial run read
+    // as "nothing happened", which is the one thing it never means.
+    console.error(`  ERROR after ${total} rows deleted: ${describe(error)}`);
+    throw error;
   }
+
   console.warn(
     `  WARN: stopped at MAX_BATCHES=${MAX_BATCHES} with rows still eligible. Re-run to continue.`,
   );
   return total;
+}
+
+/** @param {unknown} error */
+function describe(error) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 async function main() {

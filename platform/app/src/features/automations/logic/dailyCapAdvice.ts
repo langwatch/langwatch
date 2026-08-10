@@ -1,6 +1,13 @@
 import { TriggerAction } from "@langwatch/automations/enums";
 
 /**
+ * Triggers one `getDailyCapStatus` call may ask about. Shared with the query's
+ * own input schema so the caller cannot ask for more than the server accepts:
+ * two numbers that have to agree, kept in one place.
+ */
+export const DAILY_CAP_STATUS_MAX_TRIGGERS = 500;
+
+/**
  * Actions that write one record per confirmed match, the only ones the plan's
  * daily automation ceiling governs. Notify actions are bounded by their digest
  * cadence and the email caps instead, so a busy notify automation is not over
