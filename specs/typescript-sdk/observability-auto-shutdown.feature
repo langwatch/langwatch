@@ -52,6 +52,12 @@ Feature: The observability SDK flushes on exit without terminating its host
       Then the failure is reported to the SDK logger
       And the SDK does not exit the process
 
+    @unit
+    Scenario: A second signal during the flush does not start a second shutdown
+      Given the application registered its own SIGTERM handler
+      When the process receives SIGTERM twice
+      Then the SDK flushes its pending telemetry once
+
   Rule: A program whose only shutdown listener is the SDK still stops
 
     @unit
@@ -83,12 +89,6 @@ Feature: The observability SDK flushes on exit without terminating its host
       Then the SDK flushes its pending telemetry
       And the SDK does not exit the process
       And the SDK does not re-raise any signal
-
-    @unit
-    Scenario: A second signal during the flush does not start a second shutdown
-      Given the application registered its own SIGTERM handler
-      When the process receives SIGTERM twice
-      Then the SDK flushes its pending telemetry once
 
   Rule: The host can opt out of the handlers, or opt in to being exited
 

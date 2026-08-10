@@ -190,10 +190,10 @@ const registerAutoShutdownHandlers = ({
           return;
         }
 
-        const otherListeners = process.listenerCount(signal);
-        if (otherListeners > 0) {
+        const otherListenerCount = process.listenerCount(signal);
+        if (otherListenerCount > 0) {
           logger.debug(
-            `${signal}: flush complete, leaving the process to the ${otherListeners} other listener(s)`,
+            `${signal}: flush complete, leaving the process to the ${otherListenerCount} other listener(s)`,
           );
           return;
         }
