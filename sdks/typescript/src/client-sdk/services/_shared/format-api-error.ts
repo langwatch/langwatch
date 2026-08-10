@@ -15,6 +15,8 @@
  *   5. `Error#message` if the input is a thrown Error
  *   6. A status-code-derived fallback, if available
  */
+import { isCodeAsMessage, sentenceForCode } from "./error-code-copy";
+
 const GENERIC_MESSAGES = new Set([
   "",
   // The bare class name some envelopes carry in their `error` field; as a
@@ -185,6 +187,14 @@ export function formatApiErrorMessage({
     // Without this they render as unreadable raw JSON to the user.
     const zod = formatZodIssues(body);
     if (zod) return zod;
+
+    // The handled-error envelope forwards the code as the message rather than
+    // the server's own prose (see `error-code-copy.ts`), so `message` here says
+    // nothing `code` did not. Rendering our own sentence for the code is the
+    // difference between "Enterprise plan required" and the slug itself.
+    if (isCodeAsMessage({ code: body.code, message: body.message })) {
+      return sentenceForCode(body.code as string);
+    }
 
     // Most specific fields first.
     const fromMessage = typeof body.message === "string" ? body.message : undefined;

@@ -66,7 +66,8 @@ Feature: Organization provisioning REST API for self-hosted deployments
   Scenario: Listing organizations requires the instance key
     Given two organizations exist on the deployment
     When I list organizations without the instance administrator credential
-    Then the request is refused with status 401
+    Then the request is refused with code missing_credentials and status 401
+    And presenting a credential that is not the instance's is refused with code invalid_credentials
     And listing them with the credential returns both
 
   @integration

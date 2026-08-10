@@ -217,13 +217,20 @@ describe("Feature: Organization provisioning REST API for self-hosted deployment
         await provision({ name: "List B", slug: `prov-list-b-${ns}` })
       ).json();
 
+      // Both refusals name a stable code rather than an HTTP phrase, and they
+      // are different codes on purpose: nothing presented is a configuration
+      // mistake the caller fixes from the message, a wrong value is a
+      // credential that is not this instance's. The code travels in `error`,
+      // which is where this family's envelope carries it.
       const unauthenticated = await app.request("/api/organizations");
       expect(unauthenticated.status).toBe(401);
+      expect((await unauthenticated.json()).error).toBe("missing_credentials");
 
       const wrongKey = await app.request("/api/organizations", {
         headers: { Authorization: `Bearer not-the-instance-key-${ns}` },
       });
       expect(wrongKey.status).toBe(401);
+      expect((await wrongKey.json()).error).toBe("invalid_credentials");
 
       const response = await app.request("/api/organizations", {
         headers: instanceHeaders(),

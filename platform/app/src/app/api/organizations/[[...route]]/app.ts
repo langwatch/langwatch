@@ -20,7 +20,7 @@
  */
 import { timingSafeEqual } from "node:crypto";
 import { auditLog } from "@ee/audit-log/auditLog";
-import { NotFoundError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import type { Context, Next } from "hono";
 import { describeRoute } from "hono-openapi";
@@ -50,6 +50,29 @@ function instanceAdminKey(): string | undefined {
   return key ? key : undefined;
 }
 
+/**
+ * The instance credential was absent or wrong.
+ *
+ * A handled error rather than a hand-rolled body, so `createServiceApp`'s
+ * error handler serialises it like every other refusal on the surface and the
+ * caller reads a stable `code` instead of an HTTP phrase. The two cases stay
+ * apart because they need different answers: nothing presented means "set
+ * LANGWATCH_INSTANCE_ADMIN_API_KEY, or pass --instance-key"; a wrong value
+ * means the credential itself is not the instance's.
+ */
+class InstanceAdminRefusedError extends HandledError {
+  constructor(code: "missing_credentials" | "invalid_credentials") {
+    super(
+      code,
+      code === "missing_credentials"
+        ? "This request carried no instance administrator credential"
+        : "That is not this instance's administrator credential",
+      { httpStatus: 401, fault: "customer" },
+    );
+    this.name = "InstanceAdminRefusedError";
+  }
+}
+
 function isAuthorized(
   authorizationHeader: string | undefined,
   expected: string,
@@ -73,14 +96,12 @@ export async function verifyInstanceAdminKey(c: Context, next: Next) {
   if (!configured) return c.notFound();
   if (getApp().config.isSaas) return c.notFound();
 
-  if (!isAuthorized(c.req.header("authorization"), configured)) {
-    return c.json(
-      {
-        error: "Unauthorized",
-        message: "Invalid instance administrator credential",
-      },
-      401,
-    );
+  const authorization = c.req.header("authorization");
+  if (!authorization?.startsWith("Bearer ")) {
+    throw new InstanceAdminRefusedError("missing_credentials");
+  }
+  if (!isAuthorized(authorization, configured)) {
+    throw new InstanceAdminRefusedError("invalid_credentials");
   }
   await next();
 }

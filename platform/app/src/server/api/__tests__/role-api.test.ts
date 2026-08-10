@@ -13,6 +13,7 @@ import {
 const mockPrisma = {
   customRole: {
     findMany: vi.fn(),
+    findFirst: vi.fn(),
     findUnique: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
@@ -298,6 +299,13 @@ describe("RoleService Tests", () => {
       // calls but keeps implementations, so a `mockResolvedValue` here would
       // still be in force for every test after this one.
       mockPrisma.$executeRaw.mockResolvedValueOnce(0);
+      // The role is re-read after the delete removed nothing: still there
+      // means a holder appeared, gone means somebody else deleted it.
+      mockPrisma.customRole.findFirst.mockResolvedValueOnce({
+        id: "role-1",
+        organizationId: "org-123",
+        kind: "custom",
+      });
       // Counted twice: once by the check before the delete, which has to pass
       // for the statement to run at all, and once after it removed nothing.
       mockPrisma.roleBinding.count
