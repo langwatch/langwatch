@@ -21749,7 +21749,7 @@ def add(a: int, b: int) -> int:
 
 
 # Model with tools
-model = init_chat_model("gpt-5-mini", temperature=0)
+model = init_chat_model("gpt-5-mini")
 tools = [add]
 tools_by_name = {t.name: t for t in tools}
 model_with_tools = model.bind_tools(tools)
@@ -39171,7 +39171,7 @@ import dspy
 lm = dspy.LM('openai/gpt-5-mini')
 colbertv2_wiki17_abstracts = dspy.ColBERTv2(url='http://20.102.90.50:2017/wiki17_abstracts')
 
-dspy.settings.configure(lm=lm, rm=colbertv2_wiki17_abstracts)
+dspy.configure(lm=lm, rm=colbertv2_wiki17_abstracts)
 
 from dspy.datasets import HotPotQA
 
@@ -41599,8 +41599,8 @@ experiment = langwatch.experiment.init("model-comparison-ci")
 
 for idx, row in experiment.loop(dataset.iterrows()):
     def compare(idx, row):
-        # Test GPT-4
-        with experiment.target("gpt-5-mini", {"model": "gpt-5-mini", "temperature": 0.7}):
+        # Test the OpenAI model
+        with experiment.target("gpt-5-mini", {"model": "gpt-5-mini"}):
             response = call_openai("gpt-5-mini", row["input"])
             experiment.log_response(response)
             experiment.evaluate("ragas/faithfulness", index=idx, data={
@@ -41609,9 +41609,9 @@ for idx, row in experiment.loop(dataset.iterrows()):
                 "contexts": row["contexts"],
             })
 
-        # Test Claude
+        # Test the Anthropic model
         with experiment.target("claude-sonnet-5", {"model": "claude-sonnet-5"}):
-            response = call_anthropic(row["input"])
+            response = call_anthropic("claude-sonnet-5", row["input"])
             experiment.log_response(response)
             experiment.evaluate("ragas/faithfulness", index=idx, data={
                 "input": row["input"],
@@ -43387,14 +43387,14 @@ For each target in your evaluation, the following columns are exported:
 | Column Pattern | Description | Example |
 |----------------|-------------|---------|
 | `{target}_model` | Model used for this target | `gpt-5-mini_model` → `openai/gpt-5-mini` |
-| `{target}_prompt_id` | Prompt configuration ID (for prompt targets) | `gpt-4_prompt_id` → `prompt-abc123` |
-| `{target}_prompt_version` | Prompt version number | `gpt-4_prompt_version` → `2` |
-| `{target}_{metadata_key}` | Custom metadata values | `gpt-4_temperature` → `0.7` |
-| `{target}_output` | Model output (or individual output fields) | `gpt-4_output` → `"The answer is 42"` |
-| `{target}_cost` | Execution cost in USD | `gpt-4_cost` → `0.0012` |
-| `{target}_duration_ms` | Execution time in milliseconds | `gpt-4_duration_ms` → `1250` |
-| `{target}_error` | Error message if execution failed | `gpt-4_error` → `"Rate limit exceeded"` |
-| `{target}_trace_id` | Trace ID for viewing execution details | `gpt-4_trace_id` → `trace_abc123` |
+| `{target}_prompt_id` | Prompt configuration ID (for prompt targets) | `gpt-5-mini_prompt_id` → `prompt-abc123` |
+| `{target}_prompt_version` | Prompt version number | `gpt-5-mini_prompt_version` → `2` |
+| `{target}_{metadata_key}` | Custom metadata values | `gpt-5-mini_seed` → `42` |
+| `{target}_output` | Model output (or individual output fields) | `gpt-5-mini_output` → `"The answer is 42"` |
+| `{target}_cost` | Execution cost in USD | `gpt-5-mini_cost` → `0.0012` |
+| `{target}_duration_ms` | Execution time in milliseconds | `gpt-5-mini_duration_ms` → `1250` |
+| `{target}_error` | Error message if execution failed | `gpt-5-mini_error` → `"Rate limit exceeded"` |
+| `{target}_trace_id` | Trace ID for viewing execution details | `gpt-5-mini_trace_id` → `trace_abc123` |
 
 #### Evaluator Columns (per target, per evaluator)
 
@@ -43402,12 +43402,12 @@ For each evaluator applied to a target:
 
 | Column Pattern | Description | Example |
 |----------------|-------------|---------|
-| `{target}_{evaluator}_score` | Numeric score (0-1) | `gpt-4_faithfulness_score` → `0.95` |
-| `{target}_{evaluator}_passed` | Boolean pass/fail | `gpt-4_faithfulness_passed` → `true` |
-| `{target}_{evaluator}_label` | Classification label | `gpt-4_sentiment_label` → `positive` |
-| `{target}_{evaluator}_details` | Additional details or explanation | `gpt-4_faithfulness_details` → `"All claims supported"` |
-| `{target}_{evaluator}_cost` | Cost of running the evaluator | `gpt-4_faithfulness_cost` → `0.0005` |
-| `{target}_{evaluator}_duration_ms` | Evaluator execution time | `gpt-4_faithfulness_duration_ms` → `850` |
+| `{target}_{evaluator}_score` | Numeric score (0-1) | `gpt-5-mini_faithfulness_score` → `0.95` |
+| `{target}_{evaluator}_passed` | Boolean pass/fail | `gpt-5-mini_faithfulness_passed` → `true` |
+| `{target}_{evaluator}_label` | Classification label | `gpt-5-mini_sentiment_label` → `positive` |
+| `{target}_{evaluator}_details` | Additional details or explanation | `gpt-5-mini_faithfulness_details` → `"All claims supported"` |
+| `{target}_{evaluator}_cost` | Cost of running the evaluator | `gpt-5-mini_faithfulness_cost` → `0.0005` |
+| `{target}_{evaluator}_duration_ms` | Evaluator execution time | `gpt-5-mini_faithfulness_duration_ms` → `850` |
 
 #### Comparison Columns (per comparison)
 
@@ -43437,10 +43437,10 @@ A row's candidates can be fewer than the comparison's full set of targets, becau
 
 ### Example CSV Output
 
-For an evaluation comparing GPT-4 and Claude with a faithfulness evaluator:
+For an evaluation comparing two targets, `gpt-5-mini` and `claude`, with a faithfulness evaluator:
 
 ```csv
-index,question,expected,gpt-4_model,gpt-4_output,gpt-4_cost,gpt-4_duration_ms,gpt-4_faithfulness_score,gpt-4_faithfulness_passed,claude_model,claude_output,claude_cost,claude_duration_ms,claude_faithfulness_score,claude_faithfulness_passed
+index,question,expected,gpt-5-mini_model,gpt-5-mini_output,gpt-5-mini_cost,gpt-5-mini_duration_ms,gpt-5-mini_faithfulness_score,gpt-5-mini_faithfulness_passed,claude_model,claude_output,claude_cost,claude_duration_ms,claude_faithfulness_score,claude_faithfulness_passed
 0,What is 2+2?,4,openai/gpt-5-mini,The answer is 4,0.0012,1250,0.95,true,anthropic/claude-sonnet-5,2+2 equals 4,0.0008,980,0.92,true
 1,Capital of France?,Paris,openai/gpt-5-mini,Paris is the capital of France,0.0015,1100,0.98,true,anthropic/claude-sonnet-5,The capital of France is Paris,0.0010,890,0.97,true
 ```
@@ -59751,7 +59751,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.5.0
+    targetRevision: 3.12.0
     helm:
       releaseName: langwatch
       values: |
@@ -59800,7 +59800,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.5.0
+      targetRevision: 3.12.0
       helm:
         releaseName: langwatch
         valueFiles:
@@ -63850,7 +63850,7 @@ helm repo update
 
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.0.0 \
+  --version 3.12.0 \
   -f values-production.yaml \
   --wait --timeout 10m
 ```
@@ -64182,7 +64182,7 @@ helm search repo langwatch/langwatch --versions
 # Install a specific chart version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.0.0 \
+  --version 3.12.0 \
   -f values-production.yaml
 ```
 

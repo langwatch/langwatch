@@ -67,6 +67,27 @@ Feature: Docs structure check
     When docscheck runs
     Then it raises no finding, because keeping that URL working is somebody else's job
 
+  # Mintlify's documented way to move a whole section carries the wildcard
+  # through to the destination, so the destination is a pattern rather than a
+  # page. Resolving it against the page list would fail a correct redirect.
+  @unit
+  Scenario: A redirect that carries its wildcard through to the destination is left alone
+    Given a redirect sends /old-section/:path* to /self-hosting/:path*
+    When docscheck runs
+    Then it raises no finding, because the destination is a pattern, not a page
+
+  @unit
+  Scenario: A protocol-relative redirect destination counts as off-site
+    Given a redirect destination begins with a double slash
+    When docscheck runs
+    Then it raises no finding, because the destination leaves the docs site
+
+  @unit
+  Scenario: An internal page whose slug begins with http is still checked
+    Given a redirect destination is an internal path starting with the letters http
+    When docscheck runs
+    Then it is still resolved against the pages, so a dead end is reported
+
   @unit
   Scenario: A release version the chart no longer ships is reported
     Given a page names a LangWatch image tag

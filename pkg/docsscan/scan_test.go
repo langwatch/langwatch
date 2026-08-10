@@ -112,6 +112,42 @@ func TestExternalRedirectIsLeftAlone(t *testing.T) {
 	})
 }
 
+// @scenario "A redirect that carries its wildcard through to the destination is left alone"
+func TestWildcardRedirectDestinationIsLeftAlone(t *testing.T) {
+	// Mintlify's documented way to move a whole section. The destination is a
+	// pattern, not a page, so resolving it against the page list would fail a
+	// correct redirect and send the author chasing a remedy that does not apply.
+	only(t, docsscan.Inputs{
+		NavPages:     []string{"self-hosting/overview"},
+		ContentPages: []string{"self-hosting/overview"},
+		Redirects: []docsscan.Redirect{
+			{Source: "/old-section/:path*", Destination: "/self-hosting/:path*"},
+		},
+	})
+}
+
+// @scenario "A protocol-relative redirect destination counts as off-site"
+func TestProtocolRelativeRedirectIsExternal(t *testing.T) {
+	only(t, docsscan.Inputs{
+		Redirects: []docsscan.Redirect{
+			{Source: "/blog", Destination: "//langwatch.ai/blog"},
+		},
+	})
+}
+
+// @scenario "An internal page whose slug begins with http is still checked"
+func TestInternalDestinationBeginningWithHttpIsStillChecked(t *testing.T) {
+	// A prefix test on "http" would exempt this from both redirect rules, so
+	// the checker would quietly stop covering it.
+	only(t, docsscan.Inputs{
+		NavPages:     []string{"guides/index"},
+		ContentPages: []string{"guides/index"},
+		Redirects: []docsscan.Redirect{
+			{Source: "/old", Destination: "/http-agents"},
+		},
+	}, docsscan.RedirectDeadEnd)
+}
+
 // @scenario "A release version the chart no longer ships is reported"
 func TestVersionDriftIsReported(t *testing.T) {
 	findings := only(t, docsscan.Inputs{
@@ -210,6 +246,34 @@ func TestFindVersionRefs(t *testing.T) {
 			name:     "finds every version in a file, in order",
 			contents: "intro\nVERSION=1.2.3\nmore\ntag: \"4.5.6\"\n",
 			want:     []string{"1.2.3", "4.5.6"},
+		},
+		{
+			name:     "finds a pinned chart release in a helm command",
+			contents: "helm upgrade langwatch langwatch/langwatch \\\n  --version 3.12.0 \\\n",
+			want:     []string{"3.12.0"},
+		},
+		{
+			name:     "finds the chart revision an ArgoCD Application tracks",
+			contents: "    chart: langwatch\n    targetRevision: 3.12.0\n",
+			want:     []string{"3.12.0"},
+		},
+		{
+			// `targetRevision: main` tracks a branch, not a release.
+			name:     "ignores a branch-tracking targetRevision",
+			contents: "    targetRevision: main\n",
+			want:     nil,
+		},
+		{
+			// clickhouse-serverless is versioned independently of the chart, so
+			// holding it to appVersion would fire on a correct reference.
+			name:     "ignores an independently versioned LangWatch image",
+			contents: "image: langwatch/clickhouse-serverless:0.2.0\n",
+			want:     nil,
+		},
+		{
+			name:     "still finds the three release-tracking images",
+			contents: "langwatch/langwatch:1.1.1 langwatch/langwatch_nlp:2.2.2 langwatch/langevals:3.3.3\n",
+			want:     []string{"1.1.1", "2.2.2", "3.3.3"},
 		},
 	}
 

@@ -13,6 +13,13 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
 
+# No job here writes anything. Declared explicitly rather than inherited,
+# because this workflow installs an npm dependency tree and runs it: if the
+# repository default is ever flipped to write, that would silently hand those
+# jobs a write token. go-ci.yaml and langwatch-app-ci.yml do the same.
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   # Supersede an outdated run on a PR branch, never on main: every commit
@@ -52,10 +59,18 @@ jobs:
               - 'pkg/docsscan/**'
               - 'tools/docscheck/**'
               - 'cmd/docscheck/**'
+              - 'go.mod'
+              - 'go.sum'
               # docscheck holds the release the docs name against the chart's
               # appVersion, so bumping the chart without touching the docs is
               # exactly the drift this job has to catch.
               - 'charts/langwatch/Chart.yaml'
+              # check_generated_files installs with --frozen-lockfile, and both
+              # composites below shape how these jobs run — detect-changes is
+              # the gate itself, so a change to it must re-run the gate.
+              - 'pnpm-lock.yaml'
+              - '.github/actions/setup-pnpm-node/**'
+              - '.github/actions/detect-changes/**'
 
   check_links:
     needs: changes
@@ -68,13 +83,30 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # The CLI refuses to run on Node >= 25 and on < 20.17, and this job would
+      # otherwise use whatever the runner image ships — so the next image bump
+      # would red every docs PR with nothing in the repo having changed. 24 is
+      # what .github/actions/setup-pnpm-node pins for the sibling job.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 24
+
       # `mint` is the CLI. `mintlify` is the same package at the same version,
       # and Mintlify's install docs say to remove it if both are present, so
-      # this pins the name that is going to keep existing. Pinned rather than
-      # `@latest`, because an unpinned CLI turns an upstream release into a
-      # surprise red build on an unrelated PR.
+      # this pins the name that is going to keep existing.
+      #
+      # --ignore-scripts because the dependency tree reaches puppeteer, whose
+      # postinstall downloads a Chrome build that none of validate, broken-links
+      # or a11y needs.
+      #
+      # The pin covers the CLI, not everything it runs: `mint validate` fetches
+      # the current Mintlify build client at run time (releases.mintlify.com,
+      # unpinned, no checksum), so an upstream client release can still change
+      # this step's behaviour, and an outage there fails it. Pinning the client
+      # is possible only through an undocumented hidden flag, so this accepts
+      # the exposure rather than depending on unsupported surface.
       - name: Install the Mintlify CLI
-        run: npm install -g mint@4.2.788
+        run: npm install -g --ignore-scripts mint@4.2.788
 
       # Strict mode: exits non-zero on warnings as well as errors, and
       # validates the OpenAPI documents docs.json references. Replaces a shell
@@ -95,8 +127,22 @@ jobs:
       # We ship 52 <Frame> images and a lot of generated tables; a11y regressions
       # are invisible in review. Non-blocking for now — it reports a baseline
       # nobody has triaged, and a gate nobody can pass gets deleted.
+      #
+      # Exit 1 means "issues found", which is the baseline we are choosing not
+      # to gate on. Anything else means the check did not run — CLI missing
+      # (127), OOM-killed (137), a crash — and that must not read as the same
+      # warning, or the day it stops checking looks identical to today.
       - name: Check accessibility
-        run: mint a11y || echo "::warning::mint a11y reported issues (not gating)"
+        run: |
+          set +e
+          mint a11y
+          code=$?
+          set -e
+          case "$code" in
+            0) ;;
+            1) echo "::warning::mint a11y reported issues (not gating)" ;;
+            *) echo "::error::mint a11y did not run (exit $code)"; exit 1 ;;
+          esac
 
   # Structural rules the Mintlify CLI does not have: a page that exists but is
   # in no navigation group is still served at its URL, so nothing upstream

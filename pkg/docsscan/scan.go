@@ -12,6 +12,7 @@ package docsscan
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
@@ -95,11 +96,23 @@ type Inputs struct {
 // check that cries wolf gets switched off.
 var versionPatterns = []*regexp.Regexp{
 	// A tagged LangWatch image: langwatch/langwatch_nlp:3.12.0
-	regexp.MustCompile(`langwatch/[a-z_]+:(\d+\.\d+\.\d+)`),
+	//
+	// The three names are listed rather than matched by a character class, so
+	// that `langwatch/clickhouse-serverless:0.2.0` stays out: it is versioned
+	// independently of the chart, and widening this to `[a-z0-9_-]+` — the
+	// obvious-looking change — makes the rule fire on it every run.
+	regexp.MustCompile(`langwatch/(?:langwatch|langwatch_nlp|langevals):(\d+\.\d+\.\d+)`),
 	// An image tag in a Helm values block, for example `tag: "3.12.0"`.
 	regexp.MustCompile(`^\s*tag:\s*"(\d+\.\d+\.\d+)"`),
 	// The shell variable the mirroring example sets: VERSION=3.12.0
 	regexp.MustCompile(`\bVERSION=(\d+\.\d+\.\d+)\b`),
+	// A pinned chart release: `helm upgrade langwatch langwatch/langwatch
+	// --version 3.12.0`. Without this the upgrade guides pinned a release nine
+	// minors old while the checker reported the site sound.
+	regexp.MustCompile(`--version\s+(\d+\.\d+\.\d+)\b`),
+	// The chart revision an ArgoCD Application tracks. Readers copy these
+	// manifests verbatim, so a stale one deploys a stale release.
+	regexp.MustCompile(`^\s*targetRevision:\s*"?(\d+\.\d+\.\d+)"?`),
 }
 
 // FindVersionRefs pulls every release version out of one page's contents.
@@ -238,7 +251,7 @@ func checkRedirects(in Inputs) []Finding {
 	for _, redirect := range in.Redirects {
 		where := redirect.Source + " -> " + redirect.Destination
 		// An off-site destination is somebody else's to keep working.
-		if strings.HasPrefix(redirect.Destination, "http") {
+		if isExternal(redirect.Destination) {
 			continue
 		}
 		if sources[redirect.Destination] {
@@ -250,8 +263,13 @@ func checkRedirects(in Inputs) []Finding {
 			})
 			continue
 		}
-		// A wildcard redirect's destination is a concrete page; the source
-		// pattern is what carries the :path* or :splat.
+		// Mintlify's documented way to move a whole section is to carry the
+		// wildcard through to the destination — `/old/:path*` → `/new/:path*`.
+		// The destination is then a pattern rather than a page, so resolving it
+		// against the page list would fail a redirect that is entirely correct.
+		if hasPathParameter(redirect.Destination) {
+			continue
+		}
 		if !content[strings.TrimPrefix(redirect.Destination, "/")] {
 			findings = append(findings, Finding{
 				Kind:    RedirectDeadEnd,
@@ -263,6 +281,26 @@ func checkRedirects(in Inputs) []Finding {
 	}
 
 	return findings
+}
+
+// isExternal reports whether a redirect destination leaves the docs site.
+//
+// This tests the scheme rather than a "http" prefix: a prefix test calls a
+// protocol-relative `//host/path` internal, and calls an internal page whose
+// slug happens to begin with those four letters external — which would quietly
+// exempt it from both redirect rules.
+func isExternal(destination string) bool {
+	if strings.HasPrefix(destination, "//") {
+		return true
+	}
+	parsed, err := url.Parse(destination)
+	return err == nil && parsed.Scheme != ""
+}
+
+// hasPathParameter reports whether a redirect path is a pattern rather than a
+// concrete page — `/old/:path*`, `/x/:slug`.
+func hasPathParameter(path string) bool {
+	return strings.Contains(path, "/:")
 }
 
 func checkVersions(in Inputs) []Finding {
