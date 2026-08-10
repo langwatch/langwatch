@@ -120,6 +120,22 @@ Feature: Staged automation authoring drawer
       When a trace is evaluated against it
       Then the automation does not match
 
+  Rule: Links to an automation survive a change of drawer
+
+    The REST `platformUrl` field and the automation emails name a drawer inside
+    the URL they hand out, and those URLs outlive the drawer they were written
+    for: they sit in inboxes and in whatever a caller stored from an API
+    response. A name that stops resolving turns every one of them into a dead
+    link. A name that resolves to the filter-only drawer is worse than dead in
+    the case that matters, because a limit email asks the customer to narrow a
+    condition and that drawer cannot edit a query at all.
+
+    @unit
+    Scenario: A link issued before the drawer changed still opens the automation
+      Given a link that names the drawer the API used to hand out
+      When the app resolves that name
+      Then it opens the automation authoring drawer
+
   Rule: Notifications configure templates; actions configure destinations
 
     Scenario: An email notification configures recipients and templates

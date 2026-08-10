@@ -80,42 +80,52 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * The predicates are the runbook's, one retention window wider than the
  * sweep's, so this only ever removes rows the sweep would also remove.
  *
- * @type {Array<{ name: string, count: string, delete: string }>}
+ * Every value is bound, never interpolated. `intEnv` above already rejects
+ * anything that is not a whole number, but a validated value spliced into SQL
+ * is still a shape that only stays safe while the validation two screens up
+ * keeps matching the splice, and the next override added here would not
+ * necessarily be an integer. Binding removes the question.
+ *
+ * @type {Array<{ name: string, countEligible: () => Promise<unknown>, deleteBatch: () => Promise<number> }>}
  */
 const TARGETS = [
   {
     name: "ProcessManagerOutbox (dispatched)",
-    count: `SELECT count(*)::bigint AS n FROM "ProcessManagerOutbox"
-            WHERE "status" = 'dispatched'
-              AND "dispatchedAt" < now() - interval '${RETENTION_DAYS} days'`,
-    delete: `WITH batch AS (
-               SELECT ctid FROM "ProcessManagerOutbox"
-               WHERE "status" = 'dispatched'
-                 AND "dispatchedAt" < now() - interval '${RETENTION_DAYS} days'
-               LIMIT ${BATCH_SIZE}
-             )
-             DELETE FROM "ProcessManagerOutbox" o USING batch WHERE o.ctid = batch.ctid`,
+    countEligible: () => prisma.$queryRaw`
+      SELECT count(*)::bigint AS n FROM "ProcessManagerOutbox"
+      WHERE "status" = 'dispatched'
+        AND "dispatchedAt" < now() - (${RETENTION_DAYS}::int * interval '1 day')`,
+    deleteBatch: () => prisma.$executeRaw`
+      WITH batch AS (
+        SELECT ctid FROM "ProcessManagerOutbox"
+        WHERE "status" = 'dispatched'
+          AND "dispatchedAt" < now() - (${RETENTION_DAYS}::int * interval '1 day')
+        LIMIT ${BATCH_SIZE}
+      )
+      DELETE FROM "ProcessManagerOutbox" o USING batch WHERE o.ctid = batch.ctid`,
   },
   {
     name: "ProcessManagerInbox (consumed)",
-    count: `SELECT count(*)::bigint AS n FROM "ProcessManagerInbox"
-            WHERE "consumedAt" < now() - interval '${RETENTION_DAYS} days'`,
-    delete: `WITH batch AS (
-               SELECT ctid FROM "ProcessManagerInbox"
-               WHERE "consumedAt" < now() - interval '${RETENTION_DAYS} days'
-               LIMIT ${BATCH_SIZE}
-             )
-             DELETE FROM "ProcessManagerInbox" i USING batch WHERE i.ctid = batch.ctid`,
+    countEligible: () => prisma.$queryRaw`
+      SELECT count(*)::bigint AS n FROM "ProcessManagerInbox"
+      WHERE "consumedAt" < now() - (${RETENTION_DAYS}::int * interval '1 day')`,
+    deleteBatch: () => prisma.$executeRaw`
+      WITH batch AS (
+        SELECT ctid FROM "ProcessManagerInbox"
+        WHERE "consumedAt" < now() - (${RETENTION_DAYS}::int * interval '1 day')
+        LIMIT ${BATCH_SIZE}
+      )
+      DELETE FROM "ProcessManagerInbox" i USING batch WHERE i.ctid = batch.ctid`,
   },
 ];
 
 /**
- * @param {string} sql
+ * @param {(typeof TARGETS)[number]} target
  * @returns {Promise<number>}
  */
-async function countEligible(sql) {
+async function countEligible(target) {
   const rows = /** @type {Array<{ n: unknown }>} */ (
-    await prisma.$queryRawUnsafe(sql)
+    await target.countEligible()
   );
   return Number(rows[0]?.n ?? 0);
 }
@@ -123,13 +133,13 @@ async function countEligible(sql) {
 /**
  * Deletes one target in batches until it runs dry or the batch ceiling hits.
  *
- * @param {{ name: string, count: string, delete: string }} target
+ * @param {(typeof TARGETS)[number]} target
  * @returns {Promise<number>}
  */
 async function purge(target) {
   let total = 0;
   for (let batch = 0; batch < MAX_BATCHES; batch++) {
-    const deleted = await prisma.$executeRawUnsafe(target.delete);
+    const deleted = await target.deleteBatch();
     total += deleted;
     if (deleted === 0) return total;
     if (batch % 10 === 0) console.log(`  ... ${total} rows deleted so far`);
@@ -148,7 +158,7 @@ async function main() {
   );
 
   for (const target of TARGETS) {
-    const eligible = await countEligible(target.count);
+    const eligible = await countEligible(target);
     console.log(`${target.name}: ${eligible} eligible rows`);
     if (!APPLY) continue;
     const deleted = await purge(target);
@@ -165,6 +175,9 @@ async function main() {
   // ACCESS EXCLUSIVE lock on tables the automations pipeline writes to
   // continuously, so it is never the right trade here.
   console.log("vacuuming (this does not shrink the files, by design) ...");
+  // The one statement that cannot be bound: Postgres takes no parameter in an
+  // identifier position, and VACUUM takes no parameters at all. Both names are
+  // literals in this line, so nothing outside this file reaches the string.
   for (const table of ["ProcessManagerOutbox", "ProcessManagerInbox"]) {
     await prisma.$executeRawUnsafe(`VACUUM (ANALYZE) "${table}"`);
   }
