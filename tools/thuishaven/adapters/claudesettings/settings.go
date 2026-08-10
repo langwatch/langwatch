@@ -12,9 +12,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/atomicfile"
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // Settings is the filesystem-backed implementation of app.ClaudeSettings.
@@ -156,13 +156,18 @@ func findGateHook(entry any) map[string]any {
 // checkout can live under a directory with a space) followed by the subcommand,
 // so the test is: last word is the subcommand, and the first word names a file
 // called haven.
+//
+// The split has to be shell-aware for the same reason the path is quoted in the
+// first place. Splitting on whitespace would read `'/src/my worktree/haven'
+// gate` as four words starting with `'/src`, decide the hook is a stranger's,
+// and append a second gate — so every checkout with a space in its path would
+// collect another hook on every `haven setup` and gate each tool call twice.
 func isHavenGate(command string) bool {
-	fields := strings.Fields(command)
-	if len(fields) < 2 || fields[len(fields)-1] != gateSubcommand {
+	words := domain.ShellWords(command)
+	if len(words) < 2 || words[len(words)-1] != gateSubcommand {
 		return false
 	}
-	executable := strings.Trim(fields[0], `'"`)
-	return filepath.Base(executable) == havenBinary
+	return filepath.Base(words[0]) == havenBinary
 }
 
 const (

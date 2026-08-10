@@ -370,6 +370,14 @@ Feature: haven answers an agent's tool call before it runs
     Because writing our own idea of its contents would delete the developer's settings
 
   @unit
+  Scenario: A gate installed from a path with a space is still recognised as haven's own
+    Given a checkout whose directory name contains a space
+    When the gate hook is installed a second time
+    Then nothing is written, because the first one is found
+    Because a quoted path read back as separate words looks like a stranger's hook,
+    And every setup would leave another gate behind to run on every tool call
+
+  @unit
   Scenario: An unrelated hook whose command merely contains the word is not mistaken for the gate
     Given an existing hook whose command contains the word gateway
     When the gate hook is installed

@@ -155,6 +155,44 @@ func TestWrapCommandKeepsTheWholeShellLineInsideTheSlot(t *testing.T) {
 	})
 }
 
+func TestShellWordsReadsBackWhatShellQuoteWrote(t *testing.T) {
+	t.Run("given the values haven quotes into commands it writes", func(t *testing.T) {
+		for _, value := range []string{
+			"/opt/homebrew/bin/haven",
+			"/src/my worktree/haven",
+			`/src/it's mine/haven`,
+			"pnpm test:unit && echo done",
+			"",
+		} {
+			t.Run("when "+value+" is quoted and read back", func(t *testing.T) {
+				words := ShellWords(ShellQuote(value))
+
+				t.Run("it comes back as exactly one word, unchanged", func(t *testing.T) {
+					if len(words) != 1 || words[0] != value {
+						t.Fatalf("quoting is only safe if it survives the round trip: %q -> %q", value, words)
+					}
+				})
+			})
+		}
+	})
+
+	t.Run("given a command mixing quoted and bare words", func(t *testing.T) {
+		words := ShellWords(`'/src/my worktree/haven' gate --sh "echo hi"`)
+
+		t.Run("each word is one word, whatever quoted it", func(t *testing.T) {
+			want := []string{"/src/my worktree/haven", "gate", "--sh", "echo hi"}
+			if len(words) != len(want) {
+				t.Fatalf("expected %d words, got %q", len(want), words)
+			}
+			for i, w := range want {
+				if words[i] != w {
+					t.Fatalf("word %d: expected %q, got %q", i, w, words[i])
+				}
+			}
+		})
+	})
+}
+
 // @scenario "The rewrap carries the decision it was given"
 func TestWrapCommandCarriesTheDecision(t *testing.T) {
 	t.Run("given a sub-agent's narrowed run", func(t *testing.T) {

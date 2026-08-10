@@ -3,6 +3,7 @@ package domain
 import (
 	"fmt"
 	"strings"
+	"unicode"
 )
 
 // The gate's pure half: deciding what a command is, and what to say about it.
@@ -125,6 +126,96 @@ func WrapCommand(havenPath, command string, opts WrapOptions) string {
 // ShellQuote single-quotes s for safe interpolation, escaping embedded quotes.
 func ShellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
+}
+
+// ShellWords splits a command the way a shell would, undoing the quoting
+// ShellQuote applies. It exists because a command we WROTE has to be read back:
+// the gate hook records haven's own absolute path, quoted, and recognising it
+// later by splitting on whitespace would tear a path with a space in it into
+// several words and fail to recognise haven's own handiwork.
+//
+// It is a reader for our own output, not a shell: expansion, substitution and
+// operators are all deliberately absent, since nothing here needs to know what
+// `$HOME` or `&&` mean — only where one word ends and the next begins.
+func ShellWords(command string) []string {
+	s := &shellScanner{}
+	for _, r := range command {
+		s.next(r)
+	}
+	s.flush()
+	return s.words
+}
+
+// shellScanner is ShellWords' state. A type rather than locals in a loop so each
+// state gets its own named method instead of one switch nested inside another.
+type shellScanner struct {
+	words   []string
+	word    strings.Builder
+	inWord  bool
+	quote   rune
+	escaped bool
+}
+
+func (s *shellScanner) next(r rune) {
+	switch {
+	case s.escaped:
+		s.word.WriteRune(r)
+		s.escaped = false
+	case s.quote != 0:
+		s.quoted(r)
+	default:
+		s.bare(r)
+	}
+}
+
+// quoted consumes a rune inside quotes. Single quotes take everything
+// literally; double quotes honour a backslash, which is what makes ShellQuote's
+// own '"'"' escape read back as one apostrophe.
+func (s *shellScanner) quoted(r rune) {
+	if s.quote == '\'' {
+		if r == '\'' {
+			s.quote = 0
+			return
+		}
+		s.word.WriteRune(r)
+		return
+	}
+	switch r {
+	case '"':
+		s.quote = 0
+	case '\\':
+		s.escaped = true
+	default:
+		s.word.WriteRune(r)
+	}
+}
+
+func (s *shellScanner) bare(r rune) {
+	switch {
+	case r == '\'' || r == '"':
+		s.quote = r
+		s.inWord = true
+	case r == '\\':
+		s.escaped = true
+		s.inWord = true
+	case unicode.IsSpace(r):
+		s.flush()
+	default:
+		s.word.WriteRune(r)
+		s.inWord = true
+	}
+}
+
+// flush ends the current word. An opened quote counts as a word even before any
+// character lands in it, so a pair of quotes with nothing between them is an
+// empty argument rather than nothing at all.
+func (s *shellScanner) flush() {
+	if !s.inWord {
+		return
+	}
+	s.words = append(s.words, s.word.String())
+	s.word.Reset()
+	s.inWord = false
 }
 
 // RefusalReason is what the model reads when the gate says no. It is the only

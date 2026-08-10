@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 func settingsPath(root string) string {
@@ -230,6 +232,37 @@ func TestEnsureHookMatchesTheGateAndNotMerelyTheWord(t *testing.T) {
 				// developer's siblings with it.
 				if !strings.Contains(written, "notify-me") {
 					t.Fatalf("a sibling hook was deleted: %s", written)
+				}
+			})
+		})
+	})
+}
+
+// @scenario "A gate installed from a path with a space is still recognised as haven's own"
+func TestEnsureHookRecognisesItsOwnQuotedPath(t *testing.T) {
+	t.Run("given a gate installed from a worktree whose name has a space in it", func(t *testing.T) {
+		root := t.TempDir()
+		command := domain.ShellQuote("/src/my worktree/haven") + " gate"
+
+		if _, err := New().EnsureHook(root, command); err != nil {
+			t.Fatal(err)
+		}
+
+		t.Run("when setup runs again", func(t *testing.T) {
+			isInstalled, err := New().EnsureHook(root, command)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			t.Run("haven recognises its own handiwork and writes nothing", func(t *testing.T) {
+				// Split on whitespace this reads as `'/src`, and haven decides the
+				// hook belongs to a stranger — so every checkout with a space in its
+				// path collects one more gate per setup, each gating every call.
+				if isInstalled {
+					t.Fatal("the gate was not recognised, so a duplicate was installed")
+				}
+				if got := len(preToolUse(t, readSettings(t, root))); got != 1 {
+					t.Fatalf("expected the one entry it wrote, got %d", got)
 				}
 			})
 		})
