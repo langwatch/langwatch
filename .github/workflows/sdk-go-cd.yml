@@ -7,7 +7,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  # write, because the release fans the version out to the sibling module tags
+  # (see "Tag the sibling modules"). Nothing else here needs it.
+  contents: write
 
 jobs:
   publish:
@@ -33,6 +35,41 @@ jobs:
         env:
           GOWORK: off
         run: go test -v ./...
+
+      - name: Tag the sibling modules
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        # sdks/go is the only release-please component, but the SDK is twelve Go
+        # modules. Each one is resolved by the proxy from its OWN <subdir>/vX.Y.Z
+        # tag, so releasing the core alone leaves `go get
+        # .../instrumentation/openai` — which the README tells people to run —
+        # unresolvable. Every sibling requires the core at the released version,
+        # so they are tagged in lockstep off the same commit.
+        #
+        # examples and e2e are excluded: they are in-repo fixtures that always
+        # build through their replace directives, and tagging them would publish
+        # them on pkg.go.dev as if they were something to depend on.
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#sdks/go/}"
+          sha="${GITHUB_SHA}"
+          find sdks/go -name go.mod \
+            -not -path 'sdks/go/go.mod' \
+            -not -path 'sdks/go/examples/*' \
+            -not -path 'sdks/go/e2e/*' -print0 |
+            while IFS= read -r -d '' modfile; do
+              subdir="$(dirname "$modfile")"
+              tag="${subdir}/${version}"
+              if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+                echo "exists, skipping: ${tag}"
+                continue
+              fi
+              echo "tagging ${tag} -> ${sha}"
+              gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
+                -f "ref=refs/tags/${tag}" -f "sha=${sha}"
+            done
 
       - name: Trigger pkg.go.dev to index the new version
         run: |

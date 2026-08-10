@@ -6,7 +6,7 @@ replace github.com/langwatch/langwatch/sdks/go => ../../
 
 require (
 	github.com/anthropics/anthropic-sdk-go v1.61.0
-	github.com/langwatch/langwatch/sdks/go v0.0.0-00010101000000-000000000000
+	github.com/langwatch/langwatch/sdks/go v1.0.0
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel v1.44.0
 	go.opentelemetry.io/otel/sdk v1.44.0

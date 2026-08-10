@@ -7,8 +7,8 @@ replace github.com/langwatch/langwatch/sdks/go => ../../
 replace github.com/langwatch/langwatch/sdks/go/instrumentation/openai => ../openai
 
 require (
-	github.com/langwatch/langwatch/sdks/go v0.0.0-00010101000000-000000000000
-	github.com/langwatch/langwatch/sdks/go/instrumentation/openai v0.0.0-00010101000000-000000000000
+	github.com/langwatch/langwatch/sdks/go v1.0.0
+	github.com/langwatch/langwatch/sdks/go/instrumentation/openai v1.0.0
 	github.com/openai/openai-go/v3 v3.50.0
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel v1.44.0

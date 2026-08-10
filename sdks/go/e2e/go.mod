@@ -6,7 +6,7 @@ go 1.25.0
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/langwatch/langwatch/sdks/go v0.0.0-00010101000000-000000000000
+	github.com/langwatch/langwatch/sdks/go v1.0.0
 	github.com/muesli/termenv v0.16.0
 	github.com/openai/openai-go/v3 v3.50.0
 	go.opentelemetry.io/otel v1.44.0
@@ -22,7 +22,7 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 // indirect
-	github.com/langwatch/langwatch/sdks/go/instrumentation/openai v0.0.0-00010101000000-000000000000
+	github.com/langwatch/langwatch/sdks/go/instrumentation/openai v1.0.0
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect

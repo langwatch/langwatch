@@ -8,7 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.43.4
 	github.com/aws/aws-sdk-go-v2/service/bedrockruntime v1.57.1
 	github.com/aws/smithy-go v1.27.6
-	github.com/langwatch/langwatch/sdks/go v0.0.0-00010101000000-000000000000
+	github.com/langwatch/langwatch/sdks/go v1.0.0
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel v1.44.0
 	go.opentelemetry.io/otel/sdk v1.44.0
