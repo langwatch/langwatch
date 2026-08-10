@@ -137,10 +137,13 @@ const VENDOR_KEY_PATTERNS = [
   // The prefixes are duplicated rather than imported because this package is
   // shared with the SDK and stays dependency-free; a test pins them to the
   // constants so the two cannot drift.
-  String.raw`(?:sk|ik|pat)-lw-[A-Za-z0-9_-]{3,}`,
+  String.raw`(?:sk|ik|pat|vk)-lw-[A-Za-z0-9_-]{3,}`,
   // GitLab personal, project, deploy, runner and agent tokens.
   String.raw`gl(?:pat|rt|dt|soat|ptt|cbt|imt|agent|ffct)-[A-Za-z0-9_-]{20,}`,
   String.raw`npm_[A-Za-z0-9]{36}`,
+  // Google OAuth client secret.
+  String.raw`GOCSPX-[A-Za-z0-9_-]{20,}`,
+  String.raw`mb_[A-Za-z0-9+/=]{40,}`,
   String.raw`dckr_pat_[A-Za-z0-9_-]{20,}`,
   // Shopify admin, storefront, custom and private app tokens.
   String.raw`shp(?:at|ss|ca|pa)_[0-9a-fA-F]{32}`,
@@ -356,13 +359,23 @@ const RECORD_ID_PREFIXES = new Set([
   "sub",
 ]);
 
+/**
+ * Keys that are published on purpose. PostHog's `phc_` is a client-side project
+ * key that ships inside web bundles by design, so blanking it hides legitimate
+ * telemetry configuration and protects nothing. The vendor-list comment has
+ * always said so; the shape rule was catching it anyway, which is the same
+ * over-redaction as eating a record id.
+ */
+const PUBLIC_KEY_PREFIXES = new Set(["phc"]);
+
 /** Every prefix that announces something other than a credential. */
 function isNonCredentialPrefix(prefix: string): boolean {
   const lower = prefix.toLowerCase();
   return (
     DIGEST_PREFIXES.has(lower) ||
     IDENTIFIER_PREFIXES.has(lower) ||
-    RECORD_ID_PREFIXES.has(lower)
+    RECORD_ID_PREFIXES.has(lower) ||
+    PUBLIC_KEY_PREFIXES.has(lower)
   );
 }
 
@@ -481,7 +494,24 @@ const VALUE_RULES: ValueRule[] = [
     id: "pem_private_key",
     description: "PEM private key block",
     regex:
-      /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----/g,
+      /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----[\s\S]*?-----END (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----/g,
+  },
+  {
+    // PuTTY's own private-key format, which carries no PEM armour. The body
+    // runs to the end of the file, so it is clamped at the next blank line
+    // rather than allowed to swallow the rest of the payload.
+    id: "putty_private_key",
+    description: "PuTTY private key file",
+    regex: /PuTTY-User-Key-File-\d+:[\s\S]*?(?:\n\s*\n|$)/g,
+  },
+  {
+    // A kubeconfig embeds the client certificate and its key as base64. The
+    // key is the credential; the certificate is redacted with it because
+    // together they are a working login.
+    id: "kubeconfig_client_credentials",
+    description: "Embedded kubeconfig client key or certificate",
+    regex: /\b(client-(?:key|certificate)-data:\s*)[A-Za-z0-9+/=]{40,}/g,
+    render: (_m, prefix) => `${prefix}${REPLACEMENT}`,
   },
   {
     id: "aws_access_key_id",
@@ -543,6 +573,17 @@ const VALUE_RULES: ValueRule[] = [
     id: "bearer_token",
     description: "Bearer authorization token",
     regex: /\b(Bearer\s+)[A-Za-z0-9._~+/-]{10,}=*/gi,
+    render: (_m, prefix) => `${prefix}${REPLACEMENT}`,
+  },
+  {
+    // The other Authorization schemes. Unlike `Bearer` these are ordinary
+    // words (`Token`, `OAuth`, `Splunk`), so they are only a credential cue
+    // inside an actual Authorization header: a bare "token acme_live_abcd1234"
+    // in prose is a sentence, not a header, and matching it redacted one.
+    id: "authorization_scheme_token",
+    description: "Non-Bearer authorization scheme token",
+    regex:
+      /\b(Authorization:\s*(?:Token|SSWS|GenieKey|Splunk|OAuth)\s+)[A-Za-z0-9._~+/-]{10,}=*/gi,
     render: (_m, prefix) => `${prefix}${REPLACEMENT}`,
   },
   {

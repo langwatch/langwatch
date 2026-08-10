@@ -192,6 +192,23 @@ Feature: Redacting secrets from traces
     When the text is redacted
     Then the identifier is left as written
 
+  # A second pass over the vendor list, from a sweep of what real payloads
+  # carry. `vk-lw-` is ours and was reaching only the generic shape rule, so it
+  # survived on a short body. `PGP PRIVATE KEY BLOCK` broke the PEM anchor on
+  # its own suffix. The non-Bearer Authorization schemes are ordinary words, so
+  # they count only inside an actual Authorization header: a sentence containing
+  # "token" is not a credential.
+  #
+  # PostHog's `phc_` goes the other way. It is a client-side project key that
+  # ships in published web bundles by design, so it is deliberately NOT
+  # redacted; the shape rule had been catching it against the stated intent.
+
+  @unit
+  Scenario: Credentials the vendor list had missed are redacted
+    Given a credential carrying a vendor prefix, armour or authorization scheme the list had missed
+    When the text is redacted
+    Then the credential is replaced
+
   @unit
   Scenario: A key with a standard base64 body is redacted
     Given a prefixed key whose body uses standard base64 rather than base64url

@@ -282,6 +282,56 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
     });
   });
 
+  describe("given credentials the vendor list had missed", () => {
+    const missed: Array<[string, string]> = [
+      ["Google OAuth client secret", `GOCSPX-${BODY.slice(0, 24)}`],
+      ["LangWatch virtual key", `vk-lw-${BODY.slice(0, 12)}_${BODY.slice(0, 32)}`],
+      ["a short LangWatch virtual key", "vk-lw-123af"],
+      ["Metabase key", `mb_${BODY.slice(0, 44)}`],
+      ["an Authorization Token header", `Authorization: Token ${BODY.slice(0, 32)}`],
+      ["an Okta SSWS Authorization header", `Authorization: SSWS ${BODY.slice(0, 32)}`],
+      ["an Opsgenie GenieKey header", `Authorization: GenieKey ${BODY.slice(0, 32)}`],
+      ["a Splunk header", `Authorization: Splunk ${BODY.slice(0, 32)}`],
+      ["an OAuth header", `Authorization: OAuth ${BODY.slice(0, 32)}`],
+      [
+        "an encrypted PEM block",
+        "-----BEGIN ENCRYPTED PRIVATE KEY-----\nMIIabc\n-----END ENCRYPTED PRIVATE KEY-----",
+      ],
+      [
+        "a PGP private key block",
+        "-----BEGIN PGP PRIVATE KEY BLOCK-----\nlQOYBF\n-----END PGP PRIVATE KEY BLOCK-----",
+      ],
+      [
+        "a PuTTY private key",
+        "PuTTY-User-Key-File-3: ssh-rsa\nPrivate-Lines: 8\nAAAABBBB\n\ntail",
+      ],
+      ["an embedded kubeconfig key", `client-key-data: ${BODY.slice(0, 44)}`],
+      [
+        "an embedded kubeconfig certificate",
+        `client-certificate-data: ${BODY.slice(0, 44)}`,
+      ],
+    ];
+
+    /** @scenario "Credentials the vendor list had missed are redacted" */
+    it("redacts every one of them", () => {
+      const survived = missed.filter(
+        ([, value]) => redact(value).redactedCount === 0,
+      );
+      expect(survived.map(([label]) => label)).toEqual([]);
+    });
+
+    // `vk-lw-` was reaching only the generic shape rule, so it survived on a
+    // short body; `PGP PRIVATE KEY BLOCK` broke the PEM anchor on its suffix.
+    it("still redacts the credentials that already worked", () => {
+      expect(redact(`phx_${BODY.slice(0, 36)}`).redactedCount).toBe(1);
+      expect(redact(`Bearer ${BODY.slice(0, 32)}`).redactedCount).toBe(1);
+      expect(
+        redact("-----BEGIN PRIVATE KEY-----\nMIIabc\n-----END PRIVATE KEY-----")
+          .redactedCount,
+      ).toBe(1);
+    });
+  });
+
   describe("given a key whose body is standard base64", () => {
     // `+` and `/` landing early in the body used to cut the match short of the
     // length floor, so the key was missed. Measured at a 57% miss rate for
@@ -491,6 +541,9 @@ describe("redactSecretsInText, given text that only looks like secrets", () => {
     ],
     ["a transcript tag", "<task-notification> and <task-progress>"],
     ["package versions", "@langwatch/web@3.12.0 and pnpm@10.4.1"],
+    // A PostHog project key ships inside published web bundles by design,
+    // so blanking it hides telemetry configuration and protects nothing.
+    ["a public PostHog project key", `phc_${BODY.slice(0, 43)}`],
     // Record ids. `prefix_<random body>` is how this product and the APIs it
     // talks to mint an id, which is the shape a key is minted in and carries
     // the same entropy, so the prefix is the only thing telling them apart. A
@@ -761,6 +814,7 @@ describe("isSensitiveAttributeKey, given a camelCase name", () => {
         "gen_ai.usage.input_tokens",
         "tokenCount",
         "keyboardLayout",
+        "monkeyPatch",
       ].filter((name) => isSensitiveAttributeKey(name));
       expect(fired).toEqual([]);
     });
