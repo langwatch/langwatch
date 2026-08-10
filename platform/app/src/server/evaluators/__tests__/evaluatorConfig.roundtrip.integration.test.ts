@@ -36,7 +36,7 @@ describe.skipIf(!DB_URL)("evaluator config round-trip through Postgres", () => {
   let prisma: PrismaClient | undefined;
 
   beforeAll(async () => {
-    prisma = new PrismaClient({ adapter: createPrismaPgAdapter(DB_URL) });
+    prisma = new PrismaClient({ adapter: createPrismaPgAdapter(DB_URL ?? "") });
     await cleanupTestRows(prisma, [["evaluator", { projectId: PROJECT_ID }]]);
   });
 
