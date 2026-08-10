@@ -171,7 +171,14 @@ describe("trace correlation append coalescing", () => {
         const registrations = createTraceProcessingPipeline(
           buildTraceDeps(),
         ).commands.filter((candidate) => wired.has(candidate.name));
-        expect(registrations).toHaveLength(wired.size);
+        if (registrations.length !== wired.size) {
+          // A precondition, not an expectation: if a command were renamed the
+          // filter would quietly wire fewer than it names, and every assertion
+          // below would read as a pass on a registry that was never populated.
+          throw new Error(
+            `expected ${wired.size} registrations, resolved ${registrations.length}`,
+          );
+        }
 
         manager.initializeCommandQueues(
           registrations as never,
