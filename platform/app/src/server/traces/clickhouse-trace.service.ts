@@ -944,7 +944,7 @@ export class ClickHouseTraceService {
                 cursor &&
                 cursor.scrollStart !== undefined &&
                 (typeof cursor.scrollStart !== "number" ||
-                  !Number.isFinite(cursor.scrollStart) ||
+                  !Number.isSafeInteger(cursor.scrollStart) ||
                   cursor.scrollStart <= 0)
               ) {
                 // scrollId is client-supplied base64 JSON parsed without a shape
@@ -952,6 +952,9 @@ export class ClickHouseTraceService {
                 // a null or a negative would fail the query outright instead of
                 // degrading, so a malformed one drops the cursor like every other
                 // mismatch here and the scroll restarts uncapped.
+                //
+                // Safe INTEGER, not merely finite: an epoch is whole, and both
+                // 1.5 and 2**53 are finite positives that UInt64 will not take.
                 this.logger.warn(
                   { cursorScrollStart: cursor.scrollStart },
                   "Invalid scrollStart in cursor, ignoring cursor",
@@ -1028,6 +1031,19 @@ export class ClickHouseTraceService {
                 : Date.now()
               : undefined;
 
+          // The window this scroll can honestly claim. Version resolution is
+          // pinned at scrollStart, so nothing written after it is in the scroll
+          // — and a request may legitimately ask for an endDate beyond that
+          // point. Reporting the requested window while delivering a shorter
+          // one is how a client loses rows: it resumes from the end it asked
+          // for and steps straight over the difference. Clamp instead, and
+          // return the bound as `updatedThrough` so the next pull can start
+          // exactly where this one stopped.
+          const effectiveEndDate =
+            scrollStart !== undefined
+              ? Math.min(input.endDate ?? scrollStart, scrollStart)
+              : input.endDate;
+
           // Build the query with keyset pagination
           let { traces, totalHits, lastTrace } =
             await this.fetchTracesWithPagination({
@@ -1037,7 +1053,7 @@ export class ClickHouseTraceService {
               cursor,
               protections,
               startDate: input.startDate,
-              endDate: input.endDate,
+              endDate: effectiveEndDate,
               filterConditions,
               filterParams,
               traceIds: input.traceIds,
@@ -1201,6 +1217,9 @@ export class ClickHouseTraceService {
             totalHits,
             traceChecks,
             scrollId: newScrollId,
+            ...(effectiveEndDate !== undefined && scrollStart !== undefined
+              ? { updatedThrough: effectiveEndDate }
+              : {}),
           };
         } catch (error) {
           this.logger.error(

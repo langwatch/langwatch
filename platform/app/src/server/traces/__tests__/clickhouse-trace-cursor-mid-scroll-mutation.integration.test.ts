@@ -62,6 +62,9 @@ const backdatedTenant = `test-mid-scroll-backdated-${nanoid()}`;
 // Cursor-tampering scenarios: never mutated after seeding, so page 1 is stable
 // no matter when the assertions run.
 const tamperTenant = `test-mid-scroll-tamper-${nanoid()}`;
+// A trace arrives mid-scroll here; its own tenant so the arrival cannot perturb
+// the ordering the other scenarios assert on.
+const arrivalTenant = `test-mid-scroll-arrival-${nanoid()}`;
 
 const mkTraceIds = () => ({
   a: `trace-a-${nanoid()}`,
@@ -75,14 +78,19 @@ const mkTraceIds = () => ({
 const live = mkTraceIds();
 const backdated = mkTraceIds();
 const tampered = mkTraceIds();
+const arriving = mkTraceIds();
 
 const initialOffsets = { a: -10, b: -20, c: -30, d: -40 } as const;
 
-function makeTraceSummaryRow(
-  tenantId: string,
-  traceId: string,
-  updatedAt: number,
-) {
+function makeTraceSummaryRow({
+  tenantId,
+  traceId,
+  updatedAt,
+}: {
+  tenantId: string;
+  traceId: string;
+  updatedAt: number;
+}) {
   return {
     ProjectionId: `proj-${nanoid()}`,
     TenantId: tenantId,
@@ -120,12 +128,17 @@ function makeTraceSummaryRow(
   };
 }
 
-function makeQueryInput(tenantId: string): GetAllTracesForProjectInput {
+function makeQueryInput(
+  tenantId: string,
+  startDate = now - 60 * SECOND,
+): GetAllTracesForProjectInput {
   return {
     projectId: tenantId,
-    startDate: now - 60 * SECOND,
-    // Generous upper bound so a bump stamped at write time stays in-window
-    // however long the suite takes to reach it.
+    startDate,
+    // Deliberately far in the future: a CDC client asking for "everything up to
+    // now" produces an endDate at or before the scroll's start, which would
+    // hide the boundary the tests below are about. Asking past it is what makes
+    // the clamp observable.
     endDate: now + 60 * 60 * SECOND,
     filters: {},
     pageSize: 2,
@@ -145,12 +158,17 @@ async function insert(values: Record<string, unknown>[]) {
   });
 }
 
-async function fetchPage(
-  tenantId: string,
-  scrollId?: string | null,
-): Promise<TracesForProjectResult> {
+async function fetchPage({
+  tenantId,
+  scrollId,
+  startDate,
+}: {
+  tenantId: string;
+  scrollId?: string | null;
+  startDate?: number;
+}): Promise<TracesForProjectResult> {
   const results = await service.getAllTracesForProject(
-    makeQueryInput(tenantId),
+    makeQueryInput(tenantId, startDate),
     openProtections,
     { downloadMode: true, dateField: "updated", scrollId },
   );
@@ -167,14 +185,17 @@ function traceIdsOf(result: TracesForProjectResult): string[] {
 }
 
 /** Walk the scroll to exhaustion from a first page, collecting what it yields. */
-async function drain(
-  tenantId: string,
-  firstPage: TracesForProjectResult,
-): Promise<string[]> {
+async function drain({
+  tenantId,
+  firstPage,
+}: {
+  tenantId: string;
+  firstPage: TracesForProjectResult;
+}): Promise<string[]> {
   const seen = [...traceIdsOf(firstPage)];
   let scrollId = firstPage.scrollId;
   for (let guard = 0; guard < 5 && scrollId; guard++) {
-    const page = await fetchPage(tenantId, scrollId);
+    const page = await fetchPage({ tenantId, scrollId });
     seen.push(...traceIdsOf(page));
     scrollId = page.scrollId;
   }
@@ -193,28 +214,38 @@ beforeAll(async () => {
 
   await insert([
     ...(["a", "b", "c", "d"] as const).flatMap((key) => [
-      makeTraceSummaryRow(
-        liveTenant,
-        live[key],
-        now + initialOffsets[key] * SECOND,
-      ),
-      makeTraceSummaryRow(
-        backdatedTenant,
-        backdated[key],
-        now + initialOffsets[key] * SECOND,
-      ),
-      makeTraceSummaryRow(
-        tamperTenant,
-        tampered[key],
-        now + initialOffsets[key] * SECOND,
-      ),
+      makeTraceSummaryRow({
+        tenantId: liveTenant,
+        traceId: live[key],
+        updatedAt: now + initialOffsets[key] * SECOND,
+      }),
+      makeTraceSummaryRow({
+        tenantId: backdatedTenant,
+        traceId: backdated[key],
+        updatedAt: now + initialOffsets[key] * SECOND,
+      }),
+      makeTraceSummaryRow({
+        tenantId: tamperTenant,
+        traceId: tampered[key],
+        updatedAt: now + initialOffsets[key] * SECOND,
+      }),
+      makeTraceSummaryRow({
+        tenantId: arrivalTenant,
+        traceId: arriving[key],
+        updatedAt: now + initialOffsets[key] * SECOND,
+      }),
     ]),
   ]);
 }, 60_000);
 
 afterAll(async () => {
   if (ch) {
-    for (const t of [liveTenant, backdatedTenant, tamperTenant]) {
+    for (const t of [
+      liveTenant,
+      backdatedTenant,
+      tamperTenant,
+      arrivalTenant,
+    ]) {
       await ch.exec({
         query:
           "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
@@ -229,7 +260,7 @@ describe("updated-axis scroll when a trace is modified mid-pagination", () => {
   describe("given a trace ranked below the page-1 cursor", () => {
     describe("when a live write bumps it above the cursor before page 2", () => {
       it("still delivers every in-window trace exactly once across the scroll", async () => {
-        const page1 = await fetchPage(liveTenant);
+        const page1 = await fetchPage({ tenantId: liveTenant });
         expect(traceIdsOf(page1)).toEqual([live.a, live.b]);
         expect(page1.scrollId).toBeTruthy();
         // What the client is told to expect, captured before anything moves.
@@ -239,10 +270,14 @@ describe("updated-axis scroll when a trace is modified mid-pagination", () => {
         // write time, which is what a real write does — and necessarily after
         // the scroll began.
         await insert([
-          makeTraceSummaryRow(liveTenant, live.d, Date.now() + 5 * SECOND),
+          makeTraceSummaryRow({
+            tenantId: liveTenant,
+            traceId: live.d,
+            updatedAt: Date.now() + 5 * SECOND,
+          }),
         ]);
 
-        const seen = await drain(liveTenant, page1);
+        const seen = await drain({ tenantId: liveTenant, firstPage: page1 });
 
         // D is in the window before and after the bump, so no correct scroll
         // may drop it, and no trace may arrive twice.
@@ -275,15 +310,22 @@ describe("updated-axis scroll when a trace is modified mid-pagination", () => {
     // above needs revisiting rather than quietly rotting.
     describe("when a write is backdated above the cursor", () => {
       it("drops the trace — the bound cannot see write time, and nothing backdates", async () => {
-        const page1 = await fetchPage(backdatedTenant);
+        const page1 = await fetchPage({ tenantId: backdatedTenant });
         expect(traceIdsOf(page1)).toEqual([backdated.a, backdated.b]);
 
         // Below the scroll start, above the page-1 cursor: a rewrite of history.
         await insert([
-          makeTraceSummaryRow(backdatedTenant, backdated.d, now - 15 * SECOND),
+          makeTraceSummaryRow({
+            tenantId: backdatedTenant,
+            traceId: backdated.d,
+            updatedAt: now - 15 * SECOND,
+          }),
         ]);
 
-        const seen = await drain(backdatedTenant, page1);
+        const seen = await drain({
+          tenantId: backdatedTenant,
+          firstPage: page1,
+        });
 
         // Pin what the scroll DID deliver first. Without this the assertion
         // below passes just as happily on a scroll that returned nothing,
@@ -300,11 +342,66 @@ describe("updated-axis scroll when a trace is modified mid-pagination", () => {
     });
   });
 
+  // The snapshot has an edge, and a client that does not know where it is will
+  // walk straight past it. A trace CREATED after the scroll starts has no
+  // version at or before the bound, so it is in no page of this scroll — while
+  // the requested endDate still stretches beyond it.
+  describe("given a trace created after the scroll started", () => {
+    describe("when the client resumes from the boundary the response reported", () => {
+      it("does not deliver it in this scroll, and does deliver it in the next", async () => {
+        const page1 = await fetchPage({ tenantId: arrivalTenant });
+        expect(traceIdsOf(page1)).toEqual([arriving.a, arriving.b]);
+
+        // The response has to say where the snapshot stopped, or the client has
+        // nothing safe to resume from.
+        const boundary = page1.updatedThrough;
+        expect(boundary).toBeDefined();
+        // Clamped below the requested endDate, which sits an hour out.
+        expect(boundary as number).toBeLessThan(now + 60 * 60 * SECOND);
+
+        // A brand new trace lands mid-scroll — one version, stamped now, which
+        // is what a real write does.
+        const newcomer = `trace-new-${nanoid()}`;
+        await insert([
+          makeTraceSummaryRow({
+            tenantId: arrivalTenant,
+            traceId: newcomer,
+            // Write time, the way a real write stamps it. The +1ms only
+            // guarantees it lands strictly after page one's bound even if both
+            // fall in the same millisecond; dating it further ahead would push
+            // it past the NEXT pull's bound too, and it would never arrive.
+            updatedAt: Date.now() + 1,
+          }),
+        ]);
+
+        const thisScroll = await drain({
+          tenantId: arrivalTenant,
+          firstPage: page1,
+        });
+        expect(thisScroll).not.toContain(newcomer);
+
+        // The next incremental pull starts where this one stopped. Resuming
+        // from the requested endDate instead would skip the newcomer forever.
+        const nextPull = await fetchPage({
+          tenantId: arrivalTenant,
+          startDate: boundary,
+        });
+        expect(traceIdsOf(nextPull)).toContain(newcomer);
+      });
+    });
+  });
+
   // scrollId is client-supplied, so scrollStart is attacker-controlled and
   // binds as {scrollStart:UInt64}. A non-numeric value must not reach the
   // query — it would fail the whole request rather than degrade.
   describe("given a cursor whose scrollStart has been tampered with", () => {
-    const tamper = (scrollId: string, scrollStart: unknown) => {
+    const tamper = ({
+      scrollId,
+      scrollStart,
+    }: {
+      scrollId: string;
+      scrollStart: unknown;
+    }) => {
       const cursor = JSON.parse(
         Buffer.from(scrollId, "base64").toString("utf-8"),
       );
@@ -317,19 +414,26 @@ describe("updated-axis scroll when a trace is modified mid-pagination", () => {
       ["a string", "not-a-number"],
       ["null", null],
       ["a negative number", -1],
+      // Both are finite positives, so a finiteness check waves them through
+      // and UInt64 refuses them at the query.
+      ["a fraction", 1.5],
+      ["beyond the safe integer range", Number.MAX_SAFE_INTEGER + 1],
     ] as const) {
       describe(`when scrollStart is ${label}`, () => {
         it("restarts the scroll instead of failing the query", async () => {
-          const page1 = await fetchPage(tamperTenant);
+          const page1 = await fetchPage({ tenantId: tamperTenant });
           expect(traceIdsOf(page1)).toEqual([tampered.a, tampered.b]);
           expect(page1.scrollId).toBeTruthy();
 
           // Must not throw: a rejected cursor degrades to a fresh first page,
           // the same way every other cursor mismatch in that block behaves.
-          const page = await fetchPage(
-            tamperTenant,
-            tamper(page1.scrollId as string, value),
-          );
+          const page = await fetchPage({
+            tenantId: tamperTenant,
+            scrollId: tamper({
+              scrollId: page1.scrollId as string,
+              scrollStart: value,
+            }),
+          });
 
           expect(traceIdsOf(page)).toEqual([tampered.a, tampered.b]);
         });
