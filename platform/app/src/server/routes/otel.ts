@@ -36,6 +36,10 @@ import type { UsageLimitResult } from "~/server/app-layer/usage/usage.service";
 import { prisma } from "~/server/db";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
+  OTLP_CORRECTED_PATH_HEADER,
+  readCorrectedPath,
+} from "~/server/otel/otlpPathCanonicalisation";
+import {
   OTLP_MAX_BODY_BYTES,
   parseOtlpLogs,
   parseOtlpMetrics,
@@ -179,7 +183,35 @@ async function authenticate(
     };
   }
 
+  logCorrectedPath({ c, projectId: resolved.project.id, logger });
+
   return { project: resolved.project, resolved };
+}
+
+/**
+ * Records that this request reached us on a path a misconfigured exporter
+ * produced (see otel-path-aliases). Logged here rather than at the alias
+ * because the project is what makes it actionable: it is the difference
+ * between "somebody's exporter is misconfigured" and knowing whose.
+ */
+function logCorrectedPath({
+  c,
+  projectId,
+  logger,
+}: {
+  c: RouteContext;
+  projectId: string;
+  logger: ReturnType<typeof createLogger>;
+}): void {
+  const originalPath = readCorrectedPath(
+    c.req.header(OTLP_CORRECTED_PATH_HEADER),
+  );
+  if (!originalPath) return;
+
+  logger.warn(
+    { projectId, originalPath, canonicalPath: c.req.path },
+    "OTLP exporter posted to a non-canonical path; served from the canonical route",
+  );
 }
 
 /**

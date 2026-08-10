@@ -72,6 +72,7 @@ import { app as langyRelayApp } from "./routes/langy-relay";
 import { app as miscApp } from "./routes/misc";
 import { app as opsApp } from "./routes/ops";
 import { app as otelApp } from "./routes/otel";
+import { app as otelPathAliasApp } from "./routes/otel-path-aliases";
 import { app as playgroundApp } from "./routes/playground";
 import { app as rumApp } from "./routes/rum";
 import { app as scenarioGenerateApp } from "./routes/scenario-generate";
@@ -198,6 +199,10 @@ export function createApiRouter() {
   api.route("/", authCliApp); // /api/auth/cli/* — RFC 8628 device-flow for CLI
   api.route("/", authApp);
   api.route("/", collectorApp);
+  // ORDERING: last of the ingestion apps. It claims the OTLP paths a
+  // misconfigured exporter produces, which overlap the /api/otel and
+  // /api/collector namespaces, so every real route must get its match first.
+  api.route("/", otelPathAliasApp);
   api.route("/", ingestionRoutesApp); // /api/ingest/* — Activity Monitor receivers
   api.route("/", cronApp);
   api.route("/", evaluationsLegacyApp);
