@@ -167,6 +167,7 @@ describe("Feature: a REST-created automation must carry a condition", () => {
   });
 
   describe("when a patch would clear the last condition", () => {
+    /** @scenario "A REST edit that empties the condition changes nothing" */
     it("refuses it and leaves the stored condition alone", async () => {
       const stored = await prisma.trigger.create({
         data: {

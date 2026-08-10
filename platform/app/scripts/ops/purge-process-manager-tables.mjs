@@ -155,7 +155,7 @@ async function purge(target) {
   }
 
   console.warn(
-    `  WARN: stopped at MAX_BATCHES=${MAX_BATCHES} with rows still eligible. Re-run to continue.`,
+    `  WARN: stopped at MAX_BATCHES=${MAX_BATCHES}; rows may still be eligible. Re-run to continue.`,
   );
   return total;
 }

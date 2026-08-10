@@ -103,6 +103,17 @@ Feature: Staged automation authoring drawer
       Then the request is refused with a condition-required error
       And the response carries the machine-readable condition-required code
 
+    # The edit rule above is stated once for every write path, but the REST edit
+    # is the one that can leave a half-applied automation behind, so it names
+    # its own contract: the machine-readable code the caller matches on, and the
+    # stored condition surviving the refusal untouched.
+    @integration
+    Scenario: A REST edit that empties the condition changes nothing
+      Given a stored automation whose condition is a filter set
+      When a REST patch replaces that condition with an empty one
+      Then the request is refused with the machine-readable condition-required code
+      And the stored condition is unchanged
+
     @integration
     Scenario: Automations that predate the rule keep firing
       Given a stored automation with no condition at all
