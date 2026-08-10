@@ -16,7 +16,11 @@
  * Requires: PostgreSQL database (Prisma)
  */
 
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -107,6 +111,145 @@ describe("given a member who is the only admin of a shared team", () => {
         cause: {
           code: "team_last_admin_required",
           meta: { teamName: fixture.onlyAdminTeamName },
+        },
+      });
+    });
+  });
+
+  describe("when a group with a member also holds the Admin role on the team", () => {
+    /** @scenario A group that administers the team counts as its admin */
+    it("lets the team's own member edit demote them", async () => {
+      await fixture.withAdminGroupOn({
+        teamId: fixture.onlyAdminTeamId,
+        memberUserId: fixture.companionUserId,
+        run: async () => {
+          await expect(
+            fixture.callerAsAdmin().organization.updateTeamMemberRole({
+              teamId: fixture.onlyAdminTeamId,
+              userId: fixture.soloUserId,
+              role: TeamUserRole.VIEWER,
+            }),
+          ).resolves.toMatchObject({ success: true });
+
+          await expect(
+            fixture.teamRoleOf({
+              userId: fixture.soloUserId,
+              teamId: fixture.onlyAdminTeamId,
+            }),
+          ).resolves.toBe(TeamUserRole.VIEWER);
+        },
+      });
+    });
+
+    /** @scenario A group that administers the team counts as its admin */
+    it("lets a seat change naming the team role go through", async () => {
+      await fixture.withAdminGroupOn({
+        teamId: fixture.onlyAdminTeamId,
+        memberUserId: fixture.companionUserId,
+        run: async () => {
+          await expect(seatChangeNamingTheTeamRole()).resolves.toMatchObject({
+            success: true,
+          });
+
+          await expect(
+            fixture.teamRoleOf({
+              userId: fixture.soloUserId,
+              teamId: fixture.onlyAdminTeamId,
+            }),
+          ).resolves.toBe(TeamUserRole.VIEWER);
+        },
+      });
+    });
+  });
+
+  describe("given a seat correction left the team with no admin at all", () => {
+    beforeEach(() =>
+      prisma.roleBinding.updateMany({
+        where: {
+          organizationId: fixture.organizationId,
+          userId: fixture.soloUserId,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: fixture.onlyAdminTeamId,
+        },
+        data: { role: TeamUserRole.VIEWER },
+      }),
+    );
+
+    describe("when a member's role on the team is edited", () => {
+      /** @scenario A team already without a team admin stays editable */
+      it("saves the change", async () => {
+        await expect(
+          fixture.callerAsAdmin().organization.updateTeamMemberRole({
+            teamId: fixture.onlyAdminTeamId,
+            userId: fixture.soloUserId,
+            role: TeamUserRole.MEMBER,
+          }),
+        ).resolves.toMatchObject({ success: true });
+
+        await expect(
+          fixture.teamRoleOf({
+            userId: fixture.soloUserId,
+            teamId: fixture.onlyAdminTeamId,
+          }),
+        ).resolves.toBe(TeamUserRole.MEMBER);
+      });
+    });
+
+    describe("when a member is promoted back to Admin", () => {
+      /** @scenario A team already without a team admin stays editable */
+      it("repairs the team", async () => {
+        await expect(
+          fixture.callerAsAdmin().organization.updateTeamMemberRole({
+            teamId: fixture.onlyAdminTeamId,
+            userId: fixture.soloUserId,
+            role: TeamUserRole.ADMIN,
+          }),
+        ).resolves.toMatchObject({ success: true });
+
+        await expect(
+          fixture.teamRoleOf({
+            userId: fixture.soloUserId,
+            teamId: fixture.onlyAdminTeamId,
+          }),
+        ).resolves.toBe(TeamUserRole.ADMIN);
+      });
+    });
+  });
+
+  describe("when a team's only Admin role is held by a group with members", () => {
+    /** @scenario A team administered only through a group accepts member edits */
+    it("accepts a member edit from the team", async () => {
+      // The SCIM shape: nobody holds a direct ADMIN binding on the team, the
+      // group does. Guards that count only direct bindings read this team as
+      // having no admin and refuse every edit.
+      await prisma.roleBinding.updateMany({
+        where: {
+          organizationId: fixture.organizationId,
+          userId: fixture.soloUserId,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: fixture.onlyAdminTeamId,
+        },
+        data: { role: TeamUserRole.VIEWER },
+      });
+
+      await fixture.withAdminGroupOn({
+        teamId: fixture.onlyAdminTeamId,
+        memberUserId: fixture.companionUserId,
+        run: async () => {
+          await expect(
+            fixture.callerAsAdmin().organization.updateTeamMemberRole({
+              teamId: fixture.onlyAdminTeamId,
+              userId: fixture.soloUserId,
+              role: TeamUserRole.MEMBER,
+            }),
+          ).resolves.toMatchObject({ success: true });
+
+          await expect(
+            fixture.teamRoleOf({
+              userId: fixture.soloUserId,
+              teamId: fixture.onlyAdminTeamId,
+            }),
+          ).resolves.toBe(TeamUserRole.MEMBER);
         },
       });
     });
