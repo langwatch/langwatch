@@ -2,6 +2,7 @@ package docscheck
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -57,7 +58,20 @@ func Load(root, docsDir, chartPath string) (docsscan.Inputs, error) {
 		return in, fmt.Errorf("parse docs.json: %w", err)
 	}
 	in.Redirects = config.Redirects
-	in.NavPages = collectNavPages(config.Navigation)
+	in.NavPages, err = collectNavPages(config.Navigation)
+	if err != nil {
+		return in, fmt.Errorf("read navigation from docs.json: %w", err)
+	}
+	// Without this, an unreadable or absent navigation reads as "no page is
+	// referenced", and the orphan rule then reports every page on the site.
+	// Hundreds of findings whose real cause is one missing key is worse than no
+	// check at all, so this exits 2 rather than 1.
+	if len(in.NavPages) == 0 {
+		return in, errors.New(
+			"docs.json navigation references no pages at all — expected a `navigation` " +
+				"key holding groups of `pages`; refusing to report every page as an orphan",
+		)
+	}
 
 	pages, refs, err := walkContent(docsRoot, docsDir)
 	if err != nil {
@@ -79,16 +93,23 @@ func Load(root, docsDir, chartPath string) (docsscan.Inputs, error) {
 	return in, nil
 }
 
-// collectNavPages walks the navigation tree and returns every page string in
-// document order, duplicates included. A string anywhere under a "pages" key is
-// a page reference; anything else is structure. Walking generically keeps this
-// immune to a new navigation division being introduced upstream.
-func collectNavPages(raw json.RawMessage) []string {
+// collectNavPages walks the navigation tree and returns every page string,
+// duplicates included. A string anywhere under a "pages" key is a page
+// reference; anything else is structure. Walking generically keeps this immune
+// to a new navigation division being introduced upstream.
+//
+// The order is not meaningful: Go randomizes map iteration, so a group's
+// position in the result varies between runs. Nothing may depend on it — Check
+// sorts the findings it produces, which is what keeps the report stable.
+func collectNavPages(raw json.RawMessage) ([]string, error) {
+	if len(raw) == 0 {
+		return nil, errors.New("no `navigation` key")
+	}
 	var root any
 	if err := json.Unmarshal(raw, &root); err != nil {
-		return nil
+		return nil, err
 	}
-	return appendNavPages(nil, root, false)
+	return appendNavPages(nil, root, false), nil
 }
 
 func appendNavPages(pages []string, node any, inPages bool) []string {
