@@ -16,8 +16,6 @@ import httpx
 import pytest
 
 import langwatch
-import langwatch.projects as projects_module
-import langwatch.teams as teams_module
 from langwatch.api_errors import LangWatchApiNotFoundError
 from langwatch.projects import ProjectsFacade
 from langwatch.teams import TeamsFacade
@@ -72,10 +70,9 @@ def test_teams_and_projects_resolve_from_the_package_entry_point(monkeypatch):
     instance = SimpleNamespace(
         rest_api_client=FakeRestClient(lambda _: httpx.Response(200, json={}))
     )
-    for module in (teams_module, projects_module):
-        monkeypatch.setattr(module, "ensure_setup", lambda: None)
-        monkeypatch.setattr(module, "get_instance", lambda: instance)
     for name in ("teams", "projects"):
+        monkeypatch.setattr(f"langwatch.{name}.ensure_setup", lambda: None)
+        monkeypatch.setattr(f"langwatch.{name}.get_instance", lambda: instance)
         monkeypatch.delitem(vars(langwatch), name, raising=False)
 
     assert isinstance(langwatch.teams, TeamsFacade)
