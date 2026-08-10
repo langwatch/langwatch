@@ -105,7 +105,16 @@ describe("the ingestion-ledger union's money", () => {
       // The union is best-effort by design: what must not happen is a wrong
       // number, and what must not happen either is an empty dashboard.
       const repository = {
-        findSummary: vi.fn().mockResolvedValue(null),
+        // The trace-summary side answers normally — findSummary returns a row
+        // rather than null, empty or not — so what this asserts is the ledger
+        // union failing on its own.
+        findSummary: vi.fn().mockResolvedValue({
+          totalCost: 0,
+          billedCost: 0,
+          requestCount: 0,
+          promptTokens: 0,
+          completionTokens: 0,
+        }),
         findTopModel: vi.fn().mockResolvedValue(null),
         findIngestionPrincipalSummary: vi
           .fn()
