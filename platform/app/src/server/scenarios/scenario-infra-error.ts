@@ -105,7 +105,7 @@ function extractProviderMessage(raw: string): string | undefined {
  * path like `node:internal/modules/cjs/loader:1520` — which is what the
  * fallback used to show for a runner that failed to boot.
  */
-const NOISE_LINE_PATTERNS: RegExp[] = [
+const NOISE_LINE_PATTERNS = [
   /^at\s/,
   /^node:/,
   /^\^+$/,
@@ -116,7 +116,7 @@ const NOISE_LINE_PATTERNS: RegExp[] = [
   /^-\s*[/\\]\S*$/,
   /^[/\\][^\s]*$/,
   /^Node\.js\s+v?\d/i,
-];
+] as const;
 
 /** True when a line is pure runtime noise rather than a human explanation. */
 function isNoiseLine(line: string): boolean {
@@ -141,7 +141,7 @@ function isNoiseLine(line: string): boolean {
  * status, the URL, the request id and their own error body to hide nothing.
  * A path is only an internal when it is ours.
  */
-const INTERNALS_PATTERNS: RegExp[] = [
+const INTERNALS_PATTERNS = [
   /\bnode:[a-z_]+/,
   // `at Foo (…)` and `at async Foo.bar (…)` — the async form has an extra
   // token, which a fixed `\S+\s+\(` shape missed.
@@ -150,7 +150,7 @@ const INTERNALS_PATTERNS: RegExp[] = [
   /(?:^|[\s'"(/\\])(?:dist|node_modules)[/\\]/,
   /\bscenario-child-process\b/,
   /\.cjs\b/,
-];
+] as const;
 
 /** True when a candidate message would expose our internals to the user. */
 function exposesInternals(message: string): boolean {
@@ -244,7 +244,7 @@ const NODE_CRASH_MARKERS = [
   "node:internal/modules",
   "Require stack:",
   "at Module._",
-];
+] as const;
 
 /**
  * The wrapper `scenario.processor.ts` puts on a child that exited non-zero
@@ -413,8 +413,10 @@ export function classifyScenarioInfraError(
   }
 
   for (const rule of CLASSIFICATION_RULES) {
-    const hit = rule.needles.some((needle) => contains(text, needle));
-    if (hit && (rule.alsoRequires?.(text) ?? true)) {
+    const hasMatchingNeedle = rule.needles.some((needle) =>
+      contains(text, needle),
+    );
+    if (hasMatchingNeedle && (rule.alsoRequires?.(text) ?? true)) {
       return rule.build(text);
     }
   }

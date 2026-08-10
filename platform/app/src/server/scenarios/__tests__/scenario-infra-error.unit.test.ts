@@ -21,8 +21,8 @@ import {
 } from "../scenario-infra-error";
 
 /** The internals a user must never read, each with the name it fails under. */
-const INTERNAL_MARKERS: { label: string; pattern: RegExp }[] = [
-  { label: "stack frame", pattern: /\bat\s+\S+\s+\(/ },
+const INTERNAL_MARKERS = [
+  { label: "stack frame", pattern: /\bat\s+(?:async\s+)?\S+\s*\(/ },
   { label: "interpreter source location", pattern: /node:internal/ },
   {
     label: "container path",
@@ -30,7 +30,11 @@ const INTERNAL_MARKERS: { label: string; pattern: RegExp }[] = [
   },
   { label: "child-process wrapper", pattern: /Child process exited/ },
   { label: "bundle filename", pattern: /\.cjs\b|\.js:/ },
-];
+  {
+    label: "build tree",
+    pattern: /(?:^|[\s'"(/\\])(?:dist|node_modules)[/\\]/,
+  },
+] as const;
 
 /**
  * Nothing a user reads may carry a stack frame, an interpreter source
@@ -326,6 +330,25 @@ describe("classifyScenarioInfraError", () => {
         "TypeError: x is not a function (scenario-child-process.cjs:80978:27)",
       ],
     ])("suppresses %s, which carries no leading slash", (_label, raw) => {
+      expectNoInternals(classifyScenarioInfraError(raw).message);
+    });
+
+    it.each([
+      [
+        "backslash-separated",
+        "Error thrown in C:\\app\\dist\\server\\scenario-child-process.cjs:80978",
+      ],
+      [
+        "a UNC share",
+        "Error thrown in \\\\build\\share\\dist\\server\\workers.cjs:12",
+      ],
+    ])("suppresses our bundle path when %s", (_label, raw) => {
+      // The guard keys on our artefacts (dist, node_modules, .cjs, the runner
+      // bundle's name) with either separator, rather than on path shape — so
+      // the drive letter and the UNC prefix are beside the point. A bare
+      // `C:\app\runner.js` is deliberately NOT suppressed: it names nothing of
+      // ours, and blanket path suppression is what cost the customer their own
+      // diagnostics in the case above.
       expectNoInternals(classifyScenarioInfraError(raw).message);
     });
 
