@@ -94,14 +94,24 @@ type Inputs struct {
 // The set is deliberately narrow. A rule that flagged every semver in the docs
 // would fire on Kubernetes versions, Python versions and SDK versions, and a
 // check that cries wolf gets switched off.
-var versionPatterns = []*regexp.Regexp{
-	// A tagged LangWatch image: langwatch/langwatch_nlp:3.12.0
-	//
-	// The three names are listed rather than matched by a character class, so
-	// that `langwatch/clickhouse-serverless:0.2.0` stays out: it is versioned
-	// independently of the chart, and widening this to `[a-z0-9_-]+` — the
-	// obvious-looking change — makes the rule fire on it every run.
+// selfIdentifyingVersionPatterns name a LangWatch release on their own, so they
+// need no surrounding context to be sure.
+//
+// The three image names are listed rather than matched by a character class, so
+// that `langwatch/clickhouse-serverless:0.2.0` stays out: it is versioned
+// independently of the chart, and widening this to `[a-z0-9_-]+` — the
+// obvious-looking change — makes the rule fire on it every run.
+var selfIdentifyingVersionPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`langwatch/(?:langwatch|langwatch_nlp|langevals):(\d+\.\d+\.\d+)`),
+}
+
+// contextualVersionPatterns are version forms that mean a LangWatch release
+// only when a LangWatch chart or image is named nearby. On their own they are
+// generic: `--version 1.14.5` in a cert-manager example, or a `tag:` in any
+// values block, would otherwise be reported as drift and the author told to
+// change it to the LangWatch release — advice that would corrupt the page. A
+// rule that fires on unrelated versions is a rule people switch off.
+var contextualVersionPatterns = []*regexp.Regexp{
 	// An image tag in a Helm values block, for example `tag: "3.12.0"`.
 	regexp.MustCompile(`^\s*tag:\s*"(\d+\.\d+\.\d+)"`),
 	// The shell variable the mirroring example sets: VERSION=3.12.0
@@ -109,23 +119,72 @@ var versionPatterns = []*regexp.Regexp{
 	// A pinned chart release: `helm upgrade langwatch langwatch/langwatch
 	// --version 3.12.0`. Without this the upgrade guides pinned a release nine
 	// minors old while the checker reported the site sound.
-	regexp.MustCompile(`--version\s+(\d+\.\d+\.\d+)\b`),
+	regexp.MustCompile(`--version[= ]\s*(\d+\.\d+\.\d+)\b`),
 	// The chart revision an ArgoCD Application tracks. Readers copy these
 	// manifests verbatim, so a stale one deploys a stale release.
 	regexp.MustCompile(`^\s*targetRevision:\s*"?(\d+\.\d+\.\d+)"?`),
 }
 
+// langwatchContext marks a line as being about a LangWatch chart or image.
+var langwatchContext = regexp.MustCompile(
+	`langwatch/(?:langwatch|langwatch_nlp|langevals)\b` +
+		`|chart:\s*langwatch\b` +
+		`|repoURL:.*langwatch` +
+		`|repository:.*langwatch/`,
+)
+
+// contextWindow is how far either side of a version a LangWatch chart reference
+// may sit. It reaches both ways because the two real shapes differ: a `helm
+// upgrade langwatch langwatch/langwatch \` line precedes its `--version`
+// continuation, while the mirroring example sets `VERSION=` above the loop that
+// names the images.
+const contextWindow = 8
+
 // FindVersionRefs pulls every release version out of one page's contents.
 func FindVersionRefs(file, contents string) []VersionRef {
+	lines := strings.Split(contents, "\n")
 	var refs []VersionRef
-	for i, line := range strings.Split(contents, "\n") {
-		for _, pattern := range versionPatterns {
-			for _, match := range pattern.FindAllStringSubmatch(line, -1) {
-				refs = append(refs, VersionRef{File: file, Line: i + 1, Version: match[1]})
-			}
+	for i, line := range lines {
+		at := versionSite{file: file, index: i, line: line}
+		refs = at.append(refs, selfIdentifyingVersionPatterns)
+		if nearLangwatchChart(lines, i) {
+			refs = at.append(refs, contextualVersionPatterns)
 		}
 	}
 	return refs
+}
+
+// versionSite is one line of one page, the place a version can be written.
+type versionSite struct {
+	file  string
+	index int
+	line  string
+}
+
+func (s versionSite) append(refs []VersionRef, patterns []*regexp.Regexp) []VersionRef {
+	for _, pattern := range patterns {
+		for _, match := range pattern.FindAllStringSubmatch(s.line, -1) {
+			refs = append(refs, VersionRef{
+				File:    s.file,
+				Line:    s.index + 1,
+				Version: match[1],
+			})
+		}
+	}
+	return refs
+}
+
+// nearLangwatchChart reports whether any line within contextWindow of lines[at]
+// names a LangWatch chart or image.
+func nearLangwatchChart(lines []string, at int) bool {
+	from := max(at-contextWindow, 0)
+	to := min(at+contextWindow, len(lines)-1)
+	for i := from; i <= to; i++ {
+		if langwatchContext.MatchString(lines[i]) {
+			return true
+		}
+	}
+	return false
 }
 
 // Check runs every rule and returns the findings, ordered by kind and then by

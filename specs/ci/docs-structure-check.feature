@@ -102,6 +102,18 @@ Feature: Docs structure check
     When docscheck runs
     Then it raises no finding, because a check that fires on unrelated versions gets switched off
 
+  # `--version`, `tag:` and `targetRevision:` say nothing about whose release
+  # they pin, so they only count when a LangWatch chart or image is named within
+  # a few lines. Otherwise the remedy would tell an author to change another
+  # project's version to ours, and a rule that fires on unrelated versions is a
+  # rule people switch off.
+  @unit
+  Scenario: A pinned release for another project's chart is left alone
+    Given a page pins a version for a chart that is not LangWatch's
+    And no LangWatch chart or image is named nearby
+    When docscheck runs
+    Then it raises no finding
+
   @unit
   Scenario: A placeholder tag cannot drift
     Given a rollback example names the release to roll back to as a placeholder
