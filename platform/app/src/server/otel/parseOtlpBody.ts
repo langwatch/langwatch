@@ -35,7 +35,11 @@ import type {
   IExportTraceServiceRequest,
 } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
-import { OtlpBodyTooLargeError } from "./errors";
+import {
+  OtlpBodyTooLargeError,
+  OtlpBodyUnreadableError,
+  OtlpUnsupportedEncodingError,
+} from "./errors";
 
 const gunzipAsync = promisify(gunzip);
 const inflateAsync = promisify(inflate);
@@ -104,41 +108,101 @@ function isSupportedEncoding(encoding: string): encoding is SupportedEncoding {
 }
 
 /**
+ * Release the reader without letting it throw.
+ *
+ * A reader whose stream was torn down mid-read can throw from `releaseLock()`
+ * itself, and thrown from a `finally` block that error REPLACES the one already
+ * on its way out. That is how a client disconnect came to be reported as an
+ * unrelated stream-internals TypeError, and — being unclassified — answered
+ * 500. Nothing here is worth reporting: the stream is already gone, and the
+ * failure that matters has been raised.
+ */
+function releaseQuietly(reader: { releaseLock: () => void }): void {
+  try {
+    reader.releaseLock();
+  } catch {
+    // Deliberately swallowed; see above.
+  }
+}
+
+/** Same reasoning as {@link releaseQuietly}, for the over-size cancel path. */
+async function cancelQuietly(reader: {
+  cancel: () => Promise<void>;
+}): Promise<void> {
+  try {
+    await reader.cancel();
+  } catch {
+    // The refusal we are about to throw is the diagnosis, not this.
+  }
+}
+
+/**
  * Read the wire body, refusing it the moment it passes
  * {@link OTLP_MAX_BODY_BYTES}.
  *
  * Consuming the stream by hand rather than calling `req.arrayBuffer()` is the
  * point: `arrayBuffer()` buffers the whole body and only then hands it over, so
  * measuring afterwards would concede exactly the memory being defended.
+ *
+ * Every way this can fail is the sender's: the body was already consumed, the
+ * connection ended mid-read, or it passed the size bound. None of them is a
+ * server fault, and leaving them unclassified is what had them answered 500.
  */
+/**
+ * "Body is unusable" — the body was already consumed, or another reader holds
+ * the lock. Nothing can be read, and it is not a server fault.
+ */
+function acquireReader(
+  stream: ReadableStream<Uint8Array>,
+): ReadableStreamDefaultReader<Uint8Array> {
+  try {
+    return stream.getReader();
+  } catch (error) {
+    throw new OtlpBodyUnreadableError({ cause: error });
+  }
+}
+
+/** Drain the reader, refusing the body the moment it passes the byte bound. */
+async function drainWithinLimit(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+): Promise<Buffer> {
+  const chunks: Uint8Array[] = [];
+  let held = 0;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    held += value.byteLength;
+    if (held > OTLP_MAX_BODY_BYTES) {
+      await cancelQuietly(reader);
+      throw new OtlpBodyTooLargeError({
+        maxBytes: OTLP_MAX_BODY_BYTES,
+        encoding: null,
+      });
+    }
+    chunks.push(value);
+  }
+
+  return Buffer.concat(chunks);
+}
+
 async function readWireBody(req: Request): Promise<Buffer> {
   const stream = req.body;
   if (!stream) return Buffer.alloc(0);
 
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
-  let held = 0;
+  const reader = acquireReader(stream);
 
   try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      held += value.byteLength;
-      if (held > OTLP_MAX_BODY_BYTES) {
-        await reader.cancel();
-        throw new OtlpBodyTooLargeError({
-          maxBytes: OTLP_MAX_BODY_BYTES,
-          encoding: null,
-        });
-      }
-      chunks.push(value);
-    }
+    return await drainWithinLimit(reader);
+  } catch (error) {
+    // The size refusal is our own verdict and keeps its own status; anything
+    // else ended the read from the other end of the connection.
+    if (error instanceof OtlpBodyTooLargeError) throw error;
+    throw new OtlpBodyUnreadableError({ cause: error });
   } finally {
-    reader.releaseLock();
+    releaseQuietly(reader);
   }
-
-  return Buffer.concat(chunks);
 }
 
 /**
@@ -159,7 +223,7 @@ export async function readOtlpBody(req: Request): Promise<ArrayBuffer> {
   // Settled before the body is read, so a request we are going to refuse
   // outright does not get to spend the read budget first.
   if (!isSupportedEncoding(encoding)) {
-    throw new Error(`Unsupported Content-Encoding: ${encoding}`);
+    throw new OtlpUnsupportedEncodingError({ encoding });
   }
 
   // Widened to the shared signature deliberately: the three entries differ in
@@ -179,7 +243,10 @@ export async function readOtlpBody(req: Request): Promise<ArrayBuffer> {
         encoding,
       });
     }
-    throw error;
+    // Anything else zlib raises here is a body that does not decompress —
+    // truncated by a disconnect, or not the encoding it claimed. Both are the
+    // sender's, and neither is a reason to answer 500.
+    throw new OtlpBodyUnreadableError({ cause: error });
   }
 }
 

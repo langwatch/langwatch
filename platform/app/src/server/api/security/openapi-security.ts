@@ -54,15 +54,17 @@ export function documentedPathOf(honoPath: string): string {
  * Which security schemes the published document offers for each credential
  * class.
  *
- * Only the two API-key families and `none` appear, and the omission is the
- * point: an empty requirement list is not OpenAPI for "you cannot call this",
- * it is OpenAPI for "no credential is required". That is true of a public
- * route and false of a session-only or internal one, so those two have no
- * entry and are refused instead of published as unauthenticated.
+ * Only the classes an API consumer can actually present appear here, and the
+ * omission is the point: an empty requirement list is not OpenAPI for "you
+ * cannot call this", it is OpenAPI for "no credential is required". That is
+ * true of a public route and false of a session-only or internal one, so those
+ * two have no entry and are refused instead of published as unauthenticated.
  */
 const SECURITY_BY_CREDENTIAL_CLASS = {
   project_api_key: [{ project_api_key: [] }],
   organization_api_key: [{ admin_api_key: [] }],
+  instance_admin_api_key: [{ instance_admin_key: [] }],
+  scim_token: [{ scim_bearer: [] }],
   none: [],
 } as const satisfies Record<
   Exclude<CredentialClass, "session" | "internal">,

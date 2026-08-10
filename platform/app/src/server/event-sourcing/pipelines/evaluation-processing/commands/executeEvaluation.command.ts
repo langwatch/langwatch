@@ -96,6 +96,14 @@ export interface ExecuteEvaluationCommandDeps {
     projectId: string,
   ) => Promise<Record<string, string> | null>;
   /**
+   * Emergency rollback for the langwatch#6397 settings recovery
+   * (`ops_evaluator_settings_recovery_disabled`, SYSTEM scope). Absent means
+   * recovery is ACTIVE — the shipped default. Injected so the command stays
+   * testable without a flag service. Wired in `pipelineRegistry.ts`; leaving it
+   * unwired makes the operator switch inert rather than failing loudly.
+   */
+  isSettingsRecoveryDisabled?: () => Promise<boolean>;
+  /**
    * Offloads oversized evaluator inputs to durable object storage before the
    * event is built, so `event_log.EventPayload` and the fold stay bounded
    * (ADR-040). Returns the inputs unchanged (inline) or a stored-object
@@ -115,6 +123,124 @@ const SCHEMA = defineCommandSchema(
   executeEvaluationCommandDataSchema,
   "Command to execute a single evaluation",
 );
+
+/**
+ * Keys that live alongside an evaluator's settings inside `config` but are
+ * metadata about the evaluator rather than input to the judge.
+ */
+const CONFIG_METADATA_KEYS = new Set(["evaluatorType", "settings"]);
+
+/**
+ * Where the settings handed to the judge came from.
+ *
+ * `top-level-recovery` is the langwatch#6397 case: the prompt the previous rule
+ * dropped. It is reported at the call site because AC0d asks for the PREVALENCE
+ * of affected evaluator configs, and this is the only place that knows an
+ * individual config was in the losing shape.
+ */
+export type EvaluatorSettingsSource =
+  | "config-settings"
+  | "top-level-recovery"
+  | "monitor-parameters";
+
+/**
+ * Resolves the settings sent to the judge for an online (monitor-driven) evaluation.
+ *
+ * Nothing guarantees `config.settings` exists: `EvaluatorService.create`/`.update` are raw
+ * passthroughs, and the copy/replicate tRPC flows write `config` straight through Prisma, so an
+ * evaluator can be stored with its prompt at the TOP LEVEL of `config`. The previous rule
+ * (`config.settings ?? parameters`) silently dropped that prompt and forwarded `monitor.parameters`
+ * — empty for newer monitors, per `schema.prisma`'s "new monitors may have empty" — at which point
+ * langevals applies its own strict default prompt and scores the trace 0. That is langwatch#6397:
+ * the customer saw 0 on every trace while the same prompt passed in the playground, because the
+ * playground posts the prompt from the form and never has to read it back.
+ *
+ * Precedence is deliberate: the evaluator's own config wins over `monitor.parameters`. The reverse
+ * ordering satisfies every other acceptance criterion identically while leaving the bug live for
+ * any monitor with populated `parameters`.
+ */
+export function resolveEvaluatorSettingsWithSource({
+  config,
+  parameters,
+  evaluatorRecordType,
+  recoveryDisabled = false,
+}: {
+  config: Record<string, unknown> | null | undefined;
+  parameters: Record<string, unknown> | null | undefined;
+  /**
+   * `Evaluator.type` of the linked record. REQUIRED, and deliberately not
+   * defaulted: an optional dependency that defaults to the safe value fails
+   * silently when a call site forgets it, which is exactly how this command's
+   * rollback flag shipped inert earlier in langwatch#6397. Making it required
+   * turns the same mistake into a compile error.
+   */
+  evaluatorRecordType: string | null | undefined;
+  /**
+   * Operator rollback (`ops_evaluator_settings_recovery_disabled`). Defaults to
+   * false so every caller that does not know about the flag — and the shipped
+   * configuration — gets the recovery.
+   */
+  recoveryDisabled?: boolean;
+}): {
+  settings: Record<string, unknown> | null | undefined;
+  source: EvaluatorSettingsSource;
+} {
+  if (!config) {
+    return { settings: parameters, source: "monitor-parameters" };
+  }
+
+  // An EMPTY `settings` is not a usable payload — it is the exact thing that
+  // scored every trace 0, since langevals substitutes its own strict default
+  // prompt for `{}`. It must not shadow a recoverable top-level prompt, and the
+  // shape is reachable from the customer's own UI: the evaluator editor loads
+  // `settings: config?.settings ?? {}` and saves that back, so the P1 reporter
+  // opening their evaluator to confirm the fix would otherwise re-break the row
+  // permanently. Emptiness is tested the same way here as on the recovery
+  // branch below — one rule, not two.
+  const nested = config.settings;
+  if (
+    nested &&
+    typeof nested === "object" &&
+    Object.keys(nested as Record<string, unknown>).length > 0
+  ) {
+    return {
+      settings: nested as Record<string, unknown>,
+      source: "config-settings",
+    };
+  }
+
+  if (recoveryDisabled) {
+    return { settings: parameters, source: "monitor-parameters" };
+  }
+
+  // Only "evaluator" (built-in) can have LOST settings. `evaluatorTypeSchema`
+  // in the evaluators router enumerates three, and the other two own their
+  // `config` shape outright: a code evaluator's is a VALID top-level
+  // `{ code, inputs, outputs }` per `codeEvaluatorConfigSchema`, and a workflow
+  // evaluator's is empty. Recovering from those hands a correct config to the
+  // judge as settings and counts healthy rows as affected.
+  //
+  // An allowlist, not a `!== "code"` denylist: a type added later gets the
+  // previous, safe behaviour rather than silently inheriting a recovery rule
+  // written before it existed. Compared inline, matching how this same file
+  // reads `type === "workflow"` at the call site below.
+  //
+  // Scope of the change, precisely: recovery is what this gates. The empty-
+  // `settings` rule above sits UPSTREAM of it and still applies to every type,
+  // so a non-built-in evaluator carrying `settings: {}` now falls back to
+  // `monitor.parameters` where the old rule returned the empty object.
+  if (evaluatorRecordType !== "evaluator") {
+    return { settings: parameters, source: "monitor-parameters" };
+  }
+
+  const recovered = Object.fromEntries(
+    Object.entries(config).filter(([key]) => !CONFIG_METADATA_KEYS.has(key)),
+  );
+
+  return Object.keys(recovered).length > 0
+    ? { settings: recovered, source: "top-level-recovery" }
+    : { settings: parameters, source: "monitor-parameters" };
+}
 
 /**
  * Command handler for executing evaluations.
@@ -160,6 +286,32 @@ export class ExecuteEvaluationCommand
       return `exec:${payload.tenantId}:thread:${payload.threadId}:${payload.evaluatorId}`;
     }
     return `exec:${payload.tenantId}:${payload.traceId}:${payload.evaluatorId}`;
+  }
+
+  /**
+   * Reads the emergency rollback flag, failing open to the shipped default
+   * (recovery ACTIVE).
+   *
+   * The lookup is resolved before `handle`'s try block, so an unguarded
+   * rejection would escape `handle()` entirely — no `skipped` and no `error`
+   * event for the trace. That would invert the flag's purpose: a safety valve
+   * would become a new way for every evaluation to fail. Catches synchronous
+   * throws as well as rejections, since `deps` is injected.
+   */
+  private async readSettingsRecoveryFlag(): Promise<boolean> {
+    try {
+      return (await this.deps.isSettingsRecoveryDisabled?.()) ?? false;
+    } catch (error) {
+      // Message only. The pino error serializer for...in-copies every enumerable
+      // property off a thrown error, so an HTTP or DB client error would print
+      // its request config / connection detail in cleartext. Same idiom as
+      // featureFlagStore.postgres.ts.
+      logger.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        "Settings-recovery rollback flag could not be read — leaving recovery active",
+      );
+      return false;
+    }
   }
 
   async handle(
@@ -297,10 +449,45 @@ export class ExecuteEvaluationCommand
     }
 
     // 4. Run evaluation via app-layer service
-    const settings = monitor.evaluator?.config
-      ? ((monitor.evaluator.config as Record<string, any>).settings ??
-        monitor.parameters)
-      : monitor.parameters;
+    const { settings, source: settingsSource } =
+      resolveEvaluatorSettingsWithSource({
+        config: monitor.evaluator?.config as Record<string, unknown> | null,
+        parameters: monitor.parameters as Record<string, unknown> | null,
+        evaluatorRecordType: monitor.evaluator?.type,
+        recoveryDisabled: await this.readSettingsRecoveryFlag(),
+      });
+
+    // AC0d wants the PREVALENCE of configs in the losing shape, and a prod SQL
+    // read was never available. This is the same number from the running system.
+    // Emitted at info so it survives production log levels.
+    //
+    // NO KEY NAMES. `config` is written through `z.record(z.unknown())` — the
+    // evaluator router validates nothing for the `evaluator` type, and the
+    // copy/replicate flows validate nothing at all — so top-level key NAMES are
+    // customer-controlled strings, not a fixed vocabulary. Echoing them into the
+    // shared log pipeline would be an exfiltration path for whatever a
+    // misconfigured integration wrote as a key. A count plus "did the prompt
+    // come back" answers AC0d without inspecting customer content at all.
+    //
+    // Volume, stated honestly: this fires once per affected EVALUATION, not once
+    // per affected evaluator, and write-side normalisation was NOT shipped (see
+    // the spec), so nothing converts these rows — it does not decay on its own.
+    // If it proves noisy, the operator lever is the rollback flag, which stops
+    // the recovery and the reporting together.
+    if (settingsSource === "top-level-recovery") {
+      logger.info(
+        {
+          tenantId,
+          // The monitor id: `getMonitorById(data.evaluatorId)` above. Distinct
+          // values of this pair ARE the prevalence count.
+          evaluatorId: data.evaluatorId,
+          traceId: data.traceId,
+          recoveredKeyCount: Object.keys(settings ?? {}).length,
+          recoveredPrompt: Object.hasOwn(settings ?? {}, "prompt"),
+        },
+        "Recovered evaluator settings from the top level of config — langwatch#6397 affected config",
+      );
+    }
 
     const workflowId =
       monitor.evaluator?.type === "workflow"

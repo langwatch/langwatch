@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  ClickHouseOverloadedError,
   ClickHouseUnavailableError,
   QueryMemoryExceededError,
 } from "~/server/app-layer/traces/errors";
@@ -350,6 +351,49 @@ describe("categorizeError", () => {
 });
 
 describe("classifyClickHouseError", () => {
+  /**
+   * Shedding exists so a busy platform refuses work instead of queueing it
+   * without limit. That only holds if the refusal is retryable: a job turned
+   * away BECAUSE ClickHouse was busy has to come back, not be dropped.
+   *
+   * The shed signal underneath — a full wait queue, or a wait that expired —
+   * carries no ClickHouse code and matches no transient message fragment, so
+   * classifying by the wrapped reasons alone made every shed statement
+   * CRITICAL. The verdict is on the handled shell, and has to be read there.
+   */
+  describe("when the platform shed the statement rather than queue it", () => {
+    /** @scenario a statement that waits too long is refused, not left waiting */
+    it("returns RECOVERABLE so the job is re-staged, not dropped", () => {
+      const shed = new ClickHouseOverloadedError({
+        reasons: [
+          new Error(
+            "ClickHouse concurrency queue is full (64 waiting). Shedding rather than queueing further.",
+          ),
+        ],
+      });
+
+      expect(classifyClickHouseError(shed)).toBe(ErrorCategory.RECOVERABLE);
+    });
+
+    it("returns RECOVERABLE for an expired wait, whose reason names no ClickHouse code", () => {
+      const shed = new ClickHouseOverloadedError({
+        reasons: [
+          new Error("Aborted while waiting for a ClickHouse concurrency slot."),
+        ],
+      });
+
+      expect(classifyClickHouseError(shed)).toBe(ErrorCategory.RECOVERABLE);
+    });
+
+    it("still treats an unrelated handled error by its cause", () => {
+      const notShed = new ClickHouseUnavailableError({
+        reasons: [new Error("some permanent schema problem")],
+      });
+
+      expect(classifyClickHouseError(notShed)).toBe(ErrorCategory.CRITICAL);
+    });
+  });
+
   describe("when error has a transient ClickHouse error code", () => {
     it("returns RECOVERABLE for code 202 (TOO_MANY_SIMULTANEOUS_QUERIES)", () => {
       const err = Object.assign(new Error("Too many simultaneous queries"), {

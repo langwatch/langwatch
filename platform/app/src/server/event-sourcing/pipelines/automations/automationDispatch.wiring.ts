@@ -13,6 +13,10 @@ import {
   consumeTenantEmailCapSlot,
 } from "~/server/app-layer/automations/dispatch/emailCaps";
 import { dispatchGraphAlertAction } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
+import {
+  consumePersistCapSlot,
+  resolvePersistDailyCap,
+} from "~/server/app-layer/automations/dispatch/persistCap";
 import type { EmailSuppressionService } from "~/server/app-layer/automations/emailSuppression.service";
 import {
   evaluateGraphTrigger,
@@ -26,6 +30,8 @@ import {
   type GraphTriggerSweepCandidate,
 } from "~/server/app-layer/automations/graph-trigger-heartbeat";
 import { PrismaGraphTriggerSentRepository } from "~/server/app-layer/automations/repositories/trigger.prisma.repository";
+import { defaultRunawayContainmentDeps } from "~/server/app-layer/automations/runaway-containment.deps";
+import { handlePersistCapBreach } from "~/server/app-layer/automations/runaway-containment.service";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import { WebhookDeliveryService } from "~/server/app-layer/automations/webhook-delivery.service";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
@@ -152,8 +158,8 @@ export function buildAutomationDispatchPorts({
     loadCustomGraph: async ({ customGraphId, projectId }) =>
       customGraphs.getById({ customGraphId, projectId }),
     loadProject: async (projectId) => projects.getById(projectId),
-    getTimeseries: async (input) =>
-      getApp().analytics.service.getTimeseries(input),
+    getTimeseries: async (input, options) =>
+      getApp().analytics.service.getTimeseries(input, options),
     triggerSent: graphTriggerSentRepo,
     updateLastRunAt: async ({ triggerId, projectId }) =>
       triggers.updateLastRunAt(triggerId, projectId),
@@ -277,6 +283,20 @@ export function buildAutomationDispatchPorts({
       await createManyDatasetRecords(params);
     },
     recordWebhookDelivery,
+    resolvePersistDailyCap: (projectId) => resolvePersistDailyCap(projectId),
+    consumePersistCapSlot: (params) => consumePersistCapSlot(params),
+    handlePersistCapBreach: (breach) =>
+      handlePersistCapBreach(
+        defaultRunawayContainmentDeps({
+          prisma,
+          triggers,
+          projects,
+          emailSuppressions,
+          baseHost,
+          resolveClickHouseClient,
+        }),
+        breach,
+      ),
   };
 
   return {
