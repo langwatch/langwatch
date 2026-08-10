@@ -56,7 +56,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
         {
           id: TEAM_ID,
           name: "platform",
-          projects: [{ id: PROJECT_ID, name: "web-app" }],
+          projects: [{ id: PROJECT_ID, name: "web-app", slug: "web-app" }],
         },
       ],
     },
@@ -341,6 +341,29 @@ describe("given the edit drawer for an existing key", () => {
       );
       await save();
       expect(lastUpdateInput().config.providersAllowed).toBeNull();
+    });
+  });
+
+  describe("when the key's traces land in a project the viewer can open", () => {
+    it("offers the trace destination's traces next to where they land", async () => {
+      renderDrawer({ traceProjectId: PROJECT_ID, traceProjectArchived: false });
+
+      const href = await waitFor(() =>
+        screen.getByTestId("vk-view-traces").closest("a")?.getAttribute("href"),
+      );
+      expect(href?.startsWith("/web-app/traces#all-traces?")).toBe(true);
+      expect(href).toContain(encodeURIComponent(`"${VK_ID}"`));
+    });
+  });
+
+  describe("when the project the key traces into was deleted", () => {
+    it("keeps the Deleted badge and offers no way to open its traces", async () => {
+      renderDrawer({ traceProjectId: PROJECT_ID, traceProjectArchived: true });
+
+      await waitFor(() =>
+        expect(screen.getByTestId("vk-trace-destination-deleted")).toBeTruthy(),
+      );
+      expect(screen.queryByTestId("vk-view-traces")).toBeNull();
     });
   });
 });

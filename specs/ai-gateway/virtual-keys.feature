@@ -124,6 +124,36 @@ Feature: AI Gateway — Virtual Keys
     And the dev-sandbox-legacy row shows "never" in muted text
 
   # ============================================================================
+  # Reading a key's traces
+  #
+  # The gateway stamps the virtual key id on every span it proxies and the
+  # trace fold hoists it onto the trace summary, so the destination project's
+  # Trace Explorer can filter to one key. The action is only offered when it
+  # leads somewhere the reader can actually open.
+  # ============================================================================
+
+  @integration
+  Scenario: View traces opens the key's destination filtered to that key
+    Given virtual key "prod-key" files its traces into the project "web-app"
+    And I am a member of the team that holds "web-app"
+    When I choose "View traces" for "prod-key"
+    Then the Trace Explorer for "web-app" opens
+    And it lists only the traces that key produced, over the last 30 days
+
+  @integration
+  Scenario: View traces is absent when the key has no trace destination
+    Given virtual key "legacy-key" has no trace destination
+    When I look at the actions for "legacy-key"
+    Then "View traces" is not offered
+
+  @integration
+  Scenario: View traces is absent when the trace destination was deleted
+    Given virtual key "prod-key" files its traces into a project that was deleted
+    When I look at the actions for "prod-key"
+    Then "View traces" is not offered
+    And the trace destination is still badged as deleted
+
+  # ============================================================================
   # Create-drawer capability preview (Lane B iter 23) — minimum-viable
   # creation surface with a read-only preview of advanced settings.
   #
