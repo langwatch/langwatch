@@ -573,20 +573,20 @@ Feature: Credential Validation
   # answer about the endpoint they just replaced.
   # ──────────────────────────────────────────────────────────────────────
 
-  @unit
+  @integration
   Scenario: A provider that cannot be checked offers no control
     Given I am configuring a provider whose credentials cannot be probed
     When I have filled in every field
     Then no way to check the connection is offered
     And I am not told the connection works
 
-  @unit
+  @integration
   Scenario: Both places agree on which providers can be checked
     Given a provider that offers no way to check the connection in the drawer
     When I look at that provider in the list
     Then no way to check the connection is offered there either
 
-  @unit
+  @integration
   Scenario: Checking is unavailable until the credential is complete
     Given I am configuring a provider that can be checked
     And one required field is still empty
@@ -594,7 +594,7 @@ Feature: Credential Validation
     Then it is offered but cannot be used
     And filling in the last field makes it usable
 
-  @unit
+  @integration
   Scenario: A credential the provider's own rules reject cannot be checked
     Given a provider that accepts a project and a location together or not at all
     And I have filled in the project but not the location
@@ -605,7 +605,7 @@ Feature: Credential Validation
   # editing an endpoint is looking at a real endpoint and a masked key. The
   # check has to be about both halves or it is about neither.
 
-  @unit
+  @integration
   Scenario: Checking after changing an endpoint uses the endpoint on screen
     Given I have a configured provider
     And I have changed its endpoint and entered the credential again
@@ -613,7 +613,7 @@ Feature: Credential Validation
     Then the endpoint I am looking at is the one checked
     And the endpoint that was stored is not checked
 
-  @unit
+  @integration
   Scenario: Changing an endpoint without the credential asks for the credential
     Given I have a configured provider whose credential is hidden
     And I have changed its endpoint but not re-entered the credential
@@ -621,14 +621,14 @@ Feature: Credential Validation
     Then I am asked to enter the credential again
     And the stored credential is not sent anywhere
 
-  @unit
+  @integration
   Scenario: An unchanged provider is still checked against what is stored
     Given I have a configured provider I have not edited
     When I check the connection
     Then the stored credential is used
     And I am not asked to enter it again
 
-  @unit
+  @integration
   Scenario: Checking does not save
     Given I am configuring a provider and have not saved it
     When I check the connection and am told it works
@@ -641,13 +641,13 @@ Feature: Credential Validation
   # is worth pinning is that the drawer reaches that validator rather than
   # some path around it, which the scenarios above do.
 
-  @unit
+  @integration
   Scenario: A result disappears when I change the credential
     Given I have checked a connection from the drawer and been told it works
     When I change any credential field
     Then the earlier result is no longer shown
 
-  @unit
+  @integration
   Scenario: A result still in flight when I change the credential is discarded
     Given I have asked for a check from the drawer and the answer has not arrived
     When I change a credential field before it does

@@ -970,9 +970,19 @@ export class ModelProviderService {
    * while this route could only be reached by saving — a refusal arms a gate
    * that lets the next save through unprobed, so nobody could sit on it — and
    * stops being survivable the moment a control checks without saving.
+   *
+   * The organization the budget is charged to has to be one the caller can
+   * actually reach, and that needs asserting here rather than assumed. When a
+   * project anchors the call the route has already authorized it, so the
+   * organization derived from it is trustworthy. When nothing but an
+   * organization handle arrives, it is a value the caller chose: left
+   * unchecked, naming someone else's organization spends *their* budget, which
+   * both hands the caller an unlimited supply of fresh buckets and denies the
+   * real owner a control they are entitled to.
    */
   async validateCredential({
     input,
+    ctx,
   }: {
     input: {
       projectId?: string;
@@ -980,6 +990,7 @@ export class ModelProviderService {
       provider: string;
       customKeys: Record<string, string>;
     };
+    ctx: AuthzContext;
   }): Promise<ValidationResult> {
     const anchor = await this.resolveOrganizationAnchor({
       projectId: input.projectId,
@@ -987,6 +998,14 @@ export class ModelProviderService {
     });
     if (!anchor) {
       throw new ModelProviderAnchorRequiredError("project_or_organization");
+    }
+
+    // Only the caller-supplied path needs the check: an anchor derived from a
+    // project came through the route's project permission gate to get here.
+    if (!input.projectId) {
+      await assertCanManageAllScopes(ctx, [
+        { scopeType: "ORGANIZATION", scopeId: anchor },
+      ]);
     }
 
     await assertTestConnectionWithinBudget(anchor);

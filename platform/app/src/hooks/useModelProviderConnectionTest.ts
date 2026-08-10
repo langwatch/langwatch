@@ -34,7 +34,6 @@ import {
  */
 type ConnectionTestResult = ValidationResult;
 
-
 export function useModelProviderConnectionTest({
   projectId,
   organizationId,
@@ -110,7 +109,7 @@ export function useModelProviderConnectionTest({
           organizationId,
         });
 
-        setResult(modelProviderId, toConnectionTestState(result), asked);
+        setResult(modelProviderId, toConnectionTestState({ result }), asked);
       } catch (error) {
         // Not `error.message`: a handled error's message is replaced by its
         // stable code on the wire, so reading it renders a slug like

@@ -90,6 +90,43 @@ export function useCredentialCheck({
     setState(undefined);
   }, [credentialsFingerprint, modelProviderId]);
 
+  /**
+   * Ask whichever route can answer about what is on screen.
+   *
+   * A saved row is checked where it lives, so the settings only travel when
+   * they differ from it — an untouched form would send a blank or masked key
+   * and come back "no credential" for a provider that is configured fine. A row
+   * that does not exist yet has nothing but the typed credential to send.
+   */
+  const ask = useCallback(async () => {
+    if (modelProviderId) {
+      return await testConnection({
+        modelProviderId,
+        projectId,
+        organizationId,
+        ...(hasEdits ? { customKeys } : {}),
+      });
+    }
+
+    return await validateApiKey({
+      projectId,
+      organizationId,
+      provider,
+      customKeys,
+      scopes: scopes && scopes.length > 0 ? scopes : undefined,
+    });
+  }, [
+    customKeys,
+    hasEdits,
+    modelProviderId,
+    organizationId,
+    projectId,
+    provider,
+    scopes,
+    testConnection,
+    validateApiKey,
+  ]);
+
   const check = useCallback(async () => {
     const asked = credentialsFingerprint;
     // Discard anything that arrives about credentials the customer has since
@@ -105,25 +142,12 @@ export function useCredentialCheck({
     setState({ status: "testing" });
 
     try {
-      const result = modelProviderId
-        ? await testConnection({
-            modelProviderId,
-            projectId,
-            organizationId,
-            // Only when there is something the row does not already know.
-            // Sending an untouched form would send a blank or masked key and
-            // get back "no credential" for a provider that is configured fine.
-            ...(hasEdits ? { customKeys } : {}),
-          })
-        : await validateApiKey({
-            projectId,
-            organizationId,
-            provider,
-            customKeys,
-            scopes: scopes && scopes.length > 0 ? scopes : undefined,
-          });
-
-      settle(toConnectionTestState(result, describeUncheckedInDrawer));
+      settle(
+        toConnectionTestState({
+          result: await ask(),
+          describeUnchecked: describeUncheckedInDrawer,
+        }),
+      );
     } catch (error) {
       // Not `error.message`: a handled error's message is replaced by its
       // stable code on the wire, so reading it renders a slug like
@@ -138,18 +162,7 @@ export function useCredentialCheck({
         }),
       });
     }
-  }, [
-    credentialsFingerprint,
-    customKeys,
-    hasEdits,
-    modelProviderId,
-    organizationId,
-    projectId,
-    provider,
-    scopes,
-    testConnection,
-    validateApiKey,
-  ]);
+  }, [ask, credentialsFingerprint]);
 
   return { state, check };
 }

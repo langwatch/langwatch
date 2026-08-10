@@ -177,10 +177,12 @@ describe("Feature: checking a credential from the drawer it was typed into", () 
       expect(checkButton()).toBeDisabled();
     });
 
-    it("becomes usable once the credential is entered", async () => {
-      await userEvent.type(inputFor("OPENAI_API_KEY"), "sk-typed-just-now");
+    describe("when the credential is entered", () => {
+      it("becomes usable", async () => {
+        await userEvent.type(inputFor("OPENAI_API_KEY"), "sk-typed-just-now");
 
-      await waitFor(() => expect(checkButton()).toBeEnabled());
+        await waitFor(() => expect(checkButton()).toBeEnabled());
+      });
     });
   });
 
@@ -190,16 +192,18 @@ describe("Feature: checking a credential from the drawer it was typed into", () 
       renderDrawer({ modelProviderId: "new", providerKey: "gemini" });
     });
 
-    /** @scenario "A credential the provider's own rules reject cannot be checked" */
-    it("stays unusable when only half the pair is filled in", async () => {
-      // Every *required* field is satisfied here — the project and location
-      // are both optional on their own. Only the provider's own schema knows
-      // that one without the other is not a credential, which is why the rule
-      // asks the schema rather than counting empty required fields.
-      await userEvent.type(inputFor("GEMINI_API_KEY"), "a-real-key");
-      await userEvent.type(inputFor("GEMINI_PROJECT"), "my-project");
+    describe("when only half the pair is filled in", () => {
+      /** @scenario "A credential the provider's own rules reject cannot be checked" */
+      it("stays unusable", async () => {
+        // Every *required* field is satisfied here — the project and location
+        // are both optional on their own. Only the provider's own schema knows
+        // that one without the other is not a credential, which is why the rule
+        // asks the schema rather than counting empty required fields.
+        await userEvent.type(inputFor("GEMINI_API_KEY"), "a-real-key");
+        await userEvent.type(inputFor("GEMINI_PROJECT"), "my-project");
 
-      await waitFor(() => expect(checkButton()).toBeDisabled());
+        await waitFor(() => expect(checkButton()).toBeDisabled());
+      });
     });
 
     it("becomes usable when the pair is completed", async () => {
@@ -224,22 +228,24 @@ describe("Feature: checking a credential from the drawer it was typed into", () 
       renderDrawer({ modelProviderId: "row-openai", providerKey: "openai" });
     });
 
-    /** @scenario "An unchanged provider is still checked against what is stored" */
-    it("checks the stored credential without asking for it again", async () => {
-      await userEvent.click(checkButton()!);
+    describe("when I check the connection", () => {
+      /** @scenario "An unchanged provider is still checked against what is stored" */
+      it("checks the stored credential without asking for it again", async () => {
+        await userEvent.click(checkButton()!);
 
-      await waitFor(() => expect(mockTestConnection).toHaveBeenCalled());
-      const [sent] = mockTestConnection.mock.calls[0]!;
-      // No settings travel with the call, so the server reads the row. This
-      // is the only way to check a key the form deliberately never shows.
-      expect(sent.customKeys).toBeUndefined();
-      expect(sent.modelProviderId).toBe("row-openai");
-    });
+        await waitFor(() => expect(mockTestConnection).toHaveBeenCalled());
+        const [sent] = mockTestConnection.mock.calls[0]!;
+        // No settings travel with the call, so the server reads the row. This
+        // is the only way to check a key the form deliberately never shows.
+        expect(sent.customKeys).toBeUndefined();
+        expect(sent.modelProviderId).toBe("row-openai");
+      });
 
-    it("reports the verdict where the customer is looking", async () => {
-      await userEvent.click(checkButton()!);
+      it("reports the verdict where the customer is looking", async () => {
+        await userEvent.click(checkButton()!);
 
-      expect(await screen.findByText("Connection works")).toBeTruthy();
+        expect(await screen.findByText("Connection works")).toBeTruthy();
+      });
     });
   });
 
@@ -256,53 +262,57 @@ describe("Feature: checking a credential from the drawer it was typed into", () 
       renderDrawer({ modelProviderId: "row-openai", providerKey: "openai" });
     });
 
-    /** @scenario "Checking after changing an endpoint uses the endpoint on screen" */
-    it("checks the endpoint on screen once the credential is entered again", async () => {
-      await userEvent.clear(inputFor("OPENAI_BASE_URL"));
-      await userEvent.type(
-        inputFor("OPENAI_BASE_URL"),
-        "https://new.example.com/v1",
-      );
-      await userEvent.clear(inputFor("OPENAI_API_KEY"));
-      await userEvent.type(inputFor("OPENAI_API_KEY"), "sk-typed-just-now");
+    describe("when I enter the credential again and check", () => {
+      /** @scenario "Checking after changing an endpoint uses the endpoint on screen" */
+      it("checks the endpoint on screen", async () => {
+        await userEvent.clear(inputFor("OPENAI_BASE_URL"));
+        await userEvent.type(
+          inputFor("OPENAI_BASE_URL"),
+          "https://new.example.com/v1",
+        );
+        await userEvent.clear(inputFor("OPENAI_API_KEY"));
+        await userEvent.type(inputFor("OPENAI_API_KEY"), "sk-typed-just-now");
 
-      await userEvent.click(checkButton()!);
+        await userEvent.click(checkButton()!);
 
-      await waitFor(() => expect(mockTestConnection).toHaveBeenCalled());
-      const [sent] = mockTestConnection.mock.calls[0]!;
-      expect(sent.customKeys?.OPENAI_BASE_URL).toBe(
-        "https://new.example.com/v1",
-      );
-      expect(sent.customKeys?.OPENAI_API_KEY).toBe("sk-typed-just-now");
+        await waitFor(() => expect(mockTestConnection).toHaveBeenCalled());
+        const [sent] = mockTestConnection.mock.calls[0]!;
+        expect(sent.customKeys?.OPENAI_BASE_URL).toBe(
+          "https://new.example.com/v1",
+        );
+        expect(sent.customKeys?.OPENAI_API_KEY).toBe("sk-typed-just-now");
+      });
     });
 
-    /** @scenario "Changing an endpoint without the credential asks for the credential" */
-    it("asks for the credential rather than reaching for the stored one", async () => {
-      // The server refuses to pair a stored secret with an address from the
-      // request, so a masked credential comes back unchecked. What the
-      // customer needs is the next step, not an apology about storage.
-      mockTestConnection.mockResolvedValue({
-        outcome: "unchecked",
-        valid: true,
-        reason: "credential_masked",
+    describe("when I check without re-entering the credential", () => {
+      /** @scenario "Changing an endpoint without the credential asks for the credential" */
+      it("asks for the credential rather than reaching for the stored one", async () => {
+        // The server refuses to pair a stored secret with an address from the
+        // request, so a masked credential comes back unchecked. What the
+        // customer needs is the next step, not an apology about storage.
+        mockTestConnection.mockResolvedValue({
+          outcome: "unchecked",
+          valid: true,
+          reason: "credential_masked",
+        });
+
+        await userEvent.clear(inputFor("OPENAI_BASE_URL"));
+        await userEvent.type(
+          inputFor("OPENAI_BASE_URL"),
+          "https://new.example.com/v1",
+        );
+
+        await userEvent.click(checkButton()!);
+
+        expect(
+          await screen.findByText(
+            "Enter the credential again to check these settings.",
+          ),
+        ).toBeTruthy();
+
+        const [sent] = mockTestConnection.mock.calls[0]!;
+        expect(sent.customKeys?.OPENAI_API_KEY).toBe(MASKED_KEY_PLACEHOLDER);
       });
-
-      await userEvent.clear(inputFor("OPENAI_BASE_URL"));
-      await userEvent.type(
-        inputFor("OPENAI_BASE_URL"),
-        "https://new.example.com/v1",
-      );
-
-      await userEvent.click(checkButton()!);
-
-      expect(
-        await screen.findByText(
-          "Enter the credential again to check these settings.",
-        ),
-      ).toBeTruthy();
-
-      const [sent] = mockTestConnection.mock.calls[0]!;
-      expect(sent.customKeys?.OPENAI_API_KEY).toBe(MASKED_KEY_PLACEHOLDER);
     });
   });
 
@@ -312,24 +322,26 @@ describe("Feature: checking a credential from the drawer it was typed into", () 
       renderDrawer({ modelProviderId: "new", providerKey: "openai" });
     });
 
-    /** @scenario "Checking does not save" */
-    it("checks the credential without creating the provider", async () => {
-      await userEvent.type(inputFor("OPENAI_API_KEY"), "sk-typed-just-now");
-      await userEvent.click(checkButton()!);
+    describe("when I check the credential I have typed", () => {
+      /** @scenario "Checking does not save" */
+      it("checks it without creating the provider", async () => {
+        await userEvent.type(inputFor("OPENAI_API_KEY"), "sk-typed-just-now");
+        await userEvent.click(checkButton()!);
 
-      await waitFor(() =>
-        expect(mockValidateApiKeyMutation).toHaveBeenCalled(),
-      );
-      expect(mockMutateAsync).not.toHaveBeenCalled();
-    });
+        await waitFor(() =>
+          expect(mockValidateApiKeyMutation).toHaveBeenCalled(),
+        );
+        expect(mockMutateAsync).not.toHaveBeenCalled();
+      });
 
-    it("says what is still left to do, so a pass does not read as a save", async () => {
-      await userEvent.type(inputFor("OPENAI_API_KEY"), "sk-typed-just-now");
-      await userEvent.click(checkButton()!);
+      it("says what is still left to do, so a pass does not read as a save", async () => {
+        await userEvent.type(inputFor("OPENAI_API_KEY"), "sk-typed-just-now");
+        await userEvent.click(checkButton()!);
 
-      expect(
-        await screen.findByText("Save to finish adding this provider."),
-      ).toBeTruthy();
+        expect(
+          await screen.findByText("Save to finish adding this provider."),
+        ).toBeTruthy();
+      });
     });
 
     /** @scenario "A result disappears when I change the credential" */

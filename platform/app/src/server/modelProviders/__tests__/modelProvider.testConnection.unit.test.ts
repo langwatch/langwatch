@@ -180,7 +180,9 @@ describe("testConnection", () => {
 
     it("still refuses a caller who cannot manage the row", async () => {
       // Supplying settings does not route around the row: it is still looked
-      // up, still scope-checked, and still counted against the budget.
+      // up and still scope-checked. The budget is deliberately not reached —
+      // a caller who cannot manage the row is refused rather than throttled,
+      // so their attempt never spends the organization's allowance.
       findByIdForOrganizationMock.mockResolvedValueOnce(orgScopedRow());
       hasOrganizationPermissionMock.mockResolvedValue(false);
 
@@ -196,6 +198,7 @@ describe("testConnection", () => {
       ).rejects.toBeInstanceOf(ModelProviderScopeForbiddenError);
 
       expect(validateProviderApiKeyMock).not.toHaveBeenCalled();
+      expect(rateLimitMock).not.toHaveBeenCalled();
     });
 
     /** @scenario "Testing an organization-scoped provider reaches its credential" */
@@ -341,6 +344,7 @@ describe("testConnection", () => {
             provider: "openai",
             customKeys: { OPENAI_API_KEY: "sk-typed-just-now" },
           },
+          ctx,
         }),
       ).rejects.toBeInstanceOf(ModelProviderTestRateLimitedError);
 
@@ -354,6 +358,7 @@ describe("testConnection", () => {
           provider: "openai",
           customKeys: { OPENAI_API_KEY: "sk-typed-just-now" },
         },
+        ctx,
       });
 
       // The same keys, so a caller cannot double their allowance by
@@ -372,11 +377,35 @@ describe("testConnection", () => {
           provider: "openai",
           customKeys: { OPENAI_API_KEY: "sk-typed-just-now" },
         },
+        ctx,
       });
 
       expect(validateProviderApiKeyMock).toHaveBeenCalledWith("openai", {
         OPENAI_API_KEY: "sk-typed-just-now",
       });
+    });
+
+    it("refuses to spend the budget of an organization the caller cannot manage", async () => {
+      // The organization handle is a value the caller chose, and it is the
+      // rate-limit key. Unchecked, naming someone else's organization spends
+      // their allowance — which both supplies the caller with an endless run
+      // of fresh buckets and denies the real owner a control they are entitled
+      // to. Nothing goes out, and nothing is counted.
+      hasOrganizationPermissionMock.mockResolvedValue(false);
+
+      await expect(
+        service().validateCredential({
+          input: {
+            organizationId: "org_someone_else",
+            provider: "openai",
+            customKeys: { OPENAI_API_KEY: "sk-typed-just-now" },
+          },
+          ctx,
+        }),
+      ).rejects.toBeInstanceOf(ModelProviderScopeForbiddenError);
+
+      expect(rateLimitMock).not.toHaveBeenCalled();
+      expect(validateProviderApiKeyMock).not.toHaveBeenCalled();
     });
   });
 

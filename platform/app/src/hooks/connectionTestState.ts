@@ -65,12 +65,16 @@ export const uncheckedMessage = (reason: UncheckedReason): string => {
  *   stored-credential check and the typed-credential one return this shape, so
  *   one mapping covers the list and the drawer.
  * @param describeUnchecked - Copy for a check that did not run. Defaults to the
- *   reading-only wording above.
+ *   reading-only wording above. Named rather than positional, so the second
+ *   argument still reads at the call site once a third exists.
  */
-export function toConnectionTestState(
-  result: ValidationResult,
-  describeUnchecked: (reason: UncheckedReason) => string = uncheckedMessage,
-): ConnectionTestState {
+export function toConnectionTestState({
+  result,
+  describeUnchecked = uncheckedMessage,
+}: {
+  result: ValidationResult;
+  describeUnchecked?: (reason: UncheckedReason) => string;
+}): ConnectionTestState {
   if (result.outcome === "verified") {
     return { status: "works" };
   }

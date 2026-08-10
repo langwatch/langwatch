@@ -289,6 +289,7 @@ export const modelProviderRouter = createTRPCRouter({
           provider: input.provider,
           customKeys: input.customKeys,
         },
+        ctx: { prisma: ctx.prisma, session: ctx.session },
       });
     }),
 
