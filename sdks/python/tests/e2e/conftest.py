@@ -20,7 +20,7 @@ import pytest
 
 import langwatch
 
-from tag_registry import SessionTagRegistry
+from fixtures.tag_registry import SessionTagRegistry
 
 logger = logging.getLogger(__name__)
 

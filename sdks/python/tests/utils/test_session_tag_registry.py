@@ -1,10 +1,10 @@
 """
 Unit tests for the session-scoped tag registry used by the e2e tag fixtures.
 
-Deliberately unmarked, so `make test-unit` runs them without an API key: the
-accounting they cover is what turns a silent teardown failure into a visible
-one, and a guard that only runs when the e2e secrets are present would be
-absent from exactly the runs that need it most.
+Marked `unit` and kept out of `tests/e2e/`, so `make test-unit` runs them with
+no API key and no backend. The accounting they cover is what turns a silent
+teardown failure into a visible one, and a guard that only ran when the e2e
+secrets are present would be absent from exactly the runs that need it most.
 
 The e2e suite itself proves the fixtures talk to the real backend. These prove
 the ledger underneath them counts correctly, including the paths a real run
@@ -14,7 +14,9 @@ runs at all).
 
 from typing import List, Tuple
 
-from tag_registry import SessionTagRegistry
+import pytest
+
+from fixtures.tag_registry import SessionTagRegistry
 
 
 def _recording_deleter(fails: List[str]):
@@ -28,6 +30,7 @@ def _recording_deleter(fails: List[str]):
     return delete, calls
 
 
+@pytest.mark.unit
 class TestSessionTagRegistry:
     def test_reports_nothing_created_for_an_untouched_session(self):
         registry = SessionTagRegistry()
