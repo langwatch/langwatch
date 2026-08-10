@@ -22,6 +22,14 @@ describe("PLATFORM_TOOL_POLICIES", () => {
         allowOtelDirect: false,
       });
     });
+
+    /** @scenario Copilot's default platform policy allows both paths */
+    it("allows both paths for copilot (ADR-039: native OTel + BYOK gateway)", () => {
+      expect(PLATFORM_TOOL_POLICIES.copilot).toEqual({
+        allowVk: true,
+        allowOtelDirect: true,
+      });
+    });
   });
 });
 

@@ -49,6 +49,7 @@ function buildPipeline() {
     codingAgentSessionStore: store,
     codingAgentTraceSessionAppendStore: store,
     sessionMetricSeriesAppendStore: store,
+    codingAgentSessionEventsAppendStore: store,
   });
 }
 

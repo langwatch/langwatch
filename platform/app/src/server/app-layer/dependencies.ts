@@ -30,6 +30,7 @@ import type { AppCommands } from "../event-sourcing/pipelineRegistry";
 import type { ExperimentService } from "../experiments/experiment.service";
 import type { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";
 import type { OpsExplainService } from "../ops/opsExplain.service";
+import type { TraceEditOverlayService } from "../traces/edit-overlay/traceEditOverlay.service";
 import type { EmailSuppressionService } from "./automations/emailSuppression.service";
 import type { TriggerService } from "./automations/trigger.service";
 import type {
@@ -38,16 +39,20 @@ import type {
 } from "./automations/trigger-template.service";
 import type { BroadcastService } from "./broadcast/broadcast.service";
 import type { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
+import type { PullRequestUsageService } from "./coding-agent/pull-request-usage.service";
 import type { AppConfig } from "./config";
 import type { DspyStepService } from "./dspy-steps/dspy-step.service";
 import type { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
 import type { EvaluationRunService } from "./evaluations/evaluation-run.service";
 import type { MonitorPerformanceService } from "./evaluations/monitor-performance.service";
 import type { TraceEvaluationsRepository } from "./evaluations/repositories/trace-evaluations.clickhouse.repository";
+import type { GithubInstallationsService } from "./github/github-installations.service";
+import type { GithubPullRequestMappingService } from "./github/github-pull-request-mapping.service";
+import type { GithubPullRequestStatusService } from "./github/github-pull-request-status.service";
+import type { GithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
 import type { LangyCredentialService } from "./langy/LangyCredentialService";
 import type { LangyConversationService } from "./langy/langy-conversation.service";
 import type { LangyFeedbackPromptService } from "./langy/langy-feedback-prompt.service";
-import type { LangyGithubInstallationsService } from "./langy/langy-github-installations.service";
 import type { LangyMessageService } from "./langy/langy-message.service";
 import type { LangyTurnService } from "./langy/langy-turn.service";
 import type { BlobStoreService } from "./ops/blob-store.service";
@@ -75,6 +80,7 @@ import type { TopicClusteringStatusService } from "./topic-clustering/topic-clus
 import type { LogRecordStorageService } from "./traces/log-record-storage.service";
 import type { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import type { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
+import type { SessionGroupsService } from "./traces/session-groups.service";
 import type { SpanStorageService } from "./traces/span-storage.service";
 import type { TokenizerService } from "./traces/tokenizer.service";
 import type { TraceListService } from "./traces/trace-list.service";
@@ -108,11 +114,15 @@ export interface AppDependencies {
   traces: {
     summary: TraceSummaryService;
     list: TraceListService;
+    /** Sessions lens: server-side per-conversation rollups (specs/traces-v2/sessions-lens.feature). */
+    sessionGroups: SessionGroupsService;
     spans: SpanStorageService;
     logRecords: LogRecordStorageService;
     collection: TraceRequestCollectionService;
     logCollection: LogRequestCollectionService;
     metricCollection: MetricRequestCollectionService;
+    /** Reviewer corrections applied over a captured trace at read time. */
+    editOverlay: TraceEditOverlayService;
   };
   evaluations: {
     runs: EvaluationRunService;
@@ -246,6 +256,24 @@ export interface AppDependencies {
   /** ADR-056: read side of the coding-agent session aggregate. */
   codingAgents: {
     sessions: CodingAgentSessionService;
+    /** What a pull request cost in assistant usage, RBAC-scoped. */
+    pullRequestUsage: PullRequestUsageService;
+  };
+  /**
+   * The organization's GitHub connection, consumed by Langy for writes and by
+   * pull-request linkage for reads.
+   */
+  github: {
+    installations: GithubInstallationsService;
+    /**
+     * Branch to pull-request linkage: the mapping that discovers and stores
+     * them, the live status read, and the store both sit on.
+     */
+    pullRequests: {
+      mapping: GithubPullRequestMappingService;
+      status: GithubPullRequestStatusService;
+      repository: GithubPullRequestsRepository;
+    };
   };
   /** Cross-tenant stored-object lookups — the documented, project-filter-free
    *  exception `/api/files/:id` uses to resolve an id's owning project before
@@ -265,7 +293,6 @@ export interface AppDependencies {
     conversations: LangyConversationService;
     turns: LangyTurnService;
     messages: LangyMessageService;
-    githubInstallations: LangyGithubInstallationsService;
     credentials: LangyCredentialService;
     feedbackPrompt: LangyFeedbackPromptService;
   };

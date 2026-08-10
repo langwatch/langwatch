@@ -250,11 +250,17 @@ export async function platformSSOAllowed(): Promise<boolean> {
  *
  * Both builders only ever produce an entry for `NEXTAUTH_PROVIDER`, so
  * "produced nothing" means the deployment named a provider that this build
- * cannot mount — an id it does not know (`azureAd` for `azure-ad`, or one
+ * cannot mount: an id it does not know (`azureAd` for `azure-ad`, or one
  * that was never implemented), or a known id whose client credentials are
  * missing.
+ *
+ * Exported because the authentication settings page reports this state. Email
+ * mode is the safe landing for it (see `resolveAuthProvider`), but it is
+ * indistinguishable on screen from a deployment that never configured single
+ * sign-on at all, and an operator who cannot tell those apart may believe
+ * federation is being enforced when it is not.
  */
-function authProviderIsMounted(): boolean {
+export function authProviderIsMounted(): boolean {
   return (
     Object.keys(buildSocialProviders(env)).length > 0 ||
     buildGenericOAuthConfigs(env).length > 0

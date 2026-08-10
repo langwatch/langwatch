@@ -11,9 +11,10 @@ import {
   getTeamRolePermissions,
 } from "~/server/api/rbac";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
-import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
+import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
 import type { RoleService } from "~/server/role/role.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { isBindingRoleAllowedForOrganizationRole } from "~/utils/memberRoleConstraints";
 import { assertNoPersonalTeamScope } from "./personal-team-scope";
 
 type ScopeRows = {
@@ -93,6 +94,11 @@ export class RoleBindingService {
     });
   }
 
+  /**
+   * Besides confirming the principal belongs to the organization, this
+   * returns a user's organization role, because what may be written for them
+   * depends on their seat. A group principal has no seat, so its role is null.
+   */
   private async validatePrincipalInOrganization({
     organizationId,
     userId,
@@ -101,9 +107,19 @@ export class RoleBindingService {
     organizationId: string;
     userId?: string;
     groupId?: string;
-  }): Promise<void> {
+  }): Promise<{ organizationRole: OrganizationUserRole | null }> {
     if (userId) {
-      await assertUsersInOrganization(this.prisma, organizationId, [userId]);
+      const membership = await this.prisma.organizationUser.findFirst({
+        where: { organizationId, userId },
+        select: { role: true },
+      });
+      if (!membership) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "One or more users are not in this organization",
+        });
+      }
+      return { organizationRole: membership.role };
     }
     if (groupId) {
       const group = await this.prisma.group.findFirst({
@@ -117,6 +133,51 @@ export class RoleBindingService {
         });
       }
     }
+    return { organizationRole: null };
+  }
+
+  /**
+   * A Lite Member seat means viewing only, and the stored access says so too.
+   * A direct row above Viewer, a custom role (its permissions are its own, so
+   * holding one requires a full seat), or any organization-scoped row is
+   * refused rather than stored and capped at resolution — the seat ceiling is
+   * enforced when access is written, the same way `updateTeamMemberRole`
+   * enforces it. Group bindings are never checked here: a group has no seat,
+   * and what the seat does to group-granted access is decided at resolution.
+   */
+  private async assertRowsWithinLiteMemberSeat({
+    organizationRole,
+    organizationId,
+    bindings,
+  }: {
+    /** Null when the principal is a group — a group has no seat. */
+    organizationRole: OrganizationUserRole | null;
+    organizationId: string;
+    bindings: Array<{
+      role: TeamUserRole;
+      scopeType: RoleBindingScopeType;
+      scopeId: string;
+    }>;
+  }): Promise<void> {
+    if (organizationRole !== OrganizationUserRole.EXTERNAL) return;
+
+    const offending = bindings.find(
+      (b) =>
+        b.scopeType === RoleBindingScopeType.ORGANIZATION ||
+        !isBindingRoleAllowedForOrganizationRole({
+          organizationRole,
+          role: b.role,
+        }),
+    );
+    if (!offending) return;
+
+    const { scopeNames } = await this.resolveScopes({
+      bindings: [offending],
+      organizationId,
+    });
+    throw new LiteMemberViewerOnlyError(
+      scopeNames.get(offending.scopeId) ?? null,
+    );
   }
 
   /**
@@ -489,7 +550,7 @@ export class RoleBindingService {
       client: this.prisma,
       scopes: [{ scopeType, scopeId }],
     });
-    await this.validatePrincipalInOrganization({
+    const { organizationRole } = await this.validatePrincipalInOrganization({
       organizationId,
       userId,
       groupId,
@@ -497,6 +558,11 @@ export class RoleBindingService {
     await this.validateCustomRolesAssignable({
       organizationId,
       bindings: [{ role, customRoleId }],
+    });
+    await this.assertRowsWithinLiteMemberSeat({
+      organizationRole,
+      organizationId,
+      bindings: [{ role, scopeType, scopeId }],
     });
 
     return this.prisma.roleBinding.create({
@@ -536,6 +602,23 @@ export class RoleBindingService {
       organizationId,
       bindings: [{ role, customRoleId }],
     });
+    if (binding.userId) {
+      const membership = await this.prisma.organizationUser.findFirst({
+        where: { organizationId, userId: binding.userId },
+        select: { role: true },
+      });
+      // A row can outlive its member (historical data); with nobody on a seat
+      // there is no ceiling to hold the edit against.
+      if (membership) {
+        await this.assertRowsWithinLiteMemberSeat({
+          organizationRole: membership.role,
+          organizationId,
+          bindings: [
+            { role, scopeType: binding.scopeType, scopeId: binding.scopeId },
+          ],
+        });
+      }
+    }
     return this.prisma.roleBinding.update({
       where: { id: bindingId },
       data: {
@@ -587,7 +670,10 @@ export class RoleBindingService {
   }) {
     // Validate scopes and role assignability up front so a bad input fails
     // the whole batch before we open the transaction.
-    await assertUsersInOrganization(this.prisma, organizationId, [userId]);
+    const { organizationRole } = await this.validatePrincipalInOrganization({
+      organizationId,
+      userId,
+    });
     for (const b of bindingsToCreate) {
       await this.repo.validateScopeInOrg({
         organizationId,
@@ -603,23 +689,38 @@ export class RoleBindingService {
       organizationId,
       bindings: bindingsToCreate,
     });
+    // The dialog applies the seat before this batch, so the ceiling is held
+    // against the seat the member is on by the time the rows would be written.
+    await this.assertRowsWithinLiteMemberSeat({
+      organizationRole,
+      organizationId,
+      bindings: bindingsToCreate,
+    });
 
     return this.prisma.$transaction(async (tx) => {
       if (bindingIdsToDelete.length > 0) {
+        // The batch describes the state the admin wants this member's access
+        // to be in, so an id that no longer exists is already in that state:
+        // a seat change applied just before this batch rewrites the member's
+        // team rows (delete + recreate, new ids), and a row another admin
+        // removed concurrently is equally gone. Only the member's own direct
+        // rows are deletable through their edit — an id resolving to another
+        // principal is skipped, never deleted.
         const existing = await tx.roleBinding.findMany({
-          where: { id: { in: bindingIdsToDelete }, organizationId },
+          where: {
+            id: { in: bindingIdsToDelete },
+            organizationId,
+            userId,
+            groupId: null,
+          },
           select: { id: true, scopeType: true, scopeId: true },
         });
-        if (existing.length !== bindingIdsToDelete.length) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "One or more bindings not found",
+        if (existing.length > 0) {
+          await assertNoPersonalTeamScope({ client: tx, scopes: existing });
+          await tx.roleBinding.deleteMany({
+            where: { id: { in: existing.map((b) => b.id) } },
           });
         }
-        await assertNoPersonalTeamScope({ client: tx, scopes: existing });
-        await tx.roleBinding.deleteMany({
-          where: { id: { in: bindingIdsToDelete }, organizationId },
-        });
       }
 
       if (bindingsToCreate.length > 0) {
@@ -635,6 +736,10 @@ export class RoleBindingService {
             scopeType: b.scopeType,
             scopeId: b.scopeId,
           })),
+          // Re-asserting a row the member already holds (or staging the same
+          // row twice) lands on the partial unique indexes; skipping the
+          // conflict leaves exactly the state the admin asked for.
+          skipDuplicates: true,
         });
       }
 
@@ -708,6 +813,10 @@ export class RoleBindingService {
       }
 
       if (bindingIdsToDelete.length > 0) {
+        // Same desired-state rule as applyMemberBindings: an id another
+        // admin already removed is already in the state this edit asks for,
+        // and an id resolving to a different group's row is skipped, never
+        // deleted.
         const existing = await tx.roleBinding.findMany({
           where: {
             id: { in: bindingIdsToDelete },
@@ -716,16 +825,12 @@ export class RoleBindingService {
           },
           select: { id: true, scopeType: true, scopeId: true },
         });
-        if (existing.length !== bindingIdsToDelete.length) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "One or more bindings not found",
+        if (existing.length > 0) {
+          await assertNoPersonalTeamScope({ client: tx, scopes: existing });
+          await tx.roleBinding.deleteMany({
+            where: { id: { in: existing.map((b) => b.id) } },
           });
         }
-        await assertNoPersonalTeamScope({ client: tx, scopes: existing });
-        await tx.roleBinding.deleteMany({
-          where: { id: { in: bindingIdsToDelete }, organizationId, groupId },
-        });
       }
 
       if (bindingsToCreate.length > 0) {
@@ -741,6 +846,7 @@ export class RoleBindingService {
             scopeType: b.scopeType,
             scopeId: b.scopeId,
           })),
+          skipDuplicates: true,
         });
       }
 

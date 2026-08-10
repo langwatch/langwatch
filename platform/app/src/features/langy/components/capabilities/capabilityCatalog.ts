@@ -147,6 +147,13 @@ export const CAPABILITY_CATALOG = {
     digestStrategy: "id-ref",
     noun: { singular: "trace", plural: "traces" },
   },
+  session: {
+    // Deep-links to the traces surface, which is where a session is opened.
+    // `id-ref` because a session result is addressed by its session id.
+    surface: "traces",
+    digestStrategy: "id-ref",
+    noun: { singular: "session", plural: "sessions" },
+  },
   analytics: {
     surface: "analytics",
     digestStrategy: "query-ref",

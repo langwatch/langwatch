@@ -1,4 +1,4 @@
-export { translateFilterToClickHouse } from "./ast";
+export { extractFreeTextTerms, translateFilterToClickHouse } from "./ast";
 export {
   FIELD_DEFS,
   KNOWN_FIELDS,

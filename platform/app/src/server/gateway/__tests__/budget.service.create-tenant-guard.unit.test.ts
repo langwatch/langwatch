@@ -23,7 +23,14 @@ function mockPrisma(overrides: {
     team: { findFirst: vi.fn().mockResolvedValue(overrides.team ?? null) },
     project: {
       findFirst: vi.fn().mockResolvedValue(overrides.project ?? null),
+      findMany: vi.fn().mockResolvedValue([]),
     },
+    // No active keys, which is the one shape the reach guard always lets
+    // through: an organization is allowed to write budgets before it has
+    // any keys, so this test still reaches the transaction on its own
+    // question rather than being answered by a different guard.
+    virtualKey: { findMany: vi.fn().mockResolvedValue([]) },
+    groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
     // If control reaches here, the guard let the scope through.
     $transaction: vi.fn().mockRejectedValue(new Error(REACHED_TRANSACTION)),
   } as unknown as PrismaClient;

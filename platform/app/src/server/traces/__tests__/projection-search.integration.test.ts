@@ -416,7 +416,10 @@ describe("trace search projection (integration)", () => {
         expect(row).toEqual({
           trace_id: traceId,
           metadata: { user_id: "u_42" },
-          metrics: { total_cost: 0.0031 },
+          // Approximate: ClickHouse's float text parser may land one ULP off
+          // the literal (platform-dependent), and the projection passes the
+          // stored value through untouched.
+          metrics: { total_cost: expect.closeTo(0.0031, 12) },
         });
         expect(row).not.toHaveProperty("input");
         expect(row).not.toHaveProperty("output");
@@ -444,7 +447,7 @@ describe("trace search projection (integration)", () => {
         expect(row).toMatchObject({
           trace_id: traceId,
           metadata: { user_id: "u_42" },
-          metrics: { total_cost: 0.0031 },
+          metrics: { total_cost: expect.closeTo(0.0031, 12) },
           events: [{ type: "thumbs_up_down" }],
           annotations: [{ is_thumbs_up: true }],
           evaluations: [{ score: 0.91 }],

@@ -46,7 +46,7 @@ import {
   GatewayGuardrailEvaluationService,
   GUARDRAIL_WIRE_DIRECTIONS,
 } from "~/server/gateway/guardrailEvaluation.service";
-import { resolveTraceProject } from "~/server/gateway/scopeResolver";
+import { traceProjectFor } from "~/server/gateway/scopeResolver";
 import {
   hashVirtualKeySecret,
   parseVirtualKey,
@@ -416,11 +416,11 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
     return c.json(rejectionBody(statusRejection), statusRejection.status);
   }
 
-  // Resolve the trace project for OTLP routing. PROJECT-scoped VK with
-  // exactly one PROJECT scope -> that project; otherwise -> the org's
-  // `internal_governance` project; otherwise -> null (gateway skips
-  // span export rather than failing the auth handshake).
-  const traceProject = await resolveTraceProject(prisma, vk);
+  // Where this key's traces land, read off the key. Null for a key written
+  // before the destination was stored in an organization with no governance
+  // project to fall back to; the gateway then skips span export rather than
+  // failing the auth handshake.
+  const traceProject = await traceProjectFor(prisma, vk.traceProjectId);
 
   const { jwt } = signGatewayJwt({
     vk_id: vk.id,

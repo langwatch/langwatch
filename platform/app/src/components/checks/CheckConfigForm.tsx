@@ -1,6 +1,5 @@
 import {
   Accordion,
-  Alert,
   Button,
   Card,
   Field,
@@ -118,6 +117,12 @@ export default function CheckConfigForm({
   const form = useForm<CheckConfigFormData>({
     defaultValues,
     resolver: (data, context, options) => {
+      // A saved monitor can name an evaluator this server no longer has, so the
+      // schema lookup is by presence rather than by type.
+      const settingsSchema = data.checkType
+        ? evaluatorsSchema.shape[data.checkType]?.shape.settings
+        : undefined;
+
       const schema = z.object({
         name: z.string().min(1).max(255).refine(validateNameUniqueness),
         checkType: evaluatorTypesSchema,
@@ -125,8 +130,8 @@ export default function CheckConfigForm({
         preconditions: checkPreconditionsSchema,
         settings: data.checkType?.startsWith("custom/")
           ? z.object({}).optional()
-          : evaluatorsSchema.shape[data.checkType ?? "langevals/basic"].shape
-              .settings,
+          : (settingsSchema ??
+            evaluatorsSchema.shape["langevals/basic"].shape.settings),
         executionMode: z
           .enum([
             EvaluationExecutionMode.ON_MESSAGE,
@@ -197,6 +202,18 @@ export default function CheckConfigForm({
     }
   }, [checkType, isChoosing, router]);
 
+  const evaluatorDefinition = useMemo(
+    () => (checkType ? availableEvaluators?.[checkType] : undefined),
+    [checkType, availableEvaluators],
+  );
+
+  // A monitor can carry a checkType that is no longer in the catalog, either
+  // because the evaluator was retired or because this server does not ship it.
+  // There is no definition to render settings from, so the form falls back to
+  // the picker and names the saved slug there.
+  const isRetiredEvaluator =
+    !!checkType && !!availableEvaluators && !evaluatorDefinition;
+
   useEffect(() => {
     if (!availableEvaluators) return;
     if (defaultValues?.settings && defaultValues.checkType === checkType)
@@ -237,7 +254,7 @@ export default function CheckConfigForm({
     };
 
     setDefaultSettings(
-      getEvaluatorDefaultSettings(availableEvaluators[checkType], {
+      getEvaluatorDefaultSettings(evaluatorDefinition, {
         defaultModel: resolvedDefaultModel.data?.model ?? null,
         embeddingsModel: resolvedDefaultEmbeddings.data?.model ?? null,
       }),
@@ -266,11 +283,6 @@ export default function CheckConfigForm({
     </Text>
   );
 
-  const evaluatorDefinition = useMemo(
-    () => checkType && availableEvaluators?.[checkType],
-    [checkType, availableEvaluators],
-  );
-
   const fields = useMemo(() => {
     return [
       ...(evaluatorDefinition?.requiredFields ?? []),
@@ -286,8 +298,14 @@ export default function CheckConfigForm({
         })}
         style={{ width: "100%" }}
       >
-        {!checkType || isChoosing || !availableEvaluators ? (
-          <EvaluatorSelection form={form} />
+        {!checkType ||
+        isChoosing ||
+        !availableEvaluators ||
+        !evaluatorDefinition ? (
+          <EvaluatorSelection
+            form={form}
+            retiredEvaluatorType={isRetiredEvaluator ? checkType : undefined}
+          />
         ) : (
           <VStack gap={6} align="start" width="full">
             <Card.Root width="full">
@@ -301,9 +319,7 @@ export default function CheckConfigForm({
                     <VStack align="start" width="full">
                       <HStack gap={0} width="full">
                         <Text>
-                          {evaluatorDisplayName(
-                            availableEvaluators[checkType].name,
-                          )}
+                          {evaluatorDisplayName(evaluatorDefinition.name)}
                         </Text>
                         <Button
                           variant="ghost"
@@ -322,20 +338,8 @@ export default function CheckConfigForm({
                         </Button>
                       </HStack>
                       <Text fontSize="12px" color="fg.muted">
-                        {availableEvaluators[checkType].description}
+                        {evaluatorDefinition.description}
                       </Text>
-                      {checkType.startsWith("legacy/") && (
-                        <Alert.Root status="warning">
-                          <Alert.Indicator />
-                          <Alert.Content>
-                            <Text fontSize="13px">
-                              You are using a legacy evaluator version, please
-                              click the <b>change</b> button above to select a
-                              newer version or a replacement for this evaluator.
-                            </Text>
-                          </Alert.Content>
-                        </Alert.Root>
-                      )}
                     </VStack>
                   </HorizontalFormControl>
                   <HorizontalFormControl
@@ -407,7 +411,7 @@ export default function CheckConfigForm({
                   {executionMode !== EvaluationExecutionMode.ON_MESSAGE && (
                     <EvaluationManualIntegration
                       slug={slug}
-                      evaluatorDefinition={availableEvaluators[checkType]!}
+                      evaluatorDefinition={evaluatorDefinition}
                       form={form}
                       checkType={checkType}
                       name={nameValue}

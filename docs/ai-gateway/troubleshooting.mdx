@@ -355,7 +355,7 @@ kubectl logs -n langwatch "$POD" | grep -E 'dns resolution failed|tcp dial faile
 **Root cause:** cold start + auth cache miss. New replica's L1 cache is empty; first unknown-VK request triggers a `/resolve-key` round-trip.
 
 **Fix:**
-- Enable Redis L2 (`GATEWAY_REDIS_URL`), new replicas warm from Redis instead of control plane.
+- Expect it. The auth cache is per pod, so a new replica warms from the control plane on its first request for each key, exactly as every replica does after a rolling deploy.
 - Ensure pod readiness probe waits for the long-poll loop to be running (`/readyz` handles this correctly by default).
 - `GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` is a planned v1.1 enhancement that would pre-warm the L1 LRU with every active VK on startup; the flag is reserved in env wiring but currently has no Go-side implementation, so setting it does not help today.
 

@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { prisma } from "../db";
 import { TtlCache } from "../utils/ttlCache";
 import { KILL_SWITCH_CACHE_TTL_MS } from "./constants";
+import { type FeatureFlagKey, resolveFlagDefinition } from "./registry";
 import {
   evaluateRules,
   type FeatureFlagRules,
@@ -68,6 +69,28 @@ export class FeatureFlagStorePostgres {
     if (row === null) return null;
     const ruleHit = evaluateRules(row.rules, ctx);
     return ruleHit ?? row.enabled;
+  }
+
+  /**
+   * Same resolution as `get`, but an absent row resolves to the flag's
+   * registry default instead of `null`.
+   *
+   * For hot-path callers that must decide without the service layer: the
+   * PRODUCT branch of `FeatureFlagService` falls through to PostHog when no
+   * row exists, which per-span ingestion cannot afford. Reading `get`
+   * directly instead makes an absent row read as "off" and silently strands
+   * the registry default, so a flag that ships on by default would never
+   * reach a deployment that has not written an operator row. This method is
+   * the resolution those callers actually want: operator row (with its
+   * targeting rules) first, registry default second, PostHog never.
+   */
+  async getOrRegistryDefault(
+    key: FeatureFlagKey,
+    ctx: RuleEvaluationContext = {},
+  ): Promise<boolean> {
+    const stored = await this.get(key, ctx);
+    if (stored !== null) return stored;
+    return resolveFlagDefinition(key)?.defaultValue ?? false;
   }
 
   /**
@@ -143,10 +166,19 @@ export class FeatureFlagStorePostgres {
   }
 
   /**
-   * Operator write of the targeting rules for a flag. Creates a row
-   * with rule-only semantics (no row-level true) when one doesn't
-   * already exist so an org-scoped enable doesn't accidentally flip
-   * the flag on cluster-wide.
+   * Operator write of the targeting rules for a flag.
+   *
+   * A rule is an override for the targets it names, and for nobody else.
+   * When no row exists yet, the row this creates seeds its row-level
+   * `enabled` from the registry default so unmatched callers keep resolving
+   * to exactly what they resolved to before the rule was written. Seeding
+   * `false` unconditionally would make a single per-project opt-out rule
+   * switch a default-on flag off for the whole fleet, since the new row
+   * shadows the registry default for every non-matching context.
+   *
+   * For a default-off flag the seed is `false`, so an org-scoped enable
+   * still cannot flip the flag on cluster-wide. Unregistered keys seed
+   * `false` for the same reason.
    */
   async setRules(
     key: string,
@@ -157,7 +189,7 @@ export class FeatureFlagStorePostgres {
       where: { key },
       create: {
         key,
-        enabled: false,
+        enabled: resolveFlagDefinition(key)?.defaultValue ?? false,
         rules: rules as unknown as object,
         lastEditedBy,
       },

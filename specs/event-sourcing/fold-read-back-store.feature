@@ -118,6 +118,27 @@ Feature: Fold projections read back their own state
     Then the fold recognises every event as already applied
     And the stored state is unchanged
 
+  # The cache is what gives a fold back its own last write, so a cache that
+  # cannot be read is the one moment the durable read may be behind. We answer
+  # from the durable store anyway, because refusing to fold while the cache is
+  # unwell would turn a cache outage into a processing outage. The trade is
+  # deliberate and it is counted, so it can be seen rather than assumed.
+  Scenario: an unreadable fold cache is answered from the durable store, and counted apart from a miss
+    Given a fold whose cache read fails rather than reporting no entry
+    When the next event for that aggregate is folded
+    Then the fold continues from the durable store rather than failing the delivery
+    And the fallback is counted as its own outcome rather than as a cache miss
+
+  # A rejected cache write is the quietest of the three ways a cache answer can
+  # mean something other than an expiry: no entry is ever created, so the next
+  # read reports nothing and looks exactly like a settled aggregate. The write
+  # is where it can still be seen, so that is where it is counted.
+  Scenario: a rejected fold cache write is counted where it happens, not where it shows
+    Given a fold whose durable write succeeded but whose cache write was rejected
+    When that aggregate is read back
+    Then the rejected write is counted against the cache's write errors
+    And the read reports a plain cache miss, which no expiry preceded
+
   Scenario: the event log is read only for a deliberate rebuild
     Given a projection whose logic version has changed
     When an operator replays the projection

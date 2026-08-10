@@ -94,5 +94,5 @@ export const createTrpcUtils = ({
     messages: { invalidate: () => Promise.resolve() },
     detail: { setData: () => undefined },
   },
-  langyGithub: { getInstallStatus: { invalidate: () => Promise.resolve() } },
+  github: { getConnectionStatus: { invalidate: () => Promise.resolve() } },
 });

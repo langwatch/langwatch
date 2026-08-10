@@ -1,5 +1,6 @@
-import { Box, HStack, Separator, Text, VStack } from "@chakra-ui/react";
-import type { PropsWithChildren } from "react";
+import { Box, Button, HStack, Separator, Text, VStack } from "@chakra-ui/react";
+import { MoreVertical, Pencil } from "lucide-react";
+import { type PropsWithChildren, useState } from "react";
 import { Check, Edit, Inbox, Plus, Users } from "react-feather";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
@@ -10,8 +11,98 @@ import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
-import { useRouter } from "~/utils/compat/next-router";
+import { usePathname } from "~/utils/compat/next-navigation";
 import { RandomColorAvatar } from "./RandomColorAvatar";
+import { Menu } from "./ui/menu";
+
+/**
+ * One queue in the sidebar list. The queue's own actions live here rather than
+ * on the page it opens, so they are reachable from wherever the reviewer is.
+ * The trigger takes the trailing slot the pending count sits in, and only on
+ * hover, so a resting sidebar still reads as counts.
+ */
+function QueueSidebarEntry({
+  queue,
+  href,
+  isSelected,
+  icon,
+  canEdit,
+}: {
+  queue: { id: string; name: string; pendingCount: number };
+  href: string;
+  isSelected: boolean;
+  icon: React.ReactNode;
+  canEdit: boolean;
+}) {
+  const { openDrawer } = useDrawer();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  return (
+    // A Box, not the MenuLink itself: MenuLink takes a fixed prop set and would
+    // drop the Langy target's className / handlers on the floor. The Box is
+    // width-full and carries the link's own radius, so the outline lands
+    // exactly on the row.
+    <Box width="full" borderRadius="lg" position="relative" className="group">
+      <MenuLink
+        href={href}
+        isSelectedAnnotation={isSelected}
+        icon={icon}
+        menuEnd={
+          <Text
+            fontSize="xs"
+            fontWeight="500"
+            opacity={canEdit && menuOpen ? 0 : 1}
+            _groupHover={canEdit ? { opacity: 0 } : undefined}
+          >
+            {queue.pendingCount > 0 ? queue.pendingCount : ""}
+          </Text>
+        }
+      >
+        {queue.name}
+      </MenuLink>
+      {canEdit && (
+        // Beside the link rather than inside it: a button nested in an anchor
+        // is invalid, and a click on it would also follow the link.
+        <Box
+          position="absolute"
+          right={1}
+          top="50%"
+          transform="translateY(-50%)"
+          opacity={menuOpen ? 1 : 0}
+          _groupHover={{ opacity: 1 }}
+          _focusWithin={{ opacity: 1 }}
+        >
+          <Menu.Root
+            open={menuOpen}
+            onOpenChange={({ open }) => setMenuOpen(open)}
+          >
+            <Menu.Trigger asChild>
+              <Button
+                size="xs"
+                variant="ghost"
+                aria-label={`Actions for queue ${queue.name}`}
+                minWidth={0}
+                paddingX={1}
+              >
+                <MoreVertical size={14} />
+              </Button>
+            </Menu.Trigger>
+            <Menu.Content>
+              <Menu.Item
+                value="edit"
+                onClick={() =>
+                  openDrawer("addAnnotationQueue", { queueId: queue.id })
+                }
+              >
+                <Pencil size={14} /> Edit queue
+              </Menu.Item>
+            </Menu.Content>
+          </Menu.Root>
+        </Box>
+      )}
+    </Box>
+  );
+}
 
 export default function AnnotationsLayout({
   children,
@@ -53,7 +144,10 @@ export default function AnnotationsLayout({
     done: <Check width={20} height={20} />,
   };
 
-  const router = useRouter();
+  // The concrete path the browser is on. `router.pathname` is a route PATTERN
+  // ("/[project]/annotations/[slug]"), so comparing it to a built href never
+  // matches and no entry ever reads as the current one.
+  const pathname = usePathname();
   const { openDrawer } = useDrawer();
 
   return (
@@ -91,7 +185,7 @@ export default function AnnotationsLayout({
                 </Text>
               }
               isSelectedAnnotation={
-                router.pathname === "/[project]/annotations"
+                pathname === `/${project?.slug}/annotations`
               }
             >
               Inbox
@@ -99,7 +193,7 @@ export default function AnnotationsLayout({
             <MenuLink
               href={`/${project?.slug}/annotations/me`}
               isSelectedAnnotation={
-                router.pathname === "/[project]/annotations/me"
+                pathname === `/${project?.slug}/annotations/me`
               }
               icon={menuItems.myQueues}
               menuEnd={
@@ -116,7 +210,7 @@ export default function AnnotationsLayout({
               href={`/${project?.slug}/annotations/all`}
               icon={menuItems.all}
               isSelectedAnnotation={
-                router.pathname === "/[project]/annotations/all"
+                pathname === `/${project?.slug}/annotations/all`
               }
             >
               All
@@ -147,27 +241,15 @@ export default function AnnotationsLayout({
                   noun: "annotation queue",
                 })}
               >
-                {/* A Box, not the MenuLink itself: MenuLink takes a fixed prop
-                  set and would drop the target's className / handlers on the
-                  floor. The Box is width-full and carries the link's own
-                  radius, so the outline lands exactly on the row. */}
-                <Box width="full" borderRadius="lg">
-                  <MenuLink
-                    href={`/${project?.slug}/annotations/${queue.slug}`}
-                    isSelectedAnnotation={
-                      router.pathname ===
-                      `/${project?.slug}/annotations/${queue.slug}`
-                    }
-                    icon={menuItems.queues}
-                    menuEnd={
-                      <Text fontSize="xs" fontWeight="500">
-                        {queue.pendingCount > 0 ? queue.pendingCount : ""}
-                      </Text>
-                    }
-                  >
-                    {queue.name}
-                  </MenuLink>
-                </Box>
+                <QueueSidebarEntry
+                  queue={queue}
+                  href={`/${project?.slug}/annotations/${queue.slug}`}
+                  isSelected={
+                    pathname === `/${project?.slug}/annotations/${queue.slug}`
+                  }
+                  icon={menuItems.queues}
+                  canEdit={!isLiteMember}
+                />
               </LangyContextTarget>
             ))}
           </VStack>

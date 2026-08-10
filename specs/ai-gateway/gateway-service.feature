@@ -304,8 +304,8 @@ Feature: Gateway service — public HTTP surface and operational basics
     # user is signed in with an OpenAI account. Every stage past the transport
     # (model peek, stream detection, guardrails, the provider adapters) reads
     # JSON, so the compressed bytes have to be decoded at the edge. Reading
-    # them raw finds no top-level `model` and fails the turn with a 400
-    # "missing model field" before any provider is contacted.
+    # them raw finds no top-level `model` and fails the turn with a 400 for a
+    # missing model field before any provider is contacted.
 
     @integration
     Scenario Outline: a compressed body is decoded on every dispatch lane
@@ -370,6 +370,43 @@ Feature: Gateway service — public HTTP surface and operational basics
       Then the response status is 413
       And error.type equals "payload_too_large"
       And no provider dispatch occurs
+
+  Rule: A request with no model says where THAT surface expects one
+
+    # This is the gateway's largest single source of 400s, and for five days it
+    # was one virtual key posting bodies with no top-level `model` round the
+    # clock, retrying against a rejection that read, in full, "missing model
+    # field". That names no field, no body and no endpoint, so the operator on
+    # the other end had nothing to correct and the loop never stopped. The
+    # handled error therefore carries a stable `missing_model` code plus
+    # the request surface in metadata; operators and clients need not infer
+    # this high-volume rejection from prose. Resolution still runs before the
+    # request is labeled with a model, so the request counter records
+    # model="unknown".
+    #
+    # Model resolution is unconditional, so every surface reaches this
+    # rejection - and the surfaces disagree about where a model comes from.
+    # Three read a top-level JSON field, transcription reads a multipart form
+    # part, and the Gemini passthrough reads the URL path. A single message
+    # naming the JSON endpoints is not merely vague at the other four, it is
+    # wrong: it sends a caller to fix a request shape they are not using.
+    #
+    # See dev/docs/adr/045-domain-errors-handled-boundary.md for the handled-
+    # error contract this rule follows.
+    #
+    # Bindings: services/aigateway/adapters/modelresolver/resolver_test.go
+
+    @unit
+    Scenario: a request with no model is rejected with a message the client can act on
+      Given a valid VK
+      When a request arrives naming no model
+      Then the rejection has handled error code "missing_model"
+      And its metadata names the request surface
+      And the rejection names the endpoint the caller actually used
+      And it says where that endpoint takes its model from
+      And it shows what a correct request looks like
+      And it never names a request shape the caller is not using
+      And the failure is attributed to the caller rather than to the platform
 
   Rule: Graceful SIGTERM drain (iter 24, `ea167ca`)
 

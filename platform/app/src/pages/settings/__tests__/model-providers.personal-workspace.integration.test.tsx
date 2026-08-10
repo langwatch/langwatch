@@ -55,6 +55,12 @@ vi.mock("~/utils/api", () => ({
       delete: {
         useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
       },
+      // Asked for at render time by the page's connection-test hook, so its
+      // absence fails the whole file on a TypeError rather than on anything
+      // these tests are about.
+      testConnection: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
     },
     useContext: () => ({
       organization: { getAll: { invalidate: vi.fn() } },

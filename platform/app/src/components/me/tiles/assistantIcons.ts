@@ -61,8 +61,8 @@ export const ASSISTANT_PRESETS: Record<
   },
   opencode: {
     label: "Open Code",
-    iconUrl: null,
-    darkModeInvert: false,
+    iconUrl: "/images/external-icons/opencode.svg",
+    darkModeInvert: true,
   },
   cursor: {
     label: "Cursor",

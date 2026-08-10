@@ -10,11 +10,13 @@ import type {
   SpanTreeNode,
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
+import { useTraceEditSession } from "../../hooks/useTraceEditSession";
 import { useDrawerStore } from "../../stores/drawerStore";
 import { BlurredContentGate } from "../BlurredContentGate";
 import { ConversationContext } from "./ConversationContext";
 import { ConversationView } from "./conversationView";
 import { DrawerHeader } from "./drawerHeader";
+import { EditModeBar } from "./editMode/EditModeBar";
 import { useShikiAdapter } from "./markdownView/shikiAdapter";
 import { PaneLayout } from "./panes/PaneLayout";
 import { usePaneLayout } from "./panes/usePaneLayout";
@@ -92,6 +94,10 @@ export function TraceDrawerContent({
 
   const viewMode = useDrawerStore((s) => s.viewMode);
   const expectedSpanCount = useDrawerStore((s) => s.expectedSpanCount);
+  // Edit mode is an authenticated affordance, so the share surface never has
+  // one to keep alive.
+  const isEditing = useDrawerStore((s) => s.isEditing) && !readOnly;
+  useTraceEditSession(readOnly ? undefined : traceId);
 
   // Watch the actual rendered container so the layout decision reflects
   // whatever pixel width the surface has — not the abstract widthPx state.
@@ -135,6 +141,7 @@ export function TraceDrawerContent({
             </IsolatedErrorBoundary>
           </Box>
           <Box borderBottomWidth="1px" borderColor="border" />
+          {isEditing && <EditModeBar traceId={trace.traceId} />}
           {/*
             Peer cursors render across the entire body. The `anchor` keys the
             shared coordinate space; everyone looking at the same trace shares
@@ -244,7 +251,11 @@ function TraceSwitchOverlay() {
 /**
  * Conversation-view branch. In-app only — the caller gates it behind
  * `!readOnly` (it fetches session-backed reads); this component owns just its
- * error boundary and scroll viewport.
+ * error boundary and the room the conversation fills.
+ *
+ * The scroll belongs to the turns list inside the conversation, which is also
+ * what the annotation rail measures itself against. A second scroller here
+ * would trap one inside the other and leave that measurement ambiguous.
  */
 function ConversationModePane({
   conversationId,
@@ -258,7 +269,7 @@ function ConversationModePane({
       scope="Couldn't render conversation view"
       resetKeys={[conversationId, traceId]}
     >
-      <Box flex={1} minHeight={0} overflow="auto">
+      <Box flex={1} minHeight={0}>
         <ConversationView
           conversationId={conversationId}
           currentTraceId={traceId}

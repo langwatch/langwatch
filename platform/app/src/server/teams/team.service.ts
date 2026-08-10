@@ -15,6 +15,10 @@ import {
   PersonalWorkspaceNotManagedHereError,
   TeamLastAdminRequiredError,
 } from "~/server/app-layer/teams/team.service";
+import {
+  computeEffectiveAdminUserIds,
+  projectAdminUserIdsWithoutDirectRole,
+} from "~/server/teams/effective-team-admins";
 
 // When a user holds multiple bindings on one team, the most privileged is the
 // one the settings page displays (and the binding team.update edits).
@@ -54,68 +58,6 @@ function compareNullsLast(a: string | null, b: string | null): number {
   if (a === null) return 1;
   if (b === null) return -1;
   return a.localeCompare(b);
-}
-
-type TxClient = Prisma.TransactionClient;
-
-async function computeEffectiveAdminUserIds(
-  tx: TxClient,
-  organizationId: string,
-  teamId: string,
-): Promise<Set<string>> {
-  const adminBindings = await tx.roleBinding.findMany({
-    where: {
-      organizationId,
-      scopeType: RoleBindingScopeType.TEAM,
-      scopeId: teamId,
-      role: TeamUserRole.ADMIN,
-    },
-    select: { userId: true, groupId: true },
-  });
-
-  const userIds = new Set<string>();
-  const groupIds: string[] = [];
-  for (const b of adminBindings) {
-    if (b.userId) userIds.add(b.userId);
-    if (b.groupId) groupIds.push(b.groupId);
-  }
-
-  if (groupIds.length > 0) {
-    const memberships = await tx.groupMembership.findMany({
-      where: { groupId: { in: groupIds } },
-      select: { userId: true },
-    });
-    for (const m of memberships) userIds.add(m.userId);
-  }
-
-  return userIds;
-}
-
-async function isUserAdminViaGroup(
-  tx: TxClient,
-  organizationId: string,
-  teamId: string,
-  userId: string,
-): Promise<boolean> {
-  const adminGroupBindings = await tx.roleBinding.findMany({
-    where: {
-      organizationId,
-      scopeType: RoleBindingScopeType.TEAM,
-      scopeId: teamId,
-      role: TeamUserRole.ADMIN,
-      groupId: { not: null },
-    },
-    select: { groupId: true },
-  });
-  if (adminGroupBindings.length === 0) return false;
-
-  const count = await tx.groupMembership.count({
-    where: {
-      userId,
-      groupId: { in: adminGroupBindings.map((b) => b.groupId!) },
-    },
-  });
-  return count > 0;
 }
 
 export class TeamService {
@@ -630,16 +572,11 @@ export class TeamService {
           throw new PersonalWorkspaceNotManagedHereError(team.name);
         }
 
-        // Compute the effective set of admin userIds — direct user ADMIN
-        // bindings plus members of any group with an ADMIN binding on this
-        // team. Counting only direct user bindings (as we used to) ignores
-        // SCIM/group admins and would incorrectly treat a team with a single
-        // direct admin + group-expanded admins as having only one admin.
-        const effectiveAdminUserIds = await computeEffectiveAdminUserIds(
+        const effectiveAdminUserIds = await computeEffectiveAdminUserIds({
           tx,
-          team.organizationId,
+          organizationId: team.organizationId,
           teamId,
-        );
+        });
 
         if (effectiveAdminUserIds.size === 0) {
           throw new TeamLastAdminRequiredError(team.name);
@@ -664,19 +601,13 @@ export class TeamService {
           );
         }
 
-        // Project the post-removal admin set. Removing the target's direct
-        // binding only changes things if they aren't also an admin via a
-        // group membership on this team.
-        const targetStillAdminViaGroup = await isUserAdminViaGroup(
-          tx,
-          team.organizationId,
-          teamId,
-          userId,
-        );
-        const projectedAdminUserIds = new Set(effectiveAdminUserIds);
-        if (!targetStillAdminViaGroup) {
-          projectedAdminUserIds.delete(userId);
-        }
+        const projectedAdminUserIds =
+          await projectAdminUserIdsWithoutDirectRole({
+            tx,
+            organizationId: team.organizationId,
+            teamId,
+            userId,
+          });
 
         if (projectedAdminUserIds.size === 0) {
           if (userId === currentUserId) {
@@ -703,11 +634,11 @@ export class TeamService {
 
         // Post-removal validation: ensure we still have at least one
         // effective admin (direct or group-expanded).
-        const finalAdminUserIds = await computeEffectiveAdminUserIds(
+        const finalAdminUserIds = await computeEffectiveAdminUserIds({
           tx,
-          team.organizationId,
+          organizationId: team.organizationId,
           teamId,
-        );
+        });
 
         if (finalAdminUserIds.size === 0) {
           throw new TeamLastAdminRequiredError(team.name);

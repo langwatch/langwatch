@@ -28,6 +28,7 @@ import type {
   SubscriptionRepository,
   SubscriptionWithOrg,
 } from "../../../src/server/app-layer/subscription/subscription.repository";
+import { traced } from "../../../src/server/app-layer/tracing";
 import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_CATEGORIES,
@@ -267,6 +268,59 @@ describe("webhookService", () => {
         expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith(
           "org_123",
         );
+      });
+
+      /**
+       * The webhook service reaches the whole application through the tracing
+       * proxy it is published with, so the currency the checkout selected is
+       * normalized through that proxy before it is persisted.
+       */
+      describe("when the service is published as the app publishes it", () => {
+        const published = () =>
+          traced(
+            new EEWebhookService({
+              subscriptionRepository:
+                subRepo as unknown as SubscriptionRepository,
+              organizationRepository:
+                orgRepo as unknown as OrganizationRepository,
+              stripe: mockStripeInstance as any,
+              itemCalculator,
+            }),
+            "EEWebhookService",
+          );
+
+        const completeCheckout = async (selectedCurrency?: string) => {
+          subRepo.linkStripeId.mockResolvedValue({ count: 1 });
+          subRepo.findByStripeId.mockResolvedValue(
+            makeSubscription({ status: SubscriptionStatus.PENDING }),
+          );
+          subRepo.activate.mockResolvedValue(
+            makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+          );
+
+          const promise = published().handleCheckoutCompleted({
+            subscriptionId: "sub_stripe_1",
+            clientReferenceId: "subscription_setup_sub_db_1",
+            selectedCurrency,
+          });
+          await vi.advanceTimersByTimeAsync(2000);
+          await promise;
+        };
+
+        it("persists the selected currency", async () => {
+          await completeCheckout("EUR");
+
+          expect(orgRepo.updateCurrency).toHaveBeenCalledWith({
+            organizationId: "org_123",
+            currency: "EUR",
+          });
+        });
+
+        it("persists nothing for a currency it does not accept", async () => {
+          await completeCheckout("GBP");
+
+          expect(orgRepo.updateCurrency).not.toHaveBeenCalled();
+        });
       });
 
       /** @scenario Checkout succeeds even when invite approval fails */

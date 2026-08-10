@@ -2,13 +2,17 @@
  * TokenCreatedDialog — shown immediately after an API key is minted.
  *
  * Renders four sections:
- *  1. "Use in Code" tabs (.env / Bearer / Basic Auth) — ShikiCommandBox
+ *  1. "Use in Code" tabs (.env / Bearer / Basic Auth) — CodePreview
  *  2. Amber "Copy this token now" warning
- *  3. "Use with Code Assistants" tabs (Claude Code / Codex) — ShikiCommandBox
+ *  3. "Use with Code Assistants" tabs (Claude Code / Codex) — CodePreview
  *  4. "Or paste into your config file" — existing JsonHighlight (no change)
  *
- * ShikiCommandBox is lazy-loaded via dynamic() (ssr:false) so the settings
- * page never statically imports the ~hundreds-of-KB Shiki bundle at page load.
+ * Snippets render through the shared CodePreview — the same surface the
+ * traces empty state and onboarding screens use — so the dialog reads like
+ * the rest of the product. CodePreview itself defers the Shiki engine via
+ * `await import("shiki")` inside its adapter; the one static shiki path into
+ * this page is the pre-existing JsonHighlight → shikiAdapter import below.
+ * `copyText` feeds the clipboard the real value regardless of reveal state.
  *
  * @see specs/api-keys/token-created-snippets.feature
  */
@@ -21,12 +25,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type React from "react";
 import { useMemo, useState } from "react";
-import type { ShikiCommandBoxProps } from "~/components/code/ShikiCommandBox";
-import dynamic from "~/utils/compat/next-dynamic";
 import { Dialog } from "../../../components/ui/dialog";
 import { Select } from "../../../components/ui/select";
+import { CodePreview } from "../../../features/onboarding/components/sections/observability/CodePreview";
 import { maskApiKey } from "../../../features/onboarding/components/sections/shared/api-key-utils";
 import {
   buildMcpJson,
@@ -37,16 +39,7 @@ import { copyToClipboard } from "../../../features/onboarding/components/section
 import { InlineCopyButton } from "../../../features/onboarding/components/sections/shared/InlineCopyButton";
 import { JsonHighlight } from "../../../features/onboarding/components/sections/shared/JsonHighlight";
 import { TabButton } from "../../../features/onboarding/components/sections/shared/TabButton";
-import { formatEnvLines, maskSecret } from "./utils";
-
-// Lazy-load ShikiCommandBox so /settings/api-keys/index.tsx never statically
-// imports shikiAdapter. The loading fallback is null (dialog already has
-// ambient padding; a shimmer would feel heavy here).
-const ShikiCommandBox = dynamic(
-  () =>
-    import("~/components/code/ShikiCommandBox").then((m) => m.ShikiCommandBox),
-  { ssr: false },
-) as React.ComponentType<ShikiCommandBoxProps>;
+import { formatEnvLines } from "./utils";
 
 type CodeTab = "env" | "bearer" | "basic";
 
@@ -190,18 +183,8 @@ export function TokenCreatedDialog({
   );
 
   // ── .env snippet ──────────────────────────────────────────────────────
-  const envMasked = useMemo(
-    () =>
-      formatEnvLines([
-        { key: "LANGWATCH_API_KEY", value: newToken ?? "", mask: true },
-        {
-          key: "LANGWATCH_PROJECT_ID",
-          value: activeProjectId ?? "<your-project-id>",
-        },
-        { key: "LANGWATCH_ENDPOINT", value: endpoint },
-      ]),
-    [newToken, activeProjectId, endpoint],
-  );
+  // CodePreview owns masking: it substring-replaces `sensitiveValue` in the
+  // rendered code, so only the real form is built here.
   const envUnmasked = useMemo(
     () =>
       formatEnvLines([
@@ -216,39 +199,28 @@ export function TokenCreatedDialog({
   );
 
   // ── Bearer snippet ─────────────────────────────────────────────────────
-  const bearerMasked = newToken
-    ? `Authorization: Bearer ${maskSecret(newToken)}\nX-Project-Id: ${activeProjectId ?? "<your-project-id>"}`
-    : "";
   const bearerUnmasked = `Authorization: Bearer ${newToken ?? ""}\nX-Project-Id: ${activeProjectId ?? "<your-project-id>"}`;
 
   // ── Basic Auth snippet ─────────────────────────────────────────────────
-  const basicUnmasked =
-    newToken && activeProjectId
-      ? `Authorization: Basic ${btoa(`${activeProjectId}:${newToken}`)}`
-      : "";
-  const basicMasked = `Authorization: Basic base64(${activeProjectId ?? "<your-project-id>"}:pat-lw-...)`;
+  // The SECRET here is the encoded blob, not the raw token: a token is not a
+  // substring of its own base64, so masking on the token would silently fail
+  // open and render the credential in full.
+  const basicBlob =
+    newToken && activeProjectId ? btoa(`${activeProjectId}:${newToken}`) : "";
+  const basicUnmasked = basicBlob ? `Authorization: Basic ${basicBlob}` : "";
 
   // ── Per-assistant terminal command ─────────────────────────────────────
-  // Both forms come from the same builder, so the value the user copies and
-  // the value they read can never drift apart.
   // Only the tab buttons set this key, and they map over the list itself, so
   // the lookup cannot miss; the fallback only satisfies the compiler.
   const activeAssistant =
     CODE_ASSISTANTS.find((assistant) => assistant.key === assistantKey) ??
     CODE_ASSISTANTS[0]!;
 
-  const commandContext = {
+  const assistantCommand = activeAssistant.buildCommand?.({
     projectId: activeProjectId,
     endpoint,
     isSelfHosted: !!isSelfHosted,
-  };
-  const assistantCommand = activeAssistant.buildCommand?.({
-    ...commandContext,
     apiKey: newToken ?? "",
-  });
-  const assistantMasked = activeAssistant.buildCommand?.({
-    ...commandContext,
-    apiKey: maskedKey,
   });
 
   return (
@@ -332,43 +304,58 @@ export function TokenCreatedDialog({
 
               {/* .env — ini-highlighted */}
               {codeTab === "env" && newToken && (
-                <ShikiCommandBox
-                  command={envUnmasked}
-                  maskedCommand={envMasked}
-                  lang="ini"
-                  copyLabel=".env"
+                <CodePreview
+                  code={envUnmasked}
+                  copyText={envUnmasked}
+                  filename=".env"
+                  codeLanguage="ini"
+                  sensitiveValue={newToken}
+                  enableVisibilityToggle
                 />
               )}
 
               {/* Bearer — shellscript-highlighted */}
-              {codeTab === "bearer" && (
+              {codeTab === "bearer" && newToken && (
                 <VStack gap={1} align="stretch">
                   <Text fontSize="xs" color="fg.muted">
                     Use the <code>Authorization</code> header plus{" "}
                     <code>X-Project-Id</code>:
                   </Text>
-                  <ShikiCommandBox
-                    command={bearerUnmasked}
-                    maskedCommand={bearerMasked}
-                    lang="shellscript"
-                    copyLabel="Bearer headers"
+                  <CodePreview
+                    code={bearerUnmasked}
+                    copyText={bearerUnmasked}
+                    filename="HTTP headers"
+                    codeLanguage="shellscript"
+                    sensitiveValue={newToken}
+                    enableVisibilityToggle
                   />
                 </VStack>
               )}
 
-              {/* Basic Auth — shellscript-highlighted */}
+              {/* Basic Auth — shellscript-highlighted. The sensitive value is
+                  the base64 blob (see basicBlob above). The encoded header
+                  needs a project id, so without one the tab explains itself
+                  instead of going silently blank. */}
               {codeTab === "basic" && (
                 <VStack gap={1} align="stretch">
                   <Text fontSize="xs" color="fg.muted">
                     Encode the project ID and token as{" "}
                     <code>base64(projectId:token)</code>:
                   </Text>
-                  <ShikiCommandBox
-                    command={basicUnmasked}
-                    maskedCommand={basicMasked}
-                    lang="shellscript"
-                    copyLabel="Basic Auth header"
-                  />
+                  {basicUnmasked ? (
+                    <CodePreview
+                      code={basicUnmasked}
+                      copyText={basicUnmasked}
+                      filename="HTTP headers"
+                      codeLanguage="shellscript"
+                      sensitiveValue={basicBlob}
+                      enableVisibilityToggle
+                    />
+                  ) : (
+                    <Text fontSize="xs" color="fg.muted">
+                      Select a project to fill in this header.
+                    </Text>
+                  )}
                 </VStack>
               )}
             </VStack>
@@ -409,19 +396,20 @@ export function TokenCreatedDialog({
                 ))}
               </HStack>
 
-              {/* Terminal command — bash-highlighted with >_ prompt. Only the
-                  assistants that actually ship an installer get one. */}
-              {assistantCommand && assistantMasked && newToken && (
+              {/* Terminal command — bash-highlighted. Only the assistants
+                  that actually ship an installer get one. */}
+              {assistantCommand && newToken && (
                 <VStack align="stretch" gap={3}>
                   <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
                     Run in your terminal
                   </Text>
-                  <ShikiCommandBox
-                    command={assistantCommand}
-                    maskedCommand={assistantMasked}
-                    lang="bash"
-                    showPrompt
-                    copyLabel={`${activeAssistant.label} command`}
+                  <CodePreview
+                    code={assistantCommand}
+                    copyText={assistantCommand}
+                    filename="Terminal"
+                    codeLanguage="bash"
+                    sensitiveValue={newToken}
+                    enableVisibilityToggle
                   />
                 </VStack>
               )}
