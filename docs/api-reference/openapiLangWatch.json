@@ -54906,23 +54906,28 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 200
-            }
+            },
+            "required": false
           },
           {
             "in": "query",
             "name": "from",
             "schema": {
               "type": "integer",
-              "exclusiveMinimum": 0
-            }
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "required": true
           },
           {
             "in": "query",
             "name": "to",
             "schema": {
               "type": "integer",
-              "exclusiveMinimum": 0
-            }
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "required": true
           },
           {
             "in": "query",
@@ -54930,7 +54935,8 @@
             "schema": {
               "type": "string",
               "maxLength": 500
-            }
+            },
+            "required": false
           },
           {
             "in": "query",
@@ -54940,11 +54946,12 @@
               "exclusiveMinimum": 0,
               "maximum": 200,
               "default": 50
-            }
+            },
+            "required": false
           }
         ],
         "summary": "List emitted events",
-        "description": "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.",
+        "description": "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from` must not be later than `to` — a range that ends before it starts is rejected rather than answered with an empty page. They are required because the log is a ranged read over the 13-month spend table and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.",
         "security": [
           {
             "admin_api_key": []
