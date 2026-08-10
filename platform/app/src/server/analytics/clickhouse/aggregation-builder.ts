@@ -1591,6 +1591,17 @@ function buildArrayJoinTimeseriesQuery({
   cteSelectExprs.push(
     `${traceColumnWrapper(`${ts}.TimeToFirstTokenMs`)} AS trace_time_to_first_token_ms`,
   );
+  // Hoist only the attribute reads a requested metric actually aggregates.
+  // Pushing all of them would widen the dedup subquery with the wide
+  // Attributes map for every grouped query — the same cost the conditional
+  // cache-token hoist below exists to avoid.
+  for (const { attributeKey, cteColumn } of TRACE_ATTRIBUTE_METRIC_COLUMNS) {
+    const source = traceAttributeSource(attributeKey);
+    if (!simpleMetrics.some((m) => m.selectExpression.includes(source))) {
+      continue;
+    }
+    cteSelectExprs.push(`${traceColumnWrapper(source)} AS ${cteColumn}`);
+  }
   if (needsCacheTokenColumns) {
     // toFloat64 wraps the UInt64 attribute read so both if() branches share a
     // supertype with the smd join's Float64 sums.
@@ -2532,6 +2543,40 @@ function buildPipelineMetricCTE(
  * produced by the same string builders metric-translator uses, so plain
  * split/join substitution is safe.
  */
+/**
+ * Trace-level `Attributes` map reads a metric may aggregate over, and the CTE
+ * column each is hoisted to.
+ *
+ * These are the metadata fields whose `fieldMappings` entry resolves to
+ * `Attributes['…']` rather than to a typed column. A metric over one of them
+ * (e.g. `metadata.thread_id / cardinality` →
+ * `uniqIf(ts.Attributes['gen_ai.conversation.id'], …)`) is aggregated in the
+ * OUTER query, which selects `FROM deduped_traces` and has no `ts` alias in
+ * scope — so the read has to be hoisted into the CTE under a name, exactly as
+ * the typed passthroughs (`ts.TotalCost AS trace_total_cost`) already are.
+ *
+ * Before this list existed only three hardcoded `langwatch.reserved.*` token
+ * keys were hoisted, so every other Attributes-backed metric emitted a raw
+ * `ts.Attributes[…]` into the outer SELECT and ClickHouse rejected the whole
+ * query with "Unknown expression or function identifier `ts.Attributes`".
+ * Observed in production 2026-08-10 on a thread-id count grouped by label.
+ */
+const TRACE_ATTRIBUTE_METRIC_COLUMNS = [
+  { attributeKey: "langwatch.user_id", cteColumn: "trace_attr_user_id" },
+  { attributeKey: "gen_ai.conversation.id", cteColumn: "trace_attr_thread_id" },
+  {
+    attributeKey: "langwatch.customer_id",
+    cteColumn: "trace_attr_customer_id",
+  },
+  { attributeKey: "langwatch.labels", cteColumn: "trace_attr_labels" },
+  { attributeKey: "langwatch.prompt_ids", cteColumn: "trace_attr_prompt_ids" },
+] as const;
+
+/** The `ts.Attributes['<key>']` source expression for a hoisted attribute. */
+function traceAttributeSource(attributeKey: string): string {
+  return `${tableAliases.trace_summaries}.Attributes['${attributeKey}']`;
+}
+
 function dedupSubstitutions(): Array<{
   source: string;
   cteColumn: string;
@@ -2539,6 +2584,14 @@ function dedupSubstitutions(): Array<{
 }> {
   const ts = tableAliases.trace_summaries;
   return [
+    // Attribute-map reads before the bare columns, for the same reason the
+    // composites below come first: their source contains no bare column, but
+    // keeping every map read ahead of the plain list makes the ordering rule
+    // one rule ("longest / most specific first") rather than two.
+    ...TRACE_ATTRIBUTE_METRIC_COLUMNS.map(({ attributeKey, cteColumn }) => ({
+      source: traceAttributeSource(attributeKey),
+      cteColumn,
+    })),
     // Composites first: the non-billed fallback references TotalCost and
     // Attributes, and the cache/reasoning reads reference Attributes, so they
     // must be rewritten before the bare columns they contain.
@@ -2639,13 +2692,46 @@ function stripSelectExpressionAlias(
 }
 
 /**
- * Transform a metric expression to work with deduplicated trace data.
- * count() becomes uniqExact(trace_id) to count distinct traces.
- * Trace-level column references are rewritten to their CTE columns, keeping
- * the metric's aggregation AND its arithmetic intact: a composite metric
- * like total_tokens (prompt + completion) keeps both terms.
+ * Transform a metric expression to work with deduplicated trace data, and
+ * refuse to emit one that would reference the `ts` alias outside the CTE.
+ *
+ * The guard wraps EVERY path on purpose. It used to sit inside the
+ * substitution branch, so it only ran when at least one rewrite had already
+ * matched — and the expression that actually reaches production unrewritten is
+ * precisely the one no substitution matches. `metadata.thread_id / cardinality`
+ * (`uniqIf(ts.Attributes['gen_ai.conversation.id'], …)`) matched nothing, fell
+ * through to "return as-is", and shipped `ts.Attributes[…]` into an outer
+ * SELECT whose only source is `deduped_traces`. ClickHouse then rejected the
+ * whole query with "Unknown expression or function identifier `ts.Attributes`"
+ * — a customer-visible analytics failure that the guard existed to prevent and
+ * could not, because the guard's own precondition excluded the failing case.
+ *
+ * The outer query reads `FROM deduped_traces`, which has no `ts` alias in
+ * scope, so ANY surviving `ts.` reference is invalid SQL. Throwing here turns a
+ * ClickHouse error nobody can act on into one that names the fix.
  */
 function transformMetricForDedup(
+  selectExpression: string,
+  alias: string,
+): string {
+  const rewritten = rewriteMetricForDedup(selectExpression, alias);
+  const ts = tableAliases.trace_summaries;
+  if (new RegExp(`(?<![\\w.])${ts}\\.`).test(rewritten)) {
+    throw new Error(
+      `transformMetricForDedup could not fully rewrite "${selectExpression}" for the grouped CTE. ` +
+        `Add the missing trace-level column to the arrayJoin CTE select list and dedupSubstitutions in aggregation-builder.ts.`,
+    );
+  }
+  return rewritten;
+}
+
+/**
+ * The rewrite itself. count() becomes uniqExact(trace_id) to count distinct
+ * traces. Trace-level column references are rewritten to their CTE columns,
+ * keeping the metric's aggregation AND its arithmetic intact: a composite
+ * metric like total_tokens (prompt + completion) keeps both terms.
+ */
+function rewriteMetricForDedup(
   selectExpression: string,
   alias: string,
 ): string {
@@ -2674,17 +2760,9 @@ function transformMetricForDedup(
       ? replaceColumnWithAlias(rewritten, source, cteColumn)
       : rewritten.split(source).join(cteColumn);
   }
+  // The caller ({@link transformMetricForDedup}) enforces that nothing leaves
+  // here still referencing `ts`, on this path and on every other one.
   if (rewritten !== selectExpression) {
-    // A partial rewrite would emit SQL referencing the `ts` alias outside its
-    // scope; fail loudly so a new metric-translator column gets added to the
-    // CTE select list + dedupSubstitutions instead of shipping silent nulls.
-    const ts = tableAliases.trace_summaries;
-    if (new RegExp(`(?<![\\w.])${ts}\\.`).test(rewritten)) {
-      throw new Error(
-        `transformMetricForDedup could not fully rewrite "${selectExpression}" for the grouped CTE. ` +
-          `Add the missing trace-level column to the arrayJoin CTE select list and dedupSubstitutions in aggregation-builder.ts.`,
-      );
-    }
     return rewritten;
   }
 
