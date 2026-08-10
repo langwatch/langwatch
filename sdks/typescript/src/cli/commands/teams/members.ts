@@ -11,6 +11,37 @@ import {
   withParsedFlags,
 } from "../management/_shared";
 
+type TeamMemberRow = {
+  userId: string | null;
+  name: string | null;
+  email: string | null;
+  role: string;
+};
+
+/**
+ * One row per person, listing every role they hold on the team.
+ *
+ * The endpoint answers with the team's bindings, and somebody may hold more
+ * than one role at the same scope: their permissions are the union of all of
+ * them. Printed straight through, that reads as the same person joining the
+ * team twice, and a count of people that is not a count of people.
+ */
+const membersByPerson = (
+  rows: TeamMemberRow[],
+): Array<TeamMemberRow & { roles: string[] }> => {
+  const byUser = new Map<string, TeamMemberRow & { roles: string[] }>();
+  for (const row of rows) {
+    const key = row.userId ?? `${row.email ?? ""}|${row.name ?? ""}`;
+    const seen = byUser.get(key);
+    if (seen) {
+      if (!seen.roles.includes(row.role)) seen.roles.push(row.role);
+      continue;
+    }
+    byUser.set(key, { ...row, roles: [row.role] });
+  }
+  return Array.from(byUser.values());
+};
+
 /**
  * Team membership is a team-scoped role binding, which is why adding a member
  * takes the role they get on the team rather than just their id.
@@ -23,21 +54,26 @@ export const listTeamMembersCommand = async (
     pending: `Fetching members of team "${teamId}"...`,
     run: () => new TeamsApiService().listMembers(teamId),
     succeed: (result) =>
-      `Found ${counted({ count: result.data.length, singular: "member", plural: "members" })}`,
+      `Found ${counted({
+        count: membersByPerson(result.data).length,
+        singular: "member",
+        plural: "members",
+      })}`,
     table: (result) => {
-      if (result.data.length === 0) {
+      const members = membersByPerson(result.data);
+      if (members.length === 0) {
         printEmpty({ what: "team members" });
         return;
       }
       console.log();
       formatTable({
-        data: result.data.map((member) => ({
+        data: members.map((member) => ({
           "User ID": orDash(member.userId),
           Name: orDash(member.name),
           Email: orDash(member.email),
-          Role: member.role,
+          Roles: member.roles.join(", "),
         })),
-        headers: ["User ID", "Name", "Email", "Role"],
+        headers: ["User ID", "Name", "Email", "Roles"],
         colorMap: { "User ID": chalk.gray, Name: chalk.cyan },
       });
       console.log();

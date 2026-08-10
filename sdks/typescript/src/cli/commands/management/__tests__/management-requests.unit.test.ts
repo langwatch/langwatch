@@ -45,6 +45,7 @@ import { listRolesCommand } from "../../roles/list";
 import { createScimTokenCommand } from "../../scim-tokens/create";
 import { revokeScimTokenCommand } from "../../scim-tokens/revoke";
 import { listTeamsCommand } from "../../teams/list";
+import { listTeamMembersCommand } from "../../teams/members";
 import {
   CREATED_GROUP_BINDING_RESPONSE,
   LIST_GROUPS_RESPONSE,
@@ -396,6 +397,39 @@ describe("the paginated listings", () => {
       });
       await listGroupsCommand({ limit: "1" });
       expect(succeeded[succeeded.length - 1]).toContain("7 groups");
+    });
+  });
+});
+
+describe("team members list", () => {
+  describe("when a member holds more than one role on the team", () => {
+    /** @scenario A member holding several roles on a team is listed once */
+    it("lists them once with both roles and counts them as one member", async () => {
+      respondWith({
+        data: [
+          {
+            userId: "user_1",
+            name: "Sam Okafor",
+            email: "sam@acme.example",
+            role: "MEMBER",
+          },
+          {
+            userId: "user_1",
+            name: "Sam Okafor",
+            email: "sam@acme.example",
+            role: "VIEWER",
+          },
+        ],
+      });
+
+      const result = await listTeamMembersCommand("team_1");
+      result?.table?.();
+
+      expect(succeeded[succeeded.length - 1]).toContain("1 member");
+      const rows = logged.filter((line) => line.includes("Sam Okafor"));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toContain("MEMBER");
+      expect(rows[0]).toContain("VIEWER");
     });
   });
 });

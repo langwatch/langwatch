@@ -111,6 +111,16 @@ Feature: CLI families for the management APIs
       And it carries nested member commands to list, add and remove
       And adding a member accepts the role they get on the team
 
+    # Permissions at a scope are the union of every role held there, so one
+    # person can hold several. A listing that walks bindings would show them
+    # once per role and count a two-role member as two people.
+    @unit
+    Scenario: A member holding several roles on a team is listed once
+      Given a member holds both Member and Viewer on the same team
+      When I list that team's members
+      Then they appear on a single row carrying both roles
+      And the count reports one member
+
     @unit
     Scenario: Group commands cover groups, membership and bindings
       When I read the command catalog the CLI publishes
