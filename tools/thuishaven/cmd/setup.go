@@ -32,7 +32,11 @@ func runSetup(_ context.Context, d deps, inv invocation) error {
 
 	wanted := inv.args
 	if len(wanted) == 0 {
-		if d.isAgent || !stdoutIsTTY() {
+		// Both ends have to be a terminal. Stdout alone says the answer would be
+		// seen, not that anyone can give one — with stdin on a pipe that never
+		// closes, the picker prints its question and blocks on a reply that is
+		// never coming.
+		if d.isAgent || !stdoutIsTTY() || !stdinIsTTY() {
 			// Refusing beats guessing. In agent mode there is nobody to ask, and
 			// installing "everything" because nothing was named is exactly the kind
 			// of surprise this command was split out of `up` to avoid.

@@ -96,6 +96,14 @@ Feature: The daemon watches the machine, slows what it can, and reports what it 
     Then every stack except the focused one is moved into the background scheduling band
     And no process is stopped, because demotion is reversible and losing work is not
 
+  @unit
+  Scenario: A stack with no recorded launcher is never signalled
+    Given a registered stack whose launcher process was never recorded
+    When the governor demotes or restores the others
+    Then that stack is left out of both
+    Because an unrecorded launcher is process zero, and process zero in a group signal
+    And means the caller's own group, so haven would demote itself
+
   @integration @unimplemented
   Scenario: Demotion covers the children that are already running
     Given a stack whose launcher has already spawned its children

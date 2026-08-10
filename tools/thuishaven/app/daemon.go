@@ -176,9 +176,39 @@ const vitestWorkerMarker = "vitest/dist/workers"
 // bound a process's memory (`taskpolicy -m` sets a jetsam limit at spawn), but
 // jetsam kills what breaches it, which turns a slow machine into lost work.
 // Demotion is reversible and costs nothing but time.
+//
+// The publish comes first and the work after it runs in the background, because
+// everything after the sample shells out: a sweep, a process list, a taskpolicy
+// call per stack, and two more probes per stack at red. Each is deadline-bound
+// on its own, but on a degraded machine with several stacks running they add up
+// on one tick — and a tick that outlasts domain.PressureStaleAfter makes every
+// reader on the machine fall back to green, switching governance off exactly
+// when the machine is at its worst. Publishing on a bounded path keeps the
+// record fresh however long the slow half takes.
 func (o *Orchestrator) governPressure() {
 	level := domain.ClassifyPressure(o.sys.MemStat())
 	o.publishPressure(level)
+
+	if o.isGoverning.Swap(true) {
+		// The previous tick's work is still going. Skipping is right rather than
+		// sad: what it would do is decided from a reading now two ticks old, and
+		// the run in flight is already doing it.
+		return
+	}
+	o.governance.Add(1)
+	go func() {
+		defer o.governance.Done()
+		defer o.isGoverning.Store(false)
+		o.applyGovernance(level)
+	}()
+}
+
+// awaitGovernance blocks until the slow half of the current tick has finished.
+// For tests, which assert on what it did.
+func (o *Orchestrator) awaitGovernance() { o.governance.Wait() }
+
+// applyGovernance is the slow half: everything that shells out.
+func (o *Orchestrator) applyGovernance(level domain.Pressure) {
 	o.sweepOrphanedWorkers()
 
 	stacks := o.store.Stacks()

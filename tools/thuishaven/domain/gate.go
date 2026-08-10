@@ -76,7 +76,12 @@ func AlreadyWrapped(command string) bool {
 //
 // Deliberately excludes haven's path, since the wrapper writes an absolute one
 // and a nested wrap could arrive by any spelling.
-const havenRunMarker = "run --class heavy"
+const havenRunMarker = "run --class " + HeavySlotClass
+
+// HeavySlotClass is the only slot pool there is. Named here, where the wrapper
+// writes it, so the command that validates the flag and the command that emits
+// it cannot come to disagree about its spelling.
+const HeavySlotClass = "heavy"
 
 // WrapOptions carries what the gate already decided into the wrapped command.
 //

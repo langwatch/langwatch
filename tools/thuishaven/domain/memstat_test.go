@@ -51,6 +51,21 @@ func TestParseVMStatReadsOccupiedPagesAtTheMachinesPageSize(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("given a header whose occupancy line has gone", func(t *testing.T) {
+		const renamed = `Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                              168362.
+Pages held by compressor:                127999.`
+
+		t.Run("it reports failure rather than an empty compressor", func(t *testing.T) {
+			// Zero here is not a quiet machine, it is a format change — and the
+			// governor reading it as one would sit at green while the machine
+			// thrashes, which is the failure this parser exists to prevent.
+			if _, occupied, ok := ParseVMStat(renamed); ok || occupied != 0 {
+				t.Fatalf("expected a refusal, got occupied=%d ok=%v", occupied, ok)
+			}
+		})
+	})
 }
 
 func TestParseSwapUsage(t *testing.T) {
@@ -96,6 +111,17 @@ func TestParseSwapUsage(t *testing.T) {
 		t.Run("it refuses rather than converting to an arbitrary number", func(t *testing.T) {
 			if _, _, ok := ParseSwapUsage("total = 1e30T  used = 1e30T"); ok {
 				t.Fatal("an impossible size must not be believed")
+			}
+		})
+	})
+
+	t.Run("given a figure that is not a number at all", func(t *testing.T) {
+		// ParseFloat accepts "NaN", and NaN is neither negative nor above the
+		// bound, so it walks through both guards and reaches the conversion they
+		// exist to protect.
+		t.Run("it refuses rather than converting NaN", func(t *testing.T) {
+			if _, _, ok := ParseSwapUsage("total = NaNM  used = NaNM"); ok {
+				t.Fatal("NaN must not be believed as a swap figure")
 			}
 		})
 	})

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -18,6 +19,13 @@ func governorOrch(store *fakeStore, sys *fakeSystem) *Orchestrator {
 		store: store, sys: sys, proxy: &fakeProxy{},
 		log: zap.NewNop(),
 	}
+}
+
+// govern runs one whole tick: the bounded sample-and-publish, then the slow
+// half it hands off, waited out so the assertions below see what it did.
+func govern(o *Orchestrator) {
+	o.governPressure()
+	o.awaitGovernance()
 }
 
 // twoStacks returns a focused stack (most recently updated, so first) and an
@@ -38,7 +46,7 @@ func TestGovernorPublishesItsReading(t *testing.T) {
 		sys.memStat = domain.MemStat{TotalBytes: 18 * testGiB, CompressedBytes: 2 * testGiB}
 
 		t.Run("when the daemon completes a tick", func(t *testing.T) {
-			governorOrch(store, sys).governPressure()
+			govern(governorOrch(store, sys))
 
 			t.Run("the current level is written with a version and a timestamp", func(t *testing.T) {
 				rec, ok := store.ReadPressure()
@@ -66,7 +74,7 @@ func TestGovernorDemotesEveryStackButTheFocusedOne(t *testing.T) {
 		t.Run("when pressure reaches amber", func(t *testing.T) {
 			store, sys := twoStacks()
 			sys.memStat = domain.MemStat{TotalBytes: 18 * testGiB, CompressedBytes: 2 * testGiB}
-			governorOrch(store, sys).governPressure()
+			govern(governorOrch(store, sys))
 
 			t.Run("the unfocused stack is moved into the background band", func(t *testing.T) {
 				if len(sys.demoted) != 1 || sys.demoted[0] != 200 {
@@ -92,7 +100,7 @@ func TestGovernorDemotesEveryStackButTheFocusedOne(t *testing.T) {
 		t.Run("when pressure returns to green", func(t *testing.T) {
 			store, sys := twoStacks()
 			sys.memStat = domain.MemStat{TotalBytes: 18 * testGiB}
-			governorOrch(store, sys).governPressure()
+			govern(governorOrch(store, sys))
 
 			t.Run("every stack is restored to the normal band", func(t *testing.T) {
 				if len(sys.restored) != 2 {
@@ -109,6 +117,52 @@ func TestGovernorDemotesEveryStackButTheFocusedOne(t *testing.T) {
 	})
 }
 
+// A registered stack can carry LauncherPID == 0, and pid 0 in kill(2) addresses
+// the caller's own process group — the daemon's. Every other test in this file
+// gives both stacks a real pid, so deleting the guard in governable would leave
+// them all green.
+//
+// @scenario "A stack with no recorded launcher is never signalled"
+func TestGovernorNeverSignalsAZeroLauncher(t *testing.T) {
+	t.Run("given a registered stack whose launcher pid was never recorded", func(t *testing.T) {
+		newStore := func() *fakeStore {
+			return &fakeStore{stacks: []domain.Stack{
+				{Slug: "focused", LauncherPID: 100},
+				{Slug: "unrecorded", LauncherPID: 0},
+			}}
+		}
+		// Pid 0 reports alive too, so liveness cannot stand in for the guard
+		// this test is about.
+		newSys := func() *fakeSystem {
+			return &fakeSystem{alive: map[int]bool{100: true, 0: true}, now: time.Now()}
+		}
+
+		t.Run("when pressure reaches amber", func(t *testing.T) {
+			sys := newSys()
+			sys.memStat = domain.MemStat{TotalBytes: 18 * testGiB, CompressedBytes: 2 * testGiB}
+			govern(governorOrch(newStore(), sys))
+
+			t.Run("it is not demoted, because pid 0 would demote haven itself", func(t *testing.T) {
+				if slices.Contains(sys.demoted, 0) {
+					t.Fatalf("demoting pid 0 demotes the daemon's own group: %v", sys.demoted)
+				}
+			})
+		})
+
+		t.Run("when pressure is green", func(t *testing.T) {
+			sys := newSys()
+			sys.memStat = domain.MemStat{TotalBytes: 18 * testGiB}
+			govern(governorOrch(newStore(), sys))
+
+			t.Run("it is not restored either, for the same reason", func(t *testing.T) {
+				if slices.Contains(sys.restored, 0) {
+					t.Fatalf("restoring pid 0 aims at the daemon's own group: %v", sys.restored)
+				}
+			})
+		})
+	})
+}
+
 // @scenario "At critical pressure the daemon names the worst offender but does not act on it"
 func TestGovernorNamesTheWorstOffenderWithoutStoppingIt(t *testing.T) {
 	t.Run("given pressure is red", func(t *testing.T) {
@@ -118,7 +172,7 @@ func TestGovernorNamesTheWorstOffenderWithoutStoppingIt(t *testing.T) {
 		}
 
 		t.Run("when the daemon completes a tick", func(t *testing.T) {
-			governorOrch(store, sys).governPressure()
+			govern(governorOrch(store, sys))
 
 			t.Run("it does not stop anything, because it did not start that work", func(t *testing.T) {
 				if len(sys.terminated) != 0 || len(sys.groupKilled) != 0 {
@@ -143,7 +197,7 @@ func TestGovernorSweepsOrphanedTestWorkers(t *testing.T) {
 		sys.orphans = []int{4242}
 
 		t.Run("when the daemon completes a tick", func(t *testing.T) {
-			governorOrch(store, sys).governPressure()
+			govern(governorOrch(store, sys))
 
 			t.Run("that worker is reclaimed", func(t *testing.T) {
 				if len(sys.groupKilled) != 1 || sys.groupKilled[0] != 4242 {
@@ -166,7 +220,7 @@ func TestGovernorSweepsOrphanedTestWorkers(t *testing.T) {
 		store, sys := twoStacks()
 
 		t.Run("nothing is reclaimed, because a worker with a live parent is not ours to take", func(t *testing.T) {
-			governorOrch(store, sys).governPressure()
+			govern(governorOrch(store, sys))
 			if len(sys.groupKilled) != 0 {
 				t.Fatalf("expected no kills, got %v", sys.groupKilled)
 			}
@@ -182,7 +236,7 @@ func TestGovernorDemotesNothingWithoutStacks(t *testing.T) {
 		sys.memStat = domain.MemStat{TotalBytes: 18 * testGiB, CompressedBytes: 2 * testGiB}
 
 		t.Run("when pressure reaches amber", func(t *testing.T) {
-			governorOrch(store, sys).governPressure()
+			govern(governorOrch(store, sys))
 
 			t.Run("nothing is demoted", func(t *testing.T) {
 				if len(sys.demoted) != 0 {

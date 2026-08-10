@@ -95,6 +95,13 @@ type AdmissionRequest struct {
 	CanBackground bool
 }
 
+// canGiveUpWidth reports whether there is any width to take away: a kind that
+// divides, a caller that has not already chosen its own count, and not a human
+// waiting at a terminal.
+func (r AdmissionRequest) canGiveUpWidth() bool {
+	return r.Kind.Narrowable() && !r.HasCallerWorkerCount && r.Caller != Interactive
+}
+
 // fitsInsideFloor reports whether a narrowed run would finish before this
 // caller's prompt cache expires. An unobserved command never fits: unknown is
 // treated as long, because queueing is the answer that cannot make the machine
@@ -103,13 +110,6 @@ type AdmissionRequest struct {
 // The narrowed run is assumed to take up to twice as long as observed — fewer
 // workers, more wall clock — which is the pessimistic direction and keeps the
 // decision honest when the estimate is wrong.
-// canGiveUpWidth reports whether there is any width to take away: a kind that
-// divides, a caller that has not already chosen its own count, and not a human
-// waiting at a terminal.
-func (r AdmissionRequest) canGiveUpWidth() bool {
-	return r.Kind.Narrowable() && !r.HasCallerWorkerCount && r.Caller != Interactive
-}
-
 func (r AdmissionRequest) fitsInsideFloor() bool {
 	if r.ObservedDuration <= 0 {
 		return false

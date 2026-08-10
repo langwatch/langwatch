@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -33,6 +35,12 @@ type Orchestrator struct {
 	// Nil everywhere else, including in tests that never install a feature.
 	claude ClaudeSettings
 	log    *zap.Logger
+
+	// isGoverning guards the slow half of a pressure tick, which runs off the
+	// tick so publishing stays bounded. governance is what a caller waits on to
+	// know that half has finished.
+	isGoverning atomic.Bool
+	governance  sync.WaitGroup
 }
 
 // Deps is the injected object graph. A struct rather than a positional

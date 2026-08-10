@@ -23,10 +23,10 @@ type fakeStore struct {
 	selection  map[string]domain.Selection
 	touched    []string
 
-	pressure        domain.PressureRecord
-	pressureWritten bool
-	heavyRuns       int
-	observed        map[string]time.Duration
+	pressure           domain.PressureRecord
+	hasWrittenPressure bool
+	heavyRuns          int
+	observed           map[string]time.Duration
 }
 
 func (f *fakeStore) SaveStack(domain.Stack) error { return nil }
@@ -85,11 +85,11 @@ func (f *fakeStore) ClaimDaemon(DaemonInfo) (bool, error) { return true, nil }
 func (f *fakeStore) Daemon() (DaemonInfo, bool)           { return DaemonInfo{}, false }
 func (f *fakeStore) ClearDaemon()                         {}
 func (f *fakeStore) WritePressure(rec domain.PressureRecord) error {
-	f.pressure, f.pressureWritten = rec, true
+	f.pressure, f.hasWrittenPressure = rec, true
 	return nil
 }
 func (f *fakeStore) ReadPressure() (domain.PressureRecord, bool) {
-	return f.pressure, f.pressureWritten
+	return f.pressure, f.hasWrittenPressure
 }
 func (f *fakeStore) HeavyRuns() int { return f.heavyRuns }
 func (f *fakeStore) ClaimHeavyRun(int, string) (func(), error) {

@@ -647,6 +647,16 @@ func stdoutIsTTY() bool {
 	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }
 
+// stdinIsTTY reports whether there is a human at the other end of stdin.
+//
+// Separate from stdoutIsTTY because the two travel apart: a terminal keeps
+// stdout while stdin comes from a pipe that never closes, and anything that
+// reads a line then waits forever with its prompt already on screen.
+func stdinIsTTY() bool {
+	fi, err := os.Stdin.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice != 0
+}
+
 // upRunsAttached decides how `haven up` presents itself. A human terminal gets
 // the background stack plus the attached log view on top, so quitting the view
 // detaches and leaves the stack running.

@@ -72,7 +72,7 @@ This is also where CLAUDE.md's warning is answered rather than waved at. Its gui
 
 Red is the only level that refuses. Amber's job is to demote and to stop admitting at full width; it does not refuse work.
 
-**The wait ceiling follows the caller, because the caller determines the floor.** A sub-agent gets a ceiling below five minutes. A main session and an interactive terminal keep the existing 30-minute failsafe, which sits inside their one-hour floor. The signal is `agent_id`: present means sub-agent, absent means main session. A run reaching haven with no identifying information is treated as a sub-agent, because that is the conservative direction.
+**The wait ceiling follows the caller, because the caller determines the floor.** A sub-agent gets a ceiling below five minutes. A main session and an interactive terminal keep the existing 30-minute failsafe, which sits inside their one-hour floor. The signal is `agent_id`: present means sub-agent, absent means main session. There is no third state to be conservative about — an absent `agent_id` is how a main session arrives, so a run haven cannot otherwise identify keeps the main-session ceiling.
 
 **The daemon publishes pressure; the callers read it.** The daemon already ticks every 10s. It samples the machine — compressor occupancy and swap — classifies it, and writes that to its state directory.
 
@@ -92,7 +92,7 @@ Red is the only level that refuses. Amber's job is to demote and to stop admitti
 
 Recording the sequence is the point. The premise went from asserted, to attacked, to measured wrong, to measured right, and the design is different at each step. Nobody had looked at a transcript until the third revision, and the answer was sitting in 40 of them.
 
-What is accepted in exchange. The main-session and sub-agent floors are read off `agent_id`, which is a Claude Code contract detail rather than a stable interface; if that changes, the conservative fallback (treat unknown as a sub-agent) keeps the tighter ceiling. The bimodal split is measured on one machine and could be version-specific, which is worth re-checking rather than treating as a law. The pressure signal is a heuristic; fail-open means it errs toward doing nothing. Demotion is macOS-only.
+What is accepted in exchange. The main-session and sub-agent floors are read off `agent_id`, which is a Claude Code contract detail rather than a stable interface. If it stops being sent, every caller reads as a main session and keeps the 30-minute failsafe — so the sub-agents this exists for would be parked past a five-minute cache. Defaulting the other way is not the safer trade: it would hand every main session the tighter ceiling on the strength of a field that is empty by design, and the runs that queue would narrow and background with no reason to. The bimodal split is measured on one machine and could be version-specific, which is worth re-checking rather than treating as a law. The pressure signal is a heuristic; fail-open means it errs toward doing nothing. Demotion is macOS-only.
 
 The 8 GiB VM is the honest illustration of the residual gap: after all of this, the largest single consumer on the machine is still outside haven's control, and the answer is a printed hint.
 
@@ -110,7 +110,7 @@ Nothing here touches CI. `CHECK_SLOTS` is already off under CI and a runner runn
 
 ## References
 
-- PR #6598 — the counter this extends. **Not yet merged**: it adds `dev/scripts/check-queue.mjs` and `specs/setup/check-slots.feature`, so this ADR is stacked on it and that spec link resolves only once it lands.
+- PR #6598 — the counter this extends: `dev/scripts/check-queue.mjs` and [specs/setup/check-slots.feature](../../../specs/setup/check-slots.feature).
 - [specs/setup/haven-resource-caps.feature](../../../specs/setup/haven-resource-caps.feature) — the per-service caps this sits above
 - [ADR-091](./091-haven-gate-agent-admission-and-cost-safety.md) — the hook that lets an agent's tool call reach this governor
 - `platform/app/vitest.config.ts` — the `vmForks` choice and the 573 MB/fork measurement this ADR's arithmetic rests on

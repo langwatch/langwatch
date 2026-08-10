@@ -27,6 +27,15 @@ func Write(path string, data []byte, perm os.FileMode) error {
 		_ = tmp.Close()
 		return err
 	}
+	// The rename orders the directory entry, not the data behind it, so a crash
+	// between the two can publish the new name over a file with nothing in it.
+	// One consumer of this is the developer's own Claude settings, which haven
+	// then refuses to touch until they delete it by hand — a cheap fsync against
+	// a repair nobody should have to make.
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return err
+	}
 	if err := tmp.Close(); err != nil {
 		return err
 	}

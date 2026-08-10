@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// base is a request that would be admitted, so each test below changes exactly
-// the one thing it is about.
+// base is a short sub-agent unit run that finds no free slot, which narrows.
+// Each test below changes exactly the one thing it is about.
 func base() AdmissionRequest {
 	return AdmissionRequest{
 		Pressure:         Green,

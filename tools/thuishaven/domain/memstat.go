@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"math"
 	"strconv"
 	"strings"
 )
@@ -19,17 +20,22 @@ import (
 // different number from "Pages stored in compressor": on the machine that
 // motivated ADR-090 they read 128k and 679k, so reading the wrong line
 // overstates by five times.
+// Both lines are required. A header without the occupancy line is a format
+// change, not a machine whose compressor is empty — and answering zero to that
+// question reads as green forever on a thrashing machine, which is the silent
+// understatement the rest of this comment exists to prevent.
 func ParseVMStat(out string) (pageSizeBytes, occupiedPages uint64, ok bool) {
+	var hasOccupied bool
 	for line := range strings.SplitSeq(out, "\n") {
 		if n, found := vmStatPageSize(line); found {
 			pageSizeBytes = n
 			continue
 		}
 		if n, found := vmStatOccupiedPages(line); found {
-			occupiedPages = n
+			occupiedPages, hasOccupied = n, true
 		}
 	}
-	return pageSizeBytes, occupiedPages, pageSizeBytes > 0
+	return pageSizeBytes, occupiedPages, pageSizeBytes > 0 && hasOccupied
 }
 
 // vmStatPageSize reads the header: "Mach Virtual Memory Statistics: (page size
@@ -112,7 +118,10 @@ func parseSizeWithSuffix(s string) (uint64, bool) {
 		s = s[:len(s)-1]
 	}
 	n, err := strconv.ParseFloat(s, 64)
-	if err != nil || n < 0 {
+	// NaN passes every comparison below — it is neither negative nor above the
+	// bound — so it has to be refused by name or it reaches the conversion the
+	// bound exists to keep it away from.
+	if err != nil || math.IsNaN(n) || n < 0 {
 		return 0, false
 	}
 	bytes := n * float64(multiplier)

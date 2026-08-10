@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // runHeavy is `haven run` — take a machine-wide slot, run the command, release.
@@ -18,6 +19,12 @@ func runHeavy(ctx context.Context, d deps, inv invocation) error {
 	shell := inv.value("--sh")
 	if shell == "" {
 		return fmt.Errorf("haven run needs a command: haven run --sh 'pnpm test:unit'")
+	}
+	// One pool exists, so any other name is a request haven cannot honour.
+	// Accepting it silently would run the command against the heavy pool while
+	// the caller believes it took a different one.
+	if class := inv.value("--class"); class != "" && class != domain.HeavySlotClass {
+		return fmt.Errorf("haven run has one slot class today, %q — not %q", domain.HeavySlotClass, class)
 	}
 	return d.orch.RunHeavy(ctx, app.HeavyRun{
 		Shell:   shell,

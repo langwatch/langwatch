@@ -406,19 +406,55 @@ func (s *Store) ObservedDuration(key string) time.Duration {
 // growth, and a machine that gets slower (or a suite that gets bigger) is
 // tracked within a few runs instead of being anchored to whatever the first
 // one happened to cost.
+//
+// Held under a lock for the whole read-modify-write. The file holds every
+// command's estimate in one map and the write publishes all of it, so two runs
+// finishing together would each write a map built before the other's update and
+// the later writer would drop the earlier one's key. A dropped key reads back
+// as never-observed, and the run that follows queues at full width instead of
+// narrowing — the safe direction, but not a free one, and this is the case
+// haven is built for: several agents finishing at once.
 func (s *Store) ObserveDuration(key string, took time.Duration) {
 	if key == "" || took <= 0 {
 		return
 	}
+	_ = os.MkdirAll(s.home, 0o750)
+	release, err := s.lockDurations()
+	if err != nil {
+		// Rather than skip the observation: an interleaved write costs one
+		// estimate, and never writing costs every estimate on this machine.
+		release = func() {}
+	}
+	defer release()
+
 	all := s.readDurations()
 	if prev, ok := all[key]; ok {
 		took = (prev*3 + took) / 4
 	}
 	all[key] = took
 	if b, err := json.Marshal(all); err == nil {
-		_ = os.MkdirAll(s.home, 0o750)
 		_ = writeFileAtomic(s.durationsPath(), b, 0o644)
 	}
+}
+
+// lockDurations takes the exclusive lock guarding the durations file.
+//
+// The lock is its own file rather than the durations file itself, because the
+// writer renames a fresh file over that path: a lock held on the old inode
+// would guard a file no longer at the name, which is no lock at all.
+func (s *Store) lockDurations() (func(), error) {
+	f, err := os.OpenFile(s.durationsPath()+".lock", os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		_ = f.Close()
+		return nil, err
+	}
+	return func() {
+		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+		_ = f.Close()
+	}, nil
 }
 
 func (s *Store) readDurations() map[string]time.Duration {

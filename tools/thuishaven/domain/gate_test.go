@@ -115,9 +115,13 @@ func TestWrapCommandKeepsTheWholeShellLineInsideTheSlot(t *testing.T) {
 		})
 
 		t.Run("so no part of it is parsed at the outer level", func(t *testing.T) {
-			// Anything after the closing quote would run outside the slot.
-			if strings.HasSuffix(wrapped, "&& echo done") {
+			// The line has to end at the closing quote. Anything the wrapper let
+			// past it would be parsed by the outer shell and run outside the slot.
+			if !strings.HasSuffix(wrapped, "'") {
 				t.Fatalf("part of the line escaped the slot: %q", wrapped)
+			}
+			if words := ShellWords(wrapped); words[len(words)-1] != "pnpm test:unit && echo done" {
+				t.Fatalf("the operator must arrive as one argument, got %q", words)
 			}
 		})
 

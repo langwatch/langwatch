@@ -237,6 +237,14 @@ Feature: Heavy runs are admitted, queued, or refused
     Because a suite that died after two seconds is not a two-second suite,
     And the next caller would be narrowed on the strength of a crash
 
+  @unit
+  Scenario: Timings survive several runs finishing at once
+    Given several heavy runs recording different commands at the same moment
+    When each folds its own timing into the estimate
+    Then every command's timing is still there afterwards
+    Because one file holds all of them and each writer publishes the whole of it,
+    And a timing dropped that way reads as a command nobody has ever timed
+
   # --- Refusal ---
 
   @unit
