@@ -160,7 +160,7 @@ func (s Step) Has(key string) bool {
 // how a guard silently passes: `sparse-checkout-cone-mode: flase` would have
 // read as an explicit false and satisfied the cone-mode check, in a guard
 // whose entire job is catching that class of mistake.
-func (s Step) BoolWith(key string) (value bool, valid bool) {
+func (s Step) BoolWith(key string) (value bool, isValid bool) {
 	raw, ok := s.With[key]
 	if !ok {
 		return false, false

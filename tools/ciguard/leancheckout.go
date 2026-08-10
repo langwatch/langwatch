@@ -124,12 +124,12 @@ func anchorsItsExclusions(where string, patterns []string) []string {
 // disablesConeMode catches negation under cone mode, where cone mode takes an
 // include list and the negated pattern silently does nothing.
 func disablesConeMode(where string, step ciscan.Step) []string {
-	cone, valid := step.BoolWith("sparse-checkout-cone-mode")
+	isConeModeEnabled, isValid := step.BoolWith("sparse-checkout-cone-mode")
 
 	switch {
-	case valid && !cone:
+	case isValid && !isConeModeEnabled:
 		return nil
-	case step.Has("sparse-checkout-cone-mode") && !valid:
+	case step.Has("sparse-checkout-cone-mode") && !isValid:
 		// A value neither true nor false. Named separately because the fix is
 		// different: it is a typo, not a missing setting.
 		return []string{fmt.Sprintf(
