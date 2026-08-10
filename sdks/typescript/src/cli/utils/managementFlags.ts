@@ -3,10 +3,10 @@
  *
  * The management APIs take structured values a single `--flag value` cannot
  * carry: a permission is a resource and an action, a binding is a role and a
- * scope, an invite is a person plus the teams they land on. Rather than invent
- * a per-command spelling for each, the CLI uses one colon-separated shape per
- * concept and repeats the flag, which is the convention the rest of the CLI
- * already uses for lists (`--project-id` on `api-keys create`).
+ * scope. Rather than invent a per-command spelling for each, the CLI uses one
+ * colon-separated shape per concept and repeats the flag, which is the
+ * convention the rest of the CLI already uses for lists (`--project-id` on
+ * `api-keys create`).
  *
  * Every parser refuses a malformed value by NAMING the expected shape: a
  * message that says only "invalid" leaves the caller guessing at a grammar the
@@ -14,7 +14,8 @@
  *
  * Parsing is pure and separate from the commands so it can be tested directly,
  * and so a command's failure is a validation error rather than a request the
- * platform has to reject.
+ * platform has to reject. The invite grammar, the one shape with a JSON
+ * spelling as well as a flag one, lives in `managementInvites`.
  */
 import {
   MANAGEMENT_ROLES,
@@ -25,7 +26,6 @@ import {
   type ManagementScopeType,
   type OrganizationRole,
 } from "@/client-sdk/services/_shared/management-types";
-import type { InviteInput } from "@/client-sdk/services/organization/organization-api.service";
 import type { ListRoleBindingsOptions } from "@/client-sdk/services/role-bindings/role-bindings-api.service";
 
 /** A flag value the CLI refuses before it ever reaches the platform. */
@@ -36,22 +36,27 @@ export class ManagementFlagError extends Error {
   }
 }
 
-const oneOf = (values: readonly string[]): string => values.join(", ");
+/** The tail of every "Expected one of ..." refusal. */
+export const oneOf = (values: readonly string[]): string => values.join(", ");
 
 /**
  * A non-negative integer flag, refused by name rather than sent as NaN.
  *
  * Matched as plain decimal digits rather than run through `Number`, which
  * reads "" as 0, "0x10" as 16 and "1e3" as 1000: a page size nobody typed.
+ * Digits alone are not enough either, because past 2^53 a decimal string
+ * rounds to a different integer and long enough becomes Infinity, so the
+ * request would carry a number the caller never asked for.
  */
 export const parseCount = (value: string, flag: string): number => {
   const trimmed = value.trim();
-  if (!/^\d+$/.test(trimmed)) {
+  const count = Number(trimmed);
+  if (!/^\d+$/.test(trimmed) || !Number.isSafeInteger(count)) {
     throw new ManagementFlagError(
       `Invalid ${flag} "${value}". Expected a whole number.`,
     );
   }
-  return Number(trimmed);
+  return count;
 };
 
 /**
@@ -74,7 +79,17 @@ export const parsePermissionFlags = (values: string[] = []): string[] => {
   return permissions;
 };
 
-const assertRole = (value: string, source: string): ManagementRole => {
+/**
+ * A role read out of a compound value, where `source` names which of the
+ * several roles one command can carry was the wrong one.
+ */
+export const parseRoleIn = ({
+  value,
+  source,
+}: {
+  value: string;
+  source: string;
+}): ManagementRole => {
   const role = value.trim().toUpperCase();
   if (!(MANAGEMENT_ROLES as readonly string[]).includes(role)) {
     throw new ManagementFlagError(
@@ -110,7 +125,7 @@ export const parseOrganizationRole = (value: string): OrganizationRole => {
 
 /** A role a binding grants, given on its own flag. */
 export const parseRole = (value: string): ManagementRole =>
-  assertRole(value, "--role");
+  parseRoleIn({ value, source: "--role" });
 
 /** A scope type given on its own flag. */
 export const parseScopeType = (value: string): ManagementScopeType =>
@@ -131,177 +146,11 @@ export const parseBindingFlags = (
       );
     }
     return {
-      role: assertRole(parts[0]!, `binding "${value}"`),
+      role: parseRoleIn({ value: parts[0]!, source: `binding "${value}"` }),
       scopeType: assertScopeType(parts[1]!, `binding "${value}"`),
       scopeId: parts[2]!.trim(),
     };
   });
-
-/**
- * `teamId:role`, repeated: the teams an invited person lands on and the role
- * they hold there. A team id never contains a colon.
- */
-export const parseTeamFlags = (
-  values: string[] = [],
-): Array<{ teamId: string; role: ManagementRole }> =>
-  values.map((value) => {
-    const parts = value.split(":");
-    if (parts.length !== 2 || parts.some((part) => !part.trim())) {
-      throw new ManagementFlagError(
-        `Invalid team assignment "${value}". Expected teamId:role, for example team_abc:MEMBER.`,
-      );
-    }
-    return {
-      teamId: parts[0]!.trim(),
-      role: assertRole(parts[1]!, `team assignment "${value}"`),
-    };
-  });
-
-export interface InviteFlagInput {
-  /** Repeatable `--email`. */
-  email?: string[];
-  /** Repeatable `--role`; one per email, or one for the whole batch. */
-  role?: string[];
-  /** Repeatable `--team teamId:role`, applied to every invite in the batch. */
-  team?: string[];
-}
-
-/**
- * The invite batch the flags describe.
- *
- * One `--role` covers the whole batch; several must line up one-per-email, so
- * a mismatch is caught here rather than silently pairing the wrong role with
- * the wrong person. The team assignments apply to every invite in the batch:
- * an invite with per-person teams is a JSON batch, which the same command
- * accepts through `--json`, `--file` or `--stdin`.
- */
-export const composeInvitesFromFlags = (
-  options: InviteFlagInput,
-): InviteInput[] => {
-  const emails = (options.email ?? []).map((email) => email.trim()).filter(Boolean);
-  if (emails.length === 0) {
-    throw new ManagementFlagError(
-      "No invites given. Pass --email (repeatable) with --role and --team, or a JSON batch with --json, --file or --stdin.",
-    );
-  }
-
-  const roles = options.role ?? [];
-  if (roles.length !== 1 && roles.length !== emails.length) {
-    throw new ManagementFlagError(
-      `Got ${emails.length} email flags and ${roles.length} role flags. Pass one --role for the whole batch, or one per --email.`,
-    );
-  }
-
-  const teams = parseTeamFlags(options.team);
-  if (teams.length === 0) {
-    throw new ManagementFlagError(
-      "Every invite needs at least one team. Pass --team teamId:role (repeatable).",
-    );
-  }
-
-  return emails.map((email, index) => ({
-    email,
-    role: parseOrganizationRole(roles.length === 1 ? roles[0]! : roles[index]!),
-    teams: teams.map((team) => ({ teamId: team.teamId, role: team.role })),
-  }));
-};
-
-/** A custom role id out of a JSON batch, or undefined when none was given. */
-const parseCustomRoleId = ({
-  value,
-  source,
-}: {
-  value: unknown;
-  source: string;
-}): string | undefined => {
-  if (value === undefined || value === null) return undefined;
-  if (typeof value !== "string" || !value.trim()) {
-    throw new ManagementFlagError(
-      `${source} has a customRoleId that is not a role id. Expected the id of a custom role.`,
-    );
-  }
-  return value.trim();
-};
-
-/**
- * The invite batch a JSON document describes. Both the bare array and the
- * `{ invites: [...] }` envelope are accepted, because the first is what a
- * person writes and the second is what the API answers with, and pasting back
- * a previous response is the obvious thing to try.
- */
-export const parseInvitesJson = (raw: string): InviteInput[] => {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new ManagementFlagError(
-      "Invalid JSON: could not parse the invite batch.",
-    );
-  }
-
-  const invites = Array.isArray(parsed)
-    ? parsed
-    : (parsed as { invites?: unknown } | null)?.invites;
-
-  if (!Array.isArray(invites)) {
-    throw new ManagementFlagError(
-      'Invalid invite batch: expected a JSON array of invites, or an object with an "invites" array.',
-    );
-  }
-  if (invites.length === 0) {
-    throw new ManagementFlagError(
-      "Invalid invite batch: the invites array is empty.",
-    );
-  }
-
-  return invites.map((entry, index) => {
-    const invite = entry as Partial<InviteInput> | null;
-    if (!invite || typeof invite.email !== "string" || !invite.email.trim()) {
-      throw new ManagementFlagError(
-        `Invite ${index + 1} has no email. Every invite needs email, role and teams.`,
-      );
-    }
-    if (typeof invite.role !== "string") {
-      throw new ManagementFlagError(
-        `Invite ${index + 1} ("${invite.email}") has no role. Expected one of ${oneOf(ORGANIZATION_ROLES)}.`,
-      );
-    }
-    const teams = invite.teams;
-    if (!Array.isArray(teams) || teams.length === 0) {
-      throw new ManagementFlagError(
-        `Invite ${index + 1} ("${invite.email}") has no teams. Every invite needs at least one team assignment.`,
-      );
-    }
-    return {
-      email: invite.email.trim(),
-      role: parseOrganizationRole(invite.role),
-      teams: teams.map((team, teamIndex) => {
-        const assignment = team as Partial<InviteInput["teams"][number]> | null;
-        if (
-          !assignment ||
-          typeof assignment.teamId !== "string" ||
-          !assignment.teamId.trim()
-        ) {
-          throw new ManagementFlagError(
-            `Invite ${index + 1} ("${invite.email}") team ${teamIndex + 1} has no teamId.`,
-          );
-        }
-        const customRoleId = parseCustomRoleId({
-          value: assignment.customRoleId,
-          source: `Invite ${index + 1} ("${invite.email}") team ${teamIndex + 1}`,
-        });
-        return {
-          teamId: assignment.teamId.trim(),
-          role: assertRole(
-            typeof assignment.role === "string" ? assignment.role : "",
-            `invite ${index + 1} team ${teamIndex + 1}`,
-          ),
-          ...(customRoleId !== undefined ? { customRoleId } : {}),
-        };
-      }),
-    };
-  });
-};
 
 export interface RoleBindingFilterFlags {
   principalType?: string;

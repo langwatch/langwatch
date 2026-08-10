@@ -10,13 +10,11 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  composeInvitesFromFlags,
   composeRoleBindingFilters,
   composeRoleBindingPrincipal,
   ManagementFlagError,
   parseBindingFlags,
   parseCount,
-  parseInvitesJson,
   parseOrganizationRole,
   parsePermissionFlags,
   parsePermissionMode,
@@ -85,40 +83,44 @@ describe("parseBindingFlags", () => {
 });
 
 describe("composeRoleBindingFilters", () => {
-  describe("given a principal type, a principal id and a scope", () => {
-    it("maps the principal type onto the request field it names", () => {
-      expect(
-        composeRoleBindingFilters({
-          principalType: "user",
-          principalId: "user_1",
-        }),
-      ).toEqual({ userId: "user_1" });
-      expect(
-        composeRoleBindingFilters({
-          principalType: "group",
-          principalId: "group_1",
-        }),
-      ).toEqual({ groupId: "group_1" });
-      expect(
-        composeRoleBindingFilters({
-          principalType: "api-key",
-          principalId: "key_1",
-        }),
-      ).toEqual({ apiKeyId: "key_1" });
+  describe("given a principal has a type and an id", () => {
+    describe("when both halves are given", () => {
+      it("maps the principal type onto the request field it names", () => {
+        expect(
+          composeRoleBindingFilters({
+            principalType: "user",
+            principalId: "user_1",
+          }),
+        ).toEqual({ userId: "user_1" });
+        expect(
+          composeRoleBindingFilters({
+            principalType: "group",
+            principalId: "group_1",
+          }),
+        ).toEqual({ groupId: "group_1" });
+        expect(
+          composeRoleBindingFilters({
+            principalType: "api-key",
+            principalId: "key_1",
+          }),
+        ).toEqual({ apiKeyId: "key_1" });
+      });
     });
 
-    it("refuses a principal id with no principal type to say what it names", () => {
-      expect(() =>
-        composeRoleBindingFilters({ principalId: "user_1" }),
-      ).toThrow(/--principal-type/);
-    });
+    describe("when only one half is given", () => {
+      it("refuses a principal id with no principal type to say what it names", () => {
+        expect(() =>
+          composeRoleBindingFilters({ principalId: "user_1" }),
+        ).toThrow(/--principal-type/);
+      });
 
-    it("refuses a principal type with no principal id to name", () => {
-      // Dropping the half pair would list every binding in the organization,
-      // which is the opposite of what the caller asked for.
-      expect(() =>
-        composeRoleBindingFilters({ principalType: "user" }),
-      ).toThrow(/--principal-id/);
+      it("refuses a principal type with no principal id to name", () => {
+        // Dropping the half pair would list every binding in the organization,
+        // which is the opposite of what the caller asked for.
+        expect(() =>
+          composeRoleBindingFilters({ principalType: "user" }),
+        ).toThrow(/--principal-id/);
+      });
     });
   });
 
@@ -146,130 +148,37 @@ describe("composeRoleBindingPrincipal", () => {
   });
 });
 
-describe("composeInvitesFromFlags", () => {
-  it("applies one role to the whole batch and the teams to every invite", () => {
-    expect(
-      composeInvitesFromFlags({
-        email: ["a@example.com", "b@example.com"],
-        role: ["MEMBER"],
-        team: ["team_1:MEMBER", "team_2:VIEWER"],
-      }),
-    ).toEqual([
-      {
-        email: "a@example.com",
-        role: "MEMBER",
-        teams: [
-          { teamId: "team_1", role: "MEMBER" },
-          { teamId: "team_2", role: "VIEWER" },
-        ],
-      },
-      {
-        email: "b@example.com",
-        role: "MEMBER",
-        teams: [
-          { teamId: "team_1", role: "MEMBER" },
-          { teamId: "team_2", role: "VIEWER" },
-        ],
-      },
-    ]);
-  });
-
-  it("pairs roles with emails one for one when several are given", () => {
-    expect(
-      composeInvitesFromFlags({
-        email: ["a@example.com", "b@example.com"],
-        role: ["ADMIN", "MEMBER"],
-        team: ["team_1:MEMBER"],
-      }).map((invite) => invite.role),
-    ).toEqual(["ADMIN", "MEMBER"]);
-  });
-
-  it("refuses a role count that lines up with nothing", () => {
-    expect(() =>
-      composeInvitesFromFlags({
-        email: ["a@example.com", "b@example.com", "c@example.com"],
-        role: ["ADMIN", "MEMBER"],
-        team: ["team_1:MEMBER"],
-      }),
-    ).toThrow(/one --role for the whole batch, or one per --email/);
-  });
-
-  it("refuses a batch with no team to land on", () => {
-    expect(() =>
-      composeInvitesFromFlags({ email: ["a@example.com"], role: ["MEMBER"] }),
-    ).toThrow(/--team teamId:role/);
-  });
-
-  it("refuses a malformed team assignment by naming the shape", () => {
-    expect(() =>
-      composeInvitesFromFlags({
-        email: ["a@example.com"],
-        role: ["MEMBER"],
-        team: ["team_1"],
-      }),
-    ).toThrow(/Expected teamId:role/);
-  });
-});
-
-describe("parseInvitesJson", () => {
-  const batch = [
-    {
-      email: "a@example.com",
-      role: "MEMBER",
-      teams: [{ teamId: "team_1", role: "MEMBER", customRoleId: "role_1" }],
-    },
-  ];
-
-  it("accepts a bare array and the invites envelope the API answers with", () => {
-    expect(parseInvitesJson(JSON.stringify(batch))).toEqual(batch);
-    expect(parseInvitesJson(JSON.stringify({ invites: batch }))).toEqual(batch);
-  });
-
-  it("refuses a document that is not an invite batch", () => {
-    expect(() => parseInvitesJson("{oops")).toThrow(/Invalid JSON/);
-    expect(() => parseInvitesJson('"nope"')).toThrow(/expected a JSON array/);
-    expect(() => parseInvitesJson("[]")).toThrow(/empty/);
-    expect(() => parseInvitesJson('[{"role":"MEMBER"}]')).toThrow(/no email/);
-    expect(() => parseInvitesJson('[{"email":"a@b.c"}]')).toThrow(/no role/);
-    expect(() =>
-      parseInvitesJson('[{"email":"a@b.c","role":"MEMBER"}]'),
-    ).toThrow(/no teams/);
-  });
-
-  it("refuses a custom role id that is not a role id", () => {
-    const withCustomRoleId = (customRoleId: unknown): string =>
-      JSON.stringify([
-        {
-          email: "a@example.com",
-          role: "MEMBER",
-          teams: [{ teamId: "team_1", role: "CUSTOM", customRoleId }],
-        },
-      ]);
-
-    for (const malformed of [42, {}, [], "", "   "]) {
-      expect(() => parseInvitesJson(withCustomRoleId(malformed))).toThrow(
-        ManagementFlagError,
-      );
-      expect(() => parseInvitesJson(withCustomRoleId(malformed))).toThrow(
-        /customRoleId that is not a role id/,
-      );
-    }
-  });
-});
-
 describe("the single-value parsers", () => {
-  it("reads a whole number and refuses anything a page size cannot be", () => {
-    expect(parseCount("0", "--page")).toBe(0);
-    expect(parseCount("50", "--limit")).toBe(50);
+  describe("when a paging flag is parsed", () => {
+    /** @scenario A page size the request cannot carry exactly is refused */
+    it("reads a whole number and refuses anything a page size cannot be", () => {
+      expect(parseCount("0", "--page")).toBe(0);
+      expect(parseCount("50", "--limit")).toBe(50);
 
-    // "" and " " coerce to 0 through Number, and "0x10" and "1e3" coerce to
-    // numbers nobody typed: all of them are refused by name.
-    for (const malformed of ["", "   ", "-1", "1.5", "abc", "0x10", "1e3"]) {
-      expect(() => parseCount(malformed, "--limit")).toThrow(
-        ManagementFlagError,
+      // "" and " " coerce to 0 through Number, and "0x10" and "1e3" coerce to
+      // numbers nobody typed: all of them are refused by name.
+      for (const malformed of ["", "   ", "-1", "1.5", "abc", "0x10", "1e3"]) {
+        expect(() => parseCount(malformed, "--limit")).toThrow(
+          ManagementFlagError,
+        );
+        expect(() => parseCount(malformed, "--limit")).toThrow(/--limit/);
+      }
+
+      // All digits, and still not the number that was typed: 2^53 + 1 rounds
+      // down and a long enough run of digits becomes Infinity, so sending
+      // either would page by something the caller never asked for.
+      for (const unsafe of ["9007199254740993", "9".repeat(400)]) {
+        expect(() => parseCount(unsafe, "--limit")).toThrow(
+          ManagementFlagError,
+        );
+        expect(() => parseCount(unsafe, "--limit")).toThrow(
+          /Expected a whole number/,
+        );
+      }
+      expect(parseCount(String(Number.MAX_SAFE_INTEGER), "--limit")).toBe(
+        Number.MAX_SAFE_INTEGER,
       );
-      expect(() => parseCount(malformed, "--limit")).toThrow(/--limit/);
-    }
+    });
   });
 
   it("normalise the enumerations and name what they expect", () => {

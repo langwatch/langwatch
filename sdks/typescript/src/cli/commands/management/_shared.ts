@@ -87,7 +87,7 @@ export const withParsedFlags = <T>(parse: () => T): T => {
   }
 };
 
-/** `label: value` lines, the shape every single-resource read prints. */
+/** Shared so every single-resource read across the families prints one shape. */
 export const printFacts = (facts: Array<[string, string]>): void => {
   const width = Math.max(...facts.map(([label]) => label.length));
   console.log();
@@ -97,7 +97,7 @@ export const printFacts = (facts: Array<[string, string]>): void => {
   console.log();
 };
 
-/** The line an empty listing prints, with the command that fills it. */
+/** Shared so an empty listing always offers the command that fills it. */
 export const printEmpty = ({
   what,
   hint,
@@ -111,7 +111,7 @@ export const printEmpty = ({
   console.log();
 };
 
-/** A count with its noun pluralised, for spinner success lines. */
+/** Shared so every spinner success line pluralises its noun the same way. */
 export const counted = ({
   count,
   singular,

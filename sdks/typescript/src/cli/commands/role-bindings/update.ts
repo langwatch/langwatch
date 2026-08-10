@@ -17,10 +17,13 @@ export interface UpdateRoleBindingOptions {
  * the binding's identity and cannot change; regrant with create and delete
  * instead.
  */
-export const updateRoleBindingCommand = async (
-  id: string,
-  options: UpdateRoleBindingOptions,
-): Promise<CommandResult | void> => {
+export const updateRoleBindingCommand = async ({
+  id,
+  options,
+}: {
+  id: string;
+  options: UpdateRoleBindingOptions;
+}): Promise<CommandResult | void> => {
   const input = withParsedFlags(
     (): UpdateRoleBindingInput => ({
       role: parseRole(options.role),
@@ -33,7 +36,7 @@ export const updateRoleBindingCommand = async (
   return runManagement({
     action: "update role binding",
     pending: `Updating role binding "${id}"...`,
-    run: () => new RoleBindingsApiService().update(id, input),
+    run: () => new RoleBindingsApiService().update({ id, input }),
     succeed: (binding) =>
       `Now grants ${chalk.cyan(binding.customRoleName ?? binding.role)} to ${binding.principal.type} "${binding.principal.name ?? binding.principal.id}"`,
     table: (binding) => {

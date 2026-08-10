@@ -18,7 +18,7 @@ export const ORGANIZATION_SETTINGS_RESPONSE = {
   s3Bucket: null,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-02T00:00:00Z",
-};
+} as const;
 
 export const LIST_MEMBERS_RESPONSE = {
   members: [
@@ -33,7 +33,7 @@ export const LIST_MEMBERS_RESPONSE = {
     },
   ],
   totalCount: 1,
-};
+} as const;
 
 export const LIST_ROLES_RESPONSE = {
   roles: [
@@ -46,7 +46,7 @@ export const LIST_ROLES_RESPONSE = {
       updatedAt: "2026-01-01T00:00:00Z",
     },
   ],
-};
+} as const;
 
 export const LIST_TEAMS_RESPONSE = {
   data: [
@@ -60,7 +60,7 @@ export const LIST_TEAMS_RESPONSE = {
     },
   ],
   pagination: { page: 1, limit: 50, total: 1 },
-};
+} as const;
 
 export const LIST_GROUPS_RESPONSE = {
   data: [
@@ -76,14 +76,14 @@ export const LIST_GROUPS_RESPONSE = {
     },
   ],
   pagination: { page: 1, limit: 50, total: 1 },
-};
+} as const;
 
 export const CREATED_GROUP_BINDING_RESPONSE = {
   id: "rb_1",
   role: "MEMBER",
   scopeType: "PROJECT",
   scopeId: "project_1",
-};
+} as const;
 
 export const LIST_ROLE_BINDINGS_RESPONSE = {
   bindings: [
@@ -100,7 +100,7 @@ export const LIST_ROLE_BINDINGS_RESPONSE = {
     },
   ],
   totalCount: 1,
-};
+} as const;
 
 export const UPDATED_API_KEY_RESPONSE = {
   id: "key_1",
@@ -117,4 +117,4 @@ export const UPDATED_API_KEY_RESPONSE = {
   revokedAt: null,
   roleBindings: [],
   bindings: [],
-};
+} as const;

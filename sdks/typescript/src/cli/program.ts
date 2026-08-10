@@ -3760,7 +3760,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (id: string, options: { role: string; customRoleId?: string }) => {
       const { updateRoleBindingCommand: impl } = await import("./commands/role-bindings/update.js");
-      return impl(id, options);
+      return impl({ id, options });
     },
   );
 

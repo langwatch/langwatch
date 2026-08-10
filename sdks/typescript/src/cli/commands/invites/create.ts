@@ -12,7 +12,7 @@ import { formatTable } from "../../utils/formatting";
 import {
   composeInvitesFromFlags,
   parseInvitesJson,
-} from "../../utils/managementFlags";
+} from "../../utils/managementInvites";
 import type { CommandResult } from "../../utils/output";
 import { counted, runManagement, withParsedFlags } from "../management/_shared";
 
@@ -25,7 +25,6 @@ export interface CreateInvitesOptions {
   readFromStdin?: boolean;
 }
 
-/** Reads all data from stdin as a string (dataset records add precedent). */
 const readStdin = (): Promise<string> =>
   new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];

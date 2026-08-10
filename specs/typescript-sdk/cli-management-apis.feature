@@ -38,6 +38,11 @@ Feature: CLI families for the management APIs
       And a value that is not a resource and action pair is refused, naming the expected shape
 
     @unit
+    Scenario: A page size the request cannot carry exactly is refused
+      When a paging flag is given a number too large to be counted exactly
+      Then the CLI refuses it by name instead of sending a different number
+
+    @unit
     Scenario: A binding flag parses role, scope type and scope id
       When a binding flag is parsed
       Then the role, the scope type and the scope id are read out of it
@@ -93,6 +98,12 @@ Feature: CLI families for the management APIs
       When a management command succeeds
       Then the machine-readable output is the API response untouched
       And the human-readable output is a table over the same data
+
+    @unit
+    Scenario: A paginated listing reports the total, not the size of the page
+      When a listing is asked for a page smaller than everything there is
+      Then the success line reports how many there are in total
+      And the page size the caller asked for does not change that number
 
     @unit
     Scenario: An enterprise plan failure explains the upgrade path

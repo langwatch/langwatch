@@ -16,10 +16,15 @@ vi.mock("../../../utils/apiKey", () => ({
   })),
 }));
 
+/** The success lines the spinner was asked to print, newest last. */
+const succeeded = vi.hoisted(() => [] as string[]);
+
 vi.mock("ora", () => ({
   default: () => ({
     start: vi.fn().mockReturnThis(),
-    succeed: vi.fn(),
+    succeed: vi.fn((text?: string) => {
+      if (text !== undefined) succeeded.push(text);
+    }),
     fail: vi.fn(),
   }),
 }));
@@ -76,6 +81,7 @@ const lastRequest = (): { url: string; body: unknown; init: RequestInit } =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  succeeded.length = 0;
   // The real resolver publishes the key it found into the credential holder;
   // the mock above does not, so the environment stands in as the source the
   // services read.
@@ -128,12 +134,12 @@ describe("role-bindings update", () => {
   describe("when a role binding is updated with a new role", () => {
     /** @scenario Role bindings update changes the role a binding grants */
     it("patches that binding with the role, carrying a custom role id only when one is given", async () => {
-      const binding = LIST_ROLE_BINDINGS_RESPONSE.bindings[0]!;
+      const binding = LIST_ROLE_BINDINGS_RESPONSE.bindings[0];
       respondWith({ ...binding, role: "CUSTOM", customRoleId: "crole_1" });
 
-      const result = await updateRoleBindingCommand("rb_1", {
-        role: "custom",
-        customRoleId: "crole_1",
+      const result = await updateRoleBindingCommand({
+        id: "rb_1",
+        options: { role: "custom", customRoleId: "crole_1" },
       });
 
       const { url, body, init } = lastRequest();
@@ -148,7 +154,7 @@ describe("role-bindings update", () => {
 
       mockFetch.mockClear();
       respondWith(binding);
-      await updateRoleBindingCommand("rb_1", { role: "admin" });
+      await updateRoleBindingCommand({ id: "rb_1", options: { role: "admin" } });
       expect(lastRequest().body).toEqual({ role: "ADMIN" });
     });
   });
@@ -281,6 +287,27 @@ describe("invites create", () => {
       // All three forms produce the same request.
       expect(fromFile.body).toEqual(fromFlags.body);
       expect(fromStdin.body).toEqual(fromFlags.body);
+    });
+  });
+});
+
+describe("the paginated listings", () => {
+  describe("when a page smaller than the collection is asked for", () => {
+    /** @scenario A paginated listing reports the total, not the size of the page */
+    it("reports the total the platform holds, whatever the page size was", async () => {
+      respondWith({
+        ...LIST_TEAMS_RESPONSE,
+        pagination: { page: 1, limit: 1, total: 12 },
+      });
+      await listTeamsCommand({ limit: "1" });
+      expect(succeeded[succeeded.length - 1]).toContain("12 teams");
+
+      respondWith({
+        ...LIST_GROUPS_RESPONSE,
+        pagination: { page: 1, limit: 1, total: 7 },
+      });
+      await listGroupsCommand({ limit: "1" });
+      expect(succeeded[succeeded.length - 1]).toContain("7 groups");
     });
   });
 });
