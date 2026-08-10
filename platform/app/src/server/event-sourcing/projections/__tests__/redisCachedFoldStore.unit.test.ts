@@ -93,6 +93,20 @@ async function dedupUnavailableCount(reason: string): Promise<number> {
   );
 }
 
+/** The Redis-operation error counter for `test_table`, read off the registry. */
+async function redisErrorCount(operation: string): Promise<number> {
+  const metric = await register
+    .getSingleMetric("es_fold_cache_redis_error_total")
+    ?.get();
+  return (
+    metric?.values.find(
+      (v) =>
+        v.labels.projection_name === "test_table" &&
+        v.labels.operation === operation,
+    )?.value ?? 0
+  );
+}
+
 /** The cache-outcome counter for `test_table`, read off the registry too. */
 async function cacheTotalCount(result: string): Promise<number> {
   const metric = await register.getSingleMetric("es_fold_cache_total")?.get();
@@ -263,6 +277,29 @@ describe("RedisCachedFoldStore", () => {
           store.store({ count: 5, UpdatedAt: 200 }, CONTEXT),
         ).resolves.toBeUndefined();
         expect(inner.calls.store).toHaveLength(1);
+      });
+    });
+
+    describe("when that aggregate is read back", () => {
+      // The rejected write leaves no entry, so the read that follows cannot
+      // tell itself apart from an expiry, which is the whole point of counting
+      // it on the write instead. Both halves are asserted: the write error is
+      // counted, and the read still reports the plain miss it genuinely saw.
+      /** @scenario a rejected fold cache write is counted where it happens, not where it shows */
+      it("counts the rejected write, and reports the read as a plain miss", async () => {
+        const redis = createRedis();
+        redis.set.mockRejectedValueOnce(new Error("OOM command not allowed"));
+        const { store } = createStore(redis);
+        const errorsBefore = await redisErrorCount("set");
+        const missesBefore = await cacheTotalCount("miss");
+        const fallbacksBefore = await cacheTotalCount("fallback_error");
+
+        await store.store({ count: 5, UpdatedAt: 200 }, CONTEXT);
+        await store.get("agg-1", CONTEXT);
+
+        expect(await redisErrorCount("set")).toBe(errorsBefore + 1);
+        expect(await cacheTotalCount("miss")).toBe(missesBefore + 1);
+        expect(await cacheTotalCount("fallback_error")).toBe(fallbacksBefore);
       });
     });
   });

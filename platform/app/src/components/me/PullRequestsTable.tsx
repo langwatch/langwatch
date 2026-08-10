@@ -635,7 +635,7 @@ const TableHeaderRow: React.FC<{
 
 /**
  * A heading that sorts, drawn the way the trace table draws one: the column in
- * force reads as the one in charge, with a tinted band, a heavier label and a
+ * force reads as the one in charge, with a tinted band, a darker label and a
  * chevron pointing the way it is ordered. Every other sortable column keeps a
  * faint chevron so a reader can tell at a glance which headings do something,
  * without hovering each one to find out.

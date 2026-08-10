@@ -699,7 +699,7 @@ describe("the personal Pull Requests table", () => {
           unlinkedRow({
             modelBreakdown: [
               { model: "claude-opus-5", tokensKnown: false },
-              { model: "claude-haiku-4-5", tokensKnown: false },
+              { model: "claude-haiku-4-5-20251001", tokensKnown: false },
             ],
           }),
         ],

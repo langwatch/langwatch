@@ -642,7 +642,7 @@ describe("PullRequestUsageService", () => {
           personalSessionRow({ sessionId: "mine", models: ["claude-opus-5"] }),
           personalSessionRow({
             sessionId: "mine-2",
-            models: ["claude-opus-5", "claude-haiku-4-5"],
+            models: ["claude-opus-5", "claude-haiku-4-5-20251001"],
           }),
         ],
       });
@@ -651,7 +651,7 @@ describe("PullRequestUsageService", () => {
 
       expect(
         usage.unlinked[0]?.modelBreakdown.map((each) => each.model),
-      ).toEqual(["claude-haiku-4-5", "claude-opus-5"]);
+      ).toEqual(["claude-haiku-4-5-20251001", "claude-opus-5"]);
     });
 
     /** @scenario "A branch whose sessions recorded no model reports none" */
