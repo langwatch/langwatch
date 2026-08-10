@@ -130,7 +130,7 @@ const SOURCE_TYPE_OPTIONS: Array<{
     label: "Databricks AI/BI Genie",
     mode: "pull",
     blurb:
-      "Records who asked what in Genie and the SQL it ran against your warehouse. Needs a workspace token that can read every Genie space you want covered.",
+      "Records who asked what in Genie and the SQL it ran against your warehouse. Needs a workspace token with Can Manage on every Genie space you want covered — anything less returns only that token's own conversations.",
   },
   {
     value: "s3_custom",
@@ -1084,7 +1084,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       key: "credentialsToken",
       label: "Workspace token",
       placeholder: "dapi...",
-      hint: "A personal access token or OAuth token for a service principal that can read every Genie space you want covered. We encrypt this server-side.",
+      hint: "A personal access token or OAuth token for a service principal holding Can Manage on every Genie space you want covered. Read access is not enough — Databricks only returns other people's conversations to a token that can manage the space, so a weaker token records nothing and reports no error. We encrypt this server-side.",
       required: true,
       secret: true,
     },
