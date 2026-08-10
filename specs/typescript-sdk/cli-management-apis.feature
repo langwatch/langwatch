@@ -60,6 +60,12 @@ Feature: CLI families for the management APIs
       Then the request patches that binding with the role
       And a custom role id rides along only when one is given
 
+    @unit
+    Scenario: A mistyped invite email is refused before the batch is sent
+      When an invite carries an address that is not an email
+      Then the CLI refuses the batch, naming the address and the shape expected
+      And it makes no request, so no other invite in the batch is sent either
+
   Rule: Secrets and access changes are handled carefully
 
     @unit
@@ -73,6 +79,28 @@ Feature: CLI families for the management APIs
       When an API key is updated with repeated binding flags and restricted permissions
       Then the request replaces the key's bindings with exactly the ones given
       And it sets the permission mode to restricted with those permissions
+
+    @unit
+    Scenario: A key with no bindings is reported as granting no access
+      Given an API key that holds no role bindings
+      When the key is read or updated, in any permission mode
+      Then the output says the key grants no access
+      And it never describes the key as having organization-wide access
+      And it offers the command that gives the key a binding
+
+    @unit
+    Scenario: A restricted key shows where its access comes from
+      Given an API key in restricted mode with bindings and explicit permissions
+      When the key is read or updated
+      Then the output lists the permissions the key carries
+      And it lists the bindings that grant them
+
+    @unit
+    Scenario: The instance family refuses to run without its credential
+      Given no instance administrator credential is configured
+      When an organizations command is run
+      Then the CLI names the credential to set
+      And it makes no request with an empty one
 
   Rule: Teams and groups get the families they never had
 
@@ -111,6 +139,12 @@ Feature: CLI families for the management APIs
       When the CLI reports the failure
       Then it explains that the feature needs an Enterprise plan and links the documentation
       And guidance sent by the server is preferred over the built-in wording
+
+    @unit
+    Scenario: A success carrying no body is not read as a parse failure
+      Given a management family answers a delete with no content
+      When the CLI reads the response
+      Then the command succeeds rather than reporting a parse failure
 
     @unit
     Scenario: Every management command is covered by the feature map

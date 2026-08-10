@@ -32,6 +32,7 @@ vi.mock("ora", () => ({
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { getApiKeyCommand } from "../../api-keys/get";
 import { updateApiKeyCommand } from "../../api-keys/update";
 import { addGroupBindingCommand } from "../../groups/bindings";
 import { listGroupsCommand } from "../../groups/list";
@@ -42,6 +43,7 @@ import { listRoleBindingsCommand } from "../../role-bindings/list";
 import { updateRoleBindingCommand } from "../../role-bindings/update";
 import { listRolesCommand } from "../../roles/list";
 import { createScimTokenCommand } from "../../scim-tokens/create";
+import { revokeScimTokenCommand } from "../../scim-tokens/revoke";
 import { listTeamsCommand } from "../../teams/list";
 import {
   CREATED_GROUP_BINDING_RESPONSE,
@@ -214,6 +216,92 @@ describe("api-keys update", () => {
   });
 });
 
+describe("the API key readings", () => {
+  /** Both surfaces render a key the same way, so both are asserted. */
+  const renderings = [
+    { name: "api-keys get", run: () => getApiKeyCommand("key_1") },
+    {
+      name: "api-keys update",
+      run: () => updateApiKeyCommand({ id: "key_1", options: { name: "R" } }),
+    },
+  ];
+
+  const render = async (
+    apiKey: unknown,
+    run: () => Promise<{ table: () => void } | void>,
+  ): Promise<string> => {
+    logged = [];
+    respondWith(apiKey);
+    const result = await run();
+    result?.table();
+    return logged.join("\n");
+  };
+
+  describe("when a key carries no role bindings", () => {
+    /** @scenario A key with no bindings is reported as granting no access */
+    it("says the key grants nothing, in every permission mode", async () => {
+      // A key's own bindings are the gate the platform applies first, and it
+      // never consults the permission mode while resolving one. So an empty
+      // binding set is no permission at any scope whatever the mode says, and
+      // reporting it as organization-wide would describe a dead credential as
+      // a superuser one to the operator checking their own tightening.
+      for (const permissionMode of ["all", "readonly", "restricted"]) {
+        for (const { name, run } of renderings) {
+          const output = await render(
+            {
+              ...UPDATED_API_KEY_RESPONSE,
+              permissionMode,
+              permissions: [],
+              roleBindings: [],
+            },
+            run,
+          );
+
+          expect(output, `${name} in ${permissionMode} mode`).toContain(
+            "No bindings: this key grants no access anywhere.",
+          );
+          expect(output, `${name} in ${permissionMode} mode`).not.toContain(
+            "organization-wide",
+          );
+          // And the permissions line agrees: there are no bindings for them to
+          // come from either.
+          expect(output, `${name} in ${permissionMode} mode`).not.toContain(
+            "from the bindings",
+          );
+        }
+      }
+    });
+  });
+
+  describe("when a restricted key holds bindings and explicit permissions", () => {
+    /** @scenario A restricted key shows where its access comes from */
+    it("prints the permissions it carries and the bindings that grant them", async () => {
+      for (const { name, run } of renderings) {
+        const output = await render(
+          {
+            ...UPDATED_API_KEY_RESPONSE,
+            permissionMode: "restricted",
+            permissions: ["project:view", "trace:view"],
+            roleBindings: [
+              {
+                id: "rb_1",
+                role: "CUSTOM",
+                scopeType: "PROJECT",
+                scopeId: "project_1",
+              },
+            ],
+          },
+          run,
+        );
+
+        expect(output, name).toContain("project:view, trace:view");
+        expect(output, name).toContain("project_1");
+        expect(output, name).not.toContain("No bindings");
+      }
+    });
+  });
+});
+
 describe("invites create", () => {
   describe("when invites are created from repeated email, role and team flags", () => {
     /** @scenario Invites are created from flags and from a JSON file */
@@ -365,6 +453,14 @@ describe("every management family", () => {
           name: "role-bindings list",
           response: LIST_ROLE_BINDINGS_RESPONSE,
           run: () => listRoleBindingsCommand(),
+        },
+        {
+          // A delete answers a bare acknowledgement, and that is what `data`
+          // is: merging the id the caller already holds into it would publish
+          // a document the API never sent.
+          name: "scim-tokens revoke",
+          response: { success: true },
+          run: () => revokeScimTokenCommand("scim_1"),
         },
       ];
 

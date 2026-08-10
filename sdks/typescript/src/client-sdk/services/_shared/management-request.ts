@@ -142,6 +142,11 @@ export const createManagementRequest = ({
       throw errorFactory({ message, operation, body: parsedBody });
     }
 
+    // A 204 carries no body, and `json()` on an empty one throws a bare
+    // SyntaxError that would escape as a parse failure rather than the success
+    // it is. A family that answers 204 to a delete gets an undefined result.
+    if (response.status === 204) return undefined as T;
+
     return (await response.json()) as T;
   };
 };

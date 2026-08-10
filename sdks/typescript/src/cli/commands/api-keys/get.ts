@@ -1,8 +1,8 @@
 import chalk from "chalk";
 import { ApiKeysApiService } from "@/client-sdk/services/api-keys/api-keys-api.service";
-import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { asDate, orDash, printFacts, runManagement } from "../management/_shared";
+import { permissionsCell, printBindings } from "./_shared";
 
 /**
  * Read one API key and the access it carries. No token material: a token
@@ -25,12 +25,7 @@ export const getApiKeyCommand = async (
         ["Type", apiKey.keyType],
         ["Acts as", orDash(apiKey.assignedToUserId)],
         ["Permission mode", apiKey.permissionMode],
-        [
-          "Permissions",
-          apiKey.permissions.length > 0
-            ? apiKey.permissions.join(", ")
-            : chalk.gray("from the bindings"),
-        ],
+        ["Permissions", permissionsCell(apiKey)],
         [
           "Status",
           apiKey.revokedAt ? chalk.red("revoked") : chalk.green("active"),
@@ -39,20 +34,6 @@ export const getApiKeyCommand = async (
         ["Last used", asDate(apiKey.lastUsedAt)],
       ]);
 
-      if (apiKey.roleBindings.length === 0) {
-        console.log(chalk.gray("  No bindings: this key has organization-wide access."));
-        console.log();
-        return;
-      }
-      formatTable({
-        data: apiKey.roleBindings.map((binding) => ({
-          "Binding ID": binding.id,
-          Role: binding.role,
-          Scope: `${binding.scopeType} ${binding.scopeId}`,
-        })),
-        headers: ["Binding ID", "Role", "Scope"],
-        colorMap: { "Binding ID": chalk.gray, Role: chalk.cyan },
-      });
-      console.log();
+      printBindings(apiKey);
     },
   });

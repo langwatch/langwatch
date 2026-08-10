@@ -7,7 +7,6 @@ import {
   commandValidationError,
   reportCommandError,
 } from "../../utils/errorOutput";
-import { formatTable } from "../../utils/formatting";
 import {
   parseBindingFlags,
   parsePermissionFlags,
@@ -15,6 +14,7 @@ import {
 } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";
 import { orDash, printFacts, runManagement, withParsedFlags } from "../management/_shared";
+import { permissionsCell, printBindings } from "./_shared";
 
 export interface UpdateApiKeyOptions {
   name?: string;
@@ -85,28 +85,10 @@ export const updateApiKeyCommand = async ({
         ["Name", chalk.cyan(apiKey.name)],
         ["Description", orDash(apiKey.description)],
         ["Permission mode", apiKey.permissionMode],
-        [
-          "Permissions",
-          apiKey.permissions.length > 0
-            ? apiKey.permissions.join(", ")
-            : chalk.gray("from the bindings"),
-        ],
+        ["Permissions", permissionsCell(apiKey)],
       ]);
-      if (apiKey.roleBindings.length === 0) {
-        console.log(chalk.gray("  No bindings: this key has organization-wide access."));
-        console.log();
-        return;
-      }
-      formatTable({
-        data: apiKey.roleBindings.map((binding) => ({
-          "Binding ID": binding.id,
-          Role: binding.role,
-          Scope: `${binding.scopeType} ${binding.scopeId}`,
-        })),
-        headers: ["Binding ID", "Role", "Scope"],
-        colorMap: { "Binding ID": chalk.gray, Role: chalk.cyan },
-      });
-      console.log();
+
+      printBindings(apiKey);
     },
   });
 };

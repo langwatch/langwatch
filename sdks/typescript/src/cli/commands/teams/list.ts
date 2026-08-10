@@ -16,10 +16,10 @@ export const listTeamsCommand = async (
 ): Promise<CommandResult | void> => {
   const query = withParsedFlags(() => ({
     ...(options.page !== undefined
-      ? { page: parseCount(options.page, "--page") }
+      ? { page: parseCount({ value: options.page, flag: "--page" }) }
       : {}),
     ...(options.limit !== undefined
-      ? { limit: parseCount(options.limit, "--limit") }
+      ? { limit: parseCount({ value: options.limit, flag: "--limit" }) }
       : {}),
   }));
 

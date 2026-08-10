@@ -132,19 +132,21 @@ describe("composeRoleBindingFilters", () => {
 });
 
 describe("composeRoleBindingPrincipal", () => {
-  it("names exactly one principal field", () => {
-    expect(
-      composeRoleBindingPrincipal({
-        principalType: "api-key",
-        principalId: "key_1",
-      }),
-    ).toEqual({ apiKeyId: "key_1" });
-    expect(() =>
-      composeRoleBindingPrincipal({
-        principalType: "robot",
-        principalId: "x",
-      }),
-    ).toThrow(/Expected one of user, group, api-key/);
+  describe("when a principal type and id are composed into a request field", () => {
+    it("names exactly one principal field", () => {
+      expect(
+        composeRoleBindingPrincipal({
+          principalType: "api-key",
+          principalId: "key_1",
+        }),
+      ).toEqual({ apiKeyId: "key_1" });
+      expect(() =>
+        composeRoleBindingPrincipal({
+          principalType: "robot",
+          principalId: "x",
+        }),
+      ).toThrow(/Expected one of user, group, api-key/);
+    });
   });
 });
 
@@ -152,50 +154,56 @@ describe("the single-value parsers", () => {
   describe("when a paging flag is parsed", () => {
     /** @scenario A page size the request cannot carry exactly is refused */
     it("reads a whole number and refuses anything a page size cannot be", () => {
-      expect(parseCount("0", "--page")).toBe(0);
-      expect(parseCount("50", "--limit")).toBe(50);
+      expect(parseCount({ value: "0", flag: "--page" })).toBe(0);
+      expect(parseCount({ value: "50", flag: "--limit" })).toBe(50);
 
       // "" and " " coerce to 0 through Number, and "0x10" and "1e3" coerce to
       // numbers nobody typed: all of them are refused by name.
       for (const malformed of ["", "   ", "-1", "1.5", "abc", "0x10", "1e3"]) {
-        expect(() => parseCount(malformed, "--limit")).toThrow(
+        expect(() => parseCount({ value: malformed, flag: "--limit" })).toThrow(
           ManagementFlagError,
         );
-        expect(() => parseCount(malformed, "--limit")).toThrow(/--limit/);
+        expect(() => parseCount({ value: malformed, flag: "--limit" })).toThrow(
+          /--limit/,
+        );
       }
 
       // All digits, and still not the number that was typed: 2^53 + 1 rounds
       // down and a long enough run of digits becomes Infinity, so sending
       // either would page by something the caller never asked for.
       for (const unsafe of ["9007199254740993", "9".repeat(400)]) {
-        expect(() => parseCount(unsafe, "--limit")).toThrow(
+        expect(() => parseCount({ value: unsafe, flag: "--limit" })).toThrow(
           ManagementFlagError,
         );
-        expect(() => parseCount(unsafe, "--limit")).toThrow(
+        expect(() => parseCount({ value: unsafe, flag: "--limit" })).toThrow(
           /Expected a whole number/,
         );
       }
-      expect(parseCount(String(Number.MAX_SAFE_INTEGER), "--limit")).toBe(
-        Number.MAX_SAFE_INTEGER,
-      );
+      expect(
+        parseCount({ value: String(Number.MAX_SAFE_INTEGER), flag: "--limit" }),
+      ).toBe(Number.MAX_SAFE_INTEGER);
     });
   });
 
-  it("normalise the enumerations and name what they expect", () => {
-    expect(parseRole("admin")).toBe("ADMIN");
-    expect(parseScopeType("project")).toBe("PROJECT");
-    expect(parseOrganizationRole("external")).toBe("EXTERNAL");
-    expect(parsePermissionMode("Restricted")).toBe("restricted");
+  describe("when an enumerated flag is parsed", () => {
+    it("normalises the enumerations and names what they expect", () => {
+      expect(parseRole("admin")).toBe("ADMIN");
+      expect(parseScopeType("project")).toBe("PROJECT");
+      expect(parseOrganizationRole("external")).toBe("EXTERNAL");
+      expect(parsePermissionMode("Restricted")).toBe("restricted");
 
-    expect(() => parseRole("owner")).toThrow(/Expected one of ADMIN/);
-    expect(() => parseScopeType("workspace")).toThrow(/Expected one of ORGANIZATION/);
-    // VIEWER is a binding role, not an organization role: the two vocabularies
-    // are different and the refusal says so.
-    expect(() => parseOrganizationRole("VIEWER")).toThrow(
-      /Expected one of ADMIN, MEMBER, EXTERNAL/,
-    );
-    expect(() => parsePermissionMode("none")).toThrow(
-      /Expected one of all, readonly, restricted/,
-    );
+      expect(() => parseRole("owner")).toThrow(/Expected one of ADMIN/);
+      expect(() => parseScopeType("workspace")).toThrow(
+        /Expected one of ORGANIZATION/,
+      );
+      // VIEWER is a binding role, not an organization role: the two
+      // vocabularies are different and the refusal says so.
+      expect(() => parseOrganizationRole("VIEWER")).toThrow(
+        /Expected one of ADMIN, MEMBER, EXTERNAL/,
+      );
+      expect(() => parsePermissionMode("none")).toThrow(
+        /Expected one of all, readonly, restricted/,
+      );
+    });
   });
 });

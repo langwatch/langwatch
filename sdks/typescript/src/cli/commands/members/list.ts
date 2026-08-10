@@ -23,10 +23,10 @@ export const listMembersCommand = async (
   const query = withParsedFlags(() => ({
     ...(options.includeDisabled ? { includeDisabled: true } : {}),
     ...(options.offset !== undefined
-      ? { offset: parseCount(options.offset, "--offset") }
+      ? { offset: parseCount({ value: options.offset, flag: "--offset" }) }
       : {}),
     ...(options.limit !== undefined
-      ? { limit: parseCount(options.limit, "--limit") }
+      ? { limit: parseCount({ value: options.limit, flag: "--limit" }) }
       : {}),
   }));
 

@@ -9,7 +9,7 @@ export const revokeScimTokenCommand = async (
   runManagement({
     action: "revoke SCIM token",
     pending: `Revoking SCIM token "${id}"...`,
-    run: async () => ({ id, ...(await new ScimTokensApiService().revoke(id)) }),
+    run: () => new ScimTokensApiService().revoke(id),
     succeed: () => `Revoked SCIM token "${id}"`,
     table: () => {
       console.log();

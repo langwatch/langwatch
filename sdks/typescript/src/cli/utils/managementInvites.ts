@@ -25,6 +25,35 @@ import {
 type TeamAssignment = InviteInput["teams"][number];
 
 /**
+ * A local name, an `@`, and a domain carrying a dot. Deliberately not RFC 5322:
+ * the CLI's job here is to catch the typo the caller can see and fix, not to
+ * adjudicate address syntax, which the platform does when it sends the mail.
+ */
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * One invited address, refused before the batch is sent.
+ *
+ * An invite batch is all-or-nothing at the platform, so one mistyped address
+ * costs the caller the whole run. `source` names which one was wrong.
+ */
+const parseEmail = ({
+  value,
+  source,
+}: {
+  value: string;
+  source: string;
+}): string => {
+  const email = value.trim();
+  if (!EMAIL_SHAPE.test(email)) {
+    throw new ManagementFlagError(
+      `Invalid email "${value}" in ${source}. Expected an address like person@example.com.`,
+    );
+  }
+  return email;
+};
+
+/**
  * `teamId:role`, repeated: the teams an invited person lands on and the role
  * they hold there. A team id never contains a colon.
  */
@@ -90,7 +119,7 @@ export const composeInvitesFromFlags = (
   }
 
   return emails.map((email, index) => ({
-    email,
+    email: parseEmail({ value: email, source: "--email" }),
     role: parseOrganizationRole(roles.length === 1 ? roles[0]! : roles[index]!),
     teams: teams.map((team) => ({ teamId: team.teamId, role: team.role })),
   }));
@@ -160,6 +189,10 @@ const parseInviteEntry = ({
       `${position} has no email. Every invite needs email, role and teams.`,
     );
   }
+  const email = parseEmail({
+    value: invite.email,
+    source: position.toLowerCase(),
+  });
   if (typeof invite.role !== "string") {
     throw new ManagementFlagError(
       `${position} ("${invite.email}") has no role. Expected one of ${oneOf(ORGANIZATION_ROLES)}.`,
@@ -173,12 +206,12 @@ const parseInviteEntry = ({
   }
 
   return {
-    email: invite.email.trim(),
+    email,
     role: parseOrganizationRole(invite.role),
     teams: teams.map((team, teamIndex) =>
       parseTeamAssignment({
         team,
-        source: `${position} ("${invite.email}") team ${teamIndex + 1}`,
+        source: `${position} ("${email}") team ${teamIndex + 1}`,
         roleSource: `invite ${index + 1} team ${teamIndex + 1}`,
       }),
     ),

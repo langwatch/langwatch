@@ -48,7 +48,13 @@ export const oneOf = (values: readonly string[]): string => values.join(", ");
  * rounds to a different integer and long enough becomes Infinity, so the
  * request would carry a number the caller never asked for.
  */
-export const parseCount = (value: string, flag: string): number => {
+export const parseCount = ({
+  value,
+  flag,
+}: {
+  value: string;
+  flag: string;
+}): number => {
   const trimmed = value.trim();
   const count = Number(trimmed);
   if (!/^\d+$/.test(trimmed) || !Number.isSafeInteger(count)) {
@@ -99,10 +105,13 @@ export const parseRoleIn = ({
   return role as ManagementRole;
 };
 
-const assertScopeType = (
-  value: string,
-  source: string,
-): ManagementScopeType => {
+const assertScopeType = ({
+  value,
+  source,
+}: {
+  value: string;
+  source: string;
+}): ManagementScopeType => {
   const scopeType = value.trim().toUpperCase();
   if (!(MANAGEMENT_SCOPE_TYPES as readonly string[]).includes(scopeType)) {
     throw new ManagementFlagError(
@@ -129,7 +138,7 @@ export const parseRole = (value: string): ManagementRole =>
 
 /** A scope type given on its own flag. */
 export const parseScopeType = (value: string): ManagementScopeType =>
-  assertScopeType(value, "--scope-type");
+  assertScopeType({ value, source: "--scope-type" });
 
 /**
  * `role:scopeType:scopeId`, repeated: what an API key may do, and where.
@@ -147,7 +156,10 @@ export const parseBindingFlags = (
     }
     return {
       role: parseRoleIn({ value: parts[0]!, source: `binding "${value}"` }),
-      scopeType: assertScopeType(parts[1]!, `binding "${value}"`),
+      scopeType: assertScopeType({
+        value: parts[1]!,
+        source: `binding "${value}"`,
+      }),
       scopeId: parts[2]!.trim(),
     };
   });
@@ -219,8 +231,12 @@ export const composeRoleBindingFilters = (
     filters.scopeType = parseScopeType(flags.scopeType);
   }
   if (flags.scopeId !== undefined) filters.scopeId = flags.scopeId;
-  if (flags.offset !== undefined) filters.offset = parseCount(flags.offset, "--offset");
-  if (flags.limit !== undefined) filters.limit = parseCount(flags.limit, "--limit");
+  if (flags.offset !== undefined) {
+    filters.offset = parseCount({ value: flags.offset, flag: "--offset" });
+  }
+  if (flags.limit !== undefined) {
+    filters.limit = parseCount({ value: flags.limit, flag: "--limit" });
+  }
 
   return filters;
 };

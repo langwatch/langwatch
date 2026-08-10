@@ -3289,8 +3289,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   // ── Organization management ────────────────────────────────────────────────
   // The families that provision an organization: the organization itself, its
   // members and invites, teams, groups, custom roles, role bindings, SCIM
-  // tokens, and (self-hosted) the organizations on the instance. Every one of
-  // them takes an organization API key and is available on Enterprise plans.
+  // tokens, and (self-hosted) the organizations on the instance. All of them
+  // take an organization API key and are available on Enterprise plans, except
+  // `organizations`, which provisions the organization an API key would belong
+  // to and so authenticates against the instance instead.
 
   const organizationCmd = program
     .command("organization")
