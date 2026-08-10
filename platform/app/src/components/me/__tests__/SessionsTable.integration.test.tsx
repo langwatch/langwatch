@@ -265,10 +265,10 @@ describe("the personal Sessions table", () => {
         screen.getByText("acme/widgets · feat/git-context"),
       ).toBeInTheDocument();
 
-      // The context the session was carrying at its heaviest, over everything
-      // it consumed across its life.
-      expect(screen.getByText("Peak 156.8K")).toBeInTheDocument();
+      // Everything the session consumed across its life, over the context it
+      // was carrying at its heaviest.
       expect(screen.getByText("Total 10.0K")).toBeInTheDocument();
+      expect(screen.getByText("Peak 156.8K")).toBeInTheDocument();
 
       expect(screen.getByText("3 compactions")).toBeInTheDocument();
       expect(screen.getByText("2 cache rebuilds")).toBeInTheDocument();

@@ -269,8 +269,8 @@ const OnePageOfSessions: React.FC<{
   onPageSizeChange,
 }) => {
   const replay = useTerminalReplay({ projectId, projectSlug });
-  const largestPeak = rows.reduce(
-    (max, row) => Math.max(max, row.peakContextTokens),
+  const largestTotal = rows.reduce(
+    (max, row) => Math.max(max, row.totalTokens),
     0,
   );
   const largestCost = rows.reduce(
@@ -287,7 +287,7 @@ const OnePageOfSessions: React.FC<{
             <SessionRow
               key={row.sessionId}
               row={row}
-              largestPeak={largestPeak}
+              largestTotal={largestTotal}
               largestCost={largestCost}
               isOpening={replay.openingSessionId === row.sessionId}
               onOpenReplay={() => void replay.openReplay(row)}
@@ -627,7 +627,7 @@ const TableHeaderRow: React.FC<{
 
 const SessionRow: React.FC<{
   row: SessionListRow;
-  largestPeak: number;
+  largestTotal: number;
   largestCost: number;
   isOpening: boolean;
   onOpenReplay: () => void;
@@ -635,7 +635,7 @@ const SessionRow: React.FC<{
   onPrefetch: () => void;
 }> = ({
   row,
-  largestPeak,
+  largestTotal,
   largestCost,
   isOpening,
   onOpenReplay,
@@ -659,7 +659,7 @@ const SessionRow: React.FC<{
       {formatLastUpdate({ timestampMs: row.lastUpdateAtMs })}
     </Table.Cell>
     <Table.Cell textAlign="end">
-      <ContextCell row={row} largestPeak={largestPeak} />
+      <ContextCell row={row} largestTotal={largestTotal} />
     </Table.Cell>
     <Table.Cell>
       <CompactionsCell row={row} />
@@ -699,7 +699,10 @@ const SessionNameCell: React.FC<{
     .join(" · ");
 
   return (
-    <VStack align="start" gap={0} minWidth={0}>
+    // The column is capped, so both lines have to be told they may not grow
+    // past it: a column flex box sizes its children to their content, which
+    // lets a long branch name run under the next column instead of ellipsing.
+    <VStack align="start" gap={0} minWidth={0} width="full">
       <HStack gap={2} minWidth={0} width="full">
         {row.title ? (
           <Text fontSize="sm" fontWeight="medium" truncate>
@@ -715,9 +718,17 @@ const SessionNameCell: React.FC<{
         ) : null}
       </HStack>
       {where === "" ? null : (
-        <Text fontSize="xs" color="fg.subtle" fontFamily="mono" truncate>
-          {where}
-        </Text>
+        <Tooltip content={where} positioning={{ placement: "bottom-start" }}>
+          <Text
+            fontSize="xs"
+            color="fg.subtle"
+            fontFamily="mono"
+            truncate
+            maxWidth="full"
+          >
+            {where}
+          </Text>
+        </Tooltip>
       )}
     </VStack>
   );
@@ -727,15 +738,17 @@ const SessionNameCell: React.FC<{
  * The two token figures that answer different questions, and a bar comparing
  * the first against the heaviest session on the page.
  *
- * Peak context is how much the session was carrying when it was heaviest,
- * which is what decides whether it was about to compact; the total is what it
- * consumed over its whole life. The column sorts by the total, because a
- * reader ordering it is asking what the session cost.
+ * The total is what the session consumed over its whole life, and it leads:
+ * it is what the column sorts by, and it is the number that keeps growing, so
+ * it is the one worth ranking. Peak context, how much the session was carrying
+ * when it was heaviest, sits under it: it decides whether a session was about
+ * to compact, but it saturates against the context window rather than ranking.
+ * The bar compares the total against the heaviest session on the page.
  */
 const ContextCell: React.FC<{
   row: SessionListRow;
-  largestPeak: number;
-}> = ({ row, largestPeak }) => {
+  largestTotal: number;
+}> = ({ row, largestTotal }) => {
   if (row.peakContextTokens === 0 && row.totalTokens === 0) {
     return (
       <Text fontSize="sm" color="fg.subtle">
@@ -746,17 +759,17 @@ const ContextCell: React.FC<{
 
   return (
     <Tooltip
-      content="Peak is the largest context carried into a single model call. Total is every token the session consumed."
+      content="Total is every token the session consumed. Peak is the largest context carried into a single model call."
       positioning={{ placement: "left" }}
     >
       <VStack align="stretch" gap={1} cursor="help" tabIndex={0}>
         <VStack align="end" gap={0}>
-          <Text fontSize="sm">Peak {formatTokens(row.peakContextTokens)}</Text>
+          <Text fontSize="sm">Total {formatTokens(row.totalTokens)}</Text>
           <Text fontSize="xs" color="fg.muted">
-            Total {formatTokens(row.totalTokens)}
+            Peak {formatTokens(row.peakContextTokens)}
           </Text>
         </VStack>
-        <ComparisonBar value={row.peakContextTokens} largest={largestPeak} />
+        <ComparisonBar value={row.totalTokens} largest={largestTotal} />
       </VStack>
     </Tooltip>
   );
