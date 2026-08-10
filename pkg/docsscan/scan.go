@@ -88,21 +88,22 @@ type Inputs struct {
 	ChartVersion string
 }
 
-// versionPatterns are the ways a LangWatch release version appears in a page.
-// Each one has a capture group holding the version.
-//
-// The set is deliberately narrow. A rule that flagged every semver in the docs
-// would fire on Kubernetes versions, Python versions and SDK versions, and a
-// check that cries wolf gets switched off.
 // selfIdentifyingVersionPatterns name a LangWatch release on their own, so they
-// need no surrounding context to be sure.
+// need no surrounding context to be sure. Each has one capture group holding the
+// version.
 //
-// The three image names are listed rather than matched by a character class, so
-// that `langwatch/clickhouse-serverless:0.2.0` stays out: it is versioned
-// independently of the chart, and widening this to `[a-z0-9_-]+` — the
-// obvious-looking change — makes the rule fire on it every run.
+// The whole set of version rules is deliberately narrow: a rule that flagged
+// every semver in the docs would fire on Kubernetes, Python and SDK versions,
+// and a check that cries wolf gets switched off.
+//
+// Two boundaries matter here. The image names are listed rather than matched by
+// a character class, so `langwatch/clickhouse-serverless:0.2.0` stays out — it is
+// versioned independently of the chart, and widening this to `[a-z0-9_-]+`, the
+// obvious-looking change, makes the rule fire on it every run. And the namespace
+// is anchored, because a bare substring match reads
+// `notlangwatch/langwatch:1.14.5` as ours.
 var selfIdentifyingVersionPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`langwatch/(?:langwatch|langwatch_nlp|langevals):(\d+\.\d+\.\d+)`),
+	regexp.MustCompile(namespaceStart + `langwatch/` + releaseImages + `:(\d+\.\d+\.\d+)`),
 }
 
 // releaseImages is the set of images whose tag tracks the chart's appVersion.
@@ -110,6 +111,12 @@ var selfIdentifyingVersionPatterns = []*regexp.Regexp{
 // independently, so holding it to appVersion would report a correct reference as
 // drift and tell the author to break it.
 const releaseImages = `(?:langwatch|langwatch_nlp|langevals)`
+
+// namespaceStart is what may precede the `langwatch/` namespace: the start of the
+// line, or any character that cannot itself be part of a path component. Without
+// it the patterns match by suffix, so `notlangwatch/langwatch` and
+// `registry.example.com/notlangwatch/langwatch` would both count as ours.
+const namespaceStart = `(?:^|[^A-Za-z0-9_.-])`
 
 // imageTagPattern is an image tag in a Helm values block, `tag: "3.12.0"`.
 //
@@ -120,7 +127,13 @@ const releaseImages = `(?:langwatch|langwatch_nlp|langevals)`
 var imageTagPattern = regexp.MustCompile(`^\s*tag:\s*"(\d+\.\d+\.\d+)"`)
 
 // releaseRepository is a `repository:` naming an image that tracks the release.
-var releaseRepository = regexp.MustCompile(`^\s*repository:\s*\S*langwatch/` + releaseImages + `\s*$`)
+//
+// An optional registry host may precede the namespace, but `langwatch` has to be
+// a whole path component: `registry.example.com/langwatch/langwatch` counts,
+// `registry.example.com/notlangwatch/langwatch` does not.
+var releaseRepository = regexp.MustCompile(
+	`^\s*repository:\s*(?:[A-Za-z0-9_.:-]+/)?langwatch/` + releaseImages + `\s*$`,
+)
 
 // chartVersionPatterns are version forms that mean a LangWatch release only
 // when the surrounding lines are about the LangWatch chart. On their own they
@@ -147,12 +160,14 @@ var chartVersionPatterns = []*regexp.Regexp{
 // almost any page count as chart context.
 var chartContext = regexp.MustCompile(
 	// A tagged release image, including the mirroring loop's `langwatch/$image:`.
-	`langwatch/(?:` + releaseImages + `|\$\{?[a-z_]+\}?):` +
+	namespaceStart + `langwatch/(?:` + releaseImages + `|\$\{?[a-z_]+\}?):` +
 		// A Helm chart reference: `helm upgrade langwatch langwatch/langwatch`.
+		// The preceding `\s+` is the namespace boundary here, so the chart ref has
+		// to be its own argument — `notlangwatch/langwatch` cannot satisfy it.
 		`|helm\s+\S+\s+\S+\s+langwatch/langwatch\b` +
-		// An ArgoCD source.
+		// An ArgoCD source. The host is exact: `notlangwatch.github.io` is not ours.
 		`|chart:\s*langwatch\s*$` +
-		`|repoURL:\s*\S*langwatch\.github\.io`,
+		`|repoURL:\s*https?://langwatch\.github\.io`,
 )
 
 // chartContextRule reaches both ways because the real shapes differ: a `helm
