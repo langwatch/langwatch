@@ -342,6 +342,33 @@ func TestFindVersionRefs(t *testing.T) {
 			want:     nil,
 		},
 		{
+			// `langwatch` has to be a whole path component. Matching by suffix
+			// would make somebody else's namespace count as ours.
+			name:     "a namespace merely ending in langwatch is not ours",
+			contents: "image: notlangwatch/langwatch:1.14.5\n--version 1.14.5\n",
+			want:     nil,
+		},
+		{
+			name: "a repository under a namespace ending in langwatch is not ours",
+			contents: "  image:\n" +
+				"    repository: registry.example.com/notlangwatch/langwatch\n" +
+				"    tag: \"1.14.5\"\n",
+			want: nil,
+		},
+		{
+			name:     "a host merely ending in langwatch.github.io is not ours",
+			contents: "    repoURL: https://notlangwatch.github.io\n    targetRevision: 9.1.0\n",
+			want:     nil,
+		},
+		{
+			// The legitimate mirrored form still counts.
+			name: "a mirrored release repository under its own registry counts",
+			contents: "  image:\n" +
+				"    repository: registry.example.com/langwatch/langwatch_nlp\n" +
+				"    tag: \"3.12.0\"\n",
+			want: []string{"3.12.0"},
+		},
+		{
 			name:     "still finds the three release-tracking images",
 			contents: "langwatch/langwatch:1.1.1 langwatch/langwatch_nlp:2.2.2 langwatch/langevals:3.3.3\n",
 			want:     []string{"1.1.1", "2.2.2", "3.3.3"},
