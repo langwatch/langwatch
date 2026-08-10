@@ -262,6 +262,13 @@ describe("updated-axis scroll when a trace is modified mid-pagination", () => {
 
         const seen = await drain(backdatedTenant, page1);
 
+        // Pin what the scroll DID deliver first. Without this the assertion
+        // below passes just as happily on a scroll that returned nothing,
+        // which would hide a total breakage as a known limitation.
+        expect([...seen].sort()).toEqual(
+          [backdated.a, backdated.b, backdated.c].sort(),
+        );
+
         // Asserting CURRENT behaviour, not desired behaviour. If this starts
         // failing, the backdated case has been fixed and this should become a
         // positive assertion instead.
