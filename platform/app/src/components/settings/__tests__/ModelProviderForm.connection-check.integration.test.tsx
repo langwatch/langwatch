@@ -132,7 +132,8 @@ const renderDrawer = (props: {
     </Wrapper>,
   );
 
-const checkButton = () => screen.queryByRole("button", { name: "Test connection" });
+const checkButton = () =>
+  screen.queryByRole("button", { name: "Test connection" });
 
 const works = { outcome: "verified" as const, valid: true as const };
 
@@ -258,7 +259,10 @@ describe("Feature: checking a credential from the drawer it was typed into", () 
     /** @scenario "Checking after changing an endpoint uses the endpoint on screen" */
     it("checks the endpoint on screen once the credential is entered again", async () => {
       await userEvent.clear(inputFor("OPENAI_BASE_URL"));
-      await userEvent.type(inputFor("OPENAI_BASE_URL"), "https://new.example.com/v1");
+      await userEvent.type(
+        inputFor("OPENAI_BASE_URL"),
+        "https://new.example.com/v1",
+      );
       await userEvent.clear(inputFor("OPENAI_API_KEY"));
       await userEvent.type(inputFor("OPENAI_API_KEY"), "sk-typed-just-now");
 
@@ -284,7 +288,10 @@ describe("Feature: checking a credential from the drawer it was typed into", () 
       });
 
       await userEvent.clear(inputFor("OPENAI_BASE_URL"));
-      await userEvent.type(inputFor("OPENAI_BASE_URL"), "https://new.example.com/v1");
+      await userEvent.type(
+        inputFor("OPENAI_BASE_URL"),
+        "https://new.example.com/v1",
+      );
 
       await userEvent.click(checkButton()!);
 
@@ -310,7 +317,9 @@ describe("Feature: checking a credential from the drawer it was typed into", () 
       await userEvent.type(inputFor("OPENAI_API_KEY"), "sk-typed-just-now");
       await userEvent.click(checkButton()!);
 
-      await waitFor(() => expect(mockValidateApiKeyMutation).toHaveBeenCalled());
+      await waitFor(() =>
+        expect(mockValidateApiKeyMutation).toHaveBeenCalled(),
+      );
       expect(mockMutateAsync).not.toHaveBeenCalled();
     });
 

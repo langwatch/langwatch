@@ -10,12 +10,12 @@ vi.mock("../../../utils/ssrfProtection", async (importOriginal) => ({
   ssrfSafeFetch: (...args: unknown[]) => mockFetch(...args),
 }));
 
+import { validateProviderApiKey } from "../providerValidation";
 import {
   isProviderProbeable,
   modelProviders,
   UNPROBEABLE_PROVIDERS,
 } from "../registry";
-import { validateProviderApiKey } from "../providerValidation";
 
 /**
  * A credential that satisfies a provider's schema, built from the schema
@@ -27,8 +27,7 @@ import { validateProviderApiKey } from "../providerValidation";
  * URL because several schemas call `.url()`; everything else gets a token.
  */
 function completeCredentialFor(providerKey: string): Record<string, string> {
-  const definition =
-    modelProviders[providerKey as keyof typeof modelProviders];
+  const definition = modelProviders[providerKey as keyof typeof modelProviders];
   const shape =
     (definition.keysSchema as unknown as {
       shape?: Record<string, unknown>;
@@ -69,28 +68,27 @@ describe("isProviderProbeable", () => {
      *
      * @scenario Both places agree on which providers can be checked
      */
-    it.each(Object.keys(modelProviders))(
-      "agrees with what validation actually does for %s",
-      async (providerKey) => {
-        mockFetch.mockReset();
-        mockFetch.mockResolvedValue({
-          ok: true,
-          status: 200,
-          json: async () => ({ data: [] }),
-          text: async () => "{}",
-        });
+    it.each(
+      Object.keys(modelProviders),
+    )("agrees with what validation actually does for %s", async (providerKey) => {
+      mockFetch.mockReset();
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: [] }),
+        text: async () => "{}",
+      });
 
-        const result = await validateProviderApiKey(
-          providerKey,
-          completeCredentialFor(providerKey),
-        );
+      const result = await validateProviderApiKey(
+        providerKey,
+        completeCredentialFor(providerKey),
+      );
 
-        const wouldBeChecked = result.outcome !== "unchecked";
-        expect(wouldBeChecked).toBe(
-          isProviderProbeable({ provider: providerKey }),
-        );
-      },
-    );
+      const wouldBeChecked = result.outcome !== "unchecked";
+      expect(wouldBeChecked).toBe(
+        isProviderProbeable({ provider: providerKey }),
+      );
+    });
   });
 
   describe("when the provider is not one we recognize", () => {

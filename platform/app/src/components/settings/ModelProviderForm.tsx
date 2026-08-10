@@ -14,6 +14,7 @@ import {
   isResolvableProviderId,
   useAllModelProvidersList,
 } from "../../hooks/useAllModelProvidersList";
+import { useCredentialCheck } from "../../hooks/useCredentialCheck";
 import { useCredentialProbeGate } from "../../hooks/useCredentialProbeGate";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useFeatureFlag } from "../../hooks/useFeatureFlag";
@@ -32,14 +33,13 @@ import {
   hasUserEnteredNewApiKey,
   hasUserModifiedNonApiKeyFields,
 } from "../../utils/modelProviderHelpers";
-import { useCredentialCheck } from "../../hooks/useCredentialCheck";
-import { ConnectionTestVerdict } from "./ConnectionTestVerdict";
 import { parseZodFieldErrors, type ZodErrorStructure } from "../../utils/zod";
 import { SmallLabel } from "../SmallLabel";
 import { Switch } from "../ui/switch";
 import { toaster } from "../ui/toaster";
 import { useCodexCodingDefaultsAskStore } from "./CodexCodingDefaultsAsk";
 import { CodexSignIn } from "./CodexSignIn";
+import { ConnectionTestVerdict } from "./ConnectionTestVerdict";
 import {
   draftFromProvider,
   EMPTY_ADVANCED_DRAFT,

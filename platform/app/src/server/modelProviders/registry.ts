@@ -658,9 +658,9 @@ export function isProviderProbeable({
 }: {
   provider: string;
 }): boolean {
-  const definition = modelProviders[
-    provider as keyof typeof modelProviders
-  ] as ModelProviderDefinition | undefined;
+  const definition = modelProviders[provider as keyof typeof modelProviders] as
+    | ModelProviderDefinition
+    | undefined;
 
   if (!definition) return false;
   if (PROVIDERS_WITH_UNPROBEABLE_AUTH.has(provider)) return false;
@@ -672,11 +672,29 @@ export function isProviderProbeable({
   return (
     // The customer supplies the address themselves.
     !!definition.endpointKey ||
-    !!definition.validationBaseUrl ||
+    !!providerValidationBaseUrl(provider) ||
     !!providerDefaultBaseUrls[provider] ||
     PROVIDERS_WITH_AGENT_PLATFORM_DOOR.has(provider)
   );
 }
+
+/**
+ * Where to ask this provider about a credential, when it carries its own
+ * answer.
+ *
+ * `modelProviders` is a literal typed by `satisfies`, so each entry keeps its
+ * exact shape and an optional field is only reachable on the entries that
+ * declare it. One narrowing here beats a cast at every caller — the same
+ * reason `providerDeprecation` exists.
+ */
+export const providerValidationBaseUrl = (
+  provider: string,
+): string | undefined =>
+  (
+    modelProviders[provider as keyof typeof modelProviders] as
+      | ModelProviderDefinition
+      | undefined
+  )?.validationBaseUrl;
 
 /**
  * Every provider that cannot be checked, in registry order. Exported for the

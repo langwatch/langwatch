@@ -17,6 +17,7 @@ import { ModelProviderRepository } from "./modelProvider.repository";
 import {
   modelProviders,
   PROVIDERS_WITH_UNPROBEABLE_AUTH,
+  providerValidationBaseUrl,
 } from "./registry";
 
 /**
@@ -1221,7 +1222,7 @@ export async function validateProviderApiKey(
     providerDefaultBaseUrls[provider] ??
     // Providers added straight in Settings have no onboarding tile to carry a
     // default, so the registry entry is the only record of where to ask.
-    providerDef.validationBaseUrl ??
+    providerValidationBaseUrl(provider) ??
     "";
 
   const agentPlatform = agentPlatformPair({ provider, customKeys });
