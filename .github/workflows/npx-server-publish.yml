@@ -4,8 +4,10 @@
 # Trigger policy:
 # - `release.published` whose tag starts with `langwatch@` (the main langwatch
 #   release tag — release-please uses `<component>@<version>`). Releases for
-#   other components (sdk-go@*, typescript-sdk@*, mcp-server@*, etc.) are
-#   filtered out by the `if:` guard on the publish job.
+#   other components (typescript-sdk@*, mcp-server@*, etc.) are
+#   filtered out by the `if:` guard on the publish job. The Go SDK is the one
+#   exception to the `<component>@<version>` shape: Go requires a submodule's
+#   tag to be `<subdir>/vX.Y.Z`, so it tags as `sdks/go/v*`.
 # - `workflow_dispatch` from main for break-glass / first publish / beta
 #   bumps. The dispatched run reads the version from package.json — it does
 #   NOT require a release tag.

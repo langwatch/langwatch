@@ -50,9 +50,11 @@ import {
 import { getApp } from "~/server/app-layer/app";
 import type { DspyStepData } from "~/server/app-layer/dspy-steps/types";
 import {
-  generateTrackedEventId,
   predefinedEventsSchemas,
   predefinedEventTypes,
+} from "~/server/app-layer/events/predefinedEvents.schema";
+import {
+  generateTrackedEventId,
   recordTrackedEventSpan,
 } from "~/server/app-layer/events/track-event.service";
 import { ProjectService } from "~/server/app-layer/projects/project.service";
