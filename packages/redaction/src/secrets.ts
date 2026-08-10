@@ -466,6 +466,45 @@ function guardCustomPattern(pattern: string): string {
 }
 
 /**
+ * Strings carrying no credential of any kind: ordinary agent prose, a
+ * transcript tag, a source path, a timestamp, a model name. A custom pattern
+ * that matches one of these is not describing a credential, and because a match
+ * replaces text irreversibly at ingestion, such a pattern destroys trace
+ * content instead of protecting it. The transcript tag is the one a customer
+ * actually lost to a pattern of `sk-.*`.
+ */
+const ORDINARY_TEXT_PROBES = [
+  "the user asked the agent to summarise the meeting notes",
+  "<task-notification>",
+  "platform/app/src/server/traces/trace.service.ts",
+  "2026-08-10T14:32:11.482Z",
+  "claude-opus-5",
+] as const;
+
+/**
+ * The first piece of ordinary text a custom secret pattern would eat, or `null`
+ * when it only matches credential-shaped strings. Callers use this to refuse or
+ * warn about a pattern at the point it is written, rather than discovering it
+ * from a corrupted transcript weeks later.
+ *
+ * The probe is compiled through the exact guard the ingestion path applies, so
+ * what this reports is what would really happen. Without that, a settings-page
+ * warning and the runtime would be describing two different regexes.
+ */
+export function overBroadSecretPatternProbe(pattern: string): string | null {
+  let probeRegex: RegExp;
+  try {
+    // Deliberately not global: `.test` on a global regex carries `lastIndex`
+    // between calls and would skip probes.
+    probeRegex = new RegExp(guardCustomPattern(pattern), "i");
+  } catch {
+    // An uncompilable pattern is reported by the caller's own compile check.
+    return null;
+  }
+  return ORDINARY_TEXT_PROBES.find((probe) => probeRegex.test(probe)) ?? null;
+}
+
+/**
  * Compile user-supplied pattern strings into case-insensitive global regexes,
  * silently dropping any that fail to compile (the service validates them with
  * `isSafeRegex` before they are ever stored, so this is a last-resort guard).

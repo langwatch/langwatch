@@ -5,6 +5,7 @@ import {
   compileSecretPatterns,
   detectSecretsInText,
   isSensitiveAttributeKey,
+  overBroadSecretPatternProbe,
   redactSecretsInText,
 } from "../secrets.js";
 
@@ -469,6 +470,38 @@ describe("redactSecretsInText, given a hand-written custom pattern", () => {
       expect(redact("token acme_abcd1234 end", custom).text).toBe(
         "token [SECRET] end",
       );
+    });
+  });
+});
+
+describe("overBroadSecretPatternProbe", () => {
+  describe("given a pattern that would match ordinary text", () => {
+    /** @scenario "A pattern that would match ordinary text is reported as too broad" */
+    it("reports the ordinary text it would erase", () => {
+      expect(overBroadSecretPatternProbe(".*")).not.toBeNull();
+      expect(overBroadSecretPatternProbe("\\w+")).not.toBeNull();
+      expect(overBroadSecretPatternProbe("[a-z]+")).not.toBeNull();
+      expect(overBroadSecretPatternProbe("[\\s\\S]*")).not.toBeNull();
+    });
+  });
+
+  describe("given a pattern that describes an actual credential", () => {
+    for (const pattern of [
+      "acme_live_[a-z0-9]{8,}",
+      "sk-[A-Za-z0-9]{20,}",
+      String.raw`\bzyq_[A-Za-z0-9]{40}`,
+      // Safe once the compile guard adds the word boundary this probe shares.
+      "sk-.*",
+    ]) {
+      it(`accepts ${pattern}`, () => {
+        expect(overBroadSecretPatternProbe(pattern)).toBeNull();
+      });
+    }
+  });
+
+  describe("given a pattern that does not compile", () => {
+    it("defers to the caller's own compile check", () => {
+      expect(overBroadSecretPatternProbe("[unclosed")).toBeNull();
     });
   });
 });

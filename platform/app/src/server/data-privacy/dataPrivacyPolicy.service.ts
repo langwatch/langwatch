@@ -1,3 +1,4 @@
+import { overBroadSecretPatternProbe } from "@langwatch/redaction";
 import type { DataPrivacyPolicy } from "@prisma/client";
 import { prisma } from "~/server/db";
 import { isSafeRegex } from "~/utils/safeRegex";
@@ -55,13 +56,16 @@ function assertSafePatterns(patterns: string[], label: string): void {
  * A PII exception is the one pattern here that REMOVES redaction, so an
  * over-broad one fails open: compiled anchored as `^(?:pattern)$`, something
  * like `.*` or `\d+` matches every detected span and silently turns the whole
- * PII pass off while the UI still reports the level as active. A custom secret
- * pattern that is too broad only over-redacts, which is why this check is not
- * applied to those.
+ * PII pass off while the UI still reports the level as active.
  *
  * The test is that the pattern cannot match a string of a kind it was not
  * written for: an exception exists to name a specific business identifier, so
  * it must not match both a digit run and a plain word.
+ *
+ * Secret patterns get their own breadth check below. They used to get none, on
+ * the reasoning that a broad one "only over-redacts", but redaction happens at
+ * ingestion and replaces the text for good, so over-redacting is data loss
+ * rather than a cosmetic problem.
  */
 const OVER_BROAD_EXCEPTION_PROBES = [
   "4111111111111111",
@@ -93,6 +97,28 @@ function assertNotOverBroadExceptions(patterns: string[]): void {
           "Describe the specific identifier, including its length and any fixed prefix.",
       );
     }
+  }
+}
+
+/**
+ * A custom secret pattern runs unanchored against every string the pipeline
+ * stores, and a match rewrites that text irreversibly. One broad enough to hit
+ * ordinary prose therefore destroys trace content rather than protecting it,
+ * which is what a pattern of `sk-.*` did to a customer's own transcripts.
+ *
+ * The probe compiles the pattern exactly as the ingestion path compiles it, so
+ * the verdict here is the behaviour the customer would actually get.
+ */
+function assertNotOverBroadSecretPatterns(patterns: string[]): void {
+  for (const pattern of patterns) {
+    const eaten = overBroadSecretPatternProbe(pattern);
+    if (eaten === null) continue;
+    throw new InvalidDataPrivacyConfigError(
+      `Custom secret pattern ${JSON.stringify(
+        pattern.slice(0, 40),
+      )} also matches ordinary text like ${JSON.stringify(eaten)}, ` +
+        "so it would erase trace content. Give it the prefix or length the credential has.",
+    );
   }
 }
 
@@ -177,6 +203,7 @@ export class DataPrivacyPolicyService {
       parsed.data.secrets?.customPatterns ?? [],
       "Custom secret pattern",
     );
+    assertNotOverBroadSecretPatterns(parsed.data.secrets?.customPatterns ?? []);
     assertSafePatterns(
       parsed.data.pii?.exceptPatterns ?? [],
       "PII exception pattern",

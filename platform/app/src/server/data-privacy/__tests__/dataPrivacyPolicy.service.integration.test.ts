@@ -271,6 +271,47 @@ describe("DataPrivacyPolicyService integration", () => {
       });
     });
 
+    describe("when a custom secret pattern is over-broad", () => {
+      // Redaction rewrites the text at ingestion, so a pattern that matches
+      // ordinary prose destroys trace content and cannot be undone.
+      const catchAlls = [".*", ".+", "\\w+", "[a-z]+", "[\\s\\S]*"];
+
+      /** @scenario "An over-broad custom secret pattern is rejected when saving the rule" */
+      it("rejects a pattern that would erase ordinary text, storing nothing", async () => {
+        for (const pattern of catchAlls) {
+          await expect(
+            service.setForScope({
+              scope: { scopeType: "PROJECT", scopeId: project.id },
+              personalOnly: false,
+              config: {
+                secrets: { enabled: true, customPatterns: [pattern] },
+              },
+            }),
+          ).rejects.toThrow(/also matches ordinary text/);
+        }
+
+        const rows = await repository.findAllInOrganization({
+          organizationId,
+        });
+        expect(rows).toHaveLength(0);
+      });
+
+      it("still accepts a pattern that names an actual credential shape", async () => {
+        await expect(
+          service.setForScope({
+            scope: { scopeType: "PROJECT", scopeId: project.id },
+            personalOnly: false,
+            config: {
+              secrets: {
+                enabled: true,
+                customPatterns: ["acme_live_[a-z0-9]{8,}"],
+              },
+            },
+          }),
+        ).resolves.toBeDefined();
+      });
+    });
+
     describe("when a PII exception pattern is unsafe", () => {
       /** @scenario An unsafe exception pattern is rejected when saving the rule */
       it("rejects a pattern that can backtrack catastrophically", async () => {

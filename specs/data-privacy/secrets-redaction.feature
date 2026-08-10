@@ -137,6 +137,24 @@ Feature: Redacting secrets from traces
     When a trace is ingested whose line holds a credential followed by ordinary words
     Then only the credential is replaced and the words after it survive
 
+  # Catching it at authorship as well as at match time. An over-broad secret
+  # pattern used to be waved through on the reasoning that it "only
+  # over-redacts", but redaction runs at ingestion and rewrites the text for
+  # good, so it is data loss. The same probe answers the settings page and the
+  # server, so the warning a customer reads is the behaviour they would get.
+
+  @unit
+  Scenario: A pattern that would match ordinary text is reported as too broad
+    Given a candidate custom pattern that matches ordinary prose
+    When the pattern is checked
+    Then it reports the ordinary text it would erase
+
+  @integration
+  Scenario: An over-broad custom secret pattern is rejected when saving the rule
+    When an admin tries to save a custom secret pattern that also matches ordinary text
+    Then the request is rejected with a validation error
+    And no rule is stored
+
   @unit
   Scenario: A custom pattern still redacts the credential it was written for
     Given a rule on "web-app" whose custom pattern matches tokens starting with "sk-"
