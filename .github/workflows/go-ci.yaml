@@ -31,6 +31,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       go: ${{ steps.filter.outputs.go || steps.force.outputs.go }}
+      # ciguard reads workflow files, not Go source, so it needs its own key:
+      # a checkout added to langwatch-app-ci touches no .go file.
+      ciguards: ${{ steps.filter.outputs.ciguards || steps.force.outputs.go }}
       # Draft PRs keep lint + vet (seconds) and skip the race-detector test
       # run and the build. Both come back on ready_for_review.
       heavy: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
@@ -74,6 +77,10 @@ jobs:
               - 'go.sum'
               - '.golangci.yml'
               - '.github/workflows/go-ci.yaml'
+            ciguards:
+              - '.github/workflows/**'
+              - 'tools/ciguard/**'
+              - 'pkg/ciscan/**'
       - name: Force the filter true on non-PR events
         if: github.event_name != 'pull_request'
         id: force
@@ -92,6 +99,24 @@ jobs:
           cache-dependency-path: go.sum
       - run: go mod verify
       - run: go build ./cmd/... ./tools/thuishaven/...
+
+  # CI's own invariant: every checkout leaves the marketing media on the
+  # server. It regresses silently — a job without the sparse-checkout does not
+  # fail, it just pulls 165 MB it never reads — so it is asserted, not
+  # reviewed.
+  ci-guards:
+    needs: changes
+    if: ${{ needs.changes.outputs.go == 'true' || needs.changes.outputs.ciguards == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - run: go test ./tools/ciguard/...
+      - run: go run ./cmd/ciguard
 
   test:
     needs: changes
@@ -207,11 +232,11 @@ jobs:
   # cannot be required directly — a skipped job never reports, and branch
   # protection would wait forever. This one always runs and consolidates them.
   go-ci-complete:
-    needs: [changes, build, test, lint, vet, generated]
+    needs: [changes, build, test, lint, vet, generated, ci-guards]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: build, test, lint, vet, generated
+          allowed-skips: build, test, lint, vet, generated, ci-guards
