@@ -43,6 +43,7 @@ import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   RECORD_SPAN_COALESCE_MAX_BATCH,
   SPAN_RECEIVED_EVENT_TYPE,
+  TRACE_CORRELATION_COALESCE_MAX_BATCH,
 } from "./schemas/constants";
 import type { TraceProcessingEvent } from "./schemas/events";
 import type { NormalizedSpan } from "./schemas/spans";
@@ -323,10 +324,26 @@ export function createTraceProcessingPipeline(
       )
     : builder.withCommand("recordSpan", RecordSpanCommand, recordSpanOptions);
 
+  // ADR-066 pillar 2 for the two correlation commands: neither declares a group
+  // key, so both funnel a trace's every log record and metric exemplar through
+  // one group. See TRACE_CORRELATION_COALESCE_MAX_BATCH for why folding them is
+  // safe and why the bound is what it is.
+  const correlationOptions = {
+    coalesceMaxBatch: TRACE_CORRELATION_COALESCE_MAX_BATCH,
+  };
+
   return recordSpanBuilder
     .withCommand("assignTopic", AssignTopicCommand)
-    .withCommand("recordLogContribution", RecordLogContributionCommand)
-    .withCommand("recordMetricCorrelation", RecordMetricCorrelationCommand)
+    .withCommand(
+      "recordLogContribution",
+      RecordLogContributionCommand,
+      correlationOptions,
+    )
+    .withCommand(
+      "recordMetricCorrelation",
+      RecordMetricCorrelationCommand,
+      correlationOptions,
+    )
     .withCommand("resolveOrigin", ResolveOriginCommand)
     .withCommand("addAnnotation", AddAnnotationCommand)
     .withCommand("removeAnnotation", RemoveAnnotationCommand)

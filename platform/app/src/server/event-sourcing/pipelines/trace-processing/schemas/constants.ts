@@ -256,3 +256,34 @@ export const TRACE_SUMMARY_PROJECTION_VERSIONS = [
  * pipeline.ts for why.
  */
 export const RECORD_SPAN_COALESCE_MAX_BATCH = 64;
+
+/**
+ * Append-coalescing bound for the trace-side correlation commands —
+ * `recordLogContribution` and `recordMetricCorrelation` (ADR-066 pillar 2).
+ *
+ * Both are keyed on the trace, so every log record and every metric exemplar
+ * belonging to one trace funnels into a single queue group. A chatty agent
+ * trace mints thousands of them, and without folding the group appends one tiny
+ * event_log insert per item while every other trace waits its turn behind it.
+ * That is the same funnel `recordSpan` has, arriving by the default aggregate
+ * key rather than an explicit one — which is why the grouped-producer warning
+ * at registration, which reads a producer's *declared* grouping, never named
+ * these two.
+ *
+ * Safe to fold, on the same terms as their `log_processing` and
+ * `metric_processing` counterparts: each handler derives its event from its own
+ * command alone, never reads back a same-batch append, and stamps a per-item
+ * idempotency key, so a retried batch neither duplicates nor drops. The emitted
+ * events still carry aggregateId = traceId, leaving the trace-summary and
+ * trace-analytics folds — on their own aggregate-keyed, separately coalesced
+ * queues — untouched.
+ *
+ * Matches the log/metric *record* bound rather than the span one because these
+ * carry no more than the records they are derived from: a contribution holds
+ * IO_PREVIEW_BYTES-capped previews where the canonical record holds the whole
+ * body, and a correlation is a handful of scalars. The fat case is still bound
+ * correctly — the drain's byte budget stops a batch of large previews before
+ * this count does — so the count only has to stop a burst of small ones from
+ * growing unboundedly.
+ */
+export const TRACE_CORRELATION_COALESCE_MAX_BATCH = 256;
