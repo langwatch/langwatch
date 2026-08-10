@@ -7,17 +7,16 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { GitPullRequest, MoreVertical } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  GitPullRequest,
+  MoreVertical,
+} from "lucide-react";
 import numeral from "numeral";
 import type React from "react";
 import { useMemo, useState } from "react";
-import {
-  LuArrowDown,
-  LuArrowUp,
-  LuArrowUpDown,
-  LuEye,
-  LuLink,
-} from "react-icons/lu";
+import { LuLink } from "react-icons/lu";
 
 import { GitHub } from "~/components/icons/GitHub";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
@@ -635,10 +634,15 @@ const TableHeaderRow: React.FC<{
 );
 
 /**
- * A heading that sorts. The arrow says which column the table is ordered by
- * and which way, and `aria-sort` on the header itself says the same thing to a
- * reader who cannot see the arrow: without it someone could sort the table by
- * keyboard and have no way to learn that they had.
+ * A heading that sorts, drawn the way the trace table draws one: the column in
+ * force reads as the one in charge, with a tinted band, a heavier label and a
+ * chevron pointing the way it is ordered. Every other sortable column keeps a
+ * faint chevron so a reader can tell at a glance which headings do something,
+ * without hovering each one to find out.
+ *
+ * `aria-sort` on the header says the same thing to a reader who cannot see the
+ * chevron: without it someone could sort the table by keyboard and have no way
+ * to learn that they had.
  */
 const SortableColumnHeader: React.FC<{
   label: string;
@@ -648,11 +652,6 @@ const SortableColumnHeader: React.FC<{
   align?: "start" | "end";
 }> = ({ label, column, sort, onSort, align = "start" }) => {
   const active = sort.column === column;
-  const ArrowIcon = !active
-    ? LuArrowUpDown
-    : sort.direction === "asc"
-      ? LuArrowUp
-      : LuArrowDown;
 
   return (
     <Table.ColumnHeader
@@ -663,35 +662,54 @@ const SortableColumnHeader: React.FC<{
             : "descending"
           : "none"
       }
+      // The band and the darker label do the highlighting. Weight is left to
+      // the table's own heading style, which is already bold: overriding it
+      // here made the sorted column read LIGHTER than the rest.
+      bg={active ? "bg.muted" : undefined}
+      color={active ? "fg" : undefined}
     >
-      <HStack
+      <Button
+        type="button"
+        variant="plain"
+        aria-label={`Sort by ${label}`}
+        onClick={() => onSort(column)}
+        width="full"
+        height="auto"
+        minHeight="unset"
+        paddingX={0}
+        paddingY={0}
         gap={1}
         // The right-aligned columns keep their label pinned to the edge, so it
-        // does not shift sideways when the arrow changes width.
-        justify={align === "end" ? "flex-end" : "flex-start"}
-        cursor="pointer"
-        onClick={() => onSort(column)}
+        // does not shift sideways when the chevron changes.
+        justifyContent={align === "end" ? "flex-end" : "flex-start"}
+        // The header band owns the type; the button only carries the click.
+        color="inherit"
+        fontSize="inherit"
+        fontWeight="inherit"
+        letterSpacing="inherit"
+        textTransform="inherit"
         userSelect="none"
-        role="button"
-        tabIndex={0}
-        aria-label={`Sort by ${label}`}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            // Space scrolls the page by default; a control that responds to it
-            // has to say so.
-            event.preventDefault();
-            onSort(column);
-          }
-        }}
-        _focusVisible={{ outline: "2px solid", outlineColor: "blue.focusRing" }}
+        _hover={{ color: "fg" }}
+        css={{ "&:hover [data-sort-hint]": { opacity: 0.85 } }}
       >
-        <Text>{label}</Text>
-        <Icon
-          as={ArrowIcon}
-          boxSize="12px"
-          color={active ? "fg" : "fg.muted"}
-        />
-      </HStack>
+        {label}
+        {active ? (
+          <Icon boxSize="12px" color="fg" flexShrink={0}>
+            {sort.direction === "asc" ? <ChevronUp /> : <ChevronDown />}
+          </Icon>
+        ) : (
+          <Icon
+            data-sort-hint
+            boxSize="12px"
+            color="fg.muted"
+            opacity={0.35}
+            flexShrink={0}
+            transition="opacity 0.1s ease"
+          >
+            <ChevronDown />
+          </Icon>
+        )}
+      </Button>
     </Table.ColumnHeader>
   );
 };
@@ -1035,7 +1053,6 @@ const RowActionsMenu: React.FC<{
         <Menu.Content>
           {onOpenDetail ? (
             <Menu.Item value="details" onClick={onOpenDetail}>
-              <LuEye />
               View details
             </Menu.Item>
           ) : null}

@@ -1,6 +1,7 @@
 import { Table } from "@chakra-ui/react";
 import type React from "react";
 
+import { ListTable } from "~/components/ui/ListTable";
 import {
   formatCost,
   formatTokens,
@@ -25,50 +26,46 @@ export const SessionsSection: React.FC<{
     {sessions.length === 0 ? (
       <EmptySection>No sessions ran on this pull request yet</EmptySection>
     ) : (
-      <Table.ScrollArea>
-        <Table.Root size="sm" variant="line">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Started</Table.ColumnHeader>
-              <Table.ColumnHeader>Contributor</Table.ColumnHeader>
-              <Table.ColumnHeader>Agent</Table.ColumnHeader>
-              <Table.ColumnHeader textAlign="end">Tokens</Table.ColumnHeader>
-              <Table.ColumnHeader textAlign="end">
-                Token cost
-              </Table.ColumnHeader>
+      <ListTable size="sm" containerProps={{ overflowX: "auto" }}>
+        <Table.Header>
+          <Table.Row>
+            <Table.ColumnHeader>Started</Table.ColumnHeader>
+            <Table.ColumnHeader>Contributor</Table.ColumnHeader>
+            <Table.ColumnHeader>Agent</Table.ColumnHeader>
+            <Table.ColumnHeader textAlign="end">Tokens</Table.ColumnHeader>
+            <Table.ColumnHeader textAlign="end">Token cost</Table.ColumnHeader>
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          {sessions.map((session) => (
+            <Table.Row key={session.sessionId}>
+              <Table.Cell fontSize="sm" whiteSpace="nowrap">
+                {formatShortDate({ timestampMs: session.startedAtMs })}{" "}
+                {new Date(session.startedAtMs).toLocaleTimeString(undefined, {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </Table.Cell>
+              <ContributorName contributor={session} />
+              <Table.Cell fontSize="sm" color="fg.muted">
+                {session.agent ? (
+                  <AgentLabel agent={session.agent} />
+                ) : (
+                  MISSING_VALUE
+                )}
+              </Table.Cell>
+              <Table.Cell textAlign="end" fontSize="sm">
+                {formatTokens(session.totalTokens)}
+              </Table.Cell>
+              <Table.Cell textAlign="end" fontSize="sm">
+                {session.costUsd === null
+                  ? MISSING_VALUE
+                  : formatCost(session.costUsd)}
+              </Table.Cell>
             </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {sessions.map((session) => (
-              <Table.Row key={session.sessionId}>
-                <Table.Cell fontSize="sm" whiteSpace="nowrap">
-                  {formatShortDate({ timestampMs: session.startedAtMs })}{" "}
-                  {new Date(session.startedAtMs).toLocaleTimeString(undefined, {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </Table.Cell>
-                <ContributorName contributor={session} />
-                <Table.Cell fontSize="sm" color="fg.muted">
-                  {session.agent ? (
-                    <AgentLabel agent={session.agent} />
-                  ) : (
-                    MISSING_VALUE
-                  )}
-                </Table.Cell>
-                <Table.Cell textAlign="end" fontSize="sm">
-                  {formatTokens(session.totalTokens)}
-                </Table.Cell>
-                <Table.Cell textAlign="end" fontSize="sm">
-                  {session.costUsd === null
-                    ? MISSING_VALUE
-                    : formatCost(session.costUsd)}
-                </Table.Cell>
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </Table.Root>
-      </Table.ScrollArea>
+          ))}
+        </Table.Body>
+      </ListTable>
     )}
   </Section>
 );
