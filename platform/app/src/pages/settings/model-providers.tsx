@@ -25,14 +25,12 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useAllModelProvidersList } from "~/hooks/useAllModelProvidersList";
 import { useAvailableScopes } from "~/hooks/useAvailableScopes";
 import { useDrawer } from "~/hooks/useDrawer";
-import {
-  type ConnectionTestState,
-  useModelProviderConnectionTest,
-} from "~/hooks/useModelProviderConnectionTest";
+import { useModelProviderConnectionTest } from "~/hooks/useModelProviderConnectionTest";
 import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
 import { api } from "~/utils/api";
 import SettingsLayout from "../../components/SettingsLayout";
 import { CodexCodingDefaultsAskHost } from "../../components/settings/CodexCodingDefaultsAsk";
+import { ConnectionTestVerdict } from "../../components/settings/ConnectionTestVerdict";
 import { DefaultModelsSection } from "../../components/settings/DefaultModelsSection";
 import { ProviderScopeChips } from "../../components/settings/ProviderScopeChips";
 import { ScopeFilter as ScopeFilterComponent } from "../../components/settings/ScopeFilter";
@@ -43,6 +41,7 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { buildCustomModelDisplayNames } from "../../server/modelProviders/customModelDisplayNames";
 import {
+  isProviderProbeable,
   modelProviders as modelProvidersRegistry,
   providerDeprecation,
 } from "../../server/modelProviders/registry";
@@ -425,24 +424,38 @@ export default function ModelsPage() {
                                       Edit Provider
                                     </Box>
                                   </Menu.Item>
-                                  <Menu.Item
-                                    value="test"
-                                    disabled={!provider.id}
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      if (!provider.id) return;
-                                      void connectionTests.test(provider.id);
-                                    }}
-                                  >
-                                    <Box
-                                      display="flex"
-                                      alignItems="center"
-                                      gap={2}
+                                  {/* Offered only where it can answer. Six of
+                                      the registered providers credential in
+                                      ways no listing endpoint exercises, and
+                                      an action that can only ever report
+                                      "we did not look" is worse than no
+                                      action: it reads as broken rather than
+                                      as inapplicable. The drawer hides it on
+                                      the same answer, so the two surfaces
+                                      cannot disagree about what is
+                                      checkable. */}
+                                  {isProviderProbeable({
+                                    provider: provider.provider,
+                                  }) && (
+                                    <Menu.Item
+                                      value="test"
+                                      disabled={!provider.id}
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        if (!provider.id) return;
+                                        void connectionTests.test(provider.id);
+                                      }}
                                     >
-                                      <PlugZap size={14} />
-                                      Test Connection
-                                    </Box>
-                                  </Menu.Item>
+                                      <Box
+                                        display="flex"
+                                        alignItems="center"
+                                        gap={2}
+                                      >
+                                        <PlugZap size={14} />
+                                        Test Connection
+                                      </Box>
+                                    </Menu.Item>
+                                  )}
                                   <Menu.Item
                                     value="delete"
                                     color="red"
@@ -578,60 +591,6 @@ export default function ModelsPage() {
         </Dialog.Root>
       </VStack>
     </SettingsLayout>
-  );
-}
-
-/**
- * What the last connection test said about this row.
- *
- * Three states, rendered three different ways on purpose. A check that could
- * not run reads as neutral rather than green: it is not a pass, and dressing
- * it as one would tell a customer their configuration is fine on the strength
- * of never having asked.
- *
- * The whole verdict lives in a polite live region. The text arrives well after
- * the click that asked for it, and a screen reader announces neither the
- * "Testing…" transition nor the answer replacing it — so without this the
- * control is a button that appears to do nothing at all.
- */
-function ConnectionTestVerdict({
-  state,
-}: {
-  state: ConnectionTestState | undefined;
-}) {
-  const verdict = () => {
-    if (!state) return null;
-
-    if (state.status === "testing") {
-      return (
-        <Text fontSize="xs" color="fg.muted">
-          Testing…
-        </Text>
-      );
-    }
-
-    if (state.status === "works") {
-      return (
-        <Text fontSize="xs" color="green.fg">
-          Connection works
-        </Text>
-      );
-    }
-
-    return (
-      <Text
-        fontSize="xs"
-        color={state.status === "refused" ? "red.fg" : "fg.muted"}
-      >
-        {state.message}
-      </Text>
-    );
-  };
-
-  return (
-    <Box aria-live="polite" aria-atomic="true">
-      {verdict()}
-    </Box>
   );
 }
 

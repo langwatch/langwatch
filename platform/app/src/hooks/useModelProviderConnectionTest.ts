@@ -1,10 +1,11 @@
 import { useCallback, useRef, useState } from "react";
-import { describeError, explainSerializedError } from "../features/errors";
-import type {
-  UncheckedReason,
-  ValidationResult,
-} from "../server/modelProviders/providerValidation";
+import { describeError } from "../features/errors";
+import type { ValidationResult } from "../server/modelProviders/providerValidation";
 import { api } from "../utils/api";
+import {
+  type ConnectionTestState,
+  toConnectionTestState,
+} from "./connectionTestState";
 
 /**
  * Running a credential check against a provider that is already saved.
@@ -33,79 +34,7 @@ import { api } from "../utils/api";
  */
 type ConnectionTestResult = ValidationResult;
 
-export type ConnectionTestState =
-  | { status: "testing" }
-  | { status: "works" }
-  | { status: "refused"; message: string }
-  | { status: "unchecked"; message: string };
-
-/**
- * What to say when the check never ran.
- *
- * Deliberately short of the reason we hold internally. "This provider signs
- * every request with AWS credentials, which a listing endpoint does not
- * exercise" is true and is not the customer's problem; what they need to know
- * is whether they still have something to do. Only the cases they can act on
- * get a next step.
- */
-const uncheckedMessage = (reason: UncheckedReason): string => {
-  if (reason === "no_credential" || reason === "credential_masked") {
-    // Not "nothing is stored": a credential written before the encryption
-    // secret was rotated is unreadable rather than absent, and the two are
-    // indistinguishable by the time they reach here (the repository drops an
-    // undecryptable value to null). Telling that customer to enter a key they
-    // already entered is the misdiagnosis this whole area exists to avoid.
-    return "No credential could be read for this provider.";
-  }
-  return "This provider can't be tested automatically — its settings are checked when you first use it.";
-};
-
-/**
- * A verdict, turned into what the row should say.
- *
- * A pure function rather than three branches inside the hook: the mapping is
- * the part worth reading on its own, and keeping it out here is what lets the
- * exhaustiveness check below be the only place a new outcome has to be
- * handled.
- */
-function toState(result: ConnectionTestResult): ConnectionTestState {
-  if (result.outcome === "verified") {
-    return { status: "works" };
-  }
-
-  if (result.outcome === "refused") {
-    // The refusal is a serialized handled error riding on the payload, so it
-    // is read with `explainSerializedError` rather than `describeError`. Both
-    // land in the same code-keyed registry; only the transport differs. The
-    // provider's own sentence never appears in either — a rejected-credential
-    // body is where the credential itself tends to turn up.
-    const { title, description } = explainSerializedError(result.domainError);
-    return {
-      status: "refused",
-      message: description ? `${title}. ${description}` : title,
-    };
-  }
-
-  if (result.outcome === "unchecked") {
-    return { status: "unchecked", message: uncheckedMessage(result.reason) };
-  }
-
-  // A fourth outcome would otherwise fall into the branch above and be
-  // described as "can't be tested automatically" — a confident sentence about
-  // a verdict nobody has classified. This turns that into a compile error at
-  // the moment the server grows one.
-  //
-  // The discriminator only, never the payload: this message reaches
-  // `describeError` in the caller's catch, which can render a plain Error's
-  // text to the customer, and nothing promises a future outcome's fields are
-  // free of credential material.
-  const unhandled: never = result;
-  throw new Error(
-    `Unhandled connection test outcome: ${String(
-      (unhandled as { outcome?: unknown }).outcome,
-    )}`,
-  );
-}
+export type { ConnectionTestState };
 
 export function useModelProviderConnectionTest({
   projectId,
@@ -182,7 +111,7 @@ export function useModelProviderConnectionTest({
           organizationId,
         });
 
-        setResult(modelProviderId, toState(result), asked);
+        setResult(modelProviderId, toConnectionTestState(result), asked);
       } catch (error) {
         // Not `error.message`: a handled error's message is replaced by its
         // stable code on the wire, so reading it renders a slug like
@@ -192,6 +121,7 @@ export function useModelProviderConnectionTest({
           modelProviderId,
           {
             status: "unchecked",
+            reason: "request_failed",
             message: describeError({
               error,
               fallbackTitle: "Couldn't test this connection",

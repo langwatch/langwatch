@@ -394,6 +394,21 @@ describe("given the Model Providers settings page", () => {
         expect(await screen.findByText("Connection works")).toBeTruthy();
       });
 
+      /** @scenario "Both places agree on which providers can be checked" */
+      it("offers no test action for a provider that cannot be checked", () => {
+        // The drawer hides its own control on the same answer. If only one
+        // surface asked, the two would disagree the first time the rule moved,
+        // and the disagreement is invisible from either side — a customer sees
+        // an action in one place and not the other, with nothing to explain it.
+        mockState.providers = [{ ...openaiRow, provider: "bedrock" }];
+        renderPage();
+
+        expect(document.querySelector('[data-menu-item="test"]')).toBeNull();
+        // The rest of the menu is untouched: this is about what can be
+        // checked, not about what can be managed.
+        expect(screen.getByText("Edit Provider")).toBeTruthy();
+      });
+
       /** @scenario "A provider we cannot check says so instead of reporting success" */
       it("never renders a provider it could not check as working", async () => {
         mockTestConnection.mockResolvedValueOnce({

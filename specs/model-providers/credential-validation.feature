@@ -634,16 +634,12 @@ Feature: Credential Validation
     When I check the connection and am told it works
     Then the provider has not been created
 
-  # An endpoint that arrives with the request is an address we have not
-  # vetted, and it arrives alongside a credential. The rule the save-time
-  # probe already follows applies here for the same reason.
-
-  @unit
-  Scenario: An endpoint typed into the drawer is vetted before anything is sent
-    Given I have entered an endpoint that points at a private address
-    When I check the connection
-    Then nothing is sent to it
-    And I am told the address is not one we will call
+  # An endpoint typed into the drawer is an address we have not vetted, and it
+  # travels alongside a credential. It needs no rule of its own: the check runs
+  # through the same validator as every other, so "a credential is never
+  # carried to an address we have not vetted" above already governs it. What
+  # is worth pinning is that the drawer reaches that validator rather than
+  # some path around it, which the scenarios above do.
 
   @unit
   Scenario: A result disappears when I change the credential

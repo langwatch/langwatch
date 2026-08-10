@@ -23,6 +23,7 @@ import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRequiredCredentialKeys } from "../../hooks/useRequiredCredentialKeys";
 import {
+  isProviderProbeable,
   type MaybeStoredModelProvider,
   modelProviders as modelProvidersRegistry,
 } from "../../server/modelProviders/registry";
@@ -31,6 +32,8 @@ import {
   hasUserEnteredNewApiKey,
   hasUserModifiedNonApiKeyFields,
 } from "../../utils/modelProviderHelpers";
+import { useCredentialCheck } from "../../hooks/useCredentialCheck";
+import { ConnectionTestVerdict } from "./ConnectionTestVerdict";
 import { parseZodFieldErrors, type ZodErrorStructure } from "../../utils/zod";
 import { SmallLabel } from "../SmallLabel";
 import { Switch } from "../ui/switch";
@@ -329,6 +332,68 @@ export const EditModelProviderForm = ({
       resetKey: providerId,
     });
 
+  // Whether the credential on screen differs from the one in storage, which is
+  // what decides whether the check is about the form or about the row. The
+  // same two helpers the dirty check and the save path already use, so the
+  // three cannot end up with different opinions about what "edited" means.
+  const hasCredentialEdits =
+    hasUserEnteredNewApiKey(state.customKeys) ||
+    hasUserModifiedNonApiKeyFields(state.customKeys, state.initialKeys);
+
+  const credentialCheck = useCredentialCheck({
+    projectId,
+    organizationId,
+    modelProviderId: providerId,
+    provider: provider.provider,
+    customKeys: state.customKeys,
+    scopes: state.scopes,
+    hasEdits: hasCredentialEdits,
+  });
+
+  /**
+   * Whether to offer the check at all.
+   *
+   * A property of the provider rather than of what has been typed, so the
+   * control does not appear and vanish while the form is filled in. Six of the
+   * registered providers credential in ways no listing endpoint exercises;
+   * offering a check there would produce "we did not look" every time, which
+   * reads as a broken button rather than as an inapplicable one.
+   *
+   * This deliberately sits alongside `isLlmProvider` and `isOAuthDeviceProvider`
+   * rather than replacing them. Those two gate the probe that runs on save, and
+   * folding all three together would change when a save is allowed to proceed —
+   * a different blast radius than a button.
+   */
+  const canCheckCredential = isProviderProbeable({
+    provider: provider.provider,
+  });
+
+  /**
+   * Whether the credential is complete enough to be worth sending.
+   *
+   * Two questions, and the required-field one is not sufficient on its own. A
+   * provider can accept a pair of fields together or not at all — Gemini's
+   * project and location — so filling one leaves every *required* field
+   * satisfied while the credential as a whole is one the provider's own schema
+   * rejects. Asking the schema is the only answer that cannot drift from what
+   * a save would accept.
+   */
+  const credentialIsComplete = useMemo(() => {
+    if (
+      getEmptyRequiredCredentialKeys({
+        requiredKeys,
+        values: state.customKeys,
+      }).length > 0
+    ) {
+      return false;
+    }
+
+    if (!providerDefinition?.keysSchema) return true;
+
+    return providerDefinition.keysSchema.safeParse({ ...state.customKeys })
+      .success;
+  }, [providerDefinition, requiredKeys, state.customKeys]);
+
   const handleSave = useCallback(async () => {
     // Clear previous errors
     setFieldErrors({});
@@ -574,7 +639,33 @@ export const EditModelProviderForm = ({
           />
         )}
 
-        <HStack width="full" justify="end">
+        {/* The check sits beside Save rather than in a menu somewhere: the
+            moment a customer wants to know whether they filled this in
+            correctly is while they are still looking at the fields. It never
+            saves — see the note under the button. */}
+        <HStack width="full" justify="space-between" align="center">
+          <VStack align="start" gap={1}>
+            {canCheckCredential && !isOAuthDeviceProvider && (
+              <Button
+                size="sm"
+                variant="outline"
+                loading={credentialCheck.state?.status === "testing"}
+                disabled={cannotResolveTarget || !credentialIsComplete}
+                onClick={() => void credentialCheck.check()}
+              >
+                Test connection
+              </Button>
+            )}
+            <ConnectionTestVerdict state={credentialCheck.state} />
+            {/* Only next to a pass, and only before the row exists. "It
+                works" and "it is saved" are easy to read as the same
+                sentence, and they are furthest apart exactly here. */}
+            {credentialCheck.state?.status === "works" && !providerId && (
+              <Text fontSize="xs" color="fg.muted">
+                Save to finish adding this provider.
+              </Text>
+            )}
+          </VStack>
           <Button
             size="sm"
             colorPalette="orange"
