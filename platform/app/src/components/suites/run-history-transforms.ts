@@ -18,7 +18,10 @@ import type {
   ScenarioRunData,
   SuiteRunSummary,
 } from "~/server/scenarios/scenario-event.types";
-import { categorizeRunStatus } from "~/server/scenarios/scenario-run-category";
+import {
+  categorizeRunStatus,
+  type RunStatusCategory,
+} from "~/server/scenarios/scenario-run-category";
 import { extractSuiteId, isSuiteSetId } from "~/server/suites/suite-set-id";
 
 /** Valid values for the grouping dimension. */
@@ -502,26 +505,24 @@ export function computeRunHistoryTotals({
 }: {
   runs: ScenarioRunData[];
 }): RunHistoryTotals {
-  let passedCount = 0;
-  let failedCount = 0;
-  let cancelledCount = 0;
-  let pendingCount = 0;
-
+  const counts: Record<RunStatusCategory, number> = {
+    success: 0,
+    failure: 0,
+    stalled: 0,
+    cancelled: 0,
+    in_progress: 0,
+    queued: 0,
+  };
   for (const run of runs) {
-    const category = categorizeRunStatus(run.status);
-    if (category === "success") passedCount++;
-    else if (category === "failure" || category === "stalled") failedCount++;
-    else if (category === "cancelled") cancelledCount++;
-    else if (category === "queued" || category === "in_progress")
-      pendingCount++;
+    counts[categorizeRunStatus(run.status)]++;
   }
 
   return {
     runCount: runs.length,
-    passedCount,
-    failedCount,
-    cancelledCount,
-    pendingCount,
+    passedCount: counts.success,
+    failedCount: counts.failure + counts.stalled,
+    cancelledCount: counts.cancelled,
+    pendingCount: counts.queued + counts.in_progress,
   };
 }
 

@@ -48807,7 +48807,12 @@
                             "type": "number"
                           },
                           "failCount": {
-                            "type": "number"
+                            "type": "number",
+                            "description": "Runs that failed, errored, or stalled. Cancelled runs are not failures and are reported in cancelledCount instead."
+                          },
+                          "cancelledCount": {
+                            "type": "number",
+                            "description": "Runs cancelled by the user - neither passed nor failed."
                           },
                           "runningCount": {
                             "type": "number"
@@ -48839,6 +48844,7 @@
                           "totalCount",
                           "passCount",
                           "failCount",
+                          "cancelledCount",
                           "runningCount",
                           "stalledCount",
                           "lastRunAt",

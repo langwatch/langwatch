@@ -396,7 +396,12 @@ export class SimulationRunStateFoldProjection
       TraceIds: Array.isArray(event.data.traceIds) ? event.data.traceIds : [],
       Status: statusAfter({
         state,
-        candidate: event.data.status ?? state.Status,
+        // Same normalization as the finished handler: nothing writes the
+        // non-enum "FAILURE" string, wherever the status rode in (#6834).
+        candidate:
+          event.data.status === "FAILURE"
+            ? "FAILED"
+            : (event.data.status ?? state.Status),
       }),
     };
   }
