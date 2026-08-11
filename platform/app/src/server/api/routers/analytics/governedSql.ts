@@ -158,12 +158,12 @@ const query = protectedProcedure
       throw new GovernedSqlNotEnabledError();
     }
 
-    // The project's API key is hashed into the tenant capability the query runs
-    // under. It is read server-side and never leaves this function — no field
-    // of it appears in the response.
+    // The project's governed SQL secret is hashed into the tenant capability
+    // the query runs under. It is read server-side and never leaves this
+    // function — no field of it appears in the response.
     const project = await ctx.prisma.project.findUnique({
       where: { id: input.projectId },
-      select: { id: true, apiKey: true },
+      select: { id: true, governedSqlKey: true },
     });
     if (!project) {
       throw new NotFoundError("project_not_found", "Project", input.projectId);
