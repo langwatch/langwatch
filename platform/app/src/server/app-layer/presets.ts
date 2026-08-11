@@ -1470,6 +1470,18 @@ export function initializeDefaultApp(options?: {
       },
     });
   }
+  // BEFORE the Redis closeable, deliberately: stopping the writer hands the
+  // snapshot lease back, and a released lease is the difference between the
+  // fleet electing a new writer immediately and going without one for the
+  // remainder of the lease window — the rolling-deploy case. Once Redis is
+  // disconnected the release can no longer be issued at all.
+  gracefulCloseables.push({
+    name: "ops-snapshot",
+    close: async () => {
+      ops.metricsCollector?.stop();
+      ops.snapshotReader?.stop();
+    },
+  });
   if (redis) {
     gracefulCloseables.push({
       name: "redis",

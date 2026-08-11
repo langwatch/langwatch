@@ -62,8 +62,11 @@ export function SchedulerRowActions({
   // against that. With no resolved name, run-now — the only control that can
   // deliver something to a customer — is withheld rather than confirmed
   // against an identifier nobody can read.
+  // A paused schedule refuses run-now server-side, so offering it here would
+  // be a control the operator cannot use — the same rule that hides mutations
+  // from a view-only operator rather than letting them error on press.
   const tenant = projectName;
-  const canRunNow = tenant !== null;
+  const canRunNow = tenant !== null && !isPaused;
 
   return (
     <>
