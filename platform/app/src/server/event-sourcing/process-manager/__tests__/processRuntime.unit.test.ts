@@ -43,6 +43,9 @@ function makeStubStore(overrides: Partial<ProcessStore> = {}): ProcessStore {
     findDueWakes: async () => [],
     requeueDeadMessages: async () => 0,
     deleteDispatchedBefore: async () => 0,
+    deleteDispatchedOutboxBatch: async () => 0,
+    deleteDeadOutboxBatch: async () => 0,
+    deleteConsumedInboxBatch: async () => 0,
     ...overrides,
   };
 }

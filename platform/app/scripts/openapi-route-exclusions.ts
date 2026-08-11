@@ -234,11 +234,4 @@ export const UNPUBLISHED = [
     category: "elsewhere",
     why: "AI Governance source receivers, addressed with a per-source ingestion key. Documented today in the governance sources guide rather than the API reference",
   },
-
-  // ── Gaps: public endpoints that should be documented ───────────────────
-  {
-    match: "/api/scim/v2",
-    category: "gap",
-    why: "SCIM 2.0 user and group provisioning for enterprise directories. Enterprise buyers do look for it in the reference; it lands with the management API work, where the rest of the provisioning surface is",
-  },
 ] as const satisfies readonly Exclusion[];

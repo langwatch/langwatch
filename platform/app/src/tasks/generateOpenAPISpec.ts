@@ -1,3 +1,5 @@
+import { SCIM_SPEC_OPTIONS } from "@ee/scim/openapi";
+import { app as scimApp } from "@ee/scim/routes";
 import deepmerge from "deepmerge";
 import fs from "fs";
 import { generateSpecs } from "hono-openapi";
@@ -22,7 +24,13 @@ import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
 import rawCurrentSpec from "../app/api/openapiLangWatch.json";
+import { app as organizationApp } from "../app/api/organization/[[...route]]/app";
+import { app as organizationsApp } from "../app/api/organizations/[[...route]]/app";
+import { ORGANIZATIONS_SPEC_OPTIONS } from "../app/api/organizations/[[...route]]/openapi";
 import { app as projectsApp } from "../app/api/projects/[[...route]]/app";
+import { app as roleBindingsApp } from "../app/api/role-bindings/[[...route]]/app";
+import { app as rolesApp } from "../app/api/roles/[[...route]]/app";
+import { app as scimTokensApp } from "../app/api/scim-tokens/[[...route]]/app";
 import {
   allRegisteredRoutes,
   type CredentialClass,
@@ -68,10 +76,21 @@ const APP_DERIVED_PREFIXES = [
   "/api/gateway/v1",
   "/api/governance",
   "/api/graphs",
+  "/api/groups",
   "/api/me",
+  "/api/organization",
+  "/api/organizations",
   "/api/projects",
   "/api/prompts",
+  "/api/role-bindings",
+  "/api/roles",
+  "/api/scim-tokens",
+  // Two surfaces again, and the segment boundary keeps them apart: the SCIM
+  // 2.0 endpoints an identity provider calls live under `/api/scim/v2`, while
+  // `/api/scim-tokens` is how a LangWatch admin mints the credential for them.
+  "/api/scim/v2",
   "/api/dataset",
+  "/api/model-defaults",
   "/api/model-providers",
   "/api/monitors",
   "/api/scenario-events",
@@ -79,6 +98,7 @@ const APP_DERIVED_PREFIXES = [
   "/api/secrets",
   "/api/simulation-runs",
   "/api/suites",
+  "/api/teams",
   "/api/traces",
   "/api/triggers",
   "/api/workflows",
@@ -186,8 +206,27 @@ export default async function execute() {
   const modelDefaultsSpec = await generateSpecs(modelDefaultsApp);
   console.log("Building model providers spec...");
   const modelProvidersSpec = await generateSpecs(modelProvidersApp);
+  console.log("Building organization spec...");
+  const organizationSpec = await generateSpecs(organizationApp);
+  console.log("Building organizations (instance provisioning) spec...");
+  const organizationsSpec = await generateSpecs(
+    organizationsApp,
+    ORGANIZATIONS_SPEC_OPTIONS,
+  );
   console.log("Building projects spec...");
   const projectsSpec = await generateSpecs(projectsApp);
+  console.log("Building roles spec...");
+  const rolesSpec = await generateSpecs(rolesApp);
+  console.log("Building role bindings spec...");
+  const roleBindingsSpec = await generateSpecs(roleBindingsApp);
+  console.log("Building scim tokens spec...");
+  const scimTokensSpec = await generateSpecs(scimTokensApp);
+  console.log("Building scim spec...");
+  // A family that authenticates with its own credential declares the scheme
+  // next to the operations that name it, and `documentation` is how a
+  // generated spec contributes a `components` entry the merge carries into
+  // the document.
+  const scimSpec = await generateSpecs(scimApp, SCIM_SPEC_OPTIONS);
   console.log("Building secrets spec...");
   const secretsSpec = await generateSpecs(secretsApp);
   console.log("Building scenarios spec...");
@@ -234,6 +273,12 @@ export default async function execute() {
       modelDefaultsSpec,
       modelProvidersSpec,
       monitorsSpec,
+      organizationSpec,
+      organizationsSpec,
+      roleBindingsSpec,
+      rolesSpec,
+      scimTokensSpec,
+      scimSpec,
       scenarioEventsSpec,
       scenariosSpec,
       projectsSpec,

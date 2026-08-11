@@ -121,8 +121,18 @@ def test_webhooks_facade_routes_and_envelopes():
     assert facade.deliveries_page("we_1", limit=10)["data"] == []
     assert facade.test("we_1")["delivered"] is True
     assert facade.event_types()[0]["type"] == "gateway.request.completed"
-    assert facade.events_page(type="gateway.request.completed")["data"] == []
+    assert (
+        facade.events_page(
+            type="gateway.request.completed", from_ms=1, to_ms=2
+        )["data"]
+        == []
+    )
     assert facade.get_event("evt_1")["id"] == "evt_1"
+    # The range is required by the route, so a facade that dropped either bound
+    # would 422 against a real server while this fake happily answered.
+    events_call = next(c for c in calls if "/v1/events?" in c[1])
+    assert "from=1" in events_call[1]
+    assert "to=2" in events_call[1]
 
     # Archiving is a soft delete: nothing to hand back, only the route to hit.
     assert facade.archive("we_1") is None
@@ -173,7 +183,9 @@ def test_iter_events_walks_every_page():
     )
     facade = WebhooksFacade(FakeRestClient(handler))
 
-    rows = list(facade.iter_events(type="gateway.request.completed"))
+    rows = list(
+        facade.iter_events(type="gateway.request.completed", from_ms=1, to_ms=2)
+    )
     assert [r["id"] for r in rows] == ["evt_1", "evt_2"]
     assert seen_cursors == [None, "c1"]
 
@@ -211,6 +223,34 @@ def test_spend_facade_routes_and_envelopes():
     assert spend["caps"] == []
     wire = next(c for c in calls if "/end-users/" in c[1])
     assert "user%2F9" in wire[1]
+
+
+def test_iter_events_sends_the_required_range_on_every_page():
+    """The range is required by the route, so a walk that carried it only on
+    the first page would 422 partway through."""
+    seen: List[Dict[str, Optional[str]]] = []
+    pages = [
+        {"data": [{"id": "evt_1"}], "next_cursor": "c1"},
+        {"data": [{"id": "evt_2"}], "next_cursor": None},
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(
+            {
+                "from": request.url.params.get("from"),
+                "to": request.url.params.get("to"),
+                "cursor": request.url.params.get("cursor"),
+            }
+        )
+        return httpx.Response(200, json=pages[len(seen) - 1])
+
+    facade = WebhooksFacade(FakeRestClient(handler))
+    rows = list(facade.iter_events(from_ms=1, to_ms=2))
+
+    assert [r["id"] for r in rows] == ["evt_1", "evt_2"]
+    assert [p["from"] for p in seen] == ["1", "1"]
+    assert [p["to"] for p in seen] == ["2", "2"]
+    assert [p["cursor"] for p in seen] == [None, "c1"]
 
 
 def test_spend_events_page_sends_the_project_and_model_filters():

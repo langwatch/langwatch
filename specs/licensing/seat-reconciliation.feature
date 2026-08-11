@@ -85,6 +85,12 @@ Feature: Reconciling an organization down to its licensed seats
     Then the request is refused so the organization keeps an admin who can sign in
 
   @integration
+  Scenario: Demoting the last admin is refused
+    Given the organization has one admin
+    When their role is changed to member
+    Then the request is refused so the organization keeps an admin who can sign in
+
+  @integration
   Scenario: An organization within its seats is not told anything
     Given the organization has as many members as its license covers
     When an admin opens the license page

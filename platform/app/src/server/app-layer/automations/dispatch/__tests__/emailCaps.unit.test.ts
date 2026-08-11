@@ -46,7 +46,7 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
           set: vi.fn().mockResolvedValue("OK"),
           get: vi.fn(),
           incr: vi.fn().mockRejectedValue(new Error("READONLY blip")),
-          expire: vi.fn(),
+          eval: vi.fn(),
         };
 
         const now = new Date("2026-06-11T10:15:00Z");
@@ -74,7 +74,7 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
           set: vi.fn().mockRejectedValue(new Error("connection refused")),
           get: vi.fn().mockRejectedValue(new Error("connection refused")),
           incr: vi.fn().mockRejectedValue(new Error("connection refused")),
-          expire: vi.fn().mockRejectedValue(new Error("connection refused")),
+          eval: vi.fn().mockRejectedValue(new Error("connection refused")),
         };
 
         const now = new Date("2026-06-11T10:15:00Z");
@@ -108,15 +108,15 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
     });
 
     describe("when consecutive distinct dispatches hit the same hour key", () => {
-      it("re-applies the TTL with NX on every hit (no immortal-key leak)", async () => {
-        const expire = vi.fn().mockResolvedValue(1);
+      it("re-attempts the TTL on every hit, through one single-key script", async () => {
+        const evalFn = vi.fn().mockResolvedValue(null);
         let counter = 0;
         redisMock.connection = {
           // Distinct dedupKeys → both claims win → both reach INCR + expire.
           set: vi.fn().mockResolvedValue("OK"),
           get: vi.fn().mockResolvedValue(null),
           incr: vi.fn().mockImplementation(async () => ++counter),
-          expire,
+          eval: evalFn,
         };
 
         const now = new Date("2026-06-11T10:15:00Z");
@@ -135,13 +135,19 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
           dedupKey: "proj-1/trig-1:digest:d2",
         });
 
-        // expire is attempted on BOTH hits, with the NX flag, so a transient
-        // first-hit failure can't leave the key without a TTL.
-        expect(expire).toHaveBeenCalledTimes(2);
-        for (const call of expire.mock.calls) {
-          expect(call[0]).toMatch(/^trigger-email-cap:/);
-          expect(call[1]).toBe(7200);
-          expect(call[2]).toBe("NX");
+        // The expiry is attempted on BOTH hits, so a transient first-hit
+        // failure cannot leave the key immortal. Whether it actually applies
+        // is the script's business, pinned against real Redis in the
+        // integration suite; what belongs here is that it is one atomic call
+        // over exactly one key, since a second key would need a Cluster hash
+        // tag to share a slot.
+        expect(evalFn).toHaveBeenCalledTimes(2);
+        for (const call of evalFn.mock.calls) {
+          expect(call[0]).toContain("TTL");
+          expect(call[1]).toBe(1);
+          expect(call[2]).toMatch(/^trigger-email-cap:/);
+          expect(call[3]).toBe("7200");
+          expect(call.length).toBe(4);
         }
       });
     });
@@ -159,7 +165,7 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
           set,
           get: vi.fn().mockResolvedValue("1"),
           incr,
-          expire: vi.fn().mockResolvedValue(1),
+          eval: vi.fn().mockResolvedValue(null),
         };
 
         const now = new Date("2026-06-11T10:15:00Z");
@@ -448,7 +454,7 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
           get: vi.fn().mockResolvedValue(null),
           incr: vi.fn(),
           incrby,
-          expire: vi.fn().mockResolvedValue(1),
+          eval: vi.fn().mockResolvedValue(null),
         };
 
         const now = new Date("2026-06-11T10:15:00Z");
@@ -480,7 +486,7 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
           get: vi.fn().mockResolvedValue("4"),
           incr: vi.fn(),
           incrby,
-          expire: vi.fn().mockResolvedValue(1),
+          eval: vi.fn().mockResolvedValue(null),
         };
 
         const now = new Date("2026-06-11T10:15:00Z");
@@ -515,7 +521,7 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
           get: vi.fn().mockRejectedValue(new Error("connection refused")),
           incr: vi.fn(),
           incrby: vi.fn().mockRejectedValue(new Error("connection refused")),
-          expire: vi.fn().mockRejectedValue(new Error("connection refused")),
+          eval: vi.fn().mockRejectedValue(new Error("connection refused")),
         };
 
         const now = new Date("2026-06-11T10:15:00Z");

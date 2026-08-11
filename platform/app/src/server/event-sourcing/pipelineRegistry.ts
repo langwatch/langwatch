@@ -147,6 +147,7 @@ import {
   MetricSeriesCatalogAppendStore,
   MetricTimeRollupAppendStore,
 } from "./pipelines/metric-processing/projections/stores";
+import { createProcessManagerMaintenancePipeline } from "./pipelines/process-manager-maintenance/pipeline";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
@@ -454,6 +455,27 @@ export class PipelineRegistry {
           sweep: () => blobSweeper.sweep(),
           deleteDispatchedBefore: (params) =>
             this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
+    // Retention for the process-manager substrate's own tables. Registered
+    // unconditionally and independently of any domain: it reaps by predicate
+    // across every processName, so no process manager has to opt in and none
+    // added later can be forgotten.
+    this.deps.eventSourcing.register(
+      createProcessManagerMaintenancePipeline({
+        retentionSweep: {
+          deleteDispatchedOutboxBatch: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedOutboxBatch(
+              params,
+            ),
+          deleteDeadOutboxBatch: (params) =>
+            this.deps.repositories.processStore.deleteDeadOutboxBatch(params),
+          deleteConsumedInboxBatch: (params) =>
+            this.deps.repositories.processStore.deleteConsumedInboxBatch(
+              params,
+            ),
         },
       }),
     );
@@ -923,6 +945,20 @@ export class PipelineRegistry {
       evaluationExecution: this.deps.evaluations.execution,
       costRecorder: this.deps.costRecorder,
       azureSafetyEnvResolver: getAzureSafetyEnvFromProject,
+      // Emergency operator rollback for the langwatch#6397 settings recovery.
+      // Without this line the flag is inert: the command defaults an absent
+      // resolver to "not disabled", so /ops/feature-flags would report the
+      // switch as available while flipping it changed nothing. The command
+      // catches a rejection here and stays on the shipped default (recovery
+      // ACTIVE) — an unreadable kill switch must not fail evaluations.
+      isSettingsRecoveryDisabled: () =>
+        featureFlagService.isEnabled(
+          "ops_evaluator_settings_recovery_disabled",
+          {
+            distinctId: "evaluator-settings-recovery",
+            defaultValue: false,
+          },
+        ),
       // ADR-040: offload oversized evaluator inputs to durable object storage
       // before the event is built. ON by default (this bounds the fat-payload
       // class behind the 2026-07-10 outage); the SYSTEM flag

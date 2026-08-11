@@ -470,6 +470,9 @@ importers:
       '@hono/node-server':
         specifier: ^2.0.6
         version: 2.0.10(hono@4.12.27)
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../packages/api
       '@langwatch/automations':
         specifier: workspace:*
         version: link:../../packages/automations

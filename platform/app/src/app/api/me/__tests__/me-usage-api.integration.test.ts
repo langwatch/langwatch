@@ -15,6 +15,7 @@ import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { nanoUsdToDecimalString } from "~/server/gateway/wireMoney";
 import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
@@ -85,22 +86,29 @@ async function insertTrace({
  * insertDebit writes (budget.clickhouse.repository.ts). PRINCIPAL-scope
  * rows are how ingestion sources (Claude Code OTLP) land per-user spend,
  * written under the org's hidden Governance Project tenant.
+ *
+ * Money is seeded as the integer nano-USD the writer carries, and `AmountUSD`
+ * is derived from it exactly as the writer derives it: the decimal column is
+ * a six-place rendering of one debit, never the figure a read sums.
  */
 async function insertLedgerRow({
   ch,
   tenantId,
   scopeId,
-  amountUsd,
+  amountNanoUsd,
   model,
   occurredAt,
+  status = "success",
   gatewayRequestId = `req-${nanoid(8)}`,
 }: {
   ch: ClickHouseClient;
   tenantId: string;
   scopeId: string;
-  amountUsd: number;
+  amountNanoUsd: number;
   model: string;
   occurredAt: Date;
+  /** `provider_error` and `blocked_by_guardrail` are debits nobody spent. */
+  status?: "success" | "provider_error" | "blocked_by_guardrail";
   /**
    * Defaults to a fresh request. Pass the same id twice to seed the two
    * rows one request writes when two budgets apply to it.
@@ -119,7 +127,8 @@ async function insertLedgerRow({
         VirtualKeyId: "",
         ProviderCredentialId: "",
         GatewayRequestId: gatewayRequestId,
-        AmountUSD: amountUsd,
+        AmountNanoUSD: amountNanoUsd,
+        AmountUSD: nanoUsdToDecimalString(BigInt(amountNanoUsd)),
         TokensInput: 10,
         TokensOutput: 5,
         TokensCacheRead: 0,
@@ -127,7 +136,7 @@ async function insertLedgerRow({
         Model: model,
         ProviderSlot: "",
         DurationMS: 0,
-        Status: "success",
+        Status: status,
         OccurredAt: occurredAt.getTime(),
         EventTimestamp: occurredAt.getTime(),
       },
@@ -377,20 +386,28 @@ describe("Feature: Personal usage REST API", () => {
 
       // Ingestion ledger for ingestionUser: one request under THIS org's
       // governance tenant (must count), one under a FOREIGN tenant (must be
-      // excluded by the TenantId scope — the multi-org-leak guard), and one
-      // under the right tenant but OUT of window (must be excluded by time).
+      // excluded by the TenantId scope — the multi-org-leak guard), one under
+      // the right tenant but OUT of window (must be excluded by time), and one
+      // in scope that the provider failed (must be excluded by status, the way
+      // every other ledger read excludes it).
       //
       // The in-window request writes TWO rows, because this user carries a
       // hard cap and a soft cap and the ledger files one row per applicable
-      // budget. Both carry the request's full $0.30. Scope='principal'
+      // budget. Both carry the request's full amount. Scope='principal'
       // narrows to the user, not to one row per request, so a read that
-      // summed the rows as they sit would report $0.60.
+      // summed the rows as they sit would report double.
+      //
+      // The amount carries digits below a micro-USD on purpose: 300_000_123
+      // nano is $0.300000123, which the `AmountUSD` decimal cannot hold. A
+      // read that sums that column answers $0.300000, so the assertion below
+      // fails for any read that goes back to summing it.
+      const paidNanoUsd = 300_000_123;
       const pairedRequestId = `req-paired-${nanoid(8)}`;
       await insertLedgerRow({
         ch,
         tenantId: governanceProjectId,
         scopeId: ingestionUserId,
-        amountUsd: 0.3,
+        amountNanoUsd: paidNanoUsd,
         model: "claude-sonnet-4-6",
         occurredAt: inWindow,
         gatewayRequestId: pairedRequestId,
@@ -399,7 +416,7 @@ describe("Feature: Personal usage REST API", () => {
         ch,
         tenantId: governanceProjectId,
         scopeId: ingestionUserId,
-        amountUsd: 0.3,
+        amountNanoUsd: paidNanoUsd,
         model: "claude-sonnet-4-6",
         occurredAt: inWindow,
         gatewayRequestId: pairedRequestId,
@@ -408,7 +425,7 @@ describe("Feature: Personal usage REST API", () => {
         ch,
         tenantId: foreignGovTenantId,
         scopeId: ingestionUserId,
-        amountUsd: 99.0,
+        amountNanoUsd: 99_000_000_000,
         model: "gpt-4o",
         occurredAt: inWindow,
       });
@@ -416,9 +433,18 @@ describe("Feature: Personal usage REST API", () => {
         ch,
         tenantId: governanceProjectId,
         scopeId: ingestionUserId,
-        amountUsd: 7.0,
+        amountNanoUsd: 7_000_000_000,
         model: "claude-sonnet-4-6",
         occurredAt: outOfWindow,
+      });
+      await insertLedgerRow({
+        ch,
+        tenantId: governanceProjectId,
+        scopeId: ingestionUserId,
+        amountNanoUsd: 5_000_000_000,
+        model: "gemini-3-pro",
+        occurredAt: inWindow,
+        status: "provider_error",
       });
     }
   });
@@ -669,13 +695,18 @@ describe("Feature: Personal usage REST API", () => {
         expect(res.status).toBe(200);
         const body = await res.json();
 
-        // Only the in-org, in-window request ($0.30, 1 request) counts.
-        // The $99 foreign-tenant row is excluded by the TenantId scope (the
-        // multi-org leak guard) and the $7 out-of-window row by time. The
-        // two budget rows that one request wrote count once between them:
-        // $0.60 here would mean a user's own dashboard inflates their spend
-        // by however many budgets happen to watch them.
-        expect(body.summary.spentUsd).toBeCloseTo(0.3, 5);
+        // Only the in-org, in-window, successful request counts. The $99
+        // foreign-tenant row is excluded by the TenantId scope (the multi-org
+        // leak guard), the $7 out-of-window row by time, and the $5
+        // provider_error row by status. The two budget rows that one request
+        // wrote count once between them: double here would mean a user's own
+        // dashboard inflates their spend by however many budgets happen to
+        // watch them.
+        //
+        // Exact, not close: the amount has digits below a micro-USD, so a
+        // read that summed the `AmountUSD` decimal would answer 0.3 and this
+        // is the assertion that says so.
+        expect(body.summary.spentUsd).toBe(0.300000123);
         expect(body.summary.requests).toBe(1);
         const labels = body.breakdownByModel.map(
           (m: { label: string }) => m.label,
@@ -683,6 +714,9 @@ describe("Feature: Personal usage REST API", () => {
         expect(labels).toContain("claude-sonnet-4-6");
         // gpt-4o only appears on the foreign-tenant row — proves exclusion.
         expect(labels).not.toContain("gpt-4o");
+        // gemini-3-pro only appears on the failed row — proves the status
+        // filter, which every other ledger spend read applies.
+        expect(labels).not.toContain("gemini-3-pro");
       });
     });
   });

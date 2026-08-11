@@ -55,6 +55,7 @@ export type {
 export {
   isTransientClickHouseError,
   jitteredBackoffMs,
+  QUERY_CAUSE_FIELD,
   RETRY_CAUSE_FIELD,
   retryNoticeLevel,
   TRANSIENT_HTTP_STATUSES,
