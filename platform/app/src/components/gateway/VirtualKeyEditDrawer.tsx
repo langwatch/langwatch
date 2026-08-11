@@ -24,6 +24,7 @@ import {
   type VirtualKeyScopeEntry,
 } from "./eligibleModelProviders";
 import { humanizeGatewayError } from "./gatewayErrorCopy";
+import { resolveTracesHrefForKey } from "./tracesHrefForKey";
 import {
   budgetInvalidReason,
   EMPTY_BUDGET,
@@ -161,6 +162,18 @@ export function VirtualKeyEditDrawer({
         })),
       ) ?? [],
     [organization?.teams],
+  );
+  const viewTracesHref = useMemo(
+    () =>
+      vk
+        ? resolveTracesHrefForKey({
+            teams: organization?.teams ?? [],
+            virtualKeyId: vk.id,
+            traceProjectId: vk.traceProjectId,
+            traceProjectArchived: vk.traceProjectArchived,
+          })
+        : undefined,
+    [vk, organization?.teams],
   );
 
   const utils = api.useContext();
@@ -373,6 +386,7 @@ export function VirtualKeyEditDrawer({
                   }
                   traceProjectId={vk.traceProjectId ?? null}
                   traceProjectArchived={vk.traceProjectArchived ?? false}
+                  viewTracesHref={viewTracesHref}
                   ctx={{
                     organizationName: organization?.name,
                     availableTeams,

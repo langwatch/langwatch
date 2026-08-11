@@ -14,6 +14,7 @@ import {
 } from "@chakra-ui/react";
 import {
   Ban,
+  Bird,
   Eye,
   Gauge,
   KeyRound,
@@ -31,6 +32,7 @@ import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
+import { resolveTracesHrefForKey } from "~/components/gateway/tracesHrefForKey";
 import { VirtualKeyCreateDrawer } from "~/components/gateway/VirtualKeyCreateDrawer";
 import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
 import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretReveal";
@@ -165,6 +167,23 @@ function VirtualKeysPage() {
     [allRows],
   );
   const rows = statusTab === "active" ? activeRows : revokedRows;
+
+  // Keys whose traces can actually be opened. A key missing from this map
+  // gets no "View traces" action, because the link would only lead to a
+  // bounce or to a project that no longer serves anything.
+  const traceHrefByKeyId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const vk of allRows) {
+      const href = resolveTracesHrefForKey({
+        teams: organization?.teams ?? [],
+        virtualKeyId: vk.id,
+        traceProjectId: vk.traceProjectId,
+        traceProjectArchived: vk.traceProjectArchived,
+      });
+      if (href) map.set(vk.id, href);
+    }
+    return map;
+  }, [allRows, organization?.teams]);
 
   const confirmRotate = async () => {
     if (!rotating || !orgId) return;
@@ -509,6 +528,19 @@ function VirtualKeysPage() {
                                     >
                                       <Eye size={14} /> Details
                                     </Menu.Item>
+                                    {traceHrefByKeyId.has(vk.id) && (
+                                      <Menu.Item
+                                        value="view-traces"
+                                        data-testid={`vk-view-traces-${vk.id}`}
+                                        onClick={() =>
+                                          void router.push(
+                                            traceHrefByKeyId.get(vk.id)!,
+                                          )
+                                        }
+                                      >
+                                        <Bird size={14} /> View traces
+                                      </Menu.Item>
+                                    )}
                                     {canUpdate && (
                                       <Menu.Item
                                         value="edit"
