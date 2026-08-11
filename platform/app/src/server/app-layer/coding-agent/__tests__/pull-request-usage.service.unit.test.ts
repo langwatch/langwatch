@@ -1085,10 +1085,15 @@ describe("PullRequestUsageService", () => {
 
       const detail = await service.getPullRequestDetail(QUERY);
 
-      expect(detail.sessions[0]?.title).toBe("Fix the flaky fold test");
+      // Both fixtures started at the same moment, so the order the sort leaves
+      // them in says nothing; each is found by the session it is.
+      const titled = detail.sessions.find((s) => s.sessionId === "session-a");
+      const untitled = detail.sessions.find((s) => s.sessionId === "session-b");
+
+      expect(titled?.title).toBe("Fix the flaky fold test");
       // A session that never generated one says so with null rather than an
       // empty string, so a reader renders absence instead of a blank cell.
-      expect(detail.sessions[1]?.title).toBeNull();
+      expect(untitled?.title).toBeNull();
 
       // The session row's own key set, pinned. Anything else added here would
       // be a disclosure nobody decided on; the title is the one piece of

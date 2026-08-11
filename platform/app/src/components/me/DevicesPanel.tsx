@@ -7,6 +7,7 @@ import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 
 import { InstallCliCard } from "./InstallCliCard";
+import { formatRelativeTime } from "./relativeTime";
 import { usePersonalContext } from "./usePersonalContext";
 
 /**
@@ -294,7 +295,7 @@ function DeviceRow({
             </Text>
           )}
           <Text fontSize="xs" color="fg.muted">
-            Last used {fmtRelative(session.lastSeenMs)} · Expires{" "}
+            Last used {formatRelativeTime(session.lastSeenMs)} · Expires{" "}
             {fmtAbsolute(session.expiresAtMs)}
           </Text>
         </VStack>
@@ -342,20 +343,6 @@ function DeviceRow({
     </VStack>
   );
 }
-
-const fmtRelative = (ms: number | null | undefined): string => {
-  if (!ms) return "Never";
-  const diffMs = Date.now() - ms;
-  const sec = Math.floor(diffMs / 1000);
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min} min ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const day = Math.floor(hr / 24);
-  if (day < 30) return `${day}d ago`;
-  return new Date(ms).toLocaleDateString();
-};
 
 const fmtAbsolute = (ms: number | null | undefined): string =>
   !ms ? "—" : new Date(ms).toLocaleString();

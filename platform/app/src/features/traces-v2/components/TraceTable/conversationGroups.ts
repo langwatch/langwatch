@@ -22,9 +22,9 @@ export interface ConversationGroup {
   worstStatus: TraceStatus;
   /**
    * The conversation's most recent trace, the one a click on the row opens.
-   * Server rows always name it; page-local groups built client-side (sample
-   * preview) and skeleton rows leave it out, and their rows expand on click
-   * instead.
+   * Server rows carry the field but its value is null when the rollup named no
+   * trace; page-local groups built client-side (sample preview) and skeleton
+   * rows leave it out entirely. A row without one expands on click instead.
    */
   lastTraceId?: string | null;
   latestTimestamp: number;

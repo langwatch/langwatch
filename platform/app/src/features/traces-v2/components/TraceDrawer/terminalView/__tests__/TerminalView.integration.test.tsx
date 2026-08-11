@@ -469,6 +469,21 @@ describe("TerminalView", () => {
       });
     });
 
+    describe("when the reader scrolls upward but stays far from the top", () => {
+      it("asks for nothing, because they are still reading this turn", () => {
+        const onLoadEarlier = vi.fn();
+        const view = renderScrollback({
+          scrollback: { status: "available", earlierCount: 3, onLoadEarlier },
+        });
+        fakeBox(view.screenEl, { scrollHeight: 1000 });
+
+        scrollTo(view.screenEl, 800);
+        scrollTo(view.screenEl, 600);
+
+        expect(onLoadEarlier).not.toHaveBeenCalled();
+      });
+    });
+
     describe("when the reader moves downward at the same position", () => {
       it("asks for nothing, because reading on is not reading back", () => {
         const onLoadEarlier = vi.fn();

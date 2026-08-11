@@ -6,5 +6,5 @@ import { Navigate } from "react-router";
  * it forwards instead of dead-ending on the 404 page.
  */
 export default function MeDevicesRedirect() {
-  return <Navigate to="/me/configure" replace />;
+  return <Navigate to="/me/configure?tab=devices" replace />;
 }

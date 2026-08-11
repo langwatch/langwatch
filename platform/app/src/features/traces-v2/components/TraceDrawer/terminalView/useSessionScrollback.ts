@@ -14,7 +14,7 @@ import { indexToolSpansBySpanId, type TerminalToolSpan } from "./toolSpans";
  * this cannot be walked to its start, and the view says so rather than
  * pretending the oldest turn it can see is the beginning.
  */
-const CONVERSATION_TURN_CAP = 200;
+export const CONVERSATION_TURN_CAP = 200;
 
 /** Shared by every read of an earlier turn, matching the opened turn's own. */
 const EARLIER_TURN_FETCH = { staleTime: 60_000 } as const;
@@ -110,6 +110,13 @@ function ledgerFor(prev: Ledger, key: string): Ledger {
  * An opened turn the list does not carry has no history to walk: on a full
  * page that means the session runs past what the list reaches, otherwise the
  * trace simply has no siblings.
+ *
+ * The cap is only ever a question for that case. `conversationContext` reads
+ * the session oldest-first from its first turn, so a listed turn always has
+ * the session's real beginning at `turns[0]`, and walking back to it is the
+ * start however long the session ran. What a full list can hide is the other
+ * end: a turn past the cap is absent from the list entirely, which is why the
+ * absent case, and only it, distinguishes "unavailable" from "hidden".
  */
 function deriveStatus({
   hasSession,
@@ -262,6 +269,17 @@ function useMergedTurns({
   );
 }
 
+/** What the tab knows about the turn it opened on. */
+interface SessionScrollbackInput {
+  projectId: string;
+  traceId: string;
+  occurredAtMs?: number;
+  /** The agent's session id, which is the conversation these turns share. */
+  conversationId: string | null;
+  openedTranscript: TranscriptEntry[];
+  openedToolSpans: ReadonlyMap<string, TerminalToolSpan>;
+}
+
 /**
  * The session behind the opened turn, read backwards on demand.
  *
@@ -276,15 +294,7 @@ export function useSessionScrollback({
   conversationId,
   openedTranscript,
   openedToolSpans,
-}: {
-  projectId: string;
-  traceId: string;
-  occurredAtMs?: number;
-  /** The agent's session id, which is the conversation these turns share. */
-  conversationId: string | null;
-  openedTranscript: TranscriptEntry[];
-  openedToolSpans: ReadonlyMap<string, TerminalToolSpan>;
-}): SessionScrollback {
+}: SessionScrollbackInput): SessionScrollback {
   const { turns } = useConversationContext(conversationId, traceId);
   const key = `${projectId}|${traceId}|${conversationId ?? ""}`;
   const { current, loadTurn } = useTurnLedger({ key, projectId });

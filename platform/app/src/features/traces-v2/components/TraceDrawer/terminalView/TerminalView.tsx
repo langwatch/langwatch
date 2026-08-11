@@ -36,7 +36,10 @@ import {
   toolPrimaryArg,
 } from "./terminalSession";
 import { parsePatchHunks, type TerminalToolSpan } from "./toolSpans";
-import type { ScrollbackStatus } from "./useSessionScrollback";
+import {
+  CONVERSATION_TURN_CAP,
+  type ScrollbackStatus,
+} from "./useSessionScrollback";
 
 /** What actually ran, keyed by the tool span's OWN id (matches `entry.spanId`). */
 export type ToolSpanIndex = ReadonlyMap<string, TerminalToolSpan>;
@@ -824,7 +827,7 @@ function ScrollbackTop({
       <ScrollbackLine
         glyph={GLYPH.note}
         color={TERMINAL_TOKENS.faint}
-        text="earlier turns unavailable, this session is longer than the 200 turns the view can walk"
+        text={`earlier turns unavailable, this session is longer than the ${CONVERSATION_TURN_CAP} turns the view can walk`}
       />
     );
   }

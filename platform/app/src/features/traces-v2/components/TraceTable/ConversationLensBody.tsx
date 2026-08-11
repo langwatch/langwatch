@@ -147,9 +147,8 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
             // A click on the row opens the conversation's latest trace; the
             // chevron is what expands its turns inline (RegistryRow prefers
             // `onSelect` for the row click, and the chevron stops
-            // propagation). A conversation the read named no trace for keeps
-            // expanding on click rather than becoming dead surface: only
-            // sample-preview rows and skeletons lack one.
+            // propagation). A row with no `lastTraceId` on it expands on click
+            // instead, so it stays usable rather than becoming dead surface.
             onSelect={
               isLoading || !row.original.lastTraceId
                 ? undefined
@@ -205,7 +204,7 @@ const NoConversationsMessage: React.FC = () => (
       No conversations found.
     </Text>
     <Text textStyle="xs" color="fg.subtle">
-      Conversations appear once your traces carry a conversation id.
+      Conversations appear once your traces carry a conversation identifier.
     </Text>
   </Flex>
 );

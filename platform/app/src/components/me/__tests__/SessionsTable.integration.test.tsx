@@ -774,11 +774,11 @@ describe("the personal Sessions table", () => {
       await user.click(screen.getByText("Queue heavy session"));
       await waitFor(() => expect(mockOpenTrace).toHaveBeenCalled());
 
-      // Closing is the drawer's own doing; the table is a sibling of it and
-      // must not have been navigated away from or reset underneath it.
-      mockCloseDrawer();
-      mockStoreCloseDrawer();
-
+      // Closing is the drawer's own doing, and it is what makes the table
+      // visible again rather than what rebuilds it. What has to hold is that
+      // opening the replay left this table standing: still narrowed, still
+      // sorted, still on its page, and never navigated away from. A table the
+      // reader was sent away from would have nothing to come back to.
       expect(listedTitles()).toEqual(narrowed);
       expect(screen.getByRole("searchbox")).toHaveValue("Queue");
       expect(headingFor("Context")).toHaveAttribute("aria-sort", "descending");

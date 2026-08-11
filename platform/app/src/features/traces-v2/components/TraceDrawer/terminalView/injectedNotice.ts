@@ -57,39 +57,20 @@ export function classifyPromptText(text: string): ClassifiedPrompt {
     };
   }
 
-  const { context, body } = splitLeadingContextBlocks(text);
-  if (context === "") return { notices: [], remainder: text };
-
-  const blocks = splitTopLevelBlocks(context);
+  // The peeled blocks are taken one at a time rather than as the joined
+  // string: the terminal draws one collapsed line per block, because a monitor
+  // event and a system reminder arriving together are two things that happened
+  // to the session rather than one.
+  const { blocks, body } = splitLeadingContextBlocks(text);
   if (blocks.length === 0) return { notices: [], remainder: text };
 
   return {
-    notices: blocks.map((block) => ({ label: labelOf(block), body: block })),
+    notices: blocks.map((block) => {
+      const trimmed = block.trim();
+      return { label: labelOf(trimmed), body: trimmed };
+    }),
     remainder: body.trim() === "" ? null : body,
   };
-}
-
-/**
- * The peeled context comes back as one joined string, and the terminal draws
- * one collapsed line per injected block: a monitor event and a system reminder
- * arriving together are two different things happening to the session, not one.
- */
-function splitTopLevelBlocks(context: string): string[] {
-  const blocks: string[] = [];
-  let rest = context;
-
-  while (rest.trim() !== "") {
-    const open = BLOCK_OPEN_TAG.exec(rest);
-    if (!open) break;
-    const closeTag = `</${open[1]!}>`;
-    const closeIndex = rest.indexOf(closeTag, open[0].length);
-    if (closeIndex === -1) break;
-    const end = closeIndex + closeTag.length;
-    blocks.push(rest.slice(0, end).trim());
-    rest = rest.slice(end);
-  }
-
-  return blocks;
 }
 
 /** `task notification: Monitor event "PR watch"`: the tag, then what it was about. */

@@ -179,3 +179,31 @@ Rule: Clicking a session replays it in the terminal
     Given a terminal replay that was opened and then closed
     When a trace is opened from a project's own pages
     Then it reads the project the reader is in
+
+Rule: A session can be replayed from wherever it is listed
+
+  The Sessions table is not the only place a reader meets a session. The pull
+  request detail lists the sessions that drove it, and a reader who has just
+  seen which ones they were is the reader most likely to want to read one, so
+  those rows open the same replay through the same path rather than being a
+  table of facts with no way out of it.
+
+  @integration
+  Scenario: Choosing a session from the pull request drawer opens its replay
+    Given an open pull request detail listing the sessions that ran on it
+    When the user chooses one of those session rows
+    Then that session's terminal replay opens
+    And it reads the workspace the pull request was read in
+
+  @integration
+  Scenario: Leaving the replay returns to the pull request it was opened from
+    Given a terminal replay opened from the pull request detail
+    When the user closes the replay
+    Then the pull request detail is on screen again
+
+  @integration
+  Scenario: A session with nothing stored says so instead of opening an empty replay
+    Given a session row on the pull request detail whose turns were never stored
+    When the user chooses it
+    Then they are told the session stored none of its turns
+    And no replay opens

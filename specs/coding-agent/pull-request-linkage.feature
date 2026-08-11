@@ -28,9 +28,10 @@
 # survives branch recycling and sessions that ran before the PR was opened.
 # PR STATUS is always fetched live by the reader, never maintained by the queue;
 # the stored state is only a fallback label. The usage rollup is organization
-# first and RBAC-scoped: numbers, plus the one-line title a session generated
-# for itself, which travels under the content visibility of the project that
-# session ran in and is the only content on the surface. Work is attributed to a
+# first and RBAC-scoped, and carries numbers only. The DETAIL read adds the
+# one-line title a session generated for itself, which travels under the content
+# visibility of the project that session ran in and is the only content on that
+# surface. Work is attributed to a
 # PROJECT, named by the person who owns it when the project is one person's
 # workspace; the id an agent reports about its own user names nobody and is
 # never shown.

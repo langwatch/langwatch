@@ -43,8 +43,8 @@ export function useConversationTurns(conversationId: string | null) {
 
   const timeRange = useMemo(
     () => conversationTurnsWindow(Date.now()),
-    // Recompute only when the target conversation changes; the hour-rounded
-    // window keeps the key stable across renders within the same hour.
+    // Recompute only when the target conversation or its project changes; the
+    // hour-rounded window keeps the key stable across renders within the hour.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [projectId, conversationId],
   );

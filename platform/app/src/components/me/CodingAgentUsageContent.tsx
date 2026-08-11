@@ -67,7 +67,7 @@ export function CodingAgentUsageContent({ projectId }: { projectId: string }) {
       ? `${numeral(totals.commits).format("0,0")} commit${totals.commits === 1 ? "" : "s"}`
       : null,
     totals.pullRequests > 0
-      ? `${numeral(totals.pullRequests).format("0,0")} PR${totals.pullRequests === 1 ? "" : "s"}`
+      ? `${numeral(totals.pullRequests).format("0,0")} pull request${totals.pullRequests === 1 ? "" : "s"}`
       : null,
   ].filter((part): part is string => part !== null);
 

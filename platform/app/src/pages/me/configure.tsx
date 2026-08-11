@@ -12,11 +12,13 @@ import {
 } from "@chakra-ui/react";
 import { Copy, Laptop, Monitor, Server } from "lucide-react";
 import { useState } from "react";
+import { useSearchParams } from "react-router";
 import { AvatarUploadControl } from "~/components/me/avatar/AvatarUploadControl";
 import { DevicesPanel } from "~/components/me/DevicesPanel";
 import { HomePagePicker } from "~/components/me/HomePagePicker";
 import MyLayout from "~/components/me/MyLayout";
 import { PersonalOtlpEndpointPanel } from "~/components/me/PersonalOtlpEndpointPanel";
+import { formatRelativeTime } from "~/components/me/relativeTime";
 import {
   type PersonalApiKeyRow,
   usePersonalContext,
@@ -28,19 +30,9 @@ import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import Head from "~/utils/compat/next-head";
 
-const fmtRelative = (iso: string | null): string => {
-  if (!iso) return "Never";
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const sec = Math.floor(diffMs / 1000);
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min} min ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const day = Math.floor(hr / 24);
-  if (day < 30) return `${day}d ago`;
-  return new Date(iso).toLocaleDateString();
-};
+/** The personal keys carry ISO timestamps; the ladder counts milliseconds. */
+const fmtRelative = (iso: string | null): string =>
+  formatRelativeTime(iso ? new Date(iso).getTime() : null);
 
 const fmtUsd = (amount: number): string =>
   amount === 0
@@ -57,7 +49,24 @@ function MySettingsPage() {
     baseUrl: string;
   } | null>(null);
   const [pendingRevokeId, setPendingRevokeId] = useState<string | null>(null);
-  const [credentialsTab, setCredentialsTab] = useState("keys");
+  // Which tab is open is part of the address rather than a choice the page
+  // forgets on reload: the devices inventory is linked to directly, from the
+  // docs and from the old /me/devices path, and a link that lands on the keys
+  // tab does not take the reader where it said it would.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const credentialsTab =
+    searchParams.get("tab") === "devices" ? "devices" : "keys";
+  const selectCredentialsTab = (tab: string) =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        // Keys is the default, so it stays out of the address entirely.
+        if (tab === "devices") next.set("tab", tab);
+        else next.delete("tab");
+        return next;
+      },
+      { replace: true },
+    );
 
   const utils = api.useUtils();
   const issueMutation = api.personalVirtualKeys.issuePersonal.useMutation({
@@ -239,8 +248,11 @@ function MySettingsPage() {
         >
           <Tabs.Root
             value={credentialsTab}
-            onValueChange={(event) => setCredentialsTab(event.value)}
+            onValueChange={(event) => selectCredentialsTab(event.value)}
             colorPalette="blue"
+            // The devices panel reads its inventory on mount, so it is not
+            // mounted until the reader is actually on that tab.
+            lazyMount
           >
             <Tabs.List marginBottom={3}>
               <Tabs.Trigger value="keys">Virtual keys</Tabs.Trigger>

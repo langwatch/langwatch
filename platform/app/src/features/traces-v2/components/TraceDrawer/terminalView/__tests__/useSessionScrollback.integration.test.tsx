@@ -4,7 +4,10 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
-import { useSessionScrollback } from "../useSessionScrollback";
+import {
+  CONVERSATION_TURN_CAP,
+  useSessionScrollback,
+} from "../useSessionScrollback";
 
 const { fetchTranscript, fetchSpans, fetchEvents, utils, conversation } =
   vi.hoisted(() => {
@@ -269,26 +272,29 @@ describe("useSessionScrollback", () => {
       });
     });
 
-    describe("when the drawer closes mid-read", () => {
-      it("lets the read settle without touching a ledger that is gone", async () => {
+    describe("when the reader steps away mid-read", () => {
+      it("drops the turn instead of committing it onto a ledger they left", async () => {
         let releaseTranscript: (value: unknown) => void = () => undefined;
         fetchTranscript.mockReturnValue(
           new Promise((resolve) => {
             releaseTranscript = resolve;
           }),
         );
-        const { result, unmount } = setup();
+        const { result, rerender } = setup();
         act(() => {
           result.current.loadEarlier();
         });
 
-        unmount();
+        rerender({ traceId: "turn-2", conversationId: "session-a" });
+        await act(async () => {
+          releaseTranscript({ entries: EARLIER_ENTRIES });
+        });
 
-        await expect(
-          act(async () => {
-            releaseTranscript({ entries: EARLIER_ENTRIES });
-          }),
-        ).resolves.not.toThrow();
+        // Stepping back finds the turn was never prepended. A read that lands
+        // after the reader moved belongs to the ledger they were on, and
+        // committing it would grow that history behind their back.
+        rerender({ traceId: "turn-3", conversationId: "session-a" });
+        expect(result.current.entries).toEqual(OPENED_ENTRIES);
       });
     });
   });
@@ -323,15 +329,40 @@ describe("useSessionScrollback", () => {
   });
 
   describe("given a session longer than the turn list reaches", () => {
-    it("says the earlier turns are out of reach rather than pretending to be at the start", () => {
-      conversation.turns = Array.from({ length: 200 }, (_, index) => ({
-        traceId: `turn-${index}`,
-        timestamp: index * 1_000,
-      }));
+    beforeEach(() => {
+      conversation.turns = Array.from(
+        { length: CONVERSATION_TURN_CAP },
+        (_, index) => ({
+          traceId: `turn-${index}`,
+          timestamp: index * 1_000,
+        }),
+      );
+    });
 
-      const { result } = setup({ traceId: "turn-way-back" });
+    describe("when the opened turn is past the end of the list", () => {
+      it("says the earlier turns are out of reach rather than pretending to be at the start", () => {
+        const { result } = setup({ traceId: "turn-way-back" });
 
-      expect(result.current.status).toBe("unavailable");
+        expect(result.current.status).toBe("unavailable");
+      });
+    });
+
+    describe("when the opened turn is inside the list", () => {
+      it("walks back to the list's first turn and calls that the session start", async () => {
+        const { result } = setup({ traceId: "turn-1" });
+        expect(result.current.status).toBe("available");
+        expect(result.current.earlierCount).toBe(1);
+
+        await act(async () => {
+          result.current.loadEarlier();
+        });
+
+        // A full list truncates the RECENT end, never the old one: the read
+        // walks the session forward from its first turn, so reaching turns[0]
+        // is the beginning however long the session went on to run.
+        expect(result.current.earlierCount).toBe(0);
+        expect(result.current.status).toBe("start");
+      });
     });
   });
 });

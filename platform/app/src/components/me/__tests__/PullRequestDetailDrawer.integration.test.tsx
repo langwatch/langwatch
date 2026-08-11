@@ -10,14 +10,35 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-const { queryImpls, mockCloseDrawer } = vi.hoisted(() => ({
+const {
+  queryImpls,
+  utils,
+  mockCloseDrawer,
+  mockOpenDrawer,
+  mockOpenTrace,
+  mockSetViewModeTransient,
+  mockRouterPush,
+  mockToasterCreate,
+  mockShowErrorToast,
+} = vi.hoisted(() => ({
   queryImpls: {} as Record<string, (input: unknown) => unknown>,
+  utils: {
+    tracesV2: {
+      conversationContext: { fetch: vi.fn(), prefetch: vi.fn() },
+    },
+  },
   mockCloseDrawer: vi.fn(),
+  mockOpenDrawer: vi.fn(),
+  mockOpenTrace: vi.fn(),
+  mockSetViewModeTransient: vi.fn(),
+  mockRouterPush: vi.fn(),
+  mockToasterCreate: vi.fn(),
+  mockShowErrorToast: vi.fn(),
 }));
 
 vi.mock("~/utils/api", () => {
@@ -30,10 +51,14 @@ vi.mock("~/utils/api", () => {
   const hooksFor = (path: string): Map<string, unknown> => {
     const useQuery = (input: unknown) =>
       (queryImpls[path] ?? defaultQuery)(input);
-    return new Map<string, unknown>([
+    const hooks = new Map<string, unknown>([
       ["useQuery", useQuery],
       ["useInfiniteQuery", useQuery],
     ]);
+    // The imperative side of the same client, which the replay uses to look a
+    // session's turns up on demand rather than on render.
+    if (path === "") hooks.set("useUtils", () => utils);
+    return hooks;
   };
   const makeNode = (path: string): unknown => {
     const hooks = hooksFor(path);
@@ -51,7 +76,31 @@ vi.mock("~/utils/api", () => {
 });
 
 vi.mock("~/hooks/useDrawer", () => ({
-  useDrawer: () => ({ openDrawer: vi.fn(), closeDrawer: mockCloseDrawer }),
+  useDrawer: () => ({
+    openDrawer: mockOpenDrawer,
+    closeDrawer: mockCloseDrawer,
+  }),
+}));
+
+vi.mock("~/features/traces-v2/stores/drawerStore", () => ({
+  useDrawerStore: {
+    getState: () => ({
+      openTrace: mockOpenTrace,
+      setViewModeTransient: mockSetViewModeTransient,
+    }),
+  },
+}));
+
+vi.mock("~/utils/compat/next-router", () => ({
+  useRouter: () => ({ push: mockRouterPush }),
+}));
+
+vi.mock("~/components/ui/toaster", () => ({
+  toaster: { create: mockToasterCreate },
+}));
+
+vi.mock("~/features/errors", () => ({
+  showErrorToast: mockShowErrorToast,
 }));
 
 import { PullRequestDetailDrawer } from "../PullRequestDetailDrawer";
@@ -199,6 +248,14 @@ function renderDrawer() {
 
 beforeEach(() => {
   for (const key of Object.keys(queryImpls)) delete queryImpls[key];
+  utils.tracesV2.conversationContext.fetch.mockReset();
+  utils.tracesV2.conversationContext.prefetch.mockReset();
+  mockOpenDrawer.mockClear();
+  mockOpenTrace.mockClear();
+  mockSetViewModeTransient.mockClear();
+  mockRouterPush.mockClear();
+  mockToasterCreate.mockClear();
+  mockShowErrorToast.mockClear();
 });
 
 afterEach(() => {
@@ -586,6 +643,171 @@ describe("the pull request detail drawer", () => {
       expect(
         screen.getByText("Couldn't load this pull request"),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("given a pull request detail listing the sessions that ran on it", () => {
+    beforeEach(() => {
+      pinDetail(
+        detailPayload({
+          sessions: [
+            sessionFact({
+              sessionId: "session-a",
+              title: "Teach the fold about branches",
+            }),
+          ],
+        }),
+      );
+    });
+
+    describe("when the reader chooses one of those session rows", () => {
+      /** @scenario "Choosing a session from the pull request drawer opens its replay" */
+      it("opens that session's terminal replay in the workspace it was read in", async () => {
+        utils.tracesV2.conversationContext.fetch.mockResolvedValue({
+          turns: [
+            { traceId: "trace-early", timestamp: 1_000 },
+            { traceId: "trace-last", timestamp: 2_000 },
+          ],
+        });
+        const user = userEvent.setup();
+        renderDrawer();
+
+        await user.click(screen.getByText("Teach the fold about branches"));
+
+        // The turns of that session, and the last of them is what a replay
+        // opens on.
+        await waitFor(() =>
+          expect(utils.tracesV2.conversationContext.fetch).toHaveBeenCalledWith(
+            { projectId: "proj-personal", conversationId: "session-a" },
+          ),
+        );
+        // The project travels with the trace. These rows are read from the
+        // caller's own workspace, so a drawer left to resolve the project
+        // itself would query whichever one the chrome was sitting in and
+        // report the trace missing.
+        expect(mockOpenTrace).toHaveBeenCalledWith("trace-last", 2_000, {
+          projectId: "proj-personal",
+        });
+        expect(mockSetViewModeTransient).toHaveBeenCalledWith("terminal");
+        expect(mockOpenDrawer).toHaveBeenCalledWith("traceV2Details", {
+          traceId: "trace-last",
+          t: "2000",
+          mode: "terminal",
+          projectId: "proj-personal",
+        });
+      });
+
+      /** @scenario "Leaving the replay returns to the pull request it was opened from" */
+      it("leaves the pull request drawer standing underneath rather than closing it", async () => {
+        utils.tracesV2.conversationContext.fetch.mockResolvedValue({
+          turns: [{ traceId: "trace-last", timestamp: 2_000 }],
+        });
+        const user = userEvent.setup();
+        renderDrawer();
+
+        await user.click(screen.getByText("Teach the fold about branches"));
+        await waitFor(() => expect(mockOpenDrawer).toHaveBeenCalled());
+
+        // The replay is pushed onto the drawer stack rather than replacing
+        // this drawer, which is what lets closing it come back here: the
+        // detail is never closed, and the reader is never sent to a page.
+        expect(mockCloseDrawer).not.toHaveBeenCalled();
+        expect(mockRouterPush).not.toHaveBeenCalled();
+        expect(
+          screen.getByText("Link sessions to pull requests"),
+        ).toBeInTheDocument();
+      });
+
+      it("marks the row busy and shows nothing else opening while the turn resolves", async () => {
+        let releaseTurns: (value: unknown) => void = () => undefined;
+        utils.tracesV2.conversationContext.fetch.mockReturnValue(
+          new Promise((resolve) => {
+            releaseTurns = resolve;
+          }),
+        );
+        const user = userEvent.setup();
+        renderDrawer();
+
+        await user.click(screen.getByText("Teach the fold about branches"));
+
+        const row = screen
+          .getByText("Teach the fold about branches")
+          .closest("tr");
+        expect(row).toHaveAttribute("aria-busy", "true");
+
+        releaseTurns({ turns: [{ traceId: "trace-last", timestamp: 2_000 }] });
+        await waitFor(() => expect(mockOpenDrawer).toHaveBeenCalled());
+        expect(row).toHaveAttribute("aria-busy", "false");
+      });
+    });
+
+    describe("when the reader hovers a session row", () => {
+      it("pays for the lookup the click needs ahead of the click", async () => {
+        const user = userEvent.setup();
+        renderDrawer();
+
+        await user.hover(screen.getByText("Teach the fold about branches"));
+
+        expect(
+          utils.tracesV2.conversationContext.prefetch,
+        ).toHaveBeenCalledWith({
+          projectId: "proj-personal",
+          conversationId: "session-a",
+        });
+      });
+    });
+  });
+
+  describe("given a session on the pull request detail whose turns were never stored", () => {
+    beforeEach(() => {
+      pinDetail(
+        detailPayload({
+          sessions: [sessionFact({ title: "Ran but stored nothing" })],
+        }),
+      );
+    });
+
+    describe("when the reader chooses it", () => {
+      /** @scenario "A session with nothing stored says so instead of opening an empty replay" */
+      it("says the session stored none of its turns and opens no replay", async () => {
+        utils.tracesV2.conversationContext.fetch.mockResolvedValue({
+          turns: [],
+        });
+        const user = userEvent.setup();
+        renderDrawer();
+
+        await user.click(screen.getByText("Ran but stored nothing"));
+
+        await waitFor(() =>
+          expect(mockToasterCreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+              title: "No stored traces for this session yet",
+              type: "info",
+            }),
+          ),
+        );
+        expect(mockOpenDrawer).not.toHaveBeenCalled();
+        expect(mockOpenTrace).not.toHaveBeenCalled();
+      });
+
+      it("reports a failed lookup through the shared error toast", async () => {
+        utils.tracesV2.conversationContext.fetch.mockRejectedValue(
+          new Error("clickhouse said no"),
+        );
+        const user = userEvent.setup();
+        renderDrawer();
+
+        await user.click(screen.getByText("Ran but stored nothing"));
+
+        await waitFor(() =>
+          expect(mockShowErrorToast).toHaveBeenCalledWith(
+            expect.objectContaining({
+              fallbackTitle: "Couldn't open the terminal replay",
+            }),
+          ),
+        );
+        expect(mockOpenDrawer).not.toHaveBeenCalled();
+      });
     });
   });
 });

@@ -1,3 +1,5 @@
+import { createLogger } from "@langwatch/observability";
+
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import type {
   GithubPullRequestLookup,
@@ -21,6 +23,10 @@ import { assignSessionsToPullRequests } from "./pull-request-assignment";
  *
  * Spec: specs/coding-agent/sessions-screen.feature.
  */
+
+const logger = createLogger(
+  "langwatch:app-layer:coding-agent:sessions-list-service",
+);
 
 /** How far back the screen looks. */
 export const SESSIONS_LIST_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
@@ -160,7 +166,14 @@ export class CodingAgentSessionsListService {
       if (candidates.length === 0) return new Map();
 
       return linkDrives({ drives, candidates });
-    } catch {
+    } catch (error) {
+      // Best-effort is not the same as silent: a lookup that keeps failing
+      // renders every row unlinked, which looks exactly like an organization
+      // that never opened a pull request unless the failure is said somewhere.
+      logger.warn(
+        { error, projectId },
+        "pull request lookup failed, listing sessions unlinked",
+      );
       return new Map();
     }
   }

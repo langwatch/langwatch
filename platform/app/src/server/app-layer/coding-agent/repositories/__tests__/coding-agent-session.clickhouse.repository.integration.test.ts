@@ -531,19 +531,24 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
 });
 
 describe("coding_agent_sessions by repository branch", () => {
+  // The session both reads look for, written once so either can run alone.
+  beforeAll(async () => {
+    await sessions.upsert(
+      sessionRow({
+        sessionId: `${tag}-moved`,
+        repositoryHost: "github.com",
+        repositoryOwner: "acme",
+        repositoryName: "widgets",
+        gitBranch: "feat/second",
+        gitBranches: ["feat/first", "feat/second"],
+        title: "Ship both branches",
+      }),
+      30,
+    );
+  });
+
   /** @scenario A session that moved to another branch still counts toward the pull requests it drove */
   it("lists a session under every branch it drove, not only its last", async () => {
-    const moved = sessionRow({
-      sessionId: `${tag}-moved`,
-      repositoryHost: "github.com",
-      repositoryOwner: "acme",
-      repositoryName: "widgets",
-      gitBranch: "feat/second",
-      gitBranches: ["feat/first", "feat/second"],
-      title: "Ship both branches",
-    });
-    await sessions.upsert(moved, 30);
-
     const listed = await sessions.listByRepositoryBranch({
       tenantIds: [tenantId],
       repositoryHost: "github.com",

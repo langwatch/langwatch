@@ -1,4 +1,4 @@
-import { Text, VStack } from "@chakra-ui/react";
+import { Skeleton, Text, VStack } from "@chakra-ui/react";
 
 import MyLayout from "~/components/me/MyLayout";
 import { SessionsTable } from "~/components/me/SessionsTable";
@@ -15,7 +15,8 @@ import Head from "~/utils/compat/next-head";
  * Spec: specs/coding-agent/sessions-screen.feature.
  */
 function MySessionsPage() {
-  const { personalProjectId, personalProjectSlug } = usePersonalContext();
+  const { ready, personalProjectId, personalProjectSlug } =
+    usePersonalContext();
 
   return (
     <MyLayout>
@@ -34,7 +35,12 @@ function MySessionsPage() {
           </Text>
         </VStack>
 
-        {personalProjectId ? (
+        {/* The workspace is resolved before anything is claimed about it: an
+            unresolved context has no project id yet, and saying "no sessions"
+            in the meantime states a fact that is not known to be true. */}
+        {!ready ? (
+          <Skeleton height="180px" borderRadius="md" />
+        ) : personalProjectId ? (
           <SessionsTable
             projectId={personalProjectId}
             projectSlug={personalProjectSlug}

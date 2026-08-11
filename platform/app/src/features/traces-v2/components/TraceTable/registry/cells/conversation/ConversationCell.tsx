@@ -65,10 +65,11 @@ export function sessionLabelOf(group: ConversationGroup): string {
 }
 
 /**
- * The conversation's label, rendered as a link that scopes the All lens to
- * just this conversation. The label IS the filter affordance (the rest of the
- * row opens the drawer), so its click stops propagation; the blue colour plus
- * a hover underline and tooltip signal it acts differently from the row.
+ * The conversation's label, a button styled as a link that scopes the All lens
+ * to just this conversation. It filters rather than navigates, so it is a
+ * button and not an anchor. The label IS the filter affordance (the rest of
+ * the row opens the drawer), so its click stops propagation; the blue colour
+ * plus a hover underline and tooltip signal it acts differently from the row.
  */
 const ConversationIdLabel: React.FC<{
   conversationId: string;

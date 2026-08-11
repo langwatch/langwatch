@@ -82,8 +82,10 @@ describe("the coding-agent read gates", () => {
       expect(rows[0]?.inputTokens).toBe(100);
       expect(rows[0]?.title).toBe("Add the sessions screen");
     });
+  });
 
-    it("leaves the cost alone for a viewer who may price it", () => {
+  describe("given a viewer who may price the project", () => {
+    it("leaves the cost where it is", () => {
       const rows = gateSessionListCost({
         rows: [sessionListRow()],
         protections: FULL,
@@ -93,7 +95,7 @@ describe("the coding-agent read gates", () => {
     });
   });
 
-  describe("when a pull request's sessions span two projects", () => {
+  describe("given a pull request whose sessions span two projects", () => {
     /** @scenario "A session whose project hides captured content is listed without its title" */
     it("keeps the title of the readable project and blanks the other", () => {
       const sessions = gatePullRequestSessionTitles({
