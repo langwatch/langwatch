@@ -1270,6 +1270,108 @@ describe("given a sweep too large for one run's budget", () => {
 });
 
 /**
+ * The request cap has to hold for EVERY request, not just the paged ones.
+ *
+ * Author lookups are the ones that get away: they happen per message rather
+ * than per page, after the page they belong to is already paid for. A page of
+ * a hundred messages by a hundred different people is a hundred more requests,
+ * each free to wait out its own timeout — so a cap that only guards the page
+ * loops is a cap in name. The sweep has to stop mid-page and say it stopped.
+ */
+describe("given a budget that runs out partway through a page of messages", () => {
+  let workspace: FixtureWorkspace;
+  let fixture: Awaited<ReturnType<typeof startFixtureServer>>;
+
+  beforeAll(async () => {
+    workspace = createFixtureWorkspace();
+    fixture = await startFixtureServer({ workspace });
+  });
+
+  afterAll(async () => {
+    await fixture.close();
+  });
+
+  describe("when the remaining messages still need their authors resolved", () => {
+    /** @scenario "Author lookups are bound by the same request budget as the pages" */
+    it.each([
+      2, 3, 5, 8,
+    ])("spends no more than the %i requests it was given", async (maxRequests) => {
+      fixture.requestCounts.clear();
+      const adapter = new DatabricksGeniePuller({ maxRequests });
+      const config = adapter.validateConfig({
+        adapter: DATABRICKS_GENIE_ADAPTER_ID,
+        workspaceUrl: fixture.baseUrl,
+        spaceIds: [],
+        startingAt: "2020-01-01T00:00:00.000Z",
+        schedule: "*/15 * * * *",
+      });
+
+      const result = await adapter.runOnce(
+        { cursor: null, credentials: { token: "fixture-token" } },
+        config,
+      );
+
+      const spent = [...fixture.requestCounts.values()].reduce(
+        (a, b) => a + b,
+        0,
+      );
+      expect(spent).toBeLessThanOrEqual(maxRequests);
+      // Stopping early is only safe if the run says so: a non-null cursor is
+      // what brings the next run back for the messages this one skipped.
+      expect(result.cursor).not.toBeNull();
+    });
+
+    /**
+     * The budget here is tight enough to truncate a page but wide enough to
+     * reach one — below that the sweep cannot read a message page at all, which
+     * is the pre-existing page-level cap doing its job and not what this
+     * asserts.
+     *
+     * @scenario "Author lookups are bound by the same request budget as the pages"
+     */
+    it("comes back for the messages it skipped rather than losing them", async () => {
+      fixture.requestCounts.clear();
+      const adapter = new DatabricksGeniePuller({ maxRequests: 8 });
+      const base = {
+        adapter: DATABRICKS_GENIE_ADAPTER_ID,
+        workspaceUrl: fixture.baseUrl,
+        spaceIds: [],
+        startingAt: "2020-01-01T00:00:00.000Z",
+        schedule: "*/15 * * * *",
+      };
+      const config = adapter.validateConfig(base);
+
+      // Drive the sweep to completion in small budgeted runs, exactly as the
+      // scheduler would, and collect every message id it ever emitted.
+      const seen = new Set<string>();
+      let cursor: string | null = null;
+      for (let run = 0; run < 40; run++) {
+        const result = await adapter.runOnce(
+          { cursor, credentials: { token: "fixture-token" } },
+          config,
+        );
+        for (const event of result.events) seen.add(event.source_event_id);
+        cursor = result.cursor;
+        if (cursor === null) break;
+        const parsed = JSON.parse(cursor) as { spaceId: string | null };
+        if (parsed.spaceId === null) break;
+      }
+
+      // The generous single-run read is the yardstick: a truncating sweep must
+      // eventually surface the same messages, not a subset of them.
+      const generous = new DatabricksGeniePuller({ maxRequests: 1000 });
+      const whole = await generous.runOnce(
+        { cursor: null, credentials: { token: "fixture-token" } },
+        generous.validateConfig(base),
+      );
+      for (const event of whole.events) {
+        expect(seen).toContain(event.source_event_id);
+      }
+    });
+  });
+});
+
+/**
  * A directory that fails for a moment, not for good.
  *
  * The adapter caches a 404 — a deleted account is a permanent answer — but

@@ -83,9 +83,67 @@ const GENIE_MODEL = "databricks/genie" as const;
 
 export const DATABRICKS_GENIE_ADAPTER_ID = "databricks_genie" as const;
 
+/**
+ * The only hosts a Genie workspace is ever served from, one per cloud.
+ *
+ * Databricks owns all three, so a customer cannot register a lookalike inside
+ * them and no config can name one that is not theirs.
+ */
+const DATABRICKS_WORKSPACE_HOST_SUFFIXES = [
+  ".azuredatabricks.net",
+  ".cloud.databricks.com",
+  ".gcp.databricks.com",
+] as const;
+
+/**
+ * Whether a URL is a Databricks workspace origin we may attach a token to.
+ *
+ * This is an egress restriction, not a formatting check, and it exists because
+ * of what happens one line later in `get()`: the decrypted workspace token goes
+ * out as `Authorization: Bearer` to whatever host this string names. A plain
+ * `z.string().url()` accepts `https://attacker.example.com`, and `ssrfSafeFetch`
+ * will happily reach it — that helper rejects PRIVATE destinations, which is a
+ * different threat entirely and no defence against an attacker-owned public
+ * host.
+ *
+ * The reachable path is worth stating plainly, because it needs no knowledge of
+ * the secret: the source's config is readable, the credential travels in it as
+ * an opaque encrypted envelope, and re-encryption is deliberately idempotent.
+ * So a principal who can edit a source can submit the envelope back unchanged
+ * with a different `workspaceUrl`, and the next scheduled run decrypts a token
+ * they never saw and posts it to their host. Pinning the origin is what closes
+ * that, which is why it is enforced on every write and not only at pull time.
+ */
+export function isDatabricksWorkspaceOrigin(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  // Plain http would put the token on the wire in clear even for a real
+  // workspace, and credentials in the URL are never part of a legitimate one.
+  if (url.protocol !== "https:") return false;
+  if (url.username !== "" || url.password !== "") return false;
+  const host = url.hostname.toLowerCase();
+  return DATABRICKS_WORKSPACE_HOST_SUFFIXES.some((suffix) =>
+    host.endsWith(suffix),
+  );
+}
+
 export const databricksGeniePullConfigSchema = z.object({
   adapter: z.literal(DATABRICKS_GENIE_ADAPTER_ID),
-  /** Workspace base URL, e.g. `https://adb-1234567890.4.azuredatabricks.net`. */
+  /**
+   * Workspace base URL, e.g. `https://adb-1234567890.4.azuredatabricks.net`.
+   *
+   * Deliberately only shape-checked here. Whether the host is one we may send
+   * a token to is a question about the CONFIG A CUSTOMER SAVED, not about a
+   * string the adapter happens to parse, so it is answered on the write path
+   * (`assertPullDestinationAllowed`) where a rejection can be shown to the
+   * person making the change. Pinning it in this schema instead would also
+   * mean the adapter could never be pointed at a local fixture, which is how
+   * every test in this suite drives it.
+   */
   workspaceUrl: z.string().url(),
   /**
    * Which spaces to pull. Empty means "every space the credential can see",
@@ -467,6 +525,56 @@ const scimUserSchema = z
   })
   .passthrough();
 
+/**
+ * Where a message sits against the sweep's window, or null if it is not in it.
+ *
+ * A message with no timestamp cannot be placed at all, and emitting it would
+ * either re-emit it on every future sweep or file it under `now`. Skipping it
+ * loses one row; the alternatives corrupt the window for every row after it.
+ */
+function placeInWindow({
+  message,
+  sinceMs,
+  adapterId,
+}: {
+  message: z.infer<typeof messageSchema>;
+  sinceMs: number;
+  adapterId: string;
+}): number | null {
+  const raw = message.created_timestamp;
+  if (raw === null || !Number.isFinite(raw)) {
+    logger.warn(
+      { adapter: adapterId, messageId: message.message_id },
+      "genie message has no created_timestamp; skipping",
+    );
+    return null;
+  }
+  const createdMs = toEpochMs(raw);
+  return createdMs <= sinceMs ? null : createdMs;
+}
+
+/**
+ * Whether resolving this message's author would spend a request the run no
+ * longer has.
+ *
+ * Only an author we have not already resolved costs anything, so the cache is
+ * checked first: a page whose authors are all known must not be truncated for
+ * no reason on the last request of the budget.
+ */
+function outOfBudgetForAuthor({
+  message,
+  identities,
+  budget,
+}: {
+  message: z.infer<typeof messageSchema>;
+  identities: Map<number, GenieIdentity>;
+  budget: RunBudget;
+}): boolean {
+  const needsLookup =
+    message.user_id !== null && !identities.has(message.user_id);
+  return needsLookup && budget.exhausted();
+}
+
 /** Who asked, resolved once per run and reused across every message. */
 interface GenieIdentity {
   /**
@@ -774,6 +882,23 @@ interface SpaceRead {
  * caller has to branch on it: a 404 from SCIM is a permanent answer worth
  * caching, and every other code is a transient one that must not be.
  */
+/**
+ * Raised instead of spending a request the run's budget no longer has.
+ *
+ * It is deliberately its own type rather than a generic Error: `identityFor`
+ * treats a failed author lookup as "record the message unattributed and carry
+ * on", which is right for a 404 or a flaky SCIM call and catastrophic for a
+ * budget stop — swallowing that one would let the walk keep issuing the very
+ * requests the cap exists to prevent, one per message, each reported as a
+ * benign attribution miss.
+ */
+class BudgetExhaustedError extends Error {
+  constructor(path: string) {
+    super(`run budget exhausted before ${path}`);
+    this.name = "BudgetExhaustedError";
+  }
+}
+
 class GenieHttpError extends Error {
   readonly status: number;
 
@@ -1373,21 +1498,19 @@ export class DatabricksGeniePuller
 
     const events: NormalizedPullEvent[] = [];
     let oldestPendingMs: number | null = null;
+    // Set when the budget ran out mid-page. The page itself is already read and
+    // paid for, but the author lookups behind it are not, and a page of 100
+    // messages by 100 different people is 100 more requests — enough on its own
+    // to walk past a cap that was already spent. Stopping here costs a re-read
+    // of one conversation next run; not stopping costs the cap its meaning.
+    let truncated = false;
     for (const message of messages.items) {
-      const raw = message.created_timestamp;
-      // A message with no timestamp cannot be placed against the watermark, and
-      // emitting it would either re-emit it on every future sweep or file it
-      // under `now`. Skipping it loses one row; the alternatives corrupt the
-      // window for every row after it.
-      if (raw === null || !Number.isFinite(raw)) {
-        logger.warn(
-          { adapter: this.id, messageId: message.message_id },
-          "genie message has no created_timestamp; skipping",
-        );
-        continue;
-      }
-      const createdMs = toEpochMs(raw);
-      if (createdMs <= sinceMs) continue;
+      const createdMs = placeInWindow({
+        message,
+        sinceMs,
+        adapterId: this.id,
+      });
+      if (createdMs === null) continue;
 
       // Emitted either way — a question asked is a governance fact the moment
       // it is asked, and the OCSF sink replaces on message id, so the settled
@@ -1396,6 +1519,14 @@ export class DatabricksGeniePuller
       // could still change, so the sweep comes back for it.
       if (isSettling(message.status, createdMs)) {
         oldestPendingMs = earliest(oldestPendingMs, createdMs);
+      }
+
+      if (
+        outOfBudgetForAuthor({ message, identities, budget }) &&
+        events.length > 0
+      ) {
+        truncated = true;
+        break;
       }
 
       events.push(
@@ -1411,11 +1542,19 @@ export class DatabricksGeniePuller
             budget,
             userId: message.user_id,
             identities,
+            // The progress guarantee described above: the first record of a
+            // page may always resolve its author, so a run can never end
+            // having read a page and emitted nothing from it.
+            allowOverBudget: events.length === 0,
           }),
         }),
       );
     }
-    return { items: events, complete: messages.complete, oldestPendingMs };
+    return {
+      items: events,
+      complete: messages.complete && !truncated,
+      oldestPendingMs,
+    };
   }
 
   /**
@@ -1537,6 +1676,7 @@ export class DatabricksGeniePuller
     budget,
     userId,
     identities,
+    allowOverBudget = false,
   }: {
     config: DatabricksGeniePullConfig;
     token: string;
@@ -1544,6 +1684,8 @@ export class DatabricksGeniePuller
     budget: RunBudget;
     userId: number | null;
     identities: Map<number, GenieIdentity>;
+    /** True for the first lookup of a page — see `conversationMessages`. */
+    allowOverBudget?: boolean;
   }): Promise<GenieIdentity> {
     if (userId === null) return UNKNOWN_IDENTITY;
     const cached = identities.get(userId);
@@ -1557,12 +1699,18 @@ export class DatabricksGeniePuller
           options,
           budget,
           path: `/api/2.0/preview/scim/v2/Users/${encodeURIComponent(String(userId))}`,
+          allowOverBudget,
         }),
       );
       const identity = genieIdentityFromScimUser(user, userId);
       identities.set(userId, identity);
       return identity;
     } catch (error) {
+      // A budget stop is not an attribution failure. Let it out so the walk
+      // above can end the sweep and hand back a resume point, rather than
+      // recording this message — and every message after it — as unattributed
+      // while quietly continuing to spend.
+      if (error instanceof BudgetExhaustedError) throw error;
       const gone = error instanceof GenieHttpError && error.status === 404;
       logger.warn(
         {
@@ -1668,6 +1816,7 @@ export class DatabricksGeniePuller
     budget,
     path,
     query,
+    allowOverBudget = false,
   }: {
     config: DatabricksGeniePullConfig;
     token: string;
@@ -1675,6 +1824,8 @@ export class DatabricksGeniePuller
     budget: RunBudget;
     path: string;
     query?: Record<string, string>;
+    /** See the guard below — one deliberate exception, not a general escape. */
+    allowOverBudget?: boolean;
   }): Promise<unknown> {
     const url = new URL(path, config.workspaceUrl);
     for (const [key, value] of Object.entries(query ?? {})) {
@@ -1687,6 +1838,18 @@ export class DatabricksGeniePuller
           AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         ])
       : AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+
+    // The last line of defence for the request cap. Every walk already checks
+    // `exhausted()` before it loops, but those checks guard the loops they sit
+    // in — this one guards the spend itself, so no future caller can add a
+    // request path that counts against the budget without being stopped by it.
+    //
+    // `allowOverBudget` is the single deliberate exception, and it is spelled
+    // out at its one call site: the first author lookup of a page, which the
+    // sweep needs in order to make any progress at all.
+    if (!allowOverBudget && budget.exhausted()) {
+      throw new BudgetExhaustedError(path);
+    }
 
     budget.spend();
     const response = await ssrfSafeFetch(url.toString(), {
