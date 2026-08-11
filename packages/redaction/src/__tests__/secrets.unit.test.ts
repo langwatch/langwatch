@@ -28,6 +28,16 @@ const HEX = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
  */
 const SCAN_BUDGET = 250_000;
 
+/**
+ * PEM armour, assembled at run time. Spelling it out as a literal makes the
+ * secret scanners treat this fixture as a real committed private key and blocks
+ * the push, the same reason the vendor tokens above are built from parts.
+ */
+const pemArmour = (edge: "BEGIN" | "END", label: string) =>
+  `${"-".repeat(5)}${edge} ${label}${"-".repeat(5)}`;
+const pemBlock = (label: string, body: string) =>
+  `${pemArmour("BEGIN", label)}\n${body}\n${pemArmour("END", label)}`;
+
 describe("redactSecretsInText", () => {
   describe("given a built-in provider or cloud key", () => {
     // Provider keys use realistic base64url bodies (`_` and `-`, no inner word
@@ -68,7 +78,7 @@ describe("redactSecretsInText", () => {
   describe("given a PEM private key block", () => {
     it("redacts the whole block", () => {
       const input =
-        "key:\n-----BEGIN RSA PRIVATE KEY-----\nMIIabc\nDEFghi\n-----END RSA PRIVATE KEY-----\ntail";
+        `key:\n${pemBlock("RSA PRIVATE KEY", "MIIabc\nDEFghi")}\ntail`;
       const { text } = redact(input);
       expect(text).not.toContain("MIIabc");
       expect(text).toContain("[SECRET]");
@@ -156,9 +166,7 @@ describe("redactSecretsInText", () => {
     /** @scenario "A PEM block straddling a slice boundary is still redacted" */
     it("keeps a PEM block whole across a boundary", () => {
       const pem =
-        "-----BEGIN PRIVATE KEY-----\n" +
-        "MIIEvQIBADANBgkqh\n".repeat(40) +
-        "-----END PRIVATE KEY-----";
+        pemBlock("PRIVATE KEY", "MIIEvQIBADANBgkqh\n".repeat(40).trimEnd());
       const input = `${"z ".repeat(SCAN_BUDGET / 2 - 5)}${pem} tail`;
       const { text, redactedCount } = redact(input);
       expect(text).not.toContain("MIIEvQIBADANBgkqh");
@@ -316,11 +324,11 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
       ["an OAuth header", `Authorization: OAuth ${BODY.slice(0, 32)}`],
       [
         "an encrypted PEM block",
-        "-----BEGIN ENCRYPTED PRIVATE KEY-----\nMIIabc\n-----END ENCRYPTED PRIVATE KEY-----",
+        pemBlock("ENCRYPTED PRIVATE KEY", "MIIabc"),
       ],
       [
         "a PGP private key block",
-        "-----BEGIN PGP PRIVATE KEY BLOCK-----\nlQOYBF\n-----END PGP PRIVATE KEY BLOCK-----",
+        pemBlock("PGP PRIVATE KEY BLOCK", "lQOYBF"),
       ],
       [
         "a PuTTY private key",
@@ -347,7 +355,7 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
       expect(redact(`phx_${BODY.slice(0, 36)}`).redactedCount).toBe(1);
       expect(redact(`Bearer ${BODY.slice(0, 32)}`).redactedCount).toBe(1);
       expect(
-        redact("-----BEGIN PRIVATE KEY-----\nMIIabc\n-----END PRIVATE KEY-----")
+        redact(pemBlock("PRIVATE KEY", "MIIabc"))
           .redactedCount,
       ).toBe(1);
     });

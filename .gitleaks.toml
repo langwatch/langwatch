@@ -111,14 +111,20 @@ regexes = [
 # account, and the negative half of the same suite asserts ordinary text is left
 # alone.
 #
-# Scoped to `generic-api-key` and to this one path, so every provider-specific
+# `private-key` is in the rule list for the PEM cases: the suite has to hand the
+# redactor a real armour block to prove it redacts one, and `MIIabc` between
+# BEGIN and END markers is a private key to any scanner. The armour is assembled
+# at run time at the tip so no new literal is added, but gitleaks scans the whole
+# commit range, so the earlier commits that carried it still need naming here.
+#
+# Scoped to these two rules and to this one path, so every provider-specific
 # rule still applies here: a real OpenAI, AWS, GitHub or Stripe token pasted into
 # this file is still caught, which matters more in this file than most given what
 # it is full of. Scoped by path rather than by value so adding a fixture to the
 # corpus does not need a config change.
 [[allowlists]]
 description = "Synthetic credential fixtures fed to the redactor in the secrets-redaction suite"
-targetRules = ["generic-api-key"]
+targetRules = ["generic-api-key", "private-key"]
 paths = ['''packages/redaction/src/__tests__/secrets\.unit\.test\.ts''']
 
 # `Idempotency-Key: signup-acme-4171` and its SDK equivalents in the billing

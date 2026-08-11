@@ -968,7 +968,7 @@ function sliceEndAfter(text: string, start: number): number {
   const target = Math.min(start + MAX_SCAN_LENGTH, text.length);
   if (target >= text.length) return text.length;
 
-  let end = target;
+  let end: number;
   const lastSpace = text.slice(start, target).search(/\s(?=\S*$)/);
   if (lastSpace > 0) {
     end = start + lastSpace;
