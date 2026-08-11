@@ -1,6 +1,14 @@
-# See dev/docs/adr/089-shared-ops-snapshot-single-writer.md for the
+# See dev/docs/adr/090-shared-ops-snapshot-single-writer.md for the
 # architectural rationale (single elected writer, two-cadence snapshot,
-# why the pod-local scan path is deleted rather than kept as fallback).
+# why the pod-local scan path is deleted rather than kept as fallback,
+# and why a Redis lease is a scoped exception to ADR-052's revision fencing).
+#
+# "Parked" here always means TENANT SOFT-CAP parking — a group moved out of
+# ready into a per-tenant parked set because its tenant is at its in-flight
+# cap (specs/event-sourcing/tenant-soft-cap.feature). The poison-group guard's
+# "park" is a different thing: it parks a crash-looping group into the BLOCKED
+# set (specs/event-sourcing/poison-group-park-guard.feature), where it counts
+# toward Blocked, not Parked. The Parked panel shows only the first kind.
 
 Feature: Shared ops snapshot with a single elected writer
   As an operator
@@ -131,13 +139,11 @@ Feature: Shared ops snapshot with a single elected writer
     Then the new holder continues from the persisted peaks and history
     And viewers observe no reset in the chart
 
-  # ── Fleet duties move to the holder ──────────────────────────────────
-
-  @unit
-  Scenario: Pending-counter reconcile runs only on the holder
-    Given two writers share one Redis and one holds the lease
-    When the reconcile interval elapses on both
-    Then only the holder reconciles the pending counters
+  # The pending-counter reconcile is NOT governed here. It already has its own
+  # cross-instance single-flight marker, specified end to end in
+  # specs/ops/pending-counter-reconcile.feature — every pod attempts it, one
+  # runs. The snapshot lease does not gate it, and no scenario in this file
+  # should imply that it does.
 
   # ── Drill-down stays live ─────────────────────────────────────────────
 

@@ -1,10 +1,10 @@
-# ADR-089: One elected writer produces the ops snapshot every pod serves
+# ADR-090: One elected writer produces the ops snapshot every pod serves
 
 **Date:** 2026-08-11
 
 **Status:** Proposed
 
-**Relates to:** [ADR-004](./004-docker-dev-environment.md) (process roles; the collector today runs in every role), [specs/ops/queue-discovery.feature](../../../specs/ops/queue-discovery.feature) (the last time per-pod ops scanning had to be reined in), [specs/ops/pending-counter-reconcile.feature](../../../specs/ops/pending-counter-reconcile.feature) (the reconcile loop this ADR moves onto the writer).
+**Relates to:** [ADR-004](./004-docker-dev-environment.md) (process roles; the collector today runs in every role), [ADR-052](./052-automations-on-process-manager-substrate.md) (deleted the previous Redis leader lock in favour of revision fencing — the direction this ADR takes a reasoned exception to), [ADR-039](./039-outbox-heartbeat.md) (superseded; the leader-lock design 052 removed), [specs/ops/queue-discovery.feature](../../../specs/ops/queue-discovery.feature) (the last time per-pod ops scanning had to be reined in), [specs/event-sourcing/tenant-soft-cap.feature](../../../specs/event-sourcing/tenant-soft-cap.feature) (owns tenant parking — the concept this ADR's drill-down finally surfaces), [specs/event-sourcing/poison-group-park-guard.feature](../../../specs/event-sourcing/poison-group-park-guard.feature) (the *other* "park", which lives in the blocked set), [specs/ops/dashboard-latency.feature](../../../specs/ops/dashboard-latency.feature) (the latency and peak tiles this ADR relocates into the snapshot).
 
 Behavioural contract: [specs/ops/shared-ops-snapshot.feature](../../../specs/ops/shared-ops-snapshot.feature).
 
@@ -23,6 +23,8 @@ Because a full scan fourteen times per 2 seconds would be ruinous, the per-pod s
 | Parked | nothing — counted, never enumerated | — |
 
 Three concrete failures follow.
+
+One word needs pinning down before the rest reads correctly. **"Parked" in this ADR always means tenant soft-cap parking** — a group moved out of the ready zset into a per-tenant parked set because its tenant is at its in-flight cap ([specs/event-sourcing/tenant-soft-cap.feature](../../../specs/event-sourcing/tenant-soft-cap.feature)). The GroupQueue has a second, unrelated "park": the poison-group guard parks a crash-looping group *into the blocked set* ([specs/event-sourcing/poison-group-park-guard.feature](../../../specs/event-sourcing/poison-group-park-guard.feature)), where it counts toward Blocked and surfaces through `getBlockedSummary`. The two never mix on the dashboard, and the Parked panel this ADR adds shows only the first kind. Both documents keep their own vocabulary; this ADR does not rename either.
 
 **A count with no explanation.** Parked groups — groups a tenant's in-flight soft-cap moved out of the ready scan — are `ZCARD`ed for the tile and never enumerated anywhere. An operator seeing "Parked: 60" in warning orange scans the rest of the page for the cause and finds nothing: no errors (parked is not an error), no anomaly (a tenant can sit at cap with a flat enqueue rate), no blocked rows. The count was added so parking would be "visible instead of invisible backlog"; visibility stops at the integer.
 
@@ -88,11 +90,21 @@ Both artifacts carry `version`, `computedAt`, `writerId`, and `leaseEpoch`. Read
 
 **Every cap is labelled.** Where the detail artifact bounds anything (cluster rows, tenant rows, group rows, a serialized-size guard), it records `truncated` / `sampled` counts and the UI renders "showing N of M" — the honest-trade convention the blob-store ops pages already follow. Silent truncation is what this ADR exists to remove; reintroducing it quietly inside the snapshot would be the same bug with better plumbing.
 
-**The writer inherits the other fleet-duplicated duties.** The pending-counter reconcile loop (today: every pod, every 60s) and the peaks/history persistence move onto the lease holder. `ops:metrics:state` is subsumed: peaks and history live in the snapshot itself, so they survive writer failover and — for the first time — are the same in every browser tab. On first write the holder seeds them from the legacy key if present; the key then ages out through its existing 1-hour TTL.
+**Peaks and chart history move into the snapshot; the reconcile is left alone.** `ops:metrics:state` is subsumed — peaks and the rolling history live in the snapshot itself, so they survive writer failover and, for the first time, are the same in every browser tab. On first write the holder seeds them from the legacy key if present; the key then ages out through its existing 1-hour TTL.
+
+The pending-counter reconcile is deliberately **out of scope**. It looks like fleet-duplicated work — every pod runs the loop every 60s — but it is already coordinated: [specs/ops/pending-counter-reconcile.feature](../../../specs/ops/pending-counter-reconcile.feature) specifies a cross-instance single-flight marker, down to what a pass that loses the marker mid-run may publish (nothing) and what the write does without the marker (refuses). Every pod *attempts*; one *runs*. Gating it on the snapshot lease as well would stack two coordination mechanisms over one loop, and would make several of that spec's scenarios unreachable — a pod that never attempts can never decline, and can never lose a marker it never held. The reconcile keeps its marker and its interval, on every pod, unchanged by this ADR.
 
 ## Rationale / Trade-offs
 
 **Why a lease, when the scheduler said no to one.** The scheduler's no-leader design exists because its work is effectful and must fire exactly-once-ish; idempotent claims give that without coordination. Snapshot production is idempotent by nature — it writes derived truth, so a brief double-writer after a lease expiry means two pods wrote the same facts and last-write-wins is harmless, and a brief zero-writer window means the dashboard is a few seconds stale, which `computedAt` surfaces. The lease is doing the only job it is good at: cost deduplication, not correctness.
+
+**Why a Redis lock at all, when ADR-052 deleted the last one.** This needs answering directly, because the repo moved the other way once already. ADR-052 deleted the outbox heartbeat's Redis leader lock and replaced it with process-manager revision fencing, "so racing wake workers stand down instead of racing for a lock" — and the failure it was fixing was real: pending settlement vanished on a Redis flush while a Postgres audit table went on implying durability.
+
+Revision fencing works by making the *durable* record of the work the arbiter — a wake carries a revision, and a worker whose revision is stale stands down without needing mutual exclusion. That mechanism needs something durable to fence on. Snapshot production has nothing of the kind and should not acquire one: it derives a cache from Redis, on a 2-second cadence, and nothing downstream is owed a durable record that a particular refresh happened. Putting it on the process-manager substrate would mean minting durable wakes at 2s for work whose entire output is disposable — the inverse of the trade 052 made, which moved *durable* concerns off an ephemeral mechanism.
+
+The distinction that matters is what the coordination is protecting. ADR-052's lock guarded an effect that had to happen and had to happen once; losing the lock's guarantees lost work. Here the lease guards *cost*: both of its failure modes — two writers briefly writing identical derived facts, or no writer for a lease TTL — are visible and self-correcting, and neither loses anything that existed. A Redis flush is likewise not the 052 failure in miniature: nothing here implies durability that Redis is not providing, because the queue state being described lives in that same Redis. What a flush does cost is peaks and chart history, which is called out in Consequences rather than hidden.
+
+This is therefore a scoped exception to 052's direction, not a reversal of it: durable, effectful coordination continues to use revision fencing; a disposable read-side cache refresh uses a lease.
 
 **Why not pin the writer to a role.** Pinning to workers makes dashboard freshness depend on the workers deployment being healthy — which is exactly what the operator is often using the dashboard to diagnose. Pinning to web lands the exhaustive scan on customer-serving pods by *requirement* rather than by chance. Letting every collector-running pod compete means the dashboard degrades only when the whole fleet does.
 
@@ -112,10 +124,14 @@ Both artifacts carry `version`, `computedAt`, `writerId`, and `leaseEpoch`. Read
 - `OpsMetricsCollector` splits into a writer (scan + persist, lease-gated) and a reader (GET + merge + emit); the router-facing surface (`getDashboardData`, `getBadgeCounts`, the SSE emitter) keeps its shape so `ops.ts` and the frontend change minimally. The `DashboardData` wire shape gains staleness fields and parked tenant rows.
 - Local dev is unchanged in behaviour: a single `pnpm dev` process wins the lease trivially and is both writer and reader.
 - This is an internal, admin-gated surface; no new customer-facing error codes are introduced. Absence of a snapshot renders the existing loading state; staleness renders as status, not as a toast.
+- **A Redis flush now costs peaks and chart history.** Counts, clusters and parked rows rebuild within a cycle — they are derived from the same Redis that was flushed, so there is nothing to lose. Peaks and the 30-minute history are different: they are accumulated, not derived, and today survive a process restart in `ops:metrics:state`. Folding them into the snapshot keeps that property against restarts and failover but not against a flush. Accepted deliberately — the alternative is a durable store for a number whose only consumer is a dashboard tile, which is the shape ADR-052 spent a release removing. The tiles reset and re-accumulate; nothing else notices.
+- **Rollback is a redeploy.** The per-pod scan path is deleted, so reverting means shipping the previous image; there is no flag that restores local scanning. This is deliberate — a flag would keep the sampled path alive to be maintained and tested — but it means a regression here cannot be mitigated in-place, only rolled back.
+- [specs/ops/dashboard-latency.feature](../../../specs/ops/dashboard-latency.feature) needs updating in the same change: it frames peaks per-process ("since the last process restart", "across collections"), which describes the topology this ADR ends. Its assertions still hold; its framing does not.
 
 ## References
 
 - Behavioural contract: [specs/ops/shared-ops-snapshot.feature](../../../specs/ops/shared-ops-snapshot.feature)
 - Prior art in-repo: trace facet discover cache leadership lease (`trace-list.service.ts`); `AnomalyStateStore` (persisted, shared, all-frontends-read — the model this generalises); blob-store ops honest-sampling convention (`OPS_BLOB_SORTS` doc comment)
-- Counter-precedent addressed: scheduler no-leader design (`scheduler.service.ts`)
-- Pending-counter drift reconcile: #4683
+- Counter-precedents addressed: scheduler no-leader design (`scheduler.service.ts`); [ADR-052](./052-automations-on-process-manager-substrate.md) §"Deletion and cutover", which deleted the Redis leader lock that [ADR-039](./039-outbox-heartbeat.md) introduced
+- Out of scope, and why: [specs/ops/pending-counter-reconcile.feature](../../../specs/ops/pending-counter-reconcile.feature) (single-flight marker, #4683)
+- Vocabulary: [specs/event-sourcing/tenant-soft-cap.feature](../../../specs/event-sourcing/tenant-soft-cap.feature) (parked = over cap) vs [specs/event-sourcing/poison-group-park-guard.feature](../../../specs/event-sourcing/poison-group-park-guard.feature) (parked = into the blocked set)
