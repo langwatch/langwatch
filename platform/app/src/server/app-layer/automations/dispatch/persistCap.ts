@@ -10,7 +10,6 @@ import { resolveRedis } from "./resolveRedis";
 
 const logger = createLogger("langwatch:automations:persist-cap");
 
-
 const DAY_MS = 86_400_000;
 
 /**
