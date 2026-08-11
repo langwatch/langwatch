@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { mapStatus } from "../../../../simulations/simulation-run.mappers";
 import { isSuiteSetId } from "../../../../suites/suite-set-id";
 import type { SubscriberSpec } from "../../../pipeline/processManagerDefinition";
 import { SIMULATION_RUN_EVENT_TYPES } from "../schemas/constants";
@@ -102,7 +103,11 @@ export function createSuiteRunSyncSubscriber(
       batchRunId: data.batchRunId,
       scenarioRunId: data.scenarioRunId,
       scenarioId: data.scenarioId,
-      status: data.status,
+      // Normalize before crossing the pipeline boundary: `data.status` is an
+      // unconstrained string on the event, so it can still carry the non-enum
+      // "FAILURE" written by older callers, while the suite fold's status
+      // ladder is written against `ScenarioRunStatus` members (#6834).
+      status: mapStatus(data.status),
       verdict: data.results?.verdict,
       durationMs: data.durationMs,
       reasoning: data.results?.reasoning,

@@ -34,6 +34,8 @@ export interface SuiteRunStateData {
   StartedCount: number;
   CompletedCount: number;
   FailedCount: number;
+  /** Items cancelled by the user — neither completed nor failed (#6834). */
+  CancelledCount: number;
   Progress: number;
   PassRateBps: number | null;
   CreatedAt: number;
@@ -90,6 +92,7 @@ export class SuiteRunStateFoldProjection
       StartedCount: 0,
       CompletedCount: 0,
       FailedCount: 0,
+      CancelledCount: 0,
       Progress: 0,
       PassRateBps: null,
       StartedAt: null,
@@ -122,7 +125,8 @@ export class SuiteRunStateFoldProjection
     return {
       ...state,
       StartedCount: startedCount,
-      Progress: state.CompletedCount + state.FailedCount,
+      Progress:
+        state.CompletedCount + state.FailedCount + state.CancelledCount,
     };
   }
 
@@ -130,20 +134,36 @@ export class SuiteRunStateFoldProjection
     event: SuiteRunItemCompletedEvent,
     state: SuiteRunStateData,
   ): SuiteRunStateData {
+    // Every terminal `ScenarioRunStatus` gets an explicit bucket (#6834).
+    // The old ladder only knew "FAILURE"/"ERROR", so FAILED, CANCELLED and
+    // STALLED items fell through into CompletedCount and a suite could
+    // finish SUCCESS with cancelled or stalled items inside it. "FAILURE"
+    // is kept as an accepted legacy alias of FAILED for replays of events
+    // recorded before the run fold wrote the enum member.
     const isFailure =
-      event.data.status === "FAILURE" || event.data.status === "ERROR";
+      event.data.status === "FAILED" ||
+      event.data.status === "FAILURE" ||
+      event.data.status === "ERROR" ||
+      event.data.status === "STALLED";
+    const isCancelled = event.data.status === "CANCELLED";
 
     let completedCount = state.CompletedCount;
     let failedCount = state.FailedCount;
+    let cancelledCount = state.CancelledCount;
 
     if (isFailure) {
       failedCount += 1;
+    } else if (isCancelled) {
+      cancelledCount += 1;
     } else {
       completedCount += 1;
     }
 
     let { PassedCount: passedCount, GradedCount: gradedCount } = state;
-    if (event.data.verdict) {
+    // A cancelled item's verdict is not a grade: the cancel handler stamps
+    // `verdict: inconclusive` on user cancellations, and counting it into
+    // the denominator would read a cancellation as a non-pass (#6834).
+    if (event.data.verdict && !isCancelled) {
       gradedCount += 1;
       if (event.data.verdict === "success") {
         passedCount += 1;
@@ -153,20 +173,30 @@ export class SuiteRunStateFoldProjection
     const passRateBps =
       gradedCount > 0 ? Math.round((passedCount / gradedCount) * 10000) : null;
 
-    const progress = completedCount + failedCount;
+    const progress = completedCount + failedCount + cancelledCount;
     const allDone = state.Total > 0 && progress >= state.Total;
 
     let status = state.Status;
     let finishedAt = state.FinishedAt;
     if (allDone) {
       finishedAt = event.occurredAt;
-      status = failedCount > 0 ? "FAILURE" : "SUCCESS";
+      // FAILED outranks CANCELLED: a failure verdict is the stronger signal.
+      // A suite with cancellations and no failures reads CANCELLED rather
+      // than SUCCESS — a cancelled item must never be invisible. All three
+      // outputs are `ScenarioRunStatus` members.
+      status =
+        failedCount > 0
+          ? "FAILED"
+          : cancelledCount > 0
+            ? "CANCELLED"
+            : "SUCCESS";
     }
 
     return {
       ...state,
       CompletedCount: completedCount,
       FailedCount: failedCount,
+      CancelledCount: cancelledCount,
       Progress: progress,
       PassedCount: passedCount,
       GradedCount: gradedCount,

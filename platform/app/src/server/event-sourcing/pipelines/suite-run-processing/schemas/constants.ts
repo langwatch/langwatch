@@ -53,5 +53,8 @@ export const SUITE_RUN_EVENT_VERSIONS = {
  * Projection schema versions using calendar versioning (YYYY-MM-DD).
  */
 export const SUITE_RUN_PROJECTION_VERSIONS = {
-  RUN_STATE: "2026-03-01",
+  // 2026-08-11 — CancelledCount joined the state (#6834): cancelled items get
+  // their own bucket, terminal status ladder is FAILED > CANCELLED > SUCCESS,
+  // and a cancelled item's stamped verdict stays out of GradedCount.
+  RUN_STATE: "2026-08-11",
 } as const;

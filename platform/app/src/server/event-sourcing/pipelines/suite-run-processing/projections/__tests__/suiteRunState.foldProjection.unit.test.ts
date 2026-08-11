@@ -144,6 +144,19 @@ describe("suiteRunState fold projection", () => {
       expect(state.Progress).toBe(1);
     });
 
+    it("increments FailedCount for FAILED status (the enum member the run fold writes, #6834)", () => {
+      let state = projection.init();
+      state = projection.apply(state, createStartedEvent({ total: 3 }));
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({ status: "FAILED" }),
+      );
+
+      expect(state.CompletedCount).toBe(0);
+      expect(state.FailedCount).toBe(1);
+      expect(state.Progress).toBe(1);
+    });
+
     it("increments FailedCount for ERROR status", () => {
       let state = projection.init();
       state = projection.apply(state, createStartedEvent({ total: 3 }));
@@ -153,6 +166,58 @@ describe("suiteRunState fold projection", () => {
       );
 
       expect(state.FailedCount).toBe(1);
+    });
+
+    it("increments FailedCount for STALLED status (#6834 — a stalled item is not a clean completion)", () => {
+      let state = projection.init();
+      state = projection.apply(state, createStartedEvent({ total: 3 }));
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({ status: "STALLED" }),
+      );
+
+      expect(state.CompletedCount).toBe(0);
+      expect(state.FailedCount).toBe(1);
+    });
+
+    it("counts a CANCELLED item into CancelledCount, not completed or failed (#6834)", () => {
+      let state = projection.init();
+      state = projection.apply(state, createStartedEvent({ total: 3 }));
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({ status: "CANCELLED", verdict: undefined }),
+      );
+
+      expect(state.CompletedCount).toBe(0);
+      expect(state.FailedCount).toBe(0);
+      expect(state.CancelledCount).toBe(1);
+      expect(state.Progress).toBe(1);
+    });
+
+    it("keeps a cancelled item's stamped verdict out of the pass-rate denominator (#6834)", () => {
+      // The cancel handler stamps `verdict: inconclusive` on cancelled runs;
+      // counting it as graded would read a user cancellation as a non-pass.
+      let state = projection.init();
+      state = projection.apply(state, createStartedEvent({ total: 2 }));
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({
+          scenarioRunId: "run-1",
+          status: "SUCCESS",
+          verdict: "success",
+        }),
+      );
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({
+          scenarioRunId: "run-2",
+          status: "CANCELLED",
+          verdict: "inconclusive",
+        }),
+      );
+
+      expect(state.GradedCount).toBe(1);
+      expect(state.PassRateBps).toBe(10000);
     });
 
     it("computes PassRateBps from verdict", () => {
@@ -216,7 +281,7 @@ describe("suiteRunState fold projection", () => {
       expect(state.FinishedAt).toBe(4000);
     });
 
-    it("derives final status FAILURE when any item fails", () => {
+    it("derives final status FAILED when any item fails", () => {
       let state = projection.init();
       state = projection.apply(state, createStartedEvent({ total: 2 }));
       state = projection.apply(
@@ -234,8 +299,53 @@ describe("suiteRunState fold projection", () => {
         }),
       );
 
-      expect(state.Status).toBe("FAILURE");
+      expect(state.Status).toBe("FAILED");
       expect(state.FinishedAt).toBe(4000);
+    });
+
+    it("can not finish SUCCESS with a cancelled item inside — the suite reads CANCELLED (#6834)", () => {
+      let state = projection.init();
+      state = projection.apply(state, createStartedEvent({ total: 2 }));
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({
+          scenarioRunId: "run-1",
+          status: "SUCCESS",
+        }),
+      );
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({
+          scenarioRunId: "run-2",
+          status: "CANCELLED",
+          verdict: undefined,
+        }),
+      );
+
+      expect(state.Status).toBe("CANCELLED");
+      expect(state.FinishedAt).toBe(4000);
+    });
+
+    it("a failed item outranks a cancelled one for the final status", () => {
+      let state = projection.init();
+      state = projection.apply(state, createStartedEvent({ total: 2 }));
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({
+          scenarioRunId: "run-1",
+          status: "FAILED",
+        }),
+      );
+      state = projection.apply(
+        state,
+        createItemCompletedEvent({
+          scenarioRunId: "run-2",
+          status: "CANCELLED",
+          verdict: undefined,
+        }),
+      );
+
+      expect(state.Status).toBe("FAILED");
     });
 
     it("stays IN_PROGRESS when not all items are done", () => {
