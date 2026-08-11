@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import {
+  annotationRatingExportLabel,
   type AnnotationWithUser,
   groupedAnnotationsToRows,
   suggestionExportLine,
@@ -155,7 +156,7 @@ export default function Annotations() {
           suggestionExportLine({ annotation, traceId: annotation.traceId }),
           annotation.comment ?? "",
           annotation.traceId ?? "",
-          annotation.isThumbsUp ? "Thumbs Up" : "Thumbs Down",
+          annotationRatingExportLabel(annotation.isThumbsUp),
           JSON.stringify(annotation.scoreOptions ?? {}),
           annotation.createdAt?.toLocaleString() ?? "",
         ];
