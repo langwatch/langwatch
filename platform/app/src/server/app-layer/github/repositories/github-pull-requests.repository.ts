@@ -197,7 +197,7 @@ export interface GithubPullRequestsRepository {
    * Only ever brings it forward: a row already due at or before `dueAt` is left
    * alone, so this cannot push a question further away, and a branch that has
    * already mapped (`recheckAfter` is null) is not touched at all. That bound is
-   * what makes it safe to call on every fold — several agent worktrees folding
+   * what makes it safe to call on every fold: several agent worktrees folding
    * on one branch within a minute all land on the same due date.
    */
   bringBranchRecheckForward(params: {
