@@ -266,11 +266,10 @@ Feature: Knowable failures reach the customer as themselves
   # The SDK error mappers
   #
   # A refusal the platform wrote prose for reaches the caller as that prose, in
-  # every SDK. The Python mapper read the top-level envelope only and rendered
-  # a word derived from the status, so a plan gate served as a 403 arrived as
-  # "authentication failed" and nothing else: the operator was sent to rotate
-  # credentials that were never the problem, while the sentence explaining the
-  # plan sat unread in the body.
+  # every SDK. Python used to answer with a word derived from the status alone,
+  # so a plan gate served as a 403 arrived as "authentication failed" and
+  # nothing else: the operator was sent to rotate credentials that were never
+  # the problem, while the sentence explaining the plan went unread.
   # ---------------------------------------------------------------------------
 
   @unit
@@ -281,8 +280,8 @@ Feature: Knowable failures reach the customer as themselves
     And it does not report the credential as the problem
 
   @unit
-  Scenario: The platform's sentence is read from either envelope spelling
-    Given the same refusal nested under an error field
+  Scenario: A refusal keeps its explanation however the platform shapes the answer
+    Given the platform refuses the same read and shapes the answer another way
     When the SDK raises for that response
     Then the raised error carries the same sentence
 

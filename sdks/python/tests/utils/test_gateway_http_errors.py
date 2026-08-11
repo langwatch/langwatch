@@ -72,7 +72,7 @@ class TestGivenThePlatformRefusesTheCallAndWritesWhy:
             assert isinstance(error, LangWatchApiAuthenticationError)
 
     class TestWhenTheEnvelopeIsNestedUnderError:
-        # @scenario "The platform's sentence is read from either envelope spelling"
+        # @scenario "A refusal keeps its explanation however the platform shapes the answer"
         def test_carries_the_same_platform_sentence(self) -> None:
             error = _raised(403, {"error": FORBIDDEN_BODY})
 
