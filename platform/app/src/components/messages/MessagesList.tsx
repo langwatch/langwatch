@@ -43,7 +43,8 @@ export function MessagesList() {
   >();
   const [groupBy] = useGroupBy();
   const { filterParams, queryOpts } = useFilterParams();
-  const navigationFooter = useNavigationFooter();
+  // Trace search pages by scrollId only — a non-zero pageOffset is rejected.
+  const navigationFooter = useNavigationFooter("cursor");
 
   // Live endDate that gets bumped to "now" on SSE events so the query
   // window extends to include newly-arrived traces.
@@ -60,7 +61,6 @@ export function MessagesList() {
       endDate: liveEndDate,
       query: getSingleQueryParam(router.query.query),
       groupBy,
-      pageOffset: navigationFooter.pageOffset,
       pageSize: navigationFooter.pageSize,
       scrollId: urlScrollId,
     },

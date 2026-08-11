@@ -40,6 +40,61 @@ const createMockDb = ({
   } as unknown as PrismaClient;
 };
 
+/**
+ * A `findFirst` that honors the `orderBy` it is handed, reading the clauses the
+ * way Prisma does: the first decides, later ones break ties.
+ *
+ * A canned single row cannot tell whether the query orders anything, so the
+ * only assertion left would be a copy of the query's own literal, which passes
+ * even if the database ignores it. Sorting here lets the test say which row is
+ * selected.
+ */
+type OrderableRow = { id: string; createdAt: Date };
+type OrderByClause = Record<string, "asc" | "desc">;
+
+const compareByClause = (
+  a: OrderableRow,
+  b: OrderableRow,
+  clause: OrderByClause,
+): number => {
+  const [field, direction] = Object.entries(clause)[0] as [
+    "id" | "createdAt",
+    "asc" | "desc",
+  ];
+  const left = a[field];
+  const right = b[field];
+  const ascending = left < right ? -1 : left > right ? 1 : 0;
+  return direction === "desc" ? -ascending : ascending;
+};
+
+const firstUnder = <T extends OrderableRow>(
+  rows: T[],
+  orderBy: OrderByClause[],
+): T | null => {
+  const ordered = [...rows].sort((a, b) => {
+    for (const clause of orderBy) {
+      const settled = compareByClause(a, b, clause);
+      if (settled !== 0) return settled;
+    }
+    return 0;
+  });
+  return ordered[0] ?? null;
+};
+
+const dbHolding = (
+  rows: Array<OrderableRow & { plan: string; status: string }>,
+): PrismaClient =>
+  ({
+    subscription: {
+      findFirst: vi.fn(async (query?: { orderBy?: OrderByClause[] }) =>
+        firstUnder(rows, query?.orderBy ?? []),
+      ),
+    },
+    organization: {
+      findUnique: vi.fn().mockResolvedValue(undefined),
+    },
+  }) as unknown as PrismaClient;
+
 describe("getFreePlanLimits", () => {
   /** @scenario 'All pricing models get 50,000 events on the free tier' */
   it("returns 50,000 messages per month", () => {
@@ -66,17 +121,20 @@ describe("createSaaSPlanProvider", () => {
   });
 
   describe("when IS_SAAS is false", () => {
-    it("returns ENTERPRISE limits", async () => {
+    // Unreachable through the wiring, since a self-hosted deployment resolves
+    // its plan from the license provider. It answers the free baseline anyway:
+    // a deployment that reached this line by mistake must not be handed the
+    // entitlements the top tier carries.
+    it("returns the free baseline rather than a tier nobody bought", async () => {
       mockEnv.IS_SAAS = false;
 
       const db = createMockDb();
       const provider = createSaaSPlanProvider(db);
       const plan = await provider.getActivePlan("org_1");
 
-      expect(plan.type).toBe(PlanTypes.ENTERPRISE);
-      expect(plan.maxMembers).toBe(
-        PLAN_LIMITS[PlanTypes.ENTERPRISE].maxMembers,
-      );
+      expect(plan.type).toBe(PlanTypes.FREE);
+      expect(plan.maxMembers).toBe(PLAN_LIMITS[PlanTypes.FREE].maxMembers);
+      expect(plan.webhookEndpointsEnabled).not.toBe(true);
     });
   });
 
@@ -517,6 +575,62 @@ describe("createSaaSPlanProvider", () => {
       });
 
       expect(plan.overrideAddingLimitations).toBe(false);
+    });
+  });
+});
+
+describe("createSaaSPlanProvider subscription selection", () => {
+  beforeEach(() => {
+    mockEnv.IS_SAAS = true;
+    mockEnv.ADMIN_EMAILS = undefined;
+  });
+
+  describe("given an organization holding more than one active subscription", () => {
+    type ActiveRow = {
+      id: string;
+      organizationId: string;
+      plan: string;
+      status: string;
+      createdAt: Date;
+    };
+
+    const NEWEST: ActiveRow = {
+      id: "sub_a",
+      organizationId: "org_1",
+      plan: PlanTypes.ENTERPRISE,
+      status: SubscriptionStatus.ACTIVE,
+      createdAt: new Date("2026-02-01T00:00:00.000Z"),
+    };
+    const OLDER: ActiveRow = {
+      id: "sub_z",
+      organizationId: "org_1",
+      plan: PlanTypes.PRO,
+      status: SubscriptionStatus.ACTIVE,
+      createdAt: new Date("2025-01-01T00:00:00.000Z"),
+    };
+
+    const planFrom = async (rows: ActiveRow[]) =>
+      (await createSaaSPlanProvider(dbHolding(rows)).getActivePlan("org_1"))
+        .type;
+
+    it("reads the newest contract, not whichever row the database lists first", async () => {
+      // Handed over oldest-first, which is what a query with no ordering can
+      // hand back, so a dropped `orderBy` resolves PRO and fails here.
+      expect(await planFrom([OLDER, NEWEST])).toBe(PlanTypes.ENTERPRISE);
+    });
+
+    it("reads the same contract whichever order the rows arrive in", async () => {
+      expect(await planFrom([NEWEST, OLDER])).toBe(PlanTypes.ENTERPRISE);
+    });
+
+    it("settles two contracts created in the same instant on the id", async () => {
+      const instant = new Date("2026-02-01T00:00:00.000Z");
+      // Highest id wins, so the ENTERPRISE row does, and it is listed second
+      // to keep arrival order from being what decides.
+      const lower = { ...OLDER, id: "sub_a", createdAt: instant };
+      const higher = { ...NEWEST, id: "sub_z", createdAt: instant };
+
+      expect(await planFrom([lower, higher])).toBe(PlanTypes.ENTERPRISE);
     });
   });
 });

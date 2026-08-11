@@ -88,6 +88,7 @@ import {
   isMetricsAuthorized,
   normalizeMetricsPath,
 } from "./server/metrics";
+import { canonicalOtlpPath } from "./server/otel/otlpPathCanonicalisation";
 import { shutdownPostHog } from "./server/posthog";
 import { verifyRedisReady } from "./server/redis";
 import { buildSecurityHeaders } from "./server/securityHeaders";
@@ -108,7 +109,17 @@ export const metricsMiddleware = promBundle({
   customLabels: { project_name: "langwatch" },
   bypass: {
     onRequest: (req) => {
-      if (/^\/(api|assets|auth|settings|share|$)/.test(req.url ?? "")) {
+      // The three root-level OTLP paths a misconfigured exporter posts to are
+      // served by the API (see the handler below), so leaving them out would
+      // hide exactly the traffic worth watching. The OTLP branch is the only
+      // one anchored at the end: the others are deliberately prefixes, while
+      // this one must not let `/v1/traces-anything` in and turn a claim of
+      // three bounded labels into an open set.
+      if (
+        /^\/(?:api|assets|auth|settings|share|v1\/(?:traces|logs|metrics)\/?(?:\?.*)?$|$)/.test(
+          req.url ?? "",
+        )
+      ) {
         return false;
       }
       return true;
@@ -279,7 +290,15 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
       });
 
       // ---- API Routes (all go through Hono) ----
-      if (pathname.startsWith("/api/")) {
+      // An exporter given the site root as its OTLP endpoint posts to
+      // `/v1/traces`, which the SPA fallback below answers with the HTML shell
+      // and a 200 — the exporter reads that as success and drops the batch.
+      // Those paths belong to the API, which canonicalises them
+      // (src/server/routes/otel-path-aliases.ts).
+      if (
+        pathname.startsWith("/api/") ||
+        canonicalOtlpPath(pathname) !== null
+      ) {
         await apiListener(req, res);
         return;
       }

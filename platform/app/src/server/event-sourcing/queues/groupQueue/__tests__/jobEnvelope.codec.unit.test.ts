@@ -2,20 +2,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import { detectCompression, MSGPACK_MIN_BYTES } from "../bodyCodec";
-import { decodeJobEnvelope, encodeJobEnvelope } from "../jobEnvelope";
+import {
+  decodeJobEnvelope,
+  encodeJobEnvelope,
+  splitEnvelope,
+} from "../jobEnvelope";
 import { TieredBlobStore } from "../tieredBlobStore";
 import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blobTestDoubles";
 
 const PROJECT = createTenantId("project-codec");
 
-function makeTiered() {
+function makeTiered(s3ThresholdBytes = 256 * 1024) {
   const redisBlobs = new InMemoryJobBlobStore();
   const objectStore = new InMemoryObjectStore();
   const tieredBlobs = new TieredBlobStore({
     redisBlobs,
     objectStoreFor: () => objectStore,
     resolveDestination: async () => ({ kind: "s3", bucket: "test-bucket" }),
-    s3ThresholdBytes: 256 * 1024,
+    s3ThresholdBytes,
   });
   return { tieredBlobs, redisBlobs, objectStore };
 }
@@ -43,6 +47,35 @@ describe("jobEnvelope body codecs", () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+  });
+
+  /** @scenario Provider migration does not change the durable queue reference format */
+  it("Provider migration does not change the durable queue reference format", async () => {
+    const { tieredBlobs } = makeTiered(1);
+    const encoded = await encodeJobEnvelope({
+      jobData: {
+        projectId: PROJECT,
+        payload: "x".repeat(300 * 1024),
+      },
+      tieredBlobs,
+      projectId: PROJECT,
+    });
+
+    const { header } = splitEnvelope(encoded);
+
+    expect(header).toMatchObject({
+      v: 2,
+      e: "s3",
+      ref: {
+        tier: "s3",
+        projectId: PROJECT,
+      },
+    });
+    expect(Object.keys(header.ref ?? {}).sort()).toEqual([
+      "hash",
+      "projectId",
+      "tier",
+    ]);
   });
 
   describe("given a blob written before the codec change (gzip + JSON)", () => {

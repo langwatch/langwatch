@@ -79,7 +79,7 @@ vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
-vi.mock("../ui/toaster", () => ({
+vi.mock("../../ui/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
