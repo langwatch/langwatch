@@ -38,7 +38,15 @@ const runAsync = async () => {
     // releases Redis along with everything else the task booted. `tryGetApp`,
     // not `getApp`, because the question here is whether a task built one at
     // all — and most do not.
-    await tryGetApp()?.close();
+    // Caught, because a rejection raised from `finally` would replace the task
+    // error rethrown above — turning a diagnosable failure into a shutdown
+    // error about the wrong thing. Closing is best-effort; the process exits
+    // either way.
+    try {
+      await tryGetApp()?.close();
+    } catch (closeError) {
+      logger.error({ error: closeError, taskName }, "failed to close the app");
+    }
     logger.info("done");
   }
 

@@ -4,7 +4,7 @@
 
 **Status:** Accepted
 
-**Related:** ADR-070 (modular package architecture — this is one bounded-context package cut from it), ADR-076 (single pnpm workspace), ADR-004 (dev environment — `REDIS_DB_INDEX` worktree isolation). Applies to Redis the rule `@langwatch/clickhouse-client` already applies to ClickHouse.
+**Related:** ADR-070 (modular package architecture — this is one bounded-context package cut from it), ADR-076 (single pnpm workspace), ADR-004 (dev environment — `REDIS_DB_INDEX` worktree isolation). Redis follows the ownership rule `@langwatch/clickhouse-client` already applies to ClickHouse.
 
 ---
 

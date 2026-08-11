@@ -170,7 +170,18 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
   // has already logged what and where (ADR-090).
   try {
     await assertRedisReady();
-  } catch {
+  } catch (err) {
+    // Synchronous stderr before exiting, for the same reason the server error
+    // handler below does it: the probe logs through pino, whose transports are
+    // async worker threads that never flush past `process.exit(1)`. Without
+    // this, an unreachable Redis is an exit(1) with no output anywhere — the
+    // exact onboarding dead-end this check exists to prevent.
+    writeSync(
+      2,
+      `[langwatch:start] Redis is not reachable, exiting: ${
+        err instanceof Error ? (err.stack ?? err.message) : String(err)
+      }\n`,
+    );
     process.exit(1);
   }
 

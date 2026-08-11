@@ -63,8 +63,13 @@ beforeAll(async () => {
 
 afterAll(async () => {
   const keys = [...writtenKeys, ...pendingKeys];
-  if (connection && keys.length > 0) {
-    await connection.del(...keys);
+  if (connection) {
+    // Per-key DEL: a multi-key DEL spanning different hash slots is rejected
+    // with CROSSSLOT when this runs against a cluster, which would throw out
+    // of `afterAll` and leave every test key behind.
+    for (const key of keys) {
+      await connection.del(key);
+    }
   }
   await resetApp();
   connection?.disconnect();

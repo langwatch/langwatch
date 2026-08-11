@@ -643,7 +643,7 @@ async function spawnScenarioChildProcess(
  */
 export async function startScenarioProcessor(
   pool: ScenarioExecutionPool,
-  deps: ProcessorDependencies = createProcessorDependencies(),
+  injectedDeps?: ProcessorDependencies,
 ): Promise<{ close: () => Promise<void> } | undefined> {
   // Skipping the processor is this function's documented outcome when there
   // is no Redis, so absence must not raise (ADR-090).
@@ -652,6 +652,12 @@ export async function startScenarioProcessor(
     logger.info("No Redis connection, skipping scenario processor");
     return undefined;
   }
+
+  // Resolved after the guard, never as a default parameter: defaults evaluate
+  // before the body runs, and `createProcessorDependencies` calls `getApp()`.
+  // As a default it would raise on an uninitialized App before the check above
+  // could answer "no Redis, skip" — the very outcome the guard exists to give.
+  const deps = injectedDeps ?? createProcessorDependencies();
 
   // Wire the spawn function into the pool
   pool.setSpawnFunction(async (jobData) => {

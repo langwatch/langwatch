@@ -36,6 +36,7 @@ vi.mock("~/server/app-layer/app", async (importOriginal) => {
 });
 
 import type { Redis } from "ioredis";
+import { tryGetApp } from "../../app-layer/app";
 import {
   getTestRedisConnection,
   startTestContainers,
@@ -373,7 +374,6 @@ describe("Event-sourcing cancellation (real Redis)", () => {
 
       // Use the REAL startScenarioProcessor with the test Redis, which the
       // `tryGetApp` mock at the top of this file serves.
-      const { tryGetApp } = await import("../../app-layer/app");
       const testConnection = tryGetApp()?.redis;
 
       // If no Redis in test env, skip (testContainers provides it)
