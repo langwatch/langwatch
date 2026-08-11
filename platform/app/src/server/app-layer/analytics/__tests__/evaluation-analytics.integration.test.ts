@@ -21,9 +21,12 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { createEvaluationReportedEvent } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/__tests__/fixtures/evaluation-events.fixtures";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
+  EvaluationAnalyticsFoldProjection,
   type EvaluationAnalyticsRow,
+  projectEvaluationAnalyticsStateToRow,
 } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
 import type { EvaluationAnalyticsRollupRow } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalyticsRollup.mapProjection";
 
@@ -244,5 +247,52 @@ describe("evaluation_analytics — write path (ADR-034 Phase 6)", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]!.score).toBeCloseTo(0.9, 5);
     expect(rows[0]!.passed).toBe(true);
+  });
+
+  it("folds an errored evaluation carrying a stray verdict into a row with Passed and Score NULL (#6833)", async () => {
+    const evalId = `eval-errored-verdict-${nanoid()}`;
+    const fold = new EvaluationAnalyticsFoldProjection({
+      store: { store: async () => {}, get: async () => null },
+    });
+
+    const state = fold.handleEvaluationReported(
+      createEvaluationReportedEvent({
+        tenantId,
+        evaluationId: evalId,
+        status: "error",
+        passed: false,
+        score: 0.1,
+        occurredAt: bucketMs,
+      }),
+      fold.init(),
+    );
+    const row = projectEvaluationAnalyticsStateToRow({
+      state: { ...state, LastEventOccurredAt: bucketMs },
+      tenantId,
+      version: EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
+    });
+
+    await slimRepo.upsert(row);
+    await flushAsyncInserts();
+
+    const result = await ch.query({
+      query: `
+        SELECT Status AS status, Passed AS passed, Score AS score
+        FROM evaluation_analytics
+        WHERE TenantId = {tenantId:String}
+          AND EvaluationId = {evalId:String}
+      `,
+      query_params: { tenantId, evalId },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<{
+      status: string;
+      passed: boolean | null;
+      score: number | null;
+    }>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.status).toBe("error");
+    expect(rows[0]!.passed).toBeNull();
+    expect(rows[0]!.score).toBeNull();
   });
 });

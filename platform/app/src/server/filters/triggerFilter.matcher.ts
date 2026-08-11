@@ -505,13 +505,17 @@ function matchEvaluatorIdFilter(
     case "evaluations.evaluator_id.has_passed":
       return evaluations.some(
         (e) =>
-          evaluatorIds.includes(e.evaluatorId) && hasVerdict(e) && e.passed !== null,
+          evaluatorIds.includes(e.evaluatorId) &&
+          hasVerdict(e) &&
+          e.passed !== null,
       );
 
     case "evaluations.evaluator_id.has_score":
       return evaluations.some(
         (e) =>
-          evaluatorIds.includes(e.evaluatorId) && hasVerdict(e) && e.score !== null,
+          evaluatorIds.includes(e.evaluatorId) &&
+          hasVerdict(e) &&
+          e.score !== null,
       );
 
     case "evaluations.evaluator_id.has_label":
@@ -536,7 +540,9 @@ function matchEvaluationValues(
     case "evaluations.passed":
       return evaluations.some(
         (e) =>
-          hasVerdict(e) && e.passed !== null && values.includes(String(e.passed)),
+          hasVerdict(e) &&
+          e.passed !== null &&
+          values.includes(String(e.passed)),
       );
 
     case "evaluations.score":
