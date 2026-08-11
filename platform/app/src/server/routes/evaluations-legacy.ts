@@ -1703,6 +1703,11 @@ const dispatchToClickHouse = async (
     const evalPromises = batchEvaluation.evaluations.map((evaluation) => {
       const targetId = evaluation.target_id ?? "";
       const evaluationId = `local_eval_${runId}_${evaluation.evaluator}_${evaluation.index}_${targetId}`;
+      // A verdict is only real when the evaluator ran to completion — an
+      // errored/skipped run's stray passed/score/label must not reach
+      // analytics or triggers as a real result (#6833). Same guard as the
+      // evaluation-execution service producer.
+      const hasVerdict = evaluation.status === "processed";
       return appInstance.evaluations
         .reportEvaluation({
           tenantId: project.id,
@@ -1712,9 +1717,11 @@ const dispatchToClickHouse = async (
           evaluatorName: evaluation.name ?? undefined,
           status: evaluation.status,
           score:
-            typeof evaluation.score === "number" ? evaluation.score : undefined,
-          passed: evaluation.passed ?? undefined,
-          label: evaluation.label ?? undefined,
+            hasVerdict && typeof evaluation.score === "number"
+              ? evaluation.score
+              : undefined,
+          passed: hasVerdict ? (evaluation.passed ?? undefined) : undefined,
+          label: hasVerdict ? (evaluation.label ?? undefined) : undefined,
           details: evaluation.details ?? undefined,
           occurredAt: Date.now(),
         })

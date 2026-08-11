@@ -62,17 +62,17 @@ export interface EvaluationAnalyticsRollupRow {
   status: string;
   /** Always 1 (one row per terminal event). */
   evalCount: number;
-  /** 1 when `passed === true`, 0 otherwise (including null and false). */
+  /** 1 when `status === 'processed'` and `passed === true`, 0 otherwise. */
   passCount: number;
-  /** 1 when `passed === false`, 0 otherwise (including null and true). */
+  /** 1 when `status === 'processed'` and `passed === false`, 0 otherwise. */
   failCount: number;
   /** 1 when `status === 'error'`, 0 otherwise. */
   errorCount: number;
   /** 1 when `status === 'skipped'`, 0 otherwise. */
   skippedCount: number;
-  /** The event's `score` value, 0 when null. Pairs with `scoreCount` for true avg. */
+  /** The event's `score` when `status === 'processed'`, 0 otherwise. Pairs with `scoreCount` for true avg. */
   scoreSum: number;
-  /** 1 when `score` is a finite number, 0 otherwise. Divisor for true avg. */
+  /** 1 when `status === 'processed'` and `score` is a finite number, 0 otherwise. Divisor for true avg. */
   scoreCount: number;
   /**
    * Evaluation wall-clock duration in ms. Always 0 from this projection —
@@ -97,20 +97,38 @@ function toStartOfMinute(unixMs: number): Date {
   return new Date(Math.floor(unixMs / 60_000) * 60_000);
 }
 
-function scoreOf(value: number | null | undefined): {
+/**
+ * A verdict (passed/score) is only real when the evaluation ran to
+ * completion — producers can attach `passed: false` alongside
+ * `status: "error"` (#6833). Without the status guard such an event
+ * increments FailCount AND ErrorCount, so the counters double-count and
+ * pass-rate reads an infrastructure error as a real fail.
+ */
+function scoreOf(
+  status: string,
+  value: number | null | undefined,
+): {
   scoreSum: number;
   scoreCount: number;
 } {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
+  if (
+    status !== "processed" ||
+    typeof value !== "number" ||
+    !Number.isFinite(value)
+  ) {
     return { scoreSum: 0, scoreCount: 0 };
   }
   return { scoreSum: value, scoreCount: 1 };
 }
 
-function passFailOf(value: boolean | null | undefined): {
+function passFailOf(
+  status: string,
+  value: boolean | null | undefined,
+): {
   passCount: number;
   failCount: number;
 } {
+  if (status !== "processed") return { passCount: 0, failCount: 0 };
   if (value === true) return { passCount: 1, failCount: 0 };
   if (value === false) return { passCount: 0, failCount: 1 };
   return { passCount: 0, failCount: 0 };
@@ -167,8 +185,8 @@ export class EvaluationAnalyticsRollupMapProjection
     event: EvaluationCompletedEvent,
   ): EvaluationAnalyticsRollupRow {
     const { score, passed, status } = event.data;
-    const { scoreSum, scoreCount } = scoreOf(score);
-    const { passCount, failCount } = passFailOf(passed);
+    const { scoreSum, scoreCount } = scoreOf(status, score);
+    const { passCount, failCount } = passFailOf(status, passed);
     return {
       tenantId: event.tenantId,
       bucketStart: toStartOfMinute(event.occurredAt),
@@ -195,8 +213,8 @@ export class EvaluationAnalyticsRollupMapProjection
     event: EvaluationReportedEvent,
   ): EvaluationAnalyticsRollupRow {
     const { score, passed, status, evaluatorType } = event.data;
-    const { scoreSum, scoreCount } = scoreOf(score);
-    const { passCount, failCount } = passFailOf(passed);
+    const { scoreSum, scoreCount } = scoreOf(status, score);
+    const { passCount, failCount } = passFailOf(status, passed);
     return {
       tenantId: event.tenantId,
       bucketStart: toStartOfMinute(event.occurredAt),

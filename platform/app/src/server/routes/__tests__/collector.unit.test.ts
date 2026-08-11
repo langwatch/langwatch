@@ -332,6 +332,32 @@ describe("POST /api/collector", () => {
     });
   });
 
+  describe("given an evaluation reporting an error alongside a verdict", () => {
+    it("dispatches with status error and no verdict (passed/score/label null)", async () => {
+      const res = await postCollector({
+        trace_id: "trace-1",
+        spans: [makeSpan(1)],
+        evaluations: [
+          {
+            name: "eval-a",
+            score: 0.1,
+            passed: false,
+            label: "bad",
+            error: { message: "provider timeout", stacktrace: [] },
+          },
+        ],
+      });
+
+      expect(res.status).toBe(200);
+      const call = mockReportEvaluation.mock.calls[0]![0];
+      expect(call.status).toBe("error");
+      expect(call.passed).toBeNull();
+      expect(call.score).toBeNull();
+      expect(call.label).toBeNull();
+      expect(call.error).toBe("provider timeout");
+    });
+  });
+
   describe("given multiple evaluations where one dispatch fails", () => {
     describe("when the first reportEvaluation throws", () => {
       it("continues dispatching the rest and reports the failure count", async () => {

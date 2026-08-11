@@ -178,6 +178,11 @@ export function createCustomEvaluationSyncReactor(
           evaluation.evaluator_id ?? evaluationNameAutoslug(evaluation.name);
         const status =
           evaluation.status ?? (evaluation.error ? "error" : "processed");
+        // A verdict is only real when the evaluator ran to completion — an
+        // errored/skipped run's stray passed/score/label must not reach
+        // analytics or triggers as a real result (#6833). Same guard as the
+        // evaluation-execution service producer.
+        const hasVerdict = status === "processed";
         const occurredAt = event.occurredAt;
 
         try {
@@ -190,9 +195,9 @@ export function createCustomEvaluationSyncReactor(
             traceId,
             isGuardrail: evaluation.is_guardrail ?? undefined,
             status,
-            score: evaluation.score ?? null,
-            passed: evaluation.passed ?? null,
-            label: evaluation.label ?? null,
+            score: hasVerdict ? (evaluation.score ?? null) : null,
+            passed: hasVerdict ? (evaluation.passed ?? null) : null,
+            label: hasVerdict ? (evaluation.label ?? null) : null,
             details: evaluation.details ?? null,
             error: evaluation.error?.message ?? null,
             errorDetails: evaluation.error?.stacktrace?.join("\n") ?? null,
