@@ -79,10 +79,13 @@ export function needsAttention(status: SchedulerJobStatus): boolean {
 export const SLOT_STALE_AFTER_MS = 15 * 60_000;
 
 /** Whether a slot has been held long enough that clearing it is a repair. */
-export function isSlotStale(
-  job: SchedulerJobLike & { updatedAt?: string },
-  now: number,
-): boolean {
+export function isSlotStale({
+  job,
+  now,
+}: {
+  job: SchedulerJobLike & { updatedAt?: string };
+  now: number;
+}): boolean {
   if (!job.currentSlot) return false;
   const heldSince = job.updatedAt ?? job.currentSlot;
   return now - new Date(heldSince).getTime() >= SLOT_STALE_AFTER_MS;

@@ -132,9 +132,14 @@ side effect of viewing or of navigating.
 - **A repair states its own risk.** Clearing a stuck lease can, in the
   pathological case, admit a second worker. Say so in the confirmation and let
   the operator take the trade knowingly.
-- **A destructive-adjacent repeat gets a second gate.** Re-running an
-  already-fired slot may deliver twice; that case should feel different from the
-  ordinary one.
+- **A control that can deliver twice should not exist if it can be avoided.**
+  The scheduler's run-now was narrowed to "fire the next slot" rather than
+  "re-fire slot S" precisely so the double-delivery case has no control at all.
+  Prefer removing the shape over gating it; where it genuinely must exist, gate
+  it behind a second, explicit confirmation.
+- **A confirmation with an unresolvable name is not a confirmation.** If the
+  tenant's name cannot be resolved, withhold the control rather than confirm
+  against a ksuid the operator cannot check.
 - Audit every mutation and surface recent operator actions on the same page, so
   "why did this happen at 03:14" is answerable where it was caused.
 - Failures follow [error-handling](./error-handling.md): a refusal an operator

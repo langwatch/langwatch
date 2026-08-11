@@ -37,6 +37,11 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
   const anomaliesQuery = api.ops.listAnomalies.useQuery(undefined, {
     refetchInterval: 30_000,
   });
+  // "We could not check" is not "all clear". Until this query has actually
+  // answered, the health line must not claim anomalies are clear — collapsing
+  // an unknown into a green line is how an operator gets told nothing is wrong
+  // during the exact incident that broke the query.
+  const anomaliesKnown = anomaliesQuery.isSuccess;
   const anomalyCount = anomaliesQuery.data?.anomalies.length ?? 0;
 
   return (
@@ -48,6 +53,7 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
       <HealthLine
         errorClusterCount={data.topErrors.length}
         anomalyCount={anomalyCount}
+        anomaliesKnown={anomaliesKnown}
       />
 
       <ParkedCard

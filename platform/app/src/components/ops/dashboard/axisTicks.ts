@@ -28,10 +28,19 @@ export function niceMax(raw: number): number {
 /**
  * A maximum that divides cleanly into `AXIS_INTERVALS`, so every tick is a
  * round number rather than a repeating decimal.
+ *
+ * The rounding happens in units of the value's OWN magnitude, not in whole
+ * numbers. Rounding to a whole multiple of the interval count destroys a
+ * sub-unit axis: a completed-per-second rate peaking at 0.25 would take an
+ * axis maximum of 4, flattening the series onto the baseline — and idle rates
+ * below 1/s are the common case on a quiet queue, not an edge case.
  */
 export function alignedMax(raw: number): number {
-  const nice = niceMax(raw);
-  return Math.ceil(nice / AXIS_INTERVALS) * AXIS_INTERVALS;
+  // `niceMax` already returns 1, 2, 5 or 10 times a power of ten, and each of
+  // those divides into four parts that terminate (0.25, 0.5, 1.25, 2.5 …), so
+  // it needs no further alignment. The earlier version rounded up to a whole
+  // multiple of the interval count, which is what broke sub-unit axes.
+  return niceMax(raw);
 }
 
 /** Evenly spaced ticks from 0 to `max`, one per shared gridline. */

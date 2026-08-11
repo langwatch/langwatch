@@ -13,11 +13,17 @@ import { CheckCircle2 } from "lucide-react";
 export function HealthLine({
   errorClusterCount,
   anomalyCount,
+  anomaliesKnown,
 }: {
   errorClusterCount: number;
   anomalyCount: number;
+  /** False until the anomaly query has actually answered. */
+  anomaliesKnown: boolean;
 }) {
   if (errorClusterCount > 0 || anomalyCount > 0) return null;
+  // Say nothing rather than say "clear" on an answer we do not have. An
+  // all-clear the operator cannot trust is worse than no line at all.
+  if (!anomaliesKnown) return null;
 
   return (
     <Card.Root overflow="hidden">

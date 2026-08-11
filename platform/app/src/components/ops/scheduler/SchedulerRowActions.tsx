@@ -19,14 +19,15 @@ type PendingAction = "pause" | "resume" | "clear" | "run" | null;
 export function SchedulerRowActions({
   scheduleId,
   targetId,
-  projectLabel,
+  projectName,
   status,
   canClearSlot,
   onDone,
 }: {
   scheduleId: string;
   targetId: string;
-  projectLabel: string;
+  /** Resolved project NAME, or null when it could not be resolved. */
+  projectName: string | null;
   status: SchedulerJobStatus;
   /** Only true once the slot has been held past the staleness threshold. */
   canClearSlot: boolean;
@@ -56,6 +57,14 @@ export function SchedulerRowActions({
 
   const isPaused = status === "paused";
 
+  // ADR-091's one human guard: the risk here is the right action on the wrong
+  // tenant, and a ksuid an operator cannot verify at a glance does not guard
+  // against that. With no resolved name, run-now — the only control that can
+  // deliver something to a customer — is withheld rather than confirmed
+  // against an identifier nobody can read.
+  const tenant = projectName;
+  const canRunNow = tenant !== null;
+
   return (
     <>
       <Menu.Root>
@@ -72,9 +81,11 @@ export function SchedulerRowActions({
         <Portal>
           <Menu.Positioner>
             <Menu.Content>
-              <Menu.Item value="run" onClick={() => setPending("run")}>
-                Run now
-              </Menu.Item>
+              {canRunNow && (
+                <Menu.Item value="run" onClick={() => setPending("run")}>
+                  Run now
+                </Menu.Item>
+              )}
               <Menu.Item
                 value="active"
                 onClick={() => setPending(isPaused ? "resume" : "pause")}
@@ -97,7 +108,7 @@ export function SchedulerRowActions({
         onConfirm={() => runNow.mutate({ scheduleId })}
         isLoading={runNow.isPending}
         title="Run this schedule now?"
-        description={`${targetId} will run for ${projectLabel} as soon as a worker picks it up, exactly as a scheduled run would. Anything it delivers goes to that project.`}
+        description={`${targetId} will run for ${tenant} as soon as a worker picks it up, exactly as a scheduled run would. Anything it delivers goes to that project.`}
       />
 
       <ConfirmDialog
@@ -106,7 +117,7 @@ export function SchedulerRowActions({
         onConfirm={() => setActive.mutate({ scheduleId, active: false })}
         isLoading={setActive.isPending}
         title="Pause this schedule?"
-        description={`${targetId} will stop running for ${projectLabel} until you resume it. A run already in progress continues — pausing does not cancel it.`}
+        description={`${targetId} will stop running for ${tenant ?? "this project"} until you resume it. A run already in progress continues — pausing does not cancel it.`}
       />
 
       <ConfirmDialog
@@ -115,7 +126,7 @@ export function SchedulerRowActions({
         onConfirm={() => setActive.mutate({ scheduleId, active: true })}
         isLoading={setActive.isPending}
         title="Resume this schedule?"
-        description={`${targetId} will go back on the calendar for ${projectLabel} and run at its next scheduled time.`}
+        description={`${targetId} will go back on the calendar for ${tenant ?? "this project"} and run at its next scheduled time.`}
       />
 
       <ConfirmDialog
@@ -124,7 +135,7 @@ export function SchedulerRowActions({
         onConfirm={() => clearSlot.mutate({ scheduleId })}
         isLoading={clearSlot.isPending}
         title="Clear this stuck slot?"
-        description={`This releases the run ${targetId} has been holding for ${projectLabel} so it can be picked up again. If the original worker is somehow still alive, the slot could be worked twice.`}
+        description={`This releases the run ${targetId} has been holding for ${tenant ?? "this project"} so it can be picked up again. If the original worker is somehow still alive, the slot could be worked twice.`}
       />
     </>
   );

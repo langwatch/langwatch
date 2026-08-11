@@ -3,9 +3,11 @@ import {
   compareForAttention,
   deriveLoopHealth,
   deriveStatus,
+  isSlotStale,
   latenessMs,
   needsAttention,
   type SchedulerJobLike,
+  SLOT_STALE_AFTER_MS,
   summarize,
 } from "../schedulerStatus";
 
@@ -228,6 +230,41 @@ describe("deriveLoopHealth", () => {
 
       expect(health.healthy).toBe(true);
       expect(health.lastFiredAt).toBeNull();
+    });
+  });
+});
+
+describe("isSlotStale", () => {
+  describe("given a slot claimed moments ago", () => {
+    it("is not stale, so clearing is not offered", () => {
+      // This gate guards the one control that can admit a second worker to a
+      // slot; offering it against a healthy run is the failure mode.
+      expect(
+        isSlotStale({
+          job: { ...job({ currentSlot: at(-1_000) }), updatedAt: at(-1_000) },
+          now: NOW,
+        }),
+      ).toBe(false);
+    });
+  });
+
+  describe("given a slot held past the threshold", () => {
+    it("is stale", () => {
+      const held = at(-SLOT_STALE_AFTER_MS - 1_000);
+      expect(
+        isSlotStale({
+          job: { ...job({ currentSlot: held }), updatedAt: held },
+          now: NOW,
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("given no slot in flight", () => {
+    it("is never stale", () => {
+      expect(isSlotStale({ job: job({ currentSlot: null }), now: NOW })).toBe(
+        false,
+      );
     });
   });
 });

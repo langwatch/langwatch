@@ -15,7 +15,13 @@ export function TopErrorsCard({
 }: Pick<DashboardData, "topErrors" | "errorClustersBound">) {
   if (topErrors.length === 0) return null;
 
-  const truncated = errorClustersBound.total > errorClustersBound.included;
+  // The table renders at most five rows. That bound is the page's own, not the
+  // snapshot's, and an undisclosed cap is exactly the silent truncation this
+  // work exists to remove — so it reports itself alongside the snapshot's.
+  const VISIBLE_ROWS = 5;
+  const shown = Math.min(topErrors.length, VISIBLE_ROWS);
+  const known = Math.max(errorClustersBound.total, topErrors.length);
+  const truncated = known > shown;
 
   return (
     <Card.Root overflow="hidden">
@@ -25,7 +31,7 @@ export function TopErrorsCard({
         </Text>
         {truncated && (
           <Text textStyle="xs" color="fg.muted">
-            showing {errorClustersBound.included} of {errorClustersBound.total}
+            showing {shown} of {known}
           </Text>
         )}
       </HStack>
@@ -43,7 +49,7 @@ export function TopErrorsCard({
             </Table.Row>
           </Table.Header>
           <Table.Body>
-            {topErrors.slice(0, 5).map((err) => (
+            {topErrors.slice(0, VISIBLE_ROWS).map((err) => (
               <Table.Row key={`${err.queueName}::${err.normalizedMessage}`}>
                 <Table.Cell>
                   <Text color="red.500" fontWeight="medium">

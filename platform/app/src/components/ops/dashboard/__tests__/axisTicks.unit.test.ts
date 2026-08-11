@@ -48,12 +48,24 @@ describe("axisTicks", () => {
       expect(ticks[ticks.length - 1]).toBe(alignedMax(437));
     });
 
-    it("produces round ticks rather than repeating decimals", () => {
-      for (const max of [1, 7, 99, 437, 2_000, 129_091]) {
+    it("produces ticks that terminate rather than repeating decimals", () => {
+      for (const max of [0.25, 1, 7, 99, 437, 2_000, 129_091]) {
         for (const tick of axisTicks(max)) {
-          expect(Number.isInteger(tick)).toBe(true);
+          // A terminating decimal survives a round-trip through 4 decimal
+          // places; 1/3-style repeats do not.
+          expect(Number(tick.toFixed(4))).toBe(tick);
         }
       }
+    });
+
+    it("keeps a sub-unit axis at its own magnitude", () => {
+      // Rounding a rate that peaks at 0.25/s up to a maximum of 4 flattens the
+      // series onto the baseline — and an idle queue's rates live below 1/s.
+      expect(alignedMax(0.25)).toBeLessThanOrEqual(1);
+      expect(alignedMax(0.6)).toBeLessThanOrEqual(1);
+      expect(axisTicks(0.25)[axisTicks(0.25).length - 1]).toBeLessThanOrEqual(
+        1,
+      );
     });
 
     it("never places a tick below the data", () => {

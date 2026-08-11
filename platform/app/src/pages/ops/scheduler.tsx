@@ -170,9 +170,9 @@ export default function OpsSchedulerPage() {
                             <SchedulerRowActions
                               scheduleId={job.id}
                               targetId={job.targetId}
-                              projectLabel={job.projectName ?? job.projectId}
+                              projectName={job.projectName}
                               status={status}
-                              canClearSlot={isSlotStale(job, now)}
+                              canClearSlot={isSlotStale({ job, now })}
                               onDone={() => void jobs.refetch()}
                             />
                           )}

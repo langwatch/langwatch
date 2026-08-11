@@ -162,6 +162,18 @@ function ParkedGroupList({
     );
   }
 
+  // A failed read is not an empty result. Rendering "nothing is parked any
+  // more" over an error tells the operator the problem resolved itself during
+  // the incident that broke the query.
+  if (query.isError) {
+    return (
+      <Text textStyle="xs" color="red.500" paddingX={6} paddingY={3}>
+        Could not load this tenant's parked groups. The count above still stands
+        — do not read this as cleared.
+      </Text>
+    );
+  }
+
   const groups = query.data?.groups ?? [];
   if (groups.length === 0) {
     return (
