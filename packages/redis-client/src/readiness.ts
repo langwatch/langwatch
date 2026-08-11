@@ -36,15 +36,23 @@ export interface PingRedisOptions {
  * - the query string, which ioredis also accepts a `password` in.
  *
  * The path survives, since it is the database index and is not a secret.
+ *
+ * The query is cut with `indexOf` rather than a second regex. `/\?.*$/` reads
+ * as the obvious way to write it and is quadratic: `.` does not cross a
+ * newline while an unanchored `$` only matches end of input, so every `?` in a
+ * newline-bearing value re-scans the tail before failing.
  */
 function withoutCredentials(target: string): string {
   return target
     .split(",")
-    .map((entry) =>
-      entry
-        .replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/]*@/i, "$1")
-        .replace(/\?.*$/, ""),
-    )
+    .map((entry) => {
+      const withoutUserinfo = entry.replace(
+        /^([a-z][a-z0-9+.-]*:\/\/)[^/]*@/i,
+        "$1",
+      );
+      const query = withoutUserinfo.indexOf("?");
+      return query === -1 ? withoutUserinfo : withoutUserinfo.slice(0, query);
+    })
     .join(",");
 }
 
