@@ -522,6 +522,7 @@ function matchEvaluatorIdFilter(
       return evaluations.some(
         (e) =>
           evaluatorIds.includes(e.evaluatorId) &&
+          hasVerdict(e) &&
           e.label !== null &&
           e.label !== "",
       );
@@ -556,7 +557,7 @@ function matchEvaluationValues(
 
     case "evaluations.label":
       return evaluations.some(
-        (e) => e.label !== null && values.includes(e.label),
+        (e) => hasVerdict(e) && e.label !== null && values.includes(e.label),
       );
 
     default:

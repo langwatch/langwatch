@@ -653,6 +653,16 @@ describe("matchesEvaluationFilters", () => {
       };
       expect(matchesEvaluationFilters(evals, filters)).toBe(false);
     });
+
+    it("does not match a label attached to an errored run", () => {
+      const evals = [
+        makeEval({ evaluatorId: "eval-abc", status: "error", label: "toxic" }),
+      ];
+      const filters: TriggerFilters = {
+        "evaluations.evaluator_id.has_label": ["eval-abc"],
+      };
+      expect(matchesEvaluationFilters(evals, filters)).toBe(false);
+    });
   });
 
   describe("when filtering by evaluations.passed (keyed)", () => {
@@ -780,6 +790,20 @@ describe("matchesEvaluationFilters", () => {
         "evaluations.label": { "eval-abc": ["positive", "negative"] },
       };
       expect(matchesEvaluationFilters(evals, filters)).toBe(true);
+    });
+
+    it("does not match a label attached to an errored run", () => {
+      const evals = [
+        makeEval({
+          evaluatorId: "eval-abc",
+          status: "error",
+          label: "positive",
+        }),
+      ];
+      const filters: TriggerFilters = {
+        "evaluations.label": { "eval-abc": ["positive"] },
+      };
+      expect(matchesEvaluationFilters(evals, filters)).toBe(false);
     });
 
     it("does not match when label is not in filter values", () => {
