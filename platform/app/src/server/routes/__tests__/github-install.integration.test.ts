@@ -45,6 +45,7 @@ const isOrganizationMember = vi.fn();
 const hasOrganizationPermission = vi.fn();
 const recordInstallation = vi.fn();
 const handleWebhookEvent = vi.fn();
+const applyPullRequestEvent = vi.fn();
 const auditLog = vi.fn();
 const isEnabled = vi.fn();
 
@@ -58,6 +59,12 @@ vi.mock("~/server/app-layer", () => ({
         isOrganizationMember: (...a: unknown[]) => isOrganizationMember(...a),
         recordInstallation: (...a: unknown[]) => recordInstallation(...a),
         handleWebhookEvent: (...a: unknown[]) => handleWebhookEvent(...a),
+      },
+      pullRequests: {
+        mapping: {
+          applyPullRequestEvent: (...a: unknown[]) =>
+            applyPullRequestEvent(...a),
+        },
       },
     },
   }),
@@ -116,6 +123,7 @@ beforeEach(() => {
   isOrganizationMember.mockResolvedValue(true);
   hasOrganizationPermission.mockResolvedValue(true);
   recordInstallation.mockResolvedValue({ accountLogin: "acme" });
+  applyPullRequestEvent.mockResolvedValue(true);
   isEnabled.mockResolvedValue(true);
 });
 
@@ -456,6 +464,98 @@ describe("POST /api/github/webhook", () => {
       });
       expect(res.status).toBe(200);
       expect(handleWebhookEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when GitHub announces a pull request", () => {
+    /** A `pull_request` delivery, trimmed to the fields the route reads. */
+    function pullRequestBody(over: Record<string, unknown> = {}) {
+      return JSON.stringify({
+        action: "opened",
+        installation: { id: 555 },
+        repository: {
+          name: "widgets",
+          full_name: "acme/widgets",
+          owner: { login: "acme" },
+        },
+        pull_request: {
+          number: 7,
+          html_url: "https://github.com/acme/widgets/pull/7",
+          title: "Link sessions to pull requests",
+          state: "open",
+          draft: false,
+          merged_at: null,
+          closed_at: null,
+          created_at: "2026-08-01T10:00:00.000Z",
+          user: { login: "someone" },
+          head: { ref: "feat/linkage", repo: { full_name: "acme/widgets" } },
+        },
+        ...over,
+      });
+    }
+
+    async function deliver(body: string, signature?: string) {
+      return await request("http://localhost/api/github/webhook", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-GitHub-Event": "pull_request",
+          "X-Hub-Signature-256": signature ?? sign(body),
+        },
+        body,
+      });
+    }
+
+    it("links the head branch, and touches no installation state", async () => {
+      const res = await deliver(pullRequestBody());
+
+      expect(res.status).toBe(200);
+      expect(applyPullRequestEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "opened",
+          installationId: "555",
+          repositoryOwner: "acme",
+          repositoryName: "widgets",
+          headBranch: "feat/linkage",
+          pullRequest: expect.objectContaining({ number: 7, state: "open" }),
+        }),
+      );
+      expect(handleWebhookEvent).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Every announcement is acknowledged, applied or not" */
+    it("acks a delivery it has nothing to do with", async () => {
+      // A pull request opened from a fork: the head lives somewhere else, so
+      // linkage has nothing to write for it.
+      const forked = pullRequestBody({
+        pull_request: {
+          ...JSON.parse(pullRequestBody()).pull_request,
+          head: {
+            ref: "feat/linkage",
+            repo: { full_name: "contributor/widgets" },
+          },
+        },
+      });
+
+      const res = await deliver(forked);
+
+      expect(res.status).toBe(200);
+      expect(applyPullRequestEvent).not.toHaveBeenCalled();
+    });
+
+    it("refuses a wrongly signed announcement before reading it", async () => {
+      const res = await deliver(pullRequestBody(), "sha256=deadbeef");
+
+      expect(res.status).toBe(401);
+      expect(applyPullRequestEvent).not.toHaveBeenCalled();
+    });
+
+    it("acks even when applying the announcement fails", async () => {
+      applyPullRequestEvent.mockRejectedValue(new Error("postgres is away"));
+
+      const res = await deliver(pullRequestBody());
+
+      expect(res.status).toBe(200);
     });
   });
 });

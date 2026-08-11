@@ -384,6 +384,13 @@ export class GithubInstallationsService {
    * repository they cannot actually reach still fails honestly at the mapping
    * call. Deliberately pessimistic for "selected" with no cached list, which
    * means the install-time fetch failed and we genuinely do not know.
+   *
+   * False on an instance with no App configured, for the same reason
+   * `resolveInstallationForRepository` returns null there: stored rows can
+   * outlive the credentials that made them usable, and every lookup they would
+   * authorise short-circuits before it reaches GitHub. Answering "covered" off
+   * those rows alone tells a reader the connection reaches a repository that
+   * nothing on this instance can read.
    */
   async coversRepository({
     organizationId,
@@ -392,6 +399,7 @@ export class GithubInstallationsService {
     organizationId: string;
     repositoryFullName: string;
   }): Promise<boolean> {
+    if (!this.configured) return false;
     const wanted = repositoryFullName.toLowerCase();
     const owner = wanted.split("/")[0] ?? "";
     const installations =

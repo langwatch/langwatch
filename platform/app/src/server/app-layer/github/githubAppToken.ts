@@ -180,8 +180,14 @@ function readRateLimit(res: Response): GithubRateLimitedError | null {
   });
 }
 
-/** The subset of GitHub's pull-request JSON the read path reads. */
-interface GithubApiPullRequest {
+/**
+ * The subset of GitHub's pull-request JSON the read path reads.
+ *
+ * Exported because a `pull_request` webhook carries the very same object under
+ * `pull_request`, so the event path normalises through the function below
+ * rather than growing a second reading of GitHub's field names.
+ */
+export interface GithubApiPullRequest {
   number: number;
   html_url: string;
   title: string;
@@ -193,7 +199,7 @@ interface GithubApiPullRequest {
   user?: { login?: string } | null;
 }
 
-function toPullRequestSummary(
+export function toPullRequestSummary(
   pull: GithubApiPullRequest,
 ): GithubPullRequestSummary {
   return {

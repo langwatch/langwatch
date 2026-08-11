@@ -7,10 +7,11 @@
  *   GET  /api/github/setup: GitHub's post-install redirect. Verify the
  *        signed state, record the installation against the organization it was
  *        bound to, then postMessage the opener (popup) or 302 back (redirect).
- *   POST /api/github/webhook: GitHub installation webhooks. Verifies the
- *        X-Hub-Signature-256 HMAC and keeps the installation row + repo
+ *   POST /api/github/webhook: GitHub webhooks. Verifies the
+ *        X-Hub-Signature-256 HMAC, then keeps the installation row + repo
  *        selection fresh (created/deleted/suspend/unsuspend, repositories
- *        added/removed). Idempotent.
+ *        added/removed) and links a pull request to its head branch the moment
+ *        `pull_request` says one exists. Idempotent.
  *
  * There is no per-user OAuth: an installation IS the access boundary, PRs are
  * bot-authored, and tokens are minted on demand from the App private key. The
@@ -50,6 +51,7 @@ import {
   signGithubInstallState,
   verifyGithubInstallState,
 } from "~/server/app-layer/github/githubInstallState";
+import { parseGithubPullRequestEvent } from "~/server/app-layer/github/githubPullRequestEvent";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 
@@ -434,6 +436,28 @@ function verifyWebhookSignature(
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+/**
+ * A `pull_request` delivery: link the head branch to its pull request now,
+ * rather than waiting for that branch's next scheduled recheck, which for a
+ * branch that has been asked about a few times already is up to a day away.
+ *
+ * Acked whatever happens, like every other event here. A payload this instance
+ * cannot act on is not something a GitHub retry fixes, and the periodic recheck
+ * is the backstop under a delivery that fails or never arrives at all.
+ */
+async function applyPullRequestEvent(payload: unknown): Promise<void> {
+  const event = parseGithubPullRequestEvent(payload);
+  if (!event) return;
+  try {
+    await getApp().github.pullRequests.mapping.applyPullRequestEvent(event);
+  } catch (err) {
+    logger.warn(
+      { err, action: event.action, installationId: event.installationId },
+      "github pull request webhook handling failed",
+    );
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleWebhook(c: any): Promise<Response> {
   if (!getGithubAppConfig().webhookSecret) {
@@ -445,10 +469,7 @@ async function handleWebhook(c: any): Promise<Response> {
     return c.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  let payload: {
-    action?: string;
-    installation?: { id?: number };
-  };
+  let payload: unknown;
   try {
     payload = JSON.parse(rawBody);
   } catch {
@@ -456,9 +477,21 @@ async function handleWebhook(c: any): Promise<Response> {
   }
 
   const eventType = c.req.header("x-github-event");
-  const action = payload.action as WebhookAction | undefined;
+
+  if (eventType === "pull_request") {
+    await applyPullRequestEvent(payload);
+    return c.json({ received: true });
+  }
+
+  const installationEvent = payload as {
+    action?: string;
+    installation?: { id?: number };
+  };
+  const action = installationEvent.action as WebhookAction | undefined;
   const installationId =
-    payload.installation?.id != null ? String(payload.installation.id) : null;
+    installationEvent.installation?.id != null
+      ? String(installationEvent.installation.id)
+      : null;
 
   if (
     (eventType !== "installation" &&

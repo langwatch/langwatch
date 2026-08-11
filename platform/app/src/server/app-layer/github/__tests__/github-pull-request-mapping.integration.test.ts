@@ -45,6 +45,7 @@ import {
   type GithubAppTokenService,
   GithubRateLimitedError,
 } from "../githubAppToken";
+import { parseGithubPullRequestEvent } from "../githubPullRequestEvent";
 import { PrismaGithubInstallationsRepository } from "../repositories/github-installations.prisma.repository";
 import { PrismaGithubPullRequestsRepository } from "../repositories/github-pull-requests.prisma.repository";
 import { codingAgentSessionRow } from "./codingAgentSessionRowFixture";
@@ -139,6 +140,86 @@ function servicesWith({
   );
 
   return { mapping, installations, appTokens };
+}
+
+/** A `pull_request` delivery, in the shape GitHub posts to the webhook route. */
+function pullRequestDelivery({
+  action = "opened",
+  number = 41,
+  branch = "feat/announced",
+  state = "open",
+  mergedAt = null,
+  closedAt = null,
+  title = "Link sessions to pull requests",
+}: {
+  action?: string;
+  number?: number;
+  branch?: string;
+  state?: string;
+  mergedAt?: string | null;
+  closedAt?: string | null;
+  title?: string;
+} = {}) {
+  return {
+    action,
+    installation: { id: INSTALLATION_ID },
+    repository: {
+      name: "widgets",
+      full_name: REPO_FULL_NAME,
+      owner: { login: `acme-${tag}` },
+    },
+    pull_request: {
+      number,
+      html_url: `https://github.com/${REPO_FULL_NAME}/pull/${number}`,
+      title,
+      state,
+      draft: false,
+      merged_at: mergedAt,
+      closed_at: closedAt,
+      created_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      user: { login: "someone" },
+      head: { ref: branch, repo: { full_name: REPO_FULL_NAME } },
+    },
+  };
+}
+
+/** Deliver one webhook the way the route does: parse first, then apply. */
+async function deliver(
+  mapping: GithubPullRequestMappingService,
+  payload: unknown,
+): Promise<boolean> {
+  const event = parseGithubPullRequestEvent(payload);
+  if (!event) throw new Error("the delivery did not parse");
+  return await mapping.applyPullRequestEvent(event);
+}
+
+function branchCheckFor(headBranch: string) {
+  return repository.findBranchCheck({
+    organizationId,
+    repositoryHost: "github.com",
+    repositoryFullName: REPO_FULL_NAME,
+    headBranch,
+  });
+}
+
+function storedFor(headBranch: string) {
+  return repository.findAllByBranches({
+    organizationId,
+    repositoryHost: "github.com",
+    repositoryFullName: REPO_FULL_NAME,
+    headBranches: [headBranch],
+  });
+}
+
+/** Put a branch where the bug left it: four empty answers, a day-long wait. */
+async function armLongestBackoff(headBranch: string): Promise<void> {
+  await prisma.githubBranchPullRequestCheck.updateMany({
+    where: { organizationId, headBranch },
+    data: {
+      attempts: 4,
+      recheckAfter: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    },
+  });
 }
 
 async function seedInstallation(): Promise<void> {
@@ -606,6 +687,241 @@ describe("branch pull-request mapping", () => {
       expect(remainingPullRequests.map((row) => row.headBranch)).toEqual([
         "feat/still-read",
       ]);
+    });
+  });
+
+  describe("given GitHub announces a pull request over the webhook", () => {
+    /** @scenario "A pull request opened on a branch is linked without waiting for a recheck" */
+    it("stores it straight away and never lists the branch", async () => {
+      await seedInstallation();
+      const listPullRequestsForHead = vi.fn();
+      const { mapping } = servicesWith({ listPullRequestsForHead });
+
+      const applied = await deliver(
+        mapping,
+        pullRequestDelivery({ branch: "feat/announced", number: 41 }),
+      );
+
+      expect(applied).toBe(true);
+      const stored = await storedFor("feat/announced");
+      expect(stored.map((row) => row.prNumber)).toEqual([41]);
+      expect(stored[0]?.state).toBe("open");
+      expect(stored[0]?.authorLogin).toBe("someone");
+      // Stored lowercased, exactly as a listing's answer would be.
+      expect(stored[0]?.repositoryFullName).toBe(REPO_FULL_NAME.toLowerCase());
+      expect(listPullRequestsForHead).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The announcement clears the branch's backoff" */
+    it("clears a day-long wait and puts the ladder back at its first rung", async () => {
+      await seedInstallation();
+      const listPullRequestsForHead = vi.fn().mockResolvedValue([]);
+      const { mapping } = servicesWith({ listPullRequestsForHead });
+      await mapping.mapBranch({
+        organizationId,
+        repositoryHost: "github.com",
+        repositoryOwner: `acme-${tag}`,
+        repositoryName: "widgets",
+        headBranch: "feat/backed-off",
+      });
+      await armLongestBackoff("feat/backed-off");
+
+      await deliver(
+        mapping,
+        pullRequestDelivery({ branch: "feat/backed-off", number: 61 }),
+      );
+
+      const linked = await branchCheckFor("feat/backed-off");
+      expect(linked?.recheckAfter).toBeNull();
+      expect(linked?.notFoundAt).toBeNull();
+      expect(linked?.attempts).toBe(0);
+
+      // And the ladder really starts over: age the branch past the freshness
+      // window so the next lookup is allowed, and let it answer empty.
+      await prisma.githubBranchPullRequestCheck.updateMany({
+        where: { organizationId, headBranch: "feat/backed-off" },
+        data: { lastCheckedAt: new Date(Date.now() - 20 * 60 * 1000) },
+      });
+      await mapping.mapBranch({
+        organizationId,
+        repositoryHost: "github.com",
+        repositoryOwner: `acme-${tag}`,
+        repositoryName: "widgets",
+        headBranch: "feat/backed-off",
+      });
+
+      const afterEmpty = await branchCheckFor("feat/backed-off");
+      expect(afterEmpty?.attempts).toBe(1);
+      // The shortest rung, not the longest one it was sitting on.
+      expect(afterEmpty?.recheckAfter?.getTime()).toBeLessThan(
+        Date.now() + 20 * 60 * 1000,
+      );
+    });
+
+    /** @scenario "A pull request that merges is announced as merged" */
+    it("turns the stored pull request from open into merged", async () => {
+      await seedInstallation();
+      const { mapping } = servicesWith({
+        listPullRequestsForHead: vi.fn(),
+      });
+      await deliver(
+        mapping,
+        pullRequestDelivery({ branch: "feat/merging", number: 71 }),
+      );
+      expect((await storedFor("feat/merging"))[0]?.prMergedAt).toBeNull();
+
+      const mergedAt = new Date().toISOString();
+      await deliver(
+        mapping,
+        pullRequestDelivery({
+          branch: "feat/merging",
+          number: 71,
+          action: "closed",
+          state: "closed",
+          mergedAt,
+          closedAt: mergedAt,
+        }),
+      );
+
+      const stored = await storedFor("feat/merging");
+      expect(stored).toHaveLength(1);
+      expect(stored[0]?.state).toBe("closed");
+      expect(stored[0]?.prMergedAt).not.toBeNull();
+    });
+
+    /** @scenario "A redelivered announcement changes nothing" */
+    it("leaves one unchanged pull request after a duplicate delivery", async () => {
+      await seedInstallation();
+      const { mapping } = servicesWith({
+        listPullRequestsForHead: vi.fn(),
+      });
+      const payload = pullRequestDelivery({
+        branch: "feat/redelivered",
+        number: 81,
+      });
+
+      await deliver(mapping, payload);
+      const first = await storedFor("feat/redelivered");
+      await deliver(mapping, payload);
+      const second = await storedFor("feat/redelivered");
+
+      expect(second).toHaveLength(1);
+      expect(second[0]?.prNumber).toBe(first[0]?.prNumber);
+      expect(second[0]?.title).toBe(first[0]?.title);
+      expect(second[0]?.state).toBe(first[0]?.state);
+      expect(second[0]?.mappedAt.getTime()).toBe(first[0]?.mappedAt.getTime());
+      const check = await branchCheckFor("feat/redelivered");
+      expect(check?.attempts).toBe(0);
+      expect(check?.recheckAfter).toBeNull();
+    });
+
+    it("never lowers a branch's stored pull-request count", async () => {
+      await seedInstallation();
+      const { mapping } = servicesWith({
+        listPullRequestsForHead: vi
+          .fn()
+          .mockResolvedValue([
+            apiPullRequest({ number: 91 }),
+            apiPullRequest({ number: 92 }),
+          ]),
+      });
+      await mapping.mapBranch({
+        organizationId,
+        repositoryHost: "github.com",
+        repositoryOwner: `acme-${tag}`,
+        repositoryName: "widgets",
+        headBranch: "feat/two-pulls",
+      });
+      expect((await branchCheckFor("feat/two-pulls"))?.prCount).toBe(2);
+
+      // An announcement speaks for one pull request, not for the branch.
+      await deliver(
+        mapping,
+        pullRequestDelivery({ branch: "feat/two-pulls", number: 91 }),
+      );
+
+      expect((await branchCheckFor("feat/two-pulls"))?.prCount).toBe(2);
+    });
+
+    /** @scenario "A branch whose announcement never arrived is still linked by the recheck" */
+    it("is still linked by the sweep when no announcement is delivered at all", async () => {
+      await seedInstallation();
+      const listPullRequestsForHead = vi.fn().mockResolvedValueOnce([]);
+      const { mapping } = servicesWith({ listPullRequestsForHead });
+      await mapping.mapBranch({
+        organizationId,
+        repositoryHost: "github.com",
+        repositoryOwner: `acme-${tag}`,
+        repositoryName: "widgets",
+        headBranch: "feat/missed-hook",
+      });
+
+      // The pull request is opened and the delivery never arrives, so only the
+      // branch's backoff elapsing can find it.
+      listPullRequestsForHead.mockResolvedValue([
+        apiPullRequest({ number: 99 }),
+      ]);
+      await prisma.githubBranchPullRequestCheck.updateMany({
+        where: { organizationId, headBranch: "feat/missed-hook" },
+        data: { recheckAfter: new Date(Date.now() - 1000) },
+      });
+
+      await runBranchRecheckPass({ repository, mapping });
+
+      expect(
+        (await storedFor("feat/missed-hook")).map((r) => r.prNumber),
+      ).toEqual([99]);
+    });
+  });
+
+  describe("given a branch sitting on the longest backoff with no pull request", () => {
+    /** @scenario "A new session on a branch brings its next question forward" */
+    it("brings its next question forward when a session folds on it", async () => {
+      await seedInstallation();
+      const { mapping } = servicesWith({
+        listPullRequestsForHead: vi.fn().mockResolvedValue([]),
+      });
+      const request = {
+        tenantId: projectId,
+        repositoryHost: "github.com",
+        repositoryOwner: `acme-${tag}`,
+        repositoryName: "widgets",
+        headBranch: "feat/still-working",
+      };
+      await mapping.requestBranchMapping(request);
+      await armLongestBackoff("feat/still-working");
+
+      // A second session folds on the same branch.
+      await mapping.requestBranchMapping(request);
+
+      const check = await branchCheckFor("feat/still-working");
+      expect(check?.recheckAfter?.getTime()).toBeGreaterThan(Date.now());
+      expect(check?.recheckAfter?.getTime()).toBeLessThanOrEqual(
+        Date.now() + 15 * 60 * 1000,
+      );
+      // Back to the start of the ladder, so the next empty answer waits
+      // fifteen minutes rather than resuming near a day.
+      expect(check?.attempts).toBe(0);
+    });
+
+    /** @scenario "Repeated folds on one branch still ask GitHub once per backoff" */
+    it("still asks GitHub once however many sessions fold inside the window", async () => {
+      await seedInstallation();
+      const listPullRequestsForHead = vi.fn().mockResolvedValue([]);
+      const { mapping } = servicesWith({ listPullRequestsForHead });
+      const request = {
+        tenantId: projectId,
+        repositoryHost: "github.com",
+        repositoryOwner: `acme-${tag}`,
+        repositoryName: "widgets",
+        headBranch: "feat/busy",
+      };
+
+      await mapping.requestBranchMapping(request);
+      await mapping.requestBranchMapping(request);
+      await mapping.requestBranchMapping(request);
+
+      expect(listPullRequestsForHead).toHaveBeenCalledTimes(1);
     });
   });
 });

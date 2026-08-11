@@ -395,6 +395,34 @@ export class PrismaGithubPullRequestsRepository
     });
   }
 
+  async bringBranchRecheckForward({
+    organizationId,
+    repositoryHost,
+    repositoryFullName,
+    headBranch,
+    dueAt,
+  }: {
+    organizationId: string;
+    repositoryHost: string;
+    repositoryFullName: string;
+    headBranch: string;
+    dueAt: Date;
+  }): Promise<void> {
+    await this.prisma.githubBranchPullRequestCheck.updateMany({
+      where: {
+        organizationId,
+        repositoryHost: normalizeHost(repositoryHost),
+        repositoryFullName: normalizeFullName(repositoryFullName),
+        headBranch,
+        // Only a branch waiting longer than this. A row already due sooner is
+        // left alone, which is also what keeps a live lookup claim, whose lease
+        // sits seconds away, from being extended by a concurrent fold.
+        recheckAfter: { gt: dueAt },
+      },
+      data: { recheckAfter: dueAt, attempts: 0 },
+    });
+  }
+
   /**
    * The cross-organization sweep read. The three predicates below are matched
    * LITERALLY by the org-tenancy guard's bound for this model, so a change here

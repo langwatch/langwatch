@@ -190,6 +190,25 @@ export interface GithubPullRequestsRepository {
   }): Promise<void>;
 
   /**
+   * Pull a branch's next question forward to `dueAt`, and put its attempt count
+   * back to zero, for a branch fresh session activity says is still being
+   * worked on.
+   *
+   * Only ever brings it forward: a row already due at or before `dueAt` is left
+   * alone, so this cannot push a question further away, and a branch that has
+   * already mapped (`recheckAfter` is null) is not touched at all. That bound is
+   * what makes it safe to call on every fold — several agent worktrees folding
+   * on one branch within a minute all land on the same due date.
+   */
+  bringBranchRecheckForward(params: {
+    organizationId: string;
+    repositoryHost: string;
+    repositoryFullName: string;
+    headBranch: string;
+    dueAt: Date;
+  }): Promise<void>;
+
+  /**
    * The branches the background sweep should ask GitHub about again: mapped to
    * nothing, past their backoff, and still being asked about by a reader within
    * the last week.
@@ -258,6 +277,7 @@ export class NullGithubPullRequestsRepository
     return false;
   }
   async touchBranchCheckRequestedAt(): Promise<void> {}
+  async bringBranchRecheckForward(): Promise<void> {}
   async findRecheckDue(): Promise<GithubBranchCheckRow[]> {
     return [];
   }
