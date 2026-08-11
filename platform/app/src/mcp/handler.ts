@@ -10,7 +10,11 @@
  * - GET  /mcp          — Streamable HTTP polling
  * - DELETE /mcp        — Close session
  * - GET  /mcp/health   — Health check (no auth)
- * - GET  /.well-known/oauth-authorization-server — OAuth metadata
+ * - GET  /sse          — SSE transport stream
+ * - POST /messages, /sse/messages — SSE transport client messages
+ * - GET  /.well-known/oauth-protected-resource[/mcp|/sse] — RFC 9728 metadata
+ * - GET  /.well-known/oauth-authorization-server[/mcp|/sse] — OAuth metadata
+ * - POST /oauth/register — Dynamic client registration
  * - POST /oauth/token  — OAuth token endpoint
  */
 
@@ -28,11 +32,14 @@ import { createLogger } from "@langwatch/observability";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
+import type { Redis } from "ioredis";
 import { prisma } from "../server/db";
 import { connection as redis } from "../server/redis";
+import type { NextApiRequest } from "../types/next-stubs";
 import { decrypt, encrypt } from "../utils/encryption";
+import { getClientIp as clientIpFromRequest } from "../utils/getClientIp";
 import { registerGovernanceMcpTools } from "./governance-tools";
-import { registerOAuthClient } from "./oauthClientRegistry";
+import { getOAuthClient, registerOAuthClient } from "./oauthClientRegistry";
 
 const logger = createLogger("langwatch:mcp");
 
@@ -47,6 +54,20 @@ const REDIS_SESSION_PREFIX = "mcp:session:";
 
 /** Redis key for the set of session IDs belonging to an API key. */
 const REDIS_SESSION_SET_PREFIX = "mcp:sessions_by_key:";
+
+/** Redis key prefix for SSE transport sessions. */
+const REDIS_SSE_SESSION_PREFIX = "mcp:sse:session:";
+
+/** Redis key for the set of SSE session IDs belonging to an API key. */
+const REDIS_SSE_SESSION_SET_PREFIX = "mcp:sse:sessions_by_key:";
+
+/**
+ * Redis pub/sub channel prefix carrying a client message to whichever replica
+ * holds the SSE stream for that session. An SSE stream is bound to the socket
+ * that opened it, so a replica that receives a message for a session it does
+ * not hold cannot answer it and cannot recreate the stream either.
+ */
+const REDIS_SSE_RELAY_CHANNEL_PREFIX = "mcp:sse:relay:";
 
 /** OAuth token TTL in seconds (30 days — matches cookie-based login duration). */
 const TOKEN_TTL_SECONDS = 30 * 24 * 3600;
@@ -113,6 +134,31 @@ function createRateLimiter({
       entries.clear();
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Request logging
+// ---------------------------------------------------------------------------
+
+/**
+ * Fields a route handler learned mid-request that belong on its access log
+ * line. MCP requests return before the app's Hono stack, so this surface has
+ * no access log of its own and a failing integration is otherwise invisible.
+ *
+ * Only identifiers go in here. Bearer tokens, API keys and authorization codes
+ * never do: the log is the one place they would outlive the request.
+ */
+const requestLogFields = new WeakMap<ServerResponse, Record<string, string>>();
+
+function noteLogFields(
+  res: ServerResponse,
+  fields: Record<string, string | undefined>,
+): void {
+  const existing = requestLogFields.get(res) ?? {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (value) existing[key] = value;
+  }
+  requestLogFields.set(res, existing);
 }
 
 // ---------------------------------------------------------------------------
@@ -185,10 +231,16 @@ export function createMcpHandler(): McpHandler {
   const sseSessions = new Map<string, SseSessionState>();
   const oauthTokens = new Map<string, OAuthTokenEntry>();
 
-  // Rate limiters
-  const oauthRateLimiter = createRateLimiter({
+  // Rate limiters. Registration and token exchange get a budget each: a
+  // client that just registered immediately exchanges a code, so one shared
+  // bucket makes the second call pay for the first.
+  const registerRateLimiter = createRateLimiter({
     windowMs: 60_000,
-    maxRequests: 10,
+    maxRequests: 30,
+  });
+  const tokenRateLimiter = createRateLimiter({
+    windowMs: 60_000,
+    maxRequests: 30,
   });
   const authFailRateLimiter = createRateLimiter({
     windowMs: 60_000,
@@ -216,11 +268,13 @@ export function createMcpHandler(): McpHandler {
       }
     }
 
-    // Sweep idle SSE sessions (SSE is connection-bound, no Redis needed)
+    // Sweep idle SSE sessions. The stream itself is connection-bound, but the
+    // Redis record and the relay subscription that let other replicas reach it
+    // have to go with it.
     for (const [id, session] of sseSessions) {
       if (now - session.lastActivityAt > SESSION_MAX_AGE_MS) {
         session.transport.close().catch(() => {});
-        sseSessions.delete(id);
+        releaseSseSession(id, session.apiKey).catch(() => {});
       }
     }
 
@@ -232,7 +286,8 @@ export function createMcpHandler(): McpHandler {
     }
 
     // Sweep expired rate limiter entries
-    oauthRateLimiter.sweep();
+    registerRateLimiter.sweep();
+    tokenRateLimiter.sweep();
     authFailRateLimiter.sweep();
   }, REAPER_INTERVAL_MS);
 
@@ -243,20 +298,47 @@ export function createMcpHandler(): McpHandler {
   // Route matching
   // -------------------------------------------------------------------------
 
+  const PROTECTED_RESOURCE_METADATA_PATH =
+    "/.well-known/oauth-protected-resource";
+  const AUTHORIZATION_SERVER_METADATA_PATH =
+    "/.well-known/oauth-authorization-server";
+
   const MCP_ROUTES = new Set([
     "/mcp",
     "/mcp/health",
     "/sse",
     "/messages",
-    "/.well-known/oauth-protected-resource",
-    "/.well-known/oauth-authorization-server",
+    // Some clients resolve the endpoint the SSE stream advertises by appending
+    // it to the path they connected on, so the same handler answers both.
+    "/sse/messages",
+    PROTECTED_RESOURCE_METADATA_PATH,
+    AUTHORIZATION_SERVER_METADATA_PATH,
+    "/.well-known/openid-configuration",
     "/oauth/token",
     "/oauth/register",
   ]);
 
+  /**
+   * RFC 9728 §3.1 lets a client that only knows the resource URL ask for
+   * metadata at the resource's path under the well-known prefix, and modern
+   * MCP clients try that form before the bare one. Claiming the whole subtree
+   * keeps those probes from reaching the single-page-app fallback, which
+   * answers 200 text/html and leaves the client parsing markup as JSON.
+   */
+  const OAUTH_METADATA_PREFIXES = [
+    `${PROTECTED_RESOURCE_METADATA_PATH}/`,
+    `${AUTHORIZATION_SERVER_METADATA_PATH}/`,
+  ];
+
   function isMcpRoute(pathname: string): boolean {
-    return MCP_ROUTES.has(pathname);
+    if (MCP_ROUTES.has(pathname)) return true;
+    return OAUTH_METADATA_PREFIXES.some((prefix) =>
+      pathname.startsWith(prefix),
+    );
   }
+
+  /** The resource paths whose metadata this server publishes. */
+  const METADATA_RESOURCE_SUFFIXES = new Set(["/mcp", "/sse"]);
 
   // -------------------------------------------------------------------------
   // CORS — Access-Control-Allow-Origin: * is intentional; the Bearer token
@@ -315,6 +397,33 @@ export function createMcpHandler(): McpHandler {
     });
   }
 
+  /**
+   * Reads and parses a JSON request body, answering the caller itself when the
+   * body is unusable. Returns `undefined` in that case — a response has
+   * already been sent and the caller must stop.
+   */
+  async function readJsonBody(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<unknown | undefined> {
+    let raw: string;
+    try {
+      raw = await readBody(req);
+    } catch (err) {
+      if (err instanceof Error && err.message === "Request body too large") {
+        sendJson(res, 413, { error: "Request body too large" });
+        return undefined;
+      }
+      throw err;
+    }
+    try {
+      return JSON.parse(raw);
+    } catch {
+      sendJson(res, 400, { error: "Invalid JSON body" });
+      return undefined;
+    }
+  }
+
   function parseFormBody(raw: string): Record<string, string> {
     const params = new URLSearchParams(raw);
     const result: Record<string, string> = {};
@@ -324,13 +433,32 @@ export function createMcpHandler(): McpHandler {
     return result;
   }
 
+  /**
+   * The rate-limit bucket for a caller.
+   *
+   * The socket address alone is the load balancer for every caller once the
+   * app runs behind Cloudflare and an NLB, which collapses every client in the
+   * world into one bucket and lets a single busy integration lock everyone
+   * else out. The proxy headers are the only per-client signal that survives
+   * that hop, so they are what we key on, with the socket address as the
+   * fallback for direct connections. Shares the header priority (and the
+   * address validation) with the rest of the app rather than re-deriving it.
+   */
   function getClientIp(req: IncomingMessage): string {
-    // Use socket address only — X-Forwarded-For is client-controlled and
-    // would let attackers bypass rate limits by spoofing different IPs.
-    // Behind a reverse proxy (K8s, Cloudflare), the socket address is the
-    // proxy's IP, which means rate limiting is per-proxy not per-client.
-    // This is acceptable: the proxy itself limits concurrent connections.
-    return req.socket.remoteAddress ?? "unknown";
+    return clientIpFromRequest(req as unknown as NextApiRequest) ?? "unknown";
+  }
+
+  /**
+   * RFC 6749 §5.2 shape for a throttled OAuth request. A bare
+   * `{"error":"Too many requests"}` is not an OAuth error object, so clients
+   * report it as a protocol failure instead of backing off.
+   */
+  function sendRateLimited(res: ServerResponse, retryAfterSeconds = 60): void {
+    res.setHeader("Retry-After", String(retryAfterSeconds));
+    sendJson(res, 429, {
+      error: "temporarily_unavailable",
+      error_description: "Rate limit exceeded, retry later",
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -615,6 +743,29 @@ export function createMcpHandler(): McpHandler {
     }
   }
 
+  /** Count live sessions of one transport for an API key across all pods. */
+  async function countLiveSessions({
+    setKey,
+    sessionPrefix,
+  }: {
+    setKey: string;
+    sessionPrefix: string;
+  }): Promise<number> {
+    if (!redis) return 0;
+    const members = await redis.smembers(setKey);
+    let liveCount = 0;
+    for (const id of members) {
+      const exists = await redis.exists(`${sessionPrefix}${id}`);
+      if (exists) {
+        liveCount++;
+      } else {
+        // Stale entry — session expired, clean it from the set
+        await redis.srem(setKey, id);
+      }
+    }
+    return liveCount;
+  }
+
   /** Count sessions for an API key across all pods via Redis. */
   async function sessionCountForKey(apiKey: string): Promise<number> {
     if (!redis) {
@@ -629,32 +780,151 @@ export function createMcpHandler(): McpHandler {
       return count;
     }
     try {
-      // Count Streamable HTTP sessions from Redis (cross-pod)
-      const members = await redis.smembers(
-        `${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`,
-      );
-      let liveCount = 0;
-      for (const id of members) {
-        const exists = await redis.exists(`${REDIS_SESSION_PREFIX}${id}`);
-        if (exists) {
-          liveCount++;
-        } else {
-          // Stale entry — session expired, clean it from the set
-          await redis.srem(
-            `${REDIS_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`,
-            id,
-          );
-        }
-      }
-      // SSE sessions are connection-bound (not in Redis) — count local only
-      for (const session of sseSessions.values()) {
-        if (session.apiKey === apiKey) liveCount++;
-      }
-      return liveCount;
+      const keyHash = hashApiKey(apiKey);
+      const streamable = await countLiveSessions({
+        setKey: `${REDIS_SESSION_SET_PREFIX}${keyHash}`,
+        sessionPrefix: REDIS_SESSION_PREFIX,
+      });
+      const sse = await countLiveSessions({
+        setKey: `${REDIS_SSE_SESSION_SET_PREFIX}${keyHash}`,
+        sessionPrefix: REDIS_SSE_SESSION_PREFIX,
+      });
+      return streamable + sse;
     } catch (err) {
       logger.error({ error: err }, "Redis session count failed");
       return 0; // Fail open to avoid blocking users
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // SSE session records and the cross-replica message relay
+  // -------------------------------------------------------------------------
+
+  /**
+   * Lifetime of an SSE session record, matching the idle reap. A replica that
+   * dies without closing its streams leaves records behind, and this is what
+   * eventually clears them.
+   */
+  const SSE_SESSION_REDIS_TTL_SECONDS = SESSION_MAX_AGE_MS / 1000;
+
+  /**
+   * Dedicated subscriber connection. ioredis puts a connection into subscriber
+   * mode, where it can run no other command, so the relay cannot share the
+   * app's connection. One per handler covers every session it holds.
+   */
+  let relaySubscriber: Redis | null = null;
+  const relayListeners = new Map<string, (raw: string) => void>();
+
+  function getRelaySubscriber(): Redis | null {
+    if (relaySubscriber) return relaySubscriber;
+    if (!redis) return null;
+    try {
+      // Cluster.duplicate() takes optional overrides and returns a Cluster;
+      // both shapes answer subscribe/unsubscribe/on identically.
+      const subscriber = (redis.duplicate as () => Redis)();
+      subscriber.on("message", (channel: string, message: string) => {
+        relayListeners.get(channel)?.(message);
+      });
+      subscriber.on("error", (err: unknown) => {
+        logger.error({ error: err }, "MCP SSE relay subscriber error");
+      });
+      relaySubscriber = subscriber;
+      return subscriber;
+    } catch (err) {
+      logger.error({ error: err }, "Failed to open MCP SSE relay subscriber");
+      return null;
+    }
+  }
+
+  function relayChannel(sessionId: string): string {
+    return `${REDIS_SSE_RELAY_CHANNEL_PREFIX}${sessionId}`;
+  }
+
+  /** Record an SSE session so other replicas can find and reach it. */
+  async function storeSseSessionInRedis(
+    sessionId: string,
+    apiKey: string,
+  ): Promise<void> {
+    if (!redis) return;
+    const setKey = `${REDIS_SSE_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`;
+    await redis.set(
+      `${REDIS_SSE_SESSION_PREFIX}${sessionId}`,
+      JSON.stringify({
+        encryptedApiKey: encrypt(apiKey),
+        createdAt: Date.now(),
+      }),
+      "EX",
+      SSE_SESSION_REDIS_TTL_SECONDS,
+    );
+    await redis.sadd(setKey, sessionId);
+    await redis.expire(setKey, SSE_SESSION_REDIS_TTL_SECONDS);
+  }
+
+  /** Keep an active SSE session from being reaped, wherever it is driven from. */
+  async function touchSseSessionInRedis(
+    sessionId: string,
+    apiKey: string,
+  ): Promise<void> {
+    if (!redis) return;
+    try {
+      await redis.expire(
+        `${REDIS_SSE_SESSION_PREFIX}${sessionId}`,
+        SSE_SESSION_REDIS_TTL_SECONDS,
+      );
+      await redis.expire(
+        `${REDIS_SSE_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`,
+        SSE_SESSION_REDIS_TTL_SECONDS,
+      );
+    } catch {
+      // Non-critical — the session still works until the TTL expires
+    }
+  }
+
+  async function getSseSessionFromRedis(
+    sessionId: string,
+  ): Promise<string | null> {
+    if (!redis) return null;
+    try {
+      const data = await redis.get(`${REDIS_SSE_SESSION_PREFIX}${sessionId}`);
+      if (!data) return null;
+      const stored = JSON.parse(data) as { encryptedApiKey: string };
+      return decrypt(stored.encryptedApiKey);
+    } catch (err) {
+      logger.error({ error: err }, "Redis SSE session lookup failed");
+      return null;
+    }
+  }
+
+  async function removeSseSessionFromRedis(
+    sessionId: string,
+    apiKey?: string,
+  ): Promise<void> {
+    if (!redis) return;
+    try {
+      await redis.del(`${REDIS_SSE_SESSION_PREFIX}${sessionId}`);
+      if (apiKey) {
+        await redis.srem(
+          `${REDIS_SSE_SESSION_SET_PREFIX}${hashApiKey(apiKey)}`,
+          sessionId,
+        );
+      }
+    } catch {
+      // Best-effort cleanup
+    }
+  }
+
+  /** Drop every trace of an SSE session: local map, relay subscription, Redis. */
+  async function releaseSseSession(
+    sessionId: string,
+    apiKey: string,
+  ): Promise<void> {
+    sseSessions.delete(sessionId);
+    const channel = relayChannel(sessionId);
+    relayListeners.delete(channel);
+    if (relaySubscriber) {
+      await relaySubscriber.unsubscribe(channel).catch(() => {});
+    }
+    await removeSseSessionFromRedis(sessionId, apiKey);
   }
 
   // -------------------------------------------------------------------------
@@ -665,17 +935,37 @@ export function createMcpHandler(): McpHandler {
     sendJson(res, 200, { status: "ok" });
   }
 
+  /**
+   * `resourceSuffix` is the resource path a client asked about when it used
+   * the RFC 9728 path-suffixed form. It is echoed back as the `resource`
+   * identifier so a client validating the document against the URL it is
+   * about to call finds them equal.
+   */
   function handleProtectedResourceMetadata(
     _req: IncomingMessage,
     res: ServerResponse,
+    resourceSuffix = "",
   ): void {
     const baseUrl = process.env.BASE_HOST ?? "https://app.langwatch.ai";
 
     sendJson(res, 200, {
-      resource: baseUrl,
+      resource: `${baseUrl}${resourceSuffix}`,
       authorization_servers: [baseUrl],
       bearer_methods_supported: ["header"],
       scopes_supported: ["mcp:tools"],
+    });
+  }
+
+  /**
+   * Answers the OAuth discovery subtree this server claims but does not
+   * publish a document for. Falling through to the single-page app would give
+   * the client 200 text/html; a JSON 404 is what lets it move on to the
+   * document that does exist.
+   */
+  function handleUnknownMetadata(res: ServerResponse): void {
+    sendJson(res, 404, {
+      error: "not_found",
+      error_description: "No metadata document is published at this path",
     });
   }
 
@@ -704,11 +994,11 @@ export function createMcpHandler(): McpHandler {
     res: ServerResponse,
   ): Promise<void> {
     const ip = getClientIp(req);
-    if (oauthRateLimiter.isBlocked(ip)) {
-      sendJson(res, 429, { error: "Too many requests" });
+    if (registerRateLimiter.isBlocked(ip)) {
+      sendRateLimited(res);
       return;
     }
-    oauthRateLimiter.track(ip);
+    registerRateLimiter.track(ip);
 
     let raw: string;
     try {
@@ -768,6 +1058,8 @@ export function createMcpHandler(): McpHandler {
       return;
     }
 
+    noteLogFields(res, { clientId });
+
     sendJson(res, 201, {
       client_id: clientId,
       client_name: clientName,
@@ -778,17 +1070,40 @@ export function createMcpHandler(): McpHandler {
     });
   }
 
+  /**
+   * RFC 6749 §2.3.1 client credentials carried in an `Authorization: Basic`
+   * header. Public clients registered here have no secret, so the password
+   * half is expected to be empty and is not checked; the header is only
+   * another place a client may put its `client_id`. Both halves are
+   * form-urlencoded per the same section.
+   */
+  function clientIdFromBasicAuth(req: IncomingMessage): string | null {
+    const header = req.headers.authorization;
+    if (!header?.toLowerCase().startsWith("basic ")) return null;
+    try {
+      const decoded = Buffer.from(header.slice(6).trim(), "base64").toString(
+        "utf-8",
+      );
+      const separator = decoded.indexOf(":");
+      const rawClientId =
+        separator === -1 ? decoded : decoded.slice(0, separator);
+      return decodeURIComponent(rawClientId) || null;
+    } catch {
+      return null;
+    }
+  }
+
   async function handleOAuthToken(
     req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
     // Rate limit token endpoint per IP
     const ip = getClientIp(req);
-    if (oauthRateLimiter.isBlocked(ip)) {
-      sendJson(res, 429, { error: "Too many requests" });
+    if (tokenRateLimiter.isBlocked(ip)) {
+      sendRateLimited(res);
       return;
     }
-    oauthRateLimiter.track(ip);
+    tokenRateLimiter.track(ip);
 
     let raw: string;
     try {
@@ -841,7 +1156,7 @@ export function createMcpHandler(): McpHandler {
       });
       return;
     }
-    const clientIdParam = params.client_id;
+    const clientIdParam = params.client_id ?? clientIdFromBasicAuth(req);
     if (!clientIdParam) {
       sendJson(res, 400, {
         error: "invalid_request",
@@ -849,6 +1164,7 @@ export function createMcpHandler(): McpHandler {
       });
       return;
     }
+    noteLogFields(res, { clientId: clientIdParam });
 
     // Look up auth code from Redis
     if (!redis) {
@@ -867,6 +1183,22 @@ export function createMcpHandler(): McpHandler {
     }
 
     if (!authCodeData) {
+      // A registration that fell out of Redis takes its outstanding codes with
+      // it, and both failures look the same from here. Telling a client whose
+      // registration is gone that its *code* was bad sends it round the
+      // authorize loop forever; `invalid_client` is the code that makes it
+      // register again (RFC 6749 §5.2).
+      const registeredClient = await getOAuthClient(clientIdParam).catch(
+        () => null,
+      );
+      if (!registeredClient) {
+        sendJson(res, 401, {
+          error: "invalid_client",
+          error_description:
+            "Unknown client_id — register again via dynamic client registration",
+        });
+        return;
+      }
       sendJson(res, 400, {
         error: "invalid_grant",
         error_description: "Invalid or expired authorization code",
@@ -955,6 +1287,79 @@ export function createMcpHandler(): McpHandler {
     });
   }
 
+  /**
+   * Rebuilds a Streamable HTTP session on this replica from its Redis record,
+   * for a session first created on another one. Returns null when no record
+   * exists, and throws when the SDK internals the rebuild depends on have
+   * moved.
+   */
+  async function recoverStreamableSession({
+    sessionId,
+    incomingToken,
+  }: {
+    sessionId: string;
+    incomingToken: string | null;
+  }): Promise<SessionState | null> {
+    const redisApiKey = await getSessionFromRedis(sessionId);
+    if (!redisApiKey) return null;
+
+    // WORKAROUND: The SDK transport starts uninitialized — we patch its
+    // inner state so it accepts non-init requests with the existing
+    // session ID. This accesses private fields of the SDK's
+    // StreamableHTTPServerTransport wrapper and the underlying
+    // WebStandardStreamableHTTPServerTransport.
+    // Tested against @modelcontextprotocol/sdk@1.29.0.
+    // See: https://github.com/modelcontextprotocol/typescript-sdk/issues/1658
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => sessionId,
+    });
+
+    // Runtime assertion: verify the internal structure hasn't changed
+    const transportAny = transport as unknown as Record<string, unknown>;
+    if (
+      !transportAny._webStandardTransport ||
+      typeof transportAny._webStandardTransport !== "object"
+    ) {
+      throw new Error(
+        "StreamableHTTPServerTransport internal structure changed — " +
+          "Redis session recovery unavailable. Update the SDK workaround.",
+      );
+    }
+
+    const inner = transportAny._webStandardTransport as Record<string, unknown>;
+    inner._initialized = true;
+    inner.sessionId = sessionId;
+
+    // Re-resolve to recover OAuth userId if the token still has one;
+    // graceful degradation to undefined for direct-apiKey sessions.
+    const recoveredCtx = incomingToken
+      ? await resolveSessionContext(incomingToken)
+      : null;
+    const session: SessionState = {
+      transport,
+      apiKey: redisApiKey,
+      userId: recoveredCtx?.userId,
+      lastActivityAt: Date.now(),
+    };
+    sessions.set(sessionId, session);
+
+    transport.onclose = () => {
+      sessions.delete(sessionId);
+    };
+
+    const sessionServer = createMcpServer();
+    registerGovernanceMcpTools(sessionServer, {
+      prisma,
+      apiKey: redisApiKey,
+      callerUserId: recoveredCtx?.userId,
+    });
+    await handleWithSessionConfig(redisApiKey, () =>
+      sessionServer.connect(transport),
+    );
+
+    return session;
+  }
+
   async function handleMcpPost(
     req: IncomingMessage,
     res: ServerResponse,
@@ -989,67 +1394,14 @@ export function createMcpHandler(): McpHandler {
 
       // L2: Redis lookup — session may live on another pod
       if (!session) {
-        const redisApiKey = await getSessionFromRedis(sessionId);
-        if (redisApiKey) {
-          // Recreate transport locally for this pod.
-          // WORKAROUND: The SDK transport starts uninitialized — we patch its
-          // inner state so it accepts non-init requests with the existing
-          // session ID. This accesses private fields of the SDK's
-          // StreamableHTTPServerTransport wrapper and the underlying
-          // WebStandardStreamableHTTPServerTransport.
-          // Tested against @modelcontextprotocol/sdk@1.26.0.
-          // See: https://github.com/modelcontextprotocol/typescript-sdk/issues/1658
-          const transport = new StreamableHTTPServerTransport({
-            sessionIdGenerator: () => sessionId,
-          });
-
-          // Runtime assertion: verify the internal structure hasn't changed
-          const transportAny = transport as unknown as Record<string, unknown>;
-          if (
-            !transportAny._webStandardTransport ||
-            typeof transportAny._webStandardTransport !== "object"
-          ) {
-            logger.error(
-              "StreamableHTTPServerTransport internal structure changed — " +
-                "Redis session recovery unavailable. Update the SDK workaround.",
-            );
-            sendJson(res, 500, { error: "Internal server error" });
-            return;
-          }
-
-          const inner = transportAny._webStandardTransport as Record<
-            string,
-            unknown
-          >;
-          inner._initialized = true;
-          inner.sessionId = sessionId;
-
-          // Re-resolve to recover OAuth userId if the token still has one;
-          // graceful degradation to undefined for direct-apiKey sessions.
-          const recoveredCtx = incomingToken
-            ? await resolveSessionContext(incomingToken)
-            : null;
-          session = {
-            transport,
-            apiKey: redisApiKey,
-            userId: recoveredCtx?.userId,
-            lastActivityAt: Date.now(),
-          };
-          sessions.set(sessionId, session);
-
-          transport.onclose = () => {
-            sessions.delete(sessionId);
-          };
-
-          const sessionServer = createMcpServer();
-          registerGovernanceMcpTools(sessionServer, {
-            prisma,
-            apiKey: redisApiKey,
-            callerUserId: recoveredCtx?.userId,
-          });
-          await handleWithSessionConfig(redisApiKey, () =>
-            sessionServer.connect(transport),
-          );
+        try {
+          session =
+            (await recoverStreamableSession({ sessionId, incomingToken })) ??
+            undefined;
+        } catch (err) {
+          logger.error({ error: err }, "MCP session recovery failed");
+          sendJson(res, 500, { error: "Internal server error" });
+          return;
         }
       }
 
@@ -1156,30 +1508,50 @@ export function createMcpHandler(): McpHandler {
     res: ServerResponse,
   ): Promise<void> {
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
-    const session = sessionId ? sessions.get(sessionId) : undefined;
-
-    if (sessionId && session) {
-      const token = extractBearerToken(req);
-      if (!token) {
-        send401(res, "Authorization header required");
-        return;
-      }
-      const apiKey = await resolveApiKey(token);
-      if (apiKey !== session.apiKey) {
-        send401(res, "Bearer token does not match session");
-        return;
-      }
-
-      session.lastActivityAt = Date.now();
-      touchSessionInRedis(sessionId, session.apiKey).catch(() => {});
-      await handleWithSessionConfig(session.apiKey, () =>
-        session.transport.handleRequest(req, res),
-      );
-    } else if (sessionId) {
-      send401(res, "Session expired or not found");
-    } else {
+    if (!sessionId) {
       sendJson(res, 400, { error: "Invalid request — no valid session ID" });
+      return;
     }
+
+    let session = sessions.get(sessionId);
+
+    // L2: Redis lookup — the session may have been created on another pod, and
+    // reopening the stream is exactly what a client does after a reconnect.
+    if (!session) {
+      try {
+        session =
+          (await recoverStreamableSession({
+            sessionId,
+            incomingToken: extractBearerToken(req),
+          })) ?? undefined;
+      } catch (err) {
+        logger.error({ error: err }, "MCP session recovery failed");
+        sendJson(res, 500, { error: "Internal server error" });
+        return;
+      }
+    }
+
+    if (!session) {
+      send401(res, "Session expired or not found");
+      return;
+    }
+
+    const token = extractBearerToken(req);
+    if (!token) {
+      send401(res, "Authorization header required");
+      return;
+    }
+    const apiKey = await resolveApiKey(token);
+    if (apiKey !== session.apiKey) {
+      send401(res, "Bearer token does not match session");
+      return;
+    }
+
+    session.lastActivityAt = Date.now();
+    touchSessionInRedis(sessionId, session.apiKey).catch(() => {});
+    await handleWithSessionConfig(session.apiKey, () =>
+      session.transport.handleRequest(req, res),
+    );
   }
 
   async function handleMcpDelete(
@@ -1215,6 +1587,60 @@ export function createMcpHandler(): McpHandler {
   // SSE transport handlers (ChatGPT, etc.)
   // -------------------------------------------------------------------------
 
+  /**
+   * Listens for messages other replicas hand to this session. The reply
+   * travels back down the stream this replica holds, which is why the message
+   * comes to the stream rather than the stream moving to the message.
+   */
+  async function subscribeSessionToRelay({
+    sessionId,
+    session,
+  }: {
+    sessionId: string;
+    session: SseSessionState;
+  }): Promise<void> {
+    const subscriber = getRelaySubscriber();
+    if (!subscriber) return;
+
+    const channel = relayChannel(sessionId);
+    relayListeners.set(channel, (rawMessage) => {
+      void deliverRelayedMessage({ sessionId, session, rawMessage });
+    });
+
+    try {
+      await subscriber.subscribe(channel);
+    } catch (err) {
+      relayListeners.delete(channel);
+      logger.error(
+        { error: err, sessionId },
+        "Failed to subscribe to the MCP SSE relay channel",
+      );
+    }
+  }
+
+  async function deliverRelayedMessage({
+    sessionId,
+    session,
+    rawMessage,
+  }: {
+    sessionId: string;
+    session: SseSessionState;
+    rawMessage: string;
+  }): Promise<void> {
+    try {
+      session.lastActivityAt = Date.now();
+      await handleWithSessionConfig(session.apiKey, () =>
+        session.transport.handleMessage(JSON.parse(rawMessage)),
+      );
+      await touchSseSessionInRedis(sessionId, session.apiKey);
+    } catch (err) {
+      logger.error(
+        { error: err, sessionId },
+        "Failed to handle relayed MCP SSE message",
+      );
+    }
+  }
+
   async function handleSseConnect(
     req: IncomingMessage,
     res: ServerResponse,
@@ -1234,12 +1660,26 @@ export function createMcpHandler(): McpHandler {
     }
 
     const transport = new SSEServerTransport("/messages", res);
-    sseSessions.set(transport.sessionId, {
+    const sessionId = transport.sessionId;
+    noteLogFields(res, { sessionId });
+
+    const session: SseSessionState = {
       transport,
       apiKey,
       userId: sseUserId,
       lastActivityAt: Date.now(),
-    });
+    };
+    sseSessions.set(sessionId, session);
+
+    // Published before the stream opens: a client can post its first message
+    // to another replica the instant it reads the endpoint event.
+    try {
+      await storeSseSessionInRedis(sessionId, apiKey);
+    } catch (err) {
+      logger.error({ error: err }, "Failed to record MCP SSE session in Redis");
+    }
+
+    await subscribeSessionToRelay({ sessionId, session });
 
     const sessionServer = createMcpServer();
     registerGovernanceMcpTools(sessionServer, {
@@ -1249,7 +1689,7 @@ export function createMcpHandler(): McpHandler {
     });
 
     res.on("close", () => {
-      sseSessions.delete(transport.sessionId);
+      releaseSseSession(sessionId, apiKey).catch(() => {});
     });
 
     await handleWithSessionConfig(apiKey, () =>
@@ -1264,58 +1704,179 @@ export function createMcpHandler(): McpHandler {
     const url = new URL(req.url ?? "", "http://localhost");
     const sessionId = url.searchParams.get("sessionId");
 
-    if (!sessionId || !sseSessions.has(sessionId)) {
+    if (!sessionId) {
       sendJson(res, 400, { error: "Invalid or missing session ID" });
       return;
     }
+    noteLogFields(res, { sessionId });
 
-    const session = sseSessions.get(sessionId)!;
-
-    // Re-authenticate: verify Bearer token matches the session
+    // Authenticate before looking the session up, so a caller with no
+    // credentials is told it is unauthorized rather than that its session is
+    // bad — the two need different fixes.
     const token = extractBearerToken(req);
     if (!token) {
       send401(res, "Authorization header required");
       return;
     }
     const apiKey = await resolveApiKey(token);
-    if (apiKey !== session.apiKey) {
+    if (!apiKey) {
+      authFailRateLimiter.track(getClientIp(req));
+      send401(res, "Invalid or expired token");
+      return;
+    }
+
+    const localSession = sseSessions.get(sessionId);
+    if (localSession) {
+      if (apiKey !== localSession.apiKey) {
+        send401(res, "Bearer token does not match session");
+        return;
+      }
+      localSession.lastActivityAt = Date.now();
+      touchSseSessionInRedis(sessionId, localSession.apiKey).catch(() => {});
+
+      const body = await readJsonBody(req, res);
+      if (body === undefined) return;
+
+      await handleWithSessionConfig(localSession.apiKey, () =>
+        localSession.transport.handlePostMessage(req, res, body),
+      );
+      return;
+    }
+
+    // The stream lives on another replica. Hand the message over rather than
+    // reject it: the load balancer has no session affinity, so most messages
+    // of a healthy session arrive on a replica that does not hold it.
+    const sessionApiKey = await getSseSessionFromRedis(sessionId);
+    if (!sessionApiKey) {
+      sendJson(res, 404, { error: "Session not found" });
+      return;
+    }
+    if (apiKey !== sessionApiKey) {
       send401(res, "Bearer token does not match session");
       return;
     }
 
-    session.lastActivityAt = Date.now();
+    const body = await readJsonBody(req, res);
+    if (body === undefined) return;
 
-    let raw: string;
-    try {
-      raw = await readBody(req);
-    } catch (err) {
-      if (err instanceof Error && err.message === "Request body too large") {
-        sendJson(res, 413, { error: "Request body too large" });
-        return;
-      }
-      throw err;
-    }
-    let body: unknown;
-    try {
-      body = JSON.parse(raw);
-    } catch {
-      sendJson(res, 400, { error: "Invalid JSON body" });
+    if (!redis) {
+      sendJson(res, 404, { error: "Session not found" });
       return;
     }
 
-    await handleWithSessionConfig(session.apiKey, () =>
-      session.transport.handlePostMessage(req, res, body),
+    const receivers = await redis.publish(
+      relayChannel(sessionId),
+      JSON.stringify(body),
     );
+    if (receivers === 0) {
+      // Nobody is listening: the replica that held the stream is gone, and the
+      // record outlived it. Clear it so the client reconnects instead of
+      // posting into a void.
+      await removeSseSessionFromRedis(sessionId, sessionApiKey);
+      sendJson(res, 404, { error: "Session not found" });
+      return;
+    }
+
+    await touchSseSessionInRedis(sessionId, sessionApiKey);
+    // The JSON-RPC reply travels down the SSE stream on the replica that holds
+    // it, so this response only acknowledges the handoff — the same 202 the
+    // SDK's own transport answers a local post with.
+    sendJson(res, 202, { status: "accepted" });
   }
 
   // -------------------------------------------------------------------------
   // Main request dispatcher
   // -------------------------------------------------------------------------
 
+  /**
+   * Serves the path-suffixed OAuth discovery documents. Returns true when the
+   * request belonged to one of those subtrees and has been answered.
+   */
+  function serveOAuthMetadataSubtree({
+    req,
+    res,
+    pathname,
+    method,
+  }: {
+    req: IncomingMessage;
+    res: ServerResponse;
+    pathname: string;
+    method: string;
+  }): boolean {
+    const prefix = OAUTH_METADATA_PREFIXES.find((candidate) =>
+      pathname.startsWith(candidate),
+    );
+    if (!prefix) return false;
+
+    if (method !== "GET") {
+      sendJson(res, 405, { error: "Method not allowed" });
+      return true;
+    }
+
+    // The trailing separator of the prefix starts the resource path.
+    const resourceSuffix = pathname.slice(prefix.length - 1);
+    if (!METADATA_RESOURCE_SUFFIXES.has(resourceSuffix)) {
+      handleUnknownMetadata(res);
+      return true;
+    }
+
+    if (prefix.startsWith(PROTECTED_RESOURCE_METADATA_PATH)) {
+      handleProtectedResourceMetadata(req, res, resourceSuffix);
+    } else {
+      handleOAuthMetadata(req, res);
+    }
+    return true;
+  }
+
+  /**
+   * Emits one access log line per MCP request once the response is done.
+   * Wrapped throughout: an observability failure must never take a request
+   * with it.
+   */
+  function logRequestOnCompletion({
+    req,
+    res,
+    pathname,
+    method,
+  }: {
+    req: IncomingMessage;
+    res: ServerResponse;
+    pathname: string;
+    method: string;
+  }): void {
+    try {
+      const startedAt = Date.now();
+      res.once("close", () => {
+        try {
+          logger.info(
+            {
+              method,
+              path: pathname,
+              status: res.statusCode,
+              durationMs: Date.now() - startedAt,
+              ...requestLogFields.get(res),
+            },
+            "MCP request",
+          );
+        } catch {
+          // Logging must not break request handling.
+        }
+      });
+      const headerSessionId = req.headers["mcp-session-id"];
+      if (typeof headerSessionId === "string") {
+        noteLogFields(res, { sessionId: headerSessionId });
+      }
+    } catch {
+      // Logging must not break request handling.
+    }
+  }
+
   function handleRequest(req: IncomingMessage, res: ServerResponse): void {
     const url = req.url ?? "";
     const pathname = url.split("?")[0] ?? "";
     const method = req.method ?? "GET";
+
+    logRequestOnCompletion({ req, res, pathname, method });
 
     // Set CORS headers on all MCP routes (including error responses)
     setCorsHeaders(res);
@@ -1329,23 +1890,32 @@ export function createMcpHandler(): McpHandler {
 
     // Dispatch to route handlers
     const handle = async () => {
+      // RFC 9728 path-suffixed discovery, tried before the bare form by every
+      // current MCP client.
+      if (serveOAuthMetadataSubtree({ req, res, pathname, method })) return;
+
       switch (pathname) {
         case "/mcp/health":
           handleHealthCheck(req, res);
           break;
-        case "/.well-known/oauth-protected-resource":
+        case PROTECTED_RESOURCE_METADATA_PATH:
           if (method === "GET") {
             handleProtectedResourceMetadata(req, res);
           } else {
             sendJson(res, 405, { error: "Method not allowed" });
           }
           break;
-        case "/.well-known/oauth-authorization-server":
+        case AUTHORIZATION_SERVER_METADATA_PATH:
           if (method === "GET") {
             handleOAuthMetadata(req, res);
           } else {
             sendJson(res, 405, { error: "Method not allowed" });
           }
+          break;
+        case "/.well-known/openid-configuration":
+          // Not an OpenID provider. Claimed anyway so the probe gets a JSON
+          // 404 rather than the single-page app.
+          handleUnknownMetadata(res);
           break;
         case "/oauth/register":
           if (method === "POST") {
@@ -1384,6 +1954,7 @@ export function createMcpHandler(): McpHandler {
           }
           break;
         case "/messages":
+        case "/sse/messages":
           if (method === "POST") {
             await handleSseMessage(req, res);
           } else {
@@ -1412,7 +1983,8 @@ export function createMcpHandler(): McpHandler {
   }
 
   function clearRateLimiters(): void {
-    oauthRateLimiter.clear();
+    registerRateLimiter.clear();
+    tokenRateLimiter.clear();
     authFailRateLimiter.clear();
   }
 
@@ -1424,7 +1996,12 @@ export function createMcpHandler(): McpHandler {
     }
     for (const [id, session] of sseSessions) {
       session.transport.close().catch(() => {});
-      sseSessions.delete(id);
+      releaseSseSession(id, session.apiKey).catch(() => {});
+    }
+    relayListeners.clear();
+    if (relaySubscriber) {
+      relaySubscriber.disconnect();
+      relaySubscriber = null;
     }
   }
 
