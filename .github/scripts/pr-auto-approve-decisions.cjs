@@ -108,8 +108,10 @@ async function reviewFreshness({ headSha, sha, compare, restricted, trivialLineL
   if (files.length >= 300 || (cmp.total_commits > 0 && files.length === 0)) {
     return { fresh: false, why: "interdiff too large to verify as trivial" };
   }
-  const changed = files.reduce((n, f) => n + f.additions + f.deletions, 0);
-  if (changed > trivialLineLimit) {
+  // Missing additions/deletions must fail CLOSED like every other guard
+  // here — NaN would otherwise compare false and declare the review fresh.
+  const changed = files.reduce((n, f) => n + (f.additions ?? Number.NaN) + (f.deletions ?? Number.NaN), 0);
+  if (!Number.isFinite(changed) || changed > trivialLineLimit) {
     return { fresh: false, why: `${changed} lines changed since the review (> ${trivialLineLimit})` };
   }
   if (files.some((f) => f.status !== "modified")) {
@@ -193,21 +195,38 @@ async function checkSignals({
 }
 
 /**
+ * Committer identities GitHub itself stamps on Dependabot's commits:
+ * `web-flow` is GitHub's own signing identity (observed on real Dependabot
+ * PRs, e.g. #6830), kept alongside the bot's own login in case GitHub
+ * changes how it attributes them.
+ */
+const DEPENDABOT_COMMITTERS = new Set(["web-flow", "dependabot[bot]"]);
+
+/**
  * The Dependabot lane approves only when every commit on the branch is
- * both authored by `dependabot[bot]` AND carries a GitHub-verified
- * signature — the author field alone is spoofable by anyone who can push
- * to the branch, the signature is not. `commits` is the REST
+ * authored by `dependabot[bot]`, carries a GitHub-verified signature, AND
+ * was committed by a GitHub-controlled identity. The author field alone is
+ * spoofable by anyone who can push, and a signature only binds the
+ * COMMITTER: a human can sign an author-spoofed commit with their own key
+ * and still get `verified: true`. GitHub's verification ties the committer
+ * email to the signing key's owner, so `verified` plus a GitHub-controlled
+ * committer can only come from GitHub creating the commit itself — which
+ * is exactly how Dependabot lands commits. `commits` is the REST
  * "list commits on a pull request" payload.
  */
 function dependabotLaneVerdict(commits) {
   const foreign = commits.filter(
-    (c) => c.author?.login !== "dependabot[bot]" || c.commit?.verification?.verified !== true,
+    (c) =>
+      c.author?.login !== "dependabot[bot]" ||
+      c.commit?.verification?.verified !== true ||
+      !DEPENDABOT_COMMITTERS.has(c.committer?.login),
   );
   return {
     approve: commits.length > 0 && foreign.length === 0,
     foreign: foreign.map((c) => ({
       sha: c.sha,
       login: c.author?.login ?? "unknown",
+      committer: c.committer?.login ?? "unknown",
       verified: c.commit?.verification?.verified === true,
     })),
   };
@@ -235,7 +254,6 @@ function aiReviewedLaneVerdict({ oversized, blocked, impact, touchesExcludedArea
 }
 
 module.exports = {
-  TRAILER_RE,
   TRIVIAL_LINE_LIMIT,
   REQUIRED_REVIEWERS,
   parseVerdictTrailer,

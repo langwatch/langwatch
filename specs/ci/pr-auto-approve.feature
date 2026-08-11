@@ -81,6 +81,15 @@ Feature: PR auto-approval lanes
     When the workflow evaluates the PR
     Then the Dependabot lane does not approve
 
+  @unit
+  Scenario: A verified commit whose committer is not GitHub does not approve
+    Given a commit whose author field claims Dependabot
+    And the commit carries a signature the committer verified with their own key
+    When the workflow evaluates the PR
+    Then the Dependabot lane does not approve
+    # A signature binds the committer, not the author — only commits GitHub
+    # itself created (committer web-flow or dependabot) count for the lane.
+
   @unimplemented
   Scenario: Dependabot PRs never reach the LLM evaluator
     Given a PR authored by Dependabot

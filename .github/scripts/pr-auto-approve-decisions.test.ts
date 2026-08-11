@@ -7,6 +7,7 @@ import {
   checkSignals,
   dependabotLaneVerdict,
   latestCountableReview,
+  lowRiskLaneVerdict,
   parseVerdictTrailer,
   reviewFreshness,
   shaCoversHead,
@@ -55,9 +56,15 @@ const cleanSignalsInput = () => ({
   ],
 });
 
-const dependabotCommit = ({ login = "dependabot[bot]", verified = true, sha = "abc123" } = {}) => ({
+const dependabotCommit = ({
+  login = "dependabot[bot]",
+  committer = "web-flow",
+  verified = true,
+  sha = "abc123",
+} = {}) => ({
   sha,
   author: { login },
+  committer: { login: committer },
   commit: { verification: { verified } },
 });
 
@@ -74,17 +81,30 @@ describe("pr-auto-approve decisions", () => {
     it("refuses the lane when any commit has a non-Dependabot author", () => {
       const verdict = dependabotLaneVerdict([
         dependabotCommit(),
-        dependabotCommit({ login: "some-human", sha: "def456" }),
+        dependabotCommit({ login: "some-human", committer: "some-human", sha: "def456" }),
       ]);
       assert.equal(verdict.approve, false);
-      assert.deepEqual(verdict.foreign, [{ sha: "def456", login: "some-human", verified: true }]);
+      assert.deepEqual(verdict.foreign, [
+        { sha: "def456", login: "some-human", committer: "some-human", verified: true },
+      ]);
     });
 
     /** @scenario "A spoofed Dependabot author without a verified commit does not approve" */
     it("refuses the lane when a commit claims the Dependabot author but is unverified", () => {
       const verdict = dependabotLaneVerdict([dependabotCommit({ verified: false })]);
       assert.equal(verdict.approve, false);
-      assert.deepEqual(verdict.foreign, [{ sha: "abc123", login: "dependabot[bot]", verified: false }]);
+      assert.deepEqual(verdict.foreign, [
+        { sha: "abc123", login: "dependabot[bot]", committer: "web-flow", verified: false },
+      ]);
+    });
+
+    /** @scenario "A verified commit whose committer is not GitHub does not approve" */
+    it("refuses the lane when a verified commit was committed outside GitHub's own identities", () => {
+      const verdict = dependabotLaneVerdict([dependabotCommit({ committer: "some-human" })]);
+      assert.equal(verdict.approve, false);
+      assert.deepEqual(verdict.foreign, [
+        { sha: "abc123", login: "dependabot[bot]", committer: "some-human", verified: true },
+      ]);
     });
 
     it("refuses the lane for an empty commit list", () => {
@@ -234,6 +254,20 @@ describe("pr-auto-approve decisions", () => {
       });
       assert.equal(result.fresh, false);
     });
+
+    it("fails closed when the comparison omits line counts", async () => {
+      const result = await reviewFreshness({
+        headSha: HEAD,
+        sha: OLD,
+        restricted,
+        compare: async () => ({
+          status: "ahead",
+          total_commits: 1,
+          files: [{ filename: "platform/app/src/foo.ts", status: "modified" }],
+        }),
+      });
+      assert.equal(result.fresh, false);
+    });
   });
 
   describe("when review threads are open", () => {
@@ -262,6 +296,25 @@ describe("pr-auto-approve decisions", () => {
       assert.equal(aiReviewedLaneVerdict({ ...base, impact: "low" }), true);
       assert.equal(aiReviewedLaneVerdict({ ...base, impact: "medium", oversized: true }), false);
       assert.equal(aiReviewedLaneVerdict({ ...base, impact: "medium", blocked: true }), false);
+    });
+
+    it("grants the low-risk lane only for a qualifying low-impact change", () => {
+      assert.equal(lowRiskLaneVerdict({ ...base, impact: "low", lowRiskQualifies: true }), true);
+      assert.equal(lowRiskLaneVerdict({ ...base, impact: "low", lowRiskQualifies: false }), false);
+      assert.equal(lowRiskLaneVerdict({ ...base, impact: "medium", lowRiskQualifies: true }), false);
+      assert.equal(lowRiskLaneVerdict({ ...base, impact: "", lowRiskQualifies: true }), false);
+      assert.equal(
+        lowRiskLaneVerdict({ ...base, impact: "low", lowRiskQualifies: true, touchesExcludedAreas: true }),
+        false,
+      );
+      assert.equal(
+        lowRiskLaneVerdict({ ...base, impact: "low", lowRiskQualifies: true, oversized: true }),
+        false,
+      );
+      assert.equal(
+        lowRiskLaneVerdict({ ...base, impact: "low", lowRiskQualifies: true, blocked: true }),
+        false,
+      );
     });
   });
 
