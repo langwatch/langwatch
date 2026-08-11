@@ -38,6 +38,13 @@ on:
     types: [published]
   workflow_dispatch:
 
+# A publish run drains — see publish-docker-app. This job uploads monobinaries
+# onto the GitHub release AND publishes to npm, so a cancelled run can leave a
+# release carrying a partial set of assets that nothing reconciles.
+concurrency:
+  group: npx-server-publish-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write # for creating/updating GH release with aigateway monobinaries
   id-token: write # for npm provenance + Trusted Publishers OIDC exchange

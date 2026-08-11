@@ -6,6 +6,13 @@ on:
       - published
   workflow_dispatch:
 
+# A publish run drains — see publish-docker-app. This one fans a version out
+# across the sibling module tags, so a cancel partway through leaves the Go
+# module tags disagreeing about which version exists.
+concurrency:
+  group: sdk-go-cd-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   # write, because the release fans the version out to the sibling module tags
   # (see "Tag the sibling modules"). Nothing else here needs it.
