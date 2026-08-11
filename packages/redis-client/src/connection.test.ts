@@ -72,13 +72,23 @@ describe("createRedisConnection", () => {
       expect(standaloneCalls[0]?.[1]).toMatchObject({ db: 4, tls: {} });
     });
 
-    it("disables the offline queue and the per-request retry budget", () => {
+    it("lifts the per-request retry budget for blocking commands", () => {
       createRedisConnection({ env: { url: "redis://localhost:6379" } });
 
       expect(standaloneCalls[0]?.[1]).toMatchObject({
         maxRetriesPerRequest: null,
-        offlineQueue: false,
       });
+    });
+
+    it("passes no offline-queue option, leaving ioredis's default in place", () => {
+      createRedisConnection({ env: { url: "redis://localhost:6379" } });
+
+      // Guards the finding this replaced: `offlineQueue` is not a constructor
+      // option ioredis reads, so passing it advertised a fail-fast the client
+      // never performed. Disabling buffering means `enableOfflineQueue: false`,
+      // and that is a behaviour change with its own callers to fix first.
+      expect(standaloneCalls[0]?.[1]).not.toHaveProperty("offlineQueue");
+      expect(standaloneCalls[0]?.[1]).not.toHaveProperty("enableOfflineQueue");
     });
   });
 
@@ -148,10 +158,14 @@ describe("createRedisConnection", () => {
     it("warns even when no connection is created", () => {
       const logger = createLoggerSpy();
 
-      connectRedis(
-        { configured: false, reason: "unconfigured", warnings: ["heads up"] },
+      connectRedis({
+        config: {
+          configured: false,
+          reason: "unconfigured",
+          warnings: ["heads up"],
+        },
         logger,
-      );
+      });
 
       expect(logger.warn).toHaveBeenCalledWith({}, "heads up");
     });
@@ -161,7 +175,7 @@ describe("createRedisConnection", () => {
     it("connects without re-resolving it", () => {
       const config = resolveRedisConfig({ url: "redis://localhost:6379" });
 
-      expect(connectRedis(config)).not.toBeNull();
+      expect(connectRedis({ config })).not.toBeNull();
       expect(standaloneCalls).toHaveLength(1);
     });
   });

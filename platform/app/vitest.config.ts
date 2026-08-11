@@ -25,7 +25,7 @@ export default defineConfig({
     server: {
       deps: {
         inline: [
-          /@langwatch\/(api|langy|handled-error|automations|observability|redaction)/,
+          /@langwatch\/(api|langy|handled-error|automations|observability|redaction|redis-client)/,
         ],
       },
     },

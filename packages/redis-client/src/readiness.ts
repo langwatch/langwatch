@@ -20,6 +20,26 @@ export interface PingRedisOptions {
 }
 
 /**
+ * Drops the userinfo from each entry of a Redis target.
+ *
+ * `target` is `REDIS_URL` or `REDIS_CLUSTER_ENDPOINTS` verbatim, and a
+ * production `REDIS_URL` routinely carries an AUTH password
+ * (`rediss://:secret@host:6379`). This line is logged at error level on a boot
+ * failure, which is exactly when logs get pasted into issues and chats, so the
+ * password must not be in it.
+ *
+ * Matching greedily up to the last `@` before the path is deliberate: a
+ * password may itself contain `@`, and a lazy match would leave the tail of one
+ * behind.
+ */
+function withoutCredentials(target: string): string {
+  return target
+    .split(",")
+    .map((entry) => entry.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/]*@/i, "$1"))
+    .join(",");
+}
+
+/**
  * Probes Redis with a timeout, rejecting — never exiting — on failure.
  *
  * Callers that own the process lifecycle decide what to do with the rejection:
@@ -36,6 +56,8 @@ export async function pingRedis({
 }: PingRedisOptions): Promise<void> {
   if (!connection) return;
 
+  const safeTarget = withoutCredentials(target);
+
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     await Promise.race([
@@ -47,13 +69,13 @@ export async function pingRedis({
         );
       }),
     ]);
-    logger?.info({ target }, "redis ready");
+    logger?.info({ target: safeTarget }, "redis ready");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger?.error(
-      { error, target },
+      { error, target: safeTarget },
       `redis unreachable at boot — ${message}\n` +
-        `  REDIS_URL / REDIS_CLUSTER_ENDPOINTS points at: ${target}\n` +
+        `  REDIS_URL / REDIS_CLUSTER_ENDPOINTS points at: ${safeTarget}\n` +
         `  Running the app on the host against a containerised Redis? The host port (6379) must be published.\n` +
         `  Otherwise bring the stack up with 'make haven up' or 'make quickstart'.`,
     );

@@ -28,6 +28,51 @@ describe("pingRedis", () => {
     });
   });
 
+  describe("given a target carrying an AUTH password", () => {
+    /** @scenario "A credential in the Redis URL never reaches the logs" */
+    it("logs the host without the credential, on success and on failure", async () => {
+      const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+      const target = "rediss://admin:hunter2@redis.internal:6379";
+
+      await pingRedis({
+        connection: connectionThat(() => Promise.resolve("PONG")),
+        target,
+        logger,
+      });
+      await expect(
+        pingRedis({
+          connection: connectionThat(() => Promise.reject(new Error("down"))),
+          target,
+          logger,
+        }),
+      ).rejects.toThrow("down");
+
+      const everythingLogged = JSON.stringify([
+        logger.info.mock.calls,
+        logger.warn.mock.calls,
+        logger.error.mock.calls,
+      ]);
+      expect(everythingLogged).not.toContain("hunter2");
+      expect(everythingLogged).not.toContain("admin");
+      expect(everythingLogged).toContain("rediss://redis.internal:6379");
+    });
+
+    it("keeps a credential-free cluster endpoint list intact", async () => {
+      const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+
+      await pingRedis({
+        connection: connectionThat(() => Promise.resolve("PONG")),
+        target: "one:6379,two:6380",
+        logger,
+      });
+
+      expect(logger.info).toHaveBeenCalledWith(
+        { target: "one:6379,two:6380" },
+        "redis ready",
+      );
+    });
+  });
+
   describe("given a connection that never answers", () => {
     /** @scenario "An unresponsive Redis fails the probe rather than the process" */
     it("rejects with a timeout error", async () => {

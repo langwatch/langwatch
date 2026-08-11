@@ -19,19 +19,32 @@ export interface CreateRedisConnectionOptions {
  *
  * `maxRetriesPerRequest: null` is required by BullMQ-style blocking commands
  * and by the GroupQueue dispatcher: a blocking read must not be failed by a
- * retry budget. `offlineQueue: false` makes a command against a down Redis fail
- * now rather than buffering unboundedly and replaying a backlog on reconnect.
+ * retry budget.
+ *
+ * There is deliberately no offline-queue option here. Both call sites this
+ * package replaces passed `offlineQueue: false`, which ioredis never reads from
+ * its constructor options — the option that disables buffering is
+ * `enableOfflineQueue`, and `offlineQueue` is only a parameter of the internal
+ * `flushQueue()`. So the offline queue has always been ioredis's default (on),
+ * and carrying the dead key forward would state a guarantee the client does not
+ * give. Turning it off for real is a behaviour change, not a rename: commands
+ * issued during a disconnect would start rejecting instead of replaying, and
+ * `rateLimit` does not yet catch a rejected `incr`. That belongs in its own
+ * change, sequenced after the callers can survive it.
  */
 const SHARED_OPTIONS = {
   maxRetriesPerRequest: null,
-  offlineQueue: false,
 } as const;
 
-function attachLifecycleLogging(
-  connection: RedisConnection,
-  logger: RedisLogger,
-  context: object,
-): void {
+function attachLifecycleLogging({
+  connection,
+  logger,
+  context,
+}: {
+  connection: RedisConnection;
+  logger: RedisLogger;
+  context: object;
+}): void {
   connection.on("connect", () => logger.info(context, "connected"));
   connection.on("ready", () => logger.info(context, "ready to accept commands"));
   connection.on("error", (error: Error) =>
@@ -48,10 +61,13 @@ function attachLifecycleLogging(
  * config for its own reasons — to log the mode, or to decide a code path — does
  * not resolve it twice.
  */
-export function connectRedis(
-  config: RedisConfigResolution,
-  logger?: RedisLogger,
-): RedisConnection | null {
+export function connectRedis({
+  config,
+  logger,
+}: {
+  config: RedisConfigResolution;
+  logger?: RedisLogger | undefined;
+}): RedisConnection | null {
   for (const warning of config.warnings) logger?.warn({}, warning);
 
   if (!config.configured) return null;
@@ -63,15 +79,16 @@ export function connectRedis(
       scaleReads: "all",
     });
     if (logger) {
-      attachLifecycleLogging(connection, logger, {
-        mode: "cluster",
-        endpoints: config.endpoints.length,
+      attachLifecycleLogging({
+        connection,
+        logger,
+        context: { mode: "cluster", endpoints: config.endpoints.length },
       });
     }
     return connection;
   }
 
-  return connectStandalone(config, logger);
+  return connectStandalone({ config, logger });
 }
 
 /**
@@ -83,19 +100,23 @@ export function connectRedis(
  * rather than a full environment is what makes the return type `Redis`: there
  * is no cluster branch to widen it.
  */
-export function connectStandalone(
-  config: RedisStandaloneConfig,
-  logger?: RedisLogger,
-): Redis {
+export function connectStandalone({
+  config,
+  logger,
+}: {
+  config: RedisStandaloneConfig;
+  logger?: RedisLogger | undefined;
+}): Redis {
   const connection = new IORedis(config.url, {
     ...SHARED_OPTIONS,
     db: config.db,
     tls: config.tls,
   });
   if (logger) {
-    attachLifecycleLogging(connection, logger, {
-      mode: "standalone",
-      db: config.db,
+    attachLifecycleLogging({
+      connection,
+      logger,
+      context: { mode: "standalone", db: config.db },
     });
   }
   return connection;
@@ -126,7 +147,7 @@ export function createStandaloneRedisConnection({
       "Expected a standalone Redis configuration from a plain URL.",
     );
   }
-  return connectStandalone(config, logger);
+  return connectStandalone({ config, logger });
 }
 
 /**
@@ -141,5 +162,5 @@ export function createRedisConnection({
   env,
   logger,
 }: CreateRedisConnectionOptions): RedisConnection | null {
-  return connectRedis(resolveRedisConfig(env), logger);
+  return connectRedis({ config: resolveRedisConfig(env), logger });
 }
