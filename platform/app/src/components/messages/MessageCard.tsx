@@ -480,27 +480,25 @@ export function MessageCard({
                     ) : (
                       <CheckCircle />
                     )}
-                    {!evalSummary.done ? (
-                      `${evalSummary.passes}/${evalSummary.verdictTotal} evaluations`
-                    ) : evalSummary.allSkipped ? (
-                      "Evaluations skipped"
-                    ) : evalSummary.failed > 0 ? (
-                      `${evalSummary.failed} ${
-                        evalSummary.failed == 1
-                          ? "evaluation failed"
-                          : "evaluations failed"
-                      }`
-                    ) : evalSummary.errored > 0 ? (
-                      // A crashed evaluator is not a fail verdict — label it
-                      // as an error instead of folding it into "failed".
-                      `${evalSummary.errored} ${
-                        evalSummary.errored == 1
-                          ? "evaluation errored"
-                          : "evaluations errored"
-                      }`
-                    ) : (
-                      `${evalSummary.passes}/${evalSummary.verdictTotal} evaluations`
-                    )}
+                    {!evalSummary.done
+                      ? `${evalSummary.passes}/${evalSummary.verdictTotal} evaluations`
+                      : evalSummary.allSkipped
+                        ? "Evaluations skipped"
+                        : evalSummary.failed > 0
+                          ? `${evalSummary.failed} ${
+                              evalSummary.failed == 1
+                                ? "evaluation failed"
+                                : "evaluations failed"
+                            }`
+                          : evalSummary.errored > 0
+                            ? // A crashed evaluator is not a fail verdict — label it
+                              // as an error instead of folding it into "failed".
+                              `${evalSummary.errored} ${
+                                evalSummary.errored == 1
+                                  ? "evaluation errored"
+                                  : "evaluations errored"
+                              }`
+                            : `${evalSummary.passes}/${evalSummary.verdictTotal} evaluations`}
                   </HStack>
                 </Tag.Label>
               </Tag.Root>

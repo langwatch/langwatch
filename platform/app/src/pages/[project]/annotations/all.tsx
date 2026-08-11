@@ -4,8 +4,8 @@ import { useMemo } from "react";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import {
-  annotationRatingExportLabel,
   type AnnotationWithUser,
+  annotationRatingExportLabel,
   groupedAnnotationsToRows,
   suggestionExportLine,
 } from "~/components/annotations/annotationRow";

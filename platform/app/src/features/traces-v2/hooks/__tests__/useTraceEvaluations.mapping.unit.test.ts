@@ -66,7 +66,9 @@ describe("mapScore", () => {
 
   describe("when the evaluation carries neither score nor verdict", () => {
     it("returns null instead of a fabricated 0", () => {
-      expect(mapScore(makeEvaluation({ score: null, passed: null }))).toBeNull();
+      expect(
+        mapScore(makeEvaluation({ score: null, passed: null })),
+      ).toBeNull();
     });
   });
 });

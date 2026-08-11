@@ -210,23 +210,23 @@ export function EvalCard({
         !categoryOnly &&
         scoreType === "numeric" &&
         typeof score === "number" && (
-        <Box
-          height="3px"
-          bg="bg.subtle"
-          position="relative"
-          borderBottomWidth={
-            hasReasoning || meta.length > 0 || eval_.spanName ? "1px" : "0"
-          }
-          borderColor="border.muted"
-        >
           <Box
-            height="100%"
-            bg={tone.color}
-            width={`${barFill}%`}
-            transition="width 0.3s ease"
-          />
-        </Box>
-      )}
+            height="3px"
+            bg="bg.subtle"
+            position="relative"
+            borderBottomWidth={
+              hasReasoning || meta.length > 0 || eval_.spanName ? "1px" : "0"
+            }
+            borderColor="border.muted"
+          >
+            <Box
+              height="100%"
+              bg={tone.color}
+              width={`${barFill}%`}
+              transition="width 0.3s ease"
+            />
+          </Box>
+        )}
 
       {/* Reasoning / status message */}
       {(hasReasoning || (noVerdict && primaryStatusText)) && (

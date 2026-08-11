@@ -39,9 +39,7 @@ export function summarizeEvaluationsTag(
   const allSkipped =
     evaluations.length > 0 &&
     evaluations.every((check) => check.status === "skipped");
-  const processed = evaluations.filter(
-    (check) => check.status === "processed",
-  );
+  const processed = evaluations.filter((check) => check.status === "processed");
   const failed = processed.filter(
     (check) => evaluationPassed(check) === false,
   ).length;
