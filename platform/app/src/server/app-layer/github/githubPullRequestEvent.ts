@@ -13,10 +13,7 @@
  */
 import { z } from "zod";
 
-import {
-  type GithubApiPullRequest,
-  toPullRequestSummary,
-} from "./githubAppToken";
+import { toPullRequestSummary } from "./githubAppToken";
 
 /**
  * The actions that change something linkage stores, and nothing else.
@@ -126,6 +123,8 @@ export function parseGithubPullRequestEvent(
     repositoryName: repository.name,
     headBranch: pull.head.ref,
     // The REST path's own normalisation, over the same JSON GitHub sends there.
-    pullRequest: toPullRequestSummary(pull as GithubApiPullRequest),
+    // Passed unwidened so the compiler catches drift between this schema and
+    // the interface, rather than a cast hiding it.
+    pullRequest: toPullRequestSummary(pull),
   };
 }

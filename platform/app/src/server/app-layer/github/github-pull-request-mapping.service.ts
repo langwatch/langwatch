@@ -308,7 +308,7 @@ export class GithubPullRequestMappingService {
     await this.recordAnswer({
       scope,
       pullRequests: [event.pullRequest],
-      exhaustive: false,
+      isExhaustive: false,
     });
     return true;
   }
@@ -343,7 +343,7 @@ export class GithubPullRequestMappingService {
         repo: target.repositoryName,
         branch: scope.headBranch,
       });
-      await this.recordAnswer({ scope, pullRequests, exhaustive: true });
+      await this.recordAnswer({ scope, pullRequests, isExhaustive: true });
     } catch (error) {
       await this.recordFailure({ scope, error });
     }
@@ -514,7 +514,7 @@ export class GithubPullRequestMappingService {
   private async recordAnswer({
     scope,
     pullRequests,
-    exhaustive,
+    isExhaustive,
   }: {
     scope: BranchScope;
     pullRequests: readonly GithubPullRequestSummary[];
@@ -525,7 +525,7 @@ export class GithubPullRequestMappingService {
      * it and a branch known to host two pull requests reads as hosting one,
      * which is the number the freshness guard on the lookup claim reads.
      */
-    exhaustive: boolean;
+    isExhaustive: boolean;
   }): Promise<void> {
     const now = new Date(nowMs(this.deps));
     if (pullRequests.length > 0) {
@@ -542,7 +542,7 @@ export class GithubPullRequestMappingService {
     await this.deps.repository.upsertBranchCheck({
       ...scope,
       lastCheckedAt: now,
-      prCount: exhaustive
+      prCount: isExhaustive
         ? pullRequests.length
         : Math.max(existing?.prCount ?? 0, pullRequests.length),
       // A pull request clears the negative cache outright: the branch has an

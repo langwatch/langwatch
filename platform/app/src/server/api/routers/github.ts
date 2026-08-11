@@ -107,7 +107,12 @@ export const githubRouter = createTRPCRouter({
         input.organizationId,
       );
       return {
-        configured: service.configured,
+        // The same reading `installUrl` takes, which includes the App slug the
+        // deep link needs. Reporting token readiness here instead said GitHub
+        // was available on an instance with no slug, while both install
+        // actions were disabled, which is the state this contradiction
+        // produced on the settings page.
+        configured: getGithubAppConfig().configured,
         connected: installations.length > 0,
         installations: installations.map((i) => ({
           installationId: i.installationId,

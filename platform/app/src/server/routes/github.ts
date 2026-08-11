@@ -27,6 +27,7 @@
 import { auditLog } from "@ee/audit-log/auditLog";
 import { createLogger } from "@langwatch/observability";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { z } from "zod";
 import { env } from "~/env.mjs";
 import { hasOrganizationPermission } from "~/server/api/rbac";
 import {
@@ -415,13 +416,18 @@ async function recordInstallAudit({
 
 // GitHub webhook events: installation created/deleted/suspend/unsuspend and
 // installation_repositories added/removed. Verified by HMAC; idempotent.
-type WebhookAction =
-  | "created"
-  | "deleted"
-  | "suspend"
-  | "unsuspend"
-  | "added"
-  | "removed";
+//
+// A schema rather than a bare type, so an action GitHub adds later is REJECTED
+// here and acked by the guard below, instead of being cast to this union and
+// reaching a dispatcher that has no default case to catch it.
+const webhookActionSchema = z.enum([
+  "created",
+  "deleted",
+  "suspend",
+  "unsuspend",
+  "added",
+  "removed",
+]);
 
 function verifyWebhookSignature(
   rawBody: string,
@@ -445,9 +451,24 @@ function verifyWebhookSignature(
  * cannot act on is not something a GitHub retry fixes, and the periodic recheck
  * is the backstop under a delivery that fails or never arrives at all.
  */
-async function applyPullRequestEvent(payload: unknown): Promise<void> {
+async function applyPullRequestEvent(
+  payload: unknown,
+  deliveryId: string | undefined,
+): Promise<void> {
   const event = parseGithubPullRequestEvent(payload);
-  if (!event) return;
+  if (!event) {
+    // The parser declines four different deliveries, and every one of them
+    // still answers 200. Without this line a linkage outage looks from the
+    // outside like an unbroken run of successful deliveries. The payload is
+    // deliberately not logged: the delivery id is enough to find it in
+    // GitHub's own redelivery view, and a raw body here would put customer
+    // repository content in the logs.
+    logger.info(
+      { deliveryId },
+      "github pull request delivery dropped before linkage",
+    );
+    return;
+  }
   try {
     await getApp().github.pullRequests.mapping.applyPullRequestEvent(event);
   } catch (err) {
@@ -479,7 +500,7 @@ async function handleWebhook(c: any): Promise<Response> {
   const eventType = c.req.header("x-github-event");
 
   if (eventType === "pull_request") {
-    await applyPullRequestEvent(payload);
+    await applyPullRequestEvent(payload, c.req.header("x-github-delivery"));
     return c.json({ received: true });
   }
 
@@ -487,7 +508,7 @@ async function handleWebhook(c: any): Promise<Response> {
     action?: string;
     installation?: { id?: number };
   };
-  const action = installationEvent.action as WebhookAction | undefined;
+  const action = webhookActionSchema.safeParse(installationEvent.action).data;
   const installationId =
     installationEvent.installation?.id != null
       ? String(installationEvent.installation.id)
