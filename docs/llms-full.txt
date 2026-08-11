@@ -38853,6 +38853,7 @@ evaluation.log("coherence", {
 
 When comparing different models, prompts, or configurations, use targets to organize your results.
 Both SDKs provide a `target()`, `withTarget()` context that automatically captures latency and enables context inference.
+Once a row's targets have each produced an output, [Comparison](#comparison) judges them against each other and names a winner.
 
 
   ### Python
@@ -39148,11 +39149,15 @@ await evaluation.run(dataset, async ({ item, index }) => {
   Browse our complete list of [available evaluators](/evaluations/evaluators/list) including metrics for RAG quality, hallucination detection, safety, and more.
 </Info>
 
-### Pairwise Compare
+## Comparison
 
-`langevals/pairwise_compare` compares two candidate outputs for the same input and asks a judge model to pick the better one. This is useful when you want to compare two prompts, models, or agent configurations directly instead of scoring each one independently.
+Scoring each target on its own leaves you calibrating numbers: is `0.78` better than `0.74` for your users, or is that noise? Comparison asks the easier question instead. It shows a judge every target output for the same row and asks which one is best.
 
-The example below was verified against the live SDK path using `evaluation.evaluate("langevals/pairwise_compare", ...)`.
+`compare()` is the code-first way in. It uses the same judge as the [Comparison evaluator](/evaluations/experiments/ui/pairwise-compare) in the workbench, so a comparison you run from a notebook and one you set up in the UI read the same way on the results page.
+
+### Comparing a row
+
+Every target that recorded an output for the row is a candidate, and they are all judged in a single call. There is no candidate list to assemble and no judge prompt to choose:
 
 
   ### Python
@@ -39160,39 +39165,232 @@ The example below was verified against the live SDK path using `evaluation.evalu
 ```python
 import langwatch
 
-ROWS = [
-    {
-        "input": "Write a function that checks if a given integer is a prime number.",
-        "golden": "def is_prime(n): ...",
-        "candidate_a_id": "variant-a",
-        "candidate_a_output": "def is_prime(n: int) -> bool: ...",
-        "candidate_b_id": "variant-b",
-        "candidate_b_output": "def is_prime(n: int) -> bool: ...",
-    }
-]
+evaluation = langwatch.experiment.init("model-comparison")
 
-evaluation = langwatch.experiment.init("pairwise-sdk-verification")
+for index, row in evaluation.loop(df.iterrows()):
+    with evaluation.target("gpt-5-mini", {"model": "openai/gpt-5-mini"}):
+        evaluation.log_response(ask_gpt(row["question"]))
 
-for index, row in evaluation.loop(list(enumerate(ROWS))):
-    evaluation.evaluate(
-        "langevals/pairwise_compare",
-        index=index,
-        data={
-            "input": row["input"],
-            "golden": row["golden"],
-            "candidate_a_id": row["candidate_a_id"],
-            "candidate_a_output": row["candidate_a_output"],
-            "candidate_b_id": row["candidate_b_id"],
-            "candidate_b_output": row["candidate_b_output"],
-        },
-        settings={
-            "model": "openai/gpt-5-mini",
-            "has_golden_answer": True,
-            "swap_and_confirm": True,
-            "allow_tie": True,
-            "include_metrics": ["cost", "duration"],
-        },
-    )
+    with evaluation.target("claude-sonnet-5", {"model": "anthropic/claude-sonnet-5"}):
+        evaluation.log_response(ask_claude(row["question"]))
+
+    verdict = evaluation.compare(index, input=row["question"])
+    print(verdict.winner, verdict.reasoning)
+```
+
+The candidates are whatever `log_response()` recorded inside each `target()` block.
+
+  ### TypeScript
+
+```typescript
+const evaluation = await langwatch.experiments.init("model-comparison");
+
+await evaluation.run(dataset, async ({ item }) => {
+  await Promise.all([
+    evaluation.withTarget("gpt-5-mini", { model: "openai/gpt-5-mini" }, () =>
+      askGpt(item.question)
+    ),
+    evaluation.withTarget("claude-sonnet-5", { model: "anthropic/claude-sonnet-5" }, () =>
+      askClaude(item.question)
+    ),
+  ]);
+
+  const verdict = await evaluation.compare({ input: item.question });
+  console.log(verdict.winner, verdict.reasoning);
+});
+```
+
+The candidates are whatever each `withTarget()` callback returned.
+
+
+
+The winner comes back named with the target name you registered. Two candidates is not a different call from five: `compare()` judges however many the row has, and a target that produced nothing for the row is simply not a candidate.
+
+<Info>
+  Compare a row once its targets have finished. In Python that is after the row's last `target()` block has closed, and in TypeScript after its `withTarget()` calls have settled, which under the usual `Promise.all` is right after the `await`.
+</Info>
+
+<Note>
+  `compare()` names the row the way `log()` does in the same SDK. Python is handed the index by `loop()`, so it passes it on as the first argument, and it needs a whole number. TypeScript infers it from the iteration the comparison runs in, so `index` is only needed when you compare outside a `run()` callback, where it also accepts a string row label.
+
+  Candidate order is shuffled per row, seeded by the row index, so re-comparing the same row presents the candidates in the same order and a different row shuffles differently. A string label carries no position to seed with, so the judge falls back to its own stable order for it.
+</Note>
+
+### Judging against a reference answer
+
+By default the judge compares the candidates on their own merits, with no reference answer involved. Pass `golden` to have it judge each candidate against a reference instead. That one option is the whole switch, so there is no second flag to forget:
+
+
+  ### Python
+
+```python
+verdict = evaluation.compare(
+    index,
+    input=row["question"],
+    golden=row["expected_answer"],
+)
+```
+
+  ### TypeScript
+
+```typescript
+const verdict = await evaluation.compare({
+  input: item.question,
+  golden: item.expectedAnswer,
+});
+```
+
+
+
+<Tip>
+  Use a reference answer when correctness is the question. Leave it out for open-ended work, where tone, completeness, structure or policy adherence decide the winner and no single answer is the right one.
+</Tip>
+
+### Customizing the judge prompt
+
+Leave `prompt` unset and the judge picks the shipped prompt matching what the row actually carries: a reference answer, task context, both, or neither. The framing for whatever the row lacks is dropped rather than left empty, which is why the default is worth keeping unless you have a rubric of your own.
+
+When you do have one, pass it and it is used exactly as written. Three placeholders are filled in for you:
+
+| Placeholder | Filled with |
+|-------------|-------------|
+| `{input}` | The `input` you passed, or nothing when you passed none |
+| `{golden}` | The `golden` you passed, or nothing when you passed none |
+| `{candidates}` | The candidate outputs, one per line, each behind a slot label |
+
+
+  ### Python
+
+```python
+SUPPORT_RUBRIC = """\
+Pick the reply a support agent could send to the customer unedited.
+
+Question:
+{input}
+
+Candidates:
+{candidates}
+
+Weigh them in this order: factual accuracy first, then whether every part
+of the question is answered, then tone. Length is not quality. Explain
+briefly which candidate wins on those criteria, then pick its slot label.
+"""
+
+verdict = evaluation.compare(
+    index,
+    input=row["question"],
+    prompt=SUPPORT_RUBRIC,
+)
+```
+
+  ### TypeScript
+
+```typescript
+const supportRubric = `Pick the reply a support agent could send to the customer unedited.
+
+Question:
+{input}
+
+Candidates:
+{candidates}
+
+Weigh them in this order: factual accuracy first, then whether every part
+of the question is answered, then tone. Length is not quality. Explain
+briefly which candidate wins on those criteria, then pick its slot label.`;
+
+const verdict = await evaluation.compare({
+  input: item.question,
+  prompt: supportRubric,
+});
+```
+
+
+
+<Note>
+  Only those three placeholders are substituted, and they are substituted literally. Any other braces in your prompt reach the judge as written, so a rubric that says `score out of {10}` is passed through unchanged.
+</Note>
+
+### Options
+
+Every option is optional, because the judge already has a default for each one. An option you do not set is not sent at all, so the judge's default applies to it.
+
+| Option | Default | What it does |
+|--------|---------|--------------|
+| `targets` | Every target that recorded an output for the row | Restricts the comparison to the targets you name |
+| `input` | No task context | The task the candidates were answering, for the judge to weigh them against |
+| `golden` | No reference answer, so candidates are judged on their own merits | A reference answer to judge each candidate against, and the switch that turns reference judging on |
+| `prompt` | The shipped prompt matching what the row carries | Your own judge prompt, used exactly as written |
+| `model` | Your project's configured evaluator model | The judge model, for example `openai/gpt-5-mini` |
+| `allow_tie` / `allowTie` | `true` | Lets the judge answer "tie" when no candidate is clearly better |
+| `randomize_order` / `randomizeOrder` | `true` | Shuffles candidate order per row, seeded by the row index, so a candidate's position never sways the verdict |
+| `swap_and_reconcile` / `swapAndReconcile` | `true` | Judges each row a second time with the candidate order reversed, and establishes no winner when the two passes disagree. Doubles the judge cost per row |
+| `include_metrics` / `includeMetrics` | Nothing | Puts each candidate's `"duration"` in front of the judge, so it can prefer a faster candidate when quality is comparable. The time each target took is recorded for you. Cost is not on offer: the platform works a target's cost out from its traces after the run, so the SDK has none to show at the moment it asks for a verdict |
+| `temperature` | `0` | The judge's sampling temperature. Models that only run at their own fixed temperature, the gpt-5 family among them, ignore it |
+| `name` | `"comparison"` | The name the verdict is recorded under. Give each one its own name if you compare a row more than once |
+
+### The verdict
+
+A verdict carries four things: the `status`, the `winner`, the judge's `reasoning`, and `candidates`, the target names it actually judged.
+
+| Status | What it means |
+|--------|---------------|
+| `decided` | The judge picked a winner, named in `winner` |
+| `tie` | The judge compared the candidates and found none better than the rest, so there is no winner |
+| `inconclusive` | The judge established no winner. Under swap and reconcile that is its two passes disagreeing, so this row does not separate these candidates. That is a finding about them, and it is deliberately not a tie, which would claim they are equally good |
+| `skipped` | Fewer than two targets recorded an output, so no judge ran. `reasoning` names the targets that produced nothing |
+| `error` | The judge failed or could not be reached, so nothing was measured about the candidates at all |
+
+<Note>
+  A comparison never raises when a judge fails, and never raises on a row too thin to judge. One unreachable judge in a thousand-row run costs you that row, not the run.
+</Note>
+
+<Warning>
+  Naming a target in `targets` that recorded no output for the row does raise. Comparing whatever remains would hand you a two-way verdict where you asked for a three-way one, which is worse than a failure.
+</Warning>
+
+### Seeing the results
+
+Verdicts show up on the experiment's results page:
+
+- A **Winner** column names the winning target on each row, with the judge's reasoning underneath it, so you can see why a row went the way it did.
+- A **win-rate chart** gives each target its share of the wins, plus a bar for ties. A target that never won a single row is still charted, with zero wins.
+
+With three or more targets there is also a leaderboard that ranks them from every matchup at once, with a confidence interval so the ranking's own uncertainty is visible. It is being rolled out gradually, so ask us to turn it on for your organization if you want it.
+
+### A complete comparison
+
+Three variants, one judge call per row, and a closing summary that fails a [CI build](/evaluations/experiments/ci-cd) when the run had failures:
+
+
+  ### Python
+
+```python
+import langwatch
+
+df = langwatch.dataset.get_dataset("your-dataset-id").to_pandas()
+
+evaluation = langwatch.experiment.init("support-reply-comparison")
+
+for index, row in evaluation.loop(df.iterrows(), threads=4):
+    def task(index, row):
+        with evaluation.target("gpt-5-mini", {"model": "openai/gpt-5-mini"}):
+            evaluation.log_response(ask_gpt(row["question"]))
+
+        with evaluation.target("claude-sonnet-5", {"model": "anthropic/claude-sonnet-5"}):
+            evaluation.log_response(ask_claude(row["question"]))
+
+        with evaluation.target("gemini-flash", {"model": "gemini/gemini-2.5-flash"}):
+            evaluation.log_response(ask_gemini(row["question"]))
+
+        verdict = evaluation.compare(
+            index,
+            input=row["question"],
+            golden=row["expected_answer"],
+            include_metrics=["duration"],
+        )
+        print(f"row {index}: {verdict.status} {verdict.winner or ''}")
+
+    evaluation.submit(task, index, row)
 
 evaluation.print_summary()
 ```
@@ -39204,50 +39402,83 @@ import { LangWatch } from 'langwatch';
 
 const langwatch = new LangWatch();
 
-const rows = [
-  {
-    input: "Write a function that checks if a given integer is a prime number.",
-    golden: "function isPrime(n) { ... }",
-    candidateAId: "variant-a",
-    candidateAOutput: "function isPrime(n) { ... }",
-    candidateBId: "variant-b",
-    candidateBOutput: "function isPrime(n) { ... }",
-  },
-];
+const dataset = await loadDataset();
 
-const evaluation = await langwatch.experiments.init("pairwise-sdk-verification");
+const evaluation = await langwatch.experiments.init("support-reply-comparison");
 
-await evaluation.run(rows, async ({ item, index }) => {
-  await evaluation.evaluate("langevals/pairwise_compare", {
-    index,
-    data: {
-      input: item.input,
-      golden: item.golden,
-      candidate_a_id: item.candidateAId,
-      candidate_a_output: item.candidateAOutput,
-      candidate_b_id: item.candidateBId,
-      candidate_b_output: item.candidateBOutput,
-    },
-    settings: {
-      model: "openai/gpt-5-mini",
-      has_golden_answer: true,
-      swap_and_confirm: true,
-      allow_tie: true,
-      include_metrics: ["cost", "duration"],
-    },
+await evaluation.run(dataset, async ({ item, index }) => {
+  await Promise.all([
+    evaluation.withTarget("gpt-5-mini", { model: "openai/gpt-5-mini" }, () =>
+      askGpt(item.question)
+    ),
+    evaluation.withTarget("claude-sonnet-5", { model: "anthropic/claude-sonnet-5" }, () =>
+      askClaude(item.question)
+    ),
+    evaluation.withTarget("gemini-flash", { model: "gemini/gemini-2.5-flash" }, () =>
+      askGemini(item.question)
+    ),
+  ]);
+
+  const verdict = await evaluation.compare({
+    input: item.question,
+    golden: item.expectedAnswer,
+    includeMetrics: ["duration"],
   });
-});
+  console.log(`row ${index}: ${verdict.status} ${verdict.winner ?? ""}`);
+}, { concurrency: 4 });
 
 evaluation.printSummary();
 ```
 
 
 
-`swap_and_confirm` performs two judge calls with A/B order reversed on the second pass. If the two calls disagree, the evaluator returns a tie. Set `has_golden_answer` to `false` when you want a pure head-to-head comparison without a reference answer.
+### Comparing from an async loop
 
-The SDK result also records the pairwise judge's own evaluator cost and duration. In exported results, those appear under the evaluator columns for `langevals/pairwise_compare`; they are separate from `include_metrics`, which injects each candidate target's cost or duration into the judge prompt.
 
-If you already have your own local pairwise judge, publish its result with `evaluation.log(...)` by sending a `score`, `label`, and `details`. Those custom results are tracked like any other SDK metric. The dedicated pairwise column visualization currently comes from the built-in Pairwise Compare evaluator configuration.
+  ### Python
+
+In async-native mode, use `acompare()` so the judge is awaited rather than blocked on, leaving the event loop free for the rows running alongside it. It takes the same options and records the same verdict:
+
+```python
+evaluation = langwatch.experiment.init("async-comparison")
+
+async def task(index, row):
+    with evaluation.target("gpt-5-mini"):
+        evaluation.log_response(await ask_gpt(row["question"]))
+
+    with evaluation.target("claude-sonnet-5"):
+        evaluation.log_response(await ask_claude(row["question"]))
+
+    verdict = await evaluation.acompare(index, input=row["question"])
+    print(verdict.winner)
+
+index = 0
+async for row in evaluation.aloop(dataset, concurrency=4):
+    evaluation.asubmit(task, index, row)
+    index += 1
+```
+
+  ### TypeScript
+
+`compare()` is already awaited, so nothing changes: awaiting one row's verdict never holds up the rows running beside it. Raise `concurrency` and every row reaches the judge as soon as its own targets have settled.
+
+```typescript
+await evaluation.run(dataset, async ({ item }) => {
+  await Promise.all([
+    evaluation.withTarget("gpt-5-mini", () => askGpt(item.question)),
+    evaluation.withTarget("claude-sonnet-5", () => askClaude(item.question)),
+  ]);
+
+  const verdict = await evaluation.compare({ input: item.question });
+  console.log(verdict.winner);
+}, { concurrency: 8 });
+```
+
+
+
+<Note>
+  The older `langevals/pairwise_compare` evaluator is deprecated. Existing calls keep working, because they are routed to the same judge described here, but new code should use `compare()`: it takes any number of candidates, names the winner with your own target name, and needs no candidate columns to assemble.
+</Note>
 
 ## Complete Example
 
@@ -39449,7 +39680,17 @@ For each evaluator applied to a target:
 | `{target}_{evaluator}_cost` | Cost of running the evaluator | `gpt-4_faithfulness_cost` → `0.0005` |
 | `{target}_{evaluator}_duration_ms` | Evaluator execution time | `gpt-4_faithfulness_duration_ms` → `850` |
 
-For `langevals/pairwise_compare`, the evaluator cost and duration columns describe the pairwise judge run itself. When `swap_and_confirm` is enabled, that judge run may include two model calls.
+#### Comparison Columns (per comparison)
+
+A comparison grades the row as a whole rather than one target, so it gets its own block of columns after every target block, named after the comparison:
+
+| Column Pattern | Description | Example |
+|----------------|-------------|---------|
+| `{comparison}_winner` | Name of the winning target, or `tie` | `comparison_winner` → `gpt-5-mini` |
+| `{comparison}_candidates` | The targets compared on this row | `comparison_candidates` → `gpt-5-mini, claude-sonnet-5` |
+| `{comparison}_reasoning` | The judge's explanation for the verdict | `comparison_reasoning` → `"gpt-5-mini gives the exact reset link"` |
+
+The whole block is empty for a row the judge did not call, and the winner reads `unresolved` on the rare row where the judge answered with a name none of the targets match. A row's candidates can be fewer than the comparison's full set of targets, because a target that produced no output for that row is left out of the matchup.
 
 ### Example CSV Output
 
@@ -39855,9 +40096,11 @@ Review the aggregate result and the row-level explanations together:
 
 ## Using it from the SDK
 
-The SDKs do not currently expose the Comparison evaluator directly — a comparison's variants are target ids scoped to one workbench experiment, so there isn't yet a portable way for an SDK caller to name candidates the same way. If you run your own comparison judge locally, you can still publish its score, label, and details with `evaluation.log(...)`; those custom results render as standard evaluator results, though the dedicated Comparison column visualization is driven by the built-in evaluator's configuration.
+Comparison is available from the Python and TypeScript SDKs for code-first experiments. Register one target per candidate in your loop, then compare the row once: `evaluation.compare(index)` in Python, `await evaluation.compare({ index })` in TypeScript. The candidates are the targets that recorded an output for that row, so you never name them twice, and the verdict appears on the results page with the same winner column and win-rate chart as a comparison configured here.
 
-The legacy two-candidate `langevals/pairwise_compare` evaluator remains callable from the SDK for existing integrations — see [Experiments via SDK](/evaluations/experiments/sdk#pairwise-compare) — but new work should use Comparison from the workbench UI instead.
+See [Experiments via SDK](/evaluations/experiments/sdk) for the full set of judge options, including judging against a reference answer and replacing the judge prompt.
+
+The legacy two-candidate `langevals/pairwise_compare` evaluator stays callable for existing integrations and is handled by this same judge, so nothing to change if you already use it. New work should use Comparison, either here or with `compare()` from an SDK.
 
 ## What's Next?
 
@@ -45692,7 +45935,7 @@ For a general request such as "test my agent":
 1. Read the agent code, system prompt, tools, and relevant git history.
 2. Identify the behavior most likely to regress.
 3. Create a domain-specific dataset.
-4. Select evaluators that measure the intended behavior.
+4. Select evaluators that measure the intended behavior, or a comparison when the goal is picking a winner between candidates.
 5. Create and run a real experiment.
 6. Interpret the results and recommend concrete improvements.
 
@@ -45812,6 +46055,54 @@ await experiment.run(dataset, async ({ item, index }) => {
 
 Read `langwatch docs evaluations/evaluators/list` before choosing an evaluator, and take the type slug from `langwatch evaluator types --format json` — never from memory. If an evaluation fails with a `validation_error` naming the slug and an `expected` list, correct it from that list and retry once. Reuse project evaluators when appropriate. A scoring function is part of the experiment, not the experiment itself.
 
+## Compare Targets to Pick a Winner
+
+An evaluator answers "does this output pass?". A comparison answers "which of these is better?". For subjective quality, a judge ranking candidates side by side is usually more informative than each one getting an absolute score on its own.
+
+Register one target per candidate inside the loop, then compare the row once. Every target that recorded an output for the row is a candidate, so the candidates are never named twice, and the verdict is recorded against the row, so the results page renders it with no extra logging.
+
+### Python
+
+```python
+for index, row in experiment.loop(dataset.iterrows()):
+    with experiment.target("gpt-5-mini"):
+        experiment.log_response(call_gpt(row["input"]))
+
+    with experiment.target("claude-sonnet-5"):
+        experiment.log_response(call_claude(row["input"]))
+
+    verdict = experiment.compare(index, input=row["input"])
+```
+
+Inside an async loop, await `experiment.acompare(...)`, which takes the same options.
+
+### TypeScript
+
+```typescript
+await experiment.run(dataset, async ({ item, index }) => {
+  await Promise.all([
+    experiment.withTarget("gpt-5-mini", () => callGpt(item.input)),
+    experiment.withTarget("claude-sonnet-5", () => callClaude(item.input)),
+  ]);
+
+  const verdict = await experiment.compare({ index, input: item.input });
+});
+```
+
+Pass `golden` with a known-good answer to judge every candidate against it. Leave it out, which is the default, and the candidates are judged on their own merits.
+
+Read `verdict.status`, and keep its five answers apart:
+
+- `decided`: the judge picked a winner, named in `verdict.winner`.
+- `tie`: the judge compared the candidates and found none better than the rest.
+- `inconclusive`: no winner was established, which with the default second pass over the reversed candidate order means the two passes disagreed.
+- `skipped`: the row had fewer than two outputs, so no judge ran.
+- `error`: the judge failed, so nothing was measured about the candidates at all.
+
+A tie, an inconclusive row and an errored row are three different answers. Reporting any of them as one of the others claims a measurement the run never made.
+
+`prompt` replaces the judge prompt verbatim, with `{input}`, `{golden}` and `{candidates}` placeholders. Leave it unset unless the user asks for their own, because unset is what lets the judge use the prompt matching what each row carries. The remaining judge options are in `langwatch docs evaluations/experiments/sdk`.
+
 ## Run and Verify
 
 Always execute the experiment. An unrun experiment is incomplete.
@@ -45845,6 +46136,7 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 - Do not configure production monitoring or guardrails from this skill.
 - Do not call a batch run an online evaluation.
 - Do not use placeholder datasets.
+- Do not report an inconclusive or errored comparison as a tie.
 - Do not guess SDK APIs when the installed documentation is available.
 - Do not stop after writing the experiment. Run it and inspect the real result.
 ````
@@ -48211,7 +48503,7 @@ For a general request such as "test my agent":
 1. Read the agent code, system prompt, tools, and relevant git history.
 2. Identify the behavior most likely to regress.
 3. Create a domain-specific dataset.
-4. Select evaluators that measure the intended behavior.
+4. Select evaluators that measure the intended behavior, or a comparison when the goal is picking a winner between candidates.
 5. Create and run a real experiment.
 6. Interpret the results and recommend concrete improvements.
 
@@ -48298,6 +48590,54 @@ await experiment.run(dataset, async ({ item, index }) => {
 
 Read `langwatch docs evaluations/evaluators/list` before choosing an evaluator, and take the type slug from `langwatch evaluator types --format json` — never from memory. If an evaluation fails with a `validation_error` naming the slug and an `expected` list, correct it from that list and retry once. Reuse project evaluators when appropriate. A scoring function is part of the experiment, not the experiment itself.
 
+## Compare Targets to Pick a Winner
+
+An evaluator answers "does this output pass?". A comparison answers "which of these is better?". For subjective quality, a judge ranking candidates side by side is usually more informative than each one getting an absolute score on its own.
+
+Register one target per candidate inside the loop, then compare the row once. Every target that recorded an output for the row is a candidate, so the candidates are never named twice, and the verdict is recorded against the row, so the results page renders it with no extra logging.
+
+### Python
+
+```python
+for index, row in experiment.loop(dataset.iterrows()):
+    with experiment.target("gpt-5-mini"):
+        experiment.log_response(call_gpt(row["input"]))
+
+    with experiment.target("claude-sonnet-5"):
+        experiment.log_response(call_claude(row["input"]))
+
+    verdict = experiment.compare(index, input=row["input"])
+```
+
+Inside an async loop, await `experiment.acompare(...)`, which takes the same options.
+
+### TypeScript
+
+```typescript
+await experiment.run(dataset, async ({ item, index }) => {
+  await Promise.all([
+    experiment.withTarget("gpt-5-mini", () => callGpt(item.input)),
+    experiment.withTarget("claude-sonnet-5", () => callClaude(item.input)),
+  ]);
+
+  const verdict = await experiment.compare({ index, input: item.input });
+});
+```
+
+Pass `golden` with a known-good answer to judge every candidate against it. Leave it out, which is the default, and the candidates are judged on their own merits.
+
+Read `verdict.status`, and keep its five answers apart:
+
+- `decided`: the judge picked a winner, named in `verdict.winner`.
+- `tie`: the judge compared the candidates and found none better than the rest.
+- `inconclusive`: no winner was established, which with the default second pass over the reversed candidate order means the two passes disagreed.
+- `skipped`: the row had fewer than two outputs, so no judge ran.
+- `error`: the judge failed, so nothing was measured about the candidates at all.
+
+A tie, an inconclusive row and an errored row are three different answers. Reporting any of them as one of the others claims a measurement the run never made.
+
+`prompt` replaces the judge prompt verbatim, with `{input}`, `{golden}` and `{candidates}` placeholders. Leave it unset unless the user asks for their own, because unset is what lets the judge use the prompt matching what each row carries. The remaining judge options are in `langwatch docs evaluations/experiments/sdk`.
+
 ## Run and Verify
 
 Always execute the experiment. An unrun experiment is incomplete.
@@ -48331,6 +48671,7 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 - Do not configure production monitoring or guardrails from this skill.
 - Do not call a batch run an online evaluation.
 - Do not use placeholder datasets.
+- Do not report an inconclusive or errored comparison as a tie.
 - Do not guess SDK APIs when the installed documentation is available.
 - Do not stop after writing the experiment. Run it and inspect the real result.
 
@@ -50020,6 +50361,294 @@ langwatch trace export --format jsonl --limit 50 -o traces.jsonl
 
 <div className="lw-accordion">
   <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+    <span className="lw-accordion-title">Root-cause a production issue with my agent</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/recipes/debug-with-langwatch"} data-track="docs_copy_skill_install" data-track-title={"Root-cause a production issue with my agent"} data-track-skill={"langwatch/skills/recipes/debug-with-langwatch"}>
+          <code>npx skills add langwatch/skills/recipes/debug-with-langwatch</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/debug-with-langwatch"} data-track="docs_copy_slash_command" data-track-title={"Root-cause a production issue with my agent"} data-track-command={"/debug-with-langwatch"}>
+          <code><span className="lw-slash-command">/debug-with-langwatch</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Root-cause a production issue with my agent"} data-track-skill={"langwatch/skills/recipes/debug-with-langwatch"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
+
+````text
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
+
+# Debug Production Issues with LangWatch
+
+A structured diagnostic workflow: errored traces → span inspection → monitor/evaluator scores → root cause. Work the steps in order; each narrows the search space for the next.
+
+If traces themselves look broken (empty inputs/outputs, disconnected spans), switch to the `debug-instrumentation` recipe instead — that is an instrumentation problem, not an application problem.
+
+## Prerequisites
+
+Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
+
+```bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+```
+
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+
+## Step 0: Point the CLI at the Right Project
+
+```bash
+langwatch status
+```
+
+A fast sanity check that the API key, endpoint, and project are the ones you mean to debug. Fix auth first (see the `setup-lw` recipe) — every later step reads from this project.
+
+## Step 1: Find the Errored Traces
+
+```bash
+langwatch trace search --limit 25 -o json
+langwatch trace search -q "timeout" --start-date 2026-01-01 -o json
+```
+
+- `--start-date`/`--end-date` bound the window (ISO strings or epoch ms; default is the last 24h).
+- `-q` does a text search — the error message, a user id, a thread id.
+- The result is `{ "traces": [...], "pagination": { "totalHits": N } }`. Pull fields out with `--jq` instead of reading the whole payload:
+
+```bash
+langwatch trace search --limit 50 -o json --jq ".traces[].traceId"
+langwatch trace search -q "refund" -o json --jq ".traces | length"
+```
+
+Look for: traces with error statuses, empty or truncated outputs, outliers in latency or cost, and repeats of the same failure across users/threads (a pattern, not a one-off).
+
+## Step 2: Inspect the Failing Spans
+
+```bash
+langwatch trace get <traceId>            # human-readable digest
+langwatch trace get <traceId> -o json    # full span hierarchy
+```
+
+Read the span tree top-down:
+
+- **Which span failed?** The error is usually in one span (an LLM call, a tool call), not the whole trace. Note its input — a bad input upstream often explains a failure downstream.
+- **What did the model see?** Check the prompt/messages on the failing LLM span. Missing context, truncated history, and stale retrieved documents are the usual suspects.
+- **Retries and timeouts:** repeated identical spans suggest retry loops; a long-running span before the failure suggests a timeout.
+
+## Step 3: Check Monitors and Evaluator Scores
+
+Production quality signals live in monitors (online evaluation) and their evaluators:
+
+```bash
+langwatch monitor list -o json           # which monitors exist, are they enabled/firing?
+langwatch monitor get <id> -o json       # one monitor's config and recent state
+langwatch evaluator list -o json         # the evaluators the monitors run
+```
+
+- A firing monitor names the failure mode (toxicity, hallucination, PII) — corroborate it against the spans from Step 2.
+- No monitor for the failure mode you found? That is a gap worth closing once the root cause is fixed (`langwatch monitor create`).
+
+For a quantitative view of the blast radius:
+
+```bash
+langwatch analytics query -m trace-count -a sum --group-by metadata.model -o json
+```
+
+## Step 4: Root Cause and Verify
+
+1. Form a hypothesis from the failing span's input + the monitor's failure mode: prompt change, model change, bad retrieval, code regression. `git log` on the agent's code and prompts tells you what changed when the failures started.
+2. Apply the fix (prompt, code, or configuration).
+3. Generate fresh traffic, then re-run Step 1: the errored traces should stop appearing.
+4. If the failure was a regression, add a scenario so it stays fixed — the `scenarios` skill covers this.
+
+## Discovery
+
+The full command surface, with per-command usage hints, is one command away:
+
+```bash
+langwatch commands -o json     # machine-readable catalog of every command
+langwatch help-tree            # compact annotated tree (fits in context)
+langwatch <group> --help       # flags for one group
+```
+
+Pass `--agent` to any command for compact single-line JSON with colour and spinners off (auto-detected under most coding agents).
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/recipes/debug-with-langwatch/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Root-cause a production issue with my agent"} data-track-skill={"langwatch/skills/recipes/debug-with-langwatch"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="lw-accordion">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+    <span className="lw-accordion-title">Triage my failing experiments and evaluations</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/recipes/eval-triage"} data-track="docs_copy_skill_install" data-track-title={"Triage my failing experiments and evaluations"} data-track-skill={"langwatch/skills/recipes/eval-triage"}>
+          <code>npx skills add langwatch/skills/recipes/eval-triage</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/eval-triage"} data-track="docs_copy_slash_command" data-track-title={"Triage my failing experiments and evaluations"} data-track-command={"/eval-triage"}>
+          <code><span className="lw-slash-command">/eval-triage</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Triage my failing experiments and evaluations"} data-track-skill={"langwatch/skills/recipes/eval-triage"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
+
+````text
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
+
+# Triage Failing Experiments and Evaluations
+
+From "the run failed" to the specific rows, evaluators, and inputs responsible — then to a root cause. Work the steps in order.
+
+## Prerequisites
+
+Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
+
+```bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+```
+
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+
+## Step 1: Find the Failing Run
+
+```bash
+langwatch experiment list --limit 20 -o json          # experiments in the project
+langwatch experiment list-runs <slug> -o json         # runs for one experiment
+langwatch experiment status <slug> -o json            # latest run: status, progress, errors
+langwatch experiment status <slug> --run-id <id> -o json
+```
+
+A run can fail two ways, and they triage differently:
+
+- **Execution failure** — the run errored out or stalled. `status` shows the error; jump to Step 4.
+- **Score regression** — the run completed but evaluator scores dropped or rows failed. Continue to Step 2.
+
+## Step 2: Isolate the Failing Rows
+
+```bash
+langwatch experiment results <slug> --filter failed -o json
+langwatch experiment results <slug> --filter failed --evaluator <name> -o json
+langwatch experiment results <slug> --run-id <id> --limit 50 -o json
+```
+
+- `--filter failed` keeps only the rows that failed at least one evaluator — start there, not with the full result set.
+- `--evaluator <name>` shows one evaluator's column when several ran: is the regression concentrated in one evaluator (a scoring problem) or spread across all of them (a real behavior regression)?
+
+For each failing row, note the input, the expected output (from the dataset), and the actual output. Rows that fail the SAME way point at one root cause; rows that fail differently suggest flakiness or a noisy evaluator.
+
+## Step 3: Inspect the Evaluators
+
+```bash
+langwatch evaluator list -o json
+langwatch evaluator get <idOrSlug> -o json
+```
+
+Before blaming the agent, rule out the scorer:
+
+- **LLM-judge evaluators** — check the model in `settings`. A judge model that changed, is rate-limited, or is too weak for the rubric produces score swings that have nothing to do with the agent.
+- **Thresholds** — a score of 0.49 vs a pass threshold of 0.5 is a borderline judge, not a regression. Look at the score distribution across rows, not just pass/fail.
+- **Deterministic evaluators** (exact match, JSON validity) — these don't drift; failures here are real.
+
+## Step 4: Root Cause
+
+1. Compare the failing run against the last passing one: what changed — prompt version, model, dataset, code? `git log` on prompts and agent code usually answers this directly.
+2. If rows fail on retrieval or context: inspect a production trace of the same path (`langwatch trace search` / `langwatch trace get` — see the `debug-with-langwatch` recipe).
+3. If the dataset itself looks wrong (stale expected outputs, bad rows), fix the dataset — `langwatch dataset get <slugOrId>` to inspect it.
+4. Apply the fix and re-run:
+
+```bash
+langwatch experiment run <slug> --wait
+langwatch experiment status <slug> -o json
+```
+
+## Step 5: Prevent the Recurrence
+
+- If the failure mode wasn't covered by any evaluator, add one (`langwatch evaluator create`) and wire it into the experiment.
+- If it only shows up in production, set up a monitor (`langwatch monitor create`) so online evaluation catches it before the next experiment does.
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/recipes/eval-triage/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Triage my failing experiments and evaluations"} data-track-skill={"langwatch/skills/recipes/eval-triage"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="lw-accordion">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
     <span className="lw-accordion-title">Evaluate my multimodal agent</span>
     <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
   </div>
@@ -50344,6 +50973,134 @@ Before using the dataset:
         </div>
       </div>
       <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/recipes/generate-rag-dataset/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Generate an evaluation dataset from my RAG knowledge base"} data-track-skill={"langwatch/skills/recipes/generate-rag-dataset"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="lw-accordion">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+    <span className="lw-accordion-title">Set up and troubleshoot the LangWatch CLI</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/recipes/setup-lw"} data-track="docs_copy_skill_install" data-track-title={"Set up and troubleshoot the LangWatch CLI"} data-track-skill={"langwatch/skills/recipes/setup-lw"}>
+          <code>npx skills add langwatch/skills/recipes/setup-lw</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/setup-lw"} data-track="docs_copy_slash_command" data-track-title={"Set up and troubleshoot the LangWatch CLI"} data-track-command={"/setup-lw"}>
+          <code><span className="lw-slash-command">/setup-lw</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Set up and troubleshoot the LangWatch CLI"} data-track-skill={"langwatch/skills/recipes/setup-lw"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
+
+````text
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
+
+# Set Up the LangWatch CLI
+
+Get the CLI authenticated and talking to the right LangWatch project, then verify. The troubleshooting table at the end covers the common failure modes.
+
+## Step 1: Credentials
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+
+For CI and agents, configure non-interactively — never block on a browser:
+
+```bash
+langwatch login --api-key <key>                          # writes LANGWATCH_API_KEY to .env
+langwatch login --api-key <key> --endpoint https://lw.acme.internal   # self-hosted
+```
+
+Or set the environment directly (what the CLI actually reads):
+
+```bash
+export LANGWATCH_API_KEY=<project-api-key>
+export LANGWATCH_ENDPOINT=https://lw.acme.internal       # self-hosted only; omit for cloud
+```
+
+For humans at a terminal, plain `langwatch login` asks interactively (cloud vs self-hosted, AI tools vs project SDK), and `langwatch login --device` runs the RFC 8628 device flow via company SSO.
+
+## Step 2: Endpoint and Project
+
+- **Cloud** (app.langwatch.ai) needs no endpoint configuration.
+- **Self-hosted**: the endpoint resolves flag > env > config > default. Persist it with `langwatch config set endpoint https://lw.acme.internal`, or export `LANGWATCH_ENDPOINT` per shell.
+- **Project**: the API key determines the project. Check you're in the right one:
+
+```bash
+langwatch projects list -o json
+```
+
+A personal access token (PAT) instead of a project key also needs `LANGWATCH_PROJECT_ID` set.
+
+## Step 3: Verify
+
+```bash
+langwatch whoami          # device-session identity (governance plane)
+langwatch status          # resource counts — proves auth + endpoint + project in one shot
+```
+
+`langwatch status` printing resource counts means the setup is done. Everything else (traces, evaluations, scenarios) builds on this.
+
+## Step 4: Discover What You Can Do
+
+Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
+
+```bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+```
+
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| `401` / `unauthorized` on every command | Wrong, revoked, or missing API key | Re-run `langwatch login --api-key <key>`; check `LANGWATCH_API_KEY` in `.env` and the shell (shell wins) |
+| `401` with a PAT | Missing project id | `export LANGWATCH_PROJECT_ID=<your-project-id>` |
+| Connection refused / DNS errors | Self-hosted endpoint wrong or unreachable | Check `langwatch config get endpoint` and `LANGWATCH_ENDPOINT`; verify the instance URL loads in a browser from this machine |
+| Right credentials, wrong data | Talking to the wrong project or instance | `langwatch projects list` — re-login with a key from the intended project |
+| Old shell ignores new `.env` | Env vars already exported | Start a new shell, or `unset LANGWATCH_API_KEY LANGWATCH_ENDPOINT` so `.env` is re-read |
+| A command hangs waiting for input | Interactive prompt in a non-interactive context | Re-run with the non-interactive flags (`--api-key`, `-y`, `-o json`) — the CLI never prompts when it detects an agent |
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/recipes/setup-lw/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Set up and troubleshoot the LangWatch CLI"} data-track-skill={"langwatch/skills/recipes/setup-lw"}>
         <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
         <span className="lw-accordion-action-text">
           <span className="lw-accordion-action-title">Download SKILL.md</span>

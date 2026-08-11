@@ -161,9 +161,9 @@ export function WinRateChart({
         fontWeight="medium"
         marginBottom={2}
         lineClamp={1}
-        title={`${column.name} — win rate`}
+        title={`${column.name} win rate`}
       >
-        {column.name} — win rate
+        {column.name} win rate
       </Text>
       <ResponsiveContainer width="100%" height={chartHeight}>
         <BarChart data={chartData} margin={{ left: 10, right: 10 }}>

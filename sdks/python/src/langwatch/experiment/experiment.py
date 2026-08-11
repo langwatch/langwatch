@@ -1,5 +1,6 @@
 from __future__ import annotations
 import asyncio
+from collections import OrderedDict
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
@@ -23,6 +24,7 @@ from typing import (
     List,
     Literal,
     Optional,
+    Sequence,
     TypeVar,
     TypedDict,
     Sized,
@@ -32,6 +34,8 @@ from typing import (
 
 if TYPE_CHECKING:
     import pandas as pd
+
+    from langwatch.evaluation import EvaluationResultModel
 
 from tenacity import retry, stop_after_attempt, wait_exponential
 from tqdm.auto import tqdm
@@ -183,6 +187,113 @@ class IterationInfo(TypedDict):
     error: Optional[Exception]
 
 
+# The judge behind every comparison. Two candidates is not a different
+# feature from five, so there is exactly one evaluator for any N.
+COMPARISON_EVALUATOR = "langevals/select_best_compare"
+
+# How many rows of recorded target outputs stay readable by compare().
+# A comparison reads the row it is given, which is the row the loop is on or
+# one still in flight, so this bound is never reached by a well-formed run.
+# It is what keeps a million-row run from holding every output it produced.
+_MAX_TRACKED_OUTPUT_ROWS = 1000
+
+
+ComparisonStatus = Literal["decided", "tie", "inconclusive", "skipped", "error"]
+
+
+@dataclass(frozen=True)
+class ComparisonVerdict:
+    """The outcome of comparing a row's target outputs.
+
+    ``status`` is one of:
+
+    - "decided": the judge picked a winner, named in ``winner``.
+    - "tie": the judge found no candidate clearly better than the others.
+    - "inconclusive": the judge reached a verdict it could not stand behind,
+      so the candidates are too close to call.
+    - "skipped": the row had fewer than two outputs, so no judge was called.
+    - "error": the judge failed or could not be reached.
+
+    Each of the last three is its own answer, and collapsing any of them into
+    a tie or into each other reports something the run never established. A
+    tie says the candidates are equally good. Inconclusive says they are too
+    close to separate, which is what a swap-and-reconcile disagreement means:
+    the verdict did not survive reversing the candidate order. An error says
+    nothing about the candidates at all, only that the judge failed, and
+    ``reasoning`` carries what went wrong.
+    """
+
+    status: ComparisonStatus
+    winner: Optional[str]
+    reasoning: Optional[str]
+    candidates: List[str]
+
+
+# The batch protocol has three statuses, so each verdict resolves to exactly
+# one of them here. Every recording path reads the wire status out of this
+# table rather than naming one alongside a verdict, which is what keeps the
+# status a caller reads and the status the platform stores from disagreeing.
+_COMPARISON_ENTRY_STATUS: Dict[
+    ComparisonStatus, Literal["processed", "error", "skipped"]
+] = {
+    "decided": "processed",
+    "tie": "processed",
+    "inconclusive": "skipped",
+    "skipped": "skipped",
+    "error": "error",
+}
+
+
+@dataclass
+class _RecordedOutput:
+    """What one target produced for one row, kept outside the batch.
+
+    The batch is flushed on a debounce timer, so the dataset entries carrying
+    these outputs are often already sent and cleared by the time compare()
+    runs. This is the copy compare() reads.
+
+    ``duration`` is in seconds, which is what the judge renders.
+    """
+
+    output: str
+    duration: Optional[float] = None
+
+
+@dataclass
+class _ComparisonRequest:
+    """A judge call built for a row, plus what recording its verdict needs."""
+
+    index: int
+    name: str
+    candidates: List[str]
+    data: Dict[str, Any]
+    settings: Dict[str, Any]
+
+
+def _predicted_as_text(predicted: Optional[Dict[str, Any]]) -> str:
+    """Flatten a recorded response into the text a judge can compare.
+
+    A lone ``output`` field is unwrapped to its own value, so a plain string
+    response reaches the judge as itself. A structured response with several
+    fields is presented whole, as JSON.
+    """
+    if not predicted:
+        return ""
+    if len(predicted) == 1 and "output" in predicted:
+        value = predicted["output"]
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value
+        return json.dumps(value, cls=SerializableWithStringFallback)
+    return json.dumps(predicted, cls=SerializableWithStringFallback)
+
+
+def _current_trace_id() -> str:
+    """The active trace id, hex-encoded."""
+    return format(trace.get_current_span().get_span_context().trace_id, "x")
+
+
 class Experiment:
     _executor: ThreadPoolExecutor
     _futures: List[Future[Any]]
@@ -212,6 +323,14 @@ class Experiment:
 
         # Target registry - tracks registered targets and their metadata
         self._targets: Dict[str, TargetInfo] = {}
+
+        # Per-row, per-target outputs for compare(), independent of the batch
+        # and of when it is flushed. Ordered so the rows the run has moved
+        # past can be dropped once the map grows past its bound.
+        self._row_outputs: OrderedDict[int, Dict[str, _RecordedOutput]] = (
+            OrderedDict()
+        )
+        self._row_outputs_lock = threading.Lock()
 
         # Track whether with_target() was used in the current iteration
         # If so, we don't create row-level dataset entries
@@ -1220,6 +1339,16 @@ class Experiment:
             # Get predicted output from context (set via log_response())
             predicted = ctx.predicted
 
+            # Keep the output addressable by compare() after the batch that
+            # carries it has been flushed, and add the duration only this
+            # block knows.
+            self._record_row_output(
+                index=index,
+                target=name,
+                predicted=predicted,
+                duration_ms=duration_ms,
+            )
+
             batch_entry = BatchEntry(
                 index=index,
                 entry=entry_data,
@@ -1285,6 +1414,9 @@ class Experiment:
         else:
             # Inside explicit target context - just set predicted
             ctx.predicted = predicted
+            self._record_row_output(
+                index=ctx.index, target=ctx.target_id, predicted=predicted
+            )
 
     def _create_implicit_output_target(self, predicted: Dict[str, Any]) -> None:
         """
@@ -1408,6 +1540,53 @@ class Experiment:
         with self.lock:
             self.batch["dataset"].append(batch_entry)
 
+        self._record_row_output(
+            index=index,
+            target=target_name,
+            predicted=predicted,
+            duration_ms=duration_ms,
+        )
+
+    def _record_row_output(
+        self,
+        *,
+        index: int,
+        target: str,
+        predicted: Optional[Dict[str, Any]] = None,
+        duration_ms: Optional[int] = None,
+    ) -> None:
+        """Remember what a target produced for a row, for compare() to read.
+
+        Called from every place an output is recorded, and merges with what
+        is already there: log_response() knows the output, target() knows how
+        long producing it took, and either can arrive first.
+
+        A target that produced nothing is not kept: it has no output to
+        judge, so it is not a candidate.
+        """
+        output = _predicted_as_text(predicted)
+        duration = duration_ms / 1000.0 if duration_ms is not None else None
+
+        with self._row_outputs_lock:
+            row = self._row_outputs.get(index)
+            previous = row.get(target) if row is not None else None
+            if not output and previous is None:
+                return
+            if row is None:
+                row = {}
+                self._row_outputs[index] = row
+            self._row_outputs.move_to_end(index)
+            row[target] = _RecordedOutput(
+                output=output or (previous.output if previous else ""),
+                duration=(
+                    duration
+                    if duration is not None
+                    else (previous.duration if previous else None)
+                ),
+            )
+            while len(self._row_outputs) > _MAX_TRACKED_OUTPUT_ROWS:
+                self._row_outputs.popitem(last=False)
+
     def log(
         self,
         metric: str,
@@ -1464,23 +1643,61 @@ class Experiment:
             target_id = self._register_target(effective_target, metadata)
 
         # Use trace_id from context if available
-        trace_id = (
-            ctx.trace_id
-            if ctx
-            else format(trace.get_current_span().get_span_context().trace_id, "x")
-        )
+        trace_id = ctx.trace_id if ctx else _current_trace_id()
 
-        eval = EvaluationResult(
-            trace_id=trace_id,
+        self._record_evaluation(
             name=metric,
             evaluator=metric,
+            index=index_,
+            trace_id=trace_id,
+            target_id=target_id,
+            data=data,
+            score=score,
+            passed=passed,
+            label=label,
+            details=details,
+            status=status,
+            duration=duration,
+            cost=cost.amount if cost else None,
+            error=error,
+        )
+
+    def _record_evaluation(
+        self,
+        *,
+        name: str,
+        evaluator: str,
+        index: int,
+        trace_id: str,
+        data: Dict[str, Any],
+        target_id: Optional[str] = None,
+        score: Optional[float] = None,
+        passed: Optional[bool] = None,
+        label: Optional[str] = None,
+        details: Optional[str] = None,
+        status: Literal["processed", "error", "skipped"] = "processed",
+        duration: Optional[int] = None,
+        cost: Optional[float] = None,
+        error: Optional[Exception] = None,
+    ) -> None:
+        """Add one evaluation result to the batch.
+
+        The single place an evaluation entry is built, so a result graded
+        against a target and one graded against the row itself cannot drift
+        apart. The caller decides which it is: ``target_id=None`` records the
+        result against the row, with no target attached.
+        """
+        eval = EvaluationResult(
+            trace_id=trace_id,
+            name=name,
+            evaluator=evaluator,
             status=status if status else "error" if error else "processed",
             data=data,
             score=score,
             passed=passed,
-            index=index_,
+            index=index,
             label=label,
-            cost=cost.amount if cost else None,
+            cost=cost,
             duration=duration,
             details=details if details else str(error) if error else None,
             error_type=type(error).__name__ if error else None,
@@ -1540,6 +1757,371 @@ class Experiment:
             duration=duration,
             cost=result.cost,
         )
+
+    def compare(
+        self,
+        index: Union[int, Hashable],
+        *,
+        name: str = "comparison",
+        targets: Optional[Sequence[str]] = None,
+        input: Optional[str] = None,
+        golden: Optional[str] = None,
+        prompt: Optional[str] = None,
+        model: Optional[str] = None,
+        allow_tie: Optional[bool] = None,
+        randomize_order: Optional[bool] = None,
+        swap_and_reconcile: Optional[bool] = None,
+        include_metrics: Optional[Sequence[Literal["duration"]]] = None,
+        temperature: Optional[float] = None,
+    ) -> ComparisonVerdict:
+        """
+        Judge a row's target outputs against each other and pick the best.
+
+        Every target that recorded a non-empty output for the row is a
+        candidate, judged together in a single call. The verdict grades no
+        single target, so it is recorded against the row itself.
+
+        A row with fewer than two outputs cannot be compared, so no judge is
+        called: the row is recorded as skipped and a skipped verdict is
+        returned, leaving the rest of the run to continue. A judge that fails
+        or cannot be reached does not raise either, it comes back as an error
+        verdict, so one bad row never ends a loop over many.
+
+        Every option left unset is absent from the request, so the judge's
+        own default applies. That includes the judge prompt, whose shipped
+        default adapts per row to whether the row carries a reference answer
+        and task context.
+
+        Args:
+            index: The row to compare, taken the way log() takes it: named
+                   explicitly, since loop() hands the row index straight to
+                   you. Also seeds the judge's deterministic candidate
+                   shuffle, so the same row is always presented in the same
+                   order.
+            name: Display name for the comparison column.
+            targets: Restrict the comparison to these targets. Naming a
+                     target that recorded no output for the row is an error.
+                     Defaults to every target that recorded one.
+            input: Task context for the judge to weigh the candidates
+                   against. Defaults to no task context.
+            golden: Reference answer to compare each candidate against. Also
+                    turns on golden judging, so this is the only knob to set.
+                    Defaults to judging the candidates on their own merits.
+            prompt: Judge prompt template, used verbatim. Placeholders:
+                    {input}, {golden}, {candidates}. Defaults server-side to
+                    the shipped prompt matching what the row provides.
+            model: Judge model. Defaults server-side to the platform's
+                   configured judge model.
+            allow_tie: Let the judge answer "tie" when no candidate is
+                       clearly better. Defaults to True server-side.
+            randomize_order: Shuffle candidate order per row to counter
+                             position bias. Defaults to True server-side.
+            swap_and_reconcile: Judge each row a second time with the
+                                candidate order reversed, and establish no
+                                winner when the two disagree. Defaults to
+                                True server-side.
+            include_metrics: Per-candidate metrics to show the judge, so it
+                             can prefer a faster candidate when quality is
+                             comparable. Defaults to none server-side, and a
+                             metric is only shown for candidates whose value
+                             was recorded. Cost is not on offer: the platform
+                             works a target's cost out from its traces after
+                             the run, so there is none to show at the moment
+                             a verdict is asked for.
+            temperature: Judge sampling temperature. Defaults to 0.0
+                         server-side.
+
+        Returns:
+            A ComparisonVerdict naming the winning target, or explaining why
+            there is none.
+
+        Example:
+            ```python
+            for index, row in experiment.loop(df.iterrows()):
+                with experiment.target("gpt-5-mini"):
+                    experiment.log_response(call_gpt(row["question"]))
+
+                with experiment.target("claude-sonnet-5"):
+                    experiment.log_response(call_claude(row["question"]))
+
+                verdict = experiment.compare(index, input=row["question"])
+                print(verdict.winner, verdict.reasoning)
+            ```
+        """
+        prepared = self._prepare_comparison(
+            index=index,
+            name=name,
+            targets=targets,
+            input=input,
+            golden=golden,
+            prompt=prompt,
+            model=model,
+            allow_tie=allow_tie,
+            randomize_order=randomize_order,
+            swap_and_reconcile=swap_and_reconcile,
+            include_metrics=include_metrics,
+            temperature=temperature,
+        )
+        if isinstance(prepared, ComparisonVerdict):
+            return prepared
+
+        start_time = time.time()
+        result = langwatch.evaluation.evaluate(
+            slug=COMPARISON_EVALUATOR,
+            name=prepared.name,
+            data=prepared.data,
+            settings=prepared.settings,
+        )
+        duration = int((time.time() - start_time) * 1000)
+
+        return self._record_comparison(prepared, result, duration)
+
+    async def acompare(
+        self,
+        index: Union[int, Hashable],
+        *,
+        name: str = "comparison",
+        targets: Optional[Sequence[str]] = None,
+        input: Optional[str] = None,
+        golden: Optional[str] = None,
+        prompt: Optional[str] = None,
+        model: Optional[str] = None,
+        allow_tie: Optional[bool] = None,
+        randomize_order: Optional[bool] = None,
+        swap_and_reconcile: Optional[bool] = None,
+        include_metrics: Optional[Sequence[Literal["duration"]]] = None,
+        temperature: Optional[float] = None,
+    ) -> ComparisonVerdict:
+        """Async-native sibling of :meth:`compare`.
+
+        Awaits the judge instead of blocking on it, so a comparison inside an
+        ``aloop`` / ``asubmit`` block leaves the event loop free for its
+        concurrent siblings. Takes the same options and records the verdict
+        the same way.
+        """
+        prepared = self._prepare_comparison(
+            index=index,
+            name=name,
+            targets=targets,
+            input=input,
+            golden=golden,
+            prompt=prompt,
+            model=model,
+            allow_tie=allow_tie,
+            randomize_order=randomize_order,
+            swap_and_reconcile=swap_and_reconcile,
+            include_metrics=include_metrics,
+            temperature=temperature,
+        )
+        if isinstance(prepared, ComparisonVerdict):
+            return prepared
+
+        start_time = time.time()
+        result = await langwatch.evaluation.async_evaluate(
+            slug=COMPARISON_EVALUATOR,
+            name=prepared.name,
+            data=prepared.data,
+            settings=prepared.settings,
+        )
+        duration = int((time.time() - start_time) * 1000)
+
+        return self._record_comparison(prepared, result, duration)
+
+    def _prepare_comparison(
+        self,
+        *,
+        index: Union[int, Hashable],
+        name: str,
+        targets: Optional[Sequence[str]],
+        input: Optional[str],
+        golden: Optional[str],
+        prompt: Optional[str],
+        model: Optional[str],
+        allow_tie: Optional[bool],
+        randomize_order: Optional[bool],
+        swap_and_reconcile: Optional[bool],
+        include_metrics: Optional[Sequence[Literal["duration"]]],
+        temperature: Optional[float],
+    ) -> Union[_ComparisonRequest, ComparisonVerdict]:
+        """Build the judge call for a row, or the verdict that replaces it.
+
+        Returns a verdict directly when the row has fewer than two outputs:
+        there is nothing for a judge to compare, and the row is recorded as
+        skipped rather than failing the run.
+
+        Every option the caller left unset is left out of the request, so the
+        judge is the only place its default is written down.
+        """
+        try:
+            index_ = int(cast(Any, index))
+        except Exception:
+            raise ValueError(f"Index must be an integer, got {index}")
+
+        with self.lock:
+            registered = list(self._targets.keys())
+        with self._row_outputs_lock:
+            recorded = dict(self._row_outputs.get(index_, {}))
+
+        def has_output(target: str) -> bool:
+            return bool(recorded.get(target) and recorded[target].output)
+
+        requested: Optional[List[str]] = (
+            None if targets is None else list(dict.fromkeys(targets))
+        )
+
+        if requested is None:
+            candidates = [target for target in registered if has_output(target)]
+        else:
+            without_output = [
+                target for target in requested if not has_output(target)
+            ]
+            if without_output:
+                named = ", ".join(f"'{target}'" for target in without_output)
+                raise ValueError(
+                    f"Cannot compare row {index_}: no output was recorded for "
+                    f"{named}. Compare a row once every target() block for it "
+                    f"has closed."
+                )
+            candidates = [target for target in registered if target in requested]
+            candidates += [
+                target for target in requested if target not in candidates
+            ]
+
+        if len(candidates) < 2:
+            missing = [
+                target
+                for target in registered
+                if target not in candidates
+                and (requested is None or target in requested)
+            ]
+            details = (
+                f"A comparison needs at least two candidate outputs, this row "
+                f"has {len(candidates)}."
+            )
+            if missing:
+                details += f" No output was recorded for: {', '.join(missing)}."
+            verdict = ComparisonVerdict(
+                status="skipped",
+                winner=None,
+                reasoning=details,
+                candidates=candidates,
+            )
+            self._record_evaluation(
+                name=name,
+                evaluator=COMPARISON_EVALUATOR,
+                index=index_,
+                trace_id=_current_trace_id(),
+                data={"candidates": [{"id": target} for target in candidates]},
+                status=_COMPARISON_ENTRY_STATUS[verdict.status],
+                details=details,
+            )
+            return verdict
+
+        candidate_payloads: List[Dict[str, Any]] = []
+        for target in candidates:
+            output = recorded[target]
+            payload: Dict[str, Any] = {"id": target, "output": output.output}
+            if output.duration is not None:
+                payload["duration"] = output.duration
+            candidate_payloads.append(payload)
+
+        data: Dict[str, Any] = {}
+        if input is not None:
+            data["input"] = input
+        if golden is not None:
+            data["golden"] = golden
+        data["candidates"] = candidate_payloads
+        # Seeds the judge's deterministic shuffle, so the caller never has to
+        # repeat a row index we already know.
+        data["row_index"] = index_
+
+        settings: Dict[str, Any] = {}
+        if prompt is not None:
+            settings["prompt"] = prompt
+        if model is not None:
+            settings["model"] = model
+        if golden is not None:
+            # One knob, not two. Passing a reference answer and separately
+            # declaring that one exists is a footgun: forget the second and
+            # the judge silently ignores the first.
+            settings["has_golden_answer"] = True
+        if allow_tie is not None:
+            settings["allow_tie"] = allow_tie
+        if randomize_order is not None:
+            settings["randomize_order"] = randomize_order
+        if swap_and_reconcile is not None:
+            settings["swap_and_reconcile"] = swap_and_reconcile
+        if include_metrics is not None:
+            settings["include_metrics"] = list(include_metrics)
+        if temperature is not None:
+            settings["temperature"] = temperature
+
+        return _ComparisonRequest(
+            index=index_,
+            name=name,
+            candidates=candidates,
+            data=data,
+            settings=settings,
+        )
+
+    def _record_comparison(
+        self,
+        request: _ComparisonRequest,
+        result: EvaluationResultModel,
+        duration: int,
+    ) -> ComparisonVerdict:
+        """Record a judge's answer against the row and return it as a verdict.
+
+        The entry carries no target: a comparison grades no single candidate,
+        and attaching it to one would make that candidate look independently
+        graded. Its candidate ids are what the results page reads to render
+        the row as a comparison.
+
+        The verdict is decided first and the recorded status is read off it,
+        so what the caller is handed and what the platform stores are always
+        the same answer.
+        """
+        if result.status == "error":
+            # The judge failed or was unreachable. That says nothing about
+            # the candidates, so it is not inconclusive: inconclusive is a
+            # finding about them, and this run made no finding at all.
+            verdict_status: ComparisonStatus = "error"
+            winner = None
+        elif result.status == "processed" and result.label:
+            decided = result.label != "tie"
+            verdict_status = "decided" if decided else "tie"
+            winner = result.label if decided else None
+        else:
+            # The judge reports a skip when its swap-and-reconcile passes
+            # disagreed: the verdict did not survive reversing the candidate
+            # order, so the candidates are too close to separate. Recording
+            # that as a tie would claim they are equally good, which is a
+            # measurement this row never made.
+            verdict_status = "inconclusive"
+            winner = None
+
+        verdict = ComparisonVerdict(
+            status=verdict_status,
+            winner=winner,
+            reasoning=result.details,
+            candidates=list(request.candidates),
+        )
+
+        self._record_evaluation(
+            name=request.name,
+            evaluator=COMPARISON_EVALUATOR,
+            index=request.index,
+            trace_id=_current_trace_id(),
+            data={"candidates": [{"id": target} for target in request.candidates]},
+            status=_COMPARISON_ENTRY_STATUS[verdict.status],
+            score=result.score,
+            label=result.label,
+            details=result.details,
+            duration=duration,
+            cost=result.cost.amount if result.cost else None,
+        )
+
+        return verdict
 
     def run(
         self,

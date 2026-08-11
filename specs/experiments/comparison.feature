@@ -202,6 +202,17 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
     When a row is evaluated
     Then the judge picks a winning candidate based on how well it matches the golden answer
 
+  # The config form decides whether a prompt is still a shipped default by
+  # comparing it against its own copies of the four templates. If those
+  # copies drift from the judge's, the form stops recognizing an untouched
+  # prompt, silently turns off the adaptation above, and a golden-free
+  # comparison ships a prompt framed around a reference answer that isn't
+  # there. Nothing about that failure is visible, so the copies are pinned.
+  @unit
+  Scenario: The shipped judge prompts are identical wherever they are written down
+    Then every default judge prompt the config form knows is byte-identical
+      to the judge's own
+
   # The judge also adapts to whether the row itself carries task context: a
   # row that hands the judge a task is framed around it, while a row with no
   # task context is judged without it, so the judge is never handed an empty
@@ -286,3 +297,48 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
     Given a saved pairwise experiment where "variantA" is narrowed to output field "answer"
     When a row is re-run
     Then the judge sees only the "answer" field for that variant, not its whole structured output
+
+  # The judge is shown anonymized slot labels so a candidate's name cannot
+  # sway it, which leaves it arguing about "A", "B" and "C". A verdict reading
+  # "Winner: variant_2" above a paragraph about "Candidate C" puts the most
+  # useful half of a comparison in a code the reader has no key for, so the
+  # reasoning is translated with the same mapping the winner is.
+  @unit
+  Scenario: The verdict reasoning names candidates, not slot letters
+    Given a Comparison evaluator has judged a row with three variants
+    When the judge explains its pick as "Candidate C", or as "candidate c"
+    Then the reasoning I read names that variant in place of the letter
+
+  # The reasoning is customer-facing prose, so a substitution that corrupts a
+  # sentence is worse than a slot letter left standing. Three collisions
+  # matter: the English article, a quoted letter, which is usually a
+  # multiple-choice answer the candidate gave, and a letter that is part of a
+  # longer name, which is what "C++" is to a reader.
+  @unit
+  Scenario: Reasoning prose survives the slot translation
+    Given the judge's explanation opens with "A concise answer is better"
+    When I read the reasoning
+    Then that sentence is untouched
+    And a letter that was never one of this row's slots is untouched
+    And an explanation that mentions no slot at all is untouched
+    And a letter in quotes, or in backticks, is untouched
+    And a letter glued into a longer name such as "C++" is untouched
+
+  @unit
+  Scenario: A bare slot letter is translated only where it cannot be an article
+    Given the judge's explanation says "C is more complete than A"
+    When I read the reasoning
+    Then both letters name their variants
+    And letters written as a list item or in parentheses name their variants too
+
+  # The two passes are shown the candidates in opposite orders, so slot A of
+  # the second pass is a different variant from slot A of the first. Reading
+  # one pass with the other's key would attribute the words to the wrong
+  # variant, which is worse than leaving the letters in.
+  @unit
+  Scenario: Each judge pass is translated with the slot order it actually saw
+    Given a row is checked twice, the second time with the candidate order reversed
+    And the two passes pick different variants
+    When I read why the row was inconclusive
+    Then each pass's explanation names the variants that pass was shown
+    And no words are attributed to the variant that held that slot in the other pass

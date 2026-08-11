@@ -107,9 +107,11 @@ Review the aggregate result and the row-level explanations together:
 
 ## Using it from the SDK
 
-The SDKs do not currently expose the Comparison evaluator directly — a comparison's variants are target ids scoped to one workbench experiment, so there isn't yet a portable way for an SDK caller to name candidates the same way. If you run your own comparison judge locally, you can still publish its score, label, and details with `evaluation.log(...)`; those custom results render as standard evaluator results, though the dedicated Comparison column visualization is driven by the built-in evaluator's configuration.
+Comparison is available from the Python and TypeScript SDKs for code-first experiments. Register one target per candidate in your loop, then compare the row once: `evaluation.compare(index)` in Python, `await evaluation.compare({ index })` in TypeScript. The candidates are the targets that recorded an output for that row, so you never name them twice, and the verdict appears on the results page with the same winner column and win-rate chart as a comparison configured here.
 
-The legacy two-candidate `langevals/pairwise_compare` evaluator remains callable from the SDK for existing integrations — see [Experiments via SDK](/evaluations/experiments/sdk#pairwise-compare) — but new work should use Comparison from the workbench UI instead.
+See [Experiments via SDK](/evaluations/experiments/sdk) for the full set of judge options, including judging against a reference answer and replacing the judge prompt.
+
+The legacy two-candidate `langevals/pairwise_compare` evaluator stays callable for existing integrations and is handled by this same judge, so nothing to change if you already use it. New work should use Comparison, either here or with `compare()` from an SDK.
 
 ## What's Next?
 

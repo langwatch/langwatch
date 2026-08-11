@@ -22,6 +22,7 @@ BDD spec:     specs/experiments/comparison.feature
 import json
 import os
 import random
+import re
 from typing import Literal, Optional, cast
 
 from langevals_core.base_evaluator import (
@@ -286,13 +287,31 @@ class SelectBestCompareEvaluator(
 
         winner_id = verdict["winner"]
 
+        # `is not None` (not a truthiness check) so a genuine $0.0 cost, a
+        # real free judge call, is preserved as Money(0.0) rather than being
+        # coerced to None. cost stays None only when completion_cost actually
+        # failed to compute (verdict["cost"] is None).
+        cost = (
+            Money(amount=verdict["cost"], currency="USD")
+            if verdict.get("cost") is not None
+            else None
+        )
+
         # No winner at all — reconciliation found the verdict was order-
         # dependent and ties are disabled, so there is nothing to report. This
         # is skipped rather than scored: `score=1.0` would read as a win for
         # `label=None`, and `score=0.5` would be the tie the settings ruled
         # out. An absent verdict must contribute no evidence either way.
+        #
+        # The judge calls were still made and still billed, so the cost rides
+        # along: an inconclusive row is the most expensive kind there is (two
+        # calls instead of one), and dropping its spend understates exactly the
+        # rows a user would want to know cost them the most.
         if winner_id is None:
-            return EvaluationResultSkipped(details=verdict["reasoning"])
+            return EvaluationResultSkipped(
+                details=verdict["reasoning"],
+                cost=cost,
+            )
 
         score = 0.5 if winner_id == "tie" else 1.0
 
@@ -300,16 +319,7 @@ class SelectBestCompareEvaluator(
             score=score,
             label=winner_id,
             details=verdict["reasoning"],
-            cost=(
-                # `is not None` (not a truthiness check) so a genuine $0.0
-                # cost — a real, free judge call — is preserved as Money(0.0)
-                # rather than being coerced to None. cost stays None only when
-                # completion_cost actually failed to compute (verdict["cost"]
-                # is None).
-                Money(amount=verdict["cost"], currency="USD")
-                if verdict.get("cost") is not None
-                else None
-            ),
+            cost=cost,
         )
 
     def _effective_temperature(self) -> float:
@@ -339,6 +349,12 @@ class SelectBestCompareEvaluator(
         mapping from whatever list it's handed and translates the judge's
         slot pick back to the candidate's real id, so the reversed call
         "just works" through that existing translation logic.
+
+        Slot A of the reversed call is a different candidate from slot A of
+        the first, so both verdicts arrive with their reasoning already
+        translated against the mapping of the call that produced it. The
+        merging below only ever concatenates text that already names real
+        candidates.
 
         Returns the same `{"winner", "reasoning", "cost"}` shape `_judge`
         returns, so callers don't need to know which path ran.
@@ -441,8 +457,9 @@ class SelectBestCompareEvaluator(
     ) -> dict:
         """
         Run one judge call across N candidates. Returns the winner's
-        ORIGINAL id (not the slot label). Slot labels are alphabetic
-        (A, B, C, ...) so the judge can pick by slot and we translate.
+        ORIGINAL id (not the slot label) and reasoning that names the same
+        ids. Slot labels are alphabetic (A, B, C, ...) so the judge can pick
+        by slot and we translate both the pick and the explanation of it.
         """
         slot_to_candidate = {
             _slot_label(i): cand for i, cand in enumerate(ordered)
@@ -596,9 +613,17 @@ class SelectBestCompareEvaluator(
         except Exception:
             call_cost = None
 
+        # The judge argues in terms of the slot labels it was shown, so the
+        # reasoning is translated before it leaves `_judge`, with the same
+        # mapping the winner above is translated with. Slot order differs per
+        # call (`_reconcile` reverses it for the second one), so a reasoning
+        # that travelled any further before being translated would be read
+        # against the wrong candidates.
         return {
             "winner": winner_id,
-            "reasoning": arguments["reasoning"],
+            "reasoning": _translate_slot_references(
+                arguments["reasoning"], slot_to_candidate
+            ),
             "cost": call_cost,
         }
 
@@ -641,3 +666,309 @@ def _slot_label(index: int) -> str:
         if n < 0:
             break
     return letters
+
+
+# A slot label, optionally introduced by the noun the judge puts in front of
+# it. The lookaround pair keeps the label a word of its own, so a letter
+# inside a longer token ("v0", "A_1") is never a match.
+_SLOT_REFERENCE_RE = re.compile(
+    r"(?<![A-Za-z0-9_])"
+    r"(?:(?P<prefix>candidates?|slots?|options?)(?P<gap>[ \t]+))?"
+    r"(?P<slot>[A-Za-z]{1,2})"
+    r"(?![A-Za-z0-9_])",
+    re.IGNORECASE,
+)
+
+# Slot labels that are also ordinary English: the article "A", the pronoun
+# "I", and the two-letter labels a run of 27+ candidates reaches. Left alone
+# unless the surrounding words rule the English reading out.
+_WORD_LIKE_SLOT_LABELS = frozenset(
+    {
+        "A",
+        "AI",
+        "AM",
+        "AN",
+        "AS",
+        "AT",
+        "BE",
+        "BY",
+        "DO",
+        "GO",
+        "HE",
+        "I",
+        "ID",
+        "IF",
+        "IN",
+        "IS",
+        "IT",
+        "ME",
+        "MY",
+        "NO",
+        "OF",
+        "OK",
+        "ON",
+        "OR",
+        "SO",
+        "TO",
+        "UP",
+        "US",
+        "WE",
+    }
+)
+
+# Words that can follow a slot label but never the article "a" or the pronoun
+# "I". Auxiliaries, coordinators and third-person verbs only: a past
+# participle ("a covered case") and an adverb ("a slightly narrower reply")
+# both read fine after an article, so neither proves anything. Modals that
+# double as nouns ("a must", "a can") are left out for the same reason.
+_NON_ARTICLE_FOLLOWERS = frozenset(
+    {
+        # Auxiliaries and copulas.
+        "is",
+        "isn't",
+        "was",
+        "wasn't",
+        "are",
+        "aren't",
+        "were",
+        "weren't",
+        "has",
+        "hasn't",
+        "have",
+        "haven't",
+        "had",
+        "hadn't",
+        "does",
+        "doesn't",
+        "do",
+        "don't",
+        "did",
+        "didn't",
+        "cannot",
+        "can't",
+        "won't",
+        "would",
+        "wouldn't",
+        "could",
+        "couldn't",
+        "should",
+        "shouldn't",
+        # Coordinators and discourse markers.
+        "and",
+        "or",
+        "but",
+        "nor",
+        "however",
+        "therefore",
+        "then",
+        "though",
+        "although",
+        # Adverbs that cannot introduce a noun phrase. "Merely", "clearly" and
+        # friends can ("a clearly better reply"), so they are not here.
+        "again",
+        "also",
+        "instead",
+        "only",
+        # Third-person verbs a judge reaches for when comparing replies.
+        "adds",
+        "addresses",
+        "aligns",
+        "answers",
+        "appears",
+        "beats",
+        "captures",
+        "cites",
+        "comes",
+        "contains",
+        "covers",
+        "delivers",
+        "describes",
+        "discusses",
+        "drops",
+        "elaborates",
+        "explains",
+        "fails",
+        "follows",
+        "gets",
+        "gives",
+        "handles",
+        "hedges",
+        "ignores",
+        "includes",
+        "lacks",
+        "lists",
+        "loses",
+        "matches",
+        "mentions",
+        "misses",
+        "names",
+        "notes",
+        "offers",
+        "omits",
+        "presents",
+        "provides",
+        "quotes",
+        "ranks",
+        "reads",
+        "remains",
+        "repeats",
+        "restates",
+        "says",
+        "scores",
+        "seems",
+        "skips",
+        "stays",
+        "sticks",
+        "summarizes",
+        "ties",
+        "tracks",
+        "uses",
+        "wanders",
+        "wins",
+    }
+)
+
+# Comparisons the judge draws against another candidate. What follows one of
+# these is a candidate, not the start of a noun phrase.
+_COMPARATIVE_PRECEDERS = frozenset(
+    {
+        "beats",
+        "chose",
+        "outperforms",
+        "over",
+        "picked",
+        "prefers",
+        "than",
+        "unlike",
+        "versus",
+        "vs",
+    }
+)
+
+# Characters that close a reference when they come immediately after the
+# label. Immediacy is the whole guard: "A," ends a reference, while
+# "A 'concise' reply" is an article in front of a quoted adjective.
+_CLOSING_AFTER_SLOT = ",.;:!?)]}\n\r"
+
+# A lone letter in quotes is quoted material, most often a multiple-choice
+# answer of "B", rather than a reference to slot B. Backticks count: a judge
+# comparing code writes `C` about the language.
+_OPENING_QUOTES = "\"'“‘`"
+_CLOSING_QUOTES = "\"'”’`"
+
+# Punctuation that can follow a bare label without binding to it. Anything
+# else glued to the letter makes it part of a name rather than a reference:
+# "C++", "C#" and "B-side" are one token to a reader, and rewriting the letter
+# inside one produces "plain++", which is worse than the letter left standing.
+_UNBOUND_AFTER_SLOT = _CLOSING_AFTER_SLOT + " \t'’" + _CLOSING_QUOTES
+
+_NEXT_WORD_RE = re.compile(r"[A-Za-z'’]+")
+_PREVIOUS_WORD_RE = re.compile(r"([A-Za-z'’]+)[^A-Za-z]*$")
+
+
+def _translate_slot_references(
+    reasoning: str, slot_to_candidate: dict[str, CandidateInput]
+) -> str:
+    """
+    Rewrite the slot labels in a judge's reasoning into the candidate ids
+    they stand for, using the mapping of the call that produced it.
+
+    The judge sees anonymized slots so a candidate's name cannot sway it,
+    which leaves it explaining a verdict in terms of "A", "B" and "C" that
+    the reader has no key to. This is the key.
+
+    The prose is customer-visible and comes first: a substitution that
+    corrupts a sentence is worse than a slot letter left standing, so a label
+    is only translated where it cannot be read as ordinary English. "A
+    concise answer is better" keeps its article. Substitution happens in one
+    pass per match, so a candidate id that happens to look like a slot label
+    is never translated a second time.
+    """
+    if not reasoning:
+        return reasoning
+
+    def substitute(match: re.Match[str]) -> str:
+        candidate = slot_to_candidate.get(match.group("slot").upper())
+        if candidate is None or not _reads_as_slot_reference(reasoning, match):
+            return match.group(0)
+        prefix = match.group("prefix") or ""
+        gap = match.group("gap") or ""
+        return f"{prefix}{gap}{candidate.id}"
+
+    return _SLOT_REFERENCE_RE.sub(substitute, reasoning)
+
+
+def _reads_as_slot_reference(text: str, match: re.Match[str]) -> bool:
+    """Whether a slot-shaped token refers to a candidate rather than being an
+    ordinary word that happens to be one letter long."""
+    token = match.group("slot")
+    start, end = match.span("slot")
+    word_like = token.upper() in _WORD_LIKE_SLOT_LABELS
+
+    if match.group("prefix"):
+        # "Candidate C" / "candidate c": the noun in front settles it, unless
+        # the label is lowercase and a word in its own right. "The candidate a
+        # reader would pick" is about a reader, not about slot A.
+        if not (word_like and not token.isupper()):
+            return True
+    elif not token.isupper():
+        # A bare lowercase letter is prose far more often than a slot label.
+        return False
+    elif _is_quoted(text, start, end):
+        return False
+    elif _binds_to_what_follows(text, end):
+        return False
+    elif not word_like:
+        return True
+
+    return _english_reading_is_ruled_out(text, start, end)
+
+
+def _binds_to_what_follows(text: str, end: int) -> bool:
+    """Whether the character right after a label glues it into a longer name,
+    as the plus signs do in "C++"."""
+    return end < len(text) and text[end] not in _UNBOUND_AFTER_SLOT
+
+
+def _english_reading_is_ruled_out(text: str, start: int, end: int) -> bool:
+    """Whether the words around a slot label make the English word reading of
+    it impossible."""
+    after = text[end:]
+    if after == "" or after[0] in _CLOSING_AFTER_SLOT:
+        return True
+    if after[:2].lower() in ("'s", "’s"):
+        return True
+
+    next_word = _next_word(after)
+    if _normalize_apostrophe(next_word) in _NON_ARTICLE_FOLLOWERS:
+        return True
+
+    if _normalize_apostrophe(_previous_word(text[:start])) in _COMPARATIVE_PRECEDERS:
+        # "more complete than A (one-liner)". A capitalized word after the
+        # label means title case, where an article is capitalized too and the
+        # reading is open again.
+        return not next_word[:1].isupper()
+
+    return False
+
+
+def _is_quoted(text: str, start: int, end: int) -> bool:
+    before = text[start - 1] if start > 0 else ""
+    after = text[end] if end < len(text) else ""
+    if not before or not after:
+        return False
+    return before in _OPENING_QUOTES and after in _CLOSING_QUOTES
+
+
+def _next_word(after: str) -> str:
+    match = _NEXT_WORD_RE.match(after.lstrip(" \t"))
+    return match.group(0) if match else ""
+
+
+def _previous_word(before: str) -> str:
+    match = _PREVIOUS_WORD_RE.search(before)
+    return match.group(1) if match else ""
+
+
+def _normalize_apostrophe(word: str) -> str:
+    return word.replace("’", "'").lower()

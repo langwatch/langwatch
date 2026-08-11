@@ -410,7 +410,6 @@ const LEGACY_INERT: string[] = [
   "specs/experiments-v3/runner-configuration.feature",
   "specs/experiments-v3/table-display.feature",
   "specs/experiments-v3/undo-redo.feature",
-  "specs/experiments/comparison.feature",
   "specs/features/agent-cli.feature",
   "specs/features/analytics-cli.feature",
   "specs/features/annotation-cli.feature",

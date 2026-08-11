@@ -411,14 +411,14 @@ def test_result_carries_reasoning_and_cost():
 
     with patch(
         "langevals_langevals.select_best_compare.completion",
-        return_value=_mock_completion_response("A is closer", "A"),
+        return_value=_mock_completion_response("closer to the reference", "A"),
     ), patch(
         "langevals_langevals.select_best_compare.completion_cost",
         return_value=0.0002,
     ):
         result = evaluator.evaluate(entry)
 
-    assert result.details and "A is closer" in result.details
+    assert result.details and "closer to the reference" in result.details
     assert result.cost and result.cost.amount == pytest.approx(0.0002)
 
 
@@ -796,6 +796,51 @@ def test_swap_and_reconcile_disagreement_is_skipped_with_informative_details():
     assert "variant_2 covers more ground" in result.details
 
 
+def test_swap_and_reconcile_disagreement_still_reports_what_the_judge_calls_cost():
+    """An inconclusive row is the most expensive kind there is: two judge
+    calls and no verdict. The spend is real and has to be reported, or the
+    rows that cost the most are exactly the ones missing from the bill."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(randomize_order=False)
+    )
+    entry = _make_entry(num_candidates=3, row_index=0)
+
+    responses = [
+        _mock_completion_response("variant_0 is more concise", "A"),
+        _mock_completion_response("variant_2 covers more ground", "A"),
+    ]
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        side_effect=responses,
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        side_effect=[0.0002, 0.0003],
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert result.status == "skipped"
+    assert result.cost is not None
+    assert result.cost.amount == pytest.approx(0.0002 + 0.0003)
+    assert result.cost.currency == "USD"
+
+
+def test_pre_call_skip_reports_no_cost():
+    """A row skipped before any judge call was never billed, so it must not
+    claim a cost of zero either: the field stays absent."""
+    evaluator = SelectBestCompareEvaluator(settings=SelectBestCompareSettings())
+    entry = SelectBestCompareEntry(
+        input="q",
+        golden="g",
+        candidates=[CandidateInput(id="only", output="just one")],
+        row_index=0,
+    )
+
+    result = evaluator.evaluate(entry)
+
+    assert result.status == "skipped"
+    assert result.cost is None
+
+
 def test_swap_and_reconcile_disagreement_with_allow_tie_false_is_skipped():
     """The same outcome with ties explicitly disabled — the point being that
     it IS the same outcome.
@@ -1097,6 +1142,245 @@ def test_disagreement_details_do_not_blame_order_when_sampling_is_not_pinned():
     assert "does not establish a winner" in result.details
     # But the cause must not be asserted, because it was not isolated.
     assert "changed with candidate order" not in result.details
+
+
+# ---------------------------------------------------------------------------
+# Slot-label translation in the reasoning. The judge argues in terms of the
+# anonymized slots it was shown ("Candidate C is more complete than A"), so
+# the explanation is translated back to real candidate ids the same way the
+# winner is. Prose comes first: the article in "A concise answer is better"
+# survives, because a corrupted sentence is worse than a leftover letter.
+# ---------------------------------------------------------------------------
+
+_NAMED_IDS = ("plain", "detailed", "thorough")
+
+
+def _named_entry(ids: tuple[str, ...] = _NAMED_IDS) -> SelectBestCompareEntry:
+    """A row whose candidates have human-readable ids, so a translated
+    reasoning is obviously translated. With randomize_order off the slots are
+    A=plain, B=detailed, C=thorough."""
+    return SelectBestCompareEntry(
+        input="Explain the tradeoff between the two designs",
+        golden="A short explanation with a concrete example",
+        candidates=[CandidateInput(id=id_, output=f"{id_} output") for id_ in ids],
+        row_index=0,
+    )
+
+
+def _details_for(reasoning: str, winner: str = "C") -> str:
+    """Run one judge call answering `reasoning`/`winner` and return the
+    details the caller would read."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(
+            randomize_order=False, swap_and_reconcile=False
+        )
+    )
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        return_value=_mock_completion_response(reasoning, winner),
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        result = evaluator.evaluate(_named_entry())
+
+    assert result.details is not None
+    return result.details
+
+
+# @scenario "The verdict reasoning names candidates, not slot letters"
+def test_explicit_candidate_reference_names_the_real_candidate():
+    details = _details_for("Candidate C most closely matches the reference.")
+
+    assert details == "Candidate thorough most closely matches the reference."
+
+
+# @scenario "The verdict reasoning names candidates, not slot letters"
+def test_lowercase_candidate_reference_names_the_real_candidate():
+    details = _details_for("candidate c is the most complete reply.")
+
+    assert details == "candidate thorough is the most complete reply."
+
+
+# @scenario "The verdict reasoning names candidates, not slot letters"
+def test_translated_reasoning_agrees_with_the_winner_it_explains():
+    """The verdict and its explanation have to be about the same candidate.
+    Naming one thing above a paragraph arguing for another is the defect."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(
+            randomize_order=False, swap_and_reconcile=False
+        )
+    )
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        return_value=_mock_completion_response("Candidate B hedges the least.", "B"),
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        result = evaluator.evaluate(_named_entry())
+
+    assert result.label == "detailed"
+    assert result.details == "Candidate detailed hedges the least."
+
+
+# @scenario "Reasoning prose survives the slot translation"
+def test_english_article_is_not_mistaken_for_a_slot_label():
+    """The letter A is a slot label AND the English article. The article
+    reading has to survive intact, even in a sentence where a real slot
+    reference is translated alongside it."""
+    details = _details_for(
+        "A concise answer is better than a rambling one, so B wins.", winner="B"
+    )
+
+    assert details == "A concise answer is better than a rambling one, so detailed wins."
+
+
+# @scenario "Reasoning prose survives the slot translation"
+def test_letter_that_is_not_a_slot_in_this_call_is_left_alone():
+    """Only the slots THIS call presented are translated. Three candidates
+    means slots A, B and C, so a "D" in the prose is somebody's initial, a
+    grade, or a hallucination, never a candidate."""
+    details = _details_for("D and Z were never on the table; C wins.")
+
+    assert details == "D and Z were never on the table; thorough wins."
+
+
+# @scenario "Reasoning prose survives the slot translation"
+def test_reasoning_without_slot_references_is_returned_unchanged():
+    reasoning = "Both replies cover the tradeoff, but the second grounds it."
+
+    assert _details_for(reasoning) == reasoning
+
+
+# @scenario "Reasoning prose survives the slot translation"
+def test_quoted_single_letter_is_left_alone():
+    """A lone quoted letter is quoted material, most often a multiple-choice
+    answer, rather than a reference to that slot."""
+    details = _details_for('C answered "B", which matches the reference.')
+
+    assert details == 'thorough answered "B", which matches the reference.'
+
+
+# @scenario "Reasoning prose survives the slot translation"
+def test_letter_glued_into_a_longer_name_is_left_alone():
+    """A judge comparing code writes about C++ and C#. The letter there is
+    part of a name, and rewriting it inside one produces prose no reader can
+    make sense of."""
+    details = _details_for(
+        "C answers in C++ and C#, which the question asked for; B answers in "
+        "Python."
+    )
+
+    assert details == (
+        "thorough answers in C++ and C#, which the question asked for; "
+        "detailed answers in Python."
+    )
+
+
+# @scenario "Reasoning prose survives the slot translation"
+def test_backtick_quoted_letter_is_left_alone():
+    """Backticks quote as surely as quotation marks do, and a judge weighing
+    code answers reaches for them."""
+    details = _details_for("C names `C` as the language; B does not.")
+
+    assert details == "thorough names `C` as the language; detailed does not."
+
+
+# @scenario "A bare slot letter is translated only where it cannot be an article"
+def test_bare_slot_letters_are_translated_in_verb_and_comparison_contexts():
+    """The reasoning that surfaced this defect, verbatim in shape: a bare
+    letter in front of a verb, and two more drawn into a comparison."""
+    details = _details_for(
+        "C is more complete than A (A has a good concrete example but is "
+        "slightly narrower) and far more informative than B."
+    )
+
+    assert details == (
+        "thorough is more complete than plain (plain has a good concrete "
+        "example but is slightly narrower) and far more informative than "
+        "detailed."
+    )
+
+
+# @scenario "A bare slot letter is translated only where it cannot be an article"
+def test_list_and_parenthesised_slot_references_are_translated():
+    details = _details_for(
+        "A: one-liner. B: hedged. C: complete with an example. The pick is (C)."
+    )
+
+    assert details == (
+        "plain: one-liner. detailed: hedged. thorough: complete with an "
+        "example. The pick is (thorough)."
+    )
+
+
+# @scenario "Each judge pass is translated with the slot order it actually saw"
+def test_disagreement_translates_each_pass_with_its_own_slot_mapping():
+    """Both passes answered slot "A", but the second pass saw the candidates
+    reversed, so its "A" is a different candidate. Each reasoning is
+    translated with the mapping of the call that produced it, before the two
+    are merged. Reading the reversed pass with the first pass's key would
+    attribute its words to the wrong candidate."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(randomize_order=False)
+    )
+
+    # Pass 1 slots: A=plain, B=detailed, C=thorough.
+    # Pass 2 slots (reversed): A=thorough, B=detailed, C=plain.
+    responses = [
+        _mock_completion_response("A is terse but correct.", "A"),
+        _mock_completion_response("A is the most complete.", "A"),
+    ]
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        side_effect=responses,
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        result = evaluator.evaluate(_named_entry())
+
+    assert result.status == "skipped"
+    assert result.details is not None
+    assert "plain is terse but correct." in result.details
+    assert "thorough is the most complete." in result.details
+    # The two ways of getting the mapping wrong: translating pass 2 with pass
+    # 1's slots, or vice versa. Either attributes words to a candidate that
+    # never said them.
+    assert "thorough is terse but correct." not in result.details
+    assert "plain is the most complete." not in result.details
+
+
+# @scenario "Each judge pass is translated with the slot order it actually saw"
+def test_agreeing_reconciliation_keeps_the_translated_reasoning():
+    """The confirmation prefix rides on top of an already-translated
+    reasoning, so the agreeing path reads in candidate names too."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(randomize_order=False)
+    )
+
+    # Slot B is the middle of an odd-length list, so it is the same candidate
+    # in both directions: a genuine agreement on "detailed".
+    responses = [
+        _mock_completion_response("Candidate B is the most complete.", "B"),
+        _mock_completion_response("B still wins with the order reversed.", "B"),
+    ]
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        side_effect=responses,
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        result = evaluator.evaluate(_named_entry())
+
+    assert result.label == "detailed"
+    assert result.details is not None
+    assert "Candidate detailed is the most complete." in result.details
+    assert "Candidate B" not in result.details
 
 
 def test_disagreement_details_may_blame_order_when_the_judge_is_deterministic():
