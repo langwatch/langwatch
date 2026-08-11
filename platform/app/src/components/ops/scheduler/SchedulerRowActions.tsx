@@ -102,40 +102,83 @@ export function SchedulerRowActions({
         </Portal>
       </Menu.Root>
 
+      <SchedulerConfirmations
+        pending={pending}
+        onClose={() => setPending(null)}
+        targetId={targetId}
+        tenant={tenant}
+        onRunNow={() => runNow.mutate({ scheduleId })}
+        onSetActive={(active) => setActive.mutate({ scheduleId, active })}
+        onClearSlot={() => clearSlot.mutate({ scheduleId })}
+        busy={runNow.isPending || setActive.isPending || clearSlot.isPending}
+      />
+    </>
+  );
+}
+
+/**
+ * The four confirmations, split out so the menu component stays readable.
+ *
+ * Each names the target and the tenant: these controls are cross-tenant, and
+ * the realistic failure is the right action on the wrong row.
+ */
+function SchedulerConfirmations({
+  pending,
+  onClose,
+  targetId,
+  tenant,
+  onRunNow,
+  onSetActive,
+  onClearSlot,
+  busy,
+}: {
+  pending: PendingAction;
+  onClose: () => void;
+  targetId: string;
+  tenant: string | null;
+  onRunNow: () => void;
+  onSetActive: (active: boolean) => void;
+  onClearSlot: () => void;
+  busy: boolean;
+}) {
+  const project = tenant ?? "this project";
+
+  return (
+    <>
       <ConfirmDialog
         open={pending === "run"}
-        onClose={() => setPending(null)}
-        onConfirm={() => runNow.mutate({ scheduleId })}
-        isLoading={runNow.isPending}
+        onClose={onClose}
+        onConfirm={onRunNow}
+        isLoading={busy}
         title="Run this schedule now?"
-        description={`${targetId} will run for ${tenant} as soon as a worker picks it up, exactly as a scheduled run would. Anything it delivers goes to that project.`}
+        description={`${targetId} will run for ${project} as soon as a worker picks it up, exactly as a scheduled run would. Anything it delivers goes to that project.`}
       />
 
       <ConfirmDialog
         open={pending === "pause"}
-        onClose={() => setPending(null)}
-        onConfirm={() => setActive.mutate({ scheduleId, active: false })}
-        isLoading={setActive.isPending}
+        onClose={onClose}
+        onConfirm={() => onSetActive(false)}
+        isLoading={busy}
         title="Pause this schedule?"
-        description={`${targetId} will stop running for ${tenant ?? "this project"} until you resume it. A run already in progress continues — pausing does not cancel it.`}
+        description={`${targetId} will stop running for ${project} until you resume it. A run already in progress continues — pausing does not cancel it.`}
       />
 
       <ConfirmDialog
         open={pending === "resume"}
-        onClose={() => setPending(null)}
-        onConfirm={() => setActive.mutate({ scheduleId, active: true })}
-        isLoading={setActive.isPending}
+        onClose={onClose}
+        onConfirm={() => onSetActive(true)}
+        isLoading={busy}
         title="Resume this schedule?"
-        description={`${targetId} will go back on the calendar for ${tenant ?? "this project"} and run at its next scheduled time.`}
+        description={`${targetId} will go back on the calendar for ${project} and run at its next scheduled time.`}
       />
 
       <ConfirmDialog
         open={pending === "clear"}
-        onClose={() => setPending(null)}
-        onConfirm={() => clearSlot.mutate({ scheduleId })}
-        isLoading={clearSlot.isPending}
+        onClose={onClose}
+        onConfirm={onClearSlot}
+        isLoading={busy}
         title="Clear this stuck slot?"
-        description={`This releases the run ${targetId} has been holding for ${tenant ?? "this project"} so it can be picked up again. If the original worker is somehow still alive, the slot could be worked twice.`}
+        description={`This releases the run ${targetId} has been holding for ${project} so it can be picked up again. If the original worker is somehow still alive, the slot could be worked twice.`}
       />
     </>
   );

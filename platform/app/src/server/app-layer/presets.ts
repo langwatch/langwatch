@@ -1531,20 +1531,20 @@ export function initializeDefaultApp(options?: {
 
   const ops = {
     queues: new QueueService(queueRepo),
-    scheduler: new SchedulerOpsService(
-      new PrismaScheduledJobRepository(prisma),
-      new SchedulerAuditRepository(prisma),
+    scheduler: new SchedulerOpsService({
+      repo: new PrismaScheduledJobRepository(prisma),
+      audit: new SchedulerAuditRepository(prisma),
       // Best-effort poke so a manual run fires now rather than within one poll
       // backstop. Latency only: the loop picks the row up either way.
-      redis ? () => void SchedulerService.publishWake(redis) : null,
-      async (projectIds) => {
+      wake: redis ? () => void SchedulerService.publishWake(redis) : null,
+      resolveProjectNames: async (projectIds) => {
         const projects = await prisma.project.findMany({
           where: { id: { in: projectIds } },
           select: { id: true, name: true },
         });
         return new Map(projects.map((p) => [p.id, p.name]));
       },
-    ),
+    }),
     eventExplorer: new EventExplorerService(eventExplorerRepo),
     managerExplorer: new ManagerExplorerService(repositories.processStore),
     replay: new ReplayService(replayRepo),
@@ -2042,7 +2042,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     usageLimits: UsageLimitService.createNull(),
     ops: {
       queues: new QueueService(new NullQueueRepository()),
-      scheduler: new SchedulerOpsService(new NullScheduledJobRepository()),
+      scheduler: new SchedulerOpsService({
+        repo: new NullScheduledJobRepository(),
+      }),
       eventExplorer: new EventExplorerService(
         new NullEventExplorerRepository(),
       ),

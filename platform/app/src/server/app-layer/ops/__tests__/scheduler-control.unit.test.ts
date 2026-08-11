@@ -38,7 +38,7 @@ const makeService = (row: ScheduledJobRecord | null) => {
   const audit = { append: vi.fn().mockResolvedValue(undefined) };
   const wake = vi.fn();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const service = new SchedulerOpsService(repo as any, audit, wake);
+  const service = new SchedulerOpsService({ repo: repo as any, audit, wake });
   return { service, repo, audit, wake };
 };
 

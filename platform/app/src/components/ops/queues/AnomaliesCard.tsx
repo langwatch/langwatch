@@ -65,11 +65,6 @@ export function AnomaliesCard() {
             30s. Do NOT interpret this as &ldquo;all clear&rdquo;.
           </Text>
         )}
-        {!hasAny && !query.isLoading && !hasError && (
-          <Text paddingX={4} paddingBottom={3} color="gray.500" textStyle="xs">
-            No active anomalies in the last 60 minutes.
-          </Text>
-        )}
         {hasAny && (
           <Table.Root size="sm" variant="line">
             <Table.Header>

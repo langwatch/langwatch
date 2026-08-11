@@ -93,19 +93,31 @@ export interface SchedulerAuditEntryView {
  * UPDATE, which is what an operator had to do instead.
  */
 export class SchedulerOpsService {
-  constructor(
-    private readonly repo: ScheduledJobRepository,
-    private readonly audit?: SchedulerAuditSink | null,
-    /**
-     * Best-effort poke so a manual run fires now rather than within one poll
-     * backstop. Latency only — the loop picks the row up either way.
-     */
-    private readonly wake?: (() => void) | null,
-    /** Maps project ids to names so rows and confirmations can say who. */
-    private readonly resolveProjectNames?:
+  private readonly repo: ScheduledJobRepository;
+  private readonly audit: SchedulerAuditSink | null;
+  /**
+   * Best-effort poke so a manual run fires now rather than within one poll
+   * backstop. Latency only — the loop picks the row up either way.
+   */
+  private readonly wake: (() => void) | null;
+  /** Maps project ids to names so rows and confirmations can say who. */
+  private readonly resolveProjectNames:
+    | ((projectIds: string[]) => Promise<Map<string, string>>)
+    | null;
+
+  constructor(deps: {
+    repo: ScheduledJobRepository;
+    audit?: SchedulerAuditSink | null;
+    wake?: (() => void) | null;
+    resolveProjectNames?:
       | ((projectIds: string[]) => Promise<Map<string, string>>)
-      | null,
-  ) {}
+      | null;
+  }) {
+    this.repo = deps.repo;
+    this.audit = deps.audit ?? null;
+    this.wake = deps.wake ?? null;
+    this.resolveProjectNames = deps.resolveProjectNames ?? null;
+  }
 
   async listScheduledJobs({
     limit = 200,

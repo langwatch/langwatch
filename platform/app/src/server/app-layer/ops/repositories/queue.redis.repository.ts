@@ -959,68 +959,8 @@ export class QueueRedisRepository implements QueueRepository {
     maxTenants: number;
   }): Promise<ParkedTenantsPage> {
     const rows: ParkedTenant[] = [];
-
     for (const queueName of params.queueNames) {
-      const prefix = `${queueName}:gq:`;
-      const tenantIds = await this.redis.smembers(`${prefix}parked-tenants`);
-      if (tenantIds.length === 0) continue;
-
-      // One ZCARD (depth) plus one ZRANGE (the most-eligible member) per
-      // tenant. The registry holds one entry per OVER-CAP TENANT, so this is
-      // bounded by the number of noisy tenants — not by parked depth, which is
-      // the number that actually explodes.
-      const pipeline = this.redis.pipeline();
-      for (const tenantId of tenantIds) {
-        pipeline.zcard(`${prefix}parked:${tenantId}`);
-        pipeline.zrange(`${prefix}parked:${tenantId}`, 0, 0);
-      }
-      const results = await pipeline.exec();
-
-      const headGroups: Array<{ tenantId: string; groupId: string }> = [];
-      const depths = new Map<string, number>();
-      for (let i = 0; i < tenantIds.length; i++) {
-        const tenantId = tenantIds[i]!;
-        const depth = Number(results?.[i * 2]?.[1] ?? 0) || 0;
-        if (depth === 0) continue;
-        depths.set(tenantId, depth);
-        const head = (results?.[i * 2 + 1]?.[1] as string[]) ?? [];
-        if (head[0]) headGroups.push({ tenantId, groupId: head[0] });
-      }
-
-      // Age comes from the head group's oldest job. The head is the tenant's
-      // most dispatch-eligible parked group, and parking preserves the score
-      // it held in ready, so this is the closest available answer to "how long
-      // has this tenant been waiting" without walking every parked group.
-      const ageMs = new Map<string, number>();
-      if (headGroups.length > 0) {
-        const agePipeline = this.redis.pipeline();
-        for (const { groupId } of headGroups) {
-          agePipeline.zrange(
-            `${prefix}group:${groupId}:jobs`,
-            0,
-            0,
-            "WITHSCORES",
-          );
-        }
-        const ageResults = await agePipeline.exec();
-        for (let i = 0; i < headGroups.length; i++) {
-          const arr = (ageResults?.[i]?.[1] as string[]) ?? [];
-          if (arr.length >= 2) {
-            const ts = parseFloat(arr[1]!);
-            if (Number.isFinite(ts)) ageMs.set(headGroups[i]!.tenantId, ts);
-          }
-        }
-      }
-
-      for (const [tenantId, groupCount] of depths) {
-        const oldest = ageMs.get(tenantId);
-        rows.push({
-          tenantId,
-          queueName,
-          groupCount,
-          oldestParkedMs: oldest === undefined ? null : oldest,
-        });
-      }
+      rows.push(...(await this.parkedTenantsForQueue(queueName)));
     }
 
     rows.sort((a, b) => b.groupCount - a.groupCount);
@@ -1028,6 +968,79 @@ export class QueueRedisRepository implements QueueRepository {
       tenants: rows.slice(0, Math.max(0, params.maxTenants)),
       total: rows.length,
     };
+  }
+
+  /**
+   * One queue's over-cap tenants.
+   *
+   * The registry holds one entry per OVER-CAP TENANT, not per parked group, so
+   * this stays cheap even when parked DEPTH is in the hundreds of thousands —
+   * which is exactly the case the dashboard has to explain.
+   */
+  private async parkedTenantsForQueue(
+    queueName: string,
+  ): Promise<ParkedTenant[]> {
+    const prefix = `${queueName}:gq:`;
+    const tenantIds = await this.redis.smembers(`${prefix}parked-tenants`);
+    if (tenantIds.length === 0) return [];
+
+    const pipeline = this.redis.pipeline();
+    for (const tenantId of tenantIds) {
+      pipeline.zcard(`${prefix}parked:${tenantId}`);
+      pipeline.zrange(`${prefix}parked:${tenantId}`, 0, 0);
+    }
+    const results = await pipeline.exec();
+
+    const depths = new Map<string, number>();
+    const headGroups: Array<{ tenantId: string; groupId: string }> = [];
+    for (let i = 0; i < tenantIds.length; i++) {
+      const tenantId = tenantIds[i]!;
+      const depth = Number(results?.[i * 2]?.[1] ?? 0) || 0;
+      if (depth === 0) continue;
+      depths.set(tenantId, depth);
+      const head = (results?.[i * 2 + 1]?.[1] as string[]) ?? [];
+      if (head[0]) headGroups.push({ tenantId, groupId: head[0] });
+    }
+
+    const ageMs = await this.oldestJobPerTenant({ prefix, headGroups });
+
+    return Array.from(depths, ([tenantId, groupCount]) => ({
+      tenantId,
+      queueName,
+      groupCount,
+      oldestParkedMs: ageMs.get(tenantId) ?? null,
+    }));
+  }
+
+  /**
+   * Age comes from each tenant's head parked group's oldest job. The head is
+   * the tenant's most dispatch-eligible parked group, and parking preserves the
+   * score it held in ready, so this is the closest available answer to "how
+   * long has this tenant been waiting" without walking every parked group.
+   */
+  private async oldestJobPerTenant({
+    prefix,
+    headGroups,
+  }: {
+    prefix: string;
+    headGroups: Array<{ tenantId: string; groupId: string }>;
+  }): Promise<Map<string, number>> {
+    const ageMs = new Map<string, number>();
+    if (headGroups.length === 0) return ageMs;
+
+    const pipeline = this.redis.pipeline();
+    for (const { groupId } of headGroups) {
+      pipeline.zrange(`${prefix}group:${groupId}:jobs`, 0, 0, "WITHSCORES");
+    }
+    const results = await pipeline.exec();
+
+    for (let i = 0; i < headGroups.length; i++) {
+      const arr = (results?.[i]?.[1] as string[]) ?? [];
+      if (arr.length < 2) continue;
+      const ts = parseFloat(arr[1]!);
+      if (Number.isFinite(ts)) ageMs.set(headGroups[i]!.tenantId, ts);
+    }
+    return ageMs;
   }
 
   async listParkedGroups(params: {
@@ -1050,14 +1063,27 @@ export class QueueRedisRepository implements QueueRepository {
       "WITHSCORES",
     );
 
-    const groupIds: string[] = [];
     const scores = new Map<string, number>();
     for (let i = 0; i < members.length; i += 2) {
-      const groupId = members[i]!;
-      groupIds.push(groupId);
-      scores.set(groupId, parseFloat(members[i + 1]!));
+      scores.set(members[i]!, parseFloat(members[i + 1]!));
     }
-    if (groupIds.length === 0) return { groups: [], total };
+    if (scores.size === 0) return { groups: [], total };
+
+    return {
+      groups: await this.hydrateParkedGroups({ prefix, scores }),
+      total,
+    };
+  }
+
+  /** Fill in job counts, oldest wait and pipeline name for one page of groups. */
+  private async hydrateParkedGroups({
+    prefix,
+    scores,
+  }: {
+    prefix: string;
+    scores: Map<string, number>;
+  }): Promise<ParkedGroupInfo[]> {
+    const groupIds = Array.from(scores.keys());
 
     const pipeline = this.redis.pipeline();
     for (const groupId of groupIds) {
@@ -1066,48 +1092,37 @@ export class QueueRedisRepository implements QueueRepository {
     }
     const results = await pipeline.exec();
 
-    const oldestJobIds: Array<{ groupId: string; jobId: string | null }> = [];
-    for (let i = 0; i < groupIds.length; i++) {
-      const arr = (results?.[i * 2 + 1]?.[1] as string[]) ?? [];
-      oldestJobIds.push({ groupId: groupIds[i]!, jobId: arr[0] ?? null });
-    }
+    const oldestJobIds = groupIds.map((groupId, i) => ({
+      groupId,
+      jobId: ((results?.[i * 2 + 1]?.[1] as string[]) ?? [])[0] ?? null,
+    }));
 
     const dataPipeline = this.redis.pipeline();
-    let fetched = 0;
     for (const { groupId, jobId } of oldestJobIds) {
-      if (jobId) {
-        dataPipeline.hget(`${prefix}group:${groupId}:data`, jobId);
-        fetched++;
-      }
+      if (jobId) dataPipeline.hget(`${prefix}group:${groupId}:data`, jobId);
     }
-    const dataResults = fetched > 0 ? await dataPipeline.exec() : [];
+    const withJob = oldestJobIds.filter((entry) => entry.jobId !== null);
+    const dataResults = withJob.length > 0 ? await dataPipeline.exec() : [];
 
-    let dataIdx = 0;
-    const groups: ParkedGroupInfo[] = [];
-    for (let i = 0; i < groupIds.length; i++) {
-      const groupId = groupIds[i]!;
-      const pendingJobs = Number(results?.[i * 2]?.[1] ?? 0) || 0;
+    const pipelineNames = new Map<string, string | null>();
+    for (let i = 0; i < withJob.length; i++) {
+      const raw = (dataResults?.[i]?.[1] as string) ?? null;
+      pipelineNames.set(
+        withJob[i]!.groupId,
+        raw ? readJobRoutingMeta(raw).pipelineName : null,
+      );
+    }
+
+    return groupIds.map((groupId, i) => {
       const oldestArr = (results?.[i * 2 + 1]?.[1] as string[]) ?? [];
-      const oldestJobMs =
-        oldestArr.length >= 2 ? parseFloat(oldestArr[1]!) : null;
-
-      let pipelineName: string | null = null;
-      if (oldestJobIds[i]!.jobId) {
-        const raw = (dataResults?.[dataIdx]?.[1] as string) ?? null;
-        dataIdx++;
-        if (raw) pipelineName = readJobRoutingMeta(raw).pipelineName;
-      }
-
-      groups.push({
+      return {
         groupId,
-        pendingJobs,
-        oldestJobMs,
+        pendingJobs: Number(results?.[i * 2]?.[1] ?? 0) || 0,
+        oldestJobMs: oldestArr.length >= 2 ? parseFloat(oldestArr[1]!) : null,
         score: scores.get(groupId) ?? 0,
-        pipelineName,
-      });
-    }
-
-    return { groups, total };
+        pipelineName: pipelineNames.get(groupId) ?? null,
+      };
+    });
   }
 
   // ── Actions ─────────────────────────────────────────────────────
