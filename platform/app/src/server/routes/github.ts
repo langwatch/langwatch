@@ -457,10 +457,13 @@ function verifyWebhookSignature(
  * cannot act on is not something a GitHub retry fixes, and the periodic recheck
  * is the backstop under a delivery that fails or never arrives at all.
  */
-async function applyPullRequestEvent(
-  payload: unknown,
-  deliveryId: string | undefined,
-): Promise<void> {
+async function applyPullRequestEvent({
+  payload,
+  deliveryId,
+}: {
+  payload: unknown;
+  deliveryId: string | undefined;
+}): Promise<void> {
   const event = parseGithubPullRequestEvent(payload);
   if (!event) {
     // The parser declines four different deliveries, and every one of them
@@ -506,7 +509,10 @@ async function handleWebhook(c: any): Promise<Response> {
   const eventType = c.req.header("x-github-event");
 
   if (eventType === "pull_request") {
-    await applyPullRequestEvent(payload, c.req.header("x-github-delivery"));
+    await applyPullRequestEvent({
+      payload,
+      deliveryId: c.req.header("x-github-delivery"),
+    });
     return c.json({ received: true });
   }
 
