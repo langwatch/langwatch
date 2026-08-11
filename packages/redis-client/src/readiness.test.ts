@@ -57,6 +57,21 @@ describe("pingRedis", () => {
       expect(everythingLogged).toContain("rediss://redis.internal:6379");
     });
 
+    it("drops a password passed as a query parameter, keeping the database index", async () => {
+      const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+
+      await pingRedis({
+        connection: connectionThat(() => Promise.resolve("PONG")),
+        target: "redis://redis.internal:6379/3?password=hunter2",
+        logger,
+      });
+
+      expect(logger.info).toHaveBeenCalledWith(
+        { target: "redis://redis.internal:6379/3" },
+        "redis ready",
+      );
+    });
+
     it("keeps a credential-free cluster endpoint list intact", async () => {
       const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
 

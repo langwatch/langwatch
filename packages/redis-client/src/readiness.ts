@@ -20,7 +20,7 @@ export interface PingRedisOptions {
 }
 
 /**
- * Drops the userinfo from each entry of a Redis target.
+ * Drops the credentials from each entry of a Redis target.
  *
  * `target` is `REDIS_URL` or `REDIS_CLUSTER_ENDPOINTS` verbatim, and a
  * production `REDIS_URL` routinely carries an AUTH password
@@ -28,14 +28,23 @@ export interface PingRedisOptions {
  * failure, which is exactly when logs get pasted into issues and chats, so the
  * password must not be in it.
  *
- * Matching greedily up to the last `@` before the path is deliberate: a
- * password may itself contain `@`, and a lazy match would leave the tail of one
- * behind.
+ * Two places carry one, and dropping only the first would leave a redaction
+ * that reads as complete:
+ *
+ * - the userinfo, matched greedily to the last `@` before the path, because a
+ *   password may itself contain `@` and a lazy match leaves the tail of one;
+ * - the query string, which ioredis also accepts a `password` in.
+ *
+ * The path survives, since it is the database index and is not a secret.
  */
 function withoutCredentials(target: string): string {
   return target
     .split(",")
-    .map((entry) => entry.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/]*@/i, "$1"))
+    .map((entry) =>
+      entry
+        .replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/]*@/i, "$1")
+        .replace(/\?.*$/, ""),
+    )
     .join(",");
 }
 
