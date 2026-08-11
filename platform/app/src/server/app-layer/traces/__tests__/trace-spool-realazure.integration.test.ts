@@ -194,6 +194,79 @@ describeRealAzure("trace spool against real Azure Blob Storage", () => {
     }, 120_000);
   });
 
+  describe("given retention was confirmed at write time and is unconfirmed now", () => {
+    /**
+     * Turning `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED` back off is the
+     * remediation the refusal message itself names, and a chart rollback does
+     * it silently. The guard is about not creating an object nothing will reap
+     * — it must never strand the ones already in the container, because
+     * `getSpool` does not fail open (the edge already cleared the attributes,
+     * so a refusal loses the span) and a refused `deleteSpool` skips the eager
+     * cleanup, manufacturing the very orphan the guard exists to prevent.
+     */
+    function storeAfterFlip(): BlobStore {
+      return new BlobStore({
+        resolveS3Client: s3MustNotBeUsed,
+        spoolStorage: {
+          objectStoreFor: () => driver(),
+          resolveDestination: async () => AZURE_DESTINATION,
+          azureRetentionConfirmed: false,
+        },
+      });
+    }
+
+    it("still reads and still deletes the object already in the container", async () => {
+      const traceId = `trace-flip-${RUN_ID}`;
+      const spanId = `span-flip-${RUN_ID}`;
+      const body = Buffer.from("w".repeat(300 * 1024), "utf-8");
+      const uri = uriFor(traceId, spanId);
+      created.push(uri);
+
+      const spoolRef = await spoolStore().putSpool({
+        projectId: PROJECT_ID,
+        traceId,
+        spanId,
+        body,
+      });
+      expect(await driver().exists(uri)).toBe(true);
+
+      const afterFlip = storeAfterFlip();
+      expect(
+        await afterFlip.getSpool({
+          spoolRef,
+          projectId: PROJECT_ID,
+          traceId,
+          spanId,
+        }),
+      ).toEqual(body);
+
+      await afterFlip.deleteSpool({
+        spoolRef,
+        projectId: PROJECT_ID,
+        traceId,
+        spanId,
+      });
+      expect(await driver().exists(uri)).toBe(false);
+    }, 120_000);
+
+    it("still refuses to write a NEW object, which is what the gate is for", async () => {
+      const traceId = `trace-flip-write-${RUN_ID}`;
+      const spanId = `span-flip-write-${RUN_ID}`;
+
+      await expect(
+        storeAfterFlip().putSpool({
+          projectId: PROJECT_ID,
+          traceId,
+          spanId,
+          body: Buffer.from("payload", "utf-8"),
+        }),
+      ).rejects.toBeInstanceOf(SpoolDestinationUnsupportedError);
+
+      // Nothing landed in the real container.
+      expect(await driver().exists(uriFor(traceId, spanId))).toBe(false);
+    }, 120_000);
+  });
+
   describe("given a project whose storage is the local filesystem", () => {
     it("refuses the spool rather than writing an object nothing reaps", async () => {
       const store = new BlobStore({
