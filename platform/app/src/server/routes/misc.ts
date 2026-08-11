@@ -871,6 +871,22 @@ secured
       );
     }
 
+    // S256 is the only method the discovery document advertises, and the token
+    // endpoint verifies every code as S256 regardless of what was requested.
+    // Accepting another method here would mint a code that can never be
+    // redeemed, so the client learns now rather than at the exchange.
+    if (code_challenge_method && code_challenge_method !== "S256") {
+      const description = "code_challenge_method must be S256";
+      return c.json(
+        {
+          error: "invalid_request",
+          error_description: description,
+          redirect: errorRedirect({ error: "invalid_request", description }),
+        },
+        400,
+      );
+    }
+
     // The demo project is a globally-readable showcase: isDemoProject grants
     // `project:view` to ANY caller, so it must never reach the RoleBinding check
     // below — otherwise any authenticated user could mint an MCP auth code

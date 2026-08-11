@@ -97,11 +97,27 @@ async function authorize(overrides: Record<string, unknown> = {}) {
   });
 }
 
+/**
+ * `mockClear` does not drain a `mockResolvedValueOnce` queue, so a value a test
+ * queued but the route never read would answer the next test's call and make
+ * the outcome depend on execution order. Reset drains it, and also drops the
+ * declared default, so each default is restated here.
+ */
+function resetMocks() {
+  mockRedis.set.mockReset().mockResolvedValue("OK");
+  mockRedis.get.mockReset();
+  mockPrisma.roleBinding.findMany
+    .mockReset()
+    .mockResolvedValue([
+      { role: "ADMIN", customRoleId: null, scopeType: "TEAM" },
+    ]);
+  mockPrisma.organizationUser.findFirst
+    .mockReset()
+    .mockResolvedValue({ role: "MEMBER" });
+}
+
 describe("POST /api/mcp/authorize — redirect_uri binding", () => {
-  beforeEach(() => {
-    mockRedis.set.mockClear();
-    mockRedis.get.mockClear();
-  });
+  beforeEach(resetMocks);
 
   describe("when redirect_uri exactly matches a registered URI for client_id", () => {
     /** @scenario Authorization succeeds when redirect_uri exactly matches the registered client */
@@ -158,6 +174,8 @@ describe("POST /api/mcp/authorize — redirect_uri binding", () => {
       expect(json.error).toContain("disallowed scheme");
       expect(json.redirect).toBeUndefined();
       expect(mockRedis.set).not.toHaveBeenCalled();
+      // Proves the ordering the comment above relies on.
+      expect(mockRedis.get).not.toHaveBeenCalled();
     });
   });
 
@@ -196,10 +214,7 @@ describe("POST /api/mcp/authorize — redirect_uri binding", () => {
  * leaves the client's popup waiting forever with nothing to report.
  */
 describe("POST /api/mcp/authorize — where failures are reported", () => {
-  beforeEach(() => {
-    mockRedis.set.mockClear();
-    mockRedis.get.mockClear();
-  });
+  beforeEach(resetMocks);
 
   describe("when the client is verified but the request has no code challenge", () => {
     /** @scenario A consent failure a client can be told about is redirected back to the client */
@@ -221,6 +236,23 @@ describe("POST /api/mcp/authorize — where failures are reported", () => {
         "code_challenge",
       );
       expect(redirect.searchParams.get("state")).toBe("xyz");
+      expect(redirect.searchParams.get("code")).toBeNull();
+      expect(mockRedis.set).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the client is verified but asks for a PKCE method we do not support", () => {
+    /** @scenario A code challenge method other than S256 is refused at the authorization request */
+    it("refuses it rather than minting a code that can never be redeemed", async () => {
+      mockRedis.get.mockResolvedValueOnce(registeredClient());
+
+      const res = await authorize({ code_challenge_method: "plain" });
+      const json = (await res.json()) as { error?: string; redirect?: string };
+
+      expect(res.status).toBe(400);
+      expect(json.error).toBe("invalid_request");
+      const redirect = new URL(json.redirect ?? "");
+      expect(redirect.searchParams.get("error_description")).toContain("S256");
       expect(redirect.searchParams.get("code")).toBeNull();
       expect(mockRedis.set).not.toHaveBeenCalled();
     });

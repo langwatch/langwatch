@@ -70,7 +70,9 @@ describe("Feature: MCP streamable transport across replicas", () => {
   });
 
   afterAll(async () => {
-    await replicas.stop();
+    // beforeAll throws when Redis is missing, which leaves this unset;
+    // dereferencing it here would replace that message with a TypeError.
+    await replicas?.stop();
   });
 
   describe("given a streamable session was created on one replica", () => {
@@ -131,6 +133,9 @@ describe("Feature: MCP streamable transport across replicas", () => {
             signal: abort.signal,
           });
 
+          // A served stream never ends on its own, so the body is deliberately
+          // left unread and torn down by the abort below. The refusal tests
+          // that follow do read theirs, because a refusal is a finite body.
           expect(resumed.status).toBe(200);
         } finally {
           abort.abort();

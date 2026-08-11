@@ -164,6 +164,14 @@ Feature: MCP HTTP Server In-App Integration (Phase 1)
     And the response says the scheme is disallowed
     And no authorization code is issued
 
+  @integration
+  Scenario: A code challenge method other than S256 is refused at the authorization request
+    Given a verified client asks to authorize with a code challenge method we do not support
+    When the authorization request is made
+    Then the response status is 400
+    And the client is told the method must be S256
+    And no authorization code is issued
+
   @regression @integration
   Scenario: Authorization is rejected for an unregistered client_id
     Given no client is registered with client_id "mcp_never_registered"

@@ -19,15 +19,6 @@ import {
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
-/**
- * Whether a destination is safe to hand to `location`. Every redirect this
- * page follows was verified against the client registry server-side first;
- * this is the second lock, so that a regression on that side is a broken
- * redirect rather than script running on our origin. Shares its list with the
- * authorize route, which applies the same rule before it ever issues a code.
- */
-const isNavigableRedirect = isAllowedRedirectScheme;
-
 export default function McpAuthorize() {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -98,7 +89,10 @@ export default function McpAuthorize() {
       // told what went wrong instead of hanging on a popup. Failures it could
       // not attribute have no safe destination and are shown here.
       if (data.redirect) {
-        if (!isNavigableRedirect(data.redirect)) {
+        // The server verified this against the client registry before sending
+        // it, so this is the second lock: a regression there becomes a broken
+        // redirect rather than script running on our origin.
+        if (!isAllowedRedirectScheme(data.redirect)) {
           showError("The application asked to return to an unusable address");
           return;
         }
@@ -122,7 +116,7 @@ export default function McpAuthorize() {
 
   const handleDeny = () => {
     if (oauthParams.redirect_uri) {
-      if (!isNavigableRedirect(oauthParams.redirect_uri)) {
+      if (!isAllowedRedirectScheme(oauthParams.redirect_uri)) {
         void router.push("/");
         return;
       }

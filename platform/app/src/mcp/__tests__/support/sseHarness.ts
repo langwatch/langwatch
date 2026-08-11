@@ -123,7 +123,10 @@ export async function startReplicaPair({
       server.listen(0, "127.0.0.1", resolve),
     );
     const address = server.address();
-    const port = typeof address === "object" && address ? address.port : 0;
+    if (typeof address !== "object" || !address) {
+      throw new Error("a replica reported no address after listening");
+    }
+    const port = address.port;
     handlers.push(handler);
     servers.push(server);
     urls.push(`http://127.0.0.1:${port}`);

@@ -73,7 +73,9 @@ describe("Feature: MCP SSE transport across replicas", () => {
   });
 
   afterAll(async () => {
-    await replicas.stop();
+    // beforeAll throws when Redis is missing, which leaves this unset;
+    // dereferencing it here would replace that message with a TypeError.
+    await replicas?.stop();
   });
 
   describe("given a client opened an SSE connection against one replica", () => {
