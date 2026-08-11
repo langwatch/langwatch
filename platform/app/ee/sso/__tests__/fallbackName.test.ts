@@ -17,13 +17,6 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
 vi.mock("~/server/redis", () => ({ connection: undefined }));
-vi.mock("../hooks", () => ({
-  beforeUserCreate: vi.fn(),
-  afterUserCreate: vi.fn(),
-  beforeAccountCreate: vi.fn(),
-  beforeSessionCreate: vi.fn(),
-  afterSessionCreate: vi.fn(),
-}));
 
 import { fallbackName } from "../providers";
 

@@ -157,7 +157,7 @@ vi.mock("~/hooks/useDrawer", () => ({
   getFlowCallbacks: vi.fn(() => undefined),
 }));
 
-vi.mock("../ui/drawer", () => ({
+vi.mock("../../ui/drawer", () => ({
   Drawer: {
     Root: ({ children, open }: any) =>
       open ? <div data-testid="drawer">{children}</div> : null,
@@ -171,7 +171,7 @@ vi.mock("../ui/drawer", () => ({
   },
 }));
 
-vi.mock("../ui/toaster", () => ({
+vi.mock("../../ui/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
@@ -207,7 +207,7 @@ vi.mock("../../agents/AgentHttpEditorDrawer", () => ({
     ) : null,
 }));
 
-vi.mock("../ui/checkbox", () => ({
+vi.mock("../../ui/checkbox", () => ({
   Checkbox: ({ checked, onCheckedChange, children, ...props }: any) => (
     <label>
       <input
@@ -516,7 +516,15 @@ describe("<SuiteFormDrawer/>", () => {
     });
   });
 
-  describe("given the drawer is closed", () => {
+  describe("given the drawer registry decides visibility", () => {
+    describe("when drawerOpen returns true", () => {
+      it("renders the drawer shell", () => {
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+
+        expect(screen.getByTestId("drawer")).toBeInTheDocument();
+      });
+    });
+
     describe("when drawerOpen returns false", () => {
       it("does not render drawer content", () => {
         mocks.mockDrawerOpen.mockReturnValue(false);

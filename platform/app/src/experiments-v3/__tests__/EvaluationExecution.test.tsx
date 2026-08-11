@@ -181,9 +181,6 @@ vi.mock("~/components/evaluators/EvaluatorEditorDrawer", () => ({
 vi.mock("~/components/prompts/PromptListDrawer", () => ({
   PromptListDrawer: () => null,
 }));
-vi.mock("~/components/prompts/registry/RegistryDrawer", () => ({
-  RegistryDrawer: () => null,
-}));
 vi.mock("~/components/prompts/PromptEditorDrawer", () => ({
   PromptEditorDrawer: () => null,
 }));
