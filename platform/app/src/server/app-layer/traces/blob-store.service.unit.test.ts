@@ -316,6 +316,65 @@ describe("putSpool — given Azure storage whose orphan retention is unconfirmed
   });
 });
 
+describe("given Azure retention was confirmed at write time and is unconfirmed now", () => {
+  /**
+   * Flipping the assertion back off is the documented remediation, and a chart
+   * rollback does it silently. It must not strand the objects already written:
+   * `getSpool` does not fail open and the edge already cleared the attributes,
+   * so a refusal there loses the span outright — and a refusal in `deleteSpool`
+   * skips the eager cleanup, manufacturing the exact orphan the gate exists to
+   * prevent.
+   */
+  function storeAfterFlip(objectStore: ReturnType<typeof fakeObjectStore>) {
+    return new BlobStore({
+      resolveS3Client: forbiddenS3Resolver,
+      spoolStorage: {
+        objectStoreFor: () => objectStore,
+        resolveDestination: async () => AZURE_DESTINATION,
+        azureRetentionConfirmed: false,
+      },
+    });
+  }
+
+  describe("when the worker reads a span spooled before the flip", () => {
+    it("still returns the payload", async () => {
+      const objectStore = fakeObjectStore();
+      const body = Buffer.from("the full oversized payload", "utf-8");
+      const spoolRef = await new BlobStore({
+        resolveS3Client: forbiddenS3Resolver,
+        spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
+      }).putSpool({ ...spoolCoords, body });
+
+      expect(
+        await storeAfterFlip(objectStore).getSpool({
+          spoolRef,
+          ...spoolCoords,
+        }),
+      ).toEqual(body);
+    });
+  });
+
+  describe("when the worker deletes a span spooled before the flip", () => {
+    it("still removes the object", async () => {
+      const objectStore = fakeObjectStore();
+      const spoolRef = await new BlobStore({
+        resolveS3Client: forbiddenS3Resolver,
+        spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
+      }).putSpool({
+        ...spoolCoords,
+        body: Buffer.from("payload", "utf-8"),
+      });
+
+      await storeAfterFlip(objectStore).deleteSpool({
+        spoolRef,
+        ...spoolCoords,
+      });
+
+      expect(objectStore.objects.size).toBe(0);
+    });
+  });
+});
+
 describe("putSpool — given S3 storage with retention unconfirmed", () => {
   describe("when putSpool is called", () => {
     it("still writes, because the flag scopes to Azure only", async () => {

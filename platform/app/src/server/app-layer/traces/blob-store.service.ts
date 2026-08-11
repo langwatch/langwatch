@@ -303,6 +303,63 @@ function assertLegacySpoolKeyBelongsTo(
 }
 
 /**
+ * Refuses a destination that cannot bound an orphaned spool object.
+ *
+ * WRITE PATH ONLY. This is a rule about creating new objects, not about the
+ * ones already out there — see the `purpose` note on `BlobStore.mintSpoolUri`.
+ */
+function assertDestinationCanHostSpool({
+  destination,
+  azureRetentionConfirmed,
+}: {
+  destination: ProjectStorageDestination;
+  azureRetentionConfirmed: boolean;
+}): void {
+  // The spool is the one stored-objects consumer that depends on something
+  // OUTSIDE the object store to stay bounded: it deletes eagerly after the
+  // event_log INSERT, and leans on a lifecycle rule to reap whatever a crash
+  // between those two steps leaves behind. A filesystem has no such rule, so
+  // on this destination an orphan is permanent and the volume is what fills.
+  //
+  // Refusing here is not a regression. Before this consumer moved onto the
+  // shared layer it built an S3 client, and on a local install that resolved
+  // to the hardcoded "langwatch" bucket, which does not exist — so the PUT
+  // failed and `maybeSpool` fell open to an inline payload every time. This
+  // makes that same outcome explicit and loud instead of incidental.
+  if (destination.kind === "file") {
+    throw new SpoolDestinationUnsupportedError(
+      "The trace spool has no local-filesystem path: orphaned spool objects are reaped by a " +
+        "bucket/container lifecycle rule, which a filesystem cannot express, so a crash between " +
+        "the write and its delete would leave the object forever. Ingestion continues with the " +
+        "full payload inline. Configure S3 or Azure Blob storage to get oversize protection.",
+    );
+  }
+
+  // Same rule, applied consistently. Azure CAN express the lifecycle policy
+  // the orphan bound depends on — but nothing here can confirm it exists.
+  // The policy is a MANAGEMENT-plane resource
+  // (Microsoft.Storage/storageAccounts/managementPolicies); this deployment
+  // holds a data-plane key only, so reading it back would mean asking every
+  // operator for ARM credentials and a subscription id the feature otherwise
+  // has no use for. Refusing to check is not the same as refusing to care:
+  // the operator asserts it at deploy time, in the same config that turns the
+  // spool on, and the default is off. An Azure install that enables the flag
+  // without provisioning retention therefore degrades to inline payloads
+  // rather than accumulating customer trace data nothing will ever reap.
+  if (destination.kind === "azure" && !azureRetentionConfirmed) {
+    throw new SpoolDestinationUnsupportedError(
+      "The trace spool is disabled on Azure Blob until orphan retention is provisioned. A crash " +
+        "between the spool write and its delete leaves the object behind, and only a lifecycle " +
+        "rule reaps it. Create a lifecycle management policy on this container that deletes " +
+        "blobs under the `trace-blobs/spool/` prefix after 3 days, then set " +
+        "AZURE_BLOB_SPOOL_RETENTION_CONFIRMED=true (chart: " +
+        "`app.dataplane.providers.azureBlob.spoolRetentionConfirmed`). Ingestion continues with " +
+        "the full payload inline until then.",
+    );
+  }
+}
+
+/**
  * Provides transient spool operations (ADR-022 write path) and event_log
  * read operations (ADR-022 read path).
  *
@@ -364,15 +421,27 @@ export class BlobStore {
   /**
    * Re-derives the spool object's URI from server-trusted inputs. Never reads a
    * location out of the command.
+   *
+   * `purpose` decides whether the destination guards below apply. They exist to
+   * stop a NEW object landing where nothing will reap it, so they are a
+   * write-time rule only. Applying them to a read or a delete would punish the
+   * objects already on disk: an operator who turns the retention assertion back
+   * off — the documented remediation, and what a chart rollback does — would
+   * make every in-flight spooled span permanently unreadable (`getSpool` does
+   * not fail open, and the edge already cleared the attributes), and would stop
+   * the eager delete that is the spool's FIRST line of cleanup, manufacturing
+   * exactly the orphan the guard is there to prevent.
    */
   private async mintSpoolUri({
     projectId,
     traceId,
     spanId,
+    purpose,
   }: {
     projectId: string;
     traceId: string;
     spanId: string;
+    purpose: "write" | "access";
   }): Promise<{ uri: string; objectStore: SpoolObjectStore }> {
     if (!this.spoolStorage) {
       throw new Error(
@@ -381,50 +450,11 @@ export class BlobStore {
     }
     const destination = await this.spoolStorage.resolveDestination(projectId);
 
-    // The spool is the one stored-objects consumer that depends on something
-    // OUTSIDE the object store to stay bounded: it deletes eagerly after the
-    // event_log INSERT, and leans on a lifecycle rule to reap whatever a crash
-    // between those two steps leaves behind. A filesystem has no such rule, so
-    // on this destination an orphan is permanent and the volume is what fills.
-    //
-    // Refusing here is not a regression. Before this consumer moved onto the
-    // shared layer it built an S3 client, and on a local install that resolved
-    // to the hardcoded "langwatch" bucket, which does not exist — so the PUT
-    // failed and `maybeSpool` fell open to an inline payload every time. This
-    // makes that same outcome explicit and loud instead of incidental.
-    if (destination.kind === "file") {
-      throw new SpoolDestinationUnsupportedError(
-        "The trace spool has no local-filesystem path: orphaned spool objects are reaped by a " +
-          "bucket/container lifecycle rule, which a filesystem cannot express, so a crash between " +
-          "the write and its delete would leave the object forever. Ingestion continues with the " +
-          "full payload inline. Configure S3 or Azure Blob storage to get oversize protection.",
-      );
-    }
-
-    // Same rule, applied consistently. Azure CAN express the lifecycle policy
-    // the orphan bound depends on — but nothing here can confirm it exists.
-    // The policy is a MANAGEMENT-plane resource
-    // (Microsoft.Storage/storageAccounts/managementPolicies); this deployment
-    // holds a data-plane key only, so reading it back would mean asking every
-    // operator for ARM credentials and a subscription id the feature otherwise
-    // has no use for. Refusing to check is not the same as refusing to care:
-    // the operator asserts it at deploy time, in the same config that turns the
-    // spool on, and the default is off. An Azure install that enables the flag
-    // without provisioning retention therefore degrades to inline payloads
-    // rather than accumulating customer trace data nothing will ever reap.
-    if (
-      destination.kind === "azure" &&
-      !this.spoolStorage.azureRetentionConfirmed
-    ) {
-      throw new SpoolDestinationUnsupportedError(
-        "The trace spool is disabled on Azure Blob until orphan retention is provisioned. A crash " +
-          "between the spool write and its delete leaves the object behind, and only a lifecycle " +
-          "rule reaps it. Create a lifecycle management policy on this container that deletes " +
-          "blobs under the `trace-blobs/spool/` prefix after 3 days, then set " +
-          "AZURE_BLOB_SPOOL_RETENTION_CONFIRMED=true (chart: " +
-          "`app.dataplane.providers.azureBlob.spoolRetentionConfirmed`). Ingestion continues with " +
-          "the full payload inline until then.",
-      );
+    if (purpose === "write") {
+      assertDestinationCanHostSpool({
+        destination,
+        azureRetentionConfirmed: this.spoolStorage.azureRetentionConfirmed,
+      });
     }
 
     return {
@@ -627,6 +657,7 @@ export class BlobStore {
       projectId,
       traceId,
       spanId,
+      purpose: "access",
     });
     return streamToBuffer(await objectStore.get(uri), MAX_SPOOL_BYTES);
   }
@@ -681,6 +712,7 @@ export class BlobStore {
       projectId,
       traceId,
       spanId,
+      purpose: "write",
     });
     await objectStore.put(uri, body, "application/octet-stream");
     return SPOOL_REF_V2;
@@ -728,6 +760,7 @@ export class BlobStore {
         projectId,
         traceId,
         spanId,
+        purpose: "access",
       });
       await objectStore.delete(uri);
     } catch {
