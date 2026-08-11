@@ -34,10 +34,21 @@ func codeOf(t *testing.T, err error) herr.Code {
 	return e.Code
 }
 
-// AC16 / AC18b: no status-less Bifrost error is a timeout. None of these
-// shapes involves a network round trip, so labeling them provider_timeout is
-// wrong on its face — and it is what the switch does today for all three. The
-// 502 half of AC16 is client-facing and lives in
+// AC16 / AC18b: no status-less Bifrost error is a timeout, and each one lands
+// on a NAMED code rather than merely "something other than a timeout". None of
+// these four shapes involves a network round trip, so labeling any of them
+// provider_timeout is wrong on its face — and before the fix the status-0
+// branch did exactly that for all four.
+//
+// Each row states the exact code it must land on, because the codes are not
+// interchangeable: provider_error is retryable and would walk the whole
+// credential chain on a fault no credential can satisfy, which is the failure
+// this change exists to stop. A negative-only assertion cannot tell the two
+// apart. The discriminator is statuslessBifrostCode's shape test (nil
+// Error.Error AND nil Error.Code), so the row's constructor decides its code:
+// NewConfigurationError fills neither field, the other two fill one each.
+//
+// The code -> HTTP status half of AC16/AC18b is client-facing and lives in
 // adapters/httpapi/azure_config_error_status_test.go.
 //
 // @scenario "A configuration error carrying no status code is not classified as a timeout"
@@ -46,29 +57,38 @@ func TestClassifyBifrostError_StatuslessShapesAreNotTimeouts(t *testing.T) {
 	cases := []struct {
 		name string
 		berr *bfschemas.BifrostError
+		want herr.Code
 	}{
 		{
 			// AC16: the exact error the Azure provider raises when the
 			// deployment map never arrived (azure.go validateKeyConfig).
+			// Rejected before anything was attempted, so it is permanent and
+			// operator-fixable: misconfigured, never the retryable code.
 			name: "azure configuration error: deployments not set",
 			berr: bfproviderutils.NewConfigurationError("deployments not set", bfschemas.Azure),
+			want: domain.ErrProviderMisconfigured,
 		},
 		{
 			// Same constructor, different cause — the fix must key on the
-			// missing status, not on one message.
+			// error's shape, not on one message.
 			name: "azure configuration error: endpoint not set",
 			berr: bfproviderutils.NewConfigurationError("endpoint not set", bfschemas.Azure),
+			want: domain.ErrProviderMisconfigured,
 		},
 		{
-			// AC18b: the request type is not served by this provider. A
-			// client-side fault; retrying it can never help.
+			// AC18b: the request type is not served by this provider. Carries
+			// the vendor's own Error.Code, so it stays on the retryable code:
+			// the next credential in the chain may serve the type.
 			name: "unsupported operation",
 			berr: bfproviderutils.NewUnsupportedOperationError(bfschemas.EmbeddingRequest, bfschemas.Anthropic),
+			want: domain.ErrProviderError,
 		},
 		{
-			// AC18b: an internal Bifrost failure. Also not a timeout.
+			// AC18b: an attempt that failed short of a response, carrying the
+			// Go error it failed on. Retryable for the same reason.
 			name: "bifrost operation error",
 			berr: bfproviderutils.NewBifrostOperationError("error marshaling request", errors.New("boom"), bfschemas.Azure),
+			want: domain.ErrProviderError,
 		},
 	}
 
@@ -80,6 +100,8 @@ func TestClassifyBifrostError_StatuslessShapesAreNotTimeouts(t *testing.T) {
 
 			assert.NotEqual(t, domain.ErrProviderTimeout, got,
 				"no HTTP call was made, so this cannot be a timeout; got %q", got)
+			assert.Equal(t, tc.want, got,
+				"this shape must land on its own named code, not merely on a non-timeout one")
 		})
 	}
 }

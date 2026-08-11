@@ -11,8 +11,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/pkg/breaker"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/modelresolver"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/providers"
@@ -60,7 +62,22 @@ func newCountingUpstream(t *testing.T, respondModel string) *countingUpstream {
 	return up
 }
 
-func azureLaneRouter(t *testing.T, creds ...domain.Credential) http.Handler {
+// azureBreakerSpy counts what the retry engine reports about a credential.
+// allows also serves as a walk counter: the engine consults the breaker once
+// per slot it is willing to try, so it distinguishes "no failure recorded"
+// from "the breaker was never wired in".
+type azureBreakerSpy struct {
+	allows    int
+	successes int
+	failures  int
+}
+
+func (b *azureBreakerSpy) Allow(string) bool          { b.allows++; return true }
+func (b *azureBreakerSpy) RecordSuccess(string)       { b.successes++ }
+func (b *azureBreakerSpy) RecordFailure(string)       { b.failures++ }
+func (b *azureBreakerSpy) State(string) breaker.State { return breaker.Closed }
+
+func azureLaneRouter(t *testing.T, creds []domain.Credential, opts ...app.Option) http.Handler {
 	t.Helper()
 	registerErrorStatuses()
 
@@ -80,12 +97,13 @@ func azureLaneRouter(t *testing.T, creds ...domain.Credential) http.Handler {
 	auth := &mockAuth{resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
 		return bundle, nil
 	}}
-	return buildRouter(
+	base := []app.Option{
 		app.WithAuth(auth),
 		app.WithProviders(bf),
 		app.WithModels(modelresolver.New()),
 		app.WithLogger(zap.NewNop()),
-	)
+	}
+	return buildRouter(append(base, opts...)...)
 }
 
 func azureChatRequest(model string) *http.Request {
@@ -100,62 +118,87 @@ func azureChatRequest(model string) *http.Request {
 //
 // 502 is asserted concretely: if the fix registers its chosen code at a
 // different status, this test is where that decision has to be made explicit.
+// The status alone cannot discriminate, though — provider_error is registered
+// at 502 too, and it is the RETRYABLE code — so the envelope's error.code is
+// asserted as well. Without it this test passes on the exact classification
+// this change exists to prevent.
 //
 // @scenario "A configuration error carrying no status code is not classified as a timeout"
 // @scenario "The operator can identify the cause from the response alone"
 func TestAzureLane_ConfigurationErrorIsNotSurfacedAsATimeout(t *testing.T) {
-	router := azureLaneRouter(t, domain.Credential{
+	router := azureLaneRouter(t, []domain.Credential{{
 		ID:         "cred-azure",
 		ProviderID: domain.ProviderAzure,
 		APIKey:     "az-key",
 		// No endpoint: the provider row was never finished. Bifrost rejects
 		// this before dialing, with no HTTP status to report.
 		Extra: map[string]string{"api_version": "2024-10-21"},
-	})
+	}})
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, azureChatRequest("azure/gpt-5.3-mini"))
 
+	body := rec.Body.String()
 	assert.Equal(t, http.StatusBadGateway, rec.Code,
-		"a permanent provider misconfiguration must not be reported as an upstream timeout; body: %s", rec.Body.String())
-	assert.Contains(t, rec.Body.String(), "endpoint not set",
+		"a permanent provider misconfiguration must not be reported as an upstream timeout; body: %s", body)
+	assert.Equal(t, string(domain.ErrProviderMisconfigured), gjson.Get(body, "error.code").String(),
+		"502 is also provider_error's status, so only the code tells the client this is permanent; body: %s", body)
+	assert.Contains(t, body, "endpoint not set",
 		"the operator's only clue to the misconfiguration must survive to the client")
 }
 
 // AC17, the operational half: a permanent configuration failure must not walk
-// the credential fallback chain. Pre-fix it classifies as a timeout, which the
-// retry engine treats as retryable, so every request pays for every credential
-// in the chain before failing (the production trace showed eight identical
-// attempt pairs).
+// the credential fallback chain, and must not count against the credential's
+// circuit breaker. Pre-fix it classifies as a timeout, which the retry engine
+// both retries AND counts as a breaker failure, so every request pays for
+// every credential in the chain before failing (the production trace showed
+// eight identical attempt pairs) and marches the slot toward an open circuit.
 //
 // The second credential is fully working, so "it was never dialed" can only be
-// explained by the chain not being walked.
+// explained by the chain not being walked. The breaker spy is the second
+// instrument on the same claim: retry.Walk consults Allow once per slot it is
+// willing to try, so allows == 1 says the walk stopped at the first slot — and
+// it is what keeps "no failure recorded" from passing on a breaker that was
+// never wired in.
+//
+// The scenario's third Then is asserted as written — no failure recorded. Note
+// that the engine does not merely abstain: pkg/retry/retry.go:138 credits a
+// RecordSuccess, because recordBreaker's default arm reads any non-breaker-
+// failure outcome as proof the slot answered. That is a pkg/retry semantic
+// this change does not own, so it is left alone and deliberately not pinned
+// here; what AC17 requires, and what is asserted, is that nothing accrues
+// toward opening the circuit.
 //
 // @scenario "A permanent configuration error is not retried"
 func TestAzureLane_ConfigurationErrorDoesNotWalkTheFallbackChain(t *testing.T) {
 	healthy := newCountingUpstream(t, "gpt-5.3-mini")
+	circuits := &azureBreakerSpy{}
 
-	router := azureLaneRouter(t,
-		domain.Credential{
+	router := azureLaneRouter(t, []domain.Credential{
+		{
 			ID:         "cred-azure-misconfigured",
 			ProviderID: domain.ProviderAzure,
 			APIKey:     "az-key",
 			Extra:      map[string]string{"api_version": "2024-10-21"},
 		},
-		domain.Credential{
+		{
 			ID:            "cred-azure-healthy",
 			ProviderID:    domain.ProviderAzure,
 			APIKey:        "az-key-2",
 			Extra:         map[string]string{"endpoint": healthy.URL, "api_version": "2024-10-21"},
 			DeploymentMap: map[string]string{"gpt-5.3-mini": "gpt-5.3-mini"},
 		},
-	)
+	}, app.WithCircuitBreaker(circuits))
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, azureChatRequest("azure/gpt-5.3-mini"))
 
 	assert.Zero(t, healthy.hits.Load(),
 		"a permanent configuration failure is not retryable; the fallback chain must not be walked")
+	assert.Equal(t, 1, circuits.allows,
+		"the breaker must be consulted for the first credential and no other: a second Allow is the chain being walked")
+	assert.Zero(t, circuits.failures,
+		"the credential is misconfigured, not unhealthy; counting this would open the circuit on a fault no retry can clear")
 	assert.Equal(t, http.StatusBadGateway, rec.Code,
 		"the misconfiguration must be reported, not masked by a fallback; body: %s", rec.Body.String())
 }
@@ -165,7 +208,13 @@ func TestAzureLane_ConfigurationErrorDoesNotWalkTheFallbackChain(t *testing.T) {
 // (which package boundaries keep separate — providers cannot import httpapi,
 // and the registry is only populated here).
 //
+// provider_misconfigured is in the table for the same reason: it is the code
+// the status-less branch now lands on, and an unregistered herr code falls to
+// 500 rather than failing loudly, so the row is what makes "surfaces 502"
+// (AC16) a contract instead of an accident.
+//
 // @scenario "Errors carrying an explicit status keep their current classification"
+// @scenario "A configuration error carrying no status code is not classified as a timeout"
 func TestRegisterErrorStatuses_ProviderCodeBaseline(t *testing.T) {
 	registerErrorStatuses()
 
@@ -176,6 +225,7 @@ func TestRegisterErrorStatuses_ProviderCodeBaseline(t *testing.T) {
 		{code: domain.ErrProviderTimeout, want: http.StatusGatewayTimeout},
 		{code: domain.ErrProviderError, want: http.StatusBadGateway},
 		{code: domain.ErrRateLimited, want: http.StatusTooManyRequests},
+		{code: domain.ErrProviderMisconfigured, want: http.StatusBadGateway},
 	}
 
 	for _, tc := range cases {
