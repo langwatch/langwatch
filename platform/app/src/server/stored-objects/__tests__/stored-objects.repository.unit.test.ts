@@ -157,4 +157,43 @@ describe("StoredObjectsRepository", () => {
       });
     });
   });
+
+  describe("findLiveRowsByProjectPage", () => {
+    it("returns parsed latest rows from a project-scoped query", async () => {
+      mockQueryResult.json.mockResolvedValue([
+        {
+          ...makeRow(),
+          size_bytes: "5",
+          created_at: "2025-01-01 00:00:00.000",
+          inserted_at: "2025-01-02 00:00:00.000",
+        },
+      ]);
+
+      const result = await repo.findLiveRowsByProjectPage({
+        projectId: "proj-1",
+        afterId: "previous-id",
+        limit: 250,
+      });
+
+      expect(mockQuery).toHaveBeenCalledOnce();
+      const call = mockQuery.mock.calls[0]![0];
+      expect(call.query_params).toEqual({
+        projectId: "proj-1",
+        afterId: "previous-id",
+        limit: 250,
+      });
+      expect(call.query).toContain("max(inserted_at)");
+      expect(call.query).toContain("WHERE t.project_id = {projectId:String}");
+      expect(call.query).toContain("t.id > {afterId:String}");
+      expect(call.query).toContain("LIMIT {limit:UInt32}");
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        project_id: "proj-1",
+        size_bytes: 5,
+      });
+      expect(result[0]?.inserted_at).toEqual(
+        new Date("2025-01-02 00:00:00.000"),
+      );
+    });
+  });
 });
