@@ -34,8 +34,12 @@ import { createHash, randomBytes } from "crypto";
 import { env } from "~/env.mjs";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { getApp } from "~/server/app-layer/app";
-import { encryptParserConfigCredentials } from "./ingestionCredentials";
+import {
+  encryptParserConfigCredentials,
+  isEncryptedCredentials,
+} from "./ingestionCredentials";
 import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "./ingestionSource.constants";
+import { assertPullDestinationAllowed } from "./pullDestination";
 import { unsupportedValue } from "./unsupportedValue";
 
 export type SourceType =
@@ -349,10 +353,14 @@ export class IngestionSourceService {
     // change. `parserConfig` wins on key conflicts (it's the
     // canonical input for push-mode sources); `pullConfig` data
     // fills in for pull-mode adapters.
-    const mergedParserConfig = encryptParserConfigCredentials({
+    const requestedParserConfig = {
       ...(input.pullConfig ?? {}),
       ...(input.parserConfig ?? {}),
-    })!;
+    };
+    assertPullDestinationAllowed(requestedParserConfig);
+    const mergedParserConfig = encryptParserConfigCredentials(
+      requestedParserConfig,
+    )!;
     const source = await this.prisma.ingestionSource.create({
       data: {
         organizationId: input.organizationId,
@@ -384,8 +392,30 @@ export class IngestionSourceService {
     if (input.name !== undefined) data.name = input.name;
     if (input.description !== undefined) data.description = input.description;
     if (input.parserConfig !== undefined) {
+      // A client never handles the stored secret, in either direction. It is
+      // redacted on the way out, so an update that does not carry a fresh one
+      // is saying "leave it alone" rather than "clear it" — carry the stored
+      // envelope across, or a routine rename would silently break the source.
+      //
+      // The mirror of that: an envelope arriving FROM a client is refused. It
+      // could only have come from a copy of a response we no longer send, and
+      // honouring it would let a caller keep a secret it cannot read while
+      // pointing the source somewhere new. Rotating means sending a new secret.
+      const incoming = { ...input.parserConfig };
+      if (isEncryptedCredentials(incoming.credentials)) {
+        throw new ValidationError(
+          "Credentials cannot be submitted in their stored form. Re-enter the secret to change this source, or omit it to keep the current one.",
+        );
+      }
+      if (incoming.credentials === undefined) {
+        const stored = (existing.parserConfig as Record<string, unknown>) ?? {};
+        if (stored.credentials !== undefined) {
+          incoming.credentials = stored.credentials;
+        }
+      }
+      assertPullDestinationAllowed(incoming);
       data.parserConfig = encryptParserConfigCredentials(
-        input.parserConfig,
+        incoming,
       ) as Prisma.InputJsonValue;
     }
     if (input.status !== undefined) data.status = input.status;
