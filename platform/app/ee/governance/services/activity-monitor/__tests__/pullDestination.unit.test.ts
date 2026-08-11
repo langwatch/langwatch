@@ -29,6 +29,26 @@ describe("given a Genie config pointed somewhere the token must never go", () =>
       ).toThrow(/Databricks workspace address/);
     });
 
+    /**
+     * The admin has to be able to act on the rejection, and the only thing that
+     * tells them what to type instead is the message itself. Asserting the
+     * phrasing alone would let it shrink to "invalid workspace URL" and still
+     * pass, which is a rejection with nowhere to go.
+     *
+     * @scenario "The token may only be sent to a Databricks workspace"
+     */
+    it("names every address that would have been accepted", () => {
+      let message = "";
+      try {
+        assertPullDestinationAllowed(genie("https://attacker.example.com"));
+      } catch (error) {
+        message = error instanceof Error ? error.message : String(error);
+      }
+      expect(message).toContain(".azuredatabricks.net");
+      expect(message).toContain(".cloud.databricks.com");
+      expect(message).toContain(".gcp.databricks.com");
+    });
+
     it("refuses a lookalike that merely contains the real domain", () => {
       expect(() =>
         assertPullDestinationAllowed(

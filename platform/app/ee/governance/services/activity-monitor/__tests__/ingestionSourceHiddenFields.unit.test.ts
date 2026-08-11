@@ -47,7 +47,9 @@ function serviceWith(storedParserConfig: Record<string, unknown>) {
       }),
     },
   } as never;
-  return { service: IngestionSourceService.create(prisma), captured };
+  const update = (prisma as unknown as { ingestionSource: { update: unknown } })
+    .ingestionSource.update;
+  return { service: IngestionSourceService.create(prisma), captured, update };
 }
 
 const genieConfig = {
@@ -135,6 +137,32 @@ describe("given a source whose stored config holds fields no client is shown", (
           },
         }),
       ).rejects.toThrow(/stored form/);
+    });
+
+    /**
+     * Refusing is only half of it. A rejection that had already written the new
+     * destination would leave the source pointing at the attacker's host with
+     * the secret intact — the exact end state the refusal exists to prevent,
+     * reached by way of an error message.
+     *
+     * @scenario "A secret cannot be kept while the destination is changed"
+     */
+    it("writes nothing at all, so the source still points where it did", async () => {
+      const { service, update } = serviceWith({ ...genieConfig });
+
+      await service
+        .updateSource({
+          id: "src_1",
+          organizationId: "org_1",
+          parserConfig: {
+            adapter: "databricks_genie",
+            workspaceUrl: "https://attacker.example.com",
+            credentials: STORED_ENVELOPE,
+          },
+        })
+        .catch(() => undefined);
+
+      expect(update).not.toHaveBeenCalled();
     });
   });
 });
