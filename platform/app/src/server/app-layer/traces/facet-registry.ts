@@ -449,7 +449,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     // the sidebar's "Errored" pill counts `Status = 'error'` — mapping those
     // rows to 'unknown' made the pill filter by the wrong value.
     expression:
-      "multiIf(Status = 'error', 'error', Passed = 1, 'pass', Passed = 0, 'fail', 'unknown')",
+      "multiIf(Status = 'error', 'error', Status = 'skipped', 'skipped', Passed = 1, 'pass', Passed = 0, 'fail', 'unknown')",
   },
   {
     key: "evaluatorScore",

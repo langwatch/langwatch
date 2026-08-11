@@ -120,11 +120,13 @@ const evaluatorVerdictRead: CategoricalRead = (t) =>
     : t.evaluations.map((e) =>
         e.status === "error"
           ? "error"
-          : e.passed === true
-            ? "pass"
-            : e.passed === false
-              ? "fail"
-              : "unknown",
+          : e.status === "skipped"
+            ? "skipped"
+            : e.passed === true
+              ? "pass"
+              : e.passed === false
+                ? "fail"
+                : "unknown",
       );
 
 const evaluatorScoreRead: RangeRead = (t) =>
