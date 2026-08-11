@@ -37,7 +37,7 @@ const mockPrisma = {
     findFirst: vi.fn(),
   },
   customRole: {
-    findUnique: vi.fn(),
+    findFirst: vi.fn(),
   },
   groupMembership: {
     findMany: vi.fn(),
@@ -175,7 +175,7 @@ describe("RBAC Integration Tests", () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
       ]);
-      mockPrisma.customRole.findUnique.mockResolvedValue({
+      mockPrisma.customRole.findFirst.mockResolvedValue({
         permissions: ["workflows:manage"],
       });
 
@@ -933,7 +933,7 @@ describe("RBAC Integration Tests", () => {
           { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-1" },
         ]);
 
-        mockPrisma.customRole.findUnique.mockResolvedValue({
+        mockPrisma.customRole.findFirst.mockResolvedValue({
           permissions: ["analytics:view", "datasets:view"],
         });
 
@@ -964,7 +964,7 @@ describe("RBAC Integration Tests", () => {
           { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-1" },
         ]);
 
-        mockPrisma.customRole.findUnique.mockResolvedValue({
+        mockPrisma.customRole.findFirst.mockResolvedValue({
           permissions: ["analytics:view"],
         });
 
@@ -1620,7 +1620,7 @@ describe("RBAC Integration Tests", () => {
           assignedRoleId: "custom-role-1",
         });
 
-        mockPrisma.customRole.findUnique.mockResolvedValue({
+        mockPrisma.customRole.findFirst.mockResolvedValue({
           permissions: ["datasets:view", "prompts:view"],
         });
 
@@ -1640,7 +1640,7 @@ describe("RBAC Integration Tests", () => {
           assignedRoleId: "custom-role-1",
         });
 
-        mockPrisma.customRole.findUnique.mockResolvedValue({
+        mockPrisma.customRole.findFirst.mockResolvedValue({
           permissions: ["datasets:view"],
         });
 

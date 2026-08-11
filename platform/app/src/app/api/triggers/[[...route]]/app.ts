@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { Prisma, Trigger } from "@prisma/client";
+import { type Prisma, type Trigger, TriggerKind } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { nanoid } from "nanoid";
@@ -8,7 +8,9 @@ import { badRequestSchema } from "~/app/api/shared/schemas";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
+import { TriggerFiltersRequiredError } from "~/server/app-layer/automations/errors";
 import { prisma } from "~/server/db";
+import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
@@ -47,7 +49,11 @@ const createTriggerSchema = z.object({
   name: z.string().min(1, "name is required"),
   action: triggerActionEnum,
   actionParams: z.record(z.unknown()).default({}),
-  filters: z.record(z.unknown()).default({}),
+  // No default. An omitted condition used to become `{}`, which matches every
+  // trace forever, so the easiest possible create call produced the most
+  // expensive possible automation. Omitting it is now the same as sending an
+  // empty one, and both are refused below with a typed 422.
+  filters: z.record(z.unknown()).optional(),
   message: z.string().optional(),
   alertType: alertTypeEnum.optional(),
 });
@@ -120,7 +126,7 @@ secured.access(requires("triggers:view")).get(
         ...toTriggerResponse(t),
         platformUrl: platformUrl({
           projectSlug: project.slug,
-          path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${t.id}`,
+          path: `/automations?drawer.open=automation&drawer.automationId=${t.id}`,
         }),
       })),
     );
@@ -167,7 +173,7 @@ secured.access(requires("triggers:view")).get(
       ...toTriggerResponse(trigger),
       platformUrl: platformUrl({
         projectSlug: project.slug,
-        path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${trigger.id}`,
+        path: `/automations?drawer.open=automation&drawer.automationId=${trigger.id}`,
       }),
     });
   },
@@ -198,6 +204,12 @@ secured.access(requires("triggers:create")).post(
     const body = c.req.valid("json");
     logger.info({ projectId: project.id }, "Creating trigger");
 
+    // This route only ever writes trace automations (it carries no graph or
+    // report shape), so a condition is always required.
+    if (!hasActionableTriggerFilters(body.filters ?? {})) {
+      throw new TriggerFiltersRequiredError();
+    }
+
     const trigger = await prisma.trigger.create({
       data: {
         id: nanoid(),
@@ -219,7 +231,7 @@ secured.access(requires("triggers:create")).post(
         ...toTriggerResponse(trigger),
         platformUrl: platformUrl({
           projectSlug: project.slug,
-          path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${trigger.id}`,
+          path: `/automations?drawer.open=automation&drawer.automationId=${trigger.id}`,
         }),
       },
       201,
@@ -265,6 +277,19 @@ secured.access(requires("triggers:update")).patch(
       return c.json({ error: "Trigger not found" }, 404);
     }
 
+    // Editing is the other route to a match-everything automation: create one
+    // with a real condition, then patch the condition away. An automation whose
+    // condition lives in its query keeps a legitimately empty structured set,
+    // and alerts and reports have no trace condition to require at all.
+    if (
+      body.filters !== undefined &&
+      !hasActionableTriggerFilters(body.filters) &&
+      trigger.triggerKind === TriggerKind.AUTOMATION &&
+      (trigger.filterQuery ?? "").trim() === ""
+    ) {
+      throw new TriggerFiltersRequiredError();
+    }
+
     const data: Record<string, unknown> = {};
     if (body.name !== undefined) data.name = body.name;
     if (body.active !== undefined) data.active = body.active;
@@ -284,7 +309,7 @@ secured.access(requires("triggers:update")).patch(
       ...toTriggerResponse(updated),
       platformUrl: platformUrl({
         projectSlug: project.slug,
-        path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${updated.id}`,
+        path: `/automations?drawer.open=automation&drawer.automationId=${updated.id}`,
       }),
     });
   },

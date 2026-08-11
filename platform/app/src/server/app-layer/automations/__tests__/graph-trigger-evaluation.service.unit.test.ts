@@ -6,6 +6,7 @@ import type { GraphAlertDispatchResult } from "~/server/app-layer/automations/di
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import {
   evaluateGraphTrigger,
+  GRAPH_TRIGGER_MAX_RESULT_ROWS,
   type GraphTriggerEvaluationDeps,
 } from "../graph-trigger-evaluation.service";
 import {
@@ -249,6 +250,98 @@ describe("evaluateGraphTrigger", () => {
 
   beforeEach(() => {
     harness = makeHarness({ series: timeseries(15) });
+  });
+
+  describe("given the timeseries read the evaluation issues", () => {
+    it("asks for the result under a row ceiling", async () => {
+      await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(harness.getTimeseries).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          maxResultRows: GRAPH_TRIGGER_MAX_RESULT_ROWS,
+        }),
+      );
+    });
+  });
+
+  describe("given a graph whose grouped result exceeds the row ceiling", () => {
+    // The failure this replaces was not an error at all: the result was
+    // materialised until the process died, so the job neither completed nor
+    // failed. Three of those in a row poison-parked the tenant's whole
+    // graph-trigger lane and silently stopped every alert in the project.
+    function tooLarge() {
+      const error = new Error(
+        "Limit for result exceeded: TOO_MANY_ROWS_OR_BYTES",
+      );
+      (error as Error & { code?: string }).code = "396";
+      return error;
+    }
+
+    it("skips that trigger instead of failing the evaluation", async () => {
+      harness.getTimeseries.mockRejectedValue(tooLarge());
+
+      const result = await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(result.status).toBe("skipped");
+    });
+
+    // A retry re-asks the identical question, so an oversized trigger that
+    // threw would re-fail on every redelivery until it quarantined the lane —
+    // taking every OTHER trigger in the project down with it.
+    it("does not throw, so one bad graph cannot quarantine the tenant's lane", async () => {
+      harness.getTimeseries.mockRejectedValue(tooLarge());
+
+      await expect(
+        evaluateGraphTrigger({
+          deps: harness.deps,
+          triggerId: TRIGGER_ID,
+          projectId: PROJECT_ID,
+          reason: "real-time",
+        }),
+      ).resolves.toMatchObject({ status: "skipped" });
+    });
+
+    it("never fires an alert on a result it could not read", async () => {
+      harness.getTimeseries.mockRejectedValue(tooLarge());
+
+      await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(harness.dispatch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the timeseries read fails for any other reason", () => {
+    // Only the row ceiling is a configuration fault. A real outage must still
+    // reach the queue's retry, or a transient ClickHouse blip would silently
+    // skip evaluations and miss genuine breaches.
+    it("propagates the error rather than skipping", async () => {
+      harness.getTimeseries.mockRejectedValue(new Error("connection refused"));
+
+      await expect(
+        evaluateGraphTrigger({
+          deps: harness.deps,
+          triggerId: TRIGGER_ID,
+          projectId: PROJECT_ID,
+          reason: "real-time",
+        }),
+      ).rejects.toThrow("connection refused");
+    });
   });
 
   describe("given a keyed series whose stored identifier differs from the result bucket key", () => {

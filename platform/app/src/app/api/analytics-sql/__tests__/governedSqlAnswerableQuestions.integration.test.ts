@@ -826,7 +826,7 @@ describe("given the governed analytics SQL API and a seed with known answers", (
       table: `${database}.${harness.names.keyMapTable}`,
       format: "JSONEachRow",
       values: [asking, other].map((project) => ({
-        KeyHash: governedTenantCapability({ apiKey: project.apiKey }),
+        KeyHash: governedTenantCapability({ secret: project.governedSqlKey }),
         TenantId: project.id,
       })),
     });

@@ -43,6 +43,25 @@ export const PromptConfigDataSchema = z.object({
       content: z.string(),
     }),
   ),
+  /**
+   * The prompt's declared input variables. Without these the adapter cannot
+   * know a template's `{{question}}` was meant to be bound to anything, and it
+   * rendered as an empty string instead (#6590). Defaulted so a job queued by
+   * an older worker still parses.
+   */
+  inputs: z
+    .array(
+      z.object({
+        identifier: z.string(),
+        type: z.string(),
+      }),
+    )
+    .default([]),
+  /**
+   * Explicit bindings from the suite target for this prompt. Declared inputs
+   * these leave out are matched to a scenario source by name.
+   */
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   /** Model configured on prompt (if any). Used for model selection logic. */
   model: z.string().optional(),
   temperature: z.number().optional(),

@@ -369,7 +369,12 @@ describe("check queue", () => {
       // reads as the queue having serialized the two runs.
       const holder = startRun("holder", { holdMs: 60_000 });
       await waitForHolder();
+      // The hold must be wide enough that the run's start and end cannot
+      // share a Date.now() millisecond: maxOverlap breaks ties end-first
+      // (which "never runs more than the limit" needs), and a same-instant
+      // start/end pair would collapse this run's occupancy to nothing.
       const impatient = startRun("impatient", {
+        holdMs: 150,
         env: { CHECK_QUEUE_MAX_WAIT_MS: "200" },
       });
 
