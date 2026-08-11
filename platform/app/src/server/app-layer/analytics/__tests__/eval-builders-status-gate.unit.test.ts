@@ -116,4 +116,40 @@ describe("buildEvalSlimTimeseriesQuery — status gate on verdict metrics", () =
       expect(sql).not.toContain("Status = 'processed'");
     });
   });
+
+  describe("when grouping by evaluation_passed", () => {
+    const { sql } = buildEvalSlimTimeseriesQuery({
+      projectId: "tenant-eval-slim",
+      ...baseDates,
+      series: [
+        { metric: "evaluations.evaluation_runs", aggregation: "cardinality" },
+      ],
+      groupBy: "evaluations.evaluation_passed",
+      timeScale: 60,
+    });
+
+    it("buckets a non-processed row's stray verdict as unknown, not failed", () => {
+      expect(sql).toContain(
+        "if(ea.Status != 'processed' OR ea.Passed IS NULL, 'unknown'",
+      );
+    });
+  });
+
+  describe("when grouping by evaluation_label", () => {
+    const { sql } = buildEvalSlimTimeseriesQuery({
+      projectId: "tenant-eval-slim",
+      ...baseDates,
+      series: [
+        { metric: "evaluations.evaluation_runs", aggregation: "cardinality" },
+      ],
+      groupBy: "evaluations.evaluation_label",
+      timeScale: 60,
+    });
+
+    it("buckets a non-processed row's label as unknown", () => {
+      expect(sql).toContain(
+        "if(ea.Status != 'processed', 'unknown', coalesce(ea.Label, 'unknown'))",
+      );
+    });
+  });
 });

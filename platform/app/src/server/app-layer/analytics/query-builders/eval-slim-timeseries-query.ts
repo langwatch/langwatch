@@ -114,10 +114,14 @@ function evalSlimGroupByExpression(groupBy?: string): string | null {
     case "evaluations.evaluator_type":
       return `if(${ea}.EvaluatorType = '', 'unknown', ${ea}.EvaluatorType)`;
     case "evaluations.evaluation_passed":
-      // Nullable(Bool) → display string for group_key.
-      return `if(${ea}.Passed IS NULL, 'unknown', if(${ea}.Passed, 'passed', 'failed'))`;
+      // Nullable(Bool) → display string for group_key. Status-gated like the
+      // metric columns: a historical errored row carrying a stray verdict
+      // must bucket as 'unknown', not 'failed' — the legacy per-evaluator
+      // path gates the same way (aggregation-builder.ts, #6833).
+      return `if(${ea}.Status != 'processed' OR ${ea}.Passed IS NULL, 'unknown', if(${ea}.Passed, 'passed', 'failed'))`;
     case "evaluations.evaluation_label":
-      return `coalesce(${ea}.Label, 'unknown')`;
+      // Same status gate — an errored run's label is not a verdict (#6833).
+      return `if(${ea}.Status != 'processed', 'unknown', coalesce(${ea}.Label, 'unknown'))`;
     case "evaluations.evaluation_status":
       return `${ea}.Status`;
     default: {
