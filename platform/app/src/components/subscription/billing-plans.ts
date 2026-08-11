@@ -8,6 +8,7 @@
 import { Currency } from "@prisma/client";
 import { formatNumber } from "~/utils/formatNumber";
 import { UNLIMITED_MESSAGES } from "../../../ee/billing/planLimits";
+import type { PlanInfo } from "../../../ee/licensing/planInfo";
 
 export { isAnnualTieredPlan } from "../../../ee/billing/planTypes";
 export type { Currency } from "../../../ee/billing/pricing";
@@ -74,20 +75,60 @@ export const getGrowthPlanFeatures = (currency: Currency): string[] => [
   "Slack support",
 ];
 
-export const ENTERPRISE_PLAN_FEATURES = [
-  "Alternative hosting options",
-  "Custom data retention",
-  "Custom SSO / RBAC",
-  "Audit logs",
-  "Gateway webhooks for metering and rebilling",
-  "Uptime & Support SLA",
-  "Compliance and legal reviews",
-  "Custom terms and DPA",
-  "Dedicated Solution Engineer",
-  "Slack / Teams support",
-  "AWS/Azure/GCP Marketplace",
-  "ISO27001 / SOC2 reports",
+export const WEBHOOK_FEATURE_LABEL =
+  "Gateway webhooks for metering and rebilling";
+
+/**
+ * What the Enterprise tier offers, with each bullet tied to the entitlement
+ * that decides it where a contract can withhold one.
+ *
+ * The tie is the field name, not the sentence: a bullet whose copy is reworded
+ * keeps describing the same capability, and nothing has to match prose to know
+ * which capability a plan is missing.
+ */
+const ENTERPRISE_PLAN_FEATURE_ENTRIES: ReadonlyArray<{
+  label: string;
+  /** The plan field that decides this bullet, when one does. */
+  entitlement?: keyof Pick<PlanInfo, "webhookEndpointsEnabled">;
+}> = [
+  { label: "Alternative hosting options" },
+  { label: "Custom data retention" },
+  { label: "Custom SSO / RBAC" },
+  { label: "Audit logs" },
+  { label: WEBHOOK_FEATURE_LABEL, entitlement: "webhookEndpointsEnabled" },
+  { label: "Uptime & Support SLA" },
+  { label: "Compliance and legal reviews" },
+  { label: "Custom terms and DPA" },
+  { label: "Dedicated Solution Engineer" },
+  { label: "Slack / Teams support" },
+  { label: "AWS/Azure/GCP Marketplace" },
+  { label: "ISO27001 / SOC2 reports" },
 ];
+
+/**
+ * The Enterprise tier as it is SOLD: everything the tier offers, whatever any
+ * one contract settled on. This is the list for the pages that are selling it.
+ */
+export const ENTERPRISE_PLAN_FEATURES = ENTERPRISE_PLAN_FEATURE_ENTRIES.map(
+  (entry) => entry.label,
+);
+
+/**
+ * The Enterprise tier as one customer HOLDS it: the same list, minus anything
+ * their contract explicitly withheld.
+ *
+ * Only an explicit `false` removes a bullet. An entitlement the plan says
+ * nothing about is answered by the tier at resolution, so silence here means
+ * granted, not withheld, and a plan that never reached the resolver is
+ * described by what the tier sells rather than stripped of it.
+ */
+export function buildEnterprisePlanFeatures(
+  plan: Pick<PlanInfo, "webhookEndpointsEnabled">,
+): string[] {
+  return ENTERPRISE_PLAN_FEATURE_ENTRIES.filter(
+    (entry) => !entry.entitlement || plan[entry.entitlement] !== false,
+  ).map((entry) => entry.label);
+}
 
 export function buildPlanCapabilities({
   maxMembers,

@@ -41,10 +41,10 @@ import { api } from "~/utils/api";
 import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
 import {
   type BillingInterval,
+  buildEnterprisePlanFeatures,
   buildPlanCapabilities,
   type Currency,
   FREE_PLAN_FEATURES as DEVELOPER_FEATURES,
-  ENTERPRISE_PLAN_FEATURES,
   formatPrice,
   getAnnualDiscountPercent,
   getGrowthFeatures,
@@ -360,11 +360,12 @@ export function SubscriptionPage() {
           seatCount: plan?.maxMembers ?? 1,
           perSeatPrice: monthlyEquivalent,
         };
-  // A plan the customer already holds is described by what it grants. Only a
-  // plan we are selling gets marketing copy, which is why a license-sourced
-  // plan is read from its own numbers rather than handed another tier's list.
+  // A plan the customer already holds is described by what it grants: the
+  // enterprise list minus anything their contract withheld, and every other
+  // held plan read from its own numbers rather than handed another tier's
+  // marketing copy. Only a plan we are selling gets the tier's full pitch.
   const currentPlanFeatures = isEnterprisePlan
-    ? ENTERPRISE_PLAN_FEATURES
+    ? buildEnterprisePlanFeatures(plan)
     : isLicenseOverride || isTieredLegacyPaidPlan
       ? buildPlanCapabilities({
           maxMembers: plan?.maxMembers ?? 0,
@@ -514,7 +515,13 @@ export function SubscriptionPage() {
           }
           isManageLoading={isManageLoading}
           deprecatedNotice={isTieredLegacyPaidPlan}
-          contactSalesUrl={isEnterprisePlan ? CONTACT_SALES_URL : undefined}
+          // Sales has nothing to sell a customer already holding a signed
+          // enterprise contract, so they get no upgrade call to action.
+          contactSalesUrl={
+            isEnterprisePlan && !isLicenseOverride
+              ? CONTACT_SALES_URL
+              : undefined
+          }
         />
 
         {/* Invoices Block - always shown; listInvoices returns [] when no Stripe customer exists */}

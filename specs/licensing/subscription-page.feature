@@ -157,3 +157,16 @@ Feature: Subscription Page Plan Management
       Given my organization has a license for a plan below enterprise
       When I view the subscription page
       Then I see the features and limits that apply to my plan
+
+    @integration
+    Scenario: A licensed enterprise plan is not asked to contact sales about upgrading
+      Given my organization has an enterprise license
+      When I view the subscription page
+      Then I am not offered a way to contact sales about upgrading
+
+    @integration
+    Scenario: A capability the contract withholds is not advertised as included
+      Given my organization has an enterprise license that withholds webhook endpoints
+      When I view the subscription page
+      Then webhook endpoints are not listed among the features I have
+      And the rest of the enterprise features are still listed
