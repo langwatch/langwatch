@@ -136,6 +136,13 @@ Feature: Redis is an owned client, never a module singleton
       When readiness is probed
       Then the probe succeeds
 
+    @unit
+    Scenario: A credential in the Redis URL never reaches the logs
+      Given a Redis URL carrying an authentication password
+      When readiness is probed
+      Then the log names the host and port it dialled
+      And the password appears in no log field
+
   Rule: The application owns exactly one connection
 
     @unit
