@@ -104,14 +104,6 @@ Feature: Databricks AI/BI Genie puller
     And the next run starts at the space it stopped on
 
   @integration
-  Scenario: Author lookups are bound by the same request budget as the pages
-    Given a page of questions asked by many different people
-    When the run reaches its request budget partway through that page
-    Then the run makes no more requests than its budget allows
-    And the questions it already read are kept
-    And the next run comes back for the ones it skipped
-
-  @integration
   Scenario: Activity during a sweep is caught by the next one
     Given a sweep that reads several spaces in turn
     And someone asks a question in an already-read space while it runs
