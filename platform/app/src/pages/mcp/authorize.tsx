@@ -83,16 +83,21 @@ export default function McpAuthorize() {
 
       const data = await response.json();
 
-      if (!response.ok) {
-        showError(data.error ?? "Unknown error");
+      // A failure the server could attribute to this client comes back with a
+      // redirect that carries the OAuth error, so the waiting application is
+      // told what went wrong instead of hanging on a popup. Failures it could
+      // not attribute have no safe destination and are shown here.
+      if (data.redirect) {
+        window.location.href = data.redirect;
         return;
       }
 
-      if (data.redirect) {
-        window.location.href = data.redirect;
-      } else {
-        showError("No redirect URL received from server");
+      if (!response.ok) {
+        showError(data.error_description ?? data.error ?? "Unknown error");
+        return;
       }
+
+      showError("No redirect URL received from server");
     } catch (err) {
       showError(err instanceof Error ? err.message : "Network error");
     }

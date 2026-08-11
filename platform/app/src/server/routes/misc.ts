@@ -833,8 +833,38 @@ secured
       );
     }
 
+    // Past this point the client_id is registered and the redirect_uri is one
+    // of the URIs it registered, so RFC 6749 §4.1.2.1 says a failure belongs
+    // back at the client rather than on this page: the client is waiting on
+    // its redirect and an error rendered here leaves it hanging forever. The
+    // checks above deliberately stay local — an unverified redirect_uri is
+    // exactly what an attacker would supply, so nothing is ever sent to it.
+    const errorRedirect = ({
+      error,
+      description,
+    }: {
+      error: string;
+      description: string;
+    }) => {
+      const url = new URL(redirect_uri);
+      url.searchParams.set("error", error);
+      url.searchParams.set("error_description", description);
+      if (state) {
+        url.searchParams.set("state", state);
+      }
+      return url.toString();
+    };
+
     if (!code_challenge) {
-      return c.json({ error: "code_challenge is required (PKCE S256)" }, 400);
+      const description = "code_challenge is required (PKCE S256)";
+      return c.json(
+        {
+          error: "invalid_request",
+          error_description: description,
+          redirect: errorRedirect({ error: "invalid_request", description }),
+        },
+        400,
+      );
     }
 
     // The demo project is a globally-readable showcase: isDemoProject grants
@@ -842,11 +872,22 @@ secured
     // below — otherwise any authenticated user could mint an MCP auth code
     // embedding the demo project's API key. (The old `team.members.some` check
     // happened to block this; the RoleBinding-aware check does not.)
-    if (isDemoProject(projectId, "project:view")) {
-      return c.json(
-        { error: "Project not found or you don't have access" },
+    const noAccessDescription = "Project not found or you don't have access";
+    const noAccessResponse = () =>
+      c.json(
+        {
+          error: "access_denied",
+          error_description: noAccessDescription,
+          redirect: errorRedirect({
+            error: "access_denied",
+            description: noAccessDescription,
+          }),
+        },
         403,
       );
+
+    if (isDemoProject(projectId, "project:view")) {
+      return noAccessResponse();
     }
 
     // Authorize against RoleBindings (the authoritative source since migration
@@ -874,16 +915,21 @@ secured
     ) {
       // Single 403 whether the project is missing, archived, or simply
       // inaccessible — never disclose existence of a project the caller can't reach.
-      return c.json(
-        { error: "Project not found or you don't have access" },
-        403,
-      );
+      return noAccessResponse();
     }
 
     const code = randomUUID();
 
     if (!redis) {
-      return c.json({ error: "Redis is not available" }, 500);
+      const description = "Authorization is temporarily unavailable";
+      return c.json(
+        {
+          error: "server_error",
+          error_description: description,
+          redirect: errorRedirect({ error: "server_error", description }),
+        },
+        500,
+      );
     }
 
     const authCodeEntry = JSON.stringify({

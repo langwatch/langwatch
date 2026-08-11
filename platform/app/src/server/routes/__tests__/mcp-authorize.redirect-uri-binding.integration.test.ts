@@ -165,3 +165,74 @@ describe("POST /api/mcp/authorize — redirect_uri binding", () => {
     });
   });
 });
+
+/**
+ * RFC 6749 §4.1.2.1: once the client_id is known and the presented
+ * redirect_uri is one it registered, an authorization failure has to travel
+ * back to that redirect_uri as an OAuth error. The advertised authorize
+ * endpoint is a page in this app, so a failure rendered only as a toast here
+ * leaves the client's popup waiting forever with nothing to report.
+ */
+describe("POST /api/mcp/authorize — where failures are reported", () => {
+  beforeEach(() => {
+    mockRedis.set.mockClear();
+    mockRedis.get.mockClear();
+  });
+
+  describe("when the client is verified but the request has no code challenge", () => {
+    /** @scenario A consent failure a client can be told about is redirected back to the client */
+    it("sends the browser back to the registered redirect URI with the OAuth error", async () => {
+      mockRedis.get.mockResolvedValueOnce(registeredClient());
+
+      const res = await authorize({ code_challenge: undefined });
+      const json = (await res.json()) as {
+        error?: string;
+        redirect?: string;
+      };
+
+      expect(res.status).toBe(400);
+      expect(json.error).toBe("invalid_request");
+      const redirect = new URL(json.redirect ?? "");
+      expect(redirect.origin + redirect.pathname).toBe(REGISTERED_REDIRECT_URI);
+      expect(redirect.searchParams.get("error")).toBe("invalid_request");
+      expect(redirect.searchParams.get("error_description")).toContain(
+        "code_challenge",
+      );
+      expect(redirect.searchParams.get("state")).toBe("xyz");
+      expect(redirect.searchParams.get("code")).toBeNull();
+      expect(mockRedis.set).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the client is verified but the user cannot reach the project", () => {
+    /** @scenario A project the user cannot reach is reported to the client as access denied */
+    it("sends the browser back to the registered redirect URI as access denied", async () => {
+      mockRedis.get.mockResolvedValueOnce(registeredClient());
+      mockPrisma.roleBinding.findMany.mockResolvedValueOnce([]);
+      mockPrisma.organizationUser.findFirst.mockResolvedValueOnce(null);
+
+      const res = await authorize();
+      const json = (await res.json()) as { error?: string; redirect?: string };
+
+      expect(res.status).toBe(403);
+      expect(json.error).toBe("access_denied");
+      const redirect = new URL(json.redirect ?? "");
+      expect(redirect.searchParams.get("error")).toBe("access_denied");
+      expect(mockRedis.set).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the failure cannot be attributed to a registered client", () => {
+    /** @scenario A consent failure that cannot be attributed to a client stays on the LangWatch page */
+    it("offers no redirect back to the caller", async () => {
+      mockRedis.get.mockResolvedValueOnce(null);
+
+      const res = await authorize({ client_id: "mcp_never_registered" });
+      const json = (await res.json()) as { error?: string; redirect?: string };
+
+      expect(res.status).toBe(400);
+      expect(json.redirect).toBeUndefined();
+      expect(json.error).toBe("Unknown or unregistered client_id");
+    });
+  });
+});

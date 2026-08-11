@@ -18,7 +18,10 @@ import { app } from "../misc";
 const PROJECT_ID = "project_1";
 const TEAM_ID = "team_1";
 const ORG_ID = "org_1";
-const ERROR = "Project not found or you don't have access";
+// The client is verified by this point, so the refusal travels back to it as
+// an OAuth error code; the prose is what the description carries.
+const ERROR = "access_denied";
+const ERROR_DESCRIPTION = "Project not found or you don't have access";
 
 // Hoisted so the mock objects exist before the mocked modules are evaluated
 // (the top-level `import { app } from "../misc"` triggers those factories).
@@ -137,10 +140,14 @@ describe("POST /mcp/authorize", () => {
       mockPrisma.roleBinding.findMany.mockResolvedValueOnce([]);
 
       const res = await authorize();
-      const json = (await res.json()) as { error?: string };
+      const json = (await res.json()) as {
+        error?: string;
+        error_description?: string;
+      };
 
       expect(res.status).toBe(403);
       expect(json.error).toBe(ERROR);
+      expect(json.error_description).toBe(ERROR_DESCRIPTION);
     });
   });
 
@@ -155,10 +162,14 @@ describe("POST /mcp/authorize", () => {
       });
 
       const res = await authorize();
-      const json = (await res.json()) as { error?: string };
+      const json = (await res.json()) as {
+        error?: string;
+        error_description?: string;
+      };
 
       expect(res.status).toBe(403);
       expect(json.error).toBe(ERROR);
+      expect(json.error_description).toBe(ERROR_DESCRIPTION);
     });
   });
 
@@ -170,10 +181,14 @@ describe("POST /mcp/authorize", () => {
       process.env.DEMO_PROJECT_ID = PROJECT_ID;
       try {
         const res = await authorize();
-        const json = (await res.json()) as { error?: string };
+        const json = (await res.json()) as {
+          error?: string;
+          error_description?: string;
+        };
 
         expect(res.status).toBe(403);
         expect(json.error).toBe(ERROR);
+        expect(json.error_description).toBe(ERROR_DESCRIPTION);
       } finally {
         if (previous === undefined) delete process.env.DEMO_PROJECT_ID;
         else process.env.DEMO_PROJECT_ID = previous;
