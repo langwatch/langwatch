@@ -9,6 +9,17 @@ interface GenerateLicenseKeyParams {
   planType: string;
   maxMembers: number;
   privateKey: string;
+  /**
+   * The numbers a negotiated contract sets, where they differ from the plan
+   * template. Left off, the template's value is minted. These exist because
+   * the template is a starting point, not the contract: minting a template
+   * number over an agreed one silently cuts what the customer bought, and a
+   * signed license is the enforcement.
+   */
+  maxMembersLite?: number;
+  maxMessagesPerMonth?: number;
+  /** Defaults to one year from `now`. */
+  expiresAt?: Date;
   /** Override current time for deterministic testing */
   now?: Date;
 }
@@ -29,6 +40,9 @@ export function generateLicenseKey({
   email,
   planType,
   maxMembers,
+  maxMembersLite,
+  maxMessagesPerMonth,
+  expiresAt: requestedExpiresAt,
   privateKey,
   now = new Date(),
 }: GenerateLicenseKeyParams): GenerateLicenseKeyResult {
@@ -39,8 +53,15 @@ export function generateLicenseKey({
 
   const seats = maxMembers > 0 ? maxMembers : 1;
 
-  const expiresAt = new Date(now);
-  expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+  const oneYearOut = new Date(now);
+  oneYearOut.setFullYear(oneYearOut.getFullYear() + 1);
+  const expiresAt = requestedExpiresAt ?? oneYearOut;
+  // Same refusal the license router makes: an already-expired license reads as
+  // no license at all, which on Cloud silently drops the org onto whatever
+  // sits underneath it.
+  if (expiresAt <= now) {
+    throw new Error("Expiration date must be in the future");
+  }
 
   const resolvedOrgName = organizationName.trim() || email;
 
@@ -51,8 +72,8 @@ export function generateLicenseKey({
     type: template.type,
     name: template.name,
     maxMembers: seats,
-    maxMembersLite: template.maxMembersLite,
-    maxMessagesPerMonth: template.maxMessagesPerMonth,
+    maxMembersLite: maxMembersLite ?? template.maxMembersLite,
+    maxMessagesPerMonth: maxMessagesPerMonth ?? template.maxMessagesPerMonth,
     canPublish: template.canPublish,
     webhookEndpointsEnabled: template.webhookEndpointsEnabled,
     usageUnit: template.usageUnit,

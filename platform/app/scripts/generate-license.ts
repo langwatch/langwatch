@@ -16,10 +16,15 @@
  *        --org-id <organizationId> \
  *        --plan ENTERPRISE \
  *        [--max-members 50] \
+ *        [--max-members-lite 10000] \
+ *        [--max-messages-per-month 10000000000] \
+ *        [--expires-at 2030-02-05] \
  *        [--email ops@example.com]
  *
  *      Default plan: ENTERPRISE. Default max-members: 50. Default
- *      email: <orgSlug>@local.test.
+ *      email: <orgSlug>@local.test. Everything else defaults to the
+ *      plan template, so a contract with negotiated numbers has to
+ *      pass them: the template's value is what gets enforced.
  *
  *   2. Programmatic — seed/QA scripts import { applyLicenseToOrg }:
  *
@@ -45,6 +50,12 @@ interface ApplyLicenseInput {
   planType: string;
   /** Defaults to 50 — high enough that no realistic dev/QA org bumps the seat ceiling. */
   maxMembers?: number;
+  /** Defaults to the plan template's value. */
+  maxMembersLite?: number;
+  /** Defaults to the plan template's value. */
+  maxMessagesPerMonth?: number;
+  /** Defaults to one year out. Must be in the future. */
+  expiresAt?: Date;
   /** Defaults to `<orgSlug>@local.test`. */
   email?: string;
   privateKey: string;
@@ -79,6 +90,13 @@ export async function applyLicenseToOrg(
     email,
     planType: input.planType,
     maxMembers,
+    ...(input.maxMembersLite !== undefined
+      ? { maxMembersLite: input.maxMembersLite }
+      : {}),
+    ...(input.maxMessagesPerMonth !== undefined
+      ? { maxMessagesPerMonth: input.maxMessagesPerMonth }
+      : {}),
+    ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : {}),
     privateKey: input.privateKey,
   });
 
@@ -87,9 +105,10 @@ export async function applyLicenseToOrg(
     data: {
       license: licenseKey,
       licenseExpiresAt: new Date(licenseData.expiresAt),
-      // Force the next request through the validation cache so the new
-      // license takes effect immediately instead of waiting for the
-      // licenseLastValidatedAt TTL.
+      // Cleared so the stamp describes this license rather than the one it
+      // replaced. Nothing reads it as a cache or a TTL: the license is read
+      // from this row and verified on every request, so the new one takes
+      // effect on the next call either way.
       licenseLastValidatedAt: null,
     },
   });
@@ -107,6 +126,9 @@ interface CliArgs {
   orgId: string;
   plan: string;
   maxMembers?: number;
+  maxMembersLite?: number;
+  maxMessagesPerMonth?: number;
+  expiresAt?: Date;
   email?: string;
 }
 
@@ -123,6 +145,21 @@ function parseArgs(argv: string[]): CliArgs {
       i++;
     } else if (flag === "--max-members" && value) {
       args.maxMembers = Number.parseInt(value, 10);
+      i++;
+    } else if (flag === "--max-members-lite" && value) {
+      args.maxMembersLite = Number.parseInt(value, 10);
+      i++;
+    } else if (flag === "--max-messages-per-month" && value) {
+      args.maxMessagesPerMonth = Number.parseInt(value, 10);
+      i++;
+    } else if (flag === "--expires-at" && value) {
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) {
+        process.stderr.write(`Error: --expires-at is not a date: ${value}\n\n`);
+        printUsage();
+        process.exit(2);
+      }
+      args.expiresAt = parsed;
       i++;
     } else if (flag === "--email" && value) {
       args.email = value;
@@ -151,11 +188,20 @@ function printUsage() {
       "      --org-id <organizationId> \\",
       "      [--plan ENTERPRISE|GROWTH|PRO]   (default: ENTERPRISE)",
       "      [--max-members <N>]              (default: 50)",
+      "      [--max-members-lite <N>]         (default: the plan template)",
+      "      [--max-messages-per-month <N>]   (default: the plan template)",
+      "      [--expires-at <YYYY-MM-DD>]      (default: one year out)",
       "      [--email <addr>]                 (default: <orgSlug>@local.test)",
+      "",
+      "Anything left off is minted from the plan template, so pass the numbers",
+      "a negotiated contract sets or the license will enforce the template's.",
       "",
       "Reads LANGWATCH_LICENSE_PRIVATE_KEY from env. The matching public",
       "key must be set as LANGWATCH_LICENSE_PUBLIC_KEY for the runtime",
       "license-enforcement layer to verify it.",
+      "",
+      "Writes Organization.license directly. It does not go through",
+      "validateAndStoreLicense, so it provisions no retention rules.",
       "",
     ].join("\n"),
   );
@@ -178,6 +224,9 @@ async function main() {
     organizationId: args.orgId,
     planType: args.plan,
     maxMembers: args.maxMembers,
+    maxMembersLite: args.maxMembersLite,
+    maxMessagesPerMonth: args.maxMessagesPerMonth,
+    expiresAt: args.expiresAt,
     email: args.email,
     privateKey,
   });

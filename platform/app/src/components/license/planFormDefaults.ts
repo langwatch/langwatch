@@ -10,6 +10,7 @@ export interface PlanFormDefaults {
   maxMembersLite?: number;
   maxMessagesPerMonth?: number;
   canPublish?: boolean;
+  webhookEndpointsEnabled?: boolean;
   usageUnit?: "traces" | "events";
 }
 
@@ -17,8 +18,16 @@ export interface PlanFormDefaults {
  * Record map of plan defaults following OCP - add new plans without modifying existing code.
  * Templates already define all values, no fallbacks needed.
  *
- * Only the enforced levers (seats, messages) + identity are templated — projects,
- * teams, and experimentation resources are OSS/uncapped and not part of licenses.
+ * Only the enforced levers (seats, messages, entitlements) + identity are
+ * templated — projects, teams, and experimentation resources are OSS/uncapped
+ * and not part of licenses.
+ *
+ * Every key a template answers is present here even when its value is
+ * undefined: the form spreads these over what is already typed in, so a key
+ * left out would keep the previous plan's value after switching plans.
+ * CUSTOM answers nothing on purpose. It has no tier to inherit from and no
+ * tier decides its entitlements later, so what the operator ticks is the only
+ * thing a custom contract carries.
  */
 export const PLAN_DEFAULTS: Record<PlanType, PlanFormDefaults> = {
   PRO: {
@@ -26,6 +35,7 @@ export const PLAN_DEFAULTS: Record<PlanType, PlanFormDefaults> = {
     maxMembersLite: PRO_TEMPLATE.maxMembersLite,
     maxMessagesPerMonth: PRO_TEMPLATE.maxMessagesPerMonth,
     canPublish: PRO_TEMPLATE.canPublish,
+    webhookEndpointsEnabled: PRO_TEMPLATE.webhookEndpointsEnabled,
     usageUnit: PRO_TEMPLATE.usageUnit as "traces" | "events",
   },
   ENTERPRISE: {
@@ -33,6 +43,7 @@ export const PLAN_DEFAULTS: Record<PlanType, PlanFormDefaults> = {
     maxMembersLite: ENTERPRISE_TEMPLATE.maxMembersLite,
     maxMessagesPerMonth: ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
     canPublish: ENTERPRISE_TEMPLATE.canPublish,
+    webhookEndpointsEnabled: ENTERPRISE_TEMPLATE.webhookEndpointsEnabled,
     usageUnit: ENTERPRISE_TEMPLATE.usageUnit as "traces" | "events",
   },
   CUSTOM: {},
