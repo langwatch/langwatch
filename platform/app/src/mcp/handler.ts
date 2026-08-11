@@ -398,6 +398,27 @@ export function createMcpHandler(): McpHandler {
   }
 
   /**
+   * Reads a request body, answering the caller itself when it is too large.
+   * Returns `undefined` in that case — a response has already been sent and
+   * the caller must stop. Bodies that need their own parse failure (the form
+   * readers each answer with a different OAuth error) build on this.
+   */
+  async function readRawBody(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<string | undefined> {
+    try {
+      return await readBody(req);
+    } catch (err) {
+      if (err instanceof Error && err.message === "Request body too large") {
+        sendJson(res, 413, { error: "Request body too large" });
+        return undefined;
+      }
+      throw err;
+    }
+  }
+
+  /**
    * Reads and parses a JSON request body, answering the caller itself when the
    * body is unusable. Returns `undefined` in that case — a response has
    * already been sent and the caller must stop.
@@ -406,16 +427,8 @@ export function createMcpHandler(): McpHandler {
     req: IncomingMessage,
     res: ServerResponse,
   ): Promise<unknown | undefined> {
-    let raw: string;
-    try {
-      raw = await readBody(req);
-    } catch (err) {
-      if (err instanceof Error && err.message === "Request body too large") {
-        sendJson(res, 413, { error: "Request body too large" });
-        return undefined;
-      }
-      throw err;
-    }
+    const raw = await readRawBody(req, res);
+    if (raw === undefined) return undefined;
     try {
       return JSON.parse(raw);
     } catch {
@@ -1008,16 +1021,8 @@ export function createMcpHandler(): McpHandler {
     }
     registerRateLimiter.track(ip);
 
-    let raw: string;
-    try {
-      raw = await readBody(req);
-    } catch (err) {
-      if (err instanceof Error && err.message === "Request body too large") {
-        sendJson(res, 413, { error: "Request body too large" });
-        return;
-      }
-      throw err;
-    }
+    const raw = await readRawBody(req, res);
+    if (raw === undefined) return;
 
     let body: {
       redirect_uris?: string[];
@@ -1113,16 +1118,8 @@ export function createMcpHandler(): McpHandler {
     }
     tokenRateLimiter.track(ip);
 
-    let raw: string;
-    try {
-      raw = await readBody(req);
-    } catch (err) {
-      if (err instanceof Error && err.message === "Request body too large") {
-        sendJson(res, 413, { error: "Request body too large" });
-        return;
-      }
-      throw err;
-    }
+    const raw = await readRawBody(req, res);
+    if (raw === undefined) return;
     const params = parseFormBody(raw);
 
     if (params.grant_type !== "authorization_code") {
