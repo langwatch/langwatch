@@ -50,6 +50,11 @@ export const createSaaSPlanProvider = (db: PrismaClient): SaaSPlanProvider => {
       const overrideAddingLimitations =
         !!user?.impersonator && isAdmin(user.impersonator);
 
+      // Unreachable through the wiring: a self-hosted deployment resolves
+      // its plan from the license provider, and this one is only constructed
+      // on the SaaS branch. It answers Enterprise, so a future caller that
+      // constructs this directly off Cloud would self-report Enterprise
+      // without a license.
       if (!env.IS_SAAS) {
         return {
           ...PLAN_LIMITS[PlanTypes.ENTERPRISE],
@@ -57,6 +62,10 @@ export const createSaaSPlanProvider = (db: PrismaClient): SaaSPlanProvider => {
         };
       }
 
+      // An organization is not supposed to hold two active subscriptions, but
+      // it can, and then which one answers decides the plan. Newest contract
+      // wins, with the id as a total order so the same row answers every time
+      // rather than whichever the database happens to hand back first.
       const activeSubscription = await db.subscription.findFirst({
         where: {
           organizationId,
@@ -64,6 +73,7 @@ export const createSaaSPlanProvider = (db: PrismaClient): SaaSPlanProvider => {
             in: [SubscriptionStatus.ACTIVE],
           },
         },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       });
 
       const customLimits: Partial<PlanInfo> = {};

@@ -520,3 +520,29 @@ describe("createSaaSPlanProvider", () => {
     });
   });
 });
+
+describe("createSaaSPlanProvider subscription selection", () => {
+  beforeEach(() => {
+    mockEnv.IS_SAAS = true;
+    mockEnv.ADMIN_EMAILS = undefined;
+  });
+
+  describe("given an organization holding more than one active subscription", () => {
+    it("reads the newest one rather than whichever the database returns first", async () => {
+      const db = createMockDb({
+        findFirstResult: {
+          organizationId: "org_1",
+          plan: PlanTypes.ENTERPRISE,
+          status: SubscriptionStatus.ACTIVE,
+        },
+      });
+
+      await createSaaSPlanProvider(db).getActivePlan("org_1");
+
+      const query = (
+        db.subscription.findFirst as unknown as { mock: { calls: unknown[][] } }
+      ).mock.calls[0]![0] as { orderBy?: unknown };
+      expect(query.orderBy).toEqual([{ createdAt: "desc" }, { id: "desc" }]);
+    });
+  });
+});
