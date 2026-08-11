@@ -43,7 +43,8 @@ global:
   automountServiceAccountToken: false
 
   # ServiceAccount for the first-party workloads that touch object storage
-  # (app, workers, cronjobs). Opt-in: disabled by default, so installs that
+  # (app and workers; the cron pods only curl the app over HTTP, so they are
+  # deliberately left off it). Opt-in: disabled by default, so installs that
   # do not need it render exactly as they did before and keep using the
   # namespace `default` account.
   #

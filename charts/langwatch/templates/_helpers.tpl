@@ -1376,7 +1376,10 @@ here, once, by name, so both consuming templates agree.
 {{- end -}}
 
 {{/*
-ServiceAccount name for the first-party workloads (app, workers, cronjobs).
+ServiceAccount name for the first-party workloads that touch object storage
+(app and workers). The cron pods never name it — see the comment in
+cronjobs/cronjobs.yaml.
+
 Explicit name wins; otherwise the release name when we create one; otherwise
 empty, which callers treat as "omit serviceAccountName and use `default`".
 */}}

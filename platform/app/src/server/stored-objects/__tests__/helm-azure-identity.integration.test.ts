@@ -8,8 +8,9 @@
  * Deliberately NOT a unit test asserting on template source text. The
  * sibling `helm-and-docs-shape.unit.test.ts` greps `_helpers.tpl`, which can
  * show a string exists but can never prove "renders successfully", "fails
- * with this error", or "all three workloads name the SAME account" — those
- * are properties of the OUTPUT. The spec review called this out explicitly.
+ * with this error", or "the app and the workers name the SAME account" —
+ * those are properties of the OUTPUT. The spec review called this out
+ * explicitly.
  *
  * Skips when helm is unavailable so CI without the binary is unaffected.
  */
@@ -282,12 +283,15 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
         ...IDENTITY_SERVICE_ACCOUNT,
       ]);
 
-      // One per pod template: app, workers, cronjob. A count short means a
-      // workload boots without a token and fails on its first storage call,
-      // which is exactly the shape of the bug this label exists to prevent.
+      // One per storage-touching pod template: app and workers. A count short
+      // means a workload boots without a token and fails on its first storage
+      // call, which is exactly the shape of the bug this label exists to
+      // prevent. The cron pods are deliberately not among them — they only
+      // call the app over HTTP and never reach storage themselves, and the
+      // sibling "never binds the storage identity to cron pods" pins that
+      // exclusion rather than leaving it to this count.
       const labelled =
         out.match(/^\s*azure\.workload\.identity\/use: "true"$/gm) ?? [];
-      // The two storage consumers, and deliberately not the cron pods.
       expect(labelled).toHaveLength(2);
     });
 
