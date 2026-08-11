@@ -18,6 +18,23 @@ import {
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
+/** Schemes that execute rather than navigate, so they never reach `location`. */
+const EXECUTABLE_SCHEMES = ["javascript:", "data:", "vbscript:"];
+
+/**
+ * Whether a destination is safe to hand to `location`. Every redirect this
+ * page follows was verified against the client registry server-side first;
+ * this is the second lock, so that a regression on that side is a broken
+ * redirect rather than script running on our origin.
+ */
+function isNavigableRedirect(candidate: string): boolean {
+  try {
+    return !EXECUTABLE_SCHEMES.includes(new URL(candidate).protocol);
+  } catch {
+    return false;
+  }
+}
+
 export default function McpAuthorize() {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -88,11 +105,18 @@ export default function McpAuthorize() {
       // told what went wrong instead of hanging on a popup. Failures it could
       // not attribute have no safe destination and are shown here.
       if (data.redirect) {
+        if (!isNavigableRedirect(data.redirect)) {
+          showError("The application asked to return to an unusable address");
+          return;
+        }
         window.location.href = data.redirect;
         return;
       }
 
       if (!response.ok) {
+        // RFC 6749 §4.1.2.1 wire fields from our own authorize endpoint, not a
+        // mutation error: the copy is written for the customer at the point it
+        // is produced, so there is no error code to look up here.
         showError(data.error_description ?? data.error ?? "Unknown error");
         return;
       }
@@ -105,16 +129,11 @@ export default function McpAuthorize() {
 
   const handleDeny = () => {
     if (oauthParams.redirect_uri) {
-      const url = new URL(oauthParams.redirect_uri);
-      // Prevent XSS via executable schemes
-      if (
-        url.protocol === "javascript:" ||
-        url.protocol === "data:" ||
-        url.protocol === "vbscript:"
-      ) {
+      if (!isNavigableRedirect(oauthParams.redirect_uri)) {
         void router.push("/");
         return;
       }
+      const url = new URL(oauthParams.redirect_uri);
       url.searchParams.set("error", "access_denied");
       if (oauthParams.state) {
         url.searchParams.set("state", oauthParams.state);

@@ -103,7 +103,9 @@ async function main(): Promise<number> {
   console.error(`[probe] round-robin proxy on :${proxyPort}`);
 
   const shutdown = async () => {
-    for (const handler of handlers) handler.closeAllSessions();
+    // Await the releases before the forced exit below: a record left
+    // behind still counts against the project's concurrent sessions.
+    await Promise.all(handlers.map((handler) => handler.closeAllSessions()));
     for (const server of [...replicas, proxy]) {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }

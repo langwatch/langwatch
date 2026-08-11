@@ -169,6 +169,16 @@ function createPkceChallenge() {
 // Matches TEST_REDIRECT_URI / TEST_CLIENT_ID below — the values every
 // /oauth/token test request in this file sends, since the token endpoint now
 // requires them to match what /mcp/authorize bound to the code.
+/**
+ * Builds an `application/x-www-form-urlencoded` body. Interpolating the values
+ * into a template works only while none of them contains a `&`, `=`, `+` or
+ * `%`, and a redirect URI that grows a query string is exactly the case where
+ * the shape assertions keep passing against a truncated value.
+ */
+function formBody(fields: Record<string, string>): string {
+  return new URLSearchParams(fields).toString();
+}
+
 const TEST_REDIRECT_URI = "http://localhost/callback";
 const TEST_CLIENT_ID = "test_client";
 
@@ -313,7 +323,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   afterAll(async () => {
-    handler.closeAllSessions();
+    await handler.closeAllSessions();
     await new Promise<void>((resolve) => {
       server.close(() => resolve());
     });
@@ -434,7 +444,13 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=${TEST_REDIRECT_URI}&client_id=${TEST_CLIENT_ID}`,
+        body: formBody({
+          grant_type: "authorization_code",
+          code,
+          code_verifier: codeVerifier,
+          redirect_uri: TEST_REDIRECT_URI,
+          client_id: TEST_CLIENT_ID,
+        }),
       });
 
       expect(res.status).toBe(200);
@@ -460,7 +476,13 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=${code}&code_verifier=wrong-verifier&redirect_uri=${TEST_REDIRECT_URI}&client_id=${TEST_CLIENT_ID}`,
+        body: formBody({
+          grant_type: "authorization_code",
+          code,
+          code_verifier: "wrong-verifier",
+          redirect_uri: TEST_REDIRECT_URI,
+          client_id: TEST_CLIENT_ID,
+        }),
       });
 
       expect(res.status).toBe(400);
@@ -477,7 +499,10 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: "grant_type=authorization_code&code_verifier=some-verifier",
+        body: formBody({
+          grant_type: "authorization_code",
+          code_verifier: "some-verifier",
+        }),
       });
 
       expect(res.status).toBe(400);
@@ -494,7 +519,10 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=${randomUUID()}`,
+        body: formBody({
+          grant_type: "authorization_code",
+          code: randomUUID(),
+        }),
       });
 
       expect(res.status).toBe(400);
@@ -528,7 +556,13 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=invalid-code&code_verifier=some-verifier&redirect_uri=${TEST_REDIRECT_URI}&client_id=${TEST_CLIENT_ID}`,
+        body: formBody({
+          grant_type: "authorization_code",
+          code: "invalid-code",
+          code_verifier: "some-verifier",
+          redirect_uri: TEST_REDIRECT_URI,
+          client_id: TEST_CLIENT_ID,
+        }),
       });
 
       expect(res.status).toBe(400);
@@ -570,7 +604,12 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
         const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
           method: "POST",
           headers: { "content-type": "application/x-www-form-urlencoded" },
-          body: `grant_type=authorization_code&code=${randomUUID()}&code_verifier=some-verifier&client_id=${TEST_CLIENT_ID}`,
+          body: formBody({
+            grant_type: "authorization_code",
+            code: randomUUID(),
+            code_verifier: "some-verifier",
+            client_id: TEST_CLIENT_ID,
+          }),
         });
 
         expect(res.status).toBe(400);
@@ -588,7 +627,12 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
         const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
           method: "POST",
           headers: { "content-type": "application/x-www-form-urlencoded" },
-          body: `grant_type=authorization_code&code=${randomUUID()}&code_verifier=some-verifier&redirect_uri=${TEST_REDIRECT_URI}`,
+          body: formBody({
+            grant_type: "authorization_code",
+            code: randomUUID(),
+            code_verifier: "some-verifier",
+            redirect_uri: TEST_REDIRECT_URI,
+          }),
         });
 
         expect(res.status).toBe(400);
@@ -610,7 +654,13 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
         const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
           method: "POST",
           headers: { "content-type": "application/x-www-form-urlencoded" },
-          body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=https://attacker.invalid/callback&client_id=${TEST_CLIENT_ID}`,
+          body: formBody({
+            grant_type: "authorization_code",
+            code,
+            code_verifier: codeVerifier,
+            redirect_uri: "https://attacker.invalid/callback",
+            client_id: TEST_CLIENT_ID,
+          }),
         });
 
         expect(res.status).toBe(400);
@@ -633,7 +683,13 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
         const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
           method: "POST",
           headers: { "content-type": "application/x-www-form-urlencoded" },
-          body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=${TEST_REDIRECT_URI}&client_id=mcp_someone_elses_client`,
+          body: formBody({
+            grant_type: "authorization_code",
+            code,
+            code_verifier: codeVerifier,
+            redirect_uri: TEST_REDIRECT_URI,
+            client_id: "mcp_someone_elses_client",
+          }),
         });
 
         expect(res.status).toBe(400);
@@ -706,7 +762,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // single-page-app fallback and come back as 200 text/html, which the client
   // reports as a JSON parse failure rather than falling back to the bare form.
 
-  describe("OAuth discovery documents", () => {
+  describe("given the OAuth discovery documents are published", () => {
     async function getDiscovery(path: string) {
       const res = await sendRequest({ server, method: "GET", path });
       return {
@@ -718,34 +774,36 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
     describe("when the protected resource metadata is fetched at the resource path", () => {
       /** @scenario Protected resource metadata is served for the path-suffixed form */
-      it("describes the resource and its authorization server", async () => {
-        for (const resource of ["/sse", "/mcp"]) {
-          const res = await getDiscovery(
-            `/.well-known/oauth-protected-resource${resource}`,
-          );
+      it.each([
+        "/sse",
+        "/mcp",
+      ])("describes %s and its authorization server", async (resource) => {
+        const res = await getDiscovery(
+          `/.well-known/oauth-protected-resource${resource}`,
+        );
 
-          expect(res.status).toBe(200);
-          expect(res.contentType).toContain("application/json");
-          expect(res.body.resource).toContain(resource);
-          expect(res.body.authorization_servers.length).toBeGreaterThan(0);
-        }
+        expect(res.status).toBe(200);
+        expect(res.contentType).toContain("application/json");
+        expect(res.body.resource).toContain(resource);
+        expect(res.body.authorization_servers.length).toBeGreaterThan(0);
       });
     });
 
     describe("when the authorization server metadata is fetched at the resource path", () => {
       /** @scenario Authorization server metadata is served for the path-suffixed form */
-      it("advertises the authorization, token and registration endpoints", async () => {
-        for (const resource of ["/sse", "/mcp"]) {
-          const res = await getDiscovery(
-            `/.well-known/oauth-authorization-server${resource}`,
-          );
+      it.each([
+        "/sse",
+        "/mcp",
+      ])("advertises the authorization, token and registration endpoints for %s", async (resource) => {
+        const res = await getDiscovery(
+          `/.well-known/oauth-authorization-server${resource}`,
+        );
 
-          expect(res.status).toBe(200);
-          expect(res.contentType).toContain("application/json");
-          expect(res.body.authorization_endpoint).toContain("/mcp/authorize");
-          expect(res.body.token_endpoint).toContain("/oauth/token");
-          expect(res.body.registration_endpoint).toContain("/oauth/register");
-        }
+        expect(res.status).toBe(200);
+        expect(res.contentType).toContain("application/json");
+        expect(res.body.authorization_endpoint).toContain("/mcp/authorize");
+        expect(res.body.token_endpoint).toContain("/oauth/token");
+        expect(res.body.registration_endpoint).toContain("/oauth/register");
       });
     });
 
@@ -774,7 +832,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
   // --- OAuth token endpoint client authentication ---
 
-  describe("OAuth token endpoint client authentication", () => {
+  describe("given a client authenticates against the token endpoint", () => {
     beforeEach(() => {
       handler.clearRateLimiters();
     });
@@ -803,7 +861,12 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
             "content-type": "application/x-www-form-urlencoded",
             authorization: `Basic ${basic}`,
           },
-          body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=${TEST_REDIRECT_URI}`,
+          body: formBody({
+            grant_type: "authorization_code",
+            code,
+            code_verifier: codeVerifier,
+            redirect_uri: TEST_REDIRECT_URI,
+          }),
         });
 
         expect(res.status).toBe(200);
@@ -822,7 +885,13 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
         const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
           method: "POST",
           headers: { "content-type": "application/x-www-form-urlencoded" },
-          body: `grant_type=authorization_code&code=${randomUUID()}&code_verifier=verifier&redirect_uri=${TEST_REDIRECT_URI}&client_id=mcp_registration_is_gone`,
+          body: formBody({
+            grant_type: "authorization_code",
+            code: randomUUID(),
+            code_verifier: "verifier",
+            redirect_uri: TEST_REDIRECT_URI,
+            client_id: "mcp_registration_is_gone",
+          }),
         });
 
         expect(res.status).toBe(401);
@@ -879,7 +948,13 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const tokenRes = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=${TEST_REDIRECT_URI}&client_id=${TEST_CLIENT_ID}`,
+        body: formBody({
+          grant_type: "authorization_code",
+          code,
+          code_verifier: codeVerifier,
+          redirect_uri: TEST_REDIRECT_URI,
+          client_id: TEST_CLIENT_ID,
+        }),
       });
       const tokenBody = await tokenRes.json();
       const accessToken = tokenBody.access_token;
@@ -921,7 +996,13 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const tokenRes = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=${TEST_REDIRECT_URI}&client_id=${TEST_CLIENT_ID}`,
+        body: formBody({
+          grant_type: "authorization_code",
+          code,
+          code_verifier: codeVerifier,
+          redirect_uri: TEST_REDIRECT_URI,
+          client_id: TEST_CLIENT_ID,
+        }),
       });
       const tokenBody = await tokenRes.json();
       const accessToken = tokenBody.access_token;
@@ -989,7 +1070,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
       // 2. Simulate pod switch: close all local sessions (as if this is a
       //    different pod) but keep the Redis entry.
-      handler.closeAllSessions();
+      await handler.closeAllSessions();
 
       // 3. Mock Redis returning the session metadata
       mockRedis.get.mockImplementation(async (key: string) => {
@@ -1004,7 +1085,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       mockRedis.expire.mockResolvedValue(1);
 
       // 4. Re-create the server+handler (simulating a different pod)
-      handler.closeAllSessions();
+      await handler.closeAllSessions();
 
       // 5. Send a tool list request with the old session ID — should recover
       const toolsRes = await sendRequest({
@@ -1190,7 +1271,13 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       return fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers,
-        body: `grant_type=authorization_code&code=${code}&code_verifier=verifier&redirect_uri=${TEST_REDIRECT_URI}&client_id=${TEST_CLIENT_ID}`,
+        body: formBody({
+          grant_type: "authorization_code",
+          code,
+          code_verifier: "verifier",
+          redirect_uri: TEST_REDIRECT_URI,
+          client_id: TEST_CLIENT_ID,
+        }),
       });
     }
 
@@ -1409,7 +1496,13 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const tokenRes = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=${TEST_REDIRECT_URI}&client_id=${TEST_CLIENT_ID}`,
+        body: formBody({
+          grant_type: "authorization_code",
+          code,
+          code_verifier: codeVerifier,
+          redirect_uri: TEST_REDIRECT_URI,
+          client_id: TEST_CLIENT_ID,
+        }),
       });
       const tokenBody = (await tokenRes.json()) as { access_token: string };
       const accessToken = tokenBody.access_token;

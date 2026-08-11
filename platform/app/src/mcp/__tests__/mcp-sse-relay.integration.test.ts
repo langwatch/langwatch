@@ -10,11 +10,19 @@
  * one process, sharing one Redis, reproduce that exactly: each has its own
  * session map and its own relay subscriber, and only Redis is common.
  */
-import { createHash } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { connection as redis } from "~/server/redis";
 import { createMcpHandler, type McpHandler } from "../handler";
+import {
+  clearRecordedSessions,
+  handshake,
+  initializeBody,
+  openSseStream,
+  postMessage,
+  SSE_SESSION_PREFIX,
+  sseSessionSetKey,
+} from "./support/sseHarness";
 
 const VALID_API_KEY = "lw_relay_key_a";
 const OTHER_API_KEY = "lw_relay_key_b";
@@ -49,196 +57,6 @@ vi.mock("~/utils/encryption", () => ({
     text.startsWith("encrypted:") ? text.slice(10) : text,
 }));
 
-const SSE_SESSION_PREFIX = "mcp:sse:session:";
-const SSE_SESSION_SET_PREFIX = "mcp:sse:sessions_by_key:";
-
-interface JsonRpcMessage {
-  id?: number | string;
-  result?: Record<string, unknown>;
-  error?: Record<string, unknown>;
-  method?: string;
-}
-
-interface OpenSseStream {
-  status: number;
-  endpoint: string;
-  sessionId: string;
-  messages: JsonRpcMessage[];
-  waitFor: (match: (m: JsonRpcMessage) => boolean) => Promise<JsonRpcMessage>;
-  close: () => void;
-}
-
-/**
- * Opens `GET /sse` and keeps consuming the stream in the background, so the
- * test can assert on replies that arrive after the POST that triggered them
- * has already been answered.
- */
-async function openSseStream({
-  baseUrl,
-  apiKey,
-}: {
-  baseUrl: string;
-  apiKey: string;
-}): Promise<OpenSseStream> {
-  const abort = new AbortController();
-  const res = await fetch(`${baseUrl}/sse`, {
-    method: "GET",
-    headers: { authorization: `Bearer ${apiKey}` },
-    signal: abort.signal,
-  });
-
-  const messages: JsonRpcMessage[] = [];
-  const waiters: {
-    match: (m: JsonRpcMessage) => boolean;
-    resolve: (m: JsonRpcMessage) => void;
-  }[] = [];
-  let resolveEndpoint!: (path: string) => void;
-  const endpointArrived = new Promise<string>((resolve) => {
-    resolveEndpoint = resolve;
-  });
-
-  const reader = res.body!.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  void (async () => {
-    try {
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        let boundary = buffer.indexOf("\n\n");
-        while (boundary !== -1) {
-          const frame = buffer.slice(0, boundary);
-          buffer = buffer.slice(boundary + 2);
-          boundary = buffer.indexOf("\n\n");
-
-          const data = /^data:\s*(.*)$/m.exec(frame)?.[1]?.trim();
-          if (data === undefined) continue;
-          const event =
-            /^event:\s*(.*)$/m.exec(frame)?.[1]?.trim() ?? "message";
-          if (event === "endpoint") {
-            resolveEndpoint(data);
-            continue;
-          }
-          try {
-            const parsed = JSON.parse(data) as JsonRpcMessage;
-            messages.push(parsed);
-            for (let i = waiters.length - 1; i >= 0; i--) {
-              const waiter = waiters[i]!;
-              if (waiter.match(parsed)) {
-                waiters.splice(i, 1);
-                waiter.resolve(parsed);
-              }
-            }
-          } catch {
-            // Not a JSON-RPC frame — keep reading.
-          }
-        }
-      }
-    } catch {
-      // The stream was aborted by close() — expected at the end of a test.
-    }
-  })();
-
-  const endpoint = await endpointArrived;
-  const sessionId =
-    new URL(endpoint, "http://localhost").searchParams.get("sessionId") ?? "";
-
-  return {
-    status: res.status,
-    endpoint,
-    sessionId,
-    messages,
-    waitFor: (match) =>
-      new Promise<JsonRpcMessage>((resolve, reject) => {
-        const already = messages.find(match);
-        if (already) {
-          resolve(already);
-          return;
-        }
-        const timer = setTimeout(
-          () => reject(new Error("timed out waiting for an SSE reply")),
-          20_000,
-        );
-        waiters.push({
-          match,
-          resolve: (m) => {
-            clearTimeout(timer);
-            resolve(m);
-          },
-        });
-      }),
-    close: () => abort.abort(),
-  };
-}
-
-async function postMessage({
-  baseUrl,
-  path,
-  apiKey,
-  body,
-}: {
-  baseUrl: string;
-  path: string;
-  apiKey?: string;
-  body: unknown;
-}) {
-  const headers: Record<string, string> = {
-    "content-type": "application/json",
-  };
-  if (apiKey) headers.authorization = `Bearer ${apiKey}`;
-  const res = await fetch(`${baseUrl}${path}`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
-  return { status: res.status, body: await res.text() };
-}
-
-function initializeBody(id = 1) {
-  return {
-    jsonrpc: "2.0",
-    id,
-    method: "initialize",
-    params: {
-      protocolVersion: "2025-03-26",
-      capabilities: {},
-      clientInfo: { name: "relay-test-client", version: "1.0.0" },
-    },
-  };
-}
-
-/** Drives an SSE session through the MCP handshake over the given base URL. */
-async function handshake({
-  stream,
-  baseUrl,
-  apiKey,
-}: {
-  stream: OpenSseStream;
-  baseUrl: string;
-  apiKey: string;
-}) {
-  const init = await postMessage({
-    baseUrl,
-    path: stream.endpoint,
-    apiKey,
-    body: initializeBody(1),
-  });
-  if (init.status !== 202) {
-    throw new Error(
-      `the handshake could not start: initialize answered ${init.status} ${init.body}`,
-    );
-  }
-  await stream.waitFor((m) => m.id === 1);
-  await postMessage({
-    baseUrl,
-    path: stream.endpoint,
-    apiKey,
-    body: { jsonrpc: "2.0", method: "notifications/initialized" },
-  });
-}
-
 describe("Feature: MCP SSE transport across replicas", () => {
   let replicaA: Server;
   let replicaB: Server;
@@ -257,22 +75,8 @@ describe("Feature: MCP SSE transport across replicas", () => {
     return [server, `http://127.0.0.1:${port}`];
   }
 
-  /**
-   * Session records outlive the process that wrote them, so an interrupted
-   * run can leave this key's session set full and make the next run's very
-   * first connection hit the per-project limit.
-   */
-  async function clearRecordedSessions(apiKey: string): Promise<void> {
-    const setKey = `${SSE_SESSION_SET_PREFIX}${createHash("sha256")
-      .update(apiKey)
-      .digest("hex")
-      .slice(0, 16)}`;
-    const members = await redis!.smembers(setKey);
-    for (const id of members) {
-      await redis!.del(`${SSE_SESSION_PREFIX}${id}`);
-    }
-    await redis!.del(setKey);
-  }
+  const clearSessions = (apiKey: string) =>
+    clearRecordedSessions({ redis: redis!, apiKey });
 
   beforeAll(async () => {
     if (!redis) {
@@ -280,8 +84,8 @@ describe("Feature: MCP SSE transport across replicas", () => {
         "These tests need a real Redis — set REDIS_URL / LANGWATCH_TEST_REDIS_URL",
       );
     }
-    await clearRecordedSessions(VALID_API_KEY);
-    await clearRecordedSessions(OTHER_API_KEY);
+    await clearSessions(VALID_API_KEY);
+    await clearSessions(OTHER_API_KEY);
 
     handlerA = createMcpHandler();
     handlerB = createMcpHandler();
@@ -290,12 +94,12 @@ describe("Feature: MCP SSE transport across replicas", () => {
   });
 
   afterAll(async () => {
-    handlerA.closeAllSessions();
-    handlerB.closeAllSessions();
+    await handlerA.closeAllSessions();
+    await handlerB.closeAllSessions();
     await new Promise<void>((resolve) => replicaA.close(() => resolve()));
     await new Promise<void>((resolve) => replicaB.close(() => resolve()));
-    await clearRecordedSessions(VALID_API_KEY);
-    await clearRecordedSessions(OTHER_API_KEY);
+    await clearSessions(VALID_API_KEY);
+    await clearSessions(OTHER_API_KEY);
   });
 
   describe("given a client opened an SSE connection against one replica", () => {
@@ -462,6 +266,8 @@ describe("Feature: MCP SSE transport across replicas", () => {
         });
 
         expect(res.status).toBe(404);
+        expect(JSON.parse(res.body).error).toContain("Session not found");
+        // The stale record also stops counting against the project's limit.
         expect(await redis!.get(`${SSE_SESSION_PREFIX}${orphanId}`)).toBeNull();
       });
     });
@@ -471,11 +277,7 @@ describe("Feature: MCP SSE transport across replicas", () => {
     describe("when a client opens another SSE connection", () => {
       /** @scenario SSE sessions count towards the per-project concurrent session limit */
       it("refuses the connection as over the session limit", async () => {
-        const keyHash = createHash("sha256")
-          .update(VALID_API_KEY)
-          .digest("hex")
-          .slice(0, 16);
-        const setKey = `${SSE_SESSION_SET_PREFIX}${keyHash}`;
+        const setKey = sseSessionSetKey(VALID_API_KEY);
         const seeded: string[] = [];
         for (let i = 0; i < 20; i++) {
           const id = `relay-seeded-${i}`;
@@ -512,22 +314,50 @@ describe("Feature: MCP SSE transport across replicas", () => {
   });
 
   describe("given a streamable session was created on one replica", () => {
+    /** Opens a streamable session on replica A and returns its session id. */
+    async function createStreamableSession(id: number): Promise<string> {
+      const created = await fetch(`${urlA}/mcp`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "text/event-stream, application/json",
+          authorization: `Bearer ${VALID_API_KEY}`,
+        },
+        body: JSON.stringify(initializeBody(id)),
+      });
+      // biome-ignore-start lint/suspicious/noMisplacedAssertion: the arrangement fails loudly here rather than as a confusing assertion later
+      expect(created.status).toBe(200);
+      const sessionId = created.headers.get("mcp-session-id");
+      expect(sessionId).toBeTruthy();
+      // biome-ignore-end lint/suspicious/noMisplacedAssertion: end of the arrangement checks
+      await created.text();
+      return sessionId!;
+    }
+
+    /**
+     * Whether a replica built the session for itself. DELETE only consults
+     * the replica's own session map, so it answers 200 exactly when that
+     * replica holds the session and 404 when it never built one.
+     */
+    async function replicaHoldsSession(
+      baseUrl: string,
+      sessionId: string,
+    ): Promise<boolean> {
+      const res = await fetch(`${baseUrl}/mcp`, {
+        method: "DELETE",
+        headers: {
+          authorization: `Bearer ${VALID_API_KEY}`,
+          "mcp-session-id": sessionId,
+        },
+      });
+      await res.text();
+      return res.status === 200;
+    }
+
     describe("when the client reconnects the stream through the other replica", () => {
       /** @scenario Reconnecting the streaming transport to another replica resumes the session */
       it("serves the stream instead of reporting the session expired", async () => {
-        const created = await fetch(`${urlA}/mcp`, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            accept: "text/event-stream, application/json",
-            authorization: `Bearer ${VALID_API_KEY}`,
-          },
-          body: JSON.stringify(initializeBody(71)),
-        });
-        expect(created.status).toBe(200);
-        const sessionId = created.headers.get("mcp-session-id");
-        expect(sessionId).toBeTruthy();
-        await created.text();
+        const sessionId = await createStreamableSession(71);
 
         const abort = new AbortController();
         try {
@@ -536,7 +366,7 @@ describe("Feature: MCP SSE transport across replicas", () => {
             headers: {
               accept: "text/event-stream",
               authorization: `Bearer ${VALID_API_KEY}`,
-              "mcp-session-id": sessionId!,
+              "mcp-session-id": sessionId,
             },
             signal: abort.signal,
           });
@@ -545,6 +375,61 @@ describe("Feature: MCP SSE transport across replicas", () => {
         } finally {
           abort.abort();
         }
+      });
+    });
+
+    describe("when the reconnect carries no credentials", () => {
+      /** @scenario Reconnecting without credentials is refused and rebuilds nothing */
+      it("answers 401 and leaves the other replica holding no session", async () => {
+        const sessionId = await createStreamableSession(81);
+
+        const abort = new AbortController();
+        try {
+          const resumed = await fetch(`${urlB}/mcp`, {
+            method: "GET",
+            headers: {
+              accept: "text/event-stream",
+              "mcp-session-id": sessionId,
+            },
+            signal: abort.signal,
+          });
+          await resumed.text();
+
+          expect(resumed.status).toBe(401);
+        } finally {
+          abort.abort();
+        }
+
+        // Rebuilding decrypts the stored key and connects a server bound to
+        // it, so a refused caller must not have caused any of it.
+        expect(await replicaHoldsSession(urlB, sessionId)).toBe(false);
+      });
+    });
+
+    describe("when the reconnect carries credentials for a different project", () => {
+      /** @scenario Reconnecting with another project's credentials is refused and rebuilds nothing */
+      it("answers 401 and leaves the other replica holding no session", async () => {
+        const sessionId = await createStreamableSession(91);
+
+        const abort = new AbortController();
+        try {
+          const resumed = await fetch(`${urlB}/mcp`, {
+            method: "GET",
+            headers: {
+              accept: "text/event-stream",
+              authorization: `Bearer ${OTHER_API_KEY}`,
+              "mcp-session-id": sessionId,
+            },
+            signal: abort.signal,
+          });
+          await resumed.text();
+
+          expect(resumed.status).toBe(401);
+        } finally {
+          abort.abort();
+        }
+
+        expect(await replicaHoldsSession(urlB, sessionId)).toBe(false);
       });
     });
   });

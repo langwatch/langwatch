@@ -203,7 +203,7 @@ Feature: MCP HTTP Server In-App Integration (Phase 1)
 
   @integration
   Scenario: A message posted to a replica that does not hold the stream still reaches the session
-    Given a client opened an SSE connection and one replica holds the stream
+    Given a client opened an SSE connection against one replica
     When the client posts a tools/list message to a different replica
     Then the response is accepted
     And the tools/list reply arrives on the open SSE stream
@@ -244,10 +244,11 @@ Feature: MCP HTTP Server In-App Integration (Phase 1)
 
   @integration
   Scenario: A message for a session whose replica is gone tells the client to reconnect
-    Given an SSE session was recorded but the replica holding its stream is gone
+    Given an SSE session that no replica still holds
     When a client posts a message for that session
     Then the response status is 404
-    And the recorded session is forgotten so the client reconnects
+    And the response says the session was not found
+    And the session stops counting against the project's concurrent sessions
 
   @integration
   Scenario: SSE sessions count towards the per-project concurrent session limit
@@ -260,6 +261,20 @@ Feature: MCP HTTP Server In-App Integration (Phase 1)
     Given a streamable session was created on one replica
     When the client reconnects the stream through a different replica
     Then the stream is served rather than reported as expired
+
+  @integration
+  Scenario: Reconnecting without credentials is refused and rebuilds nothing
+    Given a streamable session was created on one replica
+    When a caller reconnects that session through a different replica with no credentials
+    Then the response status is 401
+    And the other replica serves no session for that session id
+
+  @integration
+  Scenario: Reconnecting with another project's credentials is refused and rebuilds nothing
+    Given a streamable session was created on one replica
+    When a caller reconnects that session through a different replica with another project's credentials
+    Then the response status is 401
+    And the other replica serves no session for that session id
 
   # --- OAuth discovery documents ---
 

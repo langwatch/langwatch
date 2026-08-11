@@ -91,7 +91,7 @@ describe("Feature: MCP request logging", () => {
   });
 
   afterAll(async () => {
-    handler.closeAllSessions();
+    await handler.closeAllSessions();
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 

@@ -121,6 +121,36 @@ async function authorize() {
   });
 }
 
+/**
+ * Every refusal here happens after the client_id and redirect_uri were
+ * verified against the registry, so the client is waiting on its redirect and
+ * has to be told there: a refusal that only renders on our page leaves it
+ * hanging. Asserting the destination as well as the body keeps a regression
+ * that drops or re-points the redirect from passing.
+ */
+async function expectAccessDenied(res: Response) {
+  const json = (await res.json()) as {
+    error?: string;
+    error_description?: string;
+    redirect?: string;
+  };
+
+  // biome-ignore-start lint/suspicious/noMisplacedAssertion: one refusal shape, asserted whole, for every case that produces it
+  expect(res.status).toBe(403);
+  expect(json.error).toBe(ERROR);
+  expect(json.error_description).toBe(ERROR_DESCRIPTION);
+
+  const redirect = new URL(json.redirect ?? "");
+  expect(`${redirect.origin}${redirect.pathname}`).toBe(validBody.redirect_uri);
+  expect(redirect.searchParams.get("error")).toBe(ERROR);
+  expect(redirect.searchParams.get("error_description")).toBe(
+    ERROR_DESCRIPTION,
+  );
+  expect(redirect.searchParams.get("state")).toBe(validBody.state);
+  expect(redirect.searchParams.get("code")).toBeNull();
+  // biome-ignore-end lint/suspicious/noMisplacedAssertion: end of the shared refusal assertions
+}
+
 describe("POST /mcp/authorize", () => {
   describe("when the user has project access via a TEAM-scoped RoleBinding but no legacy TeamUser row", () => {
     it("authorizes the connection instead of returning 403", async () => {
@@ -139,15 +169,7 @@ describe("POST /mcp/authorize", () => {
       // which is also absent → access denied.
       mockPrisma.roleBinding.findMany.mockResolvedValueOnce([]);
 
-      const res = await authorize();
-      const json = (await res.json()) as {
-        error?: string;
-        error_description?: string;
-      };
-
-      expect(res.status).toBe(403);
-      expect(json.error).toBe(ERROR);
-      expect(json.error_description).toBe(ERROR_DESCRIPTION);
+      await expectAccessDenied(await authorize());
     });
   });
 
@@ -161,15 +183,7 @@ describe("POST /mcp/authorize", () => {
         archivedAt: new Date("2026-01-01T00:00:00Z"),
       });
 
-      const res = await authorize();
-      const json = (await res.json()) as {
-        error?: string;
-        error_description?: string;
-      };
-
-      expect(res.status).toBe(403);
-      expect(json.error).toBe(ERROR);
-      expect(json.error_description).toBe(ERROR_DESCRIPTION);
+      await expectAccessDenied(await authorize());
     });
   });
 
@@ -180,15 +194,7 @@ describe("POST /mcp/authorize", () => {
       const previous = process.env.DEMO_PROJECT_ID;
       process.env.DEMO_PROJECT_ID = PROJECT_ID;
       try {
-        const res = await authorize();
-        const json = (await res.json()) as {
-          error?: string;
-          error_description?: string;
-        };
-
-        expect(res.status).toBe(403);
-        expect(json.error).toBe(ERROR);
-        expect(json.error_description).toBe(ERROR_DESCRIPTION);
+        await expectAccessDenied(await authorize());
       } finally {
         if (previous === undefined) delete process.env.DEMO_PROJECT_ID;
         else process.env.DEMO_PROJECT_ID = previous;

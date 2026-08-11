@@ -839,6 +839,13 @@ secured
     // its redirect and an error rendered here leaves it hanging forever. The
     // checks above deliberately stay local — an unverified redirect_uri is
     // exactly what an attacker would supply, so nothing is ever sent to it.
+    //
+    // The refusals below answer with `c.json` rather than throwing a
+    // HandledError on purpose. OAuth clients parse `error` and
+    // `error_description` at the top level of the body (RFC 6749 §5.2), and
+    // the HandledError envelope nests its own shape, which those clients read
+    // as a malformed response. This endpoint speaks the OAuth wire format, so
+    // the shape below is the contract; do not "fix" it into the envelope.
     const errorRedirect = ({
       error,
       description,

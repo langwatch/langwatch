@@ -429,7 +429,7 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
             server.close(() => resolve()),
           );
           if ("closeIdleConnections" in server) server.closeIdleConnections();
-          mcpHandler.closeAllSessions();
+          await mcpHandler.closeAllSessions();
           try {
             await closed;
           } finally {

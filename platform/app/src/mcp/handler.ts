@@ -208,8 +208,8 @@ export interface McpHandler {
   clearTokenCache: () => void;
   /** Clear the in-memory OAuth/auth-failure rate limiter state (for testing). */
   clearRateLimiters: () => void;
-  /** Close all active sessions (for graceful shutdown). */
-  closeAllSessions: () => void;
+  /** Close all active sessions and release their records (graceful shutdown). */
+  closeAllSessions: () => Promise<void>;
 }
 
 /**
@@ -443,6 +443,14 @@ export function createMcpHandler(): McpHandler {
    * that hop, so they are what we key on, with the socket address as the
    * fallback for direct connections. Shares the header priority (and the
    * address validation) with the rest of the app rather than re-deriving it.
+   *
+   * That priority puts `cf-connecting-ip` first, which is the header the edge
+   * writes itself: Cloudflare replaces any caller-supplied value before the
+   * request reaches an origin, so what we bucket on is edge-authored rather
+   * than caller-authored wherever the deployment keeps that edge in front. A
+   * deployment that exposes the origin directly is trusting these headers to
+   * the same degree as every other rate limit in the app, which is why the
+   * resolution stays shared instead of being re-derived here.
    */
   function getClientIp(req: IncomingMessage): string {
     return clientIpFromRequest(req as unknown as NextApiRequest) ?? "unknown";
@@ -1290,18 +1298,26 @@ export function createMcpHandler(): McpHandler {
   /**
    * Rebuilds a Streamable HTTP session on this replica from its Redis record,
    * for a session first created on another one. Returns null when no record
-   * exists, and throws when the SDK internals the rebuild depends on have
-   * moved.
+   * exists or when the record belongs to a different project, and throws when
+   * the SDK internals the rebuild depends on have moved.
+   *
+   * Rebuilding is itself a side effect — it decrypts the stored key, connects
+   * a server bound to it and puts the session in this replica's map — so the
+   * caller's own key is checked against the record before any of that runs,
+   * rather than only checked on the response.
    */
   async function recoverStreamableSession({
     sessionId,
     incomingToken,
+    callerApiKey,
   }: {
     sessionId: string;
     incomingToken: string | null;
+    callerApiKey: string;
   }): Promise<SessionState | null> {
     const redisApiKey = await getSessionFromRedis(sessionId);
     if (!redisApiKey) return null;
+    if (redisApiKey !== callerApiKey) return null;
 
     // WORKAROUND: The SDK transport starts uninitialized — we patch its
     // inner state so it accepts non-init requests with the existing
@@ -1364,23 +1380,8 @@ export function createMcpHandler(): McpHandler {
     req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
-    let raw: string;
-    try {
-      raw = await readBody(req);
-    } catch (err) {
-      if (err instanceof Error && err.message === "Request body too large") {
-        sendJson(res, 413, { error: "Request body too large" });
-        return;
-      }
-      throw err;
-    }
-    let body: unknown;
-    try {
-      body = JSON.parse(raw);
-    } catch {
-      sendJson(res, 400, { error: "Invalid JSON body" });
-      return;
-    }
+    const body = await readJsonBody(req, res);
+    if (body === undefined) return;
 
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
     // Extract once at the top — reused on session-recovery path to recover
@@ -1391,13 +1392,21 @@ export function createMcpHandler(): McpHandler {
     // Existing session — check local Map first, then Redis
     if (sessionId) {
       let session = sessions.get(sessionId);
+      const callerApiKey = incomingToken
+        ? await resolveApiKey(incomingToken)
+        : null;
 
-      // L2: Redis lookup — session may live on another pod
-      if (!session) {
+      // L2: Redis lookup — session may live on another pod. Only a caller
+      // that already proved it owns the session gets this far, so naming
+      // someone else's session id rebuilds nothing here.
+      if (!session && callerApiKey) {
         try {
           session =
-            (await recoverStreamableSession({ sessionId, incomingToken })) ??
-            undefined;
+            (await recoverStreamableSession({
+              sessionId,
+              incomingToken,
+              callerApiKey,
+            })) ?? undefined;
         } catch (err) {
           logger.error({ error: err }, "MCP session recovery failed");
           sendJson(res, 500, { error: "Internal server error" });
@@ -1406,13 +1415,11 @@ export function createMcpHandler(): McpHandler {
       }
 
       if (session) {
-        const token = extractBearerToken(req);
-        if (!token) {
+        if (!incomingToken) {
           send401(res, "Authorization header required");
           return;
         }
-        const apiKey = await resolveApiKey(token);
-        if (apiKey !== session.apiKey) {
+        if (callerApiKey !== session.apiKey) {
           send401(res, "Bearer token does not match session");
           return;
         }
@@ -1514,15 +1521,22 @@ export function createMcpHandler(): McpHandler {
     }
 
     let session = sessions.get(sessionId);
+    const incomingToken = extractBearerToken(req);
+    const callerApiKey = incomingToken
+      ? await resolveApiKey(incomingToken)
+      : null;
 
     // L2: Redis lookup — the session may have been created on another pod, and
     // reopening the stream is exactly what a client does after a reconnect.
-    if (!session) {
+    // The caller's key is resolved first so an unauthenticated reconnect
+    // cannot make this replica rebuild a session it was never given.
+    if (!session && callerApiKey) {
       try {
         session =
           (await recoverStreamableSession({
             sessionId,
-            incomingToken: extractBearerToken(req),
+            incomingToken,
+            callerApiKey,
           })) ?? undefined;
       } catch (err) {
         logger.error({ error: err }, "MCP session recovery failed");
@@ -1532,17 +1546,24 @@ export function createMcpHandler(): McpHandler {
     }
 
     if (!session) {
-      send401(res, "Session expired or not found");
+      // A caller that presented nothing is told that, rather than that the
+      // session vanished — the two need different things from the client.
+      // A caller whose token belongs elsewhere is told the session is gone,
+      // which is also the answer that confirms nothing about it.
+      send401(
+        res,
+        incomingToken
+          ? "Session expired or not found"
+          : "Authorization header required",
+      );
       return;
     }
 
-    const token = extractBearerToken(req);
-    if (!token) {
+    if (!incomingToken) {
       send401(res, "Authorization header required");
       return;
     }
-    const apiKey = await resolveApiKey(token);
-    if (apiKey !== session.apiKey) {
+    if (callerApiKey !== session.apiKey) {
       send401(res, "Bearer token does not match session");
       return;
     }
@@ -1988,16 +2009,24 @@ export function createMcpHandler(): McpHandler {
     authFailRateLimiter.clear();
   }
 
-  function closeAllSessions(): void {
+  /**
+   * Resolves once every session record this replica owns is gone from Redis.
+   * Shutdown waits on it: a released record frees a slot against the
+   * per-project concurrent-session limit, and a process that exits without
+   * waiting leaves those slots allocated until their TTL.
+   */
+  async function closeAllSessions(): Promise<void> {
     clearInterval(reaper);
     for (const [id, session] of sessions) {
       session.transport.close().catch(() => {});
       sessions.delete(id);
     }
+    const released: Promise<void>[] = [];
     for (const [id, session] of sseSessions) {
       session.transport.close().catch(() => {});
-      releaseSseSession(id, session.apiKey).catch(() => {});
+      released.push(releaseSseSession(id, session.apiKey).catch(() => {}));
     }
+    await Promise.all(released);
     relayListeners.clear();
     if (relaySubscriber) {
       relaySubscriber.disconnect();
