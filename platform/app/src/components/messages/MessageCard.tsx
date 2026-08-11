@@ -35,12 +35,15 @@ import {
   isPythonRepr,
   parsePythonInsideJson,
 } from "../../utils/parsePythonInsideJson";
-import { pluralize } from "../../utils/pluralize";
 import { getColorForString } from "../../utils/rotatingColors";
 import { stringifyIfObject } from "../../utils/stringifyIfObject";
 import { getExtractedInput } from "../../utils/traceExtraction";
 import { CheckPassing } from "../CheckPassing";
-import { summarizeEvaluationsTag } from "../checks/evaluationSummaryCounts";
+import {
+  evaluationsTagLabel,
+  guardrailsTagLabel,
+  summarizeEvaluationsTag,
+} from "../checks/evaluationSummaryCounts";
 import { Markdown } from "../Markdown";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import { Popover } from "../ui/popover";
@@ -395,64 +398,24 @@ export function MessageCard({
               >
                 <Tag.Label>
                   <HStack gap={2}>
-                    {!guardSummary.done ? (
-                      // Still running: passes so far out of every guardrail on
-                      // the trace — without this branch an all-pending trace
-                      // would render a green "0/0 guardrails".
-                      <>
-                        <Box>
-                          <Clock />
-                        </Box>
-                        {guardSummary.passes}/{guardSummary.total} guardrails
-                      </>
-                    ) : guardSummary.hasOnlySkippedRuns ? (
-                      <>
-                        <Box>
-                          <MinusCircle />
-                        </Box>
-                        Guardrails skipped
-                      </>
-                    ) : guardSummary.failed > 0 ? (
-                      <>
-                        <Box>
-                          <Shield />
-                        </Box>
-                        {guardSummary.failed}{" "}
-                        {pluralize(
-                          guardSummary.failed,
-                          "guardrail block",
-                          "guardrail blocks",
-                        )}
-                        {guardSummary.errored > 0
-                          ? `, ${guardSummary.errored} errored`
-                          : ""}
-                      </>
-                    ) : guardSummary.errored > 0 ? (
-                      // A crashed guardrail is neither a pass nor a block —
-                      // name it instead of counting it green (#6835).
-                      <>
-                        <Box>
-                          <XCircle />
-                        </Box>
-                        {guardSummary.errored}{" "}
-                        {pluralize(
-                          guardSummary.errored,
-                          "guardrail errored",
-                          "guardrails errored",
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <Box>
-                          <CheckCircle />
-                        </Box>
-                        {guardSummary.passes}/{guardSummary.verdictTotal}{" "}
-                        guardrails
-                        {guardSummary.skipped > 0
-                          ? `, ${guardSummary.skipped} skipped`
-                          : ""}
-                      </>
-                    )}
+                    <Box>
+                      {!guardSummary.done ? (
+                        // Without a pending branch an all-pending trace would
+                        // render a green "0/0 guardrails".
+                        <Clock />
+                      ) : guardSummary.hasOnlySkippedRuns ? (
+                        <MinusCircle />
+                      ) : guardSummary.failed > 0 ? (
+                        <Shield />
+                      ) : guardSummary.errored > 0 ? (
+                        // A crashed guardrail is neither a pass nor a block —
+                        // name it instead of counting it green (#6835).
+                        <XCircle />
+                      ) : (
+                        <CheckCircle />
+                      )}
+                    </Box>
+                    {guardrailsTagLabel(guardSummary)}
                   </HStack>
                 </Tag.Label>
               </Tag.Root>
@@ -508,39 +471,7 @@ export function MessageCard({
                     ) : (
                       <CheckCircle />
                     )}
-                    {!evalSummary.done
-                      ? // Still running: passes so far out of every evaluation
-                        // on the trace — terminal and in-flight alike.
-                        `${evalSummary.passes}/${evalSummary.total} evaluations`
-                      : evalSummary.hasOnlySkippedRuns
-                        ? "Evaluations skipped"
-                        : evalSummary.failed > 0
-                          ? // Errored runs stay visible next to real fails —
-                            // neither count may hide the other.
-                            `${evalSummary.failed} ${
-                              evalSummary.failed == 1
-                                ? "evaluation failed"
-                                : "evaluations failed"
-                            }${
-                              evalSummary.errored > 0
-                                ? `, ${evalSummary.errored} errored`
-                                : ""
-                            }`
-                          : evalSummary.errored > 0
-                            ? // A crashed evaluator is not a fail verdict — label it
-                              // as an error instead of folding it into "failed".
-                              `${evalSummary.errored} ${
-                                evalSummary.errored == 1
-                                  ? "evaluation errored"
-                                  : "evaluations errored"
-                              }`
-                            : // All good: count verdicts, and name skipped runs
-                              // so the tag reconciles with the popover list.
-                              `${evalSummary.passes}/${evalSummary.verdictTotal} evaluations${
-                                evalSummary.skipped > 0
-                                  ? `, ${evalSummary.skipped} skipped`
-                                  : ""
-                              }`}
+                    {evaluationsTagLabel(evalSummary)}
                   </HStack>
                 </Tag.Label>
               </Tag.Root>

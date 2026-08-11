@@ -59,3 +59,55 @@ export function summarizeEvaluationsTag(
     skipped: evaluations.filter((check) => check.status === "skipped").length,
   };
 }
+
+const skippedSuffix = (summary: EvaluationsTagSummary): string =>
+  summary.skipped > 0 ? `, ${summary.skipped} skipped` : "";
+
+const erroredSuffix = (summary: EvaluationsTagSummary): string =>
+  summary.errored > 0 ? `, ${summary.errored} errored` : "";
+
+/**
+ * The evaluations tag label for a trace row. Every terminal state stays
+ * visible — a failed label never hides errored or skipped runs, so the tag
+ * always reconciles with the popover list it sits above (#6835).
+ */
+export function evaluationsTagLabel(summary: EvaluationsTagSummary): string {
+  if (!summary.done) {
+    // Still running: passes so far out of every evaluation on the trace —
+    // terminal and in-flight alike.
+    return `${summary.passes}/${summary.total} evaluations`;
+  }
+  if (summary.hasOnlySkippedRuns) return "Evaluations skipped";
+  if (summary.failed > 0) {
+    const noun = summary.failed === 1 ? "evaluation" : "evaluations";
+    return `${summary.failed} ${noun} failed${erroredSuffix(summary)}${skippedSuffix(summary)}`;
+  }
+  if (summary.errored > 0) {
+    // A crashed evaluator is not a fail verdict — label it as an error
+    // instead of folding it into "failed".
+    const noun = summary.errored === 1 ? "evaluation" : "evaluations";
+    return `${summary.errored} ${noun} errored${skippedSuffix(summary)}`;
+  }
+  return `${summary.passes}/${summary.verdictTotal} evaluations${skippedSuffix(summary)}`;
+}
+
+/**
+ * The guardrails tag label — same shape as {@link evaluationsTagLabel}: a
+ * skipped or errored guardrail is neither a pass nor a block, and no count
+ * hides another.
+ */
+export function guardrailsTagLabel(summary: EvaluationsTagSummary): string {
+  if (!summary.done) {
+    return `${summary.passes}/${summary.total} guardrails`;
+  }
+  if (summary.hasOnlySkippedRuns) return "Guardrails skipped";
+  if (summary.failed > 0) {
+    const noun = summary.failed === 1 ? "guardrail block" : "guardrail blocks";
+    return `${summary.failed} ${noun}${erroredSuffix(summary)}${skippedSuffix(summary)}`;
+  }
+  if (summary.errored > 0) {
+    const noun = summary.errored === 1 ? "guardrail" : "guardrails";
+    return `${summary.errored} ${noun} errored${skippedSuffix(summary)}`;
+  }
+  return `${summary.passes}/${summary.verdictTotal} guardrails${skippedSuffix(summary)}`;
+}
