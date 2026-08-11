@@ -148,13 +148,14 @@ export const EvaluationsCount = (
 
   const groups = groupEvaluationsByEvaluator(evaluations);
 
-  const totalErrors = groups.filter(
-    (group) =>
-      group.latest.status === "error" ||
-      evaluationPassed(group.latest) === false,
+  const totalFailed = groups.filter(
+    (group) => evaluationPassed(group.latest) === false,
+  ).length;
+  const totalErrored = groups.filter(
+    (group) => group.latest.status === "error",
   ).length;
 
-  if (totalErrors > 0) {
+  if (totalFailed > 0) {
     if (trace.countGuardrails) {
       return null;
     }
@@ -167,7 +168,21 @@ export const EvaluationsCount = (
         color={"white"}
         fontSize={"sm"}
       >
-        {totalErrors} failed
+        {totalFailed} failed
+      </Text>
+    );
+  }
+
+  if (totalErrored > 0) {
+    return (
+      <Text
+        borderRadius={"md"}
+        paddingX={2}
+        backgroundColor={"yellow.solid"}
+        color={"white"}
+        fontSize={"sm"}
+      >
+        {totalErrored} errored
       </Text>
     );
   }
