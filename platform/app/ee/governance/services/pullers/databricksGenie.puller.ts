@@ -83,6 +83,56 @@ const GENIE_MODEL = "databricks/genie" as const;
 
 export const DATABRICKS_GENIE_ADAPTER_ID = "databricks_genie" as const;
 
+/**
+ * The only hosts a Genie workspace is ever served from, one per cloud.
+ *
+ * Databricks owns all three, so a customer cannot register a lookalike inside
+ * them and no config can name one that is not theirs.
+ */
+const DATABRICKS_WORKSPACE_HOST_SUFFIXES = [
+  ".azuredatabricks.net",
+  ".cloud.databricks.com",
+  ".gcp.databricks.com",
+] as const;
+
+/**
+ * Whether a URL is a Databricks workspace origin we may attach a token to.
+ *
+ * This is an egress restriction, not a formatting check, and it exists because
+ * of what `get()` does one line later: the decrypted workspace token goes out
+ * as `Authorization: Bearer` to whatever host this string names. A plain
+ * `z.string().url()` accepts `https://attacker.example.com`, and `ssrfSafeFetch`
+ * will happily reach it — that helper rejects PRIVATE destinations, which is a
+ * different threat and no defence against an attacker-owned public host.
+ *
+ * The reachable path needs no knowledge of the secret: the source's config is
+ * readable, the credential travels in it as an opaque encrypted envelope, and
+ * re-encryption is deliberately idempotent. So a principal who can edit a
+ * source could hand the envelope back unchanged with a different
+ * `workspaceUrl`, and the next scheduled run would decrypt a token they never
+ * saw and post it to their host.
+ *
+ * Enforced on the write path (`assertPullDestinationAllowed`) rather than in
+ * the schema below, so the rejection reaches whoever is making the change —
+ * and so the adapter can still be pointed at a local fixture by its tests.
+ */
+export function isDatabricksWorkspaceOrigin(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  // Plain http would put the token on the wire in clear even for a real
+  // workspace, and credentials in the URL are never part of a legitimate one.
+  if (url.protocol !== "https:") return false;
+  if (url.username !== "" || url.password !== "") return false;
+  const host = url.hostname.toLowerCase();
+  return DATABRICKS_WORKSPACE_HOST_SUFFIXES.some((suffix) =>
+    host.endsWith(suffix),
+  );
+}
+
 export const databricksGeniePullConfigSchema = z.object({
   adapter: z.literal(DATABRICKS_GENIE_ADAPTER_ID),
   /** Workspace base URL, e.g. `https://adb-1234567890.4.azuredatabricks.net`. */
