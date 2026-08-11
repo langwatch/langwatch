@@ -45,6 +45,12 @@ const PATCH = {
   spans: [{ spanId: "kept", name: "renamed" }],
 };
 
+/** The same correction, on a span it renames before removing it. */
+const RENAMED_THEN_REMOVED = {
+  deletedSpanIds: ["removed"],
+  spans: [{ spanId: "removed", name: "renamed" }],
+};
+
 beforeEach(() => {
   harness.overlayView = "edited";
   harness.isEditing = false;
@@ -72,6 +78,26 @@ describe("given a correction that removes a span", () => {
       const { result } = renderHook(() => useCorrectionMarks(SPANS));
 
       expect(result.current.deletedByCorrectionSpanIds.size).toBe(0);
+    });
+
+    /** @scenario "A deleted span reads plainly in the captured trace" */
+    it("does not colour the removed span as changed, since no value changed", () => {
+      harness.overlayView = "original";
+
+      const { result } = renderHook(() => useCorrectionMarks(SPANS));
+
+      expect(result.current.correctedSpanIds.has("removed")).toBe(false);
+      expect(result.current.correctedSpanIds.has("kept")).toBe(true);
+    });
+
+    /** @scenario "A span the correction both changes and deletes still reads as changed" */
+    it("colours a span it renamed before removing", () => {
+      harness.overlayView = "original";
+      harness.patch = RENAMED_THEN_REMOVED;
+
+      const { result } = renderHook(() => useCorrectionMarks(SPANS));
+
+      expect(result.current.correctedSpanIds.has("removed")).toBe(true);
     });
   });
 

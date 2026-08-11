@@ -271,20 +271,6 @@ export function applyOverlayToTraceHeader({
   return changed ? next : header;
 }
 
-/** True when the correction changes or removes this span. Drives the changed
- *  highlight on rows and fields. */
-export function overlayTouchesSpan({
-  patch,
-  spanId,
-}: {
-  patch: TraceEditOverlayPatch | null | undefined;
-  spanId: string;
-}): boolean {
-  if (!patch) return false;
-  if (patch.deletedSpanIds.includes(spanId)) return true;
-  return changedSpanFields({ patch, spanId }).length > 0;
-}
-
 /** The span fields this correction replaces, in presentation order. */
 export function changedSpanFields({
   patch,

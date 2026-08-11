@@ -686,13 +686,22 @@ Feature: Editing a trace in the drawer
 
     # The captured trace is the trace as it arrived. Nothing the correction did
     # belongs on it, so a span the correction removes reads there exactly like
-    # every span the correction never touched.
+    # every span the correction never touched. The changed colour is not a
+    # milder way to say it: it promises a replaced value the reader can go and
+    # compare, and a removal replaces nothing.
     @integration
     Scenario: A deleted span reads plainly in the captured trace
       Given the trace has a correction that deletes a span
       When I switch to the captured trace
       Then that span is listed with no deleted marker
       And its name is not struck through
+      And it does not carry the changed colour either
+
+    @integration
+    Scenario: A span the correction both changes and deletes still reads as changed
+      Given the trace has a correction that renames a span and then deletes it
+      When I switch to the captured trace
+      Then that span carries the changed colour
 
     # Removal is the whole of the change, and the deleted marker says it. The
     # changed colour on the same row argues with it.

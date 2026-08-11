@@ -135,6 +135,18 @@ Feature: Span field mapping when adding traces to a dataset
     Then no expansion is enabled
     And it stays off
 
+  # A switch is a control of its own, wherever the drawer places it. A field
+  # describes one control and hands that control its id, so a field wrapped
+  # around the mapping and the preview together gave every switch and every
+  # preview checkbox the same id, and a click on one went wherever that id
+  # resolved first, which was usually nowhere the reader aimed.
+  @integration
+  Scenario: An expansion switch answers to its own label in the drawer
+    Given the Add to Dataset drawer with the mapping and the preview side by side
+    When I click the words beside an expansion switch
+    Then that expansion is on
+    And no other switch and no preview checkbox moved
+
   # A dataset row per trace is what a reader asks for when they add traces to a
   # dataset; one row per span is a normalisation they opt into.
   @integration

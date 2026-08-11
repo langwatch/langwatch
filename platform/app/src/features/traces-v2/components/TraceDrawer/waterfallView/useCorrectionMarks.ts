@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { expandDeletedSpanIds } from "~/server/traces/edit-overlay/applyTraceEditOverlay";
-import { overlayTouchesSpan } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
+import { changedSpanFields } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import { useTraceEditOverlay } from "../../../hooks/useTraceEditOverlay";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { useTraceEditStore } from "../../../stores/traceEditStore";
@@ -21,6 +21,10 @@ const NO_MARKS = {
  * carries no marks about removal at all. While the correction is being written
  * the editing marks already say what is going away, so there is nothing left
  * to mark.
+ *
+ * The changed set is the rows whose values the correction replaces, and only
+ * those: it promises a captured value the reader can go and compare, which a
+ * removal has none of.
  */
 export function useCorrectionMarks(spans: SpanTreeNode[]): {
   correctedSpanIds: Set<string>;
@@ -43,7 +47,7 @@ export function useCorrectionMarks(spans: SpanTreeNode[]): {
     const correctedSpanIds = new Set(
       spans
         .map((span) => span.spanId)
-        .filter((spanId) => overlayTouchesSpan({ patch, spanId })),
+        .filter((spanId) => changedSpanFields({ patch, spanId }).length > 0),
     );
     const deletedByCorrectionSpanIds =
       !isEditing && overlayView === "edited"
