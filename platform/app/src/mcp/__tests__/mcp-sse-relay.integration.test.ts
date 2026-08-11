@@ -257,12 +257,31 @@ describe("Feature: MCP SSE transport across replicas", () => {
     return [server, `http://127.0.0.1:${port}`];
   }
 
+  /**
+   * Session records outlive the process that wrote them, so an interrupted
+   * run can leave this key's session set full and make the next run's very
+   * first connection hit the per-project limit.
+   */
+  async function clearRecordedSessions(apiKey: string): Promise<void> {
+    const setKey = `${SSE_SESSION_SET_PREFIX}${createHash("sha256")
+      .update(apiKey)
+      .digest("hex")
+      .slice(0, 16)}`;
+    const members = await redis!.smembers(setKey);
+    for (const id of members) {
+      await redis!.del(`${SSE_SESSION_PREFIX}${id}`);
+    }
+    await redis!.del(setKey);
+  }
+
   beforeAll(async () => {
     if (!redis) {
       throw new Error(
         "These tests need a real Redis — set REDIS_URL / LANGWATCH_TEST_REDIS_URL",
       );
     }
+    await clearRecordedSessions(VALID_API_KEY);
+    await clearRecordedSessions(OTHER_API_KEY);
 
     handlerA = createMcpHandler();
     handlerB = createMcpHandler();
@@ -275,6 +294,8 @@ describe("Feature: MCP SSE transport across replicas", () => {
     handlerB.closeAllSessions();
     await new Promise<void>((resolve) => replicaA.close(() => resolve()));
     await new Promise<void>((resolve) => replicaB.close(() => resolve()));
+    await clearRecordedSessions(VALID_API_KEY);
+    await clearRecordedSessions(OTHER_API_KEY);
   });
 
   describe("given a client opened an SSE connection against one replica", () => {
