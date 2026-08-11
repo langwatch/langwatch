@@ -420,6 +420,12 @@ async function recordInstallAudit({
 // A schema rather than a bare type, so an action GitHub adds later is REJECTED
 // here and acked by the guard below, instead of being cast to this union and
 // reaching a dispatcher that has no default case to catch it.
+/** The envelope both installation events share, parsed before any field read. */
+const installationEnvelopeSchema = z.object({
+  action: z.unknown().optional(),
+  installation: z.object({ id: z.number().optional() }).nullish(),
+});
+
 const webhookActionSchema = z.enum([
   "created",
   "deleted",
@@ -504,13 +510,13 @@ async function handleWebhook(c: any): Promise<Response> {
     return c.json({ received: true });
   }
 
-  const installationEvent = payload as {
-    action?: string;
-    installation?: { id?: number };
-  };
-  const action = webhookActionSchema.safeParse(installationEvent.action).data;
+  // Parsed rather than asserted: an assertion is erased at runtime, so a
+  // delivery whose body is a valid JSON `null` threw on property access and
+  // answered 500 instead of reaching the acknowledgment below.
+  const installationEvent = installationEnvelopeSchema.safeParse(payload).data;
+  const action = webhookActionSchema.safeParse(installationEvent?.action).data;
   const installationId =
-    installationEvent.installation?.id != null
+    installationEvent?.installation?.id != null
       ? String(installationEvent.installation.id)
       : null;
 
