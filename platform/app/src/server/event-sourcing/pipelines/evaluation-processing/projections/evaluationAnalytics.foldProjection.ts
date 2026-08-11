@@ -90,9 +90,14 @@ const evaluationAnalyticsEvents = [
  *  read-back path uses it as the discriminator: a row carrying an OLDER version
  *  predates those columns, so its nulls cannot be told apart from a genuinely
  *  unstarted evaluation and it is treated as a store miss (see
- *  `EvaluationAnalyticsStore.getWithApplied`). */
+ *  `EvaluationAnalyticsStore.getWithApplied`).
+ *
+ *  2026-08-11 — Passed/Score are now gated on `status === "processed"`: a
+ *  verdict attached to an errored/skipped run folds to NULL instead of being
+ *  persisted as a real pass/fail. A row at the older version may carry an
+ *  ungated verdict, so it must not be decoded as current state. */
 export const EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST =
-  "2026-07-27" as const;
+  "2026-08-11" as const;
 
 /**
  * How far an evaluation's OccurredAt (the partition column) may sit from the
@@ -378,6 +383,29 @@ const EVALUATION_STATUS_VALUES: ReadonlySet<EvaluationAnalyticsData["status"]> =
   new Set(["scheduled", "in_progress", "processed", "error", "skipped"]);
 
 /**
+ * A verdict (passed/score) is only real when the evaluator actually ran to
+ * completion. Producers may attach `passed: false` alongside `status: "error"`
+ * (the SDKs expose them as independent params), and an errored run's verdict
+ * must not reach analytics as a real fail — it poisons pass-rate charts and
+ * fires "evaluation failed" triggers on provider timeouts. Gate once here, at
+ * the fold, so every downstream reader of the slim row inherits the guard.
+ */
+function verdictPassedOf(data: {
+  status: "processed" | "error" | "skipped";
+  passed?: boolean | null;
+}): boolean | null {
+  return data.status === "processed" ? (data.passed ?? null) : null;
+}
+
+function verdictScoreOf(data: {
+  status: "processed" | "error" | "skipped";
+  score?: number | null;
+}): number | null {
+  if (data.status !== "processed") return null;
+  return typeof data.score === "number" ? data.score : null;
+}
+
+/**
  * Merge a passthrough event metadata bag into the slim attributes map.
  * Keys arrive as `Record<string, unknown>` so we coerce to string for the
  * CH `Map(String, String)` shape. Anything non-stringifiable is dropped.
@@ -551,8 +579,8 @@ export class EvaluationAnalyticsFoldProjection
       ...state,
       evaluationId: state.evaluationId || event.data.evaluationId,
       status: event.data.status,
-      score: typeof event.data.score === "number" ? event.data.score : null,
-      passed: event.data.passed ?? null,
+      score: verdictScoreOf(event.data),
+      passed: verdictPassedOf(event.data),
       label: event.data.label ?? null,
       completedAt: event.occurredAt,
       costId: event.data.costId ?? null,
@@ -573,8 +601,8 @@ export class EvaluationAnalyticsFoldProjection
       traceId: event.data.traceId ?? null,
       isGuardrail: event.data.isGuardrail ?? false,
       status: event.data.status,
-      score: typeof event.data.score === "number" ? event.data.score : null,
-      passed: event.data.passed ?? null,
+      score: verdictScoreOf(event.data),
+      passed: verdictPassedOf(event.data),
       label: event.data.label ?? null,
       startedAt: event.occurredAt,
       completedAt: event.occurredAt,
