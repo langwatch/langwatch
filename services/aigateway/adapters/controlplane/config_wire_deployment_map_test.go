@@ -21,7 +21,7 @@ import (
 // The dispatch-side consequence lives in
 // services/aigateway/adapters/providers/azure_deployment_selfmap_test.go.
 //
-// Spec: specs/ai-gateway/azure-deployment-map-control-plane-path.feature
+// @scenario "A configured deployment_map reaches the provider verbatim"
 func TestProviderSlotToCredential_DeploymentMap(t *testing.T) {
 	cases := []struct {
 		name string
@@ -96,7 +96,7 @@ func TestProviderSlotToCredential_DeploymentMap(t *testing.T) {
 // and an empty one are indistinguishable downstream, so a fix that only handles
 // one of them fixes half the fleet.
 //
-// Spec: specs/ai-gateway/azure-deployment-map-control-plane-path.feature
+// @scenario "An empty deployment_map is treated the same as an absent one"
 func TestProviderSlotToCredential_AbsentAndEmptyDeploymentMapAreIndistinguishable(t *testing.T) {
 	decode := func(t *testing.T, wire string) domain.Credential {
 		t.Helper()

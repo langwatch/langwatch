@@ -40,7 +40,10 @@ Feature: Azure deployment resolution on the control-plane / virtual-key dispatch
     When the credential for that slot is built
     Then it carries the same deployments map as a slot with no deployment_map field
 
-  @integration
+  # Not enforced: this asserts a property of the pre-fix tree, which no test
+  # living in the post-fix tree can hold. Discharged as red-before-green
+  # evidence on the pull request instead.
+  @integration @unimplemented
   Scenario: The dispatch fails on a tree without the fix
     Given the deployment self-map is not applied on the control-plane path
     When a chat completion for the Azure model is dispatched through the virtual-key path
@@ -139,13 +142,21 @@ Feature: Azure deployment resolution on the control-plane / virtual-key dispatch
     When its non-test deployment self-map call sites are enumerated
     Then there is exactly one
 
-  @integration
+  # Not enforced: untrue as written on this tree. deploymentMapModelIDs in
+  # adapters/providers/models_discovery.go reads a credential's deployment map
+  # on the ListModels path, and that credential is not produced by the
+  # chokepoint. Left unasserted rather than weakened to whatever passes; the
+  # gap is reported with this change.
+  @integration @unimplemented
   Scenario: Every consumer of a deployment map is fed by that chokepoint
     Given the non-test code paths that read a credential's deployment map, including the Bedrock VPCE lane that bypasses key construction
     When each is traced back to the credential it consumes
     Then each one receives a credential produced by the single chokepoint
 
-  @unit
+  # Not enforced: the claim is that a mutated tree fails to compile, which a
+  # test compiled as part of that tree cannot make. The chokepoint's call-site
+  # count is the enforceable half and is held by AC12.
+  @unit @unimplemented
   Scenario: A dispatch path that omits the requested model does not build
     Given a dispatch call site with the requested-model argument removed
     When the aigateway service is compiled
@@ -216,7 +227,10 @@ Feature: Azure deployment resolution on the control-plane / virtual-key dispatch
     When the client receives the error response
     Then the response body still contains the underlying provider message
 
-  @integration
+  # Not enforced here: two of the four surfaces are the generated cross-language
+  # codes and the control-plane TypeScript app, neither reachable from a Go
+  # test. The repository's own codegen and typecheck gates hold them.
+  @integration @unimplemented
   Scenario: A newly introduced error code moves with all of its coupled surfaces
     Given the fix introduces a new domain error code
     When the change is complete
@@ -227,7 +241,10 @@ Feature: Azure deployment resolution on the control-plane / virtual-key dispatch
 
   # --- H. Regression surface ---
 
-  @integration
+  # Not enforced: "deep-equal to the credential produced before the change"
+  # compares two trees, and "no assertion was edited" is a property of the
+  # diff. Both are review-time checks, not runtime ones.
+  @integration @unimplemented
   Scenario: The existing nlpgo dispatch paths produce unchanged credentials
     Given the three existing non-test self-map call sites in the nlpgo service
     When a fixed Azure input and a fixed Bedrock input are run through each
@@ -240,7 +257,9 @@ Feature: Azure deployment resolution on the control-plane / virtual-key dispatch
     When the self-map is applied to it
     Then the caller's original map is unchanged
 
-  @integration
+  # Not enforced: this is the build, vet and test gate itself. A test asserting
+  # it would be asserting its own run.
+  @integration @unimplemented
   Scenario: The repository builds, vets and tests clean
     Given the change is applied
     When the build, vet and test suites for the aigateway and nlpgo services are run
@@ -248,7 +267,9 @@ Feature: Azure deployment resolution on the control-plane / virtual-key dispatch
 
   # --- I. Rollback / deploy coupling ---
 
-  @integration
+  # Not enforced: a property of the revert and of the deploy, not of the code
+  # at any single commit.
+  @integration @unimplemented
   Scenario: The change is revertible as a plain code revert
     Given the change introduces no data or schema migration
     When a revert is required
@@ -284,3 +305,10 @@ Feature: Azure deployment resolution on the control-plane / virtual-key dispatch
 # AC25: "Plain code revert; Go + generated TS land and revert together" -> Scenario: The change is revertible as a plain code revert
 #
 # Count: 26 AC items (AC1-AC25 plus AC18b) -> 26 scenarios. No AC unmapped.
+#
+# Enforcement: 19 scenarios are bound to Go tests. 7 carry @unimplemented, each
+# with its reason stated inline above the scenario -- AC3 (asserts the pre-fix
+# tree), AC13 (untrue on this tree: a discovery-path consumer bypasses the
+# chokepoint), AC14 (a negative compile), AC21 (codegen and TypeScript
+# surfaces), AC22 (compares two trees), AC24 (the test gate itself), AC25
+# (revert and deploy coupling).

@@ -101,7 +101,8 @@ func azureChatRequest(model string) *http.Request {
 // 502 is asserted concretely: if the fix registers its chosen code at a
 // different status, this test is where that decision has to be made explicit.
 //
-// @scenario "A status-less configuration error is not reported as a timeout"
+// @scenario "A configuration error carrying no status code is not classified as a timeout"
+// @scenario "The operator can identify the cause from the response alone"
 func TestAzureLane_ConfigurationErrorIsNotSurfacedAsATimeout(t *testing.T) {
 	router := azureLaneRouter(t, domain.Credential{
 		ID:         "cred-azure",
@@ -130,7 +131,7 @@ func TestAzureLane_ConfigurationErrorIsNotSurfacedAsATimeout(t *testing.T) {
 // The second credential is fully working, so "it was never dialed" can only be
 // explained by the chain not being walked.
 //
-// @scenario "A configuration failure does not walk the credential fallback chain"
+// @scenario "A permanent configuration error is not retried"
 func TestAzureLane_ConfigurationErrorDoesNotWalkTheFallbackChain(t *testing.T) {
 	healthy := newCountingUpstream(t, "gpt-5.3-mini")
 
@@ -164,7 +165,7 @@ func TestAzureLane_ConfigurationErrorDoesNotWalkTheFallbackChain(t *testing.T) {
 // (which package boundaries keep separate — providers cannot import httpapi,
 // and the registry is only populated here).
 //
-// Spec: specs/ai-gateway/azure-deployment-map-control-plane-path.feature
+// @scenario "Errors carrying an explicit status keep their current classification"
 func TestRegisterErrorStatuses_ProviderCodeBaseline(t *testing.T) {
 	registerErrorStatuses()
 

@@ -1,6 +1,9 @@
 package domain
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -22,7 +25,7 @@ import (
 
 // AC12: exactly one non-test call site inside services/aigateway.
 //
-// @scenario "The self-map helper has a single call site in the gateway"
+// @scenario "Credential construction passes through exactly one deployment chokepoint"
 func TestWithDeploymentSelfMap_HasExactlyOneCallSiteInTheGateway(t *testing.T) {
 	// go test runs with the package directory as cwd, so this is
 	// services/aigateway.
@@ -70,9 +73,11 @@ func TestWithDeploymentSelfMap_HasExactlyOneCallSiteInTheGateway(t *testing.T) {
 
 // AC10: the chokepoint must leave providers that do not route on deployment
 // exactly as it found them — a nil map stays nil, so nothing downstream can
-// mistake them for deployment-routed providers.
+// mistake them for deployment-routed providers. The scenario's other half, that
+// no Azure key configuration is fabricated for them, is held one layer out in
+// adapters/providers/azure_deployment_selfmap_test.go.
 //
-// Spec: specs/ai-gateway/azure-deployment-map-control-plane-path.feature
+// @scenario "Providers without deployments are left untouched"
 func TestWithDeploymentSelfMap_NonMappedProvidersAreUntouched(t *testing.T) {
 	for _, providerID := range []ProviderID{
 		ProviderOpenAI,
@@ -89,4 +94,35 @@ func TestWithDeploymentSelfMap_NonMappedProvidersAreUntouched(t *testing.T) {
 			assert.Equal(t, cred, got)
 		})
 	}
+}
+
+// AC15: the doc comment claimed "Every dispatch path shares this" and then
+// enumerated the entry points that did — an enumeration the control-plane path
+// was missing from. An engineer checking whether their path was covered got a
+// wrong answer out of the prose, which is how this defect reached a third
+// dispatch path. The prose is therefore part of the fix, and pinned like any
+// other behavior.
+//
+// @scenario "The self-map helper's documented invariant is true after the fix"
+func TestWithDeploymentSelfMap_DocCommentNamesTheControlPlanePath(t *testing.T) {
+	// go test runs with the package directory as cwd, so the helper's own
+	// source file sits next to this one.
+	parsed, err := parser.ParseFile(token.NewFileSet(), "provider.go", nil, parser.ParseComments)
+	require.NoError(t, err)
+
+	var doc string
+	for _, decl := range parsed.Decls {
+		fn, isFunc := decl.(*ast.FuncDecl)
+		if !isFunc || fn.Name.Name != "WithDeploymentSelfMap" || fn.Doc == nil {
+			continue
+		}
+		doc = fn.Doc.Text()
+		break
+	}
+	require.NotEmpty(t, doc, "the helper needs a doc comment before it can be correct")
+
+	assert.NotContains(t, doc, "Every dispatch path shares this",
+		"the claim was untrue when written: the control-plane path did not share the helper")
+	assert.Contains(t, doc, "control-plane",
+		"the doc must name the path this change added, or the next reader re-runs the same audit")
 }

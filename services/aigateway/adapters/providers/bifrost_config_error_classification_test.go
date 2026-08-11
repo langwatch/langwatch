@@ -36,9 +36,12 @@ func codeOf(t *testing.T, err error) herr.Code {
 
 // AC16 / AC18b: no status-less Bifrost error is a timeout. None of these
 // shapes involves a network round trip, so labeling them provider_timeout is
-// wrong on its face — and it is what the switch does today for all three.
+// wrong on its face — and it is what the switch does today for all three. The
+// 502 half of AC16 is client-facing and lives in
+// adapters/httpapi/azure_config_error_status_test.go.
 //
-// @scenario "A status-less configuration error is not reported as a timeout"
+// @scenario "A configuration error carrying no status code is not classified as a timeout"
+// @scenario "The remaining status-less error shapes are classified deliberately"
 func TestClassifyBifrostError_StatuslessShapesAreNotTimeouts(t *testing.T) {
 	cases := []struct {
 		name string
@@ -82,9 +85,12 @@ func TestClassifyBifrostError_StatuslessShapesAreNotTimeouts(t *testing.T) {
 }
 
 // AC20: whatever code the configuration failure lands on, the operator must be
-// able to read the cause off the error alone.
+// able to read the cause off the error alone. This is the mechanism half —
+// classification must not drop the vendor's message. That the message then
+// reaches the client's response body is asserted end to end in
+// adapters/httpapi/azure_config_error_status_test.go.
 //
-// Spec: specs/ai-gateway/azure-deployment-map-control-plane-path.feature
+// @scenario "The operator can identify the cause from the response alone"
 func TestClassifyBifrostError_KeepsTheUnderlyingBifrostMessage(t *testing.T) {
 	err := classifyBifrostError(context.Background(),
 		bfproviderutils.NewConfigurationError("deployments not set", bfschemas.Azure))
@@ -99,7 +105,7 @@ func TestClassifyBifrostError_KeepsTheUnderlyingBifrostMessage(t *testing.T) {
 // 504 and Error.Type RequestTimedOut explicitly, which is why status 0 can be
 // taken off the timeout branch without losing real timeouts.
 //
-// @scenario "A genuine provider timeout is still reported as a timeout"
+// @scenario "A genuine provider timeout still classifies as a timeout"
 func TestClassifyBifrostError_VendorTimeoutStaysATimeout(t *testing.T) {
 	berr := bfproviderutils.NewBifrostTimeoutError("request timed out", errors.New("context deadline exceeded"), bfschemas.Azure)
 	require.NotNil(t, berr.StatusCode, "fixture precondition: a real timeout carries an explicit status")
@@ -113,9 +119,11 @@ func TestClassifyBifrostError_VendorTimeoutStaysATimeout(t *testing.T) {
 // AC19: the status-bearing branches of the switch are the baseline this issue
 // does not touch. 408 is deliberately absent from the switch and therefore
 // falls through to provider_error; that is current behavior, pinned so a fix
-// to the status-0 branch cannot quietly reshuffle the rest.
+// to the status-0 branch cannot quietly reshuffle the rest. This half is
+// status -> domain code; the code -> HTTP status half is one package out, in
+// adapters/httpapi/azure_config_error_status_test.go.
 //
-// Spec: specs/ai-gateway/azure-deployment-map-control-plane-path.feature
+// @scenario "Errors carrying an explicit status keep their current classification"
 func TestClassifyBifrostError_StatusBaseline(t *testing.T) {
 	cases := []struct {
 		name   string

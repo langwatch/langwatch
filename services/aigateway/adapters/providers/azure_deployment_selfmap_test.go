@@ -90,9 +90,16 @@ func newTestBifrostRouter(t *testing.T) *BifrostRouter {
 // regression for Defect A. Every row is a credential the control plane can
 // actually produce; each must reach the upstream with a resolved deployment.
 //
-// @scenario "Azure slot with no wired deployment map dispatches successfully"
-// @scenario "Azure slot with an empty deployment map dispatches successfully"
-// @scenario "Deployment map key matches the dispatched model"
+// The rows are one table because they assert one property of one call — the
+// deployment the upstream was actually asked for — over the inputs that reach
+// it. Splitting them into a test per scenario would duplicate the fixture five
+// times to vary a struct field, so the scenarios are declared together here.
+//
+// @scenario "A slot with no deployment_map on the wire still resolves a deployment"
+// @scenario "The deployment-map key equals the model string placed on the provider request"
+// @scenario "A resolved model dispatches on its bare model id"
+// @scenario "An unresolved model keeps request model and map key identical"
+// @scenario "Deployment precedence is wire mapping, then explicit deployment, then the model id"
 func TestAzureDispatch_ResolvesDeploymentForControlPlaneCredential(t *testing.T) {
 	cases := []struct {
 		name string
@@ -222,12 +229,12 @@ func TestAzureDispatch_ResolvesDeploymentForControlPlaneCredential(t *testing.T)
 	}
 }
 
-// AC7's second half: dispatch must not mutate the credential's wired map. The
-// chokepoint copies on write (domain.WithDeploymentSelfMap), and a fix that
-// writes through the reference would corrupt the bundle cache shared by every
-// request on that virtual key.
+// AC23, and the second half of AC7: dispatch must not mutate the credential's
+// wired map. The chokepoint copies on write (domain.WithDeploymentSelfMap), and
+// a fix that writes through the reference would corrupt the bundle cache shared
+// by every request on that virtual key.
 //
-// Spec: specs/ai-gateway/azure-deployment-map-control-plane-path.feature
+// @scenario "The self-map never mutates the caller's map"
 func TestAzureDispatch_DoesNotMutateTheBundlesDeploymentMap(t *testing.T) {
 	stub := newAzureResourceStub(t, "gpt-4.1")
 	router := newTestBifrostRouter(t)
@@ -254,10 +261,11 @@ func TestAzureDispatch_DoesNotMutateTheBundlesDeploymentMap(t *testing.T) {
 		"the bundle's deployment map is shared across requests and must not be written through")
 }
 
-// AC10: providers that do not route on deployment keep a nil map and get no
-// deployment-bearing key config fabricated for them.
+// AC10, the "no Azure key configuration is fabricated" half. The other half,
+// that the credential's own map stays nil, is held at the chokepoint itself in
+// domain/deployment_self_map_chokepoint_test.go.
 //
-// Spec: specs/ai-gateway/azure-deployment-map-control-plane-path.feature
+// @scenario "Providers without deployments are left untouched"
 func TestCredentialToBifrostKey_NonMappedProvidersGetNoDeploymentConfig(t *testing.T) {
 	cases := []struct {
 		name     string
