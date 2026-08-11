@@ -23,7 +23,11 @@ export function RunHistorySparkline({ runs }: { runs: EvalRunHistoryEntry[] }) {
                 ? "green.solid"
                 : r.status === "fail"
                   ? "red.solid"
-                  : "yellow.solid"
+                  : r.status === "processed"
+                    ? // Neutral, matching EVALUATION_STATUS_COLORS.processed —
+                      // a verdict-less run is not a warning (#6835).
+                      "blue.solid"
+                    : "yellow.solid"
             }
           />
         ))}

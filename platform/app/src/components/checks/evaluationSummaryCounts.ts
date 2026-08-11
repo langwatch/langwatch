@@ -17,6 +17,8 @@ export interface EvaluationsTagSummary {
   done: boolean;
   /** Every evaluation was skipped — "nothing to evaluate", not a verdict. */
   allSkipped: boolean;
+  /** Every evaluation on the trace, whatever its state. */
+  total: number;
   /** Processed runs — the only ones that can carry a verdict. */
   verdictTotal: number;
   /** Processed runs that did not fail (includes score-only neutrals). */
@@ -25,6 +27,8 @@ export interface EvaluationsTagSummary {
   failed: number;
   /** Runs whose evaluator crashed — an infrastructure state, not a fail. */
   errored: number;
+  /** Runs that were skipped — neither passed nor failed. */
+  skipped: number;
 }
 
 export function summarizeEvaluationsTag(
@@ -47,9 +51,11 @@ export function summarizeEvaluationsTag(
   return {
     done,
     allSkipped,
+    total: evaluations.length,
     verdictTotal: processed.length,
     passes: processed.length - failed,
     failed,
     errored: evaluations.filter((check) => check.status === "error").length,
+    skipped: evaluations.filter((check) => check.status === "skipped").length,
   };
 }

@@ -481,7 +481,9 @@ export function MessageCard({
                       <CheckCircle />
                     )}
                     {!evalSummary.done
-                      ? `${evalSummary.passes}/${evalSummary.verdictTotal} evaluations`
+                      ? // Still running: the denominator is every evaluation
+                        // on the trace, so "0/3" reads as three in flight.
+                        `${evalSummary.passes}/${evalSummary.total} evaluations`
                       : evalSummary.allSkipped
                         ? "Evaluations skipped"
                         : evalSummary.failed > 0
@@ -498,7 +500,13 @@ export function MessageCard({
                                   ? "evaluation errored"
                                   : "evaluations errored"
                               }`
-                            : `${evalSummary.passes}/${evalSummary.verdictTotal} evaluations`}
+                            : // All good: count verdicts, and name skipped runs
+                              // so the tag reconciles with the popover list.
+                              `${evalSummary.passes}/${evalSummary.verdictTotal} evaluations${
+                                evalSummary.skipped > 0
+                                  ? `, ${evalSummary.skipped} skipped`
+                                  : ""
+                              }`}
                   </HStack>
                 </Tag.Label>
               </Tag.Root>

@@ -186,7 +186,7 @@ export function EvalCard({
         {eval_.runHistory && eval_.runHistory.length > 1 && (
           <RunHistorySparkline runs={eval_.runHistory} />
         )}
-        {!noVerdict && !categoryOnly && (
+        {!noVerdict && !categoryOnly && scoreLabel !== "" && (
           <HStack gap={0.5} align="baseline" flexShrink={0}>
             <Text
               textStyle="lg"

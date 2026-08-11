@@ -210,14 +210,12 @@ describe("given a processed evaluation with neither passed nor score", () => {
   };
 
   describe("when the card renders", () => {
-    /** @scenario A verdict-less processed run renders neutral */
     it("shows no PASS badge for a run that produced no verdict", () => {
       renderCard(verdictlessEval);
       expect(screen.queryByText("PASS")).not.toBeInTheDocument();
       expect(screen.getByText("PROCESSED")).toBeInTheDocument();
     });
 
-    /** @scenario A verdict-less processed run renders neutral */
     it("shows no fabricated 0.00 score", () => {
       renderCard(verdictlessEval);
       expect(screen.queryByText("0.00")).not.toBeInTheDocument();
@@ -236,7 +234,6 @@ describe("given a processed score-only evaluation (score, no pass/fail)", () => 
   });
 
   describe("when the card renders", () => {
-    /** @scenario A score-only run shows its score without a verdict badge */
     it("shows the real score with the neutral tag, not a PASS badge", () => {
       renderCard({
         name: "Relevance",

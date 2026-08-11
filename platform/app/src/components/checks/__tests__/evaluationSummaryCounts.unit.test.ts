@@ -42,6 +42,11 @@ describe("summarizeEvaluationsTag", () => {
       expect(summary.verdictTotal).toBe(1);
     });
 
+    it("still reports every run in total and counts the skipped one", () => {
+      expect(summary.total).toBe(2);
+      expect(summary.skipped).toBe(1);
+    });
+
     it("is not reported as all-skipped", () => {
       expect(summary.allSkipped).toBe(false);
     });
