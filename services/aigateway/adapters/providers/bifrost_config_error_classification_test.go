@@ -17,7 +17,7 @@ import (
 
 // classifyBifrostError is the only translation point for a Bifrost error that
 // carries no HTTP status, because no HTTP call was ever made. Its switch used
-// to treat status 0 as a gateway timeout, which mislabelled every
+// to treat status 0 as a gateway timeout, which mislabeled every
 // configuration rejection the vendor raises before dialing — a permanent,
 // operator-fixable fault that then read to the client as a transient upstream
 // timeout.
@@ -34,6 +34,25 @@ func codeOf(t *testing.T, err error) herr.Code {
 	var e herr.E
 	require.ErrorAs(t, err, &e, "expected a herr.E, got %T: %v", err, err)
 	return e.Code
+}
+
+// vendorEmptyResponseError returns the error core@v1.4.22 actually raises for
+// an empty upstream body, produced by the vendor's own exported parse path
+// rather than assembled here.
+//
+// Building it through HandleProviderResponse is what keeps the exclusion
+// honest: a hand-written literal using ErrProviderResponseEmpty would still
+// pass if the vendor stopped raising that constant at the empty-body site,
+// because the fixture and the code under test would agree with each other and
+// with nothing else.
+func vendorEmptyResponseError(t *testing.T) *bfschemas.BifrostError {
+	t.Helper()
+	var discard struct{}
+	_, _, berr := bfproviderutils.HandleProviderResponse([]byte("   "), &discard, nil, false, false)
+	require.NotNil(t, berr, "vendor precondition: an empty response body must raise an error")
+	require.Equal(t, bfschemas.ErrProviderResponseEmpty, berr.Error.Message,
+		"vendor precondition: the empty-body site still raises the exported constant")
+	return berr
 }
 
 // AC16 / AC18b: no status-less Bifrost error is a timeout, and each one lands
@@ -96,14 +115,17 @@ func TestClassifyBifrostError_StatuslessShapesAreNotTimeouts(t *testing.T) {
 			// rows are here so that is a stated contract rather than an
 			// accident nobody looked at.
 			//
-			// NewBifrostOperationError is called with a nil error at ~40 sites
+			// NewBifrostOperationError is called with a nil error at 171 sites
 			// in core@v1.4.22 (providers/utils/utils.go:1058 among them), which
 			// produces exactly the shape the row above does not have: no Go
 			// error, no code. It lands on misconfigured, and that is the right
 			// call for the wrong-sounding reason — the request is rejected
 			// permanently either way, so refusing to walk the chain is correct
 			// even though the code names the provider row rather than the
-			// request.
+			// request. An AST sweep of the pinned vendor confirms those sites
+			// are caller-input validation ("file_id is required", "invalid
+			// request: nil"); the transient ones among them sit on the video and
+			// batch paths this gateway never calls.
 			name: "operation error raised without a Go error",
 			berr: bfproviderutils.NewBifrostOperationError("request body is not provided", nil, bfschemas.Azure),
 			want: domain.ErrProviderMisconfigured,
@@ -120,6 +142,30 @@ func TestClassifyBifrostError_StatuslessShapesAreNotTimeouts(t *testing.T) {
 				Error:          &bfschemas.ErrorField{Message: "chats not provided for chat completion request"},
 			},
 			want: domain.ErrProviderMisconfigured,
+		},
+		{
+			// The transient shape the bare-shape sweep would otherwise call
+			// permanent, built by the vendor's own parse path. An empty
+			// upstream body is a dropped or truncated response, not a rejected
+			// provider row: it must stay retryable so the credential chain is
+			// still walked. Non-retryable here is the precise failure this
+			// whole change exists to prevent, pointed the other way.
+			name: "empty upstream response body (vendor parse path)",
+			berr: vendorEmptyResponseError(t),
+			want: domain.ErrProviderError,
+		},
+		{
+			// The same fault as raised by the provider adapters rather than the
+			// shared parse helper (openai.go:2566/3737, mistral.go:347/457,
+			// elevenlabs.go:587): a hand-built literal, no status, no Go error,
+			// no code. Pinned separately because it reaches the branch by a
+			// different route and must land on the same code.
+			name: "empty upstream response body (provider adapter literal)",
+			berr: &bfschemas.BifrostError{
+				IsBifrostError: true,
+				Error:          &bfschemas.ErrorField{Message: bfschemas.ErrProviderResponseEmpty},
+			},
+			want: domain.ErrProviderError,
 		},
 	}
 

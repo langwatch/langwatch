@@ -1572,7 +1572,7 @@ func forwardableUpstreamHeaders(in map[string]string) map[string]string {
 }
 
 // bifrostStatus reports the upstream HTTP status a Bifrost error carries,
-// normalising anything unusable to 0.
+// normalizing anything unusable to 0.
 //
 // Both readers of the status draw the "no upstream response" line, and they
 // have to draw it in the same place: errFromBifrost decides whether to forward
@@ -1637,15 +1637,39 @@ func classifyBifrostError(ctx context.Context, berr *bfschemas.BifrostError) err
 // and for NewBifrostOperationError call sites that pass a nil error. Those are
 // swept in deliberately: they are permanent for this request too, so refusing
 // to walk the chain is the right answer even though provider_misconfigured
-// names the wrong culprit. The direction that would be a defect is the
-// reverse — a transient fault landing here — and no status-less construction
-// in the vendor reaches this branch without a Go error or a code attached.
+// names the wrong culprit.
+//
+// The reverse direction — a transient fault landing in that bucket — is the
+// one this branch has to buy back explicitly, because the shape alone cannot
+// see it. An empty upstream response body is built as a bare Message-only
+// literal with no status, Go error, or code (providers/utils/utils.go:1277 and
+// five sibling sites), so a dropped or truncated response would otherwise be
+// classified permanent and stop the credential chain — the exact direction
+// this change exists to prevent. It is excluded by comparing against the
+// vendor's EXPORTED constant, not a string we type here: ErrProviderResponseEmpty
+// is a symbol, so a vendor rewording moves our code with it or fails the build,
+// which is what separates this from the message-substring matching the shape
+// test replaced.
+//
+// Known residual, deliberately not papered over: core raises "provider is
+// shutting down" through an UNEXPORTED helper (newBifrostErrorFromMsg) in
+// tryRequest/tryStreamRequest, in the same bare shape, and the gateway reaches
+// it because it calls RemoveProvider on anthropic-compat endpoint eviction. It
+// is transient and lands on misconfigured. There is no exported symbol to
+// compare against and no exported path to build it from, so pinning it would
+// mean hardcoding the literal in both the check and its test — a test that
+// cannot detect the drift it exists to catch. It stays mis-swept until the
+// vendor exports it; the blast radius is one request losing fallback during a
+// compat-endpoint eviction race, which self-heals on the next dispatch.
 //
 // bifrost_config_error_classification_test.go pins both buckets against the
 // vendor's own constructors, so a vendor bump that changes a shape fails there
 // rather than in production.
 func statuslessBifrostCode(berr *bfschemas.BifrostError) herr.Code {
 	if berr.Error != nil && berr.Error.Error == nil && berr.Error.Code == nil {
+		if berr.Error.Message == bfschemas.ErrProviderResponseEmpty {
+			return domain.ErrProviderError
+		}
 		return domain.ErrProviderMisconfigured
 	}
 	return domain.ErrProviderError
