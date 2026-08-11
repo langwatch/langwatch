@@ -16,21 +16,24 @@
  * Three things have to line up for a route to be published, and missing any one
  * of them produces the same silence:
  *
- *   1. the handler carries `describeRoute({...})` — `generateSpecs` skips a
- *      handler that has none, so the annotation is the precondition, not a
- *      nicety
+ *   1. the operation is described. `generateSpecs` skips a handler carrying no
+ *      `describeRoute({...})`, so the annotation is the precondition, not a
+ *      nicety. A `@langwatch/api` service writes no `describeRoute` of its own:
+ *      the framework emits one from the endpoint config, and only when the
+ *      config declares an `output` or a `description`
  *   2. the route's Hono app is imported by `src/tasks/generateOpenAPISpec.ts`
  *   3. its prefix is in that file's `APP_DERIVED_PREFIXES`, or the merge keeps
  *      whatever the JSON already said
  *
  * So the answer to "can we just generate the spec for everything?" is yes,
- * mechanically — annotate the handler and import its app — and the reason it
- * had not happened is that nothing made the omission visible. This gate does.
+ * mechanically (describe the operation, import its app), and the reason it had
+ * not happened is that nothing made the omission visible. This gate does.
  *
- * Every registered route is either in the document or in the `UNPUBLISHED` list
- * in `openapi-route-exclusions.ts` with a reason. The list is ratcheted: an
- * entry matching nothing is itself a failure, so it cannot outlive the routes
- * it was written for.
+ * Every registered route is either in the document, in the `UNPUBLISHED` list
+ * in `openapi-route-exclusions.ts` with a reason, or a `withdraw(...)`
+ * tombstone that answers 410 and has no handler to describe. The list is
+ * ratcheted: an entry matching nothing is itself a failure, so it cannot
+ * outlive the routes it was written for.
  *
  * Usage:
  *   pnpm check:openapi-route-coverage           # exit 1 on an unexplained gap
@@ -46,7 +49,9 @@ import {
   discoverTypeScriptFiles,
   HTTP_METHODS,
   honoPathToTemplate,
+  importsApiFramework,
   joinRoutePath,
+  serviceBasePathsOf,
 } from "./lib/hono-route-table";
 import { type Exclusion, UNPUBLISHED } from "./openapi-route-exclusions";
 
@@ -78,6 +83,32 @@ export interface RegisteredRoute {
   file: string;
   /** Whether the handler carries `describeRoute` — step 1 of publishing. */
   described: boolean;
+  /** Present when the route is a `withdraw(...)` 410 tombstone. */
+  withdrawn?: boolean;
+  /**
+   * Present when the file declares its service through `@langwatch/api`, where
+   * publishing an endpoint is a different instruction: the framework writes the
+   * `describeRoute` itself, from the endpoint config.
+   */
+  usesApiFramework?: boolean;
+}
+
+/**
+ * Every `/api` basePath a source declares, however it declares it.
+ *
+ * A `@langwatch/api` service names itself and lets the framework derive
+ * `/api/<name>`, so the string the gate matches on never appears in the file.
+ * Composing the two readings here rather than inside `apiBasePathsOf` keeps
+ * that function answering the narrower question the completeness gate asks it.
+ */
+function declaredApiBasePaths(source: string): string[] {
+  const declared = apiBasePathsOf(source);
+
+  for (const derived of serviceBasePathsOf(source)) {
+    if (!declared.includes(derived)) declared.push(derived);
+  }
+
+  return declared;
 }
 
 /**
@@ -101,11 +132,13 @@ function basePathsFor({
   file: string;
   source: string;
 }): string[] {
-  const declared = apiBasePathsOf(source);
+  const declared = declaredApiBasePaths(source);
   if (declared.length > 0) return declared;
 
   try {
-    return apiBasePathsOf(readFileSync(join(dirname(file), "app.ts"), "utf8"));
+    return declaredApiBasePaths(
+      readFileSync(join(dirname(file), "app.ts"), "utf8"),
+    );
   } catch {
     return [];
   }
@@ -122,32 +155,40 @@ function basePathsFor({
 export function collectRegisteredRoutes(
   roots: readonly string[],
 ): RegisteredRoute[] {
-  const routes: RegisteredRoute[] = [];
+  return discoverTypeScriptFiles(roots).flatMap((file) =>
+    routesRegisteredIn({ file, source: readFileSync(file, "utf8") }),
+  );
+}
 
-  for (const file of discoverTypeScriptFiles(roots)) {
-    const source = readFileSync(file, "utf8");
-    const basePaths = basePathsFor({ file, source });
-    if (basePaths.length === 0) continue;
+/** One file's registrations, keyed the way the document spells them. */
+function routesRegisteredIn({
+  file,
+  source,
+}: {
+  file: string;
+  source: string;
+}): RegisteredRoute[] {
+  const basePaths = basePathsFor({ file, source });
+  if (basePaths.length === 0) return [];
 
-    const relative = file.startsWith(`${LANGWATCH_ROOT}/`)
-      ? file.slice(LANGWATCH_ROOT.length + 1)
-      : file;
+  const relative = file.startsWith(`${LANGWATCH_ROOT}/`)
+    ? file.slice(LANGWATCH_ROOT.length + 1)
+    : file;
+  const framework = importsApiFramework(source)
+    ? { usesApiFramework: true as const }
+    : {};
 
-    for (const registration of collectRouteRegistrations(source)) {
-      for (const basePath of basePaths) {
-        const path = honoPathToTemplate(
-          joinRoutePath({ basePath, routePath: registration.path }),
-        );
-        routes.push({
-          key: `${registration.method.toUpperCase()} ${path}`,
-          file: relative,
-          described: registration.described,
-        });
-      }
-    }
-  }
-
-  return routes;
+  return collectRouteRegistrations(source).flatMap((registration) =>
+    basePaths.map((basePath) => ({
+      key: `${registration.method.toUpperCase()} ${honoPathToTemplate(
+        joinRoutePath({ basePath, routePath: registration.path }),
+      )}`,
+      file: relative,
+      described: registration.described,
+      ...(registration.withdrawn ? { withdrawn: true as const } : {}),
+      ...framework,
+    })),
+  );
 }
 
 /** Every `METHOD /path` the document describes. */
@@ -179,6 +220,19 @@ export function excludes({
 export interface CoverageResult {
   /** Registered, undocumented, and excused by nothing. */
   unexplained: RegisteredRoute[];
+  /**
+   * Registered, undocumented, and 410 Gone.
+   *
+   * A withdrawn endpoint is a tombstone: `@langwatch/api` keeps serving the
+   * path so an older client gets an answer instead of a 404, and there is no
+   * handler behind it for the generator to describe. It therefore cannot be
+   * published at all, which makes an UNPUBLISHED entry for it a written reason
+   * for something the route's own shape already says: such an entry excuses
+   * nothing and is reported stale. The bucket accounts for them instead, and
+   * stays visible so a tombstone that should have been deleted is not silently
+   * free.
+   */
+  withdrawn: RegisteredRoute[];
   /** Entries that excused no undocumented route, so they have to go. */
   stale: Exclusion[];
   documented: number;
@@ -196,15 +250,27 @@ export function auditCoverage({
 }): CoverageResult {
   const byKey = new Map<string, RegisteredRoute>();
   for (const route of routes) {
-    if (!byKey.has(route.key)) byKey.set(route.key, route);
+    // A key registered more than once resolves to its last registration, as a
+    // whole record. Versions are declared in order and the bare alias serves
+    // the last resolution of a path, so that registration is the one the
+    // document describes: an early version registers the route, a later one
+    // withdraws it or stops describing it, and both the withdrawal and the
+    // diagnostic have to read the later shape.
+    byKey.set(route.key, route);
   }
 
   const missing = [...byKey.values()].filter(
     (route) => !documented.has(route.key),
   );
 
+  // A tombstone is accounted for by its own shape, so it never counts as the
+  // route an UNPUBLISHED entry was written for. Letting it count would leave a
+  // redundant entry earning its keep off a route that can never be published,
+  // and the ratchet would stop being one.
+  const publishable = missing.filter((route) => route.withdrawn !== true);
+
   const used = new Set<Exclusion>();
-  const unexplained = missing.filter((route) => {
+  const unexcused = publishable.filter((route) => {
     const excusing = exclusions.filter((exclusion) =>
       excludes({ exclusion, key: route.key }),
     );
@@ -212,12 +278,36 @@ export function auditCoverage({
     return excusing.length === 0;
   });
 
+  const byKeyOrder = (a: RegisteredRoute, b: RegisteredRoute) =>
+    a.key.localeCompare(b.key);
+
   return {
-    unexplained: unexplained.sort((a, b) => a.key.localeCompare(b.key)),
+    unexplained: unexcused.sort(byKeyOrder),
+    withdrawn: missing
+      .filter((route) => route.withdrawn === true)
+      .sort(byKeyOrder),
     stale: exclusions.filter((exclusion) => !used.has(exclusion)),
     documented: byKey.size - missing.length,
     registered: byKey.size,
   };
+}
+
+/**
+ * Which publishing step a route skipped.
+ *
+ * A described route reaching this report has an app the generator never asks
+ * for a spec. An undescribed one is missing its annotation, and where that
+ * annotation goes depends on the family: a `@langwatch/api` service never
+ * writes `describeRoute` by hand, so telling its author there is none sends
+ * them looking for a call their family does not make.
+ */
+function publishingStepMissing(route: RegisteredRoute): string {
+  if (route.described) {
+    return "described, so its app is probably not imported by generateOpenAPISpec";
+  }
+  return route.usesApiFramework
+    ? "no output or description in its endpoint config, so the framework describes nothing for the generator to publish"
+    : "no describeRoute, so the generator skips it";
 }
 
 /** Why each route reached the report, and which publishing step it skipped. */
@@ -231,16 +321,16 @@ function formatUnexplained(routes: RegisteredRoute[]): string[] {
 
   for (const route of routes) {
     lines.push(`  ${route.key}`);
-    lines.push(
-      `    ${route.file}${route.described ? " (has describeRoute, so its app is probably not imported by generateOpenAPISpec)" : " (no describeRoute, so the generator skips it)"}`,
-    );
+    lines.push(`    ${route.file} (${publishingStepMissing(route)})`);
   }
 
   lines.push(
     "",
-    "Publish it: add describeRoute({...}) to the handler, import its app in",
-    "src/tasks/generateOpenAPISpec.ts, add its prefix to APP_DERIVED_PREFIXES,",
-    "then run `pnpm run task generateOpenAPISpec`.",
+    "Publish it: describe the operation (describeRoute({...}) on the handler,",
+    "or output/description in the endpoint config of an @langwatch/api",
+    "service), import its app in src/tasks/generateOpenAPISpec.ts, add its",
+    "prefix to APP_DERIVED_PREFIXES, then run `pnpm run task",
+    "generateOpenAPISpec`.",
     "",
     "Or record why it stays unpublished, in UNPUBLISHED in",
     "scripts/openapi-route-exclusions.ts.",
@@ -295,6 +385,7 @@ function main(): void {
           registered: result.registered,
           documented: result.documented,
           unexplained: result.unexplained,
+          withdrawn: result.withdrawn,
           staleExclusions: result.stale,
           ok: !failed,
         },
@@ -305,13 +396,23 @@ function main(): void {
     process.exit(failed ? 1 : 0);
   }
 
-  const gaps = UNPUBLISHED.filter((e) => e.category === "gap").length;
+  // Annotated because the list narrows to the categories it currently holds:
+  // with the last `gap` entry closed, an unannotated comparison against "gap"
+  // is a type error rather than the zero it should report.
+  const gaps = UNPUBLISHED.filter(
+    (entry: Exclusion) => entry.category === "gap",
+  ).length;
   console.log(
     `openapi route coverage: ${result.documented}/${result.registered} registered routes are in the document`,
   );
   console.log(
     `unpublished on purpose: ${UNPUBLISHED.length} entries (${gaps} of them recorded as gaps still worth closing)`,
   );
+  if (result.withdrawn.length > 0) {
+    console.log(
+      `withdrawn tombstones: ${result.withdrawn.length} route${result.withdrawn.length === 1 ? "" : "s"} answer 410 Gone, so nothing about them can reach the document`,
+    );
+  }
   console.log("");
 
   if (!failed) {

@@ -64,7 +64,7 @@ describe("RoleBindingService tenant references", () => {
 
     await expect(
       service.create({ ...bindingInput, userId: "foreign_user" }),
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    ).rejects.toMatchObject({ code: "user_not_in_organization" });
 
     expect(bindingCreate).not.toHaveBeenCalled();
   });
@@ -74,7 +74,7 @@ describe("RoleBindingService tenant references", () => {
 
     await expect(
       service.create({ ...bindingInput, groupId: "foreign_group" }),
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    ).rejects.toMatchObject({ code: "group_not_in_organization" });
 
     expect(bindingCreate).not.toHaveBeenCalled();
   });
@@ -89,7 +89,7 @@ describe("RoleBindingService tenant references", () => {
         bindingIdsToDelete: [],
         bindingsToCreate: [],
       }),
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    ).rejects.toMatchObject({ code: "user_not_in_organization" });
   });
 
   it("filters stale foreign principals from organization reads", async () => {

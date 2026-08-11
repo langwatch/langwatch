@@ -1,5 +1,7 @@
+import { HandledError } from "@langwatch/handled-error";
 import { TRPCError } from "@trpc/server";
 import { getApp } from "~/server/app-layer/app";
+import { remediation } from "~/server/app-layer/error-remediation";
 import type { PlanProviderUser } from "~/server/app-layer/subscription/plan-provider";
 
 type EnterpriseGateMiddlewareParams = {
@@ -16,7 +18,38 @@ export const ENTERPRISE_FEATURE_ERRORS = {
   ACTIVITY_MONITOR: "The activity monitor requires an Enterprise plan",
   INGESTION_SOURCES: "Ingestion sources require an Enterprise plan",
   OCSF_EXPORT: "OCSF compliance export requires an Enterprise plan",
+  MANAGEMENT_API: "The management API requires an Enterprise plan",
+  GROUPS: "Groups require an Enterprise plan",
 } as const;
+
+export type EnterpriseFeature = keyof typeof ENTERPRISE_FEATURE_ERRORS;
+
+/**
+ * The plan, not the request, is what refuses here, so the status is 402 and
+ * the code is stable, letting a caller distinguish "buy the plan" from "fix
+ * the request" (403/422) without reading prose.
+ *
+ * `meta.feature` names which capability was asked for, and the remediation
+ * channel (tips + docs link) rides on the error so CLI and API consumers get
+ * upgrade guidance without a UI. `fault` stays `customer`: the refusal is an
+ * account state the customer resolves, not a platform failure.
+ *
+ * REST-only by design: the tRPC surface keeps `requireEnterprisePlan` below,
+ * which answers FORBIDDEN with the same sentences.
+ */
+export class EnterprisePlanRequiredError extends HandledError {
+  declare readonly code: "enterprise_plan_required";
+
+  constructor(feature: EnterpriseFeature) {
+    super("enterprise_plan_required", ENTERPRISE_FEATURE_ERRORS[feature], {
+      httpStatus: 402,
+      meta: { feature },
+      fault: "customer",
+      ...remediation("enterprise_plan_required"),
+    });
+    this.name = "EnterprisePlanRequiredError";
+  }
+}
 
 export function isEnterpriseTier(planType: string): boolean {
   return planType === "ENTERPRISE";

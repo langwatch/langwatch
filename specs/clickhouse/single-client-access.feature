@@ -53,6 +53,21 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
     When the caller abandons the request
     Then the statement leaves the queue instead of occupying it until a slot frees
 
+  # The queue was bounded by depth but not by time, so a statement could wait
+  # for as long as everything ahead of it took and THEN still spend the driver's
+  # full request timeout on the wire. That is how a 46-second failure was
+  # assembled out of two limits, neither of which was 46 seconds. Refusing is
+  # not losing: overload classifies as transient, so a read retries and a job is
+  # re-staged.
+  @unit
+  Scenario: a statement that waits too long is refused, not left waiting
+    Given a statement is waiting for a slot
+    When no slot frees before the wait bound elapses
+    Then it is refused with an error that names overload as the cause
+    And the refusal is classified as recoverable, so the job is re-staged rather than dropped
+    And the statement already running is left alone
+    And the wait bound is shorter than the time one statement may spend on the wire
+
   @unit
   Scenario: ClickHouse is reached through a repository, from the application object
     Given a service needs data that lives in ClickHouse

@@ -3197,6 +3197,22 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--description <desc>", "Optional description")
       .option("--expires-at <date>", "Expiration date (ISO 8601)")
       .option("--project-id <id...>", "Project IDs to scope the key to (service keys only, repeatable)")
+      .option(
+        "--binding <binding...>",
+        "What the key may reach, as role:scopeType:scopeId (repeatable), for example ADMIN:PROJECT:project_abc",
+      )
+      .option(
+        "--permission <permission...>",
+        "Restricted keys only: a permission as resource:action (repeatable)",
+      )
+      .option(
+        "--permission-mode <mode>",
+        "How the bindings are read: all, readonly or restricted",
+      )
+      .option(
+        "--assigned-to-user-id <userId>",
+        "Organization admins only: the member the key acts as, and is capped by",
+      )
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (options: {
       name: string;
@@ -3204,9 +3220,58 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       description?: string;
       expiresAt?: string;
       projectId?: string[];
+      binding?: string[];
+      permission?: string[];
+      permissionMode?: string;
+      assignedToUserId?: string;
     }) => {
       const { createApiKeyCommand: impl } = await import("./commands/api-keys/create.js");
       return impl(options);
+    },
+  );
+
+  emitsResult(
+    apiKeysCmd
+      .command("get <id>")
+      .description("Get an API key and the access it carries")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { getApiKeyCommand: impl } = await import("./commands/api-keys/get.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    apiKeysCmd
+      .command("update <id>")
+      .description("Update an API key's name, description or access")
+      .option("--name <name>", "New name for the key")
+      .option("--description <desc>", "New description")
+      .option(
+        "--binding <binding...>",
+        "Replace the key's bindings with exactly these, as role:scopeType:scopeId (repeatable)",
+      )
+      .option(
+        "--permission <permission...>",
+        "Restricted keys only: a permission as resource:action (repeatable)",
+      )
+      .option(
+        "--permission-mode <mode>",
+        "How the bindings are read: all, readonly or restricted",
+      )
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (
+      id: string,
+      options: {
+        name?: string;
+        description?: string;
+        binding?: string[];
+        permission?: string[];
+        permissionMode?: string;
+      },
+    ) => {
+      const { updateApiKeyCommand: impl } = await import("./commands/api-keys/update.js");
+      return impl({ id, options });
     },
   );
 
@@ -3218,6 +3283,729 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     async (id: string) => {
       const { revokeApiKeyCommand: impl } = await import("./commands/api-keys/revoke.js");
       return impl(id);
+    },
+  );
+
+  // ── Organization management ────────────────────────────────────────────────
+  // The families that provision an organization: the organization itself, its
+  // members and invites, teams, groups, custom roles, role bindings, SCIM
+  // tokens, and (self-hosted) the organizations on the instance. All of them
+  // take an organization API key and are available on Enterprise plans, except
+  // `organizations`, which provisions the organization an API key would belong
+  // to and so authenticates against the instance instead.
+
+  const organizationCmd = program
+    .command("organization")
+    .description("Read and update the organization profile");
+
+  emitsResult(
+    organizationCmd
+      .command("get")
+      .description("Get the organization the credential belongs to")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async () => {
+      const { getOrganizationCommand: impl } = await import("./commands/organization/get.js");
+      return impl();
+    },
+  );
+
+  emitsResult(
+    organizationCmd
+      .command("update")
+      .description("Update the organization profile")
+      .option("--name <name>", "New organization name")
+      .option("--support-contact <contact>", "Support contact shown to members")
+      .option("--presence", "Turn presence indicators on")
+      .option("--no-presence", "Turn presence indicators off")
+      .option("--trace-sharing", "Allow sharing traces outside the organization")
+      .option("--no-trace-sharing", "Stop sharing traces outside the organization")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (options: {
+      name?: string;
+      supportContact?: string;
+      presence?: boolean;
+      traceSharing?: boolean;
+    }) => {
+      const { updateOrganizationCommand: impl } = await import("./commands/organization/update.js");
+      return impl({
+        ...(options.name !== undefined ? { name: options.name } : {}),
+        ...(options.supportContact !== undefined
+          ? { supportContact: options.supportContact }
+          : {}),
+        ...(options.presence !== undefined
+          ? { presenceEnabled: options.presence }
+          : {}),
+        ...(options.traceSharing !== undefined
+          ? { traceSharingEnabled: options.traceSharing }
+          : {}),
+      });
+    },
+  );
+
+  const membersCmd = program
+    .command("members")
+    .description("Manage the people in the organization");
+
+  emitsResult(
+    membersCmd
+      .command("list")
+      .description("List organization members with their role and status")
+      .option("--include-disabled", "Include members whose access is disabled")
+      .option("--offset <n>", "Skip this many members")
+      .option("--limit <n>", "Members per page (default 50, max 200)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { includeDisabled?: boolean; offset?: string; limit?: string }) => {
+      const { listMembersCommand: impl } = await import("./commands/members/list.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    membersCmd
+      .command("get <userId>")
+      .description("Get one member and the teams they reach")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (userId: string) => {
+      const { getMemberCommand: impl } = await import("./commands/members/get.js");
+      return impl(userId);
+    },
+  );
+
+  emitsResult(
+    membersCmd
+      .command("update <userId>")
+      .description("Change a member's organization role")
+      .requiredOption("--role <role>", "Organization role to set: ADMIN, MEMBER or EXTERNAL")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (userId: string, options: { role: string }) => {
+      const { updateMemberCommand: impl } = await import("./commands/members/update.js");
+      return impl({ userId, options });
+    },
+  );
+
+  emitsResult(
+    membersCmd
+      .command("disable <userId>")
+      .description("Disable a member's access without removing them")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (userId: string) => {
+      const { disableMemberCommand: impl } = await import("./commands/members/set-disabled.js");
+      return impl(userId);
+    },
+  );
+
+  emitsResult(
+    membersCmd
+      .command("enable <userId>")
+      .description("Re-enable a disabled member (consumes a seat)")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (userId: string) => {
+      const { enableMemberCommand: impl } = await import("./commands/members/set-disabled.js");
+      return impl(userId);
+    },
+  );
+
+  emitsResult(
+    membersCmd
+      .command("remove <userId>")
+      .description("Remove a member from the organization and its teams")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (userId: string) => {
+      const { removeMemberCommand: impl } = await import("./commands/members/remove.js");
+      return impl(userId);
+    },
+  );
+
+  emitsResult(
+    membersCmd
+      .command("access <userId>")
+      .description("Show everything a member can reach and where it comes from")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (userId: string) => {
+      const { memberAccessCommand: impl } = await import("./commands/members/access.js");
+      return impl(userId);
+    },
+  );
+
+  const invitesCmd = program
+    .command("invites")
+    .description("Invite people into the organization");
+
+  emitsResult(
+    invitesCmd
+      .command("list")
+      .description("List pending invites with their acceptance links")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { listInvitesCommand: impl } = await import("./commands/invites/list.js");
+      return impl();
+    },
+  );
+
+  emitsResult(
+    invitesCmd
+      .command("create")
+      .description("Create invites from flags or from a JSON batch")
+      .option("--email <email...>", "Email address to invite (repeatable)")
+      .option(
+        "--role <role...>",
+        "Organization role for the invited people: one for the batch, or one per email",
+      )
+      .option(
+        "--team <team...>",
+        "Team the invited people land on, as teamId:role (repeatable)",
+      )
+      .option("--json <json>", "JSON array of invites (inline)")
+      .option("--file <path>", "Read the JSON array of invites from a file")
+      .option("--stdin", "Read the JSON array of invites from standard input")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (options: {
+      email?: string[];
+      role?: string[];
+      team?: string[];
+      json?: string;
+      file?: string;
+      stdin?: boolean;
+    }) => {
+      const { stdin, ...rest } = options;
+      const { createInvitesCommand: impl } = await import("./commands/invites/create.js");
+      return impl({
+        ...rest,
+        ...(stdin !== undefined ? { readFromStdin: stdin } : {}),
+      });
+    },
+  );
+
+  emitsResult(
+    invitesCmd
+      .command("revoke <id>")
+      .description("Revoke a pending invite")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { revokeInviteCommand: impl } = await import("./commands/invites/revoke.js");
+      return impl(id);
+    },
+  );
+
+  const teamsCmd = program
+    .command("teams")
+    .description("Manage the teams that group projects and people");
+
+  emitsResult(
+    teamsCmd
+      .command("list")
+      .description("List the organization's teams")
+      .option("--page <n>", "Page number (default 1)")
+      .option("--limit <n>", "Teams per page (default 50)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { page?: string; limit?: string }) => {
+      const { listTeamsCommand: impl } = await import("./commands/teams/list.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    teamsCmd
+      .command("get <id>")
+      .description("Get a team by its id")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { getTeamCommand: impl } = await import("./commands/teams/get.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    teamsCmd
+      .command("create")
+      .description("Create a team")
+      .requiredOption("--name <name>", "Team name")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (options: { name: string }) => {
+      const { createTeamCommand: impl } = await import("./commands/teams/create.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    teamsCmd
+      .command("update <id>")
+      .description("Rename a team")
+      .requiredOption("--name <name>", "New team name")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string, options: { name: string }) => {
+      const { updateTeamCommand: impl } = await import("./commands/teams/update.js");
+      return impl({ id, name: options.name });
+    },
+  );
+
+  emitsResult(
+    teamsCmd
+      .command("archive <id>")
+      .description("Archive a team (soft-delete)")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { archiveTeamCommand: impl } = await import("./commands/teams/archive.js");
+      return impl(id);
+    },
+  );
+
+  const teamMembersCmd = teamsCmd
+    .command("members")
+    .description("Manage who belongs to a team");
+
+  emitsResult(
+    teamMembersCmd
+      .command("list <teamId>")
+      .description("List the members of a team")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (teamId: string) => {
+      const { listTeamMembersCommand: impl } = await import("./commands/teams/members.js");
+      return impl(teamId);
+    },
+  );
+
+  emitsResult(
+    teamMembersCmd
+      .command("add <teamId> <userId>")
+      .description("Add a member to a team")
+      .option("--role <role>", "Role the member gets on the team: ADMIN, MEMBER or VIEWER")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (teamId: string, userId: string, options: { role?: string }) => {
+      const { addTeamMemberCommand: impl } = await import("./commands/teams/members.js");
+      return impl({ teamId, userId, options });
+    },
+  );
+
+  emitsResult(
+    teamMembersCmd
+      .command("remove <teamId> <userId>")
+      .description("Remove a member from a team")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (teamId: string, userId: string) => {
+      const { removeTeamMemberCommand: impl } = await import("./commands/teams/members.js");
+      return impl({ teamId, userId });
+    },
+  );
+
+  const groupsCmd = program
+    .command("groups")
+    .description("Manage access groups and what they grant");
+
+  emitsResult(
+    groupsCmd
+      .command("list")
+      .description("List the organization's access groups")
+      .option("--page <n>", "Page number (default 1)")
+      .option("--limit <n>", "Groups per page (default 50)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { page?: string; limit?: string }) => {
+      const { listGroupsCommand: impl } = await import("./commands/groups/list.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    groupsCmd
+      .command("get <id>")
+      .description("Get a group with its members and bindings")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { getGroupCommand: impl } = await import("./commands/groups/get.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    groupsCmd
+      .command("create")
+      .description("Create an access group")
+      .requiredOption("--name <name>", "Group name")
+      .option(
+        "--binding <binding...>",
+        "What the group grants, as role:scopeType:scopeId (repeatable)",
+      )
+      .option("--member-id <userId...>", "Members to put in the group (repeatable)")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (options: { name: string; binding?: string[]; memberId?: string[] }) => {
+      const { createGroupCommand: impl } = await import("./commands/groups/create.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    groupsCmd
+      .command("rename <id>")
+      .description("Rename a group")
+      .requiredOption("--name <name>", "New group name")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string, options: { name: string }) => {
+      const { renameGroupCommand: impl } = await import("./commands/groups/rename.js");
+      return impl({ id, name: options.name });
+    },
+  );
+
+  emitsResult(
+    groupsCmd
+      .command("delete <id>")
+      .description("Delete a group and the access it granted")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { deleteGroupCommand: impl } = await import("./commands/groups/delete.js");
+      return impl(id);
+    },
+  );
+
+  const groupMembersCmd = groupsCmd
+    .command("members")
+    .description("Manage who belongs to a group");
+
+  emitsResult(
+    groupMembersCmd
+      .command("list <groupId>")
+      .description("List the members of a group")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (groupId: string) => {
+      const { listGroupMembersCommand: impl } = await import("./commands/groups/members.js");
+      return impl(groupId);
+    },
+  );
+
+  emitsResult(
+    groupMembersCmd
+      .command("add <groupId> <userId>")
+      .description("Add a member to a group")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (groupId: string, userId: string) => {
+      const { addGroupMemberCommand: impl } = await import("./commands/groups/members.js");
+      return impl({ groupId, userId });
+    },
+  );
+
+  emitsResult(
+    groupMembersCmd
+      .command("remove <groupId> <userId>")
+      .description("Remove a member from a group")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (groupId: string, userId: string) => {
+      const { removeGroupMemberCommand: impl } = await import("./commands/groups/members.js");
+      return impl({ groupId, userId });
+    },
+  );
+
+  const groupBindingsCmd = groupsCmd
+    .command("bindings")
+    .description("Manage what a group grants, and where");
+
+  emitsResult(
+    groupBindingsCmd
+      .command("list <groupId>")
+      .description("List a group's role bindings")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (groupId: string) => {
+      const { listGroupBindingsCommand: impl } = await import("./commands/groups/bindings.js");
+      return impl(groupId);
+    },
+  );
+
+  emitsResult(
+    groupBindingsCmd
+      .command("add <groupId>")
+      .description("Grant the group a role at a scope")
+      .requiredOption("--role <role>", "Role to grant: ADMIN, MEMBER, VIEWER or CUSTOM")
+      .option("--custom-role-id <id>", "Custom role to grant, required when the role is CUSTOM")
+      .requiredOption("--scope-type <type>", "Where it applies: ORGANIZATION, TEAM or PROJECT")
+      .requiredOption("--scope-id <id>", "The organization, team or project id")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (
+      groupId: string,
+      options: {
+        role: string;
+        customRoleId?: string;
+        scopeType: string;
+        scopeId: string;
+      },
+    ) => {
+      const { addGroupBindingCommand: impl } = await import("./commands/groups/bindings.js");
+      return impl({ groupId, options });
+    },
+  );
+
+  emitsResult(
+    groupBindingsCmd
+      .command("remove <groupId> <bindingId>")
+      .description("Remove a role binding from a group")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (groupId: string, bindingId: string) => {
+      const { removeGroupBindingCommand: impl } = await import("./commands/groups/bindings.js");
+      return impl({ groupId, bindingId });
+    },
+  );
+
+  const rolesCmd = program
+    .command("roles")
+    .description("Manage custom roles and the permissions they carry");
+
+  emitsResult(
+    rolesCmd
+      .command("list")
+      .description("List the organization's custom roles")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { listRolesCommand: impl } = await import("./commands/roles/list.js");
+      return impl();
+    },
+  );
+
+  emitsResult(
+    rolesCmd
+      .command("get <id>")
+      .description("Get a custom role and its permission set")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { getRoleCommand: impl } = await import("./commands/roles/get.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    rolesCmd
+      .command("create")
+      .description("Create a custom role from permission keys")
+      .requiredOption("--name <name>", "Role name, unique within the organization")
+      .option("--description <desc>", "What the role is for")
+      .option(
+        "--permission <permission...>",
+        "A permission as resource:action (repeatable), for example project:view",
+      )
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (options: { name: string; description?: string; permission?: string[] }) => {
+      const { createRoleCommand: impl } = await import("./commands/roles/create.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    rolesCmd
+      .command("update <id>")
+      .description("Update a custom role; a permission list replaces the whole set")
+      .option("--name <name>", "New role name")
+      .option("--description <desc>", "New description")
+      .option(
+        "--permission <permission...>",
+        "The role's complete permission set as resource:action (repeatable)",
+      )
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (
+      id: string,
+      options: { name?: string; description?: string; permission?: string[] },
+    ) => {
+      const { updateRoleCommand: impl } = await import("./commands/roles/update.js");
+      return impl({ id, options });
+    },
+  );
+
+  emitsResult(
+    rolesCmd
+      .command("delete <id>")
+      .description("Delete a custom role nothing holds any more")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { deleteRoleCommand: impl } = await import("./commands/roles/delete.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    rolesCmd
+      .command("permissions")
+      .description("List the permission catalog custom roles are built from")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { rolePermissionsCommand: impl } = await import("./commands/roles/permissions.js");
+      return impl();
+    },
+  );
+
+  const roleBindingsCmd = program
+    .command("role-bindings")
+    .description("Grant roles to people, groups and API keys at a scope");
+
+  emitsResult(
+    roleBindingsCmd
+      .command("list")
+      .description("List role bindings, optionally filtered by principal and scope")
+      .option("--principal-type <type>", "Kind of principal to filter by: user, group or api-key")
+      .option("--principal-id <id>", "The user, group or API key id")
+      .option("--scope-type <type>", "Filter by scope: ORGANIZATION, TEAM or PROJECT")
+      .option("--scope-id <id>", "Filter by the organization, team or project id")
+      .option("--offset <n>", "Skip this many bindings")
+      .option("--limit <n>", "Bindings per page (default 50, max 200)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: {
+      principalType?: string;
+      principalId?: string;
+      scopeType?: string;
+      scopeId?: string;
+      offset?: string;
+      limit?: string;
+    }) => {
+      const { listRoleBindingsCommand: impl } = await import("./commands/role-bindings/list.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    roleBindingsCmd
+      .command("create")
+      .description("Grant one role to one principal at one scope")
+      .requiredOption("--principal-type <type>", "Kind of principal: user, group or api-key")
+      .requiredOption("--principal-id <id>", "The user, group or API key id")
+      .requiredOption("--role <role>", "Role to grant: ADMIN, MEMBER, VIEWER or CUSTOM")
+      .option("--custom-role-id <id>", "Custom role to grant, required when the role is CUSTOM")
+      .requiredOption("--scope-type <type>", "Where it applies: ORGANIZATION, TEAM or PROJECT")
+      .requiredOption("--scope-id <id>", "The organization, team or project id")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (options: {
+      principalType: string;
+      principalId: string;
+      role: string;
+      customRoleId?: string;
+      scopeType: string;
+      scopeId: string;
+    }) => {
+      const { createRoleBindingCommand: impl } = await import("./commands/role-bindings/create.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    roleBindingsCmd
+      .command("update <id>")
+      .description("Change the role a binding grants; principal and scope stay as they are")
+      .requiredOption("--role <role>", "Role to grant: ADMIN, MEMBER, VIEWER or CUSTOM")
+      .option("--custom-role-id <id>", "Custom role to grant, required when the role is CUSTOM")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string, options: { role: string; customRoleId?: string }) => {
+      const { updateRoleBindingCommand: impl } = await import("./commands/role-bindings/update.js");
+      return impl({ id, options });
+    },
+  );
+
+  emitsResult(
+    roleBindingsCmd
+      .command("delete <id>")
+      .description("Delete a role binding")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { deleteRoleBindingCommand: impl } = await import("./commands/role-bindings/delete.js");
+      return impl(id);
+    },
+  );
+
+  const scimTokensCmd = program
+    .command("scim-tokens")
+    .description("Mint and revoke the bearer tokens an identity provider uses");
+
+  emitsResult(
+    scimTokensCmd
+      .command("list")
+      .description("List SCIM tokens (values are never returned)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { listScimTokensCommand: impl } = await import("./commands/scim-tokens/list.js");
+      return impl();
+    },
+  );
+
+  emitsResult(
+    scimTokensCmd
+      .command("create")
+      .description("Create a SCIM token (the value is shown once)")
+      .option("--description <desc>", "What this token is for, for example the provider's name")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (options: { description?: string }) => {
+      const { createScimTokenCommand: impl } = await import("./commands/scim-tokens/create.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    scimTokensCmd
+      .command("revoke <id>")
+      .description("Revoke a SCIM token so it stops verifying")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { revokeScimTokenCommand: impl } = await import("./commands/scim-tokens/revoke.js");
+      return impl(id);
+    },
+  );
+
+  // Self-hosted only, and the one family that authenticates against the
+  // INSTANCE rather than an organization: it exists before any organization
+  // does. On LangWatch Cloud these paths answer "not found".
+  const organizationsCmd = program
+    .command("organizations")
+    .description(
+      "Provision organizations on a self-hosted instance (instance administrator credential)",
+    );
+
+  emitsResult(
+    organizationsCmd
+      .command("create")
+      .description("Create an organization and its bootstrap admin API key")
+      .requiredOption("--name <name>", "Organization name")
+      .option("--slug <slug>", "Organization slug; derived from the name when omitted")
+      .option("--admin-api-key-name <name>", "Name for the bootstrap admin API key")
+      .option(
+        "--instance-key <key>",
+        "Instance administrator credential; defaults to LANGWATCH_INSTANCE_ADMIN_API_KEY",
+      )
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (options: {
+      name: string;
+      slug?: string;
+      adminApiKeyName?: string;
+      instanceKey?: string;
+    }) => {
+      const { createOrganizationCommand: impl } = await import(
+        "./commands/organizations/create.js"
+      );
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    organizationsCmd
+      .command("list")
+      .description("List the organizations on this instance")
+      .option(
+        "--instance-key <key>",
+        "Instance administrator credential; defaults to LANGWATCH_INSTANCE_ADMIN_API_KEY",
+      )
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { instanceKey?: string }) => {
+      const { listOrganizationsCommand: impl } = await import(
+        "./commands/organizations/list.js"
+      );
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    organizationsCmd
+      .command("get <id>")
+      .description("Get one organization on this instance")
+      .option(
+        "--instance-key <key>",
+        "Instance administrator credential; defaults to LANGWATCH_INSTANCE_ADMIN_API_KEY",
+      )
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string, options: { instanceKey?: string }) => {
+      const { getOrganizationByIdCommand: impl } = await import(
+        "./commands/organizations/get.js"
+      );
+      return impl({ id, options });
     },
   );
 

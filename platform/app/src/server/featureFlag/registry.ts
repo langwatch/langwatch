@@ -98,6 +98,24 @@ export const FEATURE_FLAGS = [
       "Skips the strict PII redaction pass that calls the external analysis service (Presidio via langevals). The native secrets and essential PII redaction in the ingestion pipeline are unaffected. Emergency operator override to shed analysis-service load.",
     family: "Collector",
   },
+  // Kill switch for the evaluator settings recovery (langwatch#6397). The
+  // recovery is ON by default: an evaluator whose prompt was stored at the top
+  // level of `config` instead of under `config.settings` has it recovered on the
+  // online path, instead of being silently dropped and replaced by langevals'
+  // own strict default prompt — which scored every trace 0.
+  //
+  // SYSTEM scope is load-bearing, not incidental. A PRODUCT-scoped flag resolves
+  // env -> PostHog -> postgres -> default, so a 0%-rollout PostHog definition
+  // would leave the registry default reading `true` while production still ran
+  // the old behavior — shipping the fix inert with every test green.
+  {
+    key: "ops_evaluator_settings_recovery_disabled",
+    scope: "SYSTEM",
+    defaultValue: false,
+    description:
+      "Disables recovery of evaluator settings stored at the top level of `config` on the online evaluation path. While on, such evaluators fall back to `monitor.parameters` and, when that is empty, run against the judge's own default prompt. Emergency operator rollback for langwatch#6397.",
+    family: "Event sourcing",
+  },
   // Kill switch for the evaluation-inputs offload (ADR-040). The offload is ON
   // by default: oversized evaluator inputs go to the durable stored-objects
   // service and the event/row carry a bounded marker instead of the full

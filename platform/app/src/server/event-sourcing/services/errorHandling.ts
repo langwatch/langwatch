@@ -444,6 +444,16 @@ const CLICKHOUSE_TRANSIENT_CODES = new Set([
 ]);
 
 /**
+ * Handled error codes that are themselves a transient verdict.
+ *
+ * Kept separate from {@link CLICKHOUSE_TRANSIENT_CODES}, which holds ClickHouse
+ * server codes read off the CAUSE. These are ours, read off the handled shell,
+ * and matching them by message or by wrapped reason is not possible — the
+ * shed signal underneath carries neither.
+ */
+const TRANSIENT_HANDLED_CODES = new Set<string>(["clickhouse_overloaded"]);
+
+/**
  * Message-fragment matchers for the same conditions as
  * CLICKHOUSE_TRANSIENT_CODES, used when the error object surfaced from
  * `@clickhouse/client` embeds the code inside `error.message` rather than
@@ -477,6 +487,22 @@ export const CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS = [
  * errors are CRITICAL.
  */
 export function classifyClickHouseError(error: unknown): ErrorCategory {
+  // Some handled codes ARE the verdict, and unwrapping them loses it. The
+  // platform raises `clickhouse_overloaded` when it sheds a statement rather
+  // than queue it without limit — deliberately, before the statement reaches
+  // the server — and wraps the shed signal (`QueueFullError`, or an expired
+  // wait) in `reasons`. Neither of those carries a ClickHouse code or matches a
+  // transient fragment, so classifying by reasons alone made every shed
+  // statement CRITICAL: a job refused precisely BECAUSE the platform was busy
+  // was then dropped rather than re-staged, which is the one outcome shedding
+  // exists to avoid.
+  if (
+    HandledError.isHandled(error) &&
+    TRANSIENT_HANDLED_CODES.has(error.code)
+  ) {
+    return ErrorCategory.RECOVERABLE;
+  }
+
   // The resilient client's query translation wraps the raw driver error in a
   // HandledError's `reasons` — classify the wrapped causes, not the handled
   // shell. Single shallow pass: the translation wraps the driver error

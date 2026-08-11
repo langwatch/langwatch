@@ -6,6 +6,7 @@ import {
   Histogram,
   register,
 } from "prom-client";
+import type { AutomationPauseReason } from "~/features/automations/logic/pauseReasons";
 
 // Enable default metrics collection (heap, stack, GC, etc.)
 if (!register.getSingleMetric("process_cpu_user_seconds_total")) {
@@ -813,6 +814,106 @@ export const observeEsProcessManagerDuration = ({
   durationMs: number;
 }) =>
   esProcessManagerDuration.labels(processName, inputKind).observe(durationMs);
+
+// Retention sweep over the process-manager substrate's own tables. Labelled by
+// FAMILY rather than by table because two of the three families (dispatched and
+// dead outbox rows) share one table but carry very different windows, and the
+// question an operator asks is "is the reap keeping up with dispatched rows",
+// not "how much did the outbox table shrink".
+//
+// No process_name label: the sweep reaps by predicate across every process, so
+// a per-process breakdown would be a cardinality cost with no reader.
+register.removeSingleMetric("process_manager_retention_swept_rows_total");
+const processManagerRetentionSweptRows = new Counter({
+  name: "process_manager_retention_swept_rows_total",
+  help: "Rows deleted by the process-manager retention sweep",
+  labelNames: ["family"] as const,
+});
+
+export const incrementProcessManagerRetentionSweptRows = (
+  family: "dispatched_outbox" | "dead_outbox" | "inbox",
+  rows: number,
+) => {
+  if (rows > 0) processManagerRetentionSweptRows.labels(family).inc(rows);
+};
+
+register.removeSingleMetric("process_manager_retention_failures_total");
+const processManagerRetentionFailures = new Counter({
+  name: "process_manager_retention_failures_total",
+  help: "Retention sweep runs that failed for one family",
+  labelNames: ["family"] as const,
+});
+
+/**
+ * Without this, a family that fails every hour and a family with nothing to
+ * sweep look identical on the swept-rows counter: both report zero. Silent
+ * retention failure is the exact shape of the incident this sweep exists to
+ * prevent, so it gets its own signal.
+ */
+export const incrementProcessManagerRetentionFailures = (
+  family: "dispatched_outbox" | "dead_outbox" | "inbox",
+) => processManagerRetentionFailures.labels(family).inc();
+
+// --- Automation volume and containment ---
+//
+// The split these carry IS the policy. `automation_match_records_total` is OUR
+// amplification: our pipeline records a match for every active trigger on every
+// trace and only evaluates filters later, so this number is a multiplier we
+// chose and it is never charged to a customer. The ceiling and pause counters
+// below are customer-attributable volume: confirmed matches that were about to
+// create a dataset row or an annotation item.
+//
+// No project or trigger labels on any of them. These are fleet health, and a
+// per-tenant breakdown here would be unbounded cardinality for a question the
+// logs already answer with more detail.
+register.removeSingleMetric("automation_match_records_total");
+const automationMatchRecordsTotal = new Counter({
+  name: "automation_match_records_total",
+  help: "Trigger match records written before any filter is evaluated",
+});
+
+export const incrementAutomationMatchRecordsTotal = (records: number) => {
+  if (records > 0) automationMatchRecordsTotal.inc(records);
+};
+
+register.removeSingleMetric("automation_overflow_flush_total");
+const automationOverflowFlushTotal = new Counter({
+  name: "automation_overflow_flush_total",
+  help: "Matches flushed early because a settlement process hit its pending bound",
+});
+
+export const incrementAutomationOverflowFlushTotal = (flushed: number) => {
+  if (flushed > 0) automationOverflowFlushTotal.inc(flushed);
+};
+
+register.removeSingleMetric("automation_ceiling_breach_total");
+const automationCeilingBreachTotal = new Counter({
+  name: "automation_ceiling_breach_total",
+  help: "Confirmed automation matches dropped for passing their daily ceiling",
+});
+
+export const incrementAutomationCeilingBreachTotal = () =>
+  automationCeilingBreachTotal.inc();
+
+register.removeSingleMetric("automation_auto_paused_total");
+const automationAutoPausedTotal = new Counter({
+  name: "automation_auto_paused_total",
+  help: "Automations the platform paused, by reason",
+  labelNames: ["reason"] as const,
+});
+
+export const incrementAutomationAutoPausedTotal = (
+  reason: AutomationPauseReason,
+) => automationAutoPausedTotal.labels(reason).inc();
+
+register.removeSingleMetric("automation_containment_failed_total");
+const automationContainmentFailedTotal = new Counter({
+  name: "automation_containment_failed_total",
+  help: "Breaches where containment could not pause the automation or tell the customer",
+});
+
+export const incrementAutomationContainmentFailedTotal = () =>
+  automationContainmentFailedTotal.inc();
 
 register.removeSingleMetric("es_process_outbox_total");
 const esProcessOutboxTotal = new Counter({

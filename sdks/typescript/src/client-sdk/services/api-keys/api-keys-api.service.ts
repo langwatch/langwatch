@@ -1,14 +1,38 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
+import type {
+  ManagementRole,
+  ManagementScopeType,
+} from "@/client-sdk/services/_shared/management-types";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { resolveEndpoint } from "@/internal/endpoint";
 
 export interface RoleBinding {
   id: string;
-  role: "ADMIN" | "MEMBER" | "VIEWER";
-  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+  role: ManagementRole;
+  scopeType: ManagementScopeType;
   scopeId: string;
 }
+
+/** What a key may do, and where, in the shape a write accepts. */
+export interface ApiKeyBindingInput {
+  role: ManagementRole;
+  scopeType: ManagementScopeType;
+  scopeId: string;
+}
+
+/**
+ * How the key's bindings are read. `all` and `readonly` take their meaning
+ * from the bindings alone; `restricted` additionally requires an explicit
+ * permissions list, which is what a CUSTOM binding grants.
+ */
+export const API_KEY_PERMISSION_MODES = [
+  "all",
+  "readonly",
+  "restricted",
+] as const;
+
+export type ApiKeyPermissionMode = (typeof API_KEY_PERMISSION_MODES)[number];
 
 export interface ApiKeyInfo {
   id: string;
@@ -21,17 +45,42 @@ export interface ApiKeyInfo {
   roleBindings: RoleBinding[];
 }
 
+/**
+ * One key as GET /:id and PATCH /:id report it. `roleBindings` is the shape
+ * the listing publishes; `bindings` is the same set in the shape a write
+ * accepts, so reading a key back after a write is a comparison rather than a
+ * translation.
+ */
+export interface ApiKeyDetail extends ApiKeyInfo {
+  keyType: "personal" | "service";
+  assignedToUserId: string | null;
+  createdByUserId: string | null;
+  permissionMode: ApiKeyPermissionMode;
+  permissions: string[];
+  bindings: ApiKeyBindingInput[];
+}
+
 export interface CreateApiKeyInput {
   keyType?: "personal" | "service";
   name: string;
   description?: string;
   expiresAt?: string;
-  bindings?: Array<{
-    role: "ADMIN" | "MEMBER" | "VIEWER";
-    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-    scopeId: string;
-  }>;
+  /** Organization admins only: the member the key acts as, and is capped by. */
+  assignedToUserId?: string;
+  permissionMode?: ApiKeyPermissionMode;
+  /** Restricted mode only: the exact permissions the CUSTOM bindings grant. */
+  permissions?: string[];
+  bindings?: ApiKeyBindingInput[];
   projectIds?: string[];
+}
+
+/** Partial. A bindings list replaces the key's bindings outright. */
+export interface UpdateApiKeyInput {
+  name?: string;
+  description?: string | null;
+  permissionMode?: ApiKeyPermissionMode;
+  permissions?: string[];
+  bindings?: ApiKeyBindingInput[];
 }
 
 export interface CreatedApiKey {
@@ -106,11 +155,32 @@ export class ApiKeysApiService {
     return data;
   }
 
+  async get(id: string): Promise<ApiKeyDetail> {
+    return this.request<ApiKeyDetail>(
+      `fetch API key "${id}"`,
+      `/api/api-keys/${encodeURIComponent(id)}`,
+    );
+  }
+
   async create(input: CreateApiKeyInput): Promise<CreatedApiKey> {
     return this.request<CreatedApiKey>(
       "create API key",
       "/api/api-keys",
       { method: "POST", body: JSON.stringify(input) },
+    );
+  }
+
+  async update({
+    id,
+    input,
+  }: {
+    id: string;
+    input: UpdateApiKeyInput;
+  }): Promise<ApiKeyDetail> {
+    return this.request<ApiKeyDetail>(
+      `update API key "${id}"`,
+      `/api/api-keys/${encodeURIComponent(id)}`,
+      { method: "PATCH", body: JSON.stringify(input) },
     );
   }
 

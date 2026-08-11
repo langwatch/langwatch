@@ -46,6 +46,30 @@ Feature: Knowable failures reach the customer as themselves
     Then the caller receives the resolver's result
 
   # ---------------------------------------------------------------------------
+  # Organization-scoped API authentication
+  #
+  # Authentication runs beneath the route family's own error handler, so its
+  # refusals have to be answered in the shape that family publishes. A database
+  # failure while loading the credential's organization is not a refusal: it
+  # answers the family's authentication server error, and where the family owns
+  # the response it is re-raised as it arrived rather than minted as handled.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A database failure loading the organization answers the family's server error
+    Given an organization-scoped credential the resolver accepts
+    When loading its organization fails on the database
+    Then the caller receives the family's authentication server error
+    And the request never reaches the route
+
+  @unit
+  Scenario: A database failure loading the organization is re-raised unchanged
+    Given a family whose own error handler owns the response shape
+    When loading the credential's organization fails on the database
+    Then the original failure reaches that handler unchanged
+    And it is not dressed up as a customer-actionable error
+
+  # ---------------------------------------------------------------------------
   # Permission denials
   #
   # A denial is knowable and the caller can act on it (ask an admin), so it is
