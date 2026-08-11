@@ -38,7 +38,7 @@ function makePrisma({
       findFirst: vi.fn().mockResolvedValue(teamUser),
     },
     customRole: {
-      findUnique: vi
+      findFirst: vi
         .fn()
         .mockResolvedValue(
           customRolePermissions !== null

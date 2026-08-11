@@ -1,5 +1,6 @@
 import type { Context, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import type { DescribeRouteOptions } from "hono-openapi";
 import type { ZodType, z } from "zod";
 
 // ---------------------------------------------------------------------------
@@ -60,6 +61,34 @@ export interface BaseApp<TProject = unknown> {
 // ---------------------------------------------------------------------------
 
 /**
+ * OpenAPI documentation options for an endpoint.
+ *
+ * Only the bare (unversioned) alias mount of an endpoint is ever documented;
+ * dated, `latest`, and `preview` mounts serve traffic but never reach the
+ * published spec. These options shape that one documented operation.
+ */
+export interface EndpointDocs {
+  /** Short summary shown next to the operation in the reference. */
+  summary?: string;
+  /** Tags used to group the operation in the reference. */
+  tags?: string[];
+  /**
+   * Explicit operation id. Set it on every documented endpoint: generated ids
+   * leak URL shapes into SDK function names.
+   */
+  operationId?: string;
+  /** Exclude the endpoint from the OpenAPI document entirely. */
+  hide?: boolean;
+  /** Security requirements for the operation. */
+  security?: DescribeRouteOptions["security"];
+  /**
+   * Additional documented responses, merged over the generated success
+   * response (same-status keys win).
+   */
+  responses?: DescribeRouteOptions["responses"];
+}
+
+/**
  * Per-endpoint configuration object -- the second argument to
  * `v.get(path, config, handler)`.
  *
@@ -82,8 +111,16 @@ export interface EndpointConfig<
   query?: TQuery;
   /** OpenAPI description for the endpoint. */
   description?: string;
+  /** OpenAPI documentation options (summary, tags, operationId, ...). */
+  docs?: EndpointDocs;
   /** HTTP status code for successful responses (default: 200). */
   status?: ContentfulStatusCode;
+  /**
+   * Opaque per-endpoint metadata. The framework never reads it; it travels on
+   * `MountedRoute.config` so `onRouteMounted` consumers (route policy
+   * registries, gates) can act on it.
+   */
+  meta?: unknown;
 
   // -- per-endpoint options --------------------------------------------------
 
@@ -105,6 +142,41 @@ export interface EndpointConfig<
 // ---------------------------------------------------------------------------
 
 /**
+ * One route registration on the built Hono app, reported to
+ * `ServiceConfig.onRouteMounted`.
+ *
+ * `path` is absolute (base path included) and byte-identical to what the
+ * app's Hono route table (`app.routes[i].path`) reports for the same
+ * registration, so consumers can key route policies on it directly.
+ */
+export interface MountedRoute {
+  /** Mounted HTTP method; SSE endpoints report `"get"`, guards `"all"`. */
+  method: HttpMethod | "all";
+  /** Absolute route path, including the service base path. */
+  path: string;
+  /**
+   * The version namespace of this mount (`"2025-03-15"`, `"latest"`,
+   * `"preview"`), or `null` for the bare alias and the namespace guards.
+   */
+  version: string | null;
+  /** Version status header value this mount responds with. */
+  status: VersionStatus;
+  /** True when this mount answers 410 Gone for a withdrawn endpoint. */
+  withdrawn: boolean;
+  /**
+   * True for the two catch-alls that 404 unknown version namespaces. They are
+   * real routes in the Hono route table and MUST be covered by any route
+   * policy registry built from this callback.
+   */
+  isNamespaceGuard?: boolean;
+  /**
+   * The endpoint configuration behind this mount. Withdrawn mounts carry the
+   * inherited config (including `meta`); namespace guards carry `null`.
+   */
+  config: EndpointConfig | null;
+}
+
+/**
  * Top-level configuration for `createService()`.
  */
 export interface ServiceConfig {
@@ -122,6 +194,13 @@ export interface ServiceConfig {
   middleware?: MiddlewareHandler[];
   /** Custom error handler. If omitted the framework default is used. */
   onError?: (err: Error, c: Context) => Response | Promise<Response>;
+  /**
+   * Called synchronously during `build()` for every route mounted on the app:
+   * each dated version, `latest`, `preview`, the bare alias, withdrawn (410)
+   * endpoints, and the two version-namespace guards. Lets the host register
+   * route policies without re-deriving the route table.
+   */
+  onRouteMounted?: (route: MountedRoute) => void;
   /** Middleware that will be removed once services are fully migrated. */
   _legacy?: {
     /** Organization-resolution middleware. */

@@ -1,10 +1,10 @@
+import { createLogger } from "@langwatch/observability";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
 import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../trace-processing/schemas/constants";
 import {
   isSpanReceivedEvent,
-  makeSpanReferencedPayload,
   parseSpanReferencedPayload,
   type SpanReceivedEvent,
   type SpanReferencedPayload,
@@ -12,13 +12,25 @@ import {
 } from "../../trace-processing/schemas/events";
 import type { NormalizedSpan } from "../../trace-processing/schemas/spans";
 import type { ContributeSpanFactsCommandData } from "../schemas/commands";
-import { parseSpanFactsLiftedPayload } from "../schemas/events";
+import {
+  SPAN_FACTS_LIFTED_PAYLOAD_TYPE,
+  SPAN_FACTS_LIFTED_PAYLOAD_VERSION_LATEST,
+} from "../schemas/constants";
+import {
+  parseSpanFactsLiftedPayload,
+  type SpanFactsLiftedPayload,
+  spanFactsLiftedPayloadSchema,
+} from "../schemas/events";
 import {
   CODING_AGENT_CONTRIBUTION_KEYS,
   detectCodingAgent,
   resolveConversationKey,
 } from "../services/coding-agent-normalization";
 import { CODING_AGENT_SPAN_NAMES } from "../services/coding-agent-session.derivation";
+
+const logger = createLogger(
+  "langwatch:coding-agent-processing:span-facts-dispatch",
+);
 
 /**
  * The span→session dispatcher (ADR-056 §2): a subscriber on trace-processing's
@@ -34,26 +46,37 @@ import { CODING_AGENT_SPAN_NAMES } from "../services/coding-agent-session.deriva
  *     (ADR-056 §3).
  *   - A `span_facts_lifted` job carries a bounded derivation: the facts, already
  *     lifted, on the job itself. The handler contributes them directly. Nothing
- *     is read back, so nothing races. This is the shape the seam will stage once
- *     R2 flips the producer (see the handler contract below).
+ *     is read back, so nothing races. **This is the shape this build STAGES**
+ *     (R2 — see the deploy-order note below).
  *   - A `span_referenced` claim-check carries the span's identity, not its
  *     payload, and the handler reads the canonical span back from the span
  *     store. That read races the sibling spanStorage write, which is the
  *     failure the derivation shape exists to remove: on 2026-08-05 it parked 22
- *     per-trace groups in `:blocked`. This build still STAGES it — the producer
- *     flip is R2 — and the handler keeps resolving it after that flip, so
- *     references already in Redis drain.
+ *     per-trace groups in `:blocked`, and on 2026-08-10 the same class blocked
+ *     88 groups while the error rate rose ~10x. This build no longer stages it;
+ *     the handler keeps resolving it so references already in Redis drain.
  *   - A full `span_received` job still processes exactly as before references
  *     existed: jobs staged by a previous release, and matched events the seam
- *     could not reference, carry the whole event, and the handler normalizes
+ *     could not lift, carry the whole event, and the handler normalizes
  *     inline in its own lane.
  *
- * **Deploy order (ADR-069).** This build is the CONSUMER half: it reads
- * `span_facts_lifted` but does not stage it. The producer flip ships a release
- * later, because a worker that predates the type would otherwise complete such
- * a job silently. Anything this build cannot read at all now throws instead of
- * returning, so the next crossing of this boundary fails as a retry rather than
- * as a silent loss.
+ * **Deploy order (ADR-069).** The CONSUMER half shipped in #6621 and has been
+ * live for a full release, so this build is the PRODUCER flip: it stages
+ * `span_facts_lifted`, which every worker already knows how to read. Anything a
+ * build cannot read at all throws instead of returning, so the next crossing of
+ * this boundary fails as a retry rather than as a silent loss.
+ *
+ * **Why the flip is the fix, not a tuning knob.** The claim-check's retry budget
+ * is finite (25 attempts, ~2h27m). The spanStorage map projection it reads from
+ * is sharded into 128 lanes per tenant and coalesces 256 spans per dispatch
+ * (`spanStorageGroupKey.ts`), while this subscriber keys one group PER TRACE.
+ * A tenant with heavy coding-agent traffic therefore mints thousands of
+ * per-trace groups that contend with those 128 lanes for the same per-tenant
+ * in-flight soft cap — so the harder the tenant pushes, the later its spans
+ * land, and the more claim-checks burn attempts against a store that has not
+ * caught up. Every failed attempt re-queues, which adds contention, which
+ * delays the write further. Removing the read-back breaks that loop at its
+ * source; no cap or backoff tuning does.
  */
 export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
   contributeSpanFacts: (data: ContributeSpanFactsCommandData) => Promise<void>;
@@ -84,16 +107,21 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
     options: {
       enqueue: {
         filter: isCodingAgentSpan,
-        // `filter` has already established a coding-agent span_received
-        // event; the stage hook is a total field-pick that swaps the staged
-        // payload for its claim-check (or returns the event unchanged when
-        // the span has no id to reference).
-        stage: (event) => makeSpanReferencedPayload(event as SpanReceivedEvent),
+        // `filter` has already established a coding-agent span_received event.
+        // The stage hook lifts that span's facts HERE, so the job carries its
+        // own finished result and the handler reads nothing back.
+        stage: (event) =>
+          makeSpanFactsLiftedPayload({
+            event: event as SpanReceivedEvent,
+            normalization,
+          }),
       },
-      // Debounce past the spanStorage sibling write: the reference resolves
-      // against the span store, and both jobs are staged by the same fan-out.
-      // Two seconds puts the first attempt after that write in the common
-      // case; the queue's backoff covers the tail.
+      // The lifted derivation resolves without touching the span store, so
+      // there is no sibling write left to debounce past. The delay stays only
+      // for the residual full-event fallback, which normalizes in its own lane
+      // and is cheap to defer — and dropping it outright would dispatch a
+      // burst of coding-agent spans at ingest rate rather than spreading them
+      // across the dedup window below.
       delay: 2_000,
       deduplication: {
         makeId: (event) => {
@@ -134,51 +162,13 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
         return;
       }
 
-      // Neither staged shape. Before treating this as a full event, establish
-      // that it IS one: a payload of some other type is a shape this build
-      // cannot read — almost certainly staged by a newer worker mid-rollout —
-      // and returning here would COMPLETE the job with no throw, no retry and
-      // no counter, silently dropping that span's facts. Refusing it is the
-      // whole reason the deploy-order rule is enforceable (ADR-069).
-      if (!isSpanReceivedEvent(event)) {
-        throw new Error(
-          `codingAgentSpanFactsDispatch cannot read staged payload of type "${String((event as { type?: unknown }).type)}"; refusing it into the queue's retry rather than completing it. A newer build likely staged it — drain with a build that knows the shape.`,
-        );
-      }
-
-      // The type says `span_received`, so read the body before the name gate
-      // answers for it. The gate's `false` means "an event I decline", and a
-      // body with no span object would reach that answer for the wrong reason
-      // — unreadable, not declined — and complete silently. This cannot fire
-      // for a job this seam minted: `enqueue.filter` already found a listed
-      // span name on `data.span`, so an absent span means the payload came
-      // from somewhere this build does not know.
-      if (!hasReadableSpanBody(event)) {
-        throw new Error(
-          `codingAgentSpanFactsDispatch cannot read the staged "span_received" body (trace ${String(event.aggregateId)}): no span object on it. Refusing it into the queue's retry rather than completing it.`,
-        );
-      }
-
-      // Full-event job: a pre-reference release staged it, or the seam could
-      // not reference the span. Gate, normalize and lift inline — identical to
-      // the pre-reference handler. A span_received carrying a readable span
-      // this subscriber declines is a legitimate quiet completion, not an
-      // unreadable shape — a build that poisons the queue with every ordinary
-      // span is worse than the loss this refusal prevents.
-      if (!isCodingAgentSpan(event)) return;
-      const span = normalization.normalizeSpanReceived(
-        event.tenantId,
-        event.data.span,
-        event.data.resource,
-        event.data.instrumentationScope,
-      );
-      await deps.contributeSpanFacts(
-        liftContribution({
-          span,
-          tenantId: event.tenantId,
-          occurredAt: event.occurredAt,
-        }),
-      );
+      // Neither staged shape — the remaining one is a whole event.
+      await handleFullEvent({
+        event,
+        normalization,
+        isCodingAgentSpan,
+        contributeSpanFacts: deps.contributeSpanFacts,
+      });
     },
   };
 }
@@ -202,9 +192,179 @@ function hasReadableSpanBody(event: SpanReceivedEvent): boolean {
 }
 
 /**
+ * The full-event path: a job carrying the whole `span_received`, staged by a
+ * pre-derivation release or by a seam that could not lift the span.
+ *
+ * Split out of `handle` so that function stays what it reads as — a dispatcher
+ * over the three staged shapes — rather than a dispatcher with one shape's
+ * implementation inlined into it.
+ */
+async function handleFullEvent({
+  event,
+  normalization,
+  isCodingAgentSpan,
+  contributeSpanFacts,
+}: {
+  event: TraceProcessingEvent;
+  normalization: SpanNormalizationPipelineService;
+  isCodingAgentSpan: (
+    event: TraceProcessingEvent,
+  ) => event is SpanReceivedEvent;
+  contributeSpanFacts: (data: ContributeSpanFactsCommandData) => Promise<void>;
+}): Promise<void> {
+  // Before treating this as a full event, establish that it IS one: a payload
+  // of some other type is a shape this build cannot read — almost certainly
+  // staged by a newer worker mid-rollout — and returning here would COMPLETE
+  // the job with no throw, no retry and no counter, silently dropping that
+  // span's facts. Refusing it is the whole reason the deploy-order rule is
+  // enforceable (ADR-069).
+  if (!isSpanReceivedEvent(event)) {
+    throw new Error(
+      `codingAgentSpanFactsDispatch cannot read staged payload of type "${String((event as { type?: unknown }).type)}"; refusing it into the queue's retry rather than completing it. A newer build likely staged it — drain with a build that knows the shape.`,
+    );
+  }
+
+  // The type says `span_received`, so read the body before the name gate
+  // answers for it. The gate's `false` means "an event I decline", and a body
+  // with no span object would reach that answer for the wrong reason —
+  // unreadable, not declined — and complete silently. This cannot fire for a
+  // job this seam minted: `enqueue.filter` already found a listed span name on
+  // `data.span`, so an absent span means the payload came from somewhere this
+  // build does not know.
+  if (!hasReadableSpanBody(event)) {
+    throw new Error(
+      `codingAgentSpanFactsDispatch cannot read the staged "span_received" body (trace ${String(event.aggregateId)}): no span object on it. Refusing it into the queue's retry rather than completing it.`,
+    );
+  }
+
+  // A span_received carrying a readable span this subscriber declines is a
+  // legitimate quiet completion, not an unreadable shape — a build that
+  // poisons the queue with every ordinary span is worse than the loss this
+  // refusal prevents.
+  if (!isCodingAgentSpan(event)) return;
+
+  const span = normalizeOrReport({ event, normalization });
+  if (span === null) return;
+
+  await contributeSpanFacts(
+    liftContribution({
+      span,
+      tenantId: event.tenantId,
+      occurredAt: event.occurredAt,
+    }),
+  );
+}
+
+/**
+ * Normalizes a full event's span, or reports the failure and yields `null`.
+ *
+ * Normalization is a pure function of the span's own bytes, so a body it cannot
+ * read fails identically on every redelivery. Throwing would spend all 25
+ * attempts re-deriving the same failure and then park the TRACE's group —
+ * losing every other span's facts in that group to save one span that was never
+ * recoverable. That is the blocked-group class this whole change removes, so an
+ * unreadable body completes quietly and loudly instead: logged for an operator,
+ * not retried.
+ *
+ * This is the only path such a span can reach, because the seam already failed
+ * to lift it (`makeSpanFactsLiftedPayload` stages the full event on a
+ * normalizer throw) — which is exactly why it must not throw here too.
+ */
+function normalizeOrReport({
+  event,
+  normalization,
+}: {
+  event: SpanReceivedEvent;
+  normalization: SpanNormalizationPipelineService;
+}): NormalizedSpan | null {
+  try {
+    return normalization.normalizeSpanReceived(
+      event.tenantId,
+      event.data.span,
+      event.data.resource,
+      event.data.instrumentationScope,
+    );
+  } catch (error) {
+    logger.error(
+      {
+        tenantId: String(event.tenantId),
+        traceId: String(event.aggregateId),
+        error: error instanceof Error ? error.message : String(error),
+      },
+      "codingAgentSpanFactsDispatch: span body failed normalization; completing without contributing rather than blocking the trace's group",
+    );
+    return null;
+  }
+}
+
+/**
+ * Lifts a matched span's facts at the routing seam so the staged job carries
+ * its own finished result (ADR-069's bounded derivation).
+ *
+ * Total at runtime, exactly like `makeSpanReferencedPayload` and for the same
+ * reason: this runs as an `enqueue` hook on the shared routing seam, which has
+ * no retry, so a throw here would permanently lose the job. Normalization runs
+ * on untrusted wire data, so it is wrapped rather than trusted.
+ *
+ * The result is validated against the very schema the consumer parses with,
+ * and a payload that does not validate is DISCARDED in favour of staging the
+ * whole event. That is what makes the staged shape provably readable: the
+ * consumer's `parseSpanFactsLiftedPayload` throws on a shape it cannot read
+ * (correctly — it must never half-process), so staging an unvalidated
+ * derivation would convert a malformed span into a job that fails all 25
+ * attempts and then blocks its group, which is the exact failure class this
+ * change removes.
+ *
+ * The fallback is the FULL EVENT, never the claim-check: the full-event path
+ * resolves with no store read at all, so the rare malformed span costs
+ * scheduling-plane bytes instead of re-introducing the race. Only spans this
+ * seam cannot lift take it, and `filter` has already established that the span
+ * carries a listed coding-agent name.
+ */
+function makeSpanFactsLiftedPayload({
+  event,
+  normalization,
+}: {
+  event: SpanReceivedEvent;
+  normalization: SpanNormalizationPipelineService;
+}): SpanFactsLiftedPayload | SpanReceivedEvent {
+  let data: ContributeSpanFactsCommandData;
+  try {
+    const span = normalization.normalizeSpanReceived(
+      event.tenantId,
+      event.data.span,
+      event.data.resource,
+      event.data.instrumentationScope,
+    );
+    data = liftContribution({
+      span,
+      tenantId: event.tenantId,
+      occurredAt: event.occurredAt,
+    });
+  } catch {
+    return event;
+  }
+
+  const candidate = {
+    id: event.id,
+    aggregateId: event.aggregateId,
+    aggregateType: event.aggregateType,
+    tenantId: event.tenantId,
+    createdAt: event.createdAt,
+    occurredAt: event.occurredAt,
+    type: SPAN_FACTS_LIFTED_PAYLOAD_TYPE,
+    version: SPAN_FACTS_LIFTED_PAYLOAD_VERSION_LATEST,
+    data,
+    metadata: event.metadata,
+  };
+  const parsed = spanFactsLiftedPayloadSchema.safeParse(candidate);
+  return parsed.success ? parsed.data : event;
+}
+
+/**
  * Resolves a `span_referenced` claim-check through the span store and lifts its
- * facts. R2 stops producing references; the path stays after it so the ones
- * already staged in Redis drain.
+ * facts. R2 stopped producing references; the path stays so the ones already
+ * staged in Redis drain.
  */
 async function resolveClaimCheck(
   ref: SpanReferencedPayload,

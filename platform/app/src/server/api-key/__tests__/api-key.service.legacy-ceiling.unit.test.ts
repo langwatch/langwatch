@@ -122,6 +122,10 @@ function makePrisma({
     // The ceiling runs INSIDE the transaction, so every table it reads has to
     // exist on the tx client, not just the outer one.
     user: { findFirst: userFindFirst },
+    // The personal-workspace guard resolves TEAM and PROJECT scopes on the tx
+    // client; null means none of the scopes reach a personal workspace.
+    team: { findFirst: vi.fn().mockResolvedValue(null) },
+    project: { findFirst: vi.fn().mockResolvedValue(null) },
   };
 
   return {

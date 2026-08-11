@@ -258,6 +258,7 @@ describe("simulationRunnerRouter.run", () => {
             promptId: "prompt_123",
             systemPrompt: "You are helpful",
             messages: [],
+            inputs: [],
           },
           modelParams: {
             api_key: "test-key",
@@ -324,6 +325,7 @@ describe("simulationRunnerRouter.run", () => {
             promptId: "prompt_123",
             systemPrompt: "You are helpful",
             messages: [],
+            inputs: [],
           },
           modelParams: {
             api_key: "test-key",

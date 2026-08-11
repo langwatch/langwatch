@@ -130,6 +130,20 @@ const detailLines = (domain: CliHandledError): string[] => {
 
   if (domain.reasons?.length) {
     details.push(["caused by", domain.reasons.map((r) => r.kind).join(" → ")]);
+    // A validation failure carries one reason per rejected field, and the
+    // field plus the rule that rejected it is the whole content of the error:
+    // "caused by schema_failure" alone tells the user to fix something without
+    // saying what. Printed as `<field>  <what was wrong>` so it reads as part
+    // of the same block.
+    for (const reason of domain.reasons) {
+      const field = reason.meta?.field;
+      const message = reason.meta?.message;
+      if (typeof message !== "string" || !message) continue;
+      details.push([
+        typeof field === "string" && field ? field : reason.kind,
+        message,
+      ]);
+    }
   }
 
   const width = Math.max(...details.map(([key]) => key.length));

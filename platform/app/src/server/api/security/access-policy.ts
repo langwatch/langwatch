@@ -90,6 +90,20 @@ export type HandlerCredential = "apiKey" | "session" | "both" | "internal";
 export type CredentialClass =
   | "project_api_key"
   | "organization_api_key"
+  /**
+   * The instance administrator key a self-hosted operator configures. It is a
+   * shared secret by enforcement and an API credential by audience: it exists
+   * to create the first organization, before any organization key can, so it
+   * is the one secret the published document has a scheme for.
+   */
+  | "instance_admin_api_key"
+  /**
+   * The SCIM token an identity provider presents on the provisioning
+   * endpoints. Enforced by the family's own bearer check rather than the RBAC
+   * chain, and held by a directory connection rather than by us, so the
+   * document declares a scheme for it too.
+   */
+  | "scim_token"
   | "session"
   | "internal"
   | "none";

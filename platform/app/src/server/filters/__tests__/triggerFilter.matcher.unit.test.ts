@@ -225,6 +225,29 @@ describe("matchesTriggerFilters", () => {
     });
   });
 
+  describe("when a filter value nests deeper than key/subkey", () => {
+    /** @scenario "A condition the matcher cannot evaluate fails closed" */
+    it("fails closed instead of matching every trace", () => {
+      const data = makeTraceData();
+      // Depth the matcher has no resolver for. The save-time validation
+      // counts any non-empty nested array as "a condition", so treating this
+      // as vacuous here would let a crafted create produce an automation that
+      // matches the whole project — the exact hole the validation closes.
+      const filters = {
+        "metadata.labels": { region: { country: { code: ["eu"] } } },
+      } as unknown as TriggerFilters;
+      expect(matchesTriggerFilters(data, filters)).toBe(false);
+    });
+
+    it("still treats deeply nested EMPTY arrays as vacuous", () => {
+      const data = makeTraceData();
+      const filters = {
+        "metadata.labels": { region: { country: { code: [] } } },
+      } as unknown as TriggerFilters;
+      expect(matchesTriggerFilters(data, filters)).toBe(true);
+    });
+  });
+
   describe("when filters contain an unevaluable field (issue #4805 fail-closed)", () => {
     it("does not match when metadata.key (key-selector) is the unmet condition", () => {
       const data = makeTraceData({ origin: "application" });
