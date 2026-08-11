@@ -47,20 +47,20 @@ function correctedTreeNode({
  * their descendants) drop out, renames and type changes land. Node payloads
  * carry no content, so nothing here is privacy-sensitive.
  *
- * `keepDeleted` is for the tree the reader looks at rather than the trace the
- * correction describes. A span that simply vanished reads as one that was never
- * captured, so the waterfall keeps it on the row it had, for the caller to mark
- * and strike through. Everything that asks what the corrected trace IS -- its
- * span count, whether a comment still points at something -- leaves it off.
+ * `shouldKeepDeleted` is for the tree the reader looks at rather than the trace
+ * the correction describes. A span that simply vanished reads as one that was
+ * never captured, so the waterfall keeps it on the row it had, for the caller to
+ * mark and strike through. Everything that asks what the corrected trace IS --
+ * its span count, whether a comment still points at something -- leaves it off.
  */
 export function applyOverlayToSpanTreeNodes({
   nodes,
   patch,
-  keepDeleted = false,
+  shouldKeepDeleted = false,
 }: {
   nodes: SpanTreeNode[];
   patch: TraceEditOverlayPatch | null | undefined;
-  keepDeleted?: boolean;
+  shouldKeepDeleted?: boolean;
 }): SpanTreeNode[] {
   if (!patch || !patchHasAnyEdit(patch)) return nodes;
 
@@ -76,7 +76,7 @@ export function applyOverlayToSpanTreeNodes({
   // A removed row that is kept is kept as captured: a rename the same
   // correction made would dress up a row whose whole point is showing what the
   // trace had.
-  const keptNodes = keepDeleted
+  const keptNodes = shouldKeepDeleted
     ? nodes
     : nodes.filter((node) => !deleted.has(node.spanId));
 

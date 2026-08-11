@@ -324,8 +324,10 @@ Feature: Correcting a trace without rewriting it
     Scenario: The AI-readable column is read the way the rest of the mapping is
       Given a corrected trace being mapped into a dataset
       When the mapping fills its AI-readable column
-      Then the trace behind that column is read with corrections
-      And an evaluator being set up on the same trace reads it as captured
+      Then the column spells out the corrected trace, without the spans the
+      correction deleted
+      And an evaluator being set up on the same trace still gets every span the
+      trace captured
 
     @unit
     Scenario: A page of traces fetches its corrections in one read

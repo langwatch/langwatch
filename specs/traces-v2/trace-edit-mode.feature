@@ -760,6 +760,17 @@ Feature: Editing a trace in the drawer
       Then that attribute is listed with no removed marker
       And its value is not struck through
 
+    # A struck-through row is a way of showing what is gone, and only the table
+    # can draw it. Copying the attributes, or reading them as JSON, hands them on
+    # somewhere with nowhere to strike anything through, so a removed attribute
+    # would arrive there looking like one the span still carries.
+    @integration
+    Scenario: Copying the attributes leaves out the ones the correction removed
+      Given the trace has a correction that removes a span attribute
+      When I copy the attributes of the corrected span
+      Then the copied attributes hold everything the corrected span carries
+      And the removed attribute is not among them
+
     # A correction rewrites a whole attribute record, so an attribute holding
     # JSON comes back re-serialised even when the reviewer never touched it:
     # different spacing, different key order, the same data. Marking that as

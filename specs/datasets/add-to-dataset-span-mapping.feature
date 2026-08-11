@@ -155,6 +155,25 @@ Feature: Span field mapping when adding traces to a dataset
     When I open it without having chosen an expansion before
     Then the span expansion is off
 
+  # A trace carries one annotation or a handful, and asking for them is asking
+  # for each of them, so their expansion is the reading mapping them means. The
+  # spans are the opposite, which is why only some sources come with theirs on.
+  @integration
+  Scenario: Mapping annotations turns their expansion on
+    Given a column that has not been mapped to anything yet
+    When I map it to the annotations source
+    Then the annotation expansion is on
+
+  # An expansion is a choice the reader made, not a property of whichever column
+  # happens to be mapped right now. A source that stops being mapped takes its
+  # switch off the panel, and changing that column back has to bring the reader's
+  # answer back with it rather than start the question over.
+  @integration
+  Scenario: An expansion I turned on survives its column being remapped and mapped back
+    Given a mapping whose span expansion I turned on
+    When I change that column to another source and back to the spans source
+    Then the span expansion is still on
+
   # ============================================================================
   # The mapping preview renders with the SAME cells as the evaluations
   # workbench dataset table: same heights, JSON values formatted, double-click

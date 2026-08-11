@@ -330,6 +330,34 @@ describe("AttributeTable editing", () => {
       });
     });
 
+    describe("when the corrected span's attributes are copied", () => {
+      /** @scenario "Copying the attributes leaves out the ones the correction removed" */
+      it("hands on what the span carries, without the removed row", () => {
+        const writeText = vi.fn().mockResolvedValue(undefined);
+        Object.defineProperty(navigator, "clipboard", {
+          configurable: true,
+          value: { writeText },
+        });
+        const { getByLabelText } = render(
+          <ChakraProvider value={defaultSystem}>
+            <AttributeTable
+              attributes={{ "gen_ai.request.model": "gpt-5" }}
+              correctedFrom={{
+                "gen_ai.request.model": "gpt-5",
+                "user.email": "someone@acme.test",
+              }}
+            />
+          </ChakraProvider>,
+        );
+
+        fireEvent.click(getByLabelText("Copy all attributes"));
+
+        expect(writeText).toHaveBeenCalledTimes(1);
+        const copied = JSON.parse(writeText.mock.calls[0]![0] as string);
+        expect(copied).toEqual({ gen_ai: { request: { model: "gpt-5" } } });
+      });
+    });
+
     describe("when the captured trace renders", () => {
       /** @scenario "An attribute the correction removes reads plainly in the captured trace" */
       it("reads like any other row, with nothing said about the removal", () => {

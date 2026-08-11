@@ -116,11 +116,29 @@ describe("useSpanTree with a correction", () => {
 
       /** @scenario "A deleted span is listed and struck through in the corrected trace" */
       it("leaves a removed row saying what the trace had, not what the edit renamed", () => {
+        // The same correction renames the span it deletes. A row whose whole
+        // point is showing what the trace had must not be dressed up by it.
+        overlay.current = {
+          traceId: "trace-1",
+          patch: {
+            version: 1,
+            spans: [
+              { spanId: "root", name: "conversation turn" },
+              { spanId: "tool", name: "search the web" },
+            ],
+            deletedSpanIds: ["tool"],
+          },
+        };
+
         const { result } = renderHook(() => useSpanTreeWithCaptured());
+        const removed = result.current.display.data?.find(
+          (s) => s.spanId === "tool",
+        );
         const kept = result.current.display.data?.find(
           (s) => s.spanId === "root",
         );
 
+        expect(removed?.name).toBe("web_search");
         // The rename still lands on the rows the correction kept.
         expect(kept?.name).toBe("conversation turn");
       });

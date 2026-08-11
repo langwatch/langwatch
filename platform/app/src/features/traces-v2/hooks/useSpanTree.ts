@@ -165,7 +165,7 @@ export function useSpanTreeWithCaptured() {
   const displayData = useMemo(
     () =>
       nodes
-        ? applyOverlayToSpanTreeNodes({ nodes, patch, keepDeleted: true })
+        ? applyOverlayToSpanTreeNodes({ nodes, patch, shouldKeepDeleted: true })
         : nodes,
     [nodes, patch],
   );

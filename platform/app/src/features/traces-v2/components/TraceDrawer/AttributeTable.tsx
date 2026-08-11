@@ -266,11 +266,6 @@ interface AttributeCorrection {
 }
 
 /**
- * The captured key one flat key sits underneath, when the capture had one.
- * Walks the dotted path from the longest prefix down, so the nearest captured
- * ancestor wins.
- */
-/**
  * How one row differs from what the trace captured, or null when it says the
  * same thing. A key the correction took away is marked removed rather than
  * dropped; one the capture never had at all was added, unless it is a leaf of a
@@ -301,6 +296,11 @@ function correctionForKey({
     : { original: formatValue(capturedFlat[ancestor]) };
 }
 
+/**
+ * The captured key one flat key sits underneath, when the capture had one.
+ * Walks the dotted path from the longest prefix down, so the nearest captured
+ * ancestor wins.
+ */
 function capturedAncestorKey({
   key,
   capturedFlat,
@@ -1010,6 +1010,7 @@ function rowMarkersFor({
 function AttrSection({
   title,
   attributes,
+  jsonAttributes,
   viewMode,
   source,
   labelWidth,
@@ -1024,6 +1025,12 @@ function AttrSection({
 }: {
   title: string;
   attributes: Record<string, unknown>;
+  /**
+   * What the JSON view quotes, when that is not the rows listed. A removal is a
+   * row the flat view strikes through; JSON has nowhere to draw that, so it
+   * quotes the attributes as the correction left them.
+   */
+  jsonAttributes?: Record<string, unknown>;
   viewMode: AttrViewMode;
   source: PinnedAttributeSource;
   labelWidth: number;
@@ -1051,6 +1058,10 @@ function AttrSection({
   const { pins, isPinned, togglePin } = usePinnedAttributes(project?.id);
 
   const flat = useMemo(() => flattenAttributes(attributes), [attributes]);
+  const jsonFlat = useMemo(
+    () => (jsonAttributes ? flattenAttributes(jsonAttributes) : flat),
+    [jsonAttributes, flat],
+  );
   const leading = useMemo(() => new Set(leadingKeys ?? []), [leadingKeys]);
   const pinnedKeys = useMemo(
     () => new Set(pins.filter((p) => p.source === source).map((p) => p.key)),
@@ -1135,7 +1146,7 @@ function AttrSection({
           overflow="auto"
         >
           <PinnedAwareJsonView
-            content={JSON.stringify(buildNestedObject(flat), null, 2)}
+            content={JSON.stringify(buildNestedObject(jsonFlat), null, 2)}
             pinnedKeys={pinnedKeys}
           />
         </Box>
@@ -1310,13 +1321,12 @@ export function AttributeTable({
     );
   }, [attributes, correctedFrom]);
 
-  const flatAttrs = useMemo(() => {
-    // The removed rows go in first so a correction that re-adds the key under a
-    // different value still reads as that value.
-    const flat = { ...removedKeys, ...flattenAttributes(attributes) };
-    // Attributes the correction adds are rows in their own right; ones it
-    // removes keep their captured value so the struck-through row still shows
-    // what is being taken away.
+  // What the span carries once the correction is applied, which is what copying
+  // and the JSON view quote: an attribute the correction took away must not
+  // travel back out as one the span still has.
+  const correctedFlat = useMemo(() => {
+    const flat = flattenAttributes(attributes);
+    // Attributes the correction adds are rows in their own right.
     for (const [key, value] of Object.entries(editing?.edits ?? {})) {
       if (value === null) continue;
       flat[key] = value;
@@ -1324,7 +1334,20 @@ export function AttributeTable({
     // Prepend the span id as a synthetic, copyable first row. A real
     // `span_id` attribute (vanishingly unlikely) still wins via the spread.
     return spanId ? { [SPAN_ID_KEY]: spanId, ...flat } : flat;
-  }, [attributes, spanId, editing?.edits, removedKeys]);
+  }, [attributes, spanId, editing?.edits]);
+
+  // The rows the table lists: everything the corrected span carries, plus the
+  // keys it took away. Those keep their captured value so the struck-through
+  // row still shows what is being taken away, and a correction that re-adds one
+  // under a different value still reads as that value. Rows sort by key, so
+  // where a row goes in makes no difference to where it lands.
+  const flatAttrs = useMemo(() => {
+    const removedRows = Object.entries(removedKeys).filter(
+      ([key]) => !(key in correctedFlat),
+    );
+    if (removedRows.length === 0) return correctedFlat;
+    return { ...correctedFlat, ...Object.fromEntries(removedRows) };
+  }, [correctedFlat, removedKeys]);
   const flatResAttrs = useMemo(
     () =>
       resourceAttributes ? flattenAttributes(resourceAttributes) : undefined,
@@ -1352,6 +1375,13 @@ export function AttributeTable({
     () => filterAttributesBySearch(flatAttrs, searchTerm),
     [flatAttrs, searchTerm],
   );
+  const filterCorrectedAttrs = useMemo(
+    () =>
+      flatAttrs === correctedFlat
+        ? filterAttrs
+        : filterAttributesBySearch(correctedFlat, searchTerm),
+    [flatAttrs, correctedFlat, filterAttrs, searchTerm],
+  );
   const allAttributeKeys = useMemo(
     () => new Set(Object.keys(flatAttrs)),
     [flatAttrs],
@@ -1371,13 +1401,13 @@ export function AttributeTable({
 
   const copyPayload = useMemo(() => {
     const root: Record<string, unknown> = {
-      ...buildNestedObject(filterAttrs),
+      ...buildNestedObject(filterCorrectedAttrs),
     };
     if (filterResAttrs) {
       root.resource = buildNestedObject(filterResAttrs);
     }
     return JSON.stringify(root, null, 2);
-  }, [filterAttrs, filterResAttrs]);
+  }, [filterCorrectedAttrs, filterResAttrs]);
 
   return (
     <Box>
@@ -1405,6 +1435,7 @@ export function AttributeTable({
       <AttrSection
         title={spanAttrTitle}
         attributes={filterAttrs}
+        jsonAttributes={filterCorrectedAttrs}
         viewMode={effectiveViewMode}
         source="attribute"
         labelWidth={labelWidth}

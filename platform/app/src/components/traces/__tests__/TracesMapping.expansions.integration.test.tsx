@@ -148,6 +148,14 @@ function unmappedColumnSelect(): HTMLSelectElement {
   return unmapped;
 }
 
+/** The source dropdown reading the given source, of the only column there is. */
+function columnSourceSelect(source: string): HTMLSelectElement {
+  const selects = screen.getAllByRole<HTMLSelectElement>("combobox");
+  const mapped = selects.find((select) => select.value === source);
+  if (!mapped) throw new Error(`No column is mapped to ${source}`);
+  return mapped;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -245,7 +253,7 @@ describe("given a column that has not been mapped to anything yet", () => {
   });
 
   describe("when I map it to the annotations source", () => {
-    /** @scenario "The span expansion starts off" */
+    /** @scenario "Mapping annotations turns their expansion on" */
     it("turns the annotation expansion on, which is what mapping them means", async () => {
       const user = userEvent.setup();
       render(
@@ -261,6 +269,32 @@ describe("given a column that has not been mapped to anything yet", () => {
       await user.selectOptions(unmappedColumnSelect(), "annotations");
 
       expect(switchNamed("One row per annotation")).toBeChecked();
+    });
+  });
+});
+
+describe("given a mapping whose span expansion the reader turned on", () => {
+  describe("when its column is remapped to another source and back", () => {
+    /** @scenario "An expansion I turned on survives its column being remapped and mapped back" */
+    it("comes back on rather than starting the choice over", async () => {
+      const user = userEvent.setup();
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <ControlledMapping
+            mapping={{ spans_column: { source: "spans" } }}
+            expansions={["spans.all.span_id"]}
+            targetFields={["spans_column"]}
+          />
+        </ChakraProvider>,
+      );
+      expect(switchNamed("One row per span")).toBeChecked();
+      const columnSource = columnSourceSelect("spans");
+
+      await user.selectOptions(columnSource, "trace_id");
+      await user.selectOptions(columnSource, "spans");
+
+      expect(switchNamed("One row per span")).toBeChecked();
+      expect(lastReportedExpansions()).toEqual(["spans.all.span_id"]);
     });
   });
 });

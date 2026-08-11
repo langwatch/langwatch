@@ -144,12 +144,16 @@ const FIELD_NAME_ANY_LABEL: Record<string, string> = {
   events: "* (any event)",
 };
 
-/** Dedupe {key,label} options by key, preserving first-seen order. */
 /** Whether two expansion selections say the same thing. */
-const sameExpansions = (
-  a: Set<keyof typeof TRACE_EXPANSIONS>,
-  b: Set<keyof typeof TRACE_EXPANSIONS>,
-): boolean => a.size === b.size && Array.from(a).every((key) => b.has(key));
+const sameExpansions = ({
+  expansions,
+  other,
+}: {
+  expansions: Set<keyof typeof TRACE_EXPANSIONS>;
+  other: Set<keyof typeof TRACE_EXPANSIONS>;
+}): boolean =>
+  expansions.size === other.size &&
+  Array.from(expansions).every((key) => other.has(key));
 
 /**
  * The expansions after a column is mapped to a new source.
@@ -178,6 +182,7 @@ const expansionsAfterMapping = ({
   return new Set([...expansions, expandableBy]);
 };
 
+/** Dedupe {key,label} options by key, preserving first-seen order. */
 const dedupeKeyOptions = (options: KeyOption[]): KeyOption[] => {
   const seen = new Set<string>();
   const result: KeyOption[] = [];
@@ -492,10 +497,10 @@ export const TracesMapping = ({
     const mappingChanged =
       JSON.stringify(traceMappingState.mapping) !==
       JSON.stringify(traceMappingStateWithDefaults.mapping);
-    const expansionsChanged = !sameExpansions(
-      traceMappingState.expansions,
-      traceMappingStateWithDefaults.expansions,
-    );
+    const expansionsChanged = !sameExpansions({
+      expansions: traceMappingState.expansions,
+      other: traceMappingStateWithDefaults.expansions,
+    });
 
     if (
       !isInitializedRef.current ||
@@ -817,7 +822,7 @@ export const TracesMapping = ({
                                 : undefined;
 
                               const newExpansions = expansionsAfterMapping({
-                                expansions,
+                                expansions: prev.expansions,
                                 targetMapping,
                                 availableExpansions,
                               });
