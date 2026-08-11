@@ -5,6 +5,7 @@ import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import {
   type AnnotationWithUser,
+  annotationRatingExportLabel,
   groupedAnnotationsToRows,
   suggestionExportLine,
 } from "~/components/annotations/annotationRow";
@@ -155,7 +156,7 @@ export default function Annotations() {
           suggestionExportLine({ annotation, traceId: annotation.traceId }),
           annotation.comment ?? "",
           annotation.traceId ?? "",
-          annotation.isThumbsUp ? "Thumbs Up" : "Thumbs Down",
+          annotationRatingExportLabel(annotation.isThumbsUp),
           JSON.stringify(annotation.scoreOptions ?? {}),
           annotation.createdAt?.toLocaleString() ?? "",
         ];
