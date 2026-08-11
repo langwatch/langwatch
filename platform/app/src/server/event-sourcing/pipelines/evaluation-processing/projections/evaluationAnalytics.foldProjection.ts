@@ -20,6 +20,7 @@ import {
   evaluationScheduledEventSchema,
   evaluationStartedEventSchema,
 } from "../schemas/events";
+import { verdictPassedOf, verdictScoreOf } from "../verdictGate";
 
 /**
  * ADR-034 Phase 6 — slim per-evaluation fold projection.
@@ -92,12 +93,17 @@ const evaluationAnalyticsEvents = [
  *  unstarted evaluation and it is treated as a store miss (see
  *  `EvaluationAnalyticsStore.getWithApplied`).
  *
- *  2026-08-11 — Passed/Score are now gated on `status === "processed"`: a
- *  verdict attached to an errored/skipped run folds to NULL instead of being
- *  persisted as a real pass/fail. A row at the older version may carry an
- *  ungated verdict, so it must not be decoded as current state. */
+ *  NOT bumped for the #6833 verdict gate (Passed/Score null unless
+ *  status === "processed"), deliberately: any event that rewrites the row
+ *  overwrites Passed/Score wholesale from the (now gated) event data, a row
+ *  that receives no further event is never re-projected regardless of the
+ *  stamp, and nothing filters on Version at read time — historical rows are
+ *  covered by the Status predicates in the rollup/slim query builders
+ *  instead. A bump here would only trigger a refold wave and reset the
+ *  refoldOnStoreMiss deletion clock (dev/docs/adr/066, ADR-071) for no
+ *  correctness gain. */
 export const EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST =
-  "2026-08-11" as const;
+  "2026-07-27" as const;
 
 /**
  * How far an evaluation's OccurredAt (the partition column) may sit from the
@@ -381,29 +387,6 @@ export function evaluationAnalyticsStateFromRow(
 /** The valid `status` union values, for the read-back guard. */
 const EVALUATION_STATUS_VALUES: ReadonlySet<EvaluationAnalyticsData["status"]> =
   new Set(["scheduled", "in_progress", "processed", "error", "skipped"]);
-
-/**
- * A verdict (passed/score) is only real when the evaluator actually ran to
- * completion. Producers may attach `passed: false` alongside `status: "error"`
- * (the SDKs expose them as independent params), and an errored run's verdict
- * must not reach analytics as a real fail — it poisons pass-rate charts and
- * fires "evaluation failed" triggers on provider timeouts. Gate once here, at
- * the fold, so every downstream reader of the slim row inherits the guard.
- */
-function verdictPassedOf(data: {
-  status: "processed" | "error" | "skipped";
-  passed?: boolean | null;
-}): boolean | null {
-  return data.status === "processed" ? (data.passed ?? null) : null;
-}
-
-function verdictScoreOf(data: {
-  status: "processed" | "error" | "skipped";
-  score?: number | null;
-}): number | null {
-  if (data.status !== "processed") return null;
-  return typeof data.score === "number" ? data.score : null;
-}
 
 /**
  * Merge a passthrough event metadata bag into the slim attributes map.
