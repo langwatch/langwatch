@@ -6,7 +6,7 @@
 
 **Relates to:** [ADR-004](./004-docker-dev-environment.md) (process roles; the collector today runs in every role), [ADR-052](./052-automations-on-process-manager-substrate.md) (deleted the previous Redis leader lock in favour of revision fencing — the direction this ADR takes a reasoned exception to), [ADR-039](./039-outbox-heartbeat.md) (superseded; the leader-lock design 052 removed), [specs/ops/queue-discovery.feature](../../../specs/ops/queue-discovery.feature) (the last time per-pod ops scanning had to be reined in), [specs/event-sourcing/tenant-soft-cap.feature](../../../specs/event-sourcing/tenant-soft-cap.feature) (owns tenant parking — the concept this ADR's drill-down finally surfaces), [specs/event-sourcing/poison-group-park-guard.feature](../../../specs/event-sourcing/poison-group-park-guard.feature) (the *other* "park", which lives in the blocked set), [specs/ops/dashboard-latency.feature](../../../specs/ops/dashboard-latency.feature) (the latency and peak tiles this ADR relocates into the snapshot).
 
-Behavioural contract: [specs/ops/shared-ops-snapshot.feature](../../../specs/ops/shared-ops-snapshot.feature).
+Behavioural contract: [specs/ops/shared-ops-snapshot.feature](../../../specs/ops/shared-ops-snapshot.feature). The presentation of this data — including the parked drill-down panel — is specified in [specs/ops/ops-dashboard-density.feature](../../../specs/ops/ops-dashboard-density.feature) against the conventions in [dev/docs/best_practices/ops-dashboard.md](../best_practices/ops-dashboard.md).
 
 ## Context
 
