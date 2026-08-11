@@ -82,6 +82,18 @@ Feature: Traces tab pagination controls
     Given the trace list is showing its first page
     Then the "previous page" button is disabled
 
+  # A cursor link can be opened cold — shared, bookmarked, refreshed — and the
+  # walked-cursor stack only exists in the session that walked it. That session
+  # is the only thing that knows which page this is, so the reader is told it
+  # is not the first rather than told a page number nobody computed.
+  @integration @unimplemented
+  Scenario: Opening a cursor link cold still allows going back
+    Given a URL for the Traces tab containing a scrollId I have not walked to
+    When I open that URL
+    Then the "previous page" button is enabled
+    And the position indicator does not claim to be page one
+    And clicking "previous page" returns the list to the first page
+
   # ─── A Rejected Offset ──────────────────────────────────────────
 
   @integration @unimplemented
@@ -106,6 +118,16 @@ Feature: Traces tab pagination controls
     When I change the "Items per page" dropdown to 50
     Then the scrollId is removed from the URL
     And the trace list shows the first page at the new size
+
+  # The footer is shared with lists that really do page by offset. A cursor
+  # position and a row count are both stated in units of the old page size, so
+  # neither survives a resize — the reset has to happen in both modes.
+  @integration @unimplemented
+  Scenario: Changing items per page starts an offset list over too
+    Given an offset-paged list showing a page well past the first
+    When I change the "Items per page" dropdown
+    Then the pageOffset is removed from the URL
+    And the list shows the first page at the new size
 
   @integration @unimplemented
   Scenario: Page size persists across a page reload

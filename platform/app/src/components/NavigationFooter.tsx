@@ -261,6 +261,12 @@ export const useMessagesNavigationFooter = (
           pathname: router.pathname,
           query: buildPaginationQuery({
             pageSize: size,
+            // Resizing means starting over in BOTH modes: a cursor describes a
+            // position at the old size, and an offset counts rows at the old
+            // size, so keeping either lands the user in the wrong place. In
+            // cursor mode the offset is stripped from the URL anyway, which is
+            // why this is safe to pass unconditionally.
+            pageOffset: 0,
             scrollId: null,
           }),
         },
@@ -300,6 +306,9 @@ export const useMessagesNavigationFooter = (
         pathname: router.pathname,
         query: buildPaginationQuery({
           pageSize: DEFAULT_PAGE_SIZE,
+          // A new search is a new result set, so neither a cursor nor an offset
+          // into the old one survives it. Same reasoning as changePageSize.
+          pageOffset: 0,
           scrollId: null,
         }),
       },
@@ -372,9 +381,17 @@ export function MessagesNavigationFooter({
 
   const isCursorMode = mode === "cursor";
 
-  const isPrevDisabled = isCursorMode
-    ? cursorPageNumber <= 1
-    : pageOffset === 0;
+  // A cursor URL can be opened cold — shared, bookmarked, or refreshed — and
+  // the walked-cursor stack only exists in the session that walked it. Keying
+  // "previous" on the counter left that user with a dead button on a page they
+  // could plainly see was not the first. It is keyed on the cursor in the URL
+  // instead: with nothing walked, `prevPage` drops the cursor and returns to
+  // the first page, which is the only place keyset paging can go back to.
+  const isPrevDisabled = isCursorMode ? !isPastFirstPage : pageOffset === 0;
+  // Cold-opened, the counter says 1 while the list shows some later page, so
+  // the position is genuinely unknown rather than known-to-be-one. Saying so is
+  // better than printing a number we would be inventing.
+  const isPositionUnknown = isPastFirstPage && cursorPageNumber <= 1;
   // A cursor list is out of pages when the response carried no cursor — which
   // is also true on its first page, so this cannot be keyed on having walked
   // past page one. An offset list is out when the window reaches the total.
@@ -408,7 +425,9 @@ export function MessagesNavigationFooter({
       <HStack gap={3} paddingRight={3}>
         <Text flexShrink={0}>
           {isCursorMode && isPastFirstPage
-            ? `Page ${cursorPageNumber} of about ${estimatedTotalPages} (${totalHits} total items)`
+            ? isPositionUnknown
+              ? `Resumed from a link, in about ${estimatedTotalPages} pages (${totalHits} total items)`
+              : `Page ${cursorPageNumber} of about ${estimatedTotalPages} (${totalHits} total items)`
             : `${pageOffset + 1}-${Math.min(
                 pageOffset + pageSize,
                 totalHits,
