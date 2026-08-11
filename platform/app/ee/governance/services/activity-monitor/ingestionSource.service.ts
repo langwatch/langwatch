@@ -407,10 +407,18 @@ export class IngestionSourceService {
           "Credentials cannot be submitted in their stored form. Re-enter the secret to change this source, or omit it to keep the current one.",
         );
       }
-      if (incoming.credentials === undefined) {
-        const stored = (existing.parserConfig as Record<string, unknown>) ?? {};
-        if (stored.credentials !== undefined) {
-          incoming.credentials = stored.credentials;
+      // Carry across every key a client is never shown. `credentials` is one;
+      // the `_`-prefixed internals are the rest, and `_rotation` is the one
+      // that bites — it holds the previous secret's hash for the 24h window
+      // after a rotation, so an edit landing inside that window used to cut the
+      // grace short and start rejecting upstream clients that had not rolled
+      // over yet. A client cannot send back what it never received, so absent
+      // must mean "unchanged" for all of them, not just the secret.
+      const stored = (existing.parserConfig as Record<string, unknown>) ?? {};
+      for (const key of Object.keys(stored)) {
+        const hiddenFromClients = key === "credentials" || key.startsWith("_");
+        if (hiddenFromClients && incoming[key] === undefined) {
+          incoming[key] = stored[key];
         }
       }
       assertPullDestinationAllowed(incoming);

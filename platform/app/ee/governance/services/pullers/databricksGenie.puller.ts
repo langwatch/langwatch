@@ -1644,6 +1644,15 @@ export class DatabricksGeniePuller
     try {
       return await run();
     } catch (error) {
+      // NOTE: a `BudgetExhaustedError` reaching here would be filed as a failed
+      // read — discarding what this unit had already collected and holding the
+      // watermark for something that only needed another run. It is unreachable
+      // today: every walk preflights the budget, and the one lookup allowed
+      // past it passes `allowOverBudget`. Rethrowing instead is NOT the fix —
+      // `runOnce` catches around the whole sweep and would discard every event
+      // in the run. Making this resumable needs the stop plumbed as a result
+      // rather than an exception, which is only worth doing if a call site ever
+      // makes it reachable.
       logger.error(
         {
           adapter: this.id,
