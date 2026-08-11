@@ -38,6 +38,10 @@ export const STATUS = {
   // red.700 from the shared map so "the evaluator broke" reads as a
   // separate failure mode from "the evaluator ran and said no".
   error: buildStatusTone("error", "ERROR"),
+  // Evaluator completed but produced no verdict — no score was assigned,
+  // no pass/fail was decided. Neutral blue keeps it from competing with
+  // real pass/fail rows while still showing that the evaluator ran.
+  processed: buildStatusTone("processed", "PROCESSED"),
 } as const;
 
 /**
@@ -46,7 +50,7 @@ export const STATUS = {
  * meaningless and should be suppressed.
  */
 export function isNoVerdict(status: EvalSummary["status"]): boolean {
-  return status === "skipped" || status === "error";
+  return status === "skipped" || status === "error" || status === "processed";
 }
 
 /**
