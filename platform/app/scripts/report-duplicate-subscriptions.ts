@@ -25,12 +25,12 @@
  * Usage:
  *   DATABASE_URL=postgres://... pnpm tsx scripts/report-duplicate-subscriptions.ts
  */
-import { type Prisma, PrismaClient } from "../src/generated/prisma/client";
-import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 import {
   compareBySubscriptionOrder,
   SubscriptionStatus,
 } from "../ee/billing/planTypes";
+import { type Prisma, PrismaClient } from "../src/generated/prisma/client";
+import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 
 const SUBSCRIPTION_SELECT = {
   id: true,
