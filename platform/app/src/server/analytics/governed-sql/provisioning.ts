@@ -161,12 +161,25 @@ export interface GovernedTable {
 export interface GovernedResourceLimits {
   maxExecutionTimeSeconds: number;
   maxMemoryUsageBytes: number;
+  /** Concurrency ceiling, so one governed query cannot saturate the server's cores. */
+  maxThreads: number;
+  /**
+   * Scan ceilings, enforced with `read_overflow_mode = 'throw'`: a query that
+   * would read past either bound fails with a coded error instead of silently
+   * returning a partial result — partial data that looks complete is the worse
+   * failure for an analytics caller.
+   */
+  maxRowsToRead: number;
+  maxBytesToRead: number;
 }
 
 /** Measured working against `clickhouse/clickhouse-server:25.10.2.65`. */
 export const DEFAULT_GOVERNED_RESOURCE_LIMITS: GovernedResourceLimits = {
   maxExecutionTimeSeconds: 10,
   maxMemoryUsageBytes: 1_000_000_000,
+  maxThreads: 4,
+  maxRowsToRead: 1_000_000_000,
+  maxBytesToRead: 10_000_000_000,
 };
 
 /**
@@ -203,7 +216,8 @@ export function qualified(
 }
 
 /**
- * The key-map table: `KeyHash` to `TenantId`, one row per live API key.
+ * The key-map table: `KeyHash` to `TenantId`, one row per project — the hash
+ * of `Project.governedSqlKey`, not of any credential a caller holds.
  *
  * Deliberately a table rather than a ClickHouse dictionary. A dictionary form
  * (`dictGetOrDefault(...)` inside the policy) requires granting `dictGet` on the
@@ -248,7 +262,11 @@ export function governedSettingsProfileStatement({
     `  SETTINGS ${names.tenantSetting} = '' CHANGEABLE_IN_READONLY,\n` +
     `           readonly = 1 CONST,\n` +
     `           max_execution_time = ${limits.maxExecutionTimeSeconds} CONST,\n` +
-    `           max_memory_usage = ${limits.maxMemoryUsageBytes} CONST`
+    `           max_memory_usage = ${limits.maxMemoryUsageBytes} CONST,\n` +
+    `           max_threads = ${limits.maxThreads} CONST,\n` +
+    `           max_rows_to_read = ${limits.maxRowsToRead} CONST,\n` +
+    `           max_bytes_to_read = ${limits.maxBytesToRead} CONST,\n` +
+    `           read_overflow_mode = 'throw' CONST`
   );
 }
 

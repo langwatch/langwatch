@@ -467,7 +467,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
       table: `${database}.${harness.names.keyMapTable}`,
       format: "JSONEachRow",
       values: [openProject, gatedProject].map((project) => ({
-        KeyHash: governedTenantCapability({ apiKey: project.apiKey }),
+        KeyHash: governedTenantCapability({ secret: project.governedSqlKey }),
         TenantId: project.id,
       })),
     });
@@ -1338,7 +1338,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
       // project is the other tenant, and its very existence is one of the
       // things an error must not disclose.
       const capability = governedTenantCapability({
-        apiKey: gatedProject.apiKey,
+        secret: gatedProject.governedSqlKey,
       });
 
       // Control, one layer down: the session facts asserted absent below are
@@ -1397,6 +1397,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
         harness.names.keyMapTable,
         openProject.id,
         openProject.apiKey,
+        openProject.governedSqlKey,
         ...GOVERNED_VIEW_CATALOG.map((view) => view.sourceTable),
         facts,
         ...relayed,
