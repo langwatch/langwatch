@@ -60,14 +60,24 @@ function parseFileUri(uri: string): string {
   // Callers should still keep each segment a single component; this is the
   // backstop that makes a mistake there fail loudly instead of writing outside
   // the object root.
-  const resolved = path.resolve(decoded);
-  if (resolved !== decoded) {
+  //
+  // The check is on `..` segments specifically, NOT on "is the decoded path
+  // already canonical". Those are not the same test, and the stricter one is
+  // wrong: a storage root configured with a trailing slash — which
+  // `LANGWATCH_LOCAL_STORAGE_PATH` and the chart's
+  // `app.storedObjects.localFilesystem.path` both accept — mints
+  // `file:///root//project/object`, whose decoded form is non-canonical and
+  // completely harmless. Refusing it would break every local-filesystem write
+  // (dataset uploads, scenario media, the queue's durable blob tier) on those
+  // installs, none of which is what this guard is here for. A redundant
+  // separator is sloppy; only `..` escapes.
+  if (decoded.split("/").includes("..")) {
     throw new Error(
-      `LocalFilesystemDriver refuses a file: URI whose decoded path is not already canonical — ` +
+      `LocalFilesystemDriver refuses a file: URI whose decoded path contains a ".." segment — ` +
         `it resolves outside the location it names. Keep every path segment a single component.`,
     );
   }
-  return resolved;
+  return path.resolve(decoded);
 }
 
 /**

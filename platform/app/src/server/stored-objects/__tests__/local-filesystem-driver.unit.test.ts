@@ -281,3 +281,28 @@ describe("given a URI whose encoded segment decodes into path separators", () =>
     await expect(fs.access(escaped)).rejects.toThrow();
   });
 });
+
+describe("given a storage root configured with a trailing slash", () => {
+  // `LANGWATCH_LOCAL_STORAGE_PATH` and the chart's
+  // `app.storedObjects.localFilesystem.path` both accept one, so the minted URI
+  // carries a doubled separator. That is not a traversal, and refusing it would
+  // break every local-filesystem write on those installs — datasets and
+  // scenario media included, none of which this containment check is about.
+  it("stores and reads back through the collapsed path", async () => {
+    const uri = mintFileUri({
+      root: `${tmpDir}/`,
+      projectId: "proj-1",
+      sha256: "abc123",
+    });
+    expect(uri).toContain("//proj-1/");
+
+    await driver.put(uri, Buffer.from("payload"), "application/octet-stream");
+
+    expect(await streamToBuffer(await driver.get(uri))).toEqual(
+      Buffer.from("payload"),
+    );
+    await expect(
+      fs.access(path.join(tmpDir, "proj-1", "abc123")),
+    ).resolves.toBeUndefined();
+  });
+});
