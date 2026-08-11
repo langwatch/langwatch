@@ -213,6 +213,70 @@ describe("NotificationService", () => {
     });
   });
 
+  describe("sendSlackBillingThresholdFailureAlert()", () => {
+    const context = {
+      stripeSubscriptionId: "sub_stripe_1",
+      reason: "stripe down",
+    };
+
+    describe("when SLACK_CHANNEL_SUBSCRIPTIONS is set", () => {
+      it("sends to the subscriptions channel with the subscription and reason", async () => {
+        // Inject the webhook factory so the channel URL is observable: the
+        // suite-wide @slack/webhook mock discards the constructor argument,
+        // which would let a wrong-channel regression pass unnoticed.
+        const createSlackWebhook = vi.fn(() => ({ send: mockSlackSend }));
+        const scopedService = NotificationService.create({
+          config: {
+            ...config,
+            slackSubscriptionsChannel: "https://hooks.slack.com/subs",
+            slackPlanLimitChannel: "https://hooks.slack.com/limits",
+          },
+          createSlackWebhook,
+        });
+
+        await scopedService.sendSlackBillingThresholdFailureAlert(context);
+
+        expect(createSlackWebhook).toHaveBeenCalledWith(
+          "https://hooks.slack.com/subs",
+        );
+        expect(mockSlackSend).toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: expect.stringContaining("sub_stripe_1"),
+          }),
+        );
+        expect(mockSlackSend).toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: expect.stringContaining("stripe down"),
+          }),
+        );
+      });
+    });
+
+    describe("when SLACK_CHANNEL_SUBSCRIPTIONS is not set", () => {
+      it("returns without sending", async () => {
+        config.slackSubscriptionsChannel = undefined;
+
+        await service.sendSlackBillingThresholdFailureAlert(context);
+
+        expect(mockSlackSend).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when Slack webhook fails", () => {
+      it("catches the error so checkout is never affected", async () => {
+        config.slackSubscriptionsChannel = "https://hooks.slack.com/subs";
+
+        const error = new Error("webhook error");
+        mockSlackSend.mockRejectedValueOnce(error);
+
+        await expect(
+          service.sendSlackBillingThresholdFailureAlert(context),
+        ).resolves.toBeUndefined();
+        expect(captureException).toHaveBeenCalledWith(error);
+      });
+    });
+  });
+
   describe("sendSlackSubscriptionEvent()", () => {
     describe("when SLACK_CHANNEL_SUBSCRIPTIONS is not set", () => {
       it("returns without sending", async () => {
