@@ -110,6 +110,7 @@ const detail = (over: Partial<DetailSnapshot> = {}): DetailSnapshot => ({
 describe("mergeSnapshots", () => {
   describe("given a live and a detail artifact", () => {
     describe("when two reader pods merge the same pair", () => {
+      /** @scenario "Two reader pods serve identical dashboard data" */
       it("produces identical payloads", () => {
         const podA = mergeSnapshots({ live: live(), detail: detail() });
         const podB = mergeSnapshots({ live: live(), detail: detail() });
@@ -118,6 +119,7 @@ describe("mergeSnapshots", () => {
       });
     });
 
+    /** @scenario "The live artifact carries exact counts, not sampled ones" */
     it("derives the headline counts from the exact per-queue figures", () => {
       const merged = mergeSnapshots({ live: live(), detail: detail() });
 
@@ -134,6 +136,7 @@ describe("mergeSnapshots", () => {
       expect(merged?.parkedTenantsBound).toEqual({ included: 1, total: 1 });
     });
 
+    /** @scenario "Readers surface staleness instead of hiding it" */
     it("reports the age of both artifacts and who wrote them", () => {
       const merged = mergeSnapshots({ live: live(), detail: detail() });
 
@@ -147,6 +150,7 @@ describe("mergeSnapshots", () => {
   });
 
   describe("given a bounded parked section", () => {
+    /** @scenario "Bounded sections of the detail artifact are labelled, never silent" */
     it("reports how many exist, not just how many shipped", () => {
       const merged = mergeSnapshots({
         live: live(),
@@ -162,6 +166,7 @@ describe("mergeSnapshots", () => {
 
   describe("given no live artifact", () => {
     describe("when a reader merges", () => {
+      /** @scenario "No snapshot yet renders the loading state, not an error" */
       it("returns nothing, so the page shows loading rather than zeroes", () => {
         expect(mergeSnapshots({ live: null, detail: detail() })).toBeNull();
       });

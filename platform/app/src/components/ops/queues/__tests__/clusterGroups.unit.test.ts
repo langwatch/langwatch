@@ -19,6 +19,7 @@ const fanOut = (indexes: number[]) =>
 describe("clusterGroups", () => {
   describe("given a fan-out of one trace across many groups", () => {
     describe("when the rows are clustered", () => {
+      /** @scenario "A fan-out collapses into one row per cluster" */
       it("collapses them to a single row", () => {
         const clusters = clusterGroups(fanOut([41, 52, 15, 11, 0]));
 
@@ -48,6 +49,7 @@ describe("clusterGroups", () => {
 
   describe("given groups that share no stem", () => {
     describe("when the rows are clustered", () => {
+      /** @scenario "Groups that share no prefix are not clustered" */
       it("leaves each on its own row", () => {
         const clusters = clusterGroups([
           {
@@ -159,6 +161,7 @@ describe("splitIndexedSuffix", () => {
 
 describe("middleEllipsis", () => {
   describe("given an identifier longer than the budget", () => {
+    /** @scenario "A long identifier stays readable and copyable" */
     it("keeps both ends visible", () => {
       const out = middleEllipsis(`${TRACE}:41`, 24);
 

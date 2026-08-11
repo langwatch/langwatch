@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   LEASE_TTL_SECONDS,
   SNAPSHOT_LEASE_KEY,
@@ -101,6 +101,7 @@ describe("SnapshotRedisRepository", () => {
 
   describe("given a holder that dies without releasing", () => {
     describe("when the lease TTL elapses", () => {
+      /** @scenario "A new writer takes over when the holder stops renewing" */
       it("lets another writer acquire it under a new epoch", async () => {
         const { redis } = makeRepo();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -120,6 +121,7 @@ describe("SnapshotRedisRepository", () => {
 
   describe("given a holder shutting down cleanly", () => {
     describe("when it releases the lease", () => {
+      /** @scenario "Graceful shutdown releases the lease immediately" */
       it("frees it without waiting for the TTL", async () => {
         const { redis } = makeRepo();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -140,6 +142,7 @@ describe("SnapshotRedisRepository", () => {
 
   describe("given a writer that already lost the lease", () => {
     describe("when it tries to renew or release", () => {
+      /** @scenario "Losing the lease mid-flight does not corrupt the snapshot" */
       it("does neither, leaving the new holder untouched", async () => {
         const { redis } = makeRepo();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -214,6 +217,7 @@ describe("parseSnapshot", () => {
   });
 
   describe("given a snapshot carrying an unknown version", () => {
+    /** @scenario "A snapshot with an unknown version is treated as absent" */
     it("treats it as absent rather than coercing it", () => {
       const future = { ...validLive, version: SNAPSHOT_VERSION + 1 };
       expect(

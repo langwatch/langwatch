@@ -25,6 +25,7 @@ describe("axisTicks", () => {
         expect(counts).toHaveLength(AXIS_INTERVALS + 1);
       });
 
+      /** @scenario "Both axes share gridlines" */
       it("places every gridline at the same fraction of the plot height", () => {
         // Shared gridlines are the whole point: tick i sits at i/N of the
         // height on BOTH axes, so the two scales never visually contradict.
@@ -74,6 +75,7 @@ describe("axisTicks", () => {
 describe("axisWidthFor", () => {
   describe("given an axis whose values run into the hundreds of thousands", () => {
     describe("when its width is derived", () => {
+      /** @scenario "An axis label is never clipped" */
       it("reserves more room than a small-value axis needs", () => {
         // The bug this replaces: a fixed width sized for "500" clips "500.0k".
         const large = axisWidthFor(axisTicks(500_000), formatAxisValue);

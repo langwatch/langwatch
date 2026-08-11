@@ -24,7 +24,7 @@ Feature: Ops dashboard information density
 
   # ── The stat strip ────────────────────────────────────────────────────
 
-  @unit
+  @unimplemented
   Scenario: The stat strip occupies a single row
     Given the dashboard renders its full set of headline statistics
     When the strip is laid out at desktop width
@@ -38,7 +38,7 @@ Feature: Ops dashboard information density
     Then they are presented together as a single Redis statistic
     And each figure keeps its own label
 
-  @unit
+  @unimplemented
   Scenario: A zero counter is shown, not hidden
     Given the dead-letter queue count is zero
     When the stat strip renders
@@ -52,7 +52,7 @@ Feature: Ops dashboard information density
 
   # ── Health line ───────────────────────────────────────────────────────
 
-  @unit
+  @unimplemented
   Scenario: An all-clear health state collapses to one line
     Given there are no error clusters
     And there are no active tenant anomalies
@@ -60,7 +60,7 @@ Feature: Ops dashboard information density
     Then a single line reports that both are clear
     And no empty card is rendered for either
 
-  @unit
+  @unimplemented
   Scenario: A health problem expands in place
     Given error clusters are present
     When the dashboard renders
@@ -69,21 +69,21 @@ Feature: Ops dashboard information density
 
   # ── Parked explains itself ────────────────────────────────────────────
 
-  @unit
+  @unimplemented
   Scenario: A non-zero parked count offers its explanation
     Given tenants are parked over their in-flight cap
     When the dashboard renders
     Then the parked statistic states that parking is a capacity limit, not a failure
     And it links to the tenants responsible
 
-  @unit
+  @unimplemented
   Scenario: The parked panel names the tenants and their depth
     Given two tenants are parked over cap
     When the operator opens the parked panel
     Then each tenant is listed with its parked group count and how long the oldest has waited
     And the tenants are ordered by parked depth
 
-  @unit
+  @unimplemented
   Scenario: The parked panel is absent when nothing is parked
     Given no tenant is over its in-flight cap
     When the dashboard renders
@@ -91,20 +91,20 @@ Feature: Ops dashboard information density
 
   # ── Pipeline tree ─────────────────────────────────────────────────────
 
-  @unit
+  @unimplemented
   Scenario: Idle pipelines are folded away by default
     Given eighteen pipelines are known and nine of them have no pending, active, or blocked work
     When the pipeline tree renders
     Then only the nine pipelines with work are listed
     And a control offers to reveal the nine idle pipelines, stating how many there are
 
-  @unit
+  @unimplemented
   Scenario: Revealing idle pipelines keeps them distinguishable
     Given idle pipelines have been revealed
     When the pipeline tree renders
     Then the idle pipelines are visually de-emphasized against the working ones
 
-  @unit
+  @unimplemented
   Scenario: A pipeline that becomes busy leaves the idle fold on its own
     Given an idle pipeline is folded away
     When work arrives for that pipeline
@@ -119,7 +119,7 @@ Feature: Ops dashboard information density
     Then they are presented as a single cluster row carrying the member count
     And the row reports the aggregate pending count and the oldest wait across members
 
-  @unit
+  @unimplemented
   Scenario: A cluster expands to its members
     Given a collapsed cluster row
     When the operator expands it
@@ -147,7 +147,7 @@ Feature: Ops dashboard information density
     Then both axes divide their range into the same number of intervals
     And every gridline is shared by both
 
-  @unit
+  @unimplemented
   Scenario: The legend says which axis each series belongs to
     When the chart legend renders
     Then rate series and count series are distinguishable by axis
@@ -158,7 +158,7 @@ Feature: Ops dashboard information density
     When the chart renders
     Then the axis reserves enough width for its longest formatted label
 
-  @unit
+  @unimplemented
   Scenario: A count series stays visible against a much larger sibling
     Given parked groups outnumber pending groups by three orders of magnitude
     When the chart renders
@@ -166,13 +166,13 @@ Feature: Ops dashboard information density
 
   # ── The page as a whole ───────────────────────────────────────────────
 
-  @integration
+  @unimplemented
   Scenario: A healthy platform fits without scrolling
     Given no errors, no anomalies, nothing blocked, and nothing parked
     When the dashboard renders at desktop height
     Then the statistics, chart, and pipeline tree are all reachable without scrolling
 
-  @integration
+  @unimplemented
   Scenario: A problem is reachable without hunting
     Given tenants are parked over cap and error clusters are present
     When the dashboard renders

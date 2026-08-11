@@ -48,7 +48,7 @@ Feature: Operator control over the scheduler
     When the page renders
     Then the header reports the loop as unhealthy with the time of its last tick
 
-  @unit
+  @unimplemented
   Scenario: Schedules are named, not identified by ksuid
     Given a schedule for a target in a project
     When the row renders
@@ -57,13 +57,13 @@ Feature: Operator control over the scheduler
 
   # ── Permission ────────────────────────────────────────────────────────
 
-  @unit
+  @unimplemented
   Scenario: Viewing does not grant control
     Given an operator holding only the ops view permission
     When the page renders
     Then no control that mutates a schedule is offered
 
-  @integration
+  @unimplemented
   Scenario: A control refuses a caller without the manage permission
     Given a caller holding only the ops view permission
     When it attempts to pause a schedule
@@ -71,20 +71,20 @@ Feature: Operator control over the scheduler
 
   # ── Pause and resume ──────────────────────────────────────────────────
 
-  @integration
+  @unimplemented
   Scenario: Pausing stops future runs
     Given an active schedule with no slot in flight
     When the operator pauses it
     Then it is marked inactive
     And the calendar loop does not claim its next slot
 
-  @unit
+  @unimplemented
   Scenario: Pausing says what it does not do
     Given a schedule with a slot already in flight
     When the operator pauses it
     Then the confirmation states that the in-flight run continues
 
-  @integration
+  @unimplemented
   Scenario: Resuming returns the schedule to the calendar
     Given a paused schedule
     When the operator resumes it
@@ -99,14 +99,14 @@ Feature: Operator control over the scheduler
     When the row's actions are opened
     Then clearing the slot is not offered
 
-  @integration
+  @unimplemented
   Scenario: Clearing a stale slot lets the schedule be claimed again
     Given a schedule whose slot has been held past the staleness threshold
     When the operator clears it
     Then the slot is released
     And the schedule can be claimed on the next tick
 
-  @unit
+  @unimplemented
   Scenario: Clearing states the risk it carries
     Given a schedule whose slot has been held past the staleness threshold
     When the operator opens the clear confirmation
@@ -114,7 +114,7 @@ Feature: Operator control over the scheduler
 
   # ── Running now ───────────────────────────────────────────────────────
 
-  @unit
+  @unimplemented
   Scenario: The confirmation names the tenant, not its identifier
     Given a schedule belonging to a project
     When the operator opens the run-now confirmation
@@ -127,7 +127,7 @@ Feature: Operator control over the scheduler
     Then the schedule is made due rather than the target being invoked directly
     And the calendar loop claims and runs it as it would a scheduled slot
 
-  @integration
+  @unimplemented
   Scenario: A manual run is visible as a run
     Given a manual run is in progress
     When the page renders
@@ -153,7 +153,7 @@ Feature: Operator control over the scheduler
   # again". Replaying a delivery is the one shape of this control that
   # intentionally sends a customer the same artifact twice, so it is not
   # offered here at all rather than offered behind a second confirmation.
-  @unit
+  @unimplemented
   Scenario: A slot that has already fired cannot be re-fired from here
     Given a slot that has already fired
     When the operator opens the schedule's actions
@@ -167,7 +167,7 @@ Feature: Operator control over the scheduler
     When the audit trail is read
     Then each action is recorded with its actor, schedule, slot, project, and time
 
-  @unit
+  @unimplemented
   Scenario: Recent operator actions are visible on the page
     Given an operator ran a schedule manually
     When the page renders

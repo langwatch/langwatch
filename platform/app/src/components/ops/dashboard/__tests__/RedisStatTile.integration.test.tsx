@@ -72,6 +72,7 @@ describe("RedisStatTile", () => {
         );
       });
 
+      /** @scenario "Statistic labels are spelled out" */
       it("spells its labels out rather than abbreviating them", () => {
         renderTile();
         // "conns" cost the reader a guess to save a few pixels.
@@ -79,6 +80,7 @@ describe("RedisStatTile", () => {
         expect(tile().textContent).not.toContain("conns");
       });
 
+      /** @scenario "Redis statistics read as one subject" */
       it("carries all three figures in one tile", () => {
         renderTile();
         expect(tile().textContent).toContain("2.98GB");

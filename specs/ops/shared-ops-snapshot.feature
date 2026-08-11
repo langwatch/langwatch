@@ -69,21 +69,21 @@ Feature: Shared ops snapshot with a single elected writer
     Then the blocked count equals the full cardinality of the blocked set
     And the parked count equals the summed depth of every parked tenant
 
-  @unit
+  @unimplemented
   Scenario: The detail artifact clusters every blocked group
     Given 500 blocked groups across three distinct error messages
     When the holder writes the detail artifact
     Then the error clusters cover all 500 groups
     And the cluster counts sum to the blocked tile's count
 
-  @unit
+  @unimplemented
   Scenario: Parked tenants are enumerated with their oldest waiting group
     Given two tenants are over their in-flight cap with parked groups
     When the holder writes the detail artifact
     Then it contains one row per parked tenant
     And each row carries the tenant, queue, group count, and oldest-parked age
 
-  @unit
+  @unimplemented
   Scenario: A slow detail scan does not stall the live cycle
     Given the exhaustive detail scan takes longer than the live interval
     When live cycles elapse during the scan
@@ -105,7 +105,7 @@ Feature: Shared ops snapshot with a single elected writer
     When two different reader pods build the dashboard payload
     Then both payloads are identical, including chart history and peaks
 
-  @unit
+  @unimplemented
   Scenario: Top Errors and the blocked drill-down agree
     Given the detail artifact contains blocked error clusters
     When the dashboard page and the blocked summary are served
@@ -132,7 +132,7 @@ Feature: Shared ops snapshot with a single elected writer
     Then the snapshot is ignored as if missing
     And the reader serves the loading state until a known version appears
 
-  @unit
+  @unimplemented
   Scenario: Peaks and chart history survive a writer failover
     Given a holder has accumulated peaks and thirty minutes of history
     When a different writer takes over the lease
@@ -147,13 +147,13 @@ Feature: Shared ops snapshot with a single elected writer
 
   # ── Drill-down stays live ─────────────────────────────────────────────
 
-  @unit
+  @unimplemented
   Scenario: Expanding a parked tenant lists its groups from live Redis
     Given the detail artifact shows a tenant with parked groups
     When the operator expands that tenant
     Then the parked groups are read from Redis at request time, not from the snapshot
 
-  @unit
+  @unimplemented
   Scenario: Operator actions act on live state, not the snapshot
     Given the snapshot shows a group as blocked
     And the group was unblocked after the snapshot was written
@@ -162,7 +162,7 @@ Feature: Shared ops snapshot with a single elected writer
 
   # ── End to end ────────────────────────────────────────────────────────
 
-  @integration
+  @unimplemented
   Scenario: Writer and reader round-trip through a real Redis
     Given a writer and a reader sharing a real Redis instance
     And queues with pending, blocked, and parked groups

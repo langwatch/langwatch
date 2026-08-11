@@ -58,9 +58,27 @@ export class SchedulerAuditRepository implements SchedulerAuditSink {
         action: true,
         targetId: true,
         projectId: true,
-        user: { select: { name: true, email: true } },
+        userId: true,
       },
     });
+
+    // `AuditLog.userId` is a bare scalar — the model carries no `user`
+    // relation — so actors are resolved in a second bounded lookup rather than
+    // a join. A trail that says `user_2Kx…` answers "who" for nobody.
+    const userIds = [
+      ...new Set(rows.map((row) => row.userId).filter((id) => id !== null)),
+    ] as string[];
+    const actors = new Map<string, string>();
+    if (userIds.length > 0) {
+      const users = await this.prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, name: true, email: true },
+      });
+      for (const user of users) {
+        const label = user.name ?? user.email;
+        if (label) actors.set(user.id, label);
+      }
+    }
 
     return rows.map((row) => ({
       id: row.id,
@@ -68,9 +86,7 @@ export class SchedulerAuditRepository implements SchedulerAuditSink {
       action: row.action,
       scheduleId: row.targetId ?? "",
       projectId: row.projectId,
-      // Name first, email as the fallback: an operator reading a trail wants to
-      // know WHO, and a bare user id answers that for nobody.
-      actor: row.user?.name ?? row.user?.email ?? null,
+      actor: row.userId ? (actors.get(row.userId) ?? null) : null,
     }));
   }
 }

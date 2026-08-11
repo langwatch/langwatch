@@ -2050,6 +2050,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       replay: new ReplayService(new NullReplayRepository()),
       blobStore: new BlobStoreService(new NullBlobStoreRepository()),
       metricsCollector: null,
+      snapshotReader: null,
     },
     commands: {
       traces: {

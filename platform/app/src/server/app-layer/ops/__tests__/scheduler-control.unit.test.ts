@@ -56,6 +56,7 @@ describe("SchedulerOpsService controls", () => {
 
   describe("given a schedule that no longer exists", () => {
     describe("when a control is invoked", () => {
+      /** @scenario "A refused control explains itself in the operator's terms" */
       it("refuses with a cause the operator can act on", async () => {
         const { service } = makeService(null);
 
@@ -70,6 +71,7 @@ describe("SchedulerOpsService controls", () => {
 
   describe("given a paused schedule", () => {
     describe("when an operator runs it now", () => {
+      /** @scenario "An inactive schedule refuses to run" */
       it("refuses, naming the schedule as inactive", async () => {
         const { service, repo } = makeService(record({ active: false }));
 
@@ -85,6 +87,7 @@ describe("SchedulerOpsService controls", () => {
 
   describe("given an active schedule", () => {
     describe("when an operator runs it now", () => {
+      /** @scenario "A manual run goes through the ordinary path" */
       it("makes it due rather than invoking the target directly", async () => {
         const { service, repo } = makeService(record());
 
@@ -150,6 +153,7 @@ describe("SchedulerOpsService controls", () => {
 
   describe("given the loop claims the slot first", () => {
     describe("when the operator's run lands after it", () => {
+      /** @scenario "A manual run racing the calendar loop runs once" */
       it("changes nothing and says the scheduler got there first", async () => {
         const { service, repo } = makeService(record());
         repo.requestImmediateRunForOps.mockResolvedValue(false);
@@ -165,6 +169,7 @@ describe("SchedulerOpsService controls", () => {
 
   describe("given a slot claimed moments ago", () => {
     describe("when an operator tries to clear it", () => {
+      /** @scenario "Clearing is offered only once a slot is genuinely stale" */
       it("refuses, because it is still current", async () => {
         const { service, repo } = makeService(
           record({ currentSlot: at(-1_000), updatedAt: at(-1_000) }),
@@ -261,6 +266,7 @@ describe("SchedulerOpsService controls", () => {
       expect(repo.releaseSlotForOps).not.toHaveBeenCalled();
     });
 
+    /** @scenario "Every control writes an audit record" */
     it("records pause and resume distinctly", async () => {
       const { service, audit } = makeService(record());
 

@@ -24,6 +24,7 @@ const job = (over: Partial<SchedulerJobLike> = {}): SchedulerJobLike => ({
 describe("deriveStatus", () => {
   describe("given a schedule whose next run is in the past", () => {
     describe("when its status is derived", () => {
+      /** @scenario "An overdue schedule reads as overdue, not as a timestamp" */
       it("reads as overdue rather than as a timestamp", () => {
         expect(deriveStatus(job({ nextRunAt: at(-2_520_000) }), NOW)).toBe(
           "overdue",
@@ -94,6 +95,7 @@ describe("needsAttention", () => {
 describe("compareForAttention", () => {
   describe("given overdue, retrying and healthy schedules", () => {
     describe("when the rows are sorted", () => {
+      /** @scenario "Overdue and failing schedules sort above healthy ones" */
       it("puts the ones needing action first", () => {
         const rows = [
           job({ nextRunAt: at(60_000) }),
@@ -129,6 +131,7 @@ describe("compareForAttention", () => {
 describe("summarize", () => {
   describe("given a mix of schedules", () => {
     describe("when the header counts are derived", () => {
+      /** @scenario "The header counts what needs attention" */
       it("counts overdue, failing, due-soon, active and paused", () => {
         const counts = summarize(
           [
@@ -167,6 +170,7 @@ describe("summarize", () => {
 describe("deriveLoopHealth", () => {
   describe("given schedules are overdue and nothing has fired in a long time", () => {
     describe("when loop health is derived", () => {
+      /** @scenario "A stalled calendar loop is the headline, not a row detail" */
       it("reports the loop as unhealthy", () => {
         const health = deriveLoopHealth(
           [job({ nextRunAt: at(-600_000), lastSlot: at(-3_600_000) })],
