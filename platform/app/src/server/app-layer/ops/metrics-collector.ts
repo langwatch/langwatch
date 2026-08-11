@@ -1,4 +1,3 @@
-import { EventEmitter } from "node:events";
 import * as os from "node:os";
 import { createLogger } from "@langwatch/observability";
 import type IORedis from "ioredis";
@@ -9,6 +8,11 @@ import {
   type RedisCpuSample,
 } from "./redis-engine-cpu";
 import type { QueueRepository } from "./repositories/queue.repository";
+import type { SnapshotRepository } from "./snapshot/snapshot.repository";
+import {
+  type DetailSnapshot,
+  SNAPSHOT_VERSION,
+} from "./snapshot/snapshot.types";
 import type {
   DashboardData,
   JobNameMetrics,
@@ -24,15 +28,22 @@ const logger = createLogger("langwatch:ops:metrics-collector");
 const THROUGHPUT_BUFFER_SIZE = 900;
 const METRICS_COLLECT_INTERVAL_MS = 2_000;
 const PENDING_RECONCILE_INTERVAL_MS = 60_000;
-const DASHBOARD_BROADCAST_INTERVAL_MS = 2_000;
 const REDIS_STATE_TTL_SECONDS = 3600;
 const QUEUE_DISCOVERY_INTERVAL_MS = 10_000;
-// Memoize badge counts for 5 seconds. The badge polls every 60s
-// off-route, but this also covers concurrent calls from multiple tabs
-// or layout remounts within the same window.
-const BADGE_CACHE_TTL_MS = 5_000;
 
-export const DASHBOARD_EVENT = "dashboard";
+/**
+ * How often the exhaustive detail scan runs (ADR-090).
+ *
+ * The live cycle is cheap and stays at 2s; the detail cycle walks every blocked
+ * set in full and enumerates parked tenants, which is only affordable because
+ * ONE writer in the fleet runs it. Fifteen seconds keeps the drill-downs
+ * usefully fresh while leaving the exhaustive work firmly in the background.
+ */
+const DETAIL_CYCLE_INTERVAL_MS = 15_000;
+
+/** Bounds on the detail artifact. Every one of these reports itself. */
+const MAX_ERROR_CLUSTERS = 50;
+const MAX_PARKED_TENANTS = 50;
 
 const REDIS_STATE_KEY = "ops:metrics:state";
 const KNOWN_PIPELINES_KEY = "ops:known-pipelines";
@@ -203,6 +214,19 @@ export function buildPipelineTree({
   return tree;
 }
 
+/**
+ * The lease-elected snapshot writer (ADR-090).
+ *
+ * Every pod that can reach Redis starts one of these, but only the pod holding
+ * `ops:snapshot:lease` scans and publishes; the rest idle their loop after a
+ * single `SET NX`. Readers never call into this class — they read the artifacts
+ * it persists, so two browser tabs on different pods cannot disagree.
+ *
+ * The pending-counter reconcile is deliberately NOT lease-gated. It already has
+ * its own cross-instance single-flight marker
+ * (`specs/ops/pending-counter-reconcile.feature`), and stacking the snapshot
+ * lease on top would make several of that spec's scenarios unreachable.
+ */
 export class OpsMetricsCollector {
   private redis: IORedis | Cluster;
   private groupQueueNames: string[] = [];
@@ -252,12 +276,6 @@ export class OpsMetricsCollector {
   private latestTotalCompleted = 0;
   private latestTotalFailed = 0;
   private latestQueues: QueueInfo[] = [];
-  // Memoized badge-counts result. See `getBadgeCounts` for rationale.
-  private badgeCountsCache: {
-    blockedCount: number;
-    dlqCount: number;
-    computedAt: Date;
-  } | null = null;
   private latestRedisInfo: RedisInfo = {
     usedMemoryHuman: "?",
     peakMemoryHuman: "?",
@@ -277,7 +295,6 @@ export class OpsMetricsCollector {
   private currentRedisEngineCpuPercent: number | null = null;
   private collectInterval: ReturnType<typeof setInterval> | null = null;
   private discoveryInterval: ReturnType<typeof setInterval> | null = null;
-  private broadcastInterval: ReturnType<typeof setInterval> | null = null;
   private reconcileInterval: ReturnType<typeof setInterval> | null = null;
   private lastCpuUsage = process.cpuUsage();
   private lastCpuTime = Date.now();
@@ -302,25 +319,33 @@ export class OpsMetricsCollector {
   private isCollecting = false;
   private prevCompleted = new Map<string, number>();
   private prevFailed = new Map<string, number>();
-  private emitter = new EventEmitter();
 
   private queueRepo: QueueRepository;
+  private snapshotRepo: SnapshotRepository | null;
+  /** Identity of this writer in the lease and in every artifact it stamps. */
+  private readonly writerId: string;
+  private leaseEpoch = 0;
+  private holdsLease = false;
+  private lastDetailAt = 0;
+  private detailInFlight = false;
+  /** Latest scan, held so the detail cycle can derive structure without rescanning. */
+  private latestDetail: DetailSnapshot | null = null;
 
   constructor(params: {
     redis: IORedis | Cluster;
     queueRepo: QueueRepository;
+    snapshotRepo?: SnapshotRepository | null;
+    writerId?: string;
   }) {
     this.redis = params.redis;
     this.queueRepo = params.queueRepo;
-    // Each tRPC subscriber adds one listener. The dashboard is admin-only;
-    // raise the cap so we don't get MaxListenersExceededWarning under
-    // multi-tab use without losing the leak signal entirely.
-    this.emitter.setMaxListeners(100);
+    this.snapshotRepo = params.snapshotRepo ?? null;
+    this.writerId = params.writerId ?? `${os.hostname()}:${process.pid}`;
   }
 
-  /** Event emitter used by the tRPC dashboardStream subscription. */
-  getEmitter(): EventEmitter {
-    return this.emitter;
+  /** True while this pod is the fleet's writer. Exposed for tests and logs. */
+  isWriter(): boolean {
+    return this.holdsLease;
   }
 
   async start(): Promise<void> {
@@ -342,14 +367,10 @@ export class OpsMetricsCollector {
       PENDING_RECONCILE_INTERVAL_MS,
     );
     void this.reconcilePending();
-    this.broadcastInterval = setInterval(() => {
-      if (this.emitter.listenerCount(DASHBOARD_EVENT) === 0) return;
-      try {
-        this.emitter.emit(DASHBOARD_EVENT, this.getDashboardData());
-      } catch (err) {
-        logger.warn({ error: err }, "Failed to broadcast dashboard data");
-      }
-    }, DASHBOARD_BROADCAST_INTERVAL_MS);
+    // No broadcast here by design (ADR-090): the writer publishes to Redis and
+    // `OpsSnapshotReader` is what fans out to each pod's subscribers. A writer
+    // that also broadcast would serve its own pod a different payload from
+    // every other pod — the exact divergence this design removes.
   }
 
   stop(): void {
@@ -361,15 +382,22 @@ export class OpsMetricsCollector {
       clearInterval(this.discoveryInterval);
       this.discoveryInterval = null;
     }
-    if (this.broadcastInterval) {
-      clearInterval(this.broadcastInterval);
-      this.broadcastInterval = null;
-    }
     if (this.reconcileInterval) {
       clearInterval(this.reconcileInterval);
       this.reconcileInterval = null;
     }
-    this.emitter.removeAllListeners();
+
+    // Hand the lease back rather than letting it lapse: a clean shutdown that
+    // waits out the TTL leaves the whole fleet without a writer for up to the
+    // lease window, which is exactly the rolling-deploy case.
+    if (this.snapshotRepo && this.holdsLease) {
+      this.holdsLease = false;
+      void this.snapshotRepo
+        .releaseLease({ writerId: this.writerId })
+        .catch((err) => {
+          logger.warn({ error: err }, "Failed to release ops snapshot lease");
+        });
+    }
   }
 
   async discoverQueues(): Promise<void> {
@@ -381,51 +409,6 @@ export class OpsMetricsCollector {
         "Queue discovery failed, keeping existing names",
       );
     }
-  }
-
-  /**
-   * Lightweight per-call summary used by the global ops badge in the
-   * main menu. Pulls only the two integers the badge renders, so the
-   * global poll doesn't drag the full dashboard aggregation
-   * (pipeline tree, error normalization, etc.) into every tRPC batch.
-   * One slow procedure in a tRPC HTTP batch holds back every other
-   * query that fired in the same window.
-   *
-   * The result is memoized for `BADGE_CACHE_TTL_MS` so any burst of
-   * concurrent callers (multiple browser tabs, layout remounts, etc.)
-   * shares a single computation. `latestQueues` is already a cached
-   * snapshot, so this is mostly defense-in-depth — a future change
-   * that makes the per-call work expensive would otherwise silently
-   * regress the badge poll back into the slow tRPC batch path.
-   *
-   * `computedAt` ships back so the caller (and ops dashboards) can
-   * tell exactly how stale the value is.
-   */
-  getBadgeCounts(): {
-    blockedCount: number;
-    dlqCount: number;
-    computedAt: Date;
-  } {
-    const now = Date.now();
-    if (
-      this.badgeCountsCache &&
-      now - this.badgeCountsCache.computedAt.getTime() < BADGE_CACHE_TTL_MS
-    ) {
-      return this.badgeCountsCache;
-    }
-
-    let blockedCount = 0;
-    let dlqCount = 0;
-    for (const q of this.latestQueues) {
-      blockedCount += q.blockedGroupCount;
-      dlqCount += q.dlqCount;
-    }
-    this.badgeCountsCache = {
-      blockedCount,
-      dlqCount,
-      computedAt: new Date(now),
-    };
-    return this.badgeCountsCache;
   }
 
   private async reconcilePending(): Promise<void> {
@@ -563,7 +546,138 @@ export class OpsMetricsCollector {
       jobNameMetrics: this.currentJobNameMetrics,
       pausedKeys: this.currentPausedKeys,
       topErrors,
+      // The writer's own view carries whatever its last detail cycle produced.
+      // Readers get these from the persisted detail artifact instead; this path
+      // exists so the writer can publish and so tests can drive it directly.
+      parkedTenants: this.latestDetail?.parkedTenants ?? [],
+      parkedTenantsBound: this.latestDetail?.parkedTenantsBound ?? {
+        included: 0,
+        total: 0,
+      },
+      errorClustersBound: this.latestDetail?.errorClustersBound ?? {
+        included: topErrors.length,
+        total: topErrors.length,
+      },
+      snapshot: {
+        computedAt: Date.now(),
+        detailComputedAt: this.latestDetail?.computedAt ?? null,
+        writerId: this.writerId,
+        leaseEpoch: this.leaseEpoch,
+      },
     };
+  }
+
+  /** Cheap artifact: exact counts, rates, peaks and the rolling history. */
+  private async publishLive(): Promise<void> {
+    if (!this.snapshotRepo) return;
+    const data = this.getDashboardData();
+    const mem = process.memoryUsage();
+    try {
+      await this.snapshotRepo.writeLive({
+        version: SNAPSHOT_VERSION,
+        computedAt: Date.now(),
+        writerId: this.writerId,
+        leaseEpoch: this.leaseEpoch,
+        queues: data.queues,
+        totalGroups: data.totalGroups,
+        totalPendingJobs: data.totalPendingJobs,
+        pendingDrift: data.pendingDrift,
+        throughputIngestedPerSec: data.throughputIngestedPerSec,
+        completedPerSec: data.completedPerSec,
+        failedPerSec: data.failedPerSec,
+        totalCompleted: data.totalCompleted,
+        totalFailed: data.totalFailed,
+        peakCompletedPerSec: data.peakCompletedPerSec,
+        peakFailedPerSec: data.peakFailedPerSec,
+        peakIngestedPerSec: data.peakIngestedPerSec,
+        latencyP50Ms: data.latencyP50Ms,
+        latencyP99Ms: data.latencyP99Ms,
+        peakLatencyP50Ms: data.peakLatencyP50Ms,
+        peakLatencyP99Ms: data.peakLatencyP99Ms,
+        redisMemoryUsedBytes: data.redisMemoryUsedBytes,
+        redisMemoryPeakBytes: data.redisMemoryPeakBytes,
+        redisMemoryMaxBytes: data.redisMemoryMaxBytes,
+        redisConnectedClients: data.redisConnectedClients,
+        redisEngineCpuPercent: data.redisEngineCpuPercent,
+        processCpuPercent: data.processCpuPercent,
+        processMemoryUsedMb: Math.round(mem.rss / 1024 / 1024),
+        processMemoryTotalMb: Math.round(os.totalmem() / 1024 / 1024),
+        pausedKeys: data.pausedKeys,
+        throughputHistory: data.throughputHistory,
+      });
+    } catch (err) {
+      logger.warn({ error: err }, "Failed to publish live ops snapshot");
+    }
+  }
+
+  /**
+   * Exhaustive artifact, on its own slower cadence.
+   *
+   * Deliberately NOT awaited by the caller: the detail scan walks every blocked
+   * set in full, and a slow one must never delay the live cycle or — far worse
+   * — the lease renewal that keeps this pod the writer. Overrun shows up as a
+   * stale `computedAt`, which readers surface, rather than as a lost lease.
+   */
+  private maybePublishDetail(queues: QueueInfo[]): void {
+    if (!this.snapshotRepo) return;
+    if (this.detailInFlight) return;
+    if (Date.now() - this.lastDetailAt < DETAIL_CYCLE_INTERVAL_MS) return;
+
+    this.detailInFlight = true;
+    void (async () => {
+      try {
+        const [blocked, parked] = await Promise.all([
+          this.queueRepo.getBlockedSummary({
+            queueNames: this.groupQueueNames,
+          }),
+          this.queueRepo.enumerateParkedTenants({
+            queueNames: this.groupQueueNames,
+            maxTenants: MAX_PARKED_TENANTS,
+          }),
+        ]);
+
+        const treeSeedKeys = [
+          ...new Set([...this.currentPausedKeys, ...this.knownPipelinePaths]),
+        ];
+
+        const detail: DetailSnapshot = {
+          version: SNAPSHOT_VERSION,
+          computedAt: Date.now(),
+          writerId: this.writerId,
+          leaseEpoch: this.leaseEpoch,
+          topErrors: blocked.clusters.slice(0, MAX_ERROR_CLUSTERS),
+          errorClustersBound: {
+            included: Math.min(blocked.clusters.length, MAX_ERROR_CLUSTERS),
+            total: blocked.clusters.length,
+          },
+          parkedTenants: parked.tenants,
+          parkedTenantsBound: {
+            included: parked.tenants.length,
+            total: parked.total,
+          },
+          pipelineTree: buildPipelineTree({ queues, seedKeys: treeSeedKeys }),
+          phases: this.currentPhases,
+          jobNameMetrics: this.currentJobNameMetrics,
+        };
+
+        this.latestDetail = detail;
+        await this.snapshotRepo!.writeDetail(detail);
+        this.lastDetailAt = Date.now();
+      } catch (err) {
+        logger.warn({ error: err }, "Failed to publish detail ops snapshot");
+        // Back off a full cycle rather than retrying every 2s into a Redis
+        // that is already struggling — the failure and the cause usually share
+        // a root.
+        this.lastDetailAt = Date.now();
+      } finally {
+        this.detailInFlight = false;
+      }
+    })();
+  }
+
+  /** The detail artifact this writer most recently produced, if any. */
+  getLatestDetail(): DetailSnapshot | null {
+    return this.latestDetail;
   }
 
   private aggregatePhaseCounts(queues: QueueInfo[]): DashboardData["phases"] {
@@ -908,6 +1022,20 @@ export class OpsMetricsCollector {
     if (this.isCollecting) return;
     this.isCollecting = true;
     try {
+      // Election first: a pod that does not hold the lease must not scan at
+      // all. This is the whole cost saving — without the early return every
+      // pod would still pay for the scan and merely skip the write.
+      if (this.snapshotRepo) {
+        const lease = await this.snapshotRepo.acquireOrRenewLease({
+          writerId: this.writerId,
+        });
+        if (!lease.held) {
+          this.holdsLease = false;
+          return;
+        }
+        this.holdsLease = true;
+        this.leaseEpoch = lease.epoch;
+      }
       const [queues, redisInfo] = await Promise.all([
         this.queueRepo.scanQueues({ queueNames: this.groupQueueNames }),
         this.getRedisInfo(),
@@ -1050,6 +1178,11 @@ export class OpsMetricsCollector {
       this.persistState().catch((err) => {
         logger.warn({ error: err }, "Failed to persist metrics state");
       });
+
+      if (this.snapshotRepo) {
+        await this.publishLive();
+        this.maybePublishDetail(queues);
+      }
     } catch (err) {
       logger.warn(
         { error: err },
@@ -1066,6 +1199,7 @@ let singleton: OpsMetricsCollector | null = null;
 export function getOpsMetricsCollector(params: {
   redis: IORedis | Cluster;
   queueRepo: QueueRepository;
+  snapshotRepo?: SnapshotRepository | null;
 }): OpsMetricsCollector {
   if (!singleton) {
     singleton = new OpsMetricsCollector(params);

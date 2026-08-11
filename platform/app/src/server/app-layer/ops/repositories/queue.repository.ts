@@ -1,6 +1,22 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
-import type { ErrorCluster, QueueInfo } from "../types";
+import type {
+  ErrorCluster,
+  ParkedGroupInfo,
+  ParkedTenant,
+  QueueInfo,
+} from "../types";
+
+/**
+ * Every tenant currently over its in-flight cap, plus how many exist.
+ *
+ * `total` is the honest count even when `tenants` is capped, so a caller can
+ * say "showing N of M" rather than presenting a bounded list as complete.
+ */
+export interface ParkedTenantsPage {
+  tenants: ParkedTenant[];
+  total: number;
+}
 
 export interface BlockedSummary {
   totalBlocked: number;
@@ -57,6 +73,33 @@ export interface QueueRepository {
   }): Promise<{ jobs: JobEntry[]; total: number }>;
 
   getBlockedSummary(params: { queueNames: string[] }): Promise<BlockedSummary>;
+
+  /**
+   * Enumerate tenants parked over their in-flight cap, deepest first.
+   *
+   * The registry of over-cap tenants is naturally tiny (one entry per tenant,
+   * not per group), so this stays cheap even when the parked DEPTH is in the
+   * hundreds of thousands — which is exactly the case the dashboard has to
+   * explain. Bounded by `maxTenants`; the reported `total` is unbounded.
+   */
+  enumerateParkedTenants(params: {
+    queueNames: string[];
+    maxTenants: number;
+  }): Promise<ParkedTenantsPage>;
+
+  /**
+   * One parked tenant's groups, ordered by dispatch eligibility.
+   *
+   * Deliberately request-time rather than snapshot-carried: a parking storm
+   * can hold hundreds of thousands of groups, and shipping those in a snapshot
+   * every pod reads would recreate the size problem ADR-090 removes.
+   */
+  listParkedGroups(params: {
+    queueName: string;
+    tenantId: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{ groups: ParkedGroupInfo[]; total: number }>;
 
   unblockGroup(params: {
     queueName: string;
@@ -167,6 +210,17 @@ export class NullQueueRepository implements QueueRepository {
 
   async getBlockedSummary(): Promise<BlockedSummary> {
     return { totalBlocked: 0, clusters: [] };
+  }
+
+  async enumerateParkedTenants(): Promise<ParkedTenantsPage> {
+    return { tenants: [], total: 0 };
+  }
+
+  async listParkedGroups(): Promise<{
+    groups: ParkedGroupInfo[];
+    total: number;
+  }> {
+    return { groups: [], total: 0 };
   }
 
   async unblockGroup(): Promise<{ wasBlocked: boolean }> {

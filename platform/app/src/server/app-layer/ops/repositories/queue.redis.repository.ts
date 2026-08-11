@@ -25,12 +25,19 @@ import { TieredBlobStore } from "~/server/event-sourcing/queues/groupQueue/tiere
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
 import { normalizeErrorMessage } from "../normalize-error-message";
-import type { ErrorCluster, GroupInfo, QueueInfo } from "../types";
+import type {
+  ErrorCluster,
+  GroupInfo,
+  ParkedGroupInfo,
+  ParkedTenant,
+  QueueInfo,
+} from "../types";
 import type {
   BlockedSummary,
   DlqGroupInfo,
   DrainPreview,
   JobEntry,
+  ParkedTenantsPage,
   QueueRepository,
   ReconcileResult,
 } from "./queue.repository";
@@ -943,6 +950,159 @@ export class QueueRedisRepository implements QueueRepository {
     );
 
     return { totalBlocked, clusters };
+  }
+
+  // ── Parked (tenant soft cap) ────────────────────────────────────
+
+  async enumerateParkedTenants(params: {
+    queueNames: string[];
+    maxTenants: number;
+  }): Promise<ParkedTenantsPage> {
+    const rows: ParkedTenant[] = [];
+
+    for (const queueName of params.queueNames) {
+      const prefix = `${queueName}:gq:`;
+      const tenantIds = await this.redis.smembers(`${prefix}parked-tenants`);
+      if (tenantIds.length === 0) continue;
+
+      // One ZCARD (depth) plus one ZRANGE (the most-eligible member) per
+      // tenant. The registry holds one entry per OVER-CAP TENANT, so this is
+      // bounded by the number of noisy tenants — not by parked depth, which is
+      // the number that actually explodes.
+      const pipeline = this.redis.pipeline();
+      for (const tenantId of tenantIds) {
+        pipeline.zcard(`${prefix}parked:${tenantId}`);
+        pipeline.zrange(`${prefix}parked:${tenantId}`, 0, 0);
+      }
+      const results = await pipeline.exec();
+
+      const headGroups: Array<{ tenantId: string; groupId: string }> = [];
+      const depths = new Map<string, number>();
+      for (let i = 0; i < tenantIds.length; i++) {
+        const tenantId = tenantIds[i]!;
+        const depth = Number(results?.[i * 2]?.[1] ?? 0) || 0;
+        if (depth === 0) continue;
+        depths.set(tenantId, depth);
+        const head = (results?.[i * 2 + 1]?.[1] as string[]) ?? [];
+        if (head[0]) headGroups.push({ tenantId, groupId: head[0] });
+      }
+
+      // Age comes from the head group's oldest job. The head is the tenant's
+      // most dispatch-eligible parked group, and parking preserves the score
+      // it held in ready, so this is the closest available answer to "how long
+      // has this tenant been waiting" without walking every parked group.
+      const ageMs = new Map<string, number>();
+      if (headGroups.length > 0) {
+        const agePipeline = this.redis.pipeline();
+        for (const { groupId } of headGroups) {
+          agePipeline.zrange(`${prefix}group:${groupId}:jobs`, 0, 0, "WITHSCORES");
+        }
+        const ageResults = await agePipeline.exec();
+        for (let i = 0; i < headGroups.length; i++) {
+          const arr = (ageResults?.[i]?.[1] as string[]) ?? [];
+          if (arr.length >= 2) {
+            const ts = parseFloat(arr[1]!);
+            if (Number.isFinite(ts)) ageMs.set(headGroups[i]!.tenantId, ts);
+          }
+        }
+      }
+
+      for (const [tenantId, groupCount] of depths) {
+        const oldest = ageMs.get(tenantId);
+        rows.push({
+          tenantId,
+          queueName,
+          groupCount,
+          oldestParkedMs: oldest === undefined ? null : oldest,
+        });
+      }
+    }
+
+    rows.sort((a, b) => b.groupCount - a.groupCount);
+    return {
+      tenants: rows.slice(0, Math.max(0, params.maxTenants)),
+      total: rows.length,
+    };
+  }
+
+  async listParkedGroups(params: {
+    queueName: string;
+    tenantId: string;
+    page: number;
+    pageSize: number;
+  }): Promise<{ groups: ParkedGroupInfo[]; total: number }> {
+    const prefix = `${params.queueName}:gq:`;
+    const parkedKey = `${prefix}parked:${params.tenantId}`;
+
+    const total = await this.redis.zcard(parkedKey);
+    if (total === 0) return { groups: [], total: 0 };
+
+    const start = (params.page - 1) * params.pageSize;
+    const members = await this.redis.zrange(
+      parkedKey,
+      start,
+      start + params.pageSize - 1,
+      "WITHSCORES",
+    );
+
+    const groupIds: string[] = [];
+    const scores = new Map<string, number>();
+    for (let i = 0; i < members.length; i += 2) {
+      const groupId = members[i]!;
+      groupIds.push(groupId);
+      scores.set(groupId, parseFloat(members[i + 1]!));
+    }
+    if (groupIds.length === 0) return { groups: [], total };
+
+    const pipeline = this.redis.pipeline();
+    for (const groupId of groupIds) {
+      pipeline.zcard(`${prefix}group:${groupId}:jobs`);
+      pipeline.zrange(`${prefix}group:${groupId}:jobs`, 0, 0, "WITHSCORES");
+    }
+    const results = await pipeline.exec();
+
+    const oldestJobIds: Array<{ groupId: string; jobId: string | null }> = [];
+    for (let i = 0; i < groupIds.length; i++) {
+      const arr = (results?.[i * 2 + 1]?.[1] as string[]) ?? [];
+      oldestJobIds.push({ groupId: groupIds[i]!, jobId: arr[0] ?? null });
+    }
+
+    const dataPipeline = this.redis.pipeline();
+    let fetched = 0;
+    for (const { groupId, jobId } of oldestJobIds) {
+      if (jobId) {
+        dataPipeline.hget(`${prefix}group:${groupId}:data`, jobId);
+        fetched++;
+      }
+    }
+    const dataResults = fetched > 0 ? await dataPipeline.exec() : [];
+
+    let dataIdx = 0;
+    const groups: ParkedGroupInfo[] = [];
+    for (let i = 0; i < groupIds.length; i++) {
+      const groupId = groupIds[i]!;
+      const pendingJobs = Number(results?.[i * 2]?.[1] ?? 0) || 0;
+      const oldestArr = (results?.[i * 2 + 1]?.[1] as string[]) ?? [];
+      const oldestJobMs =
+        oldestArr.length >= 2 ? parseFloat(oldestArr[1]!) : null;
+
+      let pipelineName: string | null = null;
+      if (oldestJobIds[i]!.jobId) {
+        const raw = (dataResults?.[dataIdx]?.[1] as string) ?? null;
+        dataIdx++;
+        if (raw) pipelineName = readJobRoutingMeta(raw).pipelineName;
+      }
+
+      groups.push({
+        groupId,
+        pendingJobs,
+        oldestJobMs,
+        score: scores.get(groupId) ?? 0,
+        pipelineName,
+      });
+    }
+
+    return { groups, total };
   }
 
   // ── Actions ─────────────────────────────────────────────────────

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { checkOpsPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
-import { DASHBOARD_EVENT } from "~/server/app-layer/ops/metrics-collector";
+import { DASHBOARD_EVENT } from "~/server/app-layer/ops/snapshot/snapshot-reader";
 import {
   type DashboardData,
   OPS_BLOB_SORTS,
@@ -113,8 +113,8 @@ export const opsRouter = createTRPCRouter({
 
   getDashboardSnapshot: protectedProcedure.use(opsViewPermission).query(() => {
     const ops = getApp().ops;
-    if (!ops?.metricsCollector) return null;
-    return ops.metricsCollector.getDashboardData();
+    if (!ops?.snapshotReader) return null;
+    return ops.snapshotReader.getDashboardData();
   }),
 
   /**
@@ -126,27 +126,51 @@ export const opsRouter = createTRPCRouter({
    */
   getBadgeCounts: protectedProcedure.use(opsViewPermission).query(() => {
     const ops = getApp().ops;
-    if (!ops?.metricsCollector) {
+    if (!ops?.snapshotReader) {
       return { blockedCount: 0, dlqCount: 0 };
     }
-    return ops.metricsCollector.getBadgeCounts();
+    return ops.snapshotReader.getBadgeCounts();
   }),
 
   dashboardStream: protectedProcedure
     .use(opsViewPermission)
     .subscription(async function* (opts) {
-      const collector = getApp().ops?.metricsCollector;
-      if (!collector) return;
+      const reader = getApp().ops?.snapshotReader;
+      if (!reader) return;
 
       // Yield the current snapshot immediately so the client doesn't have
-      // to wait for the next broadcast tick before rendering.
-      yield collector.getDashboardData();
+      // to wait for the next broadcast tick before rendering. Null until a
+      // readable snapshot exists, which the page renders as its loading state.
+      const current = reader.getDashboardData();
+      if (current) yield current;
 
-      for await (const [data] of on(collector.getEmitter(), DASHBOARD_EVENT, {
+      for await (const [data] of on(reader.getEmitter(), DASHBOARD_EVENT, {
         signal: opts.signal,
       })) {
         yield data as DashboardData;
       }
+    }),
+
+  /**
+   * One parked tenant's groups, read live rather than from the snapshot.
+   *
+   * A parking storm can hold hundreds of thousands of groups; carrying those
+   * in a snapshot every pod reads would recreate the size problem ADR-090
+   * removes. The tenant ROWS ship in the snapshot, their members do not.
+   */
+  listParkedGroups: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        queueName: z.string(),
+        tenantId: z.string(),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(200).default(50),
+      }),
+    )
+    .query(async ({ input }) => {
+      const ops = requireOps();
+      return ops.queues.getParkedGroups(input);
     }),
 
   listQueues: protectedProcedure.use(opsViewPermission).query(async () => {

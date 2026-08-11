@@ -234,6 +234,8 @@ import { BlobStoreService } from "./ops/blob-store.service";
 import { EventExplorerService } from "./ops/event-explorer.service";
 import { ManagerExplorerService } from "./ops/manager-explorer.service";
 import { getOpsMetricsCollector } from "./ops/metrics-collector";
+import { getOpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
+import { SnapshotRedisRepository } from "./ops/snapshot/snapshot.repository";
 import { QueueService } from "./ops/queue.service";
 import { ReplayService } from "./ops/replay.service";
 import { BlobStoreRedisRepository } from "./ops/repositories/blob-store.redis.repository";
@@ -1518,6 +1520,9 @@ export function initializeDefaultApp(options?: {
   const replayRepo = redis
     ? new ReplayRedisRepository(redis)
     : new NullReplayRepository();
+  // One snapshot store shared by this pod's writer and its reader: the writer
+  // publishes only while it holds the lease, the reader always reads.
+  const snapshotRepo = redis ? new SnapshotRedisRepository(redis) : null;
   const sharedCh = getSharedClickHouseClient();
   const eventExplorerRepo = sharedCh
     ? new EventExplorerClickHouseRepository(sharedCh)
@@ -1537,8 +1542,10 @@ export function initializeDefaultApp(options?: {
         : new NullBlobStoreRepository(),
     ),
     metricsCollector: redis
-      ? getOpsMetricsCollector({ redis, queueRepo })
+      ? getOpsMetricsCollector({ redis, queueRepo, snapshotRepo })
       : null,
+    snapshotReader:
+      redis && snapshotRepo ? getOpsSnapshotReader(snapshotRepo) : null,
   };
 
   return initializeApp({
