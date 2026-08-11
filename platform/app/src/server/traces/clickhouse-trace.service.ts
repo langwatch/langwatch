@@ -1586,10 +1586,9 @@ export class ClickHouseTraceService {
               cost: null,
               nonBilledCost: null,
             };
-            const { resolvedSpans } = await this.resolveTraceSpans(
-              projectId,
-              [targetSpan],
-            );
+            const { resolvedSpans } = await this.resolveTraceSpans(projectId, [
+              targetSpan,
+            ]);
             const resolved = resolvedSpans[0];
             if (resolved) {
               resolvedRow = {
