@@ -475,6 +475,19 @@ function matchEvaluationField(
   return true;
 }
 
+/**
+ * A verdict (passed/score) is only real when the evaluation ran to
+ * completion. Producers can attach `passed: false` alongside `status:
+ * "error"` (the SDKs expose them as independent params), and the run feed is
+ * unfiltered — without this guard a trigger configured as "evaluations.passed
+ * = false" pages someone for a quality regression that is actually a
+ * provider timeout (#6833). Status-based filters (`evaluations.state`) are
+ * the intended way to alert on errored evaluators.
+ */
+function hasVerdict(e: EvaluationRunData): boolean {
+  return e.status === "processed";
+}
+
 function matchEvaluatorIdFilter(
   evaluations: EvaluationRunData[],
   field: FilterField,
@@ -491,12 +504,14 @@ function matchEvaluatorIdFilter(
 
     case "evaluations.evaluator_id.has_passed":
       return evaluations.some(
-        (e) => evaluatorIds.includes(e.evaluatorId) && e.passed !== null,
+        (e) =>
+          evaluatorIds.includes(e.evaluatorId) && hasVerdict(e) && e.passed !== null,
       );
 
     case "evaluations.evaluator_id.has_score":
       return evaluations.some(
-        (e) => evaluatorIds.includes(e.evaluatorId) && e.score !== null,
+        (e) =>
+          evaluatorIds.includes(e.evaluatorId) && hasVerdict(e) && e.score !== null,
       );
 
     case "evaluations.evaluator_id.has_label":
@@ -520,12 +535,14 @@ function matchEvaluationValues(
   switch (field) {
     case "evaluations.passed":
       return evaluations.some(
-        (e) => e.passed !== null && values.includes(String(e.passed)),
+        (e) =>
+          hasVerdict(e) && e.passed !== null && values.includes(String(e.passed)),
       );
 
     case "evaluations.score":
       return evaluations.some(
-        (e) => e.score !== null && values.includes(String(e.score)),
+        (e) =>
+          hasVerdict(e) && e.score !== null && values.includes(String(e.score)),
       );
 
     case "evaluations.state":
