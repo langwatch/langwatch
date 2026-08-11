@@ -547,8 +547,13 @@ app.kubernetes.io/instance: {{ .Release.Name }}
            business having: `lookup` turns a denial into a template error, so an
            installer scoped to their own namespace would get a hard render
            failure out of a check whose only job is to stay quiet. Reading the
-           release namespace's own default ServiceAccount asks for nothing the
-           Secret lookup above does not already need.
+           release namespace's own default ServiceAccount keeps the requirement
+           inside the namespace they are already installing into, next to the
+           Secret read on the line above. Not literally the same grant — a role
+           could allow `get secrets` and refuse `get serviceaccounts` — but the
+           standard admin/edit roles carry both, and namespaced is the whole
+           point: no reachable RBAC makes a cluster-scoped read succeed for an
+           installer who only holds their own namespace.
 
            Trade-off, accepted: with `--create-namespace` on a first install the
            namespace does not exist yet at render time, so the probe finds
