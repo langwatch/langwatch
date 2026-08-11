@@ -127,3 +127,33 @@ Feature: Subscription Page Plan Management
     When I view the subscription page
     Then the current plan block is still visible
 
+  # ============================================================================
+  # A plan that came from a license is still the plan the customer is on
+  # ============================================================================
+
+  Rule: A licensed enterprise plan is the current plan, not an upgrade candidate
+
+    An enterprise customer whose plan resolves from a signed license is on
+    enterprise. The page has to say so: no upgrade prompt, no smaller plan's
+    feature list, and no invitation to buy what they already have.
+
+    @integration
+    Scenario: A licensed enterprise plan is not offered an upgrade
+      Given my organization's plan resolves from an enterprise license
+      When I view the subscription page
+      Then the plan is shown as current
+      And I am not told an upgrade is required
+      And I am not offered a smaller plan to buy
+
+    @integration
+    Scenario: A licensed enterprise plan lists enterprise features
+      Given my organization's plan resolves from an enterprise license
+      When I view the subscription page
+      Then the features listed are the enterprise ones
+      And none of them describe a smaller plan's seat or event allowance
+
+    @integration
+    Scenario: A licensed plan below enterprise lists what it actually grants
+      Given my organization's plan resolves from a license below enterprise
+      When I view the subscription page
+      Then the features listed are read from that plan's own numbers
