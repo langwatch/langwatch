@@ -244,6 +244,7 @@ import { QueueRedisRepository } from "./ops/repositories/queue.redis.repository"
 import { NullQueueRepository } from "./ops/repositories/queue.repository";
 import { ReplayRedisRepository } from "./ops/repositories/replay.redis.repository";
 import { NullReplayRepository } from "./ops/repositories/replay.repository";
+import { SchedulerAuditRepository } from "./ops/scheduler-audit.repository";
 import { SchedulerOpsService } from "./ops/scheduler-ops.service";
 import { SnapshotRedisRepository } from "./ops/snapshot/snapshot.repository";
 import { getOpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
@@ -1532,6 +1533,17 @@ export function initializeDefaultApp(options?: {
     queues: new QueueService(queueRepo),
     scheduler: new SchedulerOpsService(
       new PrismaScheduledJobRepository(prisma),
+      new SchedulerAuditRepository(prisma),
+      // Best-effort poke so a manual run fires now rather than within one poll
+      // backstop. Latency only: the loop picks the row up either way.
+      redis ? () => void SchedulerService.publishWake(redis) : null,
+      async (projectIds) => {
+        const projects = await prisma.project.findMany({
+          where: { id: { in: projectIds } },
+          select: { id: true, name: true },
+        });
+        return new Map(projects.map((p) => [p.id, p.name]));
+      },
     ),
     eventExplorer: new EventExplorerService(eventExplorerRepo),
     managerExplorer: new ManagerExplorerService(repositories.processStore),

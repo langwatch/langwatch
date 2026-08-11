@@ -1,6 +1,8 @@
 # See dev/docs/adr/091-operator-control-over-the-scheduler.md for the
-# architectural rationale — in particular why a manual run claims a slot
-# through the normal path instead of invoking the target handler directly.
+# architectural rationale — in particular why a manual run makes the schedule
+# DUE and lets the calendar loop claim it through its ordinary Postgres
+# conditional-update lease, rather than invoking the target handler or
+# claiming the slot inside the ops request.
 
 Feature: Operator control over the scheduler
   As an operator responsible for schedule-triggered work across every project
@@ -116,14 +118,14 @@ Feature: Operator control over the scheduler
   Scenario: The confirmation names the tenant, not its identifier
     Given a schedule belonging to a project
     When the operator opens the run-now confirmation
-    Then the project name, the target, and the slot are stated
+    Then the project name and the target are stated
 
   @integration
-  Scenario: A manual run claims a slot through the ordinary path
-    Given an active schedule with a due slot
+  Scenario: A manual run goes through the ordinary path
+    Given an active schedule
     When the operator runs it now
-    Then the slot is claimed rather than the target being invoked directly
-    And the run is recorded as manually triggered
+    Then the schedule is made due rather than the target being invoked directly
+    And the calendar loop claims and runs it as it would a scheduled slot
 
   @integration
   Scenario: A manual run is visible as a run
@@ -146,12 +148,16 @@ Feature: Operator control over the scheduler
     Then the attempt is refused with a reason naming the schedule as inactive
     And no slot is claimed
 
+  # Deliberately narrowed during implementation: moving the schedule's due
+  # instant fires its NEXT slot, and cannot express "fire that past slot
+  # again". Replaying a delivery is the one shape of this control that
+  # intentionally sends a customer the same artifact twice, so it is not
+  # offered here at all rather than offered behind a second confirmation.
   @unit
-  Scenario: Re-running an already-fired slot takes a second confirmation
+  Scenario: A slot that has already fired cannot be re-fired from here
     Given a slot that has already fired
-    When the operator chooses to run that slot again
-    Then a second explicit confirmation is required
-    And it states that the target may be delivered twice
+    When the operator opens the schedule's actions
+    Then no control offers to run that past slot again
 
   # ── Audit ─────────────────────────────────────────────────────────────
 

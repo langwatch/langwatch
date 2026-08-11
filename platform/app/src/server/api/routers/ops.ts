@@ -186,6 +186,60 @@ export const opsRouter = createTRPCRouter({
       return ops.scheduler.listScheduledJobs({ limit: input.limit });
     }),
 
+  /** Recent scheduler operator actions, so the page explains its own history. */
+  listSchedulerActions: protectedProcedure
+    .use(opsViewPermission)
+    .input(z.object({ limit: z.number().int().min(1).max(100).default(20) }))
+    .query(async ({ input }) => {
+      const ops = requireOps();
+      return ops.scheduler.listRecentActions({ limit: input.limit });
+    }),
+
+  /**
+   * Pause or resume a schedule (ADR-091). Never touches an in-flight slot —
+   * the confirmation copy says so, because a pause that silently killed a live
+   * run would be a much larger promise than the one being made.
+   */
+  setScheduleActive: protectedProcedure
+    .use(opsManagePermission)
+    .input(z.object({ scheduleId: z.string(), active: z.boolean() }))
+    .mutation(async ({ input, ctx }) => {
+      const ops = requireOps();
+      return ops.scheduler.setActive({
+        scheduleId: input.scheduleId,
+        active: input.active,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  /** Release a slot whose worker stopped responding, so it can be claimed again. */
+  clearScheduleSlot: protectedProcedure
+    .use(opsManagePermission)
+    .input(z.object({ scheduleId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const ops = requireOps();
+      return ops.scheduler.clearStuckSlot({
+        scheduleId: input.scheduleId,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  /**
+   * Make a schedule due immediately. The loop claims and runs it through the
+   * ordinary path, so this inherits its exactly-once lease rather than
+   * bypassing it.
+   */
+  runScheduleNow: protectedProcedure
+    .use(opsManagePermission)
+    .input(z.object({ scheduleId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const ops = requireOps();
+      return ops.scheduler.runNow({
+        scheduleId: input.scheduleId,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
   listGroups: protectedProcedure
     .use(opsViewPermission)
     .input(

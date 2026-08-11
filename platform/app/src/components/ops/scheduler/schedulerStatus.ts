@@ -69,6 +69,26 @@ export function needsAttention(status: SchedulerJobStatus): boolean {
 }
 
 /**
+ * How long a claimed slot must sit untouched before clearing it is offered.
+ *
+ * Mirrors `SLOT_STALE_AFTER_MS` on the service, which is the authority — this
+ * copy decides whether the ACTION is offered, the server decides whether it is
+ * allowed. Offering a repair the server would refuse is a worse experience than
+ * hiding one it would allow, so the two are kept equal deliberately.
+ */
+export const SLOT_STALE_AFTER_MS = 15 * 60_000;
+
+/** Whether a slot has been held long enough that clearing it is a repair. */
+export function isSlotStale(
+  job: SchedulerJobLike & { updatedAt?: string },
+  now: number,
+): boolean {
+  if (!job.currentSlot) return false;
+  const heldSince = job.updatedAt ?? job.currentSlot;
+  return now - new Date(heldSince).getTime() >= SLOT_STALE_AFTER_MS;
+}
+
+/**
  * Sort so the rows that need action are first, then by how soon each fires.
  *
  * Within a status, sooner-first matches how an operator reads the page: the
@@ -107,18 +127,23 @@ export function summarize(
   };
 
   for (const job of jobs) {
-    tally(counts, job, deriveStatus(job, now), now);
+    tally({ counts, job, status: deriveStatus(job, now), now });
   }
 
   return counts;
 }
 
-function tally(
-  counts: SchedulerHeaderCounts,
-  job: SchedulerJobLike,
-  status: SchedulerJobStatus,
-  now: number,
-): void {
+function tally({
+  counts,
+  job,
+  status,
+  now,
+}: {
+  counts: SchedulerHeaderCounts;
+  job: SchedulerJobLike;
+  status: SchedulerJobStatus;
+  now: number;
+}): void {
   if (status === "paused") {
     counts.paused++;
     return;

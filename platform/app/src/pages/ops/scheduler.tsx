@@ -12,17 +12,21 @@ import { useMemo } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { middleEllipsis } from "~/components/ops/queues/clusterGroups";
 import { SchedulerHeader } from "~/components/ops/scheduler/SchedulerHeader";
+import { SchedulerRecentActions } from "~/components/ops/scheduler/SchedulerRecentActions";
+import { SchedulerRowActions } from "~/components/ops/scheduler/SchedulerRowActions";
 import { SchedulerStatusBadge } from "~/components/ops/scheduler/SchedulerStatusBadge";
 import {
   compareForAttention,
   deriveLoopHealth,
   deriveStatus,
+  isSlotStale,
   latenessMs,
   summarize,
 } from "~/components/ops/scheduler/schedulerStatus";
 import { formatTimeAgo } from "~/components/ops/shared/formatters";
 import { OpsPageShell } from "~/components/ops/shared/OpsPageShell";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api } from "~/utils/api";
 
 export default function OpsSchedulerPage() {
@@ -31,6 +35,7 @@ export default function OpsSchedulerPage() {
     { refetchInterval: 10_000 },
   );
 
+  const { hasAccess } = useOpsPermission();
   const rows = jobs.data ?? [];
   // One `now` for the whole render so a row cannot be judged against a
   // different instant than the header that summarises it.
@@ -95,6 +100,7 @@ export default function OpsSchedulerPage() {
                     <Table.ColumnHeader>Next run</Table.ColumnHeader>
                     <Table.ColumnHeader>Last run</Table.ColumnHeader>
                     <Table.ColumnHeader>Status</Table.ColumnHeader>
+                    <Table.ColumnHeader width="40px" />
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
@@ -109,10 +115,13 @@ export default function OpsSchedulerPage() {
                             </Badge>
                             <Text
                               textStyle="xs"
-                              fontFamily="mono"
-                              title={`${job.targetId} · project ${job.projectId}`}
+                              title={`${job.targetId} · ${job.projectId}`}
                             >
                               {middleEllipsis(job.targetId, 28)}
+                            </Text>
+                            <Text textStyle="xs" color="fg.muted">
+                              {job.projectName ??
+                                middleEllipsis(job.projectId, 18)}
                             </Text>
                           </HStack>
                         </Table.Cell>
@@ -154,11 +163,26 @@ export default function OpsSchedulerPage() {
                             lastError={job.lastError}
                           />
                         </Table.Cell>
+                        <Table.Cell>
+                          {/* A view-only operator is shown no control they
+                              cannot use, rather than one that errors. */}
+                          {hasAccess && (
+                            <SchedulerRowActions
+                              scheduleId={job.id}
+                              targetId={job.targetId}
+                              projectLabel={job.projectName ?? job.projectId}
+                              status={status}
+                              canClearSlot={isSlotStale(job, now)}
+                              onDone={() => void jobs.refetch()}
+                            />
+                          )}
+                        </Table.Cell>
                       </Table.Row>
                     );
                   })}
                 </Table.Body>
               </Table.Root>
+              <SchedulerRecentActions />
             </>
           )}
         </PageLayout.Container>

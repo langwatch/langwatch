@@ -188,6 +188,50 @@ export interface ScheduledJobRepository {
     targetType: string;
   }): Promise<ScheduledJobRecord[]>;
 
+  // ── Operator control (ADR-091) ──────────────────────────────────────
+  //
+  // Cross-tenant, like `listForOps`, and gated at the router on `ops:manage`.
+  // The two mutations below are CONDITIONAL on `expectedNextRunAt` for the same
+  // reason `claim` is: it is the row's fencing token. An operator acting on a
+  // row the loop has since claimed affects zero rows and is told so, rather
+  // than overwriting a live lease.
+
+  /** One schedule by id, across projects. Null when it no longer exists. */
+  findByIdForOps(params: { id: string }): Promise<ScheduledJobRecord | null>;
+
+  /** Pause or resume a schedule. Never touches an in-flight slot. */
+  setActiveForOps(params: { id: string; active: boolean }): Promise<boolean>;
+
+  /**
+   * Release a slot whose worker never settled it, and make the schedule
+   * claimable again.
+   *
+   * Clears `currentSlot` and the retry bookkeeping, and pulls `nextRunAt` to
+   * now so the next due-scan picks the row up. Guarded on the lease instant the
+   * operator was looking at.
+   */
+  releaseSlotForOps(params: {
+    id: string;
+    expectedNextRunAt: Date;
+    now: Date;
+  }): Promise<boolean>;
+
+  /**
+   * Make a schedule due immediately.
+   *
+   * Deliberately does NOT claim or execute: pulling `nextRunAt` to now hands
+   * the slot to the ordinary due-scan, so the calendar loop claims it through
+   * `claim` and runs it through the same path a scheduled fire takes —
+   * inheriting its exactly-once lease, retry ladder and settlement. Racing the
+   * loop is therefore safe: whichever of the two conditional updates lands
+   * first wins, and the loser affects zero rows.
+   */
+  requestImmediateRunForOps(params: {
+    id: string;
+    expectedNextRunAt: Date;
+    now: Date;
+  }): Promise<boolean>;
+
   /**
    * Cross-tenant read for the ops dashboard: the most-imminent scheduled jobs
    * (active first, soonest `nextRunAt` first), bounded by `limit`. Read-only
