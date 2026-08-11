@@ -125,8 +125,7 @@ export class SuiteRunStateFoldProjection
     return {
       ...state,
       StartedCount: startedCount,
-      Progress:
-        state.CompletedCount + state.FailedCount + state.CancelledCount,
+      Progress: state.CompletedCount + state.FailedCount + state.CancelledCount,
     };
   }
 
