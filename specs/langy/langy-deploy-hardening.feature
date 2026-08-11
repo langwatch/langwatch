@@ -125,10 +125,15 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
   Scenario: The install notes never depend on reading the cluster
     Given the install notes
     Then nothing in them reads the cluster to decide what to print
-    And guidance that would need such a read is printed as a command the
-      operator can choose to run themselves
     # The notes are advice printed after the install has already succeeded.
     # Nothing in them is worth failing an install over.
+    #
+    # Deliberately only the one claim. Guidance that would have needed such a
+    # read is printed as a command for the operator to run instead, but that
+    # is not asserted here: the only way to check it is to grep the notes for
+    # the command's own text, which passes by finding a string we wrote rather
+    # than by testing anything. An unenforced Then inside a scenario the parity
+    # checker calls bound is worse than one fewer Then.
 
   # ===========================================================================
   # Local e2e manifest mirrors the production security posture
