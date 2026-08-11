@@ -159,7 +159,27 @@ export function useSpanTreeWithCaptured() {
     [captured, data, nodes],
   );
 
-  return useMemo(() => ({ captured, corrected }), [captured, corrected]);
+  // The same tree with the removed rows still on it, for the waterfall to show
+  // struck through. It is what the correction did, not what the trace now is,
+  // so it never stands in for `corrected`.
+  const displayData = useMemo(
+    () =>
+      nodes
+        ? applyOverlayToSpanTreeNodes({ nodes, patch, shouldKeepDeleted: true })
+        : nodes,
+    [nodes, patch],
+  );
+
+  const display = useMemo(
+    () =>
+      displayData === nodes ? captured : { ...captured, data: displayData },
+    [captured, displayData, nodes],
+  );
+
+  return useMemo(
+    () => ({ captured, corrected, display }),
+    [captured, corrected, display],
+  );
 }
 
 /**

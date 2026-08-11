@@ -830,9 +830,18 @@ export const TRACE_MAPPINGS = {
   }
 >;
 
+/**
+ * Whether mapping a source turns its expansion on for you.
+ *
+ * A trace has one annotation or a handful, so expanding them reads as the point
+ * of mapping them at all. It has as many spans as it has work, and a dataset
+ * built from them is a row per trace until someone says otherwise, so the span
+ * expansions are opt-in.
+ */
 export const TRACE_EXPANSIONS = {
   "spans.llm.span_id": {
     label: "LLM span",
+    enabledByDefault: false,
     expansion: (trace: TraceWithAnnotations) => {
       const spans = trace.spans?.filter((span) => span.type === "llm") ?? [];
       return spans.map((span) => ({
@@ -843,6 +852,7 @@ export const TRACE_EXPANSIONS = {
   },
   "spans.all.span_id": {
     label: "span",
+    enabledByDefault: false,
     expansion: (trace: TraceWithAnnotations) => {
       const spans = trace.spans ?? [];
       return spans.map((span) => ({
@@ -853,6 +863,7 @@ export const TRACE_EXPANSIONS = {
   },
   "annotations.id": {
     label: "annotation",
+    enabledByDefault: true,
     expansion: (trace: TraceWithAnnotations) => {
       const annotations = trace.annotations ?? [];
       return annotations.map((annotation) => ({
@@ -863,6 +874,7 @@ export const TRACE_EXPANSIONS = {
   },
   "events.event_id": {
     label: "event",
+    enabledByDefault: true,
     expansion: (trace: TraceWithAnnotations) => {
       const events = trace.events ?? [];
       return events.map((event) => ({
@@ -875,6 +887,7 @@ export const TRACE_EXPANSIONS = {
   string,
   {
     label: string;
+    enabledByDefault: boolean;
     expansion: (trace: TraceWithAnnotations) => TraceWithAnnotations[];
   }
 >;

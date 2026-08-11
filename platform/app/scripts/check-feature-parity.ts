@@ -376,7 +376,6 @@ const LEGACY_INERT: string[] = [
   "specs/data-retention/trace-pinning.feature",
   "specs/data-retention/ttl-activation.feature",
   "specs/data-retention/visibility-window-teaser-redaction.feature",
-  "specs/datasets/add-to-dataset-span-mapping.feature",
   "specs/dependencies/supply-chain-age-gates.feature",
   "specs/evaluations/evaluation-payload-offload.feature",
   "specs/evaluations/experiments-online-evaluations-separation.feature",
