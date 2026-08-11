@@ -36,6 +36,11 @@ export function AnomaliesCard() {
     [anomalies],
   );
 
+  // Nothing to report collapses onto the dashboard's health line rather than
+  // spending a whole card saying so. An ERROR still renders: "we could not
+  // check" is emphatically not "all clear", and hiding it would imply it was.
+  if (!hasAny && !hasError) return null;
+
   return (
     <Card.Root borderColor={hardCount > 0 ? "red.300" : undefined}>
       <Card.Body padding={0}>
