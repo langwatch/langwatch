@@ -114,6 +114,36 @@ Feature: Span field mapping when adding traces to a dataset
     Then it produces a single row whose spans field is the array of all spans
 
   # ============================================================================
+  # The Expansions switches. Each one is a switch about its own expansion, and
+  # turning them all off is a choice the reader is allowed to make: a mapping
+  # with nothing expanded is the one that keeps one row per trace.
+  # ============================================================================
+
+  @integration
+  Scenario: Each expansion switch toggles only its own expansion
+    Given a mapping that offers both the annotation and the span expansion
+    And both are enabled
+    When I turn off the span expansion
+    Then the span expansion is off
+    And the annotation expansion is still on
+
+  @integration
+  Scenario: The last expansion can be turned off
+    Given a mapping that offers both the annotation and the span expansion
+    And only the span expansion is enabled
+    When I turn off the span expansion
+    Then no expansion is enabled
+    And it stays off
+
+  # A dataset row per trace is what a reader asks for when they add traces to a
+  # dataset; one row per span is a normalisation they opt into.
+  @integration
+  Scenario: The span expansion starts off
+    Given a mapping that offers the span expansion
+    When I open it without having chosen an expansion before
+    Then the span expansion is off
+
+  # ============================================================================
   # The mapping preview renders with the SAME cells as the evaluations
   # workbench dataset table: same heights, JSON values formatted, double-click
   # opens the editor. Mapping a span-heavy trace into a column used to dump

@@ -257,7 +257,13 @@ export const tracesRouter = createTRPCRouter({
     }),
 
   getFormattedSpansDigest: protectedProcedure
-    .input(z.object({ projectId: z.string(), traceIds: z.array(z.string()) }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceIds: z.array(z.string()),
+        withEditOverlay: withEditOverlayInput,
+      }),
+    )
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }) => {
       const { projectId, traceIds } = input;
@@ -265,11 +271,20 @@ export const tracesRouter = createTRPCRouter({
         projectId,
       });
 
-      const traceService = TraceService.create(ctx.prisma);
+      // The digest is one more reading of the same spans the other columns are
+      // mapped from, so it is read the same way. Read without the correction it
+      // would spell out, in the one column that quotes the whole trace, the very
+      // spans the reviewer deleted.
+      const traceService = TraceService.create(
+        ctx.prisma,
+        buildTraceBlobResolutionDeps(),
+      );
       const traces = await traceService.getTracesWithSpans(
         projectId,
         traceIds,
         protections,
+        undefined,
+        { full: true, withEditOverlay: input.withEditOverlay },
       );
 
       return Object.fromEntries(

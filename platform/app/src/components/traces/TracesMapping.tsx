@@ -145,6 +145,39 @@ const FIELD_NAME_ANY_LABEL: Record<string, string> = {
 };
 
 /** Dedupe {key,label} options by key, preserving first-seen order. */
+/** Whether two expansion selections say the same thing. */
+const sameExpansions = (
+  a: Set<keyof typeof TRACE_EXPANSIONS>,
+  b: Set<keyof typeof TRACE_EXPANSIONS>,
+): boolean => a.size === b.size && Array.from(a).every((key) => b.has(key));
+
+/**
+ * The expansions after a column is mapped to a new source.
+ *
+ * Mapping a source that can be expanded turns its expansion on for you, but
+ * only where expanding is what mapping it usually means: a dataset of traces
+ * stays a row per trace until the reader asks for the span expansion. A source
+ * whose expansion is already on offer changes nothing, since some other column
+ * already brought it.
+ */
+const expansionsAfterMapping = ({
+  expansions,
+  targetMapping,
+  availableExpansions,
+}: {
+  expansions: Set<keyof typeof TRACE_EXPANSIONS>;
+  targetMapping?: (typeof TRACE_MAPPINGS)[keyof typeof TRACE_MAPPINGS];
+  availableExpansions: Set<keyof typeof TRACE_EXPANSIONS>;
+}): Set<keyof typeof TRACE_EXPANSIONS> => {
+  const expandableBy =
+    targetMapping && "expandable_by" in targetMapping
+      ? targetMapping.expandable_by
+      : undefined;
+  if (!expandableBy || availableExpansions.has(expandableBy)) return expansions;
+  if (!TRACE_EXPANSIONS[expandableBy].enabledByDefault) return expansions;
+  return new Set([...expansions, expandableBy]);
+};
+
 const dedupeKeyOptions = (options: KeyOption[]): KeyOption[] => {
   const seen = new Set<string>();
   const result: KeyOption[] = [];
@@ -275,20 +308,28 @@ export const TracesMapping = ({
       mapping: {},
       expansions: new Set(),
     });
+  // The latest state, readable synchronously. Two updates in one tick (two
+  // switches clicked before React re-renders, or a click landing between the
+  // initialising effect and its re-render) would otherwise both build on the
+  // render's stale value, and the second would undo the first — which reads as
+  // one switch moving the other.
+  const traceMappingStateRef = React.useRef(traceMappingState);
+  traceMappingStateRef.current = traceMappingState;
   const setTraceMappingState = useCallback(
     (
       callback: (
         mappingState: LocalTraceMappingState,
       ) => LocalTraceMappingState,
     ) => {
-      const newMappingState = callback(traceMappingState);
+      const newMappingState = callback(traceMappingStateRef.current);
+      traceMappingStateRef.current = newMappingState;
       setTraceMappingState_(newMappingState);
       setTraceMapping?.({
         ...newMappingState,
         expansions: Array.from(newMappingState.expansions),
       });
     },
-    [traceMappingState, setTraceMapping],
+    [setTraceMapping],
   );
   const mapping = traceMappingState.mapping;
 
@@ -366,11 +407,14 @@ export const TracesMapping = ({
     [mapping],
   );
 
-  // Fetch formatted span digests from server when needed
+  // Fetch formatted span digests from server when needed, read the same way the
+  // traces being mapped were: this column quotes the whole trace, so reading it
+  // uncorrected would put back every span the other columns leave out.
   const formattedDigests = api.traces.getFormattedSpansDigest.useQuery(
     {
       projectId: project?.id ?? "",
       traceIds: traces.map((t) => t.trace_id),
+      withEditOverlay: shouldApplyCorrections,
     },
     {
       enabled: !!project?.id && needsFormattedDigest && traces.length > 0,
@@ -426,10 +470,13 @@ export const TracesMapping = ({
             inferredMappingFor(name),
         ]) ?? [],
       ),
-      expansions:
-        traceMappingState.expansions.size > 0
-          ? traceMappingState.expansions
-          : new Set(currentMapping.expansions),
+      // Only before the first pass do the stored expansions stand in. After it
+      // the state is the whole truth, including the empty set: turning the last
+      // expansion off is an answer, not an absence of one, and reading it as
+      // "nothing chosen yet" is what used to put the stored ones straight back.
+      expansions: isInitializedRef.current
+        ? traceMappingState.expansions
+        : new Set(currentMapping.expansions),
     };
 
     // Check if we need to update (new columns added, columns removed, or initial setup)
@@ -439,15 +486,26 @@ export const TracesMapping = ({
       currentFieldsSet.size !== targetFieldsSet.size ||
       !Array.from(targetFieldsSet).every((f) => currentFieldsSet.has(f));
 
+    // `JSON.stringify` writes a Set as `{}`, so comparing the whole state that
+    // way cannot see the expansions at all. Compare each half the way it can
+    // actually be compared.
+    const mappingChanged =
+      JSON.stringify(traceMappingState.mapping) !==
+      JSON.stringify(traceMappingStateWithDefaults.mapping);
+    const expansionsChanged = !sameExpansions(
+      traceMappingState.expansions,
+      traceMappingStateWithDefaults.expansions,
+    );
+
     if (
       !isInitializedRef.current ||
       fieldsChanged ||
-      JSON.stringify(traceMappingState) !==
-        JSON.stringify(traceMappingStateWithDefaults)
+      mappingChanged ||
+      expansionsChanged
     ) {
-      setTraceMappingState_(
-        traceMappingStateWithDefaults as LocalTraceMappingState,
-      );
+      const nextState = traceMappingStateWithDefaults as LocalTraceMappingState;
+      traceMappingStateRef.current = nextState;
+      setTraceMappingState_(nextState);
       setTraceMapping?.({
         ...traceMappingStateWithDefaults,
         expansions: Array.from(traceMappingStateWithDefaults.expansions),
@@ -758,20 +816,11 @@ export const TracesMapping = ({
                                   ]
                                 : undefined;
 
-                              let newExpansions = expansions;
-                              if (
-                                targetMapping &&
-                                "expandable_by" in targetMapping &&
-                                targetMapping.expandable_by &&
-                                !availableExpansions.has(
-                                  targetMapping.expandable_by,
-                                )
-                              ) {
-                                newExpansions = new Set([
-                                  ...new Set(Array.from(newExpansions)),
-                                  targetMapping.expandable_by,
-                                ]);
-                              }
+                              const newExpansions = expansionsAfterMapping({
+                                expansions,
+                                targetMapping,
+                                availableExpansions,
+                              });
 
                               return {
                                 ...prev,
@@ -1008,49 +1057,57 @@ export const TracesMapping = ({
       )}
 
       {!disableExpansions && availableExpansions.size > 0 && (
-        <Field.Root width="full" paddingY={4} marginTop={2}>
-          <VStack align="start">
-            <Field.Label margin={0}>Expansions</Field.Label>
-            <Field.HelperText
-              margin={0}
-              fontSize="13px"
-              marginBottom={2}
-              maxWidth="600px"
-            >
-              Normalize the dataset to duplicate the rows and have one entry per
-              line instead of an array for the following mappings:
-            </Field.HelperText>
-          </VStack>
+        // The switches sit outside the field on purpose. A field describes one
+        // control, so it hands the same id to every control inside it: each
+        // switch's label then pointed at the first switch's input, and clicking
+        // one moved another. Out here each switch owns its own id and label.
+        <VStack width="full" align="start" paddingY={4} marginTop={2} gap={0}>
+          <Field.Root width="full">
+            <VStack align="start">
+              <Field.Label margin={0}>Expansions</Field.Label>
+              <Field.HelperText
+                margin={0}
+                fontSize="13px"
+                marginBottom={2}
+                maxWidth="600px"
+              >
+                Normalize the dataset to duplicate the rows and have one entry
+                per line instead of an array for the following mappings:
+              </Field.HelperText>
+            </VStack>
+          </Field.Root>
           <VStack align="start" paddingTop={2} gap={2}>
             {Array.from(availableExpansions).map((expansion) => (
-              <HStack key={expansion}>
-                <Switch
-                  checked={expansions.has(expansion)}
-                  onCheckedChange={(event) => {
-                    const isChecked = event.checked;
+              // The name is the switch's own label, so clicking the words
+              // toggles it rather than only the switch itself.
+              <Switch
+                key={expansion}
+                checked={expansions.has(expansion)}
+                onCheckedChange={(event) => {
+                  const isChecked = event.checked;
 
-                    setTraceMappingState((prev) => {
-                      const newExpansions: Set<keyof typeof TRACE_EXPANSIONS> =
-                        isChecked
-                          ? new Set([...prev.expansions, expansion])
-                          : new Set(
-                              Array.from(prev.expansions).filter(
-                                (x) => x !== expansion,
-                              ),
-                            );
+                  setTraceMappingState((prev) => {
+                    const newExpansions: Set<keyof typeof TRACE_EXPANSIONS> =
+                      isChecked
+                        ? new Set([...prev.expansions, expansion])
+                        : new Set(
+                            Array.from(prev.expansions).filter(
+                              (x) => x !== expansion,
+                            ),
+                          );
 
-                      return {
-                        ...prev,
-                        expansions: newExpansions,
-                      };
-                    });
-                  }}
-                />
-                <Text>One row per {TRACE_EXPANSIONS[expansion].label}</Text>
-              </HStack>
+                    return {
+                      ...prev,
+                      expansions: newExpansions,
+                    };
+                  });
+                }}
+              >
+                One row per {TRACE_EXPANSIONS[expansion].label}
+              </Switch>
             ))}
           </VStack>
-        </Field.Root>
+        </VStack>
       )}
     </Grid>
   );
