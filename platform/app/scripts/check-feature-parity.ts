@@ -451,7 +451,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-composer-feedback-and-cards.feature",
   "specs/langy/langy-context-awareness.feature",
   "specs/langy/langy-conversation-title.feature",
-  "specs/langy/langy-deploy-hardening.feature",
   "specs/langy/langy-derived-cards.feature",
   "specs/langy/langy-dogfood-scenarios.feature",
   "specs/langy/langy-empty-state-suggestions.feature",

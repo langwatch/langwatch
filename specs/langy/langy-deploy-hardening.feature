@@ -62,14 +62,27 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
     Then the pod renders successfully
     And the pod is pinned to the sandboxed runtime
 
-  Scenario: A default install on a cluster without the RuntimeClass degrades to Pending, not to unsandboxed
+  Scenario: A default install runs Langy on a cluster that offers no sandboxed runtime
     Given an operator installs the umbrella chart with default values
+    And the cluster offers no sandboxed runtime
+    When the install completes
+    Then every workload runs, Langy included
+    And the install notes state which isolation posture this install got
+    And the install notes explain where a sandboxed runtime comes from on each major cloud
+    And the install notes name the values that pin the pod to one
+    # The defaults are an empty runtimeClassName with acceptUnsandboxedRuntime
+    # true, so Langy is available on any cluster and hardening is a deliberate
+    # later step. Pinning a RuntimeClass the cluster does not define is what
+    # leaves the pod Pending — and that can only happen after an operator has
+    # chosen to pin one, which is the scenario below.
+
+  Scenario: Pinning a RuntimeClass the cluster does not define leaves the pod Pending, not unsandboxed
+    Given an operator has pinned the langy-agent pod to a sandboxed runtime
     And the cluster defines no matching RuntimeClass
     When the install completes
     Then every other workload runs
     And the langy-agent pod waits rather than running without its sandbox
-    And the install notes explain where a sandboxed runtime comes from on each major cloud
-    And the install notes name the values that accept running without one
+    And the install notes say where the reason for the wait is recorded
 
   Scenario: The guard does not fire when the agent is not chart-managed
     Given the chart does not manage the langy-agent pod
@@ -80,6 +93,42 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
     # sandbox. Blanking the runtime while still managed does, and is refused
     # until the operator accepts it (see the scenario above, and
     # specs/langy/langy-selfhost-install.feature for the operator's story).
+
+  # ===========================================================================
+  # Restricted clusters: rendering asks for no permission the operator lacks
+  # ===========================================================================
+
+  # A customer upgrade died here. Their platform team is scoped to the namespace
+  # they install into, and the install notes tried to list the cluster's
+  # RuntimeClasses so they could offer an optional hardening tip. Helm reports a
+  # DENIED lookup as a template error rather than as an empty result, so advice
+  # nobody had asked for took the whole upgrade down:
+  #
+  #   Error: UPGRADE FAILED: template: langwatch/templates/NOTES.txt:102:11:
+  #   ... error calling lookup: runtimeclasses.node.k8s.io is forbidden: User
+  #   "..." cannot list resource "runtimeclasses" in API group "node.k8s.io" at
+  #   the cluster scope
+  #
+  # Nothing in the render matrix catches this. With no cluster behind the
+  # render every lookup returns empty and the branch is simply skipped, so the
+  # failure exists only on a cluster whose RBAC actually refuses — which is to
+  # say, only on the customer's.
+
+  @unit
+  Scenario: A restricted installer can render the chart without cluster-scoped read access
+    Given an operator whose permissions stop at the namespace they install into
+    When they render the chart
+    Then no part of the render asks to read a cluster-scoped resource
+    And the render never fails for a permission the operator was not granted
+
+  @unit
+  Scenario: The install notes never depend on reading the cluster
+    Given the install notes
+    Then nothing in them reads the cluster to decide what to print
+    And guidance that would need such a read is printed as a command the
+      operator can choose to run themselves
+    # The notes are advice printed after the install has already succeeded.
+    # Nothing in them is worth failing an install over.
 
   # ===========================================================================
   # Local e2e manifest mirrors the production security posture

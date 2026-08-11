@@ -538,9 +538,25 @@ app.kubernetes.io/instance: {{ .Release.Name }}
     {{- if not $found }}
       {{/* Every lookup comes back empty during `helm template` and dry runs, so
            "Secret not found" there means "we cannot see the cluster", not "it is
-           missing". Probe with an object every real cluster has: if kube-system
-           is invisible too, stay quiet rather than failing a plain render. */}}
-      {{- if lookup "v1" "Namespace" "" "kube-system" }}
+           missing". Probe with an object that exists in every namespace and
+           stay quiet when it is invisible too, rather than failing a plain
+           render.
+
+           The probe is namespaced on purpose. A cluster-scoped one (kube-system
+           was the obvious candidate) adds an RBAC requirement this chart has no
+           business having: `lookup` turns a denial into a template error, so an
+           installer scoped to their own namespace would get a hard render
+           failure out of a check whose only job is to stay quiet. Reading the
+           release namespace's own default ServiceAccount asks for nothing the
+           Secret lookup above does not already need.
+
+           Trade-off, accepted: with `--create-namespace` on a first install the
+           namespace does not exist yet at render time, so the probe finds
+           nothing and this guard stays silent. That degrades to the behaviour
+           from before the guard existed — the pods report
+           CreateContainerConfigError — which is the right direction to fail
+           when the alternative is blocking installs that are correctly set up. */}}
+      {{- if lookup "v1" "ServiceAccount" .Release.Namespace "default" }}
         {{- $errors = append $errors (printf "Langy is enabled (langyagent.chartManaged=true) but Secret %q was not found in namespace %q, and this chart is not generating it. The app, the workers, and the agent pod all read %q from it to authenticate to each other, so all three would start into CreateContainerConfigError. %s" $langySecretName .Release.Namespace $langyKey $hint) }}
       {{- end }}
     {{- else if not (index ($found.data | default dict) $langyKey) }}
