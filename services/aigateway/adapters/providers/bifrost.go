@@ -1516,11 +1516,8 @@ func normalizeOpenAICompatBaseURL(u string) string {
 // error, so the upstream status + body ride on UpstreamError instead of a
 // *domain.Response.
 func errFromBifrost(ctx context.Context, berr *bfschemas.BifrostError, respHeaders map[string]string) error {
-	status := 0
-	if berr.StatusCode != nil {
-		status = *berr.StatusCode
-	}
-	if status <= 0 {
+	status := bifrostStatus(berr)
+	if status == 0 {
 		return classifyBifrostError(ctx, berr)
 	}
 	body, _ := extractRawResponseBytes(berr.ExtraFields.RawResponse)
@@ -1574,11 +1571,23 @@ func forwardableUpstreamHeaders(in map[string]string) map[string]string {
 	return out
 }
 
-func classifyBifrostError(ctx context.Context, berr *bfschemas.BifrostError) error {
-	status := 0
-	if berr.StatusCode != nil {
-		status = *berr.StatusCode
+// bifrostStatus reports the upstream HTTP status a Bifrost error carries,
+// normalising anything unusable to 0.
+//
+// Both readers of the status draw the "no upstream response" line, and they
+// have to draw it in the same place: errFromBifrost decides whether to forward
+// the status verbatim, classifyBifrostError decides which code it maps to. A
+// value neither of them can forward — nil, or a non-positive int — is the same
+// fact as no status at all, so it is collapsed here rather than at each reader.
+func bifrostStatus(berr *bfschemas.BifrostError) int {
+	if berr == nil || berr.StatusCode == nil || *berr.StatusCode <= 0 {
+		return 0
 	}
+	return *berr.StatusCode
+}
+
+func classifyBifrostError(ctx context.Context, berr *bfschemas.BifrostError) error {
+	status := bifrostStatus(berr)
 
 	code := domain.ErrProviderError
 	switch status {
@@ -1602,21 +1611,43 @@ func classifyBifrostError(ctx context.Context, berr *bfschemas.BifrostError) err
 // Status 0 used to share the 504 branch, so a provider row Bifrost refuses to
 // dial ("endpoint not set", "deployments not set") reached the client as a
 // gateway timeout — transient-looking, and retryable, so the retry engine
-// walked the whole credential chain on a fault no credential could satisfy.
+// re-attempted a fault no retry can clear and told the client to wait out a
+// stall that never happened. The consequence of making it non-retryable is
+// deliberate (AC17): a misconfigured row now fails the request rather than
+// falling through to a healthy row behind it, because that silent fallback is
+// what let the misconfiguration sit unnoticed.
 //
 // The discriminator is the vendor's error shape rather than its message,
-// because the messages are open-ended: every status-less shape raised from an
-// attempted call carries the Go error it failed on (transport, DNS, body
-// marshaling, response read), and an unsupported request type carries the
-// vendor's own error code. A rejection with neither was raised before
-// anything was attempted — the provider row itself is unusable.
+// because the messages are open-ended. What the shape separates is narrower
+// than "configuration", and the narrower claim is the one that holds:
+//
+//   - An attached Go error (NewBifrostOperationError) means a call was
+//     attempted and failed at something outside the row itself — transport,
+//     DNS, body marshaling, response read. A different credential may not fail
+//     at it, so it stays retryable.
+//   - An attached vendor code (NewUnsupportedOperationError) means this
+//     provider does not serve this request type. Another provider in the chain
+//     may, so it stays retryable.
+//   - Neither means the vendor rejected the request out of hand. Retrying it
+//     against the same row cannot help.
+//
+// The last bucket is not exclusively configuration. core@v1.4.22 raises the
+// same bare Message-only shape for its own request-validation rejections
+// ("chats not provided for chat completion request", "file_id is required"),
+// and for NewBifrostOperationError call sites that pass a nil error. Those are
+// swept in deliberately: they are permanent for this request too, so refusing
+// to walk the chain is the right answer even though provider_misconfigured
+// names the wrong culprit. The direction that would be a defect is the
+// reverse — a transient fault landing here — and no status-less construction
+// in the vendor reaches this branch without a Go error or a code attached.
+//
+// bifrost_config_error_classification_test.go pins both buckets against the
+// vendor's own constructors, so a vendor bump that changes a shape fails there
+// rather than in production.
 func statuslessBifrostCode(berr *bfschemas.BifrostError) herr.Code {
 	if berr.Error != nil && berr.Error.Error == nil && berr.Error.Code == nil {
 		return domain.ErrProviderMisconfigured
 	}
-	// Everything else stays retryable: an attempt that failed short of a
-	// response, and a request type this provider does not serve, can both be
-	// answered by the next credential in the chain.
 	return domain.ErrProviderError
 }
 

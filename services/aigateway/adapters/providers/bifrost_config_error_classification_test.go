@@ -16,13 +16,15 @@ import (
 )
 
 // classifyBifrostError is the only translation point for a Bifrost error that
-// carries no HTTP status, because no HTTP call was ever made. Its switch treats
-// status 0 as a gateway timeout, which mislabels every configuration rejection
-// the vendor raises before dialing — a permanent, operator-fixable fault that
-// then reads to the client as a transient upstream timeout.
+// carries no HTTP status, because no HTTP call was ever made. Its switch used
+// to treat status 0 as a gateway timeout, which mislabelled every
+// configuration rejection the vendor raises before dialing — a permanent,
+// operator-fixable fault that then read to the client as a transient upstream
+// timeout.
 //
-// Rows build their errors with the vendor's own constructors so the shapes
-// stay honest against the pinned core@v1.4.22.
+// Rows mirror the vendor's own error constructions — its constructors where
+// there is one, its hand-built literal where there is not — so the shapes stay
+// honest against the pinned core@v1.4.22.
 //
 // Spec: specs/ai-gateway/azure-deployment-map-control-plane-path.feature
 
@@ -36,17 +38,16 @@ func codeOf(t *testing.T, err error) herr.Code {
 
 // AC16 / AC18b: no status-less Bifrost error is a timeout, and each one lands
 // on a NAMED code rather than merely "something other than a timeout". None of
-// these four shapes involves a network round trip, so labeling any of them
+// these shapes involves a network round trip, so labeling any of them
 // provider_timeout is wrong on its face — and before the fix the status-0
-// branch did exactly that for all four.
+// branch did exactly that for every one of them.
 //
 // Each row states the exact code it must land on, because the codes are not
 // interchangeable: provider_error is retryable and would walk the whole
-// credential chain on a fault no credential can satisfy, which is the failure
+// credential chain re-raising a fault no retry can clear, which is the failure
 // this change exists to stop. A negative-only assertion cannot tell the two
 // apart. The discriminator is statuslessBifrostCode's shape test (nil
-// Error.Error AND nil Error.Code), so the row's constructor decides its code:
-// NewConfigurationError fills neither field, the other two fill one each.
+// Error.Error AND nil Error.Code), so the row's construction decides its code.
 //
 // The code -> HTTP status half of AC16/AC18b is client-facing and lives in
 // adapters/httpapi/azure_config_error_status_test.go.
@@ -89,6 +90,36 @@ func TestClassifyBifrostError_StatuslessShapesAreNotTimeouts(t *testing.T) {
 			name: "bifrost operation error",
 			berr: bfproviderutils.NewBifrostOperationError("error marshaling request", errors.New("boom"), bfschemas.Azure),
 			want: domain.ErrProviderError,
+		},
+		{
+			// The shape test is not a configuration detector, and these two
+			// rows are here so that is a stated contract rather than an
+			// accident nobody looked at.
+			//
+			// NewBifrostOperationError is called with a nil error at ~40 sites
+			// in core@v1.4.22 (providers/utils/utils.go:1058 among them), which
+			// produces exactly the shape the row above does not have: no Go
+			// error, no code. It lands on misconfigured, and that is the right
+			// call for the wrong-sounding reason — the request is rejected
+			// permanently either way, so refusing to walk the chain is correct
+			// even though the code names the provider row rather than the
+			// request.
+			name: "operation error raised without a Go error",
+			berr: bfproviderutils.NewBifrostOperationError("request body is not provided", nil, bfschemas.Azure),
+			want: domain.ErrProviderMisconfigured,
+		},
+		{
+			// The same shape reached from the client's side: core's own
+			// request-validation guards (bifrost.go:669) build the literal by
+			// hand before any provider is consulted. Pinned for the same
+			// reason — permanent, so non-retryable, and no shape test can tell
+			// it apart from a bad provider row.
+			name: "vendor request validation rejection",
+			berr: &bfschemas.BifrostError{
+				IsBifrostError: false,
+				Error:          &bfschemas.ErrorField{Message: "chats not provided for chat completion request"},
+			},
+			want: domain.ErrProviderMisconfigured,
 		},
 	}
 

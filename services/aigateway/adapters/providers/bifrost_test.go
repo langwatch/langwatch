@@ -275,6 +275,48 @@ func TestErrFromBifrost_NoStatusFallsBackToClassify(t *testing.T) {
 	}
 }
 
+// The other half of the status-less fallback, and the half the fix turns on: a
+// bare error carrying neither a Go error nor a vendor code reaches
+// classifyBifrostError too, and must come back permanent. Held here next to
+// its sibling because the pair is what makes the fallback a decision — either
+// one alone passes on a classifier that ignores the shape entirely.
+func TestErrFromBifrost_NoStatusBareShapeIsPermanent(t *testing.T) {
+	berr := &bfschemas.BifrostError{
+		Error: &bfschemas.ErrorField{Message: "endpoint not set"},
+	}
+	err := errFromBifrost(context.Background(), berr, nil)
+	if _, ok := err.(*domain.UpstreamError); ok {
+		t.Fatalf("a rejection with no status must not become an UpstreamError")
+	}
+	if !herr.IsCode(err, domain.ErrProviderMisconfigured) {
+		t.Fatalf("expected provider_misconfigured, got %v", err)
+	}
+}
+
+// A status Bifrost cannot have received from an upstream is the same fact as
+// no status at all, so both readers of it have to agree. They did not: the
+// forward/classify gate took anything <= 0 while the classifier's switch
+// matched only 0, which dropped a negative straight through to the retryable
+// code without ever consulting the shape.
+//
+// core@v1.4.22 has no such producer — every StatusCode it sets comes from
+// fasthttp's resp.StatusCode() or a positive literal — so this pins the
+// invariant rather than a live path: the two must not be able to disagree
+// again if a vendor bump ever introduces one.
+func TestErrFromBifrost_NonPositiveStatusIsTreatedAsStatusless(t *testing.T) {
+	berr := &bfschemas.BifrostError{
+		StatusCode: intPtr(-1),
+		Error:      &bfschemas.ErrorField{Message: "deployments not set"},
+	}
+	err := errFromBifrost(context.Background(), berr, nil)
+	if ue, ok := err.(*domain.UpstreamError); ok {
+		t.Fatalf("a non-positive status is not forwardable, got UpstreamError with status %d", ue.StatusCode)
+	}
+	if !herr.IsCode(err, domain.ErrProviderMisconfigured) {
+		t.Fatalf("expected provider_misconfigured, got %v", err)
+	}
+}
+
 // Bifrost sums cache reads/writes into PromptTokens; the cache breakdown lives
 // on PromptTokensDetails. extractUsage must carry it onto domain.Usage so the
 // span can report the fresh input separately and the cost can price each

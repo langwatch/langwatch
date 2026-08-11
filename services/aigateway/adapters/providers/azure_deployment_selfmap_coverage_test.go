@@ -114,11 +114,13 @@ func TestDispatchCredential_DeploymentMappedProvidersAllGetTheSelfMap(t *testing
 // these provider methods before it dials (core@v1.4.22 azure.go
 // validateKeyConfig). Removing the self-map turns all seven rows red.
 //
-// The stub answers the streaming lane with SSE and the other six with the same
-// non-streaming chat-completion body, so those six fail to decode the reply.
-// Their dispatch results are deliberately not asserted: what this test claims is
-// what left the gateway, and every one of those decode failures happens after
-// the dial it asserts on.
+// The stub answers the streaming lane with SSE and every other lane with the
+// same non-streaming chat-completion body. Only the chat-completion lane can
+// decode that reply; the other five are asking for a shape it is not — a
+// Responses reply, an embedding vector, audio bytes — so they fail to decode.
+// Dispatch results are deliberately not asserted on any lane: what this test
+// claims is what left the gateway, and both the decode failures and the one
+// success happen after the dial it asserts on.
 //
 // @scenario "Every dispatch lane resolves the deployment, not only chat"
 func TestAzureDispatch_EveryLaneResolvesTheDeployment(t *testing.T) {

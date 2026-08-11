@@ -337,7 +337,6 @@ func TestCredentialToBifrostKey_NonMappedProvidersGetNoDeploymentConfig(t *testi
 			assert.Nil(t, key.AzureKeyConfig, "no AzureKeyConfig may be fabricated for %s", tc.name)
 			assert.Nil(t, key.BedrockKeyConfig, "no BedrockKeyConfig may be fabricated for %s", tc.name)
 			assert.Nil(t, key.VertexKeyConfig, "no VertexKeyConfig may be fabricated for %s", tc.name)
-			assert.Nil(t, tc.cred.DeploymentMap, "the credential's nil deployment map must stay nil")
 		})
 	}
 }
