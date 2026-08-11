@@ -713,7 +713,8 @@ secured
             // A verdict is only real when the evaluator ran to completion —
             // an errored/skipped run's stray passed/score/label must not
             // reach analytics or triggers as a real result (#6833). Same
-            // guard as the evaluation-execution service producer.
+            // gate as the shared verdictGate helpers applied at the
+            // executeEvaluation command boundary.
             const hasVerdict = status === "processed";
 
             await app.evaluations.reportEvaluation({
