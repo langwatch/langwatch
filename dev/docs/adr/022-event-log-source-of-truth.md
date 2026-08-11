@@ -240,8 +240,17 @@ the flag without creating the policy gets exactly the unbounded-orphan case the
 local-filesystem refusal above exists to prevent, and trace payloads then
 outlive the retention this ADR promises. `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED`
 (chart: `app.dataplane.providers.azureBlob.spoolRetentionConfirmed`) defaults to
-false, and `mintSpoolUri` refuses an azure destination without it, so ingestion
+false, and `putSpool` refuses an azure destination without it, so ingestion
 degrades to inline payloads rather than accumulating objects nothing reaps.
+
+The refusal is on the **write** path only. It is a rule about creating an object
+nothing will reap, and it must never touch the objects already out there:
+turning the assertion back off is the documented remediation, and a chart
+rollback does it silently, so gating reads and deletes on it would make every
+in-flight spooled span unreadable (`getSpool` does not fail open, and the edge
+has already cleared the attributes) and would skip the eager delete that is the
+spool's *first* line of cleanup — manufacturing the exact orphan the gate
+exists to prevent. Same reasoning for the local-filesystem refusal.
 
 It is an assertion, not a verification, and deliberately so. An Azure lifecycle
 policy is a management-plane resource
