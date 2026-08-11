@@ -71,12 +71,6 @@ export function maybeAzureDriver(): AzureBlobDriver | undefined {
 }
 
 /**
- * Creates a `StoredObjectsService` wired to real storage and ClickHouse.
- *
- * The `S3Driver` is scoped to `projectId` so per-tenant BYOC S3 credentials
- * are resolved at call time.
- */
-/**
  * Builds a `StorageRegistry` with the S3 / local-filesystem / (optional) Azure
  * drivers wired. The `S3Driver` is projectId-scoped so per-tenant BYOC creds
  * resolve at call time. Azure construction is deferred until an azure-blob://
@@ -97,6 +91,12 @@ export function createStorageRegistry({
   });
 }
 
+/**
+ * Creates a `StoredObjectsService` wired to real storage and ClickHouse.
+ *
+ * The `S3Driver` is scoped to `projectId` so per-tenant BYOC S3 credentials
+ * are resolved at call time.
+ */
 export function createStoredObjectsService({
   projectId,
 }: {
