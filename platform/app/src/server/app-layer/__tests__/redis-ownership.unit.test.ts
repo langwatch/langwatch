@@ -38,7 +38,8 @@ const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);
  * constant so the test below can check the pattern itself: a gap here does not
  * fail loudly, it just scans and finds nothing.
  */
-const IOREDIS_CONSTRUCTION = /\bnew\s+(?:IORedis|Redis|Cluster)(?:\s*\.\s*\w+)*\s*\(/;
+const IOREDIS_CONSTRUCTION =
+  /\bnew\s+(?:IORedis|Redis|Cluster)(?:\s*\.\s*\w+)*\s*\(/;
 const SKIP_DIRECTORIES = new Set([
   "node_modules",
   "dist",
