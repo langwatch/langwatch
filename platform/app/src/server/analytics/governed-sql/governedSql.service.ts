@@ -112,8 +112,11 @@ export interface GovernedSqlQueryResult {
 export interface GovernedSqlCaller {
   /** Project id. Used for logging; the database resolves the tenant itself. */
   readonly id: string;
-  /** The project's API key, hashed into the tenant capability. Never logged. */
-  readonly apiKey: string;
+  /**
+   * The project's governed SQL secret (`Project.governedSqlKey`), hashed into
+   * the tenant capability. Never logged.
+   */
+  readonly governedSqlKey: string;
 }
 
 export interface GovernedSqlExecuteInput {
@@ -372,7 +375,9 @@ export class GovernedSqlService {
       ...(validation.boundParameters
         ? { parameters: validation.boundParameters }
         : {}),
-      tenantCapability: governedTenantCapability({ apiKey: project.apiKey }),
+      tenantCapability: governedTenantCapability({
+        secret: project.governedSqlKey,
+      }),
       limits: this.limits,
     });
 

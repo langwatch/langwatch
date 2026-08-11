@@ -45,3 +45,21 @@ export interface AnalyticsTimeseriesBuilderInput {
   timeScale?: number | "full";
   timeZone?: string;
 }
+
+/**
+ * Per-call read options for `AnalyticsService.getTimeseries`.
+ *
+ * Deliberately NOT part of `timeseriesInput` (the tRPC/zod schema): these are
+ * the caller's own safety envelope, not something an API client gets to choose.
+ * A client that could raise its own ceiling would defeat the point.
+ */
+export interface TimeseriesReadOptions {
+  /**
+   * Hard ceiling on rows ClickHouse may return before it fails the query.
+   *
+   * Set by background callers that reduce a timeseries to a scalar and would
+   * otherwise materialise an unbounded `buckets x groupBy-cardinality` result
+   * in the worker process. Omit for interactive reads.
+   */
+  readonly maxResultRows?: number;
+}

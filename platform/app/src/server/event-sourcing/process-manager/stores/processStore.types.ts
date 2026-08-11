@@ -175,6 +175,50 @@ export interface ProcessStore {
   }): Promise<number>;
 
   /**
+   * Retention sweep, dispatched family: delete at most `limit` DISPATCHED
+   * outbox rows whose dispatch finished before `before`, ACROSS EVERY
+   * processName and project. Returns the deleted count.
+   *
+   * The absent processName predicate is the point. `deleteDispatchedBefore`
+   * above reaps one named process, so a process manager is only covered if
+   * somebody remembered to register a prune for it, and half of them never
+   * were. Reaping by predicate covers every process manager that exists and
+   * every one added later, with no registration step to forget.
+   *
+   * A returned count below `limit` means the family is drained, which is how
+   * a caller's drain loop knows to stop.
+   */
+  deleteDispatchedOutboxBatch(params: {
+    before: number;
+    limit: number;
+  }): Promise<number>;
+
+  /**
+   * Retention sweep, dead family: delete at most `limit` DEAD outbox rows
+   * last touched before `before`, across every processName and project.
+   * Dead rows are the operator's failure record, so callers give this a far
+   * longer window than the dispatched family.
+   */
+  deleteDeadOutboxBatch(params: {
+    before: number;
+    limit: number;
+  }): Promise<number>;
+
+  /**
+   * Retention sweep, inbox family: delete at most `limit` inbox rows consumed
+   * before `before`, across every processName and project.
+   *
+   * An inbox row is an idempotency marker, so the window only has to outlive
+   * the horizon in which the same source event can be redelivered. See
+   * specs/event-sourcing/process-manager-retention.feature for why that
+   * horizon is about 25 hours.
+   */
+  deleteConsumedInboxBatch(params: {
+    before: number;
+    limit: number;
+  }): Promise<number>;
+
+  /**
    * Dead-letter recovery: flip DEAD rows of one process back to pending
    * with a fresh attempt budget, due immediately. Scoped by processKey
    * (one process instance's rows) and optionally narrowed by messageKey

@@ -171,7 +171,7 @@ function tenantFixture(
     // which is indistinguishable from a tenant that simply has no data. What
     // pins the digest to SHA-256 is a known-answer assertion, in
     // `tenantIsolation.integration.test.ts`.
-    keyHash: governedTenantCapability({ apiKey: rawApiKey }),
+    keyHash: governedTenantCapability({ secret: rawApiKey }),
   };
 }
 

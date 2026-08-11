@@ -16,6 +16,14 @@ interface StoredMessage extends OutboxMessageRecord {
   leasedUntil: number;
   /** Epoch ms of the successful dispatch; null while pending/dead. */
   dispatchedAt: number | null;
+  /**
+   * Epoch ms of the last write to this row, mirroring the durable store's
+   * `updatedAt` column. The dead-row sweep reaps by this and not by
+   * `nextAttemptAt`: that one is retry scheduling and on a dead row still
+   * carries the backoff the last attempt computed, which can sit arbitrarily
+   * far from the moment the row was actually retired.
+   */
+  updatedAt: number;
 }
 
 function refKey(ref: ProcessRef): string {
@@ -68,7 +76,8 @@ function isRequeueTarget(
  */
 export class InMemoryProcessStore implements ProcessStore {
   private readonly instances = new Map<string, PersistedProcessInstance>();
-  private readonly inbox = new Set<string>();
+  /** Inbox key to the epoch ms it was consumed at, which retention reaps by. */
+  private readonly inbox = new Map<string, number>();
   private readonly messages = new Map<string, StoredMessage>();
 
   async findByRef<State = unknown>(params: {
@@ -133,12 +142,13 @@ export class InMemoryProcessStore implements ProcessStore {
         createdAt: commit.now,
         leasedUntil: 0,
         dispatchedAt: null,
+        updatedAt: commit.now,
       });
       insertedMessageKeys.push(message.messageKey);
     }
 
     if (sourceEventId !== null) {
-      this.inbox.add(inboxKey({ ref, sourceEventId }));
+      this.inbox.set(inboxKey({ ref, sourceEventId }), commit.now);
     }
 
     return {
@@ -196,6 +206,7 @@ export class InMemoryProcessStore implements ProcessStore {
     message.leasedUntil = 0;
     message.leaseToken = null;
     message.dispatchedAt = params.now;
+    message.updatedAt = params.now;
   }
 
   async markFailed(params: {
@@ -212,6 +223,7 @@ export class InMemoryProcessStore implements ProcessStore {
     message.nextAttemptAt = params.nextAttemptAt;
     message.leasedUntil = 0;
     message.leaseToken = null;
+    message.updatedAt = params.now;
   }
 
   async findDueWakes(params: {
@@ -258,6 +270,62 @@ export class InMemoryProcessStore implements ProcessStore {
     return deleted;
   }
 
+  async deleteDispatchedOutboxBatch(params: {
+    before: number;
+    limit: number;
+  }): Promise<number> {
+    return this.deleteOutboxBatch(
+      params,
+      (message) =>
+        message.status === "dispatched" &&
+        message.dispatchedAt !== null &&
+        message.dispatchedAt < params.before,
+    );
+  }
+
+  async deleteDeadOutboxBatch(params: {
+    before: number;
+    limit: number;
+  }): Promise<number> {
+    // Reaped by `updatedAt`, the same column the durable store uses, which
+    // the markFailed that retired the row stamped.
+    return this.deleteOutboxBatch(
+      params,
+      (message) =>
+        message.status === "dead" && message.updatedAt < params.before,
+    );
+  }
+
+  async deleteConsumedInboxBatch(params: {
+    before: number;
+    limit: number;
+  }): Promise<number> {
+    if (params.limit <= 0) return 0;
+    let deleted = 0;
+    for (const [key, consumedAt] of this.inbox) {
+      if (deleted >= params.limit) break;
+      if (consumedAt >= params.before) continue;
+      this.inbox.delete(key);
+      deleted++;
+    }
+    return deleted;
+  }
+
+  private deleteOutboxBatch(
+    params: { limit: number },
+    matches: (message: StoredMessage) => boolean,
+  ): number {
+    if (params.limit <= 0) return 0;
+    let deleted = 0;
+    for (const [key, message] of this.messages) {
+      if (deleted >= params.limit) break;
+      if (!matches(message)) continue;
+      this.messages.delete(key);
+      deleted++;
+    }
+    return deleted;
+  }
+
   async requeueDeadMessages(params: {
     processName: string;
     projectId: string;
@@ -272,6 +340,7 @@ export class InMemoryProcessStore implements ProcessStore {
       message.attempts = 0;
       message.nextAttemptAt = params.now;
       message.leaseToken = null;
+      message.updatedAt = params.now;
       requeued++;
     }
     return requeued;

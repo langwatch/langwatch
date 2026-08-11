@@ -94,11 +94,19 @@ func NewRouter(deps RouterDeps) http.Handler {
 	// exclude themselves from the counters.
 	r.Use(gatewaymetrics.Middleware(deps.Metrics))
 	r.Use(httpmiddleware.Recover())
+	// OUTSIDE Telemetry, and that ordering is load-bearing. Telemetry captures
+	// its context up front (`ctx := clog.With(r.Context(), ...)`) and logs
+	// `request_completed` with that same value AFTER the inner chain returns,
+	// so anything a later middleware adds to a DERIVED context is invisible to
+	// it. Registered after Telemetry, the tracer's trace_id/span_id landed on a
+	// context the access log never reads: 0 of 10,762 gateway records carried a
+	// trace_id, against 98.7% for langyagent, which wires the same two
+	// middlewares the other way round and says so in a comment.
+	r.Use(gatewaytracer.Middleware(gatewaytracer.DefaultSpanName))
 	r.Use(httpmiddleware.Telemetry())
 	if deps.Version != "" {
 		r.Use(httpmiddleware.Version("X-LangWatch-Gateway-Version", deps.Version))
 	}
-	r.Use(gatewaytracer.Middleware(gatewaytracer.DefaultSpanName))
 
 	if deps.Health != nil {
 		r.Get("/healthz", deps.Health.Liveness)

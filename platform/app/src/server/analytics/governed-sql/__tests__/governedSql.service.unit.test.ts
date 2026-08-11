@@ -34,7 +34,7 @@ const DATABASE = "analytics";
 
 const PROJECT = {
   id: "project-under-test",
-  apiKey: "sk-lw-governed-sql-service-unit-test-key",
+  governedSqlKey: "sk-lw-governed-sql-service-unit-test-key",
 };
 
 /** Everything visible: the caller the gate is measured against. */
@@ -155,7 +155,7 @@ describe("given the governed SQL service", () => {
       );
       // The raw key is the secret the digest exists to keep out of the
       // database; a capability that merely contained it would be a leak.
-      expect(executor.calls[0]!.tenantCapability).not.toContain(PROJECT.apiKey);
+      expect(executor.calls[0]!.tenantCapability).not.toContain(PROJECT.governedSqlKey);
     });
 
     it("returns the executor's typed columns, rows and statistics with no diagnostics", async () => {
