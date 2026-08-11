@@ -56,6 +56,12 @@ templates() {
 # not to be a general analyzer.
 readonly CLUSTER_SCOPED='lookup[[:space:]]+"[^"]*"[[:space:]]+"[^"]*"[[:space:]]+""'
 
+# A CALL, not the word. Every real lookup names its apiVersion as a string
+# literal, so `lookup "` is the call and `lookup` on its own is prose — the
+# template comments explaining why this rule exists say the word repeatedly,
+# and must not trip it.
+readonly ANY_LOOKUP_CALL='lookup[[:space:]]+"'
+
 # @scenario "A restricted installer can render the chart without cluster-scoped read access"
 test_no_cluster_scoped_lookup() {
   local hits
@@ -72,7 +78,7 @@ Use a namespaced lookup, or tell the operator the command to run themselves."
 # @scenario "The install notes never depend on reading the cluster"
 test_notes_make_no_lookup() {
   local hits
-  hits=$(templates | grep 'NOTES\.txt$' | xargs grep -nH 'lookup ' 2>/dev/null || true)
+  hits=$(templates | grep 'NOTES\.txt$' | xargs grep -nEH "$ANY_LOOKUP_CALL" 2>/dev/null || true)
 
   if [[ -n "$hits" ]]; then
     fail "notes-lookup" \
