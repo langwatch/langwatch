@@ -194,6 +194,164 @@ Feature: MCP HTTP Server In-App Integration (Phase 1)
     Then the response status is 400 with error "invalid_grant"
     And no access token is issued
 
+  # --- SSE transport across replicas ---
+  #
+  # The SSE stream is connection-bound: it lives on the one replica that
+  # answered GET /sse. Every follow-up message is a separate POST that the
+  # load balancer may send to any replica, so a replica that does not hold
+  # the stream has to hand the message to the one that does.
+
+  @integration
+  Scenario: A message posted to a replica that does not hold the stream still reaches the session
+    Given a client opened an SSE connection and one replica holds the stream
+    When the client posts a tools/list message to a different replica
+    Then the response is accepted
+    And the tools/list reply arrives on the open SSE stream
+    And the reply lists at least one tool
+
+  @integration
+  Scenario: A message posted to the replica holding the stream is answered directly
+    Given a client opened an SSE connection to a replica
+    When the client posts a message to that same replica
+    Then the response is accepted
+    And the reply arrives on the open SSE stream
+
+  @integration
+  Scenario: Clients that append the message path to the connect path are still routed
+    Given a client opened an SSE connection
+    When the client posts its message to the /sse/messages path instead of /messages
+    Then the response is accepted
+
+  @integration
+  Scenario: A message for an unknown session is rejected as a missing session
+    Given no SSE session exists for the session id a client presents
+    When the client posts a message for that session id
+    Then the response status is 404
+    And the response says the session was not found
+
+  @integration
+  Scenario: A message carrying credentials for a different project is rejected
+    Given a client opened an SSE connection with one project's credentials
+    When a message for that session presents another project's credentials
+    Then the response status is 401
+    And the message is never delivered to the session
+
+  @integration
+  Scenario: A message with no credentials is rejected as unauthorized rather than as a bad session
+    Given an SSE session exists
+    When a message for that session arrives with no credentials
+    Then the response status is 401
+
+  @integration
+  Scenario: A message for a session whose replica is gone tells the client to reconnect
+    Given an SSE session was recorded but the replica holding its stream is gone
+    When a client posts a message for that session
+    Then the response status is 404
+    And the recorded session is forgotten so the client reconnects
+
+  @integration
+  Scenario: SSE sessions count towards the per-project concurrent session limit
+    Given a project already holds the maximum number of concurrent sessions
+    When a client opens another SSE connection for that project
+    Then the connection is refused as over the session limit
+
+  @integration
+  Scenario: Reconnecting the streaming transport to another replica resumes the session
+    Given a streamable session was created on one replica
+    When the client reconnects the stream through a different replica
+    Then the stream is served rather than reported as expired
+
+  # --- OAuth discovery documents ---
+
+  @integration
+  Scenario: Protected resource metadata is served for the path-suffixed form
+    When a client fetches the protected resource metadata for /sse or /mcp
+    Then the response is JSON describing the resource and its authorization server
+
+  @integration
+  Scenario: Authorization server metadata is served for the path-suffixed form
+    When a client fetches the authorization server metadata for /sse or /mcp
+    Then the response is JSON advertising the authorization, token and registration endpoints
+
+  @integration
+  Scenario: An unknown OAuth discovery document answers with JSON rather than the web app
+    When a client fetches an OAuth discovery document that does not exist
+    Then the response status is 404
+    And the response is JSON, so the client can fall back to the documents that do exist
+
+  @integration
+  Scenario: OpenID configuration is answered as absent rather than with the web app
+    When a client fetches the OpenID configuration document
+    Then the response status is 404
+    And the response is JSON
+
+  # --- OAuth token endpoint ---
+
+  @integration
+  Scenario: The token endpoint accepts client credentials presented as HTTP Basic
+    Given an authorization code was issued for a client
+    When the client exchanges it presenting its client id via HTTP Basic instead of the form body
+    Then an access token is issued
+
+  @integration
+  Scenario: A token exchange from a client that is no longer registered is told to register again
+    Given a client presents a client id that has no registration
+    When it exchanges an authorization code
+    Then the response error is "invalid_client"
+    And the response tells the client to register again
+
+  @integration
+  Scenario: Rate limiting counts callers separately when a proxy reports the caller address
+    Given many token requests arrive from one caller behind a proxy
+    When a different caller behind the same proxy sends a token request
+    Then that caller is not rate limited by the first caller's traffic
+
+  @integration
+  Scenario: A rate limited OAuth request answers with an OAuth error and a retry hint
+    Given a caller exceeded the token endpoint rate limit
+    When it sends another token request
+    Then the response status is 429
+    And the response error is "temporarily_unavailable"
+    And the response carries a retry hint
+
+  @integration
+  Scenario: Registering a client and exchanging a token do not share one rate limit budget
+    Given a caller exhausted the client registration rate limit
+    When it sends a token request
+    Then the token request is not rate limited
+
+  # --- Authorization consent errors ---
+
+  @integration
+  Scenario: A consent failure a client can be told about is redirected back to the client
+    Given a client is registered with a redirect URI and asks for authorization without a code challenge
+    When the user approves the request
+    Then the browser is sent back to the client's registered redirect URI
+    And the redirect carries error "invalid_request" and the request state
+
+  @integration
+  Scenario: A project the user cannot reach is reported to the client as access denied
+    Given a client is registered with a redirect URI and the user cannot access the requested project
+    When the user approves the request
+    Then the browser is sent back to the client's registered redirect URI
+    And the redirect carries error "access_denied"
+
+  @integration
+  Scenario: A consent failure that cannot be attributed to a client stays on the LangWatch page
+    Given the authorization request names a client that is not registered
+    When the user approves the request
+    Then no redirect back to the caller is offered
+    And the failure is shown on the LangWatch page instead
+
+  # --- Observability ---
+
+  @integration
+  Scenario: Every MCP request is logged with its outcome
+    Given a client sends a request to an MCP route
+    When the response completes
+    Then one log line records the method, path, status and duration
+    And no credentials appear in the log line
+
   # --- Tool Availability ---
 
   @integration @unimplemented
