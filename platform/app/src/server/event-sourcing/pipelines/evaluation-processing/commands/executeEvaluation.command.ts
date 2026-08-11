@@ -514,6 +514,14 @@ export class ExecuteEvaluationCommand
       // not configured) are emitted earlier via their own path — or, when the
       // failure is thrown from inside execution, by the customer-fault branch
       // in the catch below — and still surface in the UI.
+      //
+      // DECIDED (#6835): this invisibility is intended. The trade-off is that
+      // a monitor whose traces are all non-evaluatable looks like it never ran
+      // rather than "ran and found nothing to evaluate" — but a per-trace
+      // skipped event would multiply event volume by every monitor × every
+      // non-matching trace, which bulk re-evaluations turn into thousands of
+      // rows that carry no verdict. If skip visibility is ever needed, add an
+      // aggregated counter (per monitor per interval), not per-trace events.
       if (result.status === "skipped") {
         logger.debug(
           {
