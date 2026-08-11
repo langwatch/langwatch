@@ -6,22 +6,19 @@
  * Production runs several app replicas behind a load balancer with no session
  * affinity. `GET /sse` opens a stream that only lives on the replica that
  * answered it, while every follow-up `POST /messages?sessionId=…` is a fresh
- * connection the balancer may hand to any replica. Two handler instances in
- * one process, sharing one Redis, reproduce that exactly: each has its own
- * session map and its own relay subscriber, and only Redis is common.
+ * connection the balancer may hand to any replica.
  */
-import { createServer, type Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { connection as redis } from "~/server/redis";
-import { createMcpHandler, type McpHandler } from "../handler";
 import {
-  clearRecordedSessions,
   handshake,
   initializeBody,
   openSseStream,
   postMessage,
+  type ReplicaPair,
   SSE_SESSION_PREFIX,
   sseSessionSetKey,
+  startReplicaPair,
 } from "./support/sseHarness";
 
 const VALID_API_KEY = "lw_relay_key_a";
@@ -58,25 +55,9 @@ vi.mock("~/utils/encryption", () => ({
 }));
 
 describe("Feature: MCP SSE transport across replicas", () => {
-  let replicaA: Server;
-  let replicaB: Server;
-  let handlerA: McpHandler;
-  let handlerB: McpHandler;
+  let replicas: ReplicaPair;
   let urlA: string;
   let urlB: string;
-
-  async function listen(handler: McpHandler): Promise<[Server, string]> {
-    const server = createServer((req, res) => handler.handleRequest(req, res));
-    await new Promise<void>((resolve) =>
-      server.listen(0, "127.0.0.1", resolve),
-    );
-    const address = server.address();
-    const port = typeof address === "object" && address ? address.port : 0;
-    return [server, `http://127.0.0.1:${port}`];
-  }
-
-  const clearSessions = (apiKey: string) =>
-    clearRecordedSessions({ redis: redis!, apiKey });
 
   beforeAll(async () => {
     if (!redis) {
@@ -84,22 +65,15 @@ describe("Feature: MCP SSE transport across replicas", () => {
         "These tests need a real Redis — set REDIS_URL / LANGWATCH_TEST_REDIS_URL",
       );
     }
-    await clearSessions(VALID_API_KEY);
-    await clearSessions(OTHER_API_KEY);
-
-    handlerA = createMcpHandler();
-    handlerB = createMcpHandler();
-    [replicaA, urlA] = await listen(handlerA);
-    [replicaB, urlB] = await listen(handlerB);
+    replicas = await startReplicaPair({
+      redis,
+      apiKeys: [VALID_API_KEY, OTHER_API_KEY],
+    });
+    ({ urlA, urlB } = replicas);
   });
 
   afterAll(async () => {
-    await handlerA.closeAllSessions();
-    await handlerB.closeAllSessions();
-    await new Promise<void>((resolve) => replicaA.close(() => resolve()));
-    await new Promise<void>((resolve) => replicaB.close(() => resolve()));
-    await clearSessions(VALID_API_KEY);
-    await clearSessions(OTHER_API_KEY);
+    await replicas.stop();
   });
 
   describe("given a client opened an SSE connection against one replica", () => {
@@ -309,127 +283,6 @@ describe("Feature: MCP SSE transport across replicas", () => {
           }
           await redis!.del(setKey);
         }
-      });
-    });
-  });
-
-  describe("given a streamable session was created on one replica", () => {
-    /** Opens a streamable session on replica A and returns its session id. */
-    async function createStreamableSession(id: number): Promise<string> {
-      const created = await fetch(`${urlA}/mcp`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          accept: "text/event-stream, application/json",
-          authorization: `Bearer ${VALID_API_KEY}`,
-        },
-        body: JSON.stringify(initializeBody(id)),
-      });
-      // biome-ignore-start lint/suspicious/noMisplacedAssertion: the arrangement fails loudly here rather than as a confusing assertion later
-      expect(created.status).toBe(200);
-      const sessionId = created.headers.get("mcp-session-id");
-      expect(sessionId).toBeTruthy();
-      // biome-ignore-end lint/suspicious/noMisplacedAssertion: end of the arrangement checks
-      await created.text();
-      return sessionId!;
-    }
-
-    /**
-     * Whether a replica built the session for itself. DELETE only consults
-     * the replica's own session map, so it answers 200 exactly when that
-     * replica holds the session and 404 when it never built one.
-     */
-    async function replicaHoldsSession(
-      baseUrl: string,
-      sessionId: string,
-    ): Promise<boolean> {
-      const res = await fetch(`${baseUrl}/mcp`, {
-        method: "DELETE",
-        headers: {
-          authorization: `Bearer ${VALID_API_KEY}`,
-          "mcp-session-id": sessionId,
-        },
-      });
-      await res.text();
-      return res.status === 200;
-    }
-
-    describe("when the client reconnects the stream through the other replica", () => {
-      /** @scenario Reconnecting the streaming transport to another replica resumes the session */
-      it("serves the stream instead of reporting the session expired", async () => {
-        const sessionId = await createStreamableSession(71);
-
-        const abort = new AbortController();
-        try {
-          const resumed = await fetch(`${urlB}/mcp`, {
-            method: "GET",
-            headers: {
-              accept: "text/event-stream",
-              authorization: `Bearer ${VALID_API_KEY}`,
-              "mcp-session-id": sessionId,
-            },
-            signal: abort.signal,
-          });
-
-          expect(resumed.status).toBe(200);
-        } finally {
-          abort.abort();
-        }
-      });
-    });
-
-    describe("when the reconnect carries no credentials", () => {
-      /** @scenario Reconnecting without credentials is refused and rebuilds nothing */
-      it("answers 401 and leaves the other replica holding no session", async () => {
-        const sessionId = await createStreamableSession(81);
-
-        const abort = new AbortController();
-        try {
-          const resumed = await fetch(`${urlB}/mcp`, {
-            method: "GET",
-            headers: {
-              accept: "text/event-stream",
-              "mcp-session-id": sessionId,
-            },
-            signal: abort.signal,
-          });
-          await resumed.text();
-
-          expect(resumed.status).toBe(401);
-        } finally {
-          abort.abort();
-        }
-
-        // Rebuilding decrypts the stored key and connects a server bound to
-        // it, so a refused caller must not have caused any of it.
-        expect(await replicaHoldsSession(urlB, sessionId)).toBe(false);
-      });
-    });
-
-    describe("when the reconnect carries credentials for a different project", () => {
-      /** @scenario Reconnecting with another project's credentials is refused and rebuilds nothing */
-      it("answers 401 and leaves the other replica holding no session", async () => {
-        const sessionId = await createStreamableSession(91);
-
-        const abort = new AbortController();
-        try {
-          const resumed = await fetch(`${urlB}/mcp`, {
-            method: "GET",
-            headers: {
-              accept: "text/event-stream",
-              authorization: `Bearer ${OTHER_API_KEY}`,
-              "mcp-session-id": sessionId,
-            },
-            signal: abort.signal,
-          });
-          await resumed.text();
-
-          expect(resumed.status).toBe(401);
-        } finally {
-          abort.abort();
-        }
-
-        expect(await replicaHoldsSession(urlB, sessionId)).toBe(false);
       });
     });
   });

@@ -9,6 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
+import { isAllowedRedirectScheme } from "~/mcp/redirectSchemes";
 import { useSession } from "~/utils/auth-client";
 import { useRouter } from "~/utils/compat/next-router";
 import {
@@ -18,22 +19,14 @@ import {
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
-/** Schemes that execute rather than navigate, so they never reach `location`. */
-const EXECUTABLE_SCHEMES = ["javascript:", "data:", "vbscript:"];
-
 /**
  * Whether a destination is safe to hand to `location`. Every redirect this
  * page follows was verified against the client registry server-side first;
  * this is the second lock, so that a regression on that side is a broken
- * redirect rather than script running on our origin.
+ * redirect rather than script running on our origin. Shares its list with the
+ * authorize route, which applies the same rule before it ever issues a code.
  */
-function isNavigableRedirect(candidate: string): boolean {
-  try {
-    return !EXECUTABLE_SCHEMES.includes(new URL(candidate).protocol);
-  } catch {
-    return false;
-  }
-}
+const isNavigableRedirect = isAllowedRedirectScheme;
 
 export default function McpAuthorize() {
   const router = useRouter();

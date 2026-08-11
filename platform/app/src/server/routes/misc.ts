@@ -29,6 +29,7 @@ import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { env } from "~/env.mjs";
 import { getOAuthClient } from "~/mcp/oauthClientRegistry";
+import { isAllowedRedirectScheme } from "~/mcp/redirectSchemes";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
 import {
   type TimeseriesInputType,
@@ -797,16 +798,12 @@ secured
     }
 
     try {
-      const redirectUrl = new URL(redirect_uri);
-      if (
-        redirectUrl.protocol === "javascript:" ||
-        redirectUrl.protocol === "data:" ||
-        redirectUrl.protocol === "vbscript:"
-      ) {
-        return c.json({ error: "redirect_uri uses a disallowed scheme" }, 400);
-      }
+      new URL(redirect_uri);
     } catch {
       return c.json({ error: "Invalid redirect_uri" }, 400);
+    }
+    if (!isAllowedRedirectScheme(redirect_uri)) {
+      return c.json({ error: "redirect_uri uses a disallowed scheme" }, 400);
     }
 
     // RFC 6749 §10.6: an authorization server must only ever issue a code to

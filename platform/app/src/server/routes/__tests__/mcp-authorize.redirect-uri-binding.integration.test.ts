@@ -139,6 +139,28 @@ describe("POST /api/mcp/authorize — redirect_uri binding", () => {
     });
   });
 
+  describe.each([
+    "javascript:alert(1)",
+    "vbscript:msgbox(1)",
+    "data:text/html,<script>alert(1)</script>",
+    "blob:https://app.langwatch.ai/00000000-0000-4000-8000-000000000000",
+    "filesystem:https://app.langwatch.ai/temporary/x",
+  ])("when redirect_uri is %s", (redirect_uri) => {
+    /** @scenario Authorization is rejected when redirect_uri uses a scheme the browser executes */
+    it("rejects with 400 and never mints an authorization code", async () => {
+      // No registration is queued on purpose: the scheme is refused before the
+      // client registry is ever consulted, which is what keeps a client that
+      // registered such a URI from being able to use it.
+      const res = await authorize({ redirect_uri });
+      const json = (await res.json()) as { redirect?: string; error?: string };
+
+      expect(res.status).toBe(400);
+      expect(json.error).toContain("disallowed scheme");
+      expect(json.redirect).toBeUndefined();
+      expect(mockRedis.set).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when client_id was never registered via /oauth/register", () => {
     /** @scenario Authorization is rejected for an unregistered client_id */
     it("rejects with 400 and never mints an authorization code", async () => {

@@ -156,6 +156,14 @@ Feature: MCP HTTP Server In-App Integration (Phase 1)
     Then the response status is 400
     And no authorization code is issued
 
+  @integration
+  Scenario: Authorization is rejected when redirect_uri uses a scheme the browser executes
+    Given a client registered with a redirect_uri the browser would execute rather than navigate to
+    When an authorization request supplies that redirect_uri
+    Then the response status is 400
+    And the response says the scheme is disallowed
+    And no authorization code is issued
+
   @regression @integration
   Scenario: Authorization is rejected for an unregistered client_id
     Given no client is registered with client_id "mcp_never_registered"

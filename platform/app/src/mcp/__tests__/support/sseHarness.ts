@@ -5,7 +5,9 @@
  * as transport plumbing.
  */
 import { createHash } from "node:crypto";
+import { createServer, type Server } from "node:http";
 import type { Cluster, Redis } from "ioredis";
+import { createMcpHandler, type McpHandler } from "../../handler";
 
 export const SSE_SESSION_PREFIX = "mcp:sse:session:";
 export const SSE_SESSION_SET_PREFIX = "mcp:sse:sessions_by_key:";
@@ -39,7 +41,13 @@ export interface OpenSseStream {
  * production side derives it the same way, and an equivalent alert on that
  * line is dismissed for the same reason.
  */
-function sessionSetKey(setPrefix: string, apiKey: string): string {
+function sessionSetKey({
+  setPrefix,
+  apiKey,
+}: {
+  setPrefix: string;
+  apiKey: string;
+}): string {
   // lgtm[js/insufficient-password-hash]
   const digest = createHash("sha256").update(apiKey).digest("hex").slice(0, 16);
   return `${setPrefix}${digest}`;
@@ -65,7 +73,7 @@ export async function clearRecordedSessions({
     [SSE_SESSION_SET_PREFIX, SSE_SESSION_PREFIX],
     [SESSION_SET_PREFIX, SESSION_PREFIX],
   ] as const) {
-    const setKey = sessionSetKey(setPrefix, apiKey);
+    const setKey = sessionSetKey({ setPrefix, apiKey });
     for (const id of await redis.smembers(setKey)) {
       await redis.del(`${sessionPrefix}${id}`);
     }
@@ -75,13 +83,71 @@ export async function clearRecordedSessions({
 
 /** The Redis set of SSE session ids for a key, for suites that seed it. */
 export function sseSessionSetKey(apiKey: string): string {
-  return sessionSetKey(SSE_SESSION_SET_PREFIX, apiKey);
+  return sessionSetKey({ setPrefix: SSE_SESSION_SET_PREFIX, apiKey });
 }
 
 function rejectAfter(ms: number, message: string): Promise<never> {
-  return new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(message)), ms),
-  );
+  return new Promise<never>((_, reject) => {
+    // Unreferenced so the loser of a race does not hold the event loop open
+    // for its full duration and stall the file's teardown.
+    setTimeout(() => reject(new Error(message)), ms).unref();
+  });
+}
+
+/**
+ * Two handlers, each on its own server, sharing one Redis.
+ *
+ * That is the shape of production: replicas behind a load balancer with no
+ * session affinity, each with its own session map and relay subscriber, with
+ * only Redis in common. A suite that wants to prove cross-replica behaviour
+ * cannot do it with one handler.
+ */
+export async function startReplicaPair({
+  redis,
+  apiKeys,
+}: {
+  redis: Redis | Cluster;
+  apiKeys: string[];
+}): Promise<ReplicaPair> {
+  for (const apiKey of apiKeys) {
+    await clearRecordedSessions({ redis, apiKey });
+  }
+
+  const handlers: McpHandler[] = [];
+  const servers: Server[] = [];
+  const urls: string[] = [];
+  for (let i = 0; i < 2; i++) {
+    const handler = createMcpHandler();
+    const server = createServer((req, res) => handler.handleRequest(req, res));
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    const address = server.address();
+    const port = typeof address === "object" && address ? address.port : 0;
+    handlers.push(handler);
+    servers.push(server);
+    urls.push(`http://127.0.0.1:${port}`);
+  }
+
+  return {
+    urlA: urls[0]!,
+    urlB: urls[1]!,
+    async stop() {
+      for (const handler of handlers) await handler.closeAllSessions();
+      for (const server of servers) {
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+      }
+      for (const apiKey of apiKeys) {
+        await clearRecordedSessions({ redis, apiKey });
+      }
+    },
+  };
+}
+
+export interface ReplicaPair {
+  urlA: string;
+  urlB: string;
+  stop: () => Promise<void>;
 }
 
 /**
