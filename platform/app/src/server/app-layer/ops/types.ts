@@ -1,7 +1,4 @@
-import type {
-  BoundedSection,
-  ParkedTenant,
-} from "./snapshot/snapshot.types";
+import type { BoundedSection, ParkedTenant } from "./snapshot/snapshot.types";
 
 export type { BoundedSection, ParkedTenant };
 

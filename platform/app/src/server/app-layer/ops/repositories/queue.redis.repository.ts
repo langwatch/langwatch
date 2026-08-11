@@ -995,7 +995,12 @@ export class QueueRedisRepository implements QueueRepository {
       if (headGroups.length > 0) {
         const agePipeline = this.redis.pipeline();
         for (const { groupId } of headGroups) {
-          agePipeline.zrange(`${prefix}group:${groupId}:jobs`, 0, 0, "WITHSCORES");
+          agePipeline.zrange(
+            `${prefix}group:${groupId}:jobs`,
+            0,
+            0,
+            "WITHSCORES",
+          );
         }
         const ageResults = await agePipeline.exec();
         for (let i = 0; i < headGroups.length; i++) {
