@@ -98,7 +98,7 @@ describe("pr-auto-approve decisions", () => {
       ]);
     });
 
-    /** @scenario "A verified commit whose committer is not GitHub does not approve" */
+    /** @scenario "A human-created commit impersonating Dependabot does not approve" */
     it("refuses the lane when a verified commit was committed outside GitHub's own identities", () => {
       const verdict = dependabotLaneVerdict([dependabotCommit({ committer: "some-human" })]);
       assert.equal(verdict.approve, false);
