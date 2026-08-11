@@ -24,7 +24,7 @@ export type ResolvedPlanLimits = {
   maxMembersLite: number;
   maxMessagesPerMonth: number;
   canPublish: boolean;
-  webhookEndpointsEnabled: boolean;
+  webhookEndpointsEnabled: boolean | undefined;
   usageUnit: string;
 };
 
@@ -32,11 +32,17 @@ export type ResolvedPlanLimits = {
  * Resolves the enforced plan limits from a license payload, applying defaults
  * to optional fields that may be missing in older licenses:
  * - maxMembersLite: DEFAULT_MEMBERS_LITE (1)
- * - webhookEndpointsEnabled: false (licenses signed before the flag existed)
  * - usageUnit: "traces"
  *
+ * `webhookEndpointsEnabled` is deliberately NOT defaulted here. A payload that
+ * omits it has said nothing, and saying nothing has to stay distinguishable
+ * from saying no: the plan's tier decides it later (`planEntitlements.ts`),
+ * which is what entitles a license signed before the flag existed. Turning
+ * absent into false here would be an answer the contract never gave, and the
+ * tier map correctly refuses to overrule an explicit false.
+ *
  * @param plan - License plan limits (the signed payload)
- * @returns The enforced limits with all fields guaranteed to have values
+ * @returns The enforced limits, with the levers the license does set resolved
  */
 export function resolvePlanDefaults(
   plan: LicensePlanLimits,
@@ -48,7 +54,7 @@ export function resolvePlanDefaults(
     maxMessagesPerMonth: plan.maxMessagesPerMonth,
     canPublish: plan.canPublish,
     maxMembersLite: plan.maxMembersLite ?? DEFAULT_MEMBERS_LITE,
-    webhookEndpointsEnabled: plan.webhookEndpointsEnabled ?? false,
+    webhookEndpointsEnabled: plan.webhookEndpointsEnabled,
     usageUnit: KNOWN_USAGE_UNITS.includes(plan.usageUnit as any)
       ? plan.usageUnit!
       : "traces",
