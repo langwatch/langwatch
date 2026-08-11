@@ -48,7 +48,6 @@ function sessionSetKey({
   setPrefix: string;
   apiKey: string;
 }): string {
-  // lgtm[js/insufficient-password-hash]
   const digest = createHash("sha256").update(apiKey).digest("hex").slice(0, 16);
   return `${setPrefix}${digest}`;
 }
