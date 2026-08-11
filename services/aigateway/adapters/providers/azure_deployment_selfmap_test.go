@@ -51,6 +51,15 @@ func newAzureResourceStub(t *testing.T, respondModel string) *azureResourceStub 
 		stub.paths = append(stub.paths, r.URL.Path)
 		stub.mu.Unlock()
 
+		// A real Azure resource content-negotiates. Bifrost sends
+		// "Accept: text/event-stream" on every streaming lane and on no other
+		// (core@v1.4.22 providers/openai/openai.go:985), so that header is the
+		// same signal the real resource answers SSE to.
+		if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
+			writeChatCompletionSSE(w, respondModel)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = fmt.Fprintf(w, `{"id":"chatcmpl-test","object":"chat.completion","created":1,"model":%q,`+
 			`"choices":[{"index":0,"message":{"role":"assistant","content":"hi"},"finish_reason":"stop"}],`+
@@ -58,6 +67,41 @@ func newAzureResourceStub(t *testing.T, respondModel string) *azureResourceStub 
 	}))
 	t.Cleanup(stub.Close)
 	return stub
+}
+
+// writeChatCompletionSSE answers a streaming chat completion the way an Azure
+// OpenAI resource does: text/event-stream, content deltas, the usage chunk
+// Bifrost asks for via stream_options.include_usage, then the [DONE] sentinel.
+//
+// Answering a streaming request with a JSON body is not merely unfaithful.
+// Bifrost reads an HTTP 200 whose Content-Type is not text/event-stream as an
+// error raised inside the stream (core@v1.4.22 providers/openai/openai.go:1121),
+// and that error reaches the request worker as the stream's first chunk
+// (bifrost.go:4963). The worker then releases the pooled plugin pipeline on its
+// error branch (bifrost.go:5256) while the provider goroutine's deferred
+// finalizer releases the same object (bifrost.go:5235) — the sync.Once at
+// bifrost.go:5231 guards the finalizer against itself, not against the worker.
+// Two unsynchronized resets of one pooled object is a data race, so a JSON
+// answer here fails this package under -race.
+func writeChatCompletionSSE(w http.ResponseWriter, model string) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.WriteHeader(http.StatusOK)
+
+	for _, data := range []string{
+		fmt.Sprintf(`{"id":"chatcmpl-test","object":"chat.completion.chunk","created":1,"model":%q,`+
+			`"choices":[{"index":0,"delta":{"role":"assistant","content":"hi"},"finish_reason":null}]}`, model),
+		fmt.Sprintf(`{"id":"chatcmpl-test","object":"chat.completion.chunk","created":1,"model":%q,`+
+			`"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`, model),
+		fmt.Sprintf(`{"id":"chatcmpl-test","object":"chat.completion.chunk","created":1,"model":%q,`+
+			`"choices":[],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`, model),
+		"[DONE]",
+	} {
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+	}
 }
 
 // deployment returns the single deployment Bifrost resolved for the dispatch.

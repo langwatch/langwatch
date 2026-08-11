@@ -114,10 +114,11 @@ func TestDispatchCredential_DeploymentMappedProvidersAllGetTheSelfMap(t *testing
 // these provider methods before it dials (core@v1.4.22 azure.go
 // validateKeyConfig). Removing the self-map turns all seven rows red.
 //
-// The stub answers every lane with the same non-streaming chat-completion body,
-// so the other six lanes fail to decode the reply. The dispatch result is
-// deliberately not asserted: what this test claims is what left the gateway,
-// and every one of those decode failures happens after the dial it asserts on.
+// The stub answers the streaming lane with SSE and the other six with the same
+// non-streaming chat-completion body, so those six fail to decode the reply.
+// Their dispatch results are deliberately not asserted: what this test claims is
+// what left the gateway, and every one of those decode failures happens after
+// the dial it asserts on.
 //
 // @scenario "Every dispatch lane resolves the deployment, not only chat"
 func TestAzureDispatch_EveryLaneResolvesTheDeployment(t *testing.T) {
@@ -208,12 +209,11 @@ func TestAzureDispatch_EveryLaneResolvesTheDeployment(t *testing.T) {
 			}
 
 			if tc.stream {
-				// The stub replies in JSON, so this lane is rejected for a
-				// non-SSE response — on the way back, having already dialed.
+				// The stub serves this lane real SSE, so the stream opens and
+				// is drained to completion before the recorded path is read.
 				it, err := router.DispatchStream(context.Background(), req, cred)
-				if err == nil {
-					drainStream(t, it)
-				}
+				require.NoError(t, err, "the streaming lane must open against an SSE upstream")
+				drainStream(t, it)
 			} else {
 				_, _ = router.Dispatch(context.Background(), req, cred)
 			}
