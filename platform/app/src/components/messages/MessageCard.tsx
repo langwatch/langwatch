@@ -423,6 +423,9 @@ export function MessageCard({
                           "guardrail block",
                           "guardrail blocks",
                         )}
+                        {guardSummary.errored > 0
+                          ? `, ${guardSummary.errored} errored`
+                          : ""}
                       </>
                     ) : guardSummary.errored > 0 ? (
                       // A crashed guardrail is neither a pass nor a block —
@@ -512,10 +515,16 @@ export function MessageCard({
                       : evalSummary.hasOnlySkippedRuns
                         ? "Evaluations skipped"
                         : evalSummary.failed > 0
-                          ? `${evalSummary.failed} ${
+                          ? // Errored runs stay visible next to real fails —
+                            // neither count may hide the other.
+                            `${evalSummary.failed} ${
                               evalSummary.failed == 1
                                 ? "evaluation failed"
                                 : "evaluations failed"
+                            }${
+                              evalSummary.errored > 0
+                                ? `, ${evalSummary.errored} errored`
+                                : ""
                             }`
                           : evalSummary.errored > 0
                             ? // A crashed evaluator is not a fail verdict — label it
