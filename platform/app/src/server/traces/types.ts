@@ -82,6 +82,12 @@ export interface TracesForProjectResult {
    * past it. A client that resumed from the `endDate` it asked for would step
    * over that gap and lose those traces; resuming from this value cannot.
    *
+   * Both ends of the window are inclusive, so a trace last written at exactly
+   * this millisecond is delivered by this pull and by the next one. That is the
+   * axis's at-least-once guarantee doing its job — a duplicate is recoverable
+   * by an idempotent apply, a gap is not — and it is why resuming here is the
+   * advice rather than resuming one millisecond past it.
+   *
    * Absent on the occurred axis, which needs no snapshot: OccurredAt does not
    * move, so the requested window is the window delivered.
    */
