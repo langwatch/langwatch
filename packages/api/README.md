@@ -6,12 +6,12 @@ Built on top of [Hono](https://hono.dev), [hono-openapi](https://github.com/rhin
 
 ## Quick start
 
-Two files per service. The service definition:
+A service is one file exporting a built Hono app:
 
 ```ts
-// src/app/api/things/[[...route]]/things.service.ts
+// src/app/api/things/[[...route]]/app.ts
 import { z } from "zod";
-import { createService, routeHandlers } from "@langwatch/api";
+import { createService } from "@langwatch/api";
 import { authMiddleware } from "../../middleware/auth";
 import { organizationMiddleware } from "../../middleware/organization";
 import { ThingService } from "~/server/things/thing.service";
@@ -31,9 +31,17 @@ export const app = createService({
     thingService: () => ThingService.create(prisma),
   })
   .version("2025-03-15", (v) => {
-    v.get("/", { output: z.array(thingSchema) }, async (_c, { app }) => {
-      return app.thingService.getAll({ projectId: app.project.id });
-    });
+    v.get(
+      "/",
+      {
+        output: z.array(thingSchema),
+        description: "Lists every thing in the project.",
+        docs: { operationId: "listThings", tags: ["Things"] },
+      },
+      async (_c, { app }) => {
+        return app.thingService.getAll({ projectId: app.project.id });
+      },
+    );
 
     v.post(
       "/",
@@ -41,6 +49,7 @@ export const app = createService({
         input: z.object({ name: z.string().min(1) }),
         output: thingSchema,
         status: 201,
+        docs: { operationId: "createThing", tags: ["Things"] },
       },
       async (_c, { input, app }) => {
         return app.thingService.create({ projectId: app.project.id, ...input });
@@ -52,6 +61,7 @@ export const app = createService({
       {
         params: z.object({ id: z.string() }),
         output: thingSchema,
+        docs: { operationId: "getThing", tags: ["Things"] },
       },
       async (_c, { params, app }) => {
         return app.thingService.getById({
@@ -62,24 +72,30 @@ export const app = createService({
     );
   })
   .build();
-
-export const { GET, POST, PUT, PATCH, DELETE } = routeHandlers(app);
 ```
 
-The Next.js route file:
+The built app carries its own base path (`/api/things` from `name`, or an explicit `basePath`), so the host's API router mounts it at the root, next to every other service:
 
 ```ts
-// src/app/api/things/[[...route]]/route.ts
-export { GET, POST, PUT, PATCH, DELETE } from "./things.service";
+// src/server/api-router.ts
+import { app as thingsApp } from "../app/api/things/[[...route]]/app";
+
+api.route("/", thingsApp);
 ```
+
+### Legacy Next-style hosts
+
+`routeHandlers(app)` converts a built app into `{ GET, POST, PUT, PATCH, DELETE }` handlers via `hono/vercel` for hosts that export per-file route handlers instead of mounting a Hono router. It stays exported for those hosts; services in this repo export the Hono app and are mounted by the api-router as above.
 
 ## What it does for you
 
 - **Tracing + logging** via `@langwatch/observability` (automatic, disable with `tracer: false` / `logger: false`)
 - **Auth, org, resource limits** applied in the right order per-endpoint
-- **Input/output/params/query validation** from Zod schemas, auto-wired to OpenAPI
+- **Input/output/params/query validation** from Zod schemas on every mount
+- **OpenAPI documentation** of the bare alias path only, shaped by `docs`
 - **Error formatting + logging** for `HandledError` (code, meta, reasons, traceId/spanId, fault/tips/docsUrl) and Zod errors
 - **Versioned routing** at `/api/{name}/{date}/...` with forward-copying from previous versions
+- **Route mounting callback** (`onRouteMounted`) so hosts can register route policies for every mounted path, namespace guards included
 
 ## Handler signature
 
@@ -109,14 +125,72 @@ Second argument to `v.get()`, `v.post()`, etc:
   params: z.object({ id: z.string() }), // Path params
   query: z.object({ limit: z.number() }), // Query string
   description: "...",               // OpenAPI description
+  docs: { operationId: "..." },      // OpenAPI documentation options (below)
   status: 201,                      // HTTP status (default 200)
   auth: "none",                     // Skip auth and legacy org resolution
   resourceLimit: "scenarios",       // Enforce resource limits
   middleware: [rateLimiter()],       // Extra per-endpoint middleware
+  meta: { policy: ... },             // Opaque, surfaced on onRouteMounted
 }
 ```
 
 All fields optional. Pass `{}` for a bare endpoint. Endpoint paths must be empty or begin with `/`. Declaring `resourceLimit` without a service-level `_legacy.resourceLimitMiddleware` fails the build rather than silently disabling the limit.
+
+`meta` is never read by the framework: it travels on `MountedRoute.config` so `onRouteMounted` consumers (route policy registries, gates) can act on per-endpoint declarations.
+
+## OpenAPI documentation
+
+**Only the bare alias path is documented.** `generateSpecs(app)` (hono-openapi) yields exactly one path per endpoint, without a version segment (`/api/things`, `/api/things/{id}`). Dated, `latest`, and `preview` mounts serve traffic and set version headers but never reach the document, and withdrawn endpoints are never documented. An endpoint reaches the document only when it declares something documentable (`output`, `description`, or `docs`) and is not hidden.
+
+`docs` shapes the documented operation:
+
+```ts
+v.get(
+  "/",
+  {
+    output: z.array(thingSchema),
+    description: "Lists every thing in the project.",
+    docs: {
+      summary: "List things",
+      tags: ["Things"],
+      operationId: "listThings",
+      security: [{ bearerAuth: [] }],
+      responses: { "404": { description: "Thing not found" } },
+    },
+  },
+  handler,
+);
+```
+
+- The success response is generated from `output` and `status`; `docs.responses` merges over it (same-status keys win).
+- `docs.hide: true` removes the endpoint from the document entirely; the route keeps serving.
+- Set `docs.operationId` explicitly on every documented endpoint: generated ids leak URL shapes into SDK function names.
+- Validation is not documentation. `params`/`query`/`input` schemas keep validating on every mount, so a bad body 422s at `/api/things/2025-03-15/` exactly as it does at `/api/things`.
+
+## Route mounting callback
+
+`onRouteMounted` fires synchronously during `build()` for every route the service mounts, so a host can register route policies (authorization registries, coverage gates) without re-deriving the route table:
+
+```ts
+createService({
+  name: "things",
+  onRouteMounted: (route) => registerRoutePolicy(route),
+});
+```
+
+Each callback receives a `MountedRoute`:
+
+| Field | Meaning |
+| --- | --- |
+| `method` | Mounted HTTP method. SSE endpoints report `"get"`, namespace guards `"all"`. |
+| `path` | Absolute path including the base path, byte-identical to what the Hono route table (`app.routes[i].path`) reports. |
+| `version` | `"2025-03-15"`, `"latest"`, `"preview"`, or `null` for the bare alias and the guards. |
+| `status` | `"stable"`, `"latest"`, `"preview"`, or `"unversioned"`. |
+| `withdrawn` | `true` for mounts answering 410 Gone. Their `config` is the inherited one, `meta` included. |
+| `namespaceGuard` | `true` for the two version-namespace catch-alls. |
+| `config` | The endpoint config behind the mount; `null` for the guards. |
+
+Completeness is the point: every dated version, `latest`, `preview`, the bare alias, withdrawn (410) endpoints, and both version-namespace guards report. The non-wildcard guard (`/:apiVersion{latest|preview|20\d{2}-\d{2}-\d{2}}`) is a real, enumerable route: a policy registry that fails on unknown routes must receive it.
 
 ## Versioning
 
@@ -146,7 +220,9 @@ URL structure:
 | `/api/things/`            | Same as latest (backwards compat)   |
 | `/api/things/preview/`    | Preview endpoints (never in latest) |
 
-Response headers: `X-API-Version` and `X-API-Version-Status` (stable/latest/preview/unversioned).
+### Version headers
+
+Every response carries `X-API-Version-Status` (`stable`, `latest`, `preview`, or `unversioned`), and versioned mounts additionally carry `X-API-Version` with the namespace they answered from (`2025-03-15`, `latest`, `preview`). Bare-path requests get only the status header. The headers are set in a `finally`, so validation errors and 410 withdrawals carry them too.
 
 The first path segment is reserved when it is `latest`, `preview`, or a date-shaped version. This prevents a missing versioned route from falling through to a dynamic unversioned endpoint.
 
@@ -258,26 +334,31 @@ Unit tests: `pnpm --filter @langwatch/api test:unit`
 
 ```
 src/
-  builder.ts          # createService(), ServiceBuilder, VersionBuilder
+  builder.ts          # createService(), ServiceBuilder
+  version-builder.ts  # VersionBuilder (v.get/post/..., v.sse(), v.withdraw())
   versioning.ts       # Forward-copy algorithm + request-time resolution
+  route-mounting.ts   # Mounts versions, guards, bare alias; fires onRouteMounted
+  pipeline.ts         # Per-endpoint middleware stack (auth, docs, validation, handler)
+  response.ts         # Output validation + serialization
   middleware.ts       # Built-in tracer + logger (uses @langwatch/observability)
   errors.ts           # Error handler (HandledError, ZodError, version-gated format)
   sse.ts              # v.sse() with typed events
-  types.ts            # ServiceConfig, EndpointConfig, Handler, BaseApp
-  index.ts            # Public re-exports + routeHandlers()
+  types.ts            # ServiceConfig, EndpointConfig, EndpointDocs, MountedRoute, ...
+  index.ts            # Public re-exports + routeHandlers() (legacy Next-style hosts)
 ```
 
 ## LLM instructions
 
 When creating a new API service using this framework:
 
-1. Create `src/app/api/{name}/[[...route]]/` with two files: `{name}.service.ts` and `route.ts`
-2. `route.ts` is always just `export { GET, POST, PUT, PATCH, DELETE } from "./{name}.service"`
+1. Create `src/app/api/{name}/[[...route]]/app.ts` exporting the built app: `export const app = createService({ name })...build()`
+2. Mount it in `src/server/api-router.ts` with `api.route("/", app)` next to the other services (do not create a `route.ts`; `routeHandlers()` is only for legacy Next-style hosts)
 3. Use `createService({ name })` with the service name matching the URL path segment
-4. Inject auth, organization, and resource limit middleware from `../../middleware/`
-5. Use `.provide()` for service-layer dependencies — factories get `{ project, _legacy: { organization, prisma } }`
+4. Pass auth and organization middleware through `createService({ auth, _legacy: { organizationMiddleware } })`
+5. Use `.provide()` for service-layer dependencies: factories get `{ project, _legacy: { organization, prisma } }`
 6. Define Zod schemas for input/output/params next to the service, not in a shared types file
 7. Handlers return raw data when `output` is set; the framework validates and serializes
-8. Throw `NotFoundError` / `HandledError` for error responses — don't return `c.json({ error }, 404)` manually
+8. Throw `NotFoundError` / `HandledError` for error responses, never a manual `c.json({ error }, 404)`
 9. Use `status: 201` in endpoint config for creation endpoints
-10. Use the Quick start in this README as the reference until an existing service has been migrated to the package
+10. Set `docs: { operationId, tags }` on every documented endpoint; only the bare alias path reaches the OpenAPI document, and endpoints without `output`, `description`, or `docs` stay out of it
+11. When the host keeps a route policy registry, declare the policy in `meta` and register it via `onRouteMounted`; every mount reports, including withdrawn endpoints and both version-namespace guards

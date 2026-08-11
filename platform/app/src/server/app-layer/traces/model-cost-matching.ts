@@ -10,17 +10,21 @@ import { coerceToNumber } from "~/utils/coerceToNumber";
 /**
  * Computes per-span cost using a priority cascade:
  * 1. Custom cost rates from enrichment attributes (per-token override policy)
- * 2. Explicit / provider-reported total cost (langwatch.span.cost)
+ * 2. Explicit total cost reported on the span (langwatch.span.cost)
  * 3. Static model registry lookup (with provider subtype + date fallbacks)
  * 4. Guardrail cost extraction
  *
- * An explicit cost is an authoritative figure — the LangWatch SDK's
- * metrics.cost, or a provider's own billed number (e.g. Claude Code's
- * cost_usd) — so it wins over our token×registry ESTIMATE. The registry
- * is the fallback for when nobody told us the cost, not an override of a
- * known-good one. (Per-token enrichment rates still rank first: they are a
- * deliberate "price everything my way" policy, more specific than a single
- * span's total.)
+ * An explicit cost is a figure the instrumented application worked out
+ * itself and handed us through the SDK's metrics.cost, so it wins over our
+ * token x registry ESTIMATE. The registry is the fallback for when nobody
+ * told us the cost, not an override of a known-good one. (Per-token
+ * enrichment rates still rank first: they are a deliberate "price
+ * everything my way" policy, more specific than a single span's total.)
+ *
+ * Priorities 2 and 4 pass through a total someone else already worked out.
+ * The two that price from rates, 1 and 3, both run the same `estimateCost`
+ * arithmetic, so a new billable unit costs the same whether the rates came
+ * from a customer override or the registry.
  */
 export function computeSpanCost({
   attrs,
@@ -50,6 +54,15 @@ export function computeSpanCost({
     coerceToNumber(attrs[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]) ??
       0,
   );
+  // The portion of the writes above that bought an hour-long cache entry, which
+  // bills higher than a short-lived one. Only emitters that know the split
+  // report it; without it every write prices short-lived, as before.
+  const cacheCreation1hTokens = Math.max(
+    0,
+    coerceToNumber(
+      attrs[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS],
+    ) ?? 0,
+  );
 
   // Audio usage: TTS spans carry the characters synthesized, STT spans the
   // seconds transcribed. These are the billable units for audio models that
@@ -73,29 +86,51 @@ export function computeSpanCost({
     attrs[ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN],
   );
   if (numInputRate !== null || numOutputRate !== null) {
-    const inputRate = numInputRate ?? 0;
-    const cacheReadRate =
-      coerceToNumber(
-        attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN],
-      ) ?? inputRate;
-    const cacheCreationRate =
-      coerceToNumber(
-        attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN],
-      ) ?? inputRate;
+    // Same arithmetic as every other priority, so a cache TTL split (or any
+    // future billable unit) is priced identically whether the rates came from
+    // a customer override or the registry.
+    //
+    // The `?? 0` is load-bearing, not defensive filler. This branch is gated on
+    // a rate being PRESENT, while `estimateCost` gates on one being NON-ZERO,
+    // so a deliberate all-zero override reaches it and comes back undefined.
+    // Coercing that to 0 is what makes such an override price at zero and stop
+    // here, instead of falling through to the registry it meant to replace.
     return (
-      inputTokens * inputRate +
-      outputTokens * (numOutputRate ?? 0) +
-      cacheReadTokens * cacheReadRate +
-      cacheCreationTokens * cacheCreationRate
+      estimateCost({
+        llmModelCost: {
+          projectId: "",
+          model: "",
+          regex: "",
+          inputCostPerToken: numInputRate ?? 0,
+          outputCostPerToken: numOutputRate ?? 0,
+          cacheReadCostPerToken:
+            coerceToNumber(
+              attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN],
+            ) ?? undefined,
+          cacheCreationCostPerToken:
+            coerceToNumber(
+              attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN],
+            ) ?? undefined,
+          cacheCreation1hCostPerToken:
+            coerceToNumber(
+              attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_1H_COST_PER_TOKEN],
+            ) ?? undefined,
+        },
+        inputTokens,
+        outputTokens,
+        cacheReadTokens,
+        cacheCreationTokens,
+        cacheCreation1hTokens,
+      }) ?? 0
     );
   }
 
-  // Priority 2: Explicit / provider-reported total cost. An authoritative
-  // figure (the SDK's metrics.cost or a provider's own billed number such as
-  // Claude Code's cost_usd) is trusted over the token×registry estimate
-  // below — when the cost is known exactly, don't re-derive an approximation
-  // of it. A zero or absent value falls through to the registry, so this
-  // never suppresses costing for spans that didn't report a cost.
+  // Priority 2: Explicit total cost the application reported for itself,
+  // through the SDK's metrics.cost. It is trusted over the token x registry
+  // estimate below: when a caller states the cost, don't re-derive an
+  // approximation of it. A zero or absent value falls through to the
+  // registry, so this never suppresses costing for spans that didn't
+  // report a cost.
   const numSpanCost = coerceToNumber(attrs[ATTR_KEYS.LANGWATCH_SPAN_COST]);
   if (numSpanCost !== null && numSpanCost > 0) return numSpanCost;
 
@@ -115,6 +150,7 @@ export function computeSpanCost({
       outputTokens > 0 ||
       cacheReadTokens > 0 ||
       cacheCreationTokens > 0 ||
+      cacheCreation1hTokens > 0 ||
       inputCharacters > 0 ||
       audioSeconds > 0)
   ) {
@@ -129,6 +165,7 @@ export function computeSpanCost({
         outputTokens,
         cacheReadTokens,
         cacheCreationTokens,
+        cacheCreation1hTokens,
         inputCharacters,
         audioSeconds,
       });

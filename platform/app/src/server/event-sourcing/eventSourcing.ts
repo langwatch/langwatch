@@ -28,7 +28,7 @@ import { createBillingMeterDispatchReactor } from "./projections/global/billingM
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
 import { ProjectionRegistry } from "./projections/projectionRegistry";
 import { RedisReplayMarkerChecker } from "./projections/replayMarkerCheck";
-import type { EventSourcedQueueProcessor } from "./queues";
+import type { EventSourcedQueueProcessor, JobDelivery } from "./queues";
 import { GroupQueueProcessor } from "./queues/groupQueue/groupQueue";
 import { gqJobsUnroutableTotal } from "./queues/groupQueue/metrics";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory";
@@ -557,7 +557,10 @@ export class EventSourcing {
         if (!result.entry.spanAttributes) return {};
         return result.entry.spanAttributes(result.clean);
       },
-      process: async (payload: Record<string, unknown>) => {
+      process: async (
+        payload: Record<string, unknown>,
+        delivery?: JobDelivery,
+      ) => {
         if (isLegacyOutboxPayload(payload)) {
           dropLegacyOutboxPayload(payload);
           return;
@@ -566,7 +569,12 @@ export class EventSourcing {
         if (!result) {
           this.rejectUnroutableJob(payload, queueName);
         }
-        await result.entry.process(result.clean);
+        // Forward the delivery. Dropping it here silently pinned
+        // `deliveryAttempt` at 1 for every registry entry, which disabled the
+        // fold store's merge-on-retry applied-id handling in the running
+        // system (#6578) — the entries forward it, this wrapper was the only
+        // point of loss.
+        await result.entry.process(result.clean, delivery);
       },
       coalesceMaxBatch: (payload: Record<string, unknown>) => {
         const result = this.lookupEntry(payload);
@@ -581,7 +589,10 @@ export class EventSourcing {
         const result = this.lookupEntry(payload);
         return result?.entry.coalesceMaxBytes;
       },
-      processBatch: async (payloads: Record<string, unknown>[]) => {
+      processBatch: async (
+        payloads: Record<string, unknown>[],
+        delivery?: JobDelivery,
+      ) => {
         if (payloads.length === 0) return;
         // A coalesced batch is always one group → one registry entry. Resolve
         // every payload and guard against a mixed/unknown batch (should never
@@ -606,11 +617,15 @@ export class EventSourcing {
             if (!result) {
               this.rejectUnroutableJob(survivors[index]!, queueName);
             }
-            await result.entry.process(result.clean);
+            await result.entry.process(result.clean, delivery);
           }
           return;
         }
-        await first.entry.processBatch!(resolved.map((r) => r!.clean));
+        // Forward the delivery — see the `process` wrapper above (#6578).
+        await first.entry.processBatch!(
+          resolved.map((r) => r!.clean),
+          delivery,
+        );
       },
     };
 

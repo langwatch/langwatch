@@ -303,7 +303,7 @@ The `setupObservability` function returns an `ObservabilityHandle` that provides
 
 #### Automatic Shutdown
 
-By default, LangWatch automatically handles shutdown when your application receives a `SIGTERM` signal:
+By default, LangWatch flushes pending traces when your application receives `SIGINT` or `SIGTERM`, or when the event loop drains:
 
 ```typescript
 // Automatic shutdown is enabled by default
@@ -316,6 +316,27 @@ const handle = setupObservability({
 
 // No manual shutdown needed - handled automatically
 ```
+
+**LangWatch never terminates your process.** Node runs every listener registered for a
+signal, so if your application has its own shutdown logic — draining a queue, finishing
+in-flight database writes, closing connections — LangWatch flushes its traces and then
+stands aside. Your handler decides when the process ends, and it is never cut off
+part-way through.
+
+The one exception keeps one-shot scripts working. Node skips a signal's default action
+while any listener is registered, so if LangWatch's handler turns out to be the *only*
+listener for that signal, it removes itself once the flush is done and re-raises the
+signal. The process then ends on the signal exactly as it would have if LangWatch were
+not installed.
+
+<Warning>
+  Earlier SDK versions called `process.exit(0)` as soon as LangWatch's own flush
+  finished, which ended the process out from under any other `SIGINT` / `SIGTERM`
+  listener. If your application relied on that to terminate — because it registers a
+  signal handler that never exits the process itself — either exit at the end of your own
+  handler (recommended) or set `advanced.UNSAFE_exitProcessAfterAutoShutdown: true` to
+  restore the old behaviour while you migrate.
+</Warning>
 
 #### Manual Shutdown
 

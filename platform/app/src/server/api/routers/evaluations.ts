@@ -30,9 +30,10 @@ export const evaluationsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("evaluations:view"))
     .query(async ({ input }) => {
-      // Azure Safety evaluators are gated by the per-project azure_safety
-      // Model Provider — we no longer read process.env for those. Compute
-      // once and reuse for all three Azure evaluator types.
+      // Azure Safety evaluators resolve their credentials solely from the
+      // project's azure_safety Model Provider. There is no process.env
+      // fallback, so an unconfigured provider reports them as missing.
+      // Computed once and reused for all three Azure evaluator types.
       const azureSafetyEnv = await getAzureSafetyEnvFromProject(
         input.projectId,
       );
@@ -41,27 +42,18 @@ export const evaluationsRouter = createTRPCRouter({
         : [...AZURE_SAFETY_ENV_VARS];
 
       return Object.fromEntries(
-        Object.entries(AVAILABLE_EVALUATORS)
-          // Evaluators this install hides entirely (deprecated families it
-          // did not download) drop out of the offer; saved references to
-          // them still resolve against the static registry and fail their
-          // runs with the clear not-installed message.
-          .filter(
-            ([key]) =>
-              !evaluatorUnavailability({ evaluatorType: key })?.isHiddenFromUi,
-          )
-          .map(([key, evaluator]) => [
-            key,
-            {
-              ...evaluator,
-              missingEnvVars: isAzureEvaluatorType(key)
-                ? azureMissingEnvVars
-                : evaluator.envVars.filter((envVar) => !process.env[envVar]),
-              // Set when this install does not have the evaluator's code at
-              // all, which is a different thing from it being unconfigured.
-              unavailable: evaluatorUnavailability({ evaluatorType: key }),
-            },
-          ]),
+        Object.entries(AVAILABLE_EVALUATORS).map(([key, evaluator]) => [
+          key,
+          {
+            ...evaluator,
+            missingEnvVars: isAzureEvaluatorType(key)
+              ? azureMissingEnvVars
+              : evaluator.envVars.filter((envVar) => !process.env[envVar]),
+            // Set when this install does not have the evaluator's code at
+            // all, which is a different thing from it being unconfigured.
+            unavailable: evaluatorUnavailability({ evaluatorType: key }),
+          },
+        ]),
       );
     }),
 

@@ -30,7 +30,8 @@ const virtualKey = (id: string): VirtualKey => ({
   purpose: "user",
   display_prefix: `vk-lw-${id}`,
   principal_user_id: null,
-  trace_project_id: null,
+  trace_project_id: "proj_1",
+  trace_project_archived: false,
   scopes: [{ scope_type: "project", scope_id: "proj_1" }],
   routing_policy_id: null,
   routing_mode: "none",
@@ -51,6 +52,13 @@ const page = (ids: string[], next_cursor: string | null): unknown => ({
 const queryOf = (call: number): string => {
   const url = String(mockFetch.mock.calls[call]![0]);
   return url.slice(url.indexOf("?") + 1);
+};
+
+/** Reads an iterator to exhaustion and hands back every row it yielded. */
+const drain = async <T,>(rows: AsyncIterable<T>): Promise<T[]> => {
+  const collected: T[] = [];
+  for await (const row of rows) collected.push(row);
+  return collected;
 };
 
 describe("VirtualKeysApiService cursor paging", () => {
@@ -146,6 +154,73 @@ describe("VirtualKeysApiService cursor paging", () => {
     });
   });
 
+  describe("iterate()", () => {
+    it("yields keys across pages without collecting the listing first", async () => {
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(page(["a", "b"], "cursor-1")))
+        .mockResolvedValueOnce(jsonResponse(page(["c"], null)));
+
+      const keys = await drain(new VirtualKeysApiService().iterate());
+
+      expect(keys.map((k) => k.id)).toEqual(["a", "b", "c"]);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("reads a page only when the consumer reaches it", async () => {
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(page(["a", "b"], "cursor-1")))
+        .mockResolvedValueOnce(jsonResponse(page(["c"], null)));
+
+      const keys = new VirtualKeysApiService().iterate();
+      // Constructing the iterator asks for nothing at all.
+      expect(mockFetch).not.toHaveBeenCalled();
+
+      await keys.next();
+      // Both rows of page one are in hand, so page two is still unread.
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      await keys.next();
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      await keys.next();
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("leaves the rest of the walk unread when the consumer stops early", async () => {
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse(page(["a", "b"], "cursor-1")),
+      );
+
+      const seen: string[] = [];
+      for await (const key of new VirtualKeysApiService().iterate()) {
+        seen.push(key.id);
+        break;
+      }
+
+      expect(seen).toEqual(["a"]);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("asks for the wire's maximum page like the eager walk does", async () => {
+      mockFetch.mockResolvedValueOnce(jsonResponse(page(["a"], null)));
+
+      await drain(new VirtualKeysApiService().iterate());
+
+      expect(queryOf(0)).toBe("limit=200");
+    });
+
+    it("raises rather than looping forever when the cursor chain never ends", async () => {
+      // A fresh Response per call: a body can only be read once.
+      mockFetch.mockImplementation(() =>
+        Promise.resolve(jsonResponse(page(["a"], "stuck"))),
+      );
+
+      // The guard fires on the second page, long before this drains.
+      await expect(
+        drain(new VirtualKeysApiService().iterate()),
+      ).rejects.toBeInstanceOf(VirtualKeysApiError);
+    });
+  });
+
   describe("listPage()", () => {
     it("takes exactly one page and hands back the cursor for the next", async () => {
       mockFetch.mockResolvedValueOnce(jsonResponse(page(["a", "b"], "cursor-1")));
@@ -175,6 +250,44 @@ describe("VirtualKeysApiService cursor paging", () => {
       await expect(
         new VirtualKeysApiService().listPage({ cursor: "made-up" }),
       ).rejects.toThrow(/cursor/i);
+    });
+  });
+  describe("filtering by your own identifier", () => {
+    it("sends external_id as an exact-match query filter", async () => {
+      mockFetch.mockResolvedValueOnce(jsonResponse(page(["a"], null)));
+
+      await new VirtualKeysApiService().listPage({ externalId: "tenant-7" });
+
+      expect(new URLSearchParams(queryOf(0)).get("external_id")).toBe("tenant-7");
+    });
+
+    it("keeps the filter on EVERY page of an eager walk", async () => {
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(page(["a"], "cursor-1")))
+        .mockResolvedValueOnce(jsonResponse(page(["b"], null)));
+
+      await new VirtualKeysApiService().list({ externalId: "tenant-7" });
+
+      // A filter dropped after page one silently widens the answer.
+      for (const call of [0, 1]) {
+        expect(new URLSearchParams(queryOf(call)).get("external_id")).toBe(
+          "tenant-7",
+        );
+      }
+    });
+
+    it("keeps the filter on every page of a lazy walk too", async () => {
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(page(["a"], "cursor-1")))
+        .mockResolvedValueOnce(jsonResponse(page(["b"], null)));
+
+      await drain(new VirtualKeysApiService().iterate({ externalId: "tenant-7" }));
+
+      for (const call of [0, 1]) {
+        expect(new URLSearchParams(queryOf(call)).get("external_id")).toBe(
+          "tenant-7",
+        );
+      }
     });
   });
 });

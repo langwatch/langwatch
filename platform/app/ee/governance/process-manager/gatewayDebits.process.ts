@@ -15,7 +15,6 @@ import {
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import type { GatewaySpendProcessingEvent } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/events";
-import { NANO_USD_PER_USD } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
 import type { JsonValue } from "~/server/event-sourcing/process-manager/json";
 import type {
   BudgetDebitRow,
@@ -35,13 +34,8 @@ import {
 
 const logger = createLogger("langwatch:governance:gateway-debits");
 
-/**
- * The registered process name. It reads as the narrower thing this process
- * used to be, and it stays that way on purpose: the inbox, instance and
- * outbox rows key on this string, so renaming it would orphan every
- * in-flight instance halfway through a deploy.
- */
-export const GATEWAY_DEBITS_PROCESS_NAME = "attributedUserDebits" as const;
+/** The registered process name. Instance, inbox and outbox rows key on it. */
+export const GATEWAY_DEBITS_PROCESS_NAME = "gatewayDebits" as const;
 
 /**
  * The sole writer of gateway budget debits.
@@ -157,13 +151,16 @@ async function resolveDebitedBudgets(
   payload: WriteGatewayDebitsPayload,
   providerKey: string | null,
 ): Promise<ResolvedBudget[]> {
-  const resolved = await resolveApplicableBudgets(prisma, {
-    organizationId: payload.organization_id,
-    teamId: payload.team_id || null,
-    projectId: payload.project_id,
-    virtualKeyId: payload.virtual_key_id,
-    principalUserId: payload.principal_user_id || null,
-    endUserId: payload.end_user_id || null,
+  const resolved = await resolveApplicableBudgets({
+    client: prisma,
+    target: {
+      organizationId: payload.organization_id,
+      teamId: payload.team_id || null,
+      projectId: payload.project_id,
+      virtualKeyId: payload.virtual_key_id,
+      principalUserId: payload.principal_user_id || null,
+      endUserId: payload.end_user_id || null,
+    },
   });
   return resolved.filter((r) => budgetAppliesToProvider(r.budget, providerKey));
 }
@@ -202,7 +199,11 @@ function buildDebitRows(
     cache_creation_input_tokens: 0,
     reasoning_tokens: 0,
   };
-  const amountUsd = (payload.cost_nano_usd / NANO_USD_PER_USD).toFixed(6);
+  // The outcome was priced once, as an integer. It stays one all the way to
+  // the ledger: dividing by 1e9 to six decimals here rounded every debit to
+  // the nearest micro-USD before it was ever summed, and the error compounded
+  // per request rather than cancelling.
+  const amountNanoUsd = payload.cost_nano_usd;
   const status = ledgerStatus(payload);
   return budgets.map((b) => ({
     tenantId: payload.project_id,
@@ -213,7 +214,7 @@ function buildDebitRows(
     virtualKeyId: payload.virtual_key_id,
     providerKey,
     gatewayRequestId: payload.gateway_request_id,
-    amountUsd,
+    amountNanoUsd,
     tokensInput: usage.input_tokens,
     tokensOutput: usage.output_tokens,
     tokensCacheRead: usage.cache_read_input_tokens,

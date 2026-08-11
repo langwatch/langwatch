@@ -55,6 +55,8 @@ def _make_api_response_200(
         "inputs": [],
         "outputs": [],
         "model": model,
+        "tags": [],
+        "parameters": {},
     })
 
 

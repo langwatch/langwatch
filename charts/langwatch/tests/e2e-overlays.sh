@@ -407,6 +407,78 @@ test_langwatch_endpoint() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# SUITE: NEXTAUTH_URL reaches every process running the app image. It used to be
+# set on the app Deployment only, so the workers pod booted into
+# "[better-auth] Base URL could not be determined" and had no address to build
+# callbacks and redirects from.
+# ─────────────────────────────────────────────────────────────────────────────
+test_auth_base_url() {
+  sep; info "Suite: NEXTAUTH_URL on every app-image workload"
+
+  local public_url="https://langwatch.example.com"
+
+  # Assert on the NEXTAUTH_URL line itself: the whole render carries BASE_HOST
+  # with the same value, so a bare grep for the URL would pass with the env var
+  # missing entirely.
+  local app_url workers_url
+  app_url=$(tmpl_only "templates/app/deployment.yaml" \
+    --set autogen.enabled=true \
+    --set "app.http.publicUrl=${public_url}" \
+    | grep -A1 "name: NEXTAUTH_URL$")
+  assert_contains "app sets NEXTAUTH_URL" "$app_url" "name: NEXTAUTH_URL"
+  assert_contains "app NEXTAUTH_URL is the public URL" "$app_url" "$public_url"
+
+  workers_url=$(tmpl_only "templates/workers/deployment.yaml" \
+    --set autogen.enabled=true \
+    --set "app.http.publicUrl=${public_url}" \
+    | grep -A1 "name: NEXTAUTH_URL$")
+  assert_contains "workers set NEXTAUTH_URL" "$workers_url" "name: NEXTAUTH_URL"
+  assert_contains "workers NEXTAUTH_URL is the public URL" \
+    "$workers_url" "$public_url"
+
+  # One key per container: a duplicate would leave which value wins up to
+  # manifest order rather than to this chart.
+  local app_render app_count workers_render workers_count
+  app_render=$(tmpl_only "templates/app/deployment.yaml" --set autogen.enabled=true)
+  app_count=$(count_matches "$app_render" "name: NEXTAUTH_URL$")
+  if [ "$app_count" = "1" ]; then
+    pass "app declares NEXTAUTH_URL exactly once"
+  else
+    fail "app declares NEXTAUTH_URL exactly once: found $app_count"
+  fi
+
+  workers_render=$(tmpl_only "templates/workers/deployment.yaml" --set autogen.enabled=true)
+  workers_count=$(count_matches "$workers_render" "name: NEXTAUTH_URL$")
+  if [ "$workers_count" = "1" ]; then
+    pass "workers declare NEXTAUTH_URL exactly once"
+  else
+    fail "workers declare NEXTAUTH_URL exactly once: found $workers_count"
+  fi
+
+  # Falls back to baseHost when only that is set, so an install that never
+  # names a separate public URL still agrees with itself.
+  local fallback
+  fallback=$(tmpl_only "templates/workers/deployment.yaml" \
+    --set autogen.enabled=true \
+    --set "app.http.publicUrl=" \
+    --set "app.http.baseHost=https://internal.example.com" \
+    | grep -A1 "name: NEXTAUTH_URL$")
+  assert_contains "NEXTAUTH_URL falls back to baseHost" \
+    "$fallback" "https://internal.example.com"
+
+  # And with both values blanked, the template's own literal default answers,
+  # so a bare install still boots with a coherent (if local) address.
+  local default_fallback
+  default_fallback=$(tmpl_only "templates/workers/deployment.yaml" \
+    --set autogen.enabled=true \
+    --set "app.http.publicUrl=" \
+    --set "app.http.baseHost=" \
+    | grep -A1 "name: NEXTAUTH_URL$")
+  assert_contains "NEXTAUTH_URL falls back to the localhost default" \
+    "$default_fallback" "http://localhost:5560"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SUITE: backup metrics gate — CLICKHOUSE_BACKUP_METRICS_ENABLED must follow the
 # backup config so the "Backup Reporting Absent" signal cannot silently drift
 # from whether backups actually run (PR #5814).
@@ -416,11 +488,16 @@ test_backup_metrics_gate() {
 
   local backup_flags="--set autogen.enabled=true --set clickhouse.objectStorage.bucket=b --set clickhouse.objectStorage.region=us-east-1"
 
-  # Off by default: no backups configured -> no backup-log querying.
+  # No backups configured -> the chart opts OUT explicitly. The app defaults to
+  # collecting (an unset var must never disarm production monitoring), so the
+  # chart has to say "false" to stop the workers querying a table that this
+  # deployment does not have.
   local off
-  off=$(tmpl_only "templates/workers/deployment.yaml" --set autogen.enabled=true)
-  assert_not_contains "default: workers do not set backup metrics" \
-    "$off" "CLICKHOUSE_BACKUP_METRICS_ENABLED"
+  off=$(tmpl_only "templates/workers/deployment.yaml" --set autogen.enabled=true \
+    | grep -A1 "name: CLICKHOUSE_BACKUP_METRICS_ENABLED")
+  assert_contains "default: workers opt out of backup metrics" \
+    "$off" "name: CLICKHOUSE_BACKUP_METRICS_ENABLED"
+  assert_contains "default: backup metrics value false" "$off" '"false"'
 
   # Chart-managed backups on -> metrics auto-enabled on the workers (which emit
   # the gauges), so the alert never fires spuriously against a live backup setup.
@@ -440,6 +517,7 @@ test_backup_metrics_gate() {
     | grep -A1 "name: CLICKHOUSE_BACKUP_METRICS_ENABLED")
   assert_contains "metricsEnabled override: workers set backup metrics" \
     "$forced" "name: CLICKHOUSE_BACKUP_METRICS_ENABLED"
+  assert_contains "metricsEnabled override: backup metrics value true" "$forced" '"true"'
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1216,6 +1294,7 @@ main() {
   test_access_nodeport
   test_access_ingress
   test_langwatch_endpoint
+  test_auth_base_url
   test_backup_metrics_gate
   test_size_overlays
   test_component_toggles

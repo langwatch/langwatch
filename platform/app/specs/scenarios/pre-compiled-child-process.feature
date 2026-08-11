@@ -13,8 +13,8 @@ Feature: Pre-compiled Scenario Child Process
   - Shared singleton dependencies (OTEL, scenario SDK) are kept external
     to preserve runtime semantics and avoid double-bundling
   - In development, tsx is used for fast iteration; in production, the
-    pre-compiled bundle is required
-  - Bundle output lives at dist/scenario-child-process.js relative to
+    pre-compiled bundle is required — packaged deployments carry no tsx
+  - Bundle output lives at dist/server/scenario-child-process.cjs relative to
     the langwatch package root
   - The build step is integrated into the existing build pipeline
 
@@ -28,7 +28,7 @@ Feature: Pre-compiled Scenario Child Process
   @integration
   Scenario: Build step produces a runnable JavaScript bundle
     When the child process build step runs
-    Then it produces a single JavaScript file at dist/scenario-child-process.js
+    Then it produces a single JavaScript file at dist/server/scenario-child-process.cjs
     And shared singleton dependencies are excluded from the bundle
 
   # ---------------------------------------------------------------------------
@@ -81,5 +81,11 @@ Feature: Pre-compiled Scenario Child Process
     Given the pre-compiled bundle file does not exist at the expected path
     And NODE_ENV is "production"
     When the scenario processor resolves the child process spawn
-    Then it falls back to tsx instead of crashing
+    Then it returns the tsx command rather than throwing
     And it logs an error with the missing bundle path and remediation steps
+
+  # The fallback above resolves without throwing, but it only RUNS where dev
+  # dependencies are installed. tsx is a devDependency, so the Docker image and
+  # the published npx tree prune it and the spawn fails there. The bundle is
+  # the only supported production path; the fallback covers source checkouts
+  # running with NODE_ENV=production.

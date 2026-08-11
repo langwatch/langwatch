@@ -5,7 +5,6 @@ import {
 } from "@ee/webhooks/entitlement";
 import { WEBHOOK_EVENT_TYPES } from "@ee/webhooks/eventRegistry";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
-import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import {
   WebhookEventNotFoundError,
   WebhookEventsService,
@@ -17,19 +16,33 @@ import type { Context, Next } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
+import {
+  IDEMPOTENCY_KEY_HEADER,
+  readIdempotencyKey,
+  withIdempotency,
+} from "~/server/api/idempotency";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import {
-  sendWebhook,
-  WEBHOOK_DELIVERY_ID_HEADER,
-} from "~/server/app-layer/automations/delivery/sendWebhook";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import { toStoredEnum, toWireEnum } from "~/server/gateway/wireEnums";
+import {
+  sendWebhook,
+  WEBHOOK_DELIVERY_ID_HEADER,
+} from "~/server/webhooks/sendWebhook";
+import { allowsInsecureLocalUrls } from "~/server/webhooks/urlPolicy";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { canonicalBaseResponses } from "../../shared/base-responses";
+import {
+  canonicalBaseResponses,
+  canonicalConflictResponses,
+} from "../../shared/base-responses";
 import { BadRequestError, ForbiddenError } from "../../shared/errors";
+import {
+  idempotencyKeyParameter,
+  idempotentJson,
+  idempotentReplayHeaders,
+} from "../../shared/idempotent-response";
 import { apiErrorSchema } from "../../shared/schemas";
 import { handleWebhookApiError } from "./error-handler";
 
@@ -40,17 +53,20 @@ const health = new WebhookHealthService({
   endpoints,
   processStore: new PrismaProcessStore(prisma),
 });
-const eventsRepository = new WebhookEventsClickHouseRepository(
-  async (tenantId) => {
-    const client = await getClickHouseClientForProject(tenantId);
-    if (!client) throw new Error("ClickHouse is not configured");
-    return client;
-  },
-);
-const eventsService = new WebhookEventsService({
-  prisma,
-  repository: eventsRepository,
-});
+
+/**
+ * Resolved per call rather than at module scope, so every route shares the
+ * one repository `getApp()` hands out instead of minting its own, and the
+ * deployment's ClickHouse configuration is read at request time, not once
+ * at import time. Undefined on a deployment without ClickHouse — the
+ * emitted-events log has no fallback store — which this reports the same
+ * way the old inline resolver did: a plain "not configured" refusal.
+ */
+function requireEventsService(): WebhookEventsService {
+  const repository = getApp().gateway.webhookEvents;
+  if (!repository) throw new Error("ClickHouse is not configured");
+  return new WebhookEventsService({ prisma, repository });
+}
 
 /**
  * Enterprise gate for the whole surface, delegating to the one shared
@@ -106,13 +122,20 @@ const deliveriesQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(200).optional().default(50),
 });
 
-const eventsQuerySchema = z.object({
-  type: z.string().min(1).max(200).optional(),
-  from: z.coerce.number().int().positive().optional(),
-  to: z.coerce.number().int().positive().optional(),
-  cursor: z.string().max(500).optional(),
-  limit: z.coerce.number().int().positive().max(200).optional().default(50),
-});
+const eventsQuerySchema = z
+  .object({
+    type: z.string().min(1).max(200).optional(),
+    // The events log is a RANGED read by contract, the same contract the
+    // spend-events pull carries and over the same table: without bounds the
+    // walk sorts the whole 13-month table under FINAL on every page.
+    from: z.coerce.number().int().positive().safe(),
+    to: z.coerce.number().int().positive().safe(),
+    cursor: z.string().max(500).optional(),
+    limit: z.coerce.number().int().positive().max(200).optional().default(50),
+  })
+  .refine((q) => q.from <= q.to, {
+    message: "from must be less than or equal to to",
+  });
 
 function endpointResponse(endpoint: {
   id: string;
@@ -319,13 +342,18 @@ secured.access(requires("webhookEndpoints:manage")).post(
   "/endpoints",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "Create a webhook endpoint",
     description:
-      "Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one.",
+      "Create a webhook endpoint. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.",
+    parameters: [idempotencyKeyParameter],
     responses: {
       ...canonicalBaseResponses,
+      ...canonicalConflictResponses,
       201: {
         description:
           "The endpoint, with the signing secret this body alone carries",
+        headers: idempotentReplayHeaders,
         content: {
           "application/json": {
             schema: resolver(z.object({ data: endpointWithSecretDtoSchema })),
@@ -338,15 +366,30 @@ secured.access(requires("webhookEndpoints:manage")).post(
   async (c) => {
     const organization = c.get("organization") as Organization;
     const body = c.req.valid("json");
-    const { endpoint, secret } = await endpoints.create({
-      organizationId: organization.id,
-      url: body.url,
-      enabledEvents: body.enabled_events,
-      maxBatchSize: body.max_batch_size,
-      maxBatchDelayMs: body.max_batch_delay_ms,
-      maxInFlight: body.max_in_flight,
+    // Scoped to the organization, not a project: this family authenticates at
+    // the org, so that is the tenancy a key is unique within.
+    const outcome = await withIdempotency({
+      prisma,
+      operation: "webhooks.v1.endpoints.create",
+      scopeId: organization.id,
+      key: readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER)),
+      validatedBody: body,
+      handler: async () => {
+        const { endpoint, secret } = await endpoints.create({
+          organizationId: organization.id,
+          url: body.url,
+          enabledEvents: body.enabled_events,
+          maxBatchSize: body.max_batch_size,
+          maxBatchDelayMs: body.max_batch_delay_ms,
+          maxInFlight: body.max_in_flight,
+        });
+        return {
+          status: 201,
+          body: { data: { ...endpointResponse(endpoint), secret } },
+        };
+      },
     });
-    return c.json({ data: { ...endpointResponse(endpoint), secret } }, 201);
+    return idempotentJson({ c, outcome });
   },
 );
 
@@ -354,6 +397,8 @@ secured.access(requires("webhookEndpoints:view")).get(
   "/endpoints",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "List webhook endpoints",
     description: "List the organization's webhook endpoints",
     responses: okResponse(
       "Every endpoint the organization has, archived ones excluded",
@@ -371,6 +416,8 @@ secured.access(requires("webhookEndpoints:view")).get(
   "/endpoints/:id",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "Get a webhook endpoint",
     description: "Get one webhook endpoint",
     responses: {
       ...okResponse("The endpoint", z.object({ data: endpointDtoSchema })),
@@ -391,6 +438,8 @@ secured.access(requires("webhookEndpoints:manage")).patch(
   "/endpoints/:id",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "Update a webhook endpoint",
     description:
       "Update a webhook endpoint's url, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it)",
     responses: {
@@ -447,6 +496,8 @@ secured.access(requires("webhookEndpoints:manage")).delete(
   "/endpoints/:id",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "Archive a webhook endpoint",
     description: "Archive a webhook endpoint",
     responses: {
       ...okResponse(
@@ -470,6 +521,8 @@ secured.access(requires("webhookEndpoints:manage")).post(
   "/endpoints/:id/roll-secret",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "Roll an endpoint's signing secret",
     description:
       "Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately.",
     responses: {
@@ -494,6 +547,8 @@ secured.access(requires("webhookEndpoints:manage")).post(
   "/endpoints/:id/test",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "Send a test event to an endpoint",
     description:
       "Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; data.delivered says whether the receiver accepted it, so clients must read the body, not the status code.",
     responses: {
@@ -527,6 +582,11 @@ secured.access(requires("webhookEndpoints:manage")).post(
         dispatchIdHeader: WEBHOOK_DELIVERY_ID_HEADER,
         signingSecrets: secrets,
         attempt: 1,
+        // The test button has to reach exactly what real delivery reaches. It
+        // did not: real delivery passes this flag and the test send did not,
+        // so on an install running the escape hatch a local endpoint delivered
+        // fine and its own test said the address was blocked.
+        allowInsecureLocal: allowsInsecureLocalUrls(),
       });
       const delivered = result.status >= 200 && result.status < 300;
       await recordTestFire({
@@ -571,6 +631,8 @@ secured.access(requires("webhookEndpoints:view")).get(
   "/endpoints/:id/deliveries",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "List an endpoint's delivery attempts",
     description:
       "The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error",
     responses: {
@@ -627,6 +689,8 @@ secured.access(requires("webhookEndpoints:view")).get(
   "/endpoints/:id/health",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "Read an endpoint's delivery health",
     description:
       "Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success rate, and p95 latency over the last hour.",
     responses: {
@@ -664,6 +728,8 @@ secured.access(requires("webhookEndpoints:view")).get(
   "/event-types",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "List subscribable event types",
     description:
       "The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet",
     responses: okResponse(
@@ -688,8 +754,10 @@ secured.access(requires("webhookEndpoints:view")).get(
   "/events",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "List emitted events",
     description:
-      "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.",
+      "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from` must not be later than `to` — a range that ends before it starts is rejected rather than answered with an empty page. They are required because the log is a ranged read over the 13-month spend table and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.",
     responses: okResponse(
       "One page of emitted-event envelopes, newest first",
       z.object({
@@ -705,7 +773,7 @@ secured.access(requires("webhookEndpoints:view")).get(
     // The service maps emitted types to row statuses and serves an empty
     // page for unknown types, so consumers can probe forward-compatibly
     // without an error.
-    const page = await eventsService.getEmittedEvents({
+    const page = await requireEventsService().getEmittedEvents({
       organizationId: organization.id,
       fromMs: query.from,
       toMs: query.to,
@@ -721,6 +789,8 @@ secured.access(requires("webhookEndpoints:view")).get(
   "/events/:id",
   requireWebhookPlan,
   describeRoute({
+    tags: ["Webhooks"],
+    summary: "Get one emitted event",
     description:
       "One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or belonging to another organization -- because telling those apart would confirm the existence of another tenant's request ids.",
     responses: {
@@ -733,7 +803,7 @@ secured.access(requires("webhookEndpoints:view")).get(
   }),
   async (c) => {
     const organization = c.get("organization") as Organization;
-    const event = await eventsService.getEmittedEventById({
+    const event = await requireEventsService().getEmittedEventById({
       organizationId: organization.id,
       id: c.req.param("id"),
     });

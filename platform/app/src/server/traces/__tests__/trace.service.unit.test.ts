@@ -66,7 +66,6 @@ describe("TraceService", () => {
     startDate: Date.now() - 86400000,
     endDate: Date.now(),
     pageSize: 10,
-    pageOffset: 0,
   } as GetAllTracesForProjectInput;
 
   beforeEach(() => {

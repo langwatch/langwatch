@@ -20,9 +20,11 @@ import {
   PERSONAL_AI_TOOLS_ANCHOR,
   PERSONAL_TRACE_INGEST_ANCHOR,
 } from "~/components/me/PersonalTracesEmptyState";
+import { PersonalWorkspaceViewOnlyNotice } from "~/components/me/PersonalWorkspaceViewOnlyNotice";
 import { spentSubline } from "~/components/me/spentSubline";
 import { TraceIngestSection } from "~/components/me/TraceIngestSection";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
+import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import Head from "~/utils/compat/next-head";
@@ -86,6 +88,8 @@ function MyUsagePage() {
       </Head>
 
       <VStack align="stretch" gap={6} width="full">
+        <PersonalWorkspaceViewOnlyNotice />
+
         <VStack
           id={PERSONAL_AI_TOOLS_ANCHOR}
           align="stretch"
@@ -321,7 +325,14 @@ function MyUsagePage() {
           )}
         </SectionCard>
 
-        <SectionCard title="Coding-agent usage (last 30 days)">
+        <SectionCard
+          title="Coding-agent usage (last 30 days)"
+          action={
+            <Link href="/me/pull-requests" fontSize="sm" color="blue.fg">
+              View pull requests
+            </Link>
+          }
+        >
           {personalProjectId ? (
             <CodingAgentUsageContent projectId={personalProjectId} />
           ) : (
@@ -386,10 +397,13 @@ function SummaryCard({
 function SectionCard({
   title,
   children,
+  action,
   flushContent = false,
 }: {
   title: string;
   children: React.ReactNode;
+  /** Optional trailing element on the title row, e.g. a link deeper in. */
+  action?: React.ReactNode;
   // When set, the content area spans the full card width (no side padding)
   // and is divided from the title by a top border. Used for an embedded
   // table that should read edge-to-edge while the title stays inset.
@@ -403,15 +417,13 @@ function SectionCard({
         borderRadius="md"
         overflow="hidden"
       >
-        <Text
-          fontSize="sm"
-          fontWeight="semibold"
-          paddingX={4}
-          paddingTop={4}
-          paddingBottom={3}
-        >
-          {title}
-        </Text>
+        <HStack paddingX={4} paddingTop={4} paddingBottom={3}>
+          <Text fontSize="sm" fontWeight="semibold">
+            {title}
+          </Text>
+          <Spacer />
+          {action}
+        </HStack>
         <Box borderTopWidth="1px" borderTopColor="border.muted">
           {children}
         </Box>
@@ -426,9 +438,13 @@ function SectionCard({
       borderRadius="md"
       padding={4}
     >
-      <Text fontSize="sm" fontWeight="semibold" marginBottom={3}>
-        {title}
-      </Text>
+      <HStack marginBottom={3}>
+        <Text fontSize="sm" fontWeight="semibold">
+          {title}
+        </Text>
+        <Spacer />
+        {action}
+      </HStack>
       {children}
     </Box>
   );

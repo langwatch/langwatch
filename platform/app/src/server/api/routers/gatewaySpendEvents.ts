@@ -7,24 +7,12 @@
  */
 import { z } from "zod";
 
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
-import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
+import { getApp } from "~/server/app-layer/app";
+import { GatewaySpendEventsService } from "~/server/gateway/spendEvents.service";
+import { spendFiltersSchema } from "~/server/gateway/spendFilters";
 
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-
-async function resolveClient(projectId: string) {
-  const client = await getClickHouseClientForProject(projectId);
-  if (!client) {
-    throw new Error(
-      `ClickHouse enabled but no client for project ${projectId}`,
-    );
-  }
-  return client;
-}
 
 export const gatewaySpendEventsRouter = createTRPCRouter({
   list: protectedProcedure
@@ -33,19 +21,11 @@ export const gatewaySpendEventsRouter = createTRPCRouter({
         projectId: z.string(),
         fromMs: z.number().int(),
         toMs: z.number().int(),
-        virtualKeyId: z.string().optional(),
-        endUserId: z.string().optional(),
-        model: z.string().optional(),
-        status: z
-          .enum([
-            "success",
-            "error",
-            "admitted",
-            "confirmed",
-            "failed",
-            "settled",
-          ])
-          .optional(),
+        // The same filter set the REST reads narrow on, in the structured
+        // spelling rather than the query-string one, so the screen and a
+        // reconciliation script cannot come to mean different things by the
+        // same narrowing.
+        filters: spendFiltersSchema.optional(),
         cursor: z
           .object({
             occurredAtMs: z.number().int(),
@@ -57,7 +37,8 @@ export const gatewaySpendEventsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("gatewayUsage:view"))
     .query(async ({ ctx, input }) => {
-      if (!isClickHouseEnabled()) {
+      const repository = getApp().gateway.spendEvents;
+      if (!repository) {
         return {
           rows: [],
           nextCursor: null,
@@ -65,17 +46,12 @@ export const gatewaySpendEventsRouter = createTRPCRouter({
           clickHouseDisabled: true,
         };
       }
-      const repository = new GatewaySpendEventsRepository(resolveClient);
-      const { rows, nextCursor } = await repository.readSpendEventsPage({
+      const service = new GatewaySpendEventsService(repository);
+      const { rows, nextCursor } = await service.getSpendEventsPage({
         tenantId: input.projectId,
         fromMs: input.fromMs,
         toMs: input.toMs,
-        filters: {
-          virtualKeyId: input.virtualKeyId,
-          endUserId: input.endUserId,
-          model: input.model,
-          status: input.status,
-        },
+        filters: input.filters ?? {},
         cursor: input.cursor,
         limit: input.limit ?? 50,
       });

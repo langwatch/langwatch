@@ -23,13 +23,13 @@ import {
   useDrawer,
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { evaluatorDisplayName } from "~/server/evaluations/evaluatorDisplayNames";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "~/server/evaluations/evaluators";
 import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import { api } from "~/utils/api";
-import { evaluatorTempNameMap } from "../checks/EvaluatorSelection";
 import { ConfirmDialog } from "../gateway/ConfirmDialog";
 import { Menu } from "../ui/menu";
 import { EvaluatorApiUsageDialog } from "./EvaluatorApiUsageDialog";
@@ -314,9 +314,7 @@ const getEvaluatorDisplayName = (evaluatorType: string): string => {
     AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
   if (!evaluatorDefinition) return evaluatorType;
 
-  return (
-    evaluatorTempNameMap[evaluatorDefinition.name] ?? evaluatorDefinition.name
-  );
+  return evaluatorDisplayName(evaluatorDefinition.name);
 };
 
 function EvaluatorCard({

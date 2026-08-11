@@ -16,6 +16,7 @@ export function estimateCost({
   outputTokens,
   cacheReadTokens,
   cacheCreationTokens,
+  cacheCreation1hTokens,
   inputCharacters,
   audioSeconds,
 }: {
@@ -29,7 +30,14 @@ export function estimateCost({
   // missing, that bucket falls back to the input rate so a cached request
   // is never costed as free.
   cacheReadTokens?: number;
+  // Every token written to the cache, however long the entry lives.
   cacheCreationTokens?: number;
+  // The portion of those writes that bought an hour-long entry rather than a
+  // short-lived one, billed higher (Anthropic: 2x input against 1.25x). Only
+  // emitters that know the split report it; without it every write is priced
+  // at the short-lived rate, which is what the whole cost path did before this
+  // bucket existed.
+  cacheCreation1hTokens?: number;
   // Audio usage: characters synthesized by TTS and seconds transcribed by
   // STT, billed at their own per-character / per-second rates. Sourced
   // from the gateway's gen_ai.usage.input_chars / gen_ai.usage.audio_seconds
@@ -37,22 +45,46 @@ export function estimateCost({
   inputCharacters?: number;
   audioSeconds?: number;
 }): number | undefined {
+  // Undefined means "nothing here prices anything", which the caller reads as
+  // an unpriced model rather than a free one. The cache rates count: a rule
+  // that leaves input and output at zero and prices only cached tokens is
+  // priced, and treating it as unpriced would silently drop its cost.
   const hasAnyRate =
     !!llmModelCost?.inputCostPerToken ||
     !!llmModelCost?.outputCostPerToken ||
     !!llmModelCost?.inputCostPerCharacter ||
-    !!llmModelCost?.inputCostPerSecond;
+    !!llmModelCost?.inputCostPerSecond ||
+    !!llmModelCost?.cacheReadCostPerToken ||
+    !!llmModelCost?.cacheCreationCostPerToken ||
+    !!llmModelCost?.cacheCreation1hCostPerToken;
   if (!hasAnyRate) return undefined;
 
   const inputRate = llmModelCost.inputCostPerToken ?? 0;
   const cacheReadRate = llmModelCost.cacheReadCostPerToken ?? inputRate;
   const cacheCreationRate = llmModelCost.cacheCreationCostPerToken ?? inputRate;
+  // A model that never had the hour-long distinction prices both buckets the
+  // same, so pricing is unchanged for it.
+  const cacheCreation1hRate =
+    llmModelCost.cacheCreation1hCostPerToken ?? cacheCreationRate;
+
+  // The hour-long count is a subset of the total, but an emitter can report one
+  // without the other, so take whichever is larger as the true total and price
+  // the remainder short-lived. Clamping keeps a malformed pair (1h above the
+  // total) from producing a negative charge.
+  const cacheWrite1h = Math.max(0, cacheCreation1hTokens ?? 0);
+  const cacheWriteTotal = Math.max(
+    Math.max(0, cacheCreationTokens ?? 0),
+    cacheWrite1h,
+  );
+  const cacheWriteCost =
+    cacheWrite1h * cacheCreation1hRate +
+    (cacheWriteTotal - cacheWrite1h) * cacheCreationRate;
 
   return (
     (inputTokens ?? 0) * inputRate +
     (outputTokens ?? 0) * (llmModelCost.outputCostPerToken ?? 0) +
     (cacheReadTokens ?? 0) * cacheReadRate +
-    (cacheCreationTokens ?? 0) * cacheCreationRate +
+    cacheWriteCost +
     (inputCharacters ?? 0) * (llmModelCost.inputCostPerCharacter ?? 0) +
     (audioSeconds ?? 0) * (llmModelCost.inputCostPerSecond ?? 0)
   );

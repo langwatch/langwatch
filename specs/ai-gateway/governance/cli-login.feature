@@ -151,6 +151,32 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     And the CLI prints "Logged out"
 
   # ---------------------------------------------------------------------------
+  # Login completion when the organization carries deleted accounts
+  # ---------------------------------------------------------------------------
+  # Membership rows survive the deletion of the account behind them, so an org
+  # can list an admin nobody can email. Login completion must still hand the
+  # CLI its policy map, otherwise the wrapper caches nothing and enforces
+  # nothing.
+
+  @integration @cli @bootstrap
+  Scenario: Login completes when the earliest admin account is gone
+    Given organization "acme" lists two admins
+    And the account behind the admin who joined first has been deleted
+    When Jane completes login and the CLI asks for its bootstrap data
+    Then login completion succeeds
+    And the "contact your admin" address is the remaining admin's email
+    And the CLI receives a policy entry for every tool it can run
+
+  @integration @cli @bootstrap
+  Scenario: Login completes when every admin account is gone
+    Given organization "acme" lists one admin
+    And the account behind that admin has been deleted
+    When Jane completes login and the CLI asks for its bootstrap data
+    Then login completion succeeds
+    And no "contact your admin" address is offered
+    And the CLI receives a policy entry for every tool it can run
+
+  # ---------------------------------------------------------------------------
   # Multi-org user (out of scope this iteration but pinned for design clarity)
   # ---------------------------------------------------------------------------
 

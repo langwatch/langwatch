@@ -504,6 +504,26 @@ export const validateUrlForSSRF = createSSRFValidator({
 
 const MAX_REDIRECTS = 10;
 
+/**
+ * The endpoint sent a redirect and the caller asked us not to follow one.
+ *
+ * A class rather than a message, because the catch below funnels every plain
+ * `Error` through `formatConnectionError`, which rewraps it as "Connection
+ * failed to host:port: …". A caller matching on the text would therefore be
+ * matching a string this module never actually emits — and would silently
+ * report every refused redirect as a connection failure, which is the opposite
+ * of what declining the hop was meant to tell them. This type passes through
+ * that catch untouched.
+ */
+export class RedirectRefusedError extends Error {
+  constructor() {
+    super(
+      "Redirects are not followed for this destination — the endpoint must answer directly.",
+    );
+    this.name = "RedirectRefusedError";
+  }
+}
+
 export interface SSRFSafeFetchOptions extends RequestInit {
   _redirectCount?: number;
   /**
@@ -644,9 +664,7 @@ export async function fetchWithResolvedIp(
       const location = response.headers.get("location");
       if (location) {
         if (init?.followRedirects === false) {
-          throw new Error(
-            "Redirects are not followed for this destination — the endpoint must answer directly.",
-          );
+          throw new RedirectRefusedError();
         }
         if (redirectCount >= MAX_REDIRECTS) {
           throw new Error(`Too many redirects (max ${MAX_REDIRECTS})`);
@@ -692,6 +710,14 @@ export async function fetchWithResolvedIp(
 
     return response;
   } catch (err) {
+    // Our own refusal, not the network's. Everything below rewrites an error
+    // into "Connection failed to host:port: …", which is the right shape for a
+    // socket problem and the wrong one for a decision this module made — a
+    // caller told the endpoint was unreachable goes and checks their network,
+    // when the endpoint answered perfectly well and simply redirected.
+    if (err instanceof RedirectRefusedError) {
+      throw err;
+    }
     if (err instanceof Error) {
       const cause = (err as Error & { cause?: Error }).cause;
       if (cause) {

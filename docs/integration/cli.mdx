@@ -314,6 +314,8 @@ Run `langwatch <resource> --help` on any of these for subcommand-level options, 
 
 These commands manage org-wide resources and require an API key with organization-level permissions.
 
+The organization, members, invites, groups, roles, role bindings and SCIM token commands are available on Enterprise plans. Without one they exit with `enterprise_plan_required` and tell you what to do about it. Projects, teams, API keys and the self-hosted organizations command are not gated.
+
 ### Projects
 
 ```bash
@@ -356,9 +358,200 @@ langwatch api-keys create \
   --project-id proj_01HZX... \
   --project-id proj_02ABC...
 
+# Read one key and the access it carries
+langwatch api-keys get key_01HZX...
+
+# Rename it, or replace what it reaches
+langwatch api-keys update key_01HZX... --name "Staging (read only)"
+
 # Revoke a key (cannot be undone)
 langwatch api-keys revoke key_01HZX...
 ```
+
+Both `create` and `update` take the access flags: `--binding role:scopeType:scopeId` says what the key reaches and where, `--permission resource:action` narrows a restricted key to an exact list, and `--permission-mode` picks between `all`, `readonly` and `restricted`. The first two repeat. On `update`, the bindings you pass replace the key's existing ones rather than adding to them.
+
+```bash
+langwatch api-keys create \
+  --name "Nightly evaluations" \
+  --permission-mode restricted \
+  --binding CUSTOM:PROJECT:proj_01HZX... \
+  --permission project:view \
+  --permission evaluations:create
+```
+
+### Organization
+
+Read and update the organization your key belongs to. There is no id to pass: the credential decides which organization you are talking to.
+
+```bash
+langwatch organization get
+
+langwatch organization update --name "Acme" --support-contact support@acme.example
+
+# Presence and trace sharing are on/off pairs
+langwatch organization update --no-trace-sharing
+```
+
+Turning trace sharing off revokes the share links that were already handed out, not only future ones.
+
+### Members
+
+Manage the people already in the organization. Someone joins through an invite, so `invites` is where a new person starts.
+
+```bash
+langwatch members list
+langwatch members list --include-disabled
+
+langwatch members get user_01HZX...
+langwatch members update user_01HZX... --role ADMIN
+
+# Offboarding: disable keeps the membership, remove does not
+langwatch members disable user_01HZX...
+langwatch members enable user_01HZX...
+langwatch members remove user_01HZX...
+```
+
+`langwatch members access user_01HZX...` answers the auditor's question: everything the person can reach, and whether it comes from their organization role, a group, or a binding of their own.
+
+### Invites
+
+Invite people in, up to 50 at a time, landing on the teams you name. Accepting stays a browser step; everything before it is here.
+
+```bash
+# One person, one team
+langwatch invites create \
+  --email engineer@acme.example \
+  --role MEMBER \
+  --team team_01HZ...:MEMBER
+
+# A batch, from a file
+langwatch invites create --file ./new-hires.json
+
+langwatch invites list
+langwatch invites revoke <invite_id>
+```
+
+`--email` and `--team` repeat, and `--role` takes either one value for the whole batch or one per email. When people need different teams or a custom role each, `--json`, `--file` and `--stdin` take a JSON array of invites instead, the same entries the API takes. Every invite comes back with its acceptance link, so a deployment with no email provider still has something to send.
+
+### Teams
+
+Teams group projects and the people who work on them.
+
+```bash
+langwatch teams list
+langwatch teams get team_01HZ...
+langwatch teams create --name "Engineering"
+langwatch teams update team_01HZ... --name "Platform Engineering"
+langwatch teams archive team_01HZ...
+
+langwatch teams members list team_01HZ...
+langwatch teams members add team_01HZ... user_01HZX... --role MEMBER
+langwatch teams members remove team_01HZ... user_01HZX...
+```
+
+### Groups
+
+A group is a named set of people that carries role bindings, so everyone in it inherits the same access. Groups synced from your identity provider land here too.
+
+```bash
+langwatch groups list
+langwatch groups get group_01HZ...
+
+# Create with members and access in one call
+langwatch groups create \
+  --name "Backend Engineers" \
+  --member-id user_01HZX... \
+  --binding MEMBER:TEAM:team_01HZ...
+
+langwatch groups rename group_01HZ... --name "Platform Engineers"
+langwatch groups delete group_01HZ...
+
+langwatch groups members list group_01HZ...
+langwatch groups members add group_01HZ... user_01HZX...
+langwatch groups members remove group_01HZ... user_01HZX...
+
+langwatch groups bindings list group_01HZ...
+langwatch groups bindings add group_01HZ... \
+  --role MEMBER --scope-type TEAM --scope-id team_01HZ...
+langwatch groups bindings remove group_01HZ... <binding_id>
+```
+
+A group your identity provider owns cannot be renamed or have its membership edited here, because the provider is the source of truth for both. Its bindings are still yours to manage.
+
+### Roles
+
+Custom roles are named permission sets, for when `ADMIN`, `MEMBER` and `VIEWER` are not the shape you need.
+
+```bash
+# The catalog the permission keys come from
+langwatch roles permissions
+
+langwatch roles create \
+  --name "Release reviewer" \
+  --description "Reads traces and runs evaluations, changes nothing" \
+  --permission project:view \
+  --permission traces:view \
+  --permission evaluations:create
+
+langwatch roles list
+langwatch roles get <custom_role_id>
+langwatch roles delete <custom_role_id>
+```
+
+`langwatch roles update` replaces the permission set with the `--permission` flags you pass, so send the full list you want the role to end up with. A role something still holds cannot be deleted: the error says how many bindings and assignments are in the way.
+
+### Role bindings
+
+A binding is one sentence: this principal has this role, here. Users, groups and API keys are all principals.
+
+```bash
+langwatch role-bindings list
+langwatch role-bindings list --principal-type user --principal-id user_01HZX...
+langwatch role-bindings list --scope-type PROJECT --scope-id proj_01HZX...
+
+langwatch role-bindings create \
+  --principal-type group --principal-id group_01HZ... \
+  --role MEMBER \
+  --scope-type TEAM --scope-id team_01HZ...
+
+# A service credential, scoped to one project through a custom role
+langwatch role-bindings create \
+  --principal-type api-key --principal-id key_01HZX... \
+  --role CUSTOM --custom-role-id <custom_role_id> \
+  --scope-type PROJECT --scope-id proj_01HZX...
+
+langwatch role-bindings update <binding_id> --role ADMIN
+
+langwatch role-bindings delete <binding_id>
+```
+
+Creating a binding that already exists reports `role_binding_already_exists` rather than making a second one, so a provisioning script can run twice. Updating changes only the role a binding grants; the principal and the scope are the binding's identity, so moving a grant means deleting one binding and creating another.
+
+### SCIM tokens
+
+The bearer tokens your identity provider presents to the SCIM endpoints.
+
+```bash
+langwatch scim-tokens create --description "Okta production"
+langwatch scim-tokens list
+langwatch scim-tokens revoke <scim_token_id>
+```
+
+The token value is printed once, when you create it. To rotate: create a second token, store it in the provider, watch the new token's last-used time move, then revoke the old one.
+
+### Organizations (self-hosted)
+
+The one family that authenticates against the instance rather than an organization, because it runs before any organization exists. It is available on self-hosted deployments that have `LANGWATCH_INSTANCE_ADMIN_API_KEY` configured.
+
+```bash
+export LANGWATCH_INSTANCE_ADMIN_API_KEY=...
+
+langwatch organizations create --name "Acme" --slug acme
+langwatch organizations list
+langwatch organizations get organization_01HZ...
+```
+
+Creating an organization returns an organization admin API key alongside it, printed once. That key is what every command above takes, so an infrastructure-as-code run can go from an empty deployment to a configured organization without opening a browser. Pass the instance credential with `--instance-key` if you would rather not export it.
 
 ## Trigger experiments
 
@@ -385,91 +578,110 @@ This keeps the CLI honest, new capabilities show up in `--help` the moment they 
 
 ## AI Gateway commands
 
-The CLI also provisions AI Gateway resources, virtual keys, budgets, provider bindings, cache rules, without touching the UI. Behaviour matches the dashboard exactly; the CLI and UI share a server-side service layer.
+The CLI provisions AI Gateway resources without touching the UI. Behaviour matches the dashboard exactly; both share a server-side service layer. Every command takes `--format json` for scripting.
 
 ### Virtual keys
 
 ```bash
-# List
 langwatch virtual-keys list
-langwatch virtual-keys list --format json
-
-# Create (returns the secret once; store it immediately)
-langwatch virtual-keys create \
-  --name prod-key \
-  --env live \
-  --provider gpc_01HZX... \
-  --provider gpc_01HZY...
-
-# Get details
 langwatch virtual-keys get vk_01HZX9K3MN...
 
-# Rotate (new secret shown once; old stops working immediately, ~60s to propagate)
+# Create: the secret is printed once, store it immediately
+langwatch virtual-keys create \
+  --name prod-key \
+  --scope team:team_01HZ... \
+  --providers-allowed mp_01HZX...,mp_01HZY... \
+  --budget-limit 500 --budget-window month
+
+langwatch virtual-keys update vk_01HZX9K3MN... --budget-limit 750
+langwatch virtual-keys spend vk_01HZX9K3MN... --from 2026-07-01T00:00:00Z
+
+# Rotate: the new secret is printed once, the old one keeps working for 24 hours
 langwatch virtual-keys rotate vk_01HZX9K3MN...
 
-# Revoke (hard, no grace)
+# Disable is reversible, revoke is not
+langwatch virtual-keys disable vk_01HZX9K3MN... --reason "payment overdue"
+langwatch virtual-keys enable vk_01HZX9K3MN...
 langwatch virtual-keys revoke vk_01HZX9K3MN...
 ```
 
-`--provider` takes a **provider-credential id** (from `langwatch gateway-providers list`), not a plain provider name. Pass the flag multiple times to bind more than one provider.
+`--scope` takes `type:id` pairs (`org`, `team`, or `project`) and repeats for several; it defaults to the calling project. `--providers-allowed` is a comma-separated list of ModelProvider ids. The atomic `--budget-*` flags cap the key itself and accept `day`, `week`, or `month`.
 
 ### Gateway budgets
 
 ```bash
-langwatch gateway-budgets list
+langwatch gateway-budgets list --scope-type team,project
 
 langwatch gateway-budgets create \
   --name eng-team-monthly \
   --scope team --team team_01HZ... \
   --window month --limit 5000 --on-breach warn
 
-# Other scopes: --scope organization|project|virtual-key|principal
+# Anchor the cycle to your own billing date instead of the calendar
+langwatch gateway-budgets create \
+  --name customer-acme \
+  --scope virtual-key --virtual-key vk_01HZX... \
+  --window month --limit 250 --cycle-anchor-at 2026-01-17T09:00:00Z
+
+langwatch gateway-budgets update bgt_01HZ... --limit 6000
+langwatch gateway-budgets reset bgt_01HZ... --reason "contract renewed"
 langwatch gateway-budgets archive bgt_01HZ...
 ```
 
-`--window` accepts `minute|hour|day|week|month|total`. `--on-breach` is `block` (default) or `warn`. `--limit` is USD. List output colourises spent-vs-limit, red at ≥100%, yellow at ≥80%.
+`--scope` is `organization|team|project|virtual-key|principal|group`, each paired with its own id flag. `--window` accepts `minute|hour|day|week|month|total|manual`, `--on-breach` is `block` (default) or `warn`, and `--limit` is USD. `--cycle-anchor-at` takes an RFC 3339 instant and cannot be used with `total` or `manual`; it is fixed at creation. List output colourises spent-vs-limit, red at 100%, yellow from 80%.
 
-### Provider bindings
+### Webhooks
 
-```bash
-langwatch gateway-providers list
-
-langwatch gateway-providers create \
-  --model-provider mp_01HZ... \
-  --slot primary \
-  --rate-limit-rpm 10000 \
-  --rate-limit-tpm 1000000 \
-  --rotation-policy manual
-
-langwatch gateway-providers disable gpc_01HZ...
-```
-
-Returns the `gpc_*` id you then pass to `--provider` on VK create. `--slot` is free-text (`primary`, `eu-region`, `canary`). `--rotation-policy` accepts `manual` in v1; `auto` and `external_secret_store` are v1.1.
-
-### Cache rules
+Endpoint management needs an **organization** API key (see [Webhooks](/features/webhooks)).
 
 ```bash
-# List (sorted priority DESC)
-langwatch cache-rules list
+langwatch webhooks list
+langwatch webhooks get whe_01HZ...
+langwatch webhooks event-types            # the subscribable catalog, by family
 
-# Create (matchers are ANDed; at least one required)
-langwatch cache-rules create \
-  --name force-cache-enterprise \
-  --priority 300 \
-  --mode force --ttl 600 \
-  --match-tag tier=enterprise
+# Create: the signing secret is printed once
+langwatch webhooks create \
+  --url https://billing.example.com/webhooks/langwatch \
+  --events gateway.request.completed,gateway.request.settled
 
-# Update / disable / archive
-langwatch cache-rules update <rule_id> --priority 400
-langwatch cache-rules update <rule_id> --disable
-langwatch cache-rules archive <rule_id>
+langwatch webhooks update whe_01HZ... --max-batch-size 50 --max-in-flight 4
+langwatch webhooks test whe_01HZ...       # one signed test.ping through the real path
+langwatch webhooks health whe_01HZ...     # how stale your feed could be
+langwatch webhooks deliveries whe_01HZ... --limit 100
+langwatch webhooks roll-secret whe_01HZ...
+langwatch webhooks disable whe_01HZ...
+langwatch webhooks enable whe_01HZ...
+langwatch webhooks archive whe_01HZ...
 
-# Bulk git-ops pattern: export → commit → apply
-langwatch cache-rules export --file cache-rules.json
-langwatch cache-rules apply --file cache-rules.json
+# The org's emitted-events log, independent of delivery
+langwatch webhooks events --type gateway.request.completed --from 2026-07-01
 ```
 
-Matcher flags: `--match-vk`, `--match-vk-prefix`, `--match-tag key=value`, `--match-principal`, `--match-model <name-or-*-glob>`, `--match-metadata key=value`. `--mode` is `respect | force | disable`.
+`--events` replaces the whole subscription set. `deliveries` and `events` page with `--cursor` and `--limit`.
+
+### Spend events
+
+The billing pull surface, also an **organization** API key (see [Billing and spend events](/ai-gateway/billing-events)).
+
+```bash
+# Reconciliation checksums first
+langwatch spend-events summary --group-by virtual_key --from 2026-07-01 --to 2026-08-01
+
+# Item diff only where a checksum diverged
+langwatch spend-events list --from 2026-07-01 --to 2026-08-01 --virtual-key vk_01HZX...
+
+# One external end user's rollup
+langwatch spend-events by-user customer-acme-42 --window month
+
+# Re-deliver a gap to one endpoint (7-day window cap)
+langwatch spend-events replay --from 2026-07-14 --to 2026-07-15 --endpoint whe_01HZ...
+```
+
+Date flags take ISO-8601 or epoch milliseconds.
+
+<Note>
+Provider credentials and cache rules have no CLI group. Manage providers with `langwatch model-provider`, and cache rules over [REST](/ai-gateway/api/management#cache-rules) or the dashboard.
+</Note>
 
 Required token permissions map onto the [RBAC](/ai-gateway/rbac) grants:
 
@@ -483,11 +695,14 @@ Required token permissions map onto the [RBAC](/ai-gateway/rbac) grants:
 | `api-keys create|revoke` | `organization:manage` |
 | `virtual-keys list|get` | `virtualKeys:view` |
 | `virtual-keys create` | `virtualKeys:create` |
+| `virtual-keys update|disable|enable` | `virtualKeys:update` |
 | `virtual-keys rotate` | `virtualKeys:rotate` |
 | `virtual-keys revoke` | `virtualKeys:delete` |
+| `virtual-keys spend` | `gatewayUsage:view` |
 | `gateway-budgets *` | `gatewayBudgets:*` |
-| `gateway-providers *` | `gatewayProviders:*` |
-| `cache-rules *` | `gatewayCacheRules:*` |
+| `webhooks list|get|deliveries|health|events|event-types` | `webhookEndpoints:view` |
+| `webhooks create|update|archive|roll-secret|test|enable|disable` | `webhookEndpoints:manage` |
+| `spend-events *` | `gatewaySpend:view` |
 
 See the [public REST API reference](/ai-gateway/api/chat-completions) for direct HTTP calls that don't require Node.
 

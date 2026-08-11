@@ -14,6 +14,7 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/breaker"
 	"github.com/langwatch/langwatch/pkg/health"
+	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaymetrics"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/modelresolver"
 	"github.com/langwatch/langwatch/services/aigateway/app"
@@ -139,4 +140,77 @@ func TestRouter_RejectedRequestIsStillCounted(t *testing.T) {
 	// lands on the error rate.
 	assert.Contains(t, gatewaySeries(t, router),
 		`gateway_http_requests_total{model="unknown",provider="unknown",route="/v1/*",status="401"} 1`)
+}
+
+// @scenario "A customer-fault rejection is counted against the key that sent it"
+func TestRouter_ClientRejectsCannotBeMintedByAnUnauthenticatedCaller(t *testing.T) {
+	// gateway_client_rejects_total carries a per-virtual-key label, which is
+	// only bounded if every value is control-plane-minted. AuthMiddleware
+	// answers a missing or unresolvable key with herr.WriteHTTP directly
+	// rather than through writeError, so an unauthenticated caller never
+	// reaches the choke point that records this counter at all. Asserted by
+	// driving the real middleware stack, because the claim is about ordering
+	// and reading the code is not proof of it.
+	t.Run("when the caller sends no API key", func(t *testing.T) {
+		recorder := gatewaymetrics.New()
+		router := buildRouterWithMetrics(recorder,
+			app.WithAuth(&mockAuth{resolveFn: func(context.Context, string) (*domain.Bundle, error) {
+				return testBundle(), nil
+			}}),
+			app.WithMetrics(recorder),
+		)
+
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(chatBody())))
+		require.Equal(t, http.StatusUnauthorized, rec.Code)
+
+		assert.NotContains(t, gatewaySeries(t, router), "gateway_client_rejects_total")
+	})
+
+	t.Run("when the caller sends a key the control plane rejects", func(t *testing.T) {
+		recorder := gatewaymetrics.New()
+		router := buildRouterWithMetrics(recorder,
+			app.WithAuth(&mockAuth{resolveFn: func(ctx context.Context, _ string) (*domain.Bundle, error) {
+				return nil, herr.New(ctx, domain.ErrInvalidAPIKey, herr.M{"message": "no such key"})
+			}}),
+			app.WithMetrics(recorder),
+		)
+
+		req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(chatBody()))
+		// The caller controls this string completely. If it could reach a
+		// label, one client looping over random tokens would mint a series
+		// each and take the pod down.
+		req.Header.Set("Authorization", "Bearer "+strings.Repeat("z", 64))
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		require.Equal(t, http.StatusUnauthorized, rec.Code)
+
+		series := gatewaySeries(t, router)
+		assert.NotContains(t, series, "gateway_client_rejects_total")
+		assert.NotContains(t, series, "zzzz")
+	})
+
+	// The counterpart: a request that DID authenticate and is then rejected
+	// on its body is counted, against the key the control plane minted.
+	t.Run("when an authenticated caller sends a body with no model", func(t *testing.T) {
+		recorder := gatewaymetrics.New()
+		router := buildRouterWithMetrics(recorder,
+			app.WithAuth(&mockAuth{resolveFn: func(context.Context, string) (*domain.Bundle, error) {
+				return testBundle(), nil
+			}}),
+			app.WithModels(modelresolver.New()),
+			app.WithMetrics(recorder),
+		)
+
+		req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions",
+			bytes.NewReader([]byte(`{"messages":[{"role":"user","content":"hi"}]}`)))
+		req.Header.Set("Authorization", "Bearer sk-test")
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Equal(t, "missing_model", rec.Header().Get(herr.HandledErrorHeader))
+
+		assert.Contains(t, gatewaySeries(t, router),
+			`gateway_client_rejects_total{code="missing_model",vk_id="vk-test"} 1`)
+	})
 }

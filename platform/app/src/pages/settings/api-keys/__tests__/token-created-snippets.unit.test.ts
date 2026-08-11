@@ -9,6 +9,7 @@
 import fs from "fs";
 import path from "path";
 import { describe, expect, it } from "vitest";
+import { CODE_ASSISTANTS, type CodeAssistant } from "../TokenCreatedDialog";
 
 const LANGWATCH_ROOT = path.resolve(__dirname, "../../../../../");
 
@@ -16,30 +17,36 @@ function readFile(rel: string): string {
   return fs.readFileSync(path.join(LANGWATCH_ROOT, rel), "utf8");
 }
 
+const CODE_PREVIEW_PATH =
+  "src/features/onboarding/components/sections/observability/CodePreview.tsx";
+
 describe("given the token-created-snippets feature is implemented", () => {
-  describe("when checking that Shiki languages are registered up-front in shikiAdapter", () => {
-    /** @scenario Highlight engine wiring — Shiki singleton with the required languages registered */
-    it("shikiAdapter registers 'ini' for the .env tab", () => {
-      const adapter = readFile(
-        "src/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter.ts",
-      );
-      expect(adapter).toContain('"ini"');
+  describe("when checking that CodePreview registers the languages the dialog needs", () => {
+    /** @scenario Highlight engine wiring — CodePreview registers the languages the dialog needs */
+    it("CodePreview's adapter registers 'ini' for the .env tab", () => {
+      expect(readFile(CODE_PREVIEW_PATH)).toContain('"ini"');
     });
 
-    /** @scenario Highlight engine wiring — Shiki singleton with the required languages registered */
-    it("shikiAdapter registers 'bash' for terminal commands", () => {
-      const adapter = readFile(
-        "src/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter.ts",
-      );
-      expect(adapter).toContain('"bash"');
+    /** @scenario Highlight engine wiring — CodePreview registers the languages the dialog needs */
+    it("CodePreview's adapter registers 'shellscript' for the auth-header tabs", () => {
+      expect(readFile(CODE_PREVIEW_PATH)).toContain('"shellscript"');
     });
 
-    /** @scenario Highlight engine wiring — Shiki singleton with the required languages registered */
-    it("shikiAdapter registers 'json' for the config block", () => {
-      const adapter = readFile(
-        "src/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter.ts",
+    /** @scenario Highlight engine wiring — CodePreview registers the languages the dialog needs */
+    it("CodePreview's adapter registers 'bash' and 'json'", () => {
+      const preview = readFile(CODE_PREVIEW_PATH);
+      expect(preview).toContain('"bash"');
+      expect(preview).toContain('"json"');
+    });
+
+    /** @scenario Highlight engine wiring — CodePreview registers the languages the dialog needs */
+    it("the dialog declares one concrete language per block, at the call site", () => {
+      const dialog = readFile(
+        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
       );
-      expect(adapter).toContain('"json"');
+      expect(dialog).toContain('codeLanguage="ini"');
+      expect(dialog).toContain('codeLanguage="shellscript"');
+      expect(dialog).toContain('codeLanguage="bash"');
     });
   });
 
@@ -61,40 +68,32 @@ describe("given the token-created-snippets feature is implemented", () => {
     });
   });
 
-  describe("when checking that a single shared command-box replaces CodeBlock and QuickCommand", () => {
-    /** @scenario A single shared command-box component replaces CodeBlock and QuickCommand inside TokenCreatedDialog */
-    it("TokenCreatedDialog imports one shared command-box component for snippet rendering", () => {
+  describe("when checking that the dialog renders through the shared snippet surface", () => {
+    /** @scenario The dialog renders snippets through the same component as the traces empty state */
+    it("TokenCreatedDialog imports the shared CodePreview for snippet rendering", () => {
       const dialog = readFile(
         "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
       );
-      // Must import ShikiCommandBox (or equivalent single component)
-      expect(dialog).toContain("ShikiCommandBox");
+      expect(dialog).toContain("CodePreview");
+      expect(dialog).not.toContain("ShikiCommandBox");
     });
 
-    /** @scenario A single shared command-box component replaces CodeBlock and QuickCommand inside TokenCreatedDialog */
+    /** @scenario The dialog renders snippets through the same component as the traces empty state */
+    it("the dialog-local ShikiCommandBox component is deleted from the codebase", () => {
+      expect(
+        fs.existsSync(
+          path.join(LANGWATCH_ROOT, "src/components/code/ShikiCommandBox.tsx"),
+        ),
+      ).toBe(false);
+    });
+
+    /** @scenario The dialog renders snippets through the same component as the traces empty state */
     it("TokenCreatedDialog does not directly import CodeBlock for snippet rendering", () => {
       const dialog = readFile(
         "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
       );
       // The old CodeBlock.tsx must no longer be imported
       expect(dialog).not.toMatch(/import.*CodeBlock.*from.*['"]\./);
-    });
-
-    /** @scenario A single shared command-box component replaces CodeBlock and QuickCommand inside TokenCreatedDialog */
-    it("TokenCreatedDialog does not directly define or import QuickCommand for snippet rendering", () => {
-      const dialog = readFile(
-        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
-      );
-      // QuickCommand must not be defined inline in the dialog
-      expect(dialog).not.toContain("function QuickCommand(");
-    });
-
-    /** @scenario A single shared command-box component replaces CodeBlock and QuickCommand inside TokenCreatedDialog */
-    it("ShikiCommandBox does not export accentCredentialSegments (decoration handled by Shiki grammar)", () => {
-      const commandBox = readFile("src/components/code/ShikiCommandBox.tsx");
-      // Visual distinction is achieved by Shiki's bash tokenization, not a regex pass
-      expect(commandBox).not.toContain("function accentCredentialSegments(");
-      expect(commandBox).not.toContain("CREDENTIAL_RE");
     });
 
     /** @scenario JSON config block keeps the existing JsonHighlight wiring */
@@ -106,24 +105,170 @@ describe("given the token-created-snippets feature is implemented", () => {
     });
   });
 
-  describe("when checking that ShikiCommandBox is lazy-loaded via dynamic()", () => {
-    /** @scenario TokenCreatedDialog lazy-loads the Shiki-backed command box on dialog open */
-    it("TokenCreatedDialog imports ShikiCommandBox via dynamic() (ssr:false)", () => {
+  describe("when checking that one list drives the assistant tabs and config paths", () => {
+    /** @scenario One list of coding assistants drives both the tabs and the config paths */
+    it("TokenCreatedDialog no longer keeps a separate EDITOR_PATHS list", () => {
       const dialog = readFile(
         "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
       );
-      // Must use dynamic() with ssr: false for the command box
-      expect(dialog).toMatch(/dynamic\s*\(/);
-      expect(dialog).toContain("ssr: false");
+      expect(dialog).not.toContain("EDITOR_PATHS");
+      expect(dialog).toContain("CODE_ASSISTANTS");
     });
 
-    /** @scenario TokenCreatedDialog lazy-loads the Shiki-backed command box on dialog open */
+    /** @scenario One list of coding assistants drives both the tabs and the config paths */
+    it("renders both the tabs and the config-path chips from CODE_ASSISTANTS", () => {
+      const dialog = readFile(
+        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
+      );
+      // Two map() call sites, both over the same list: the tab strip and the
+      // config-path chip row.
+      const renders =
+        dialog.match(/CODE_ASSISTANTS[\s\S]{0,40}?\.map\(/g) ?? [];
+      expect(renders.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe("when checking what each assistant entry builds", () => {
+    // Full expected strings, not substrings. The assistants deliberately
+    // differ in where each flag goes — Claude Code puts the project id before
+    // the `--` and its key after, Codex puts everything before — and a
+    // substring check passes happily while those are wrong. A Gemini entry
+    // whose flags sat on the wrong side of the server name shipped and was
+    // pulled for exactly that reason (#6654).
+    const API_KEY = "sk-lw-real";
+    const PROJECT_ID = "project-abc";
+    const CLOUD = "https://app.langwatch.ai";
+    const SELF_HOSTED = "https://self.host";
+
+    // Both optional flags, independently: a project id and a self-hosted
+    // endpoint are unrelated choices, and the case where BOTH are present is
+    // the densest line either builder emits — the one where an ordering
+    // mistake is most likely and least visible.
+    const COMBOS = [
+      {
+        label: "with a project id, cloud",
+        projectId: PROJECT_ID,
+        endpoint: CLOUD,
+        isSelfHosted: false,
+      },
+      {
+        label: "with a project id, self-hosted",
+        projectId: PROJECT_ID,
+        endpoint: SELF_HOSTED,
+        isSelfHosted: true,
+      },
+      {
+        label: "without a project id, cloud",
+        projectId: undefined,
+        endpoint: CLOUD,
+        isSelfHosted: false,
+      },
+      {
+        label: "without a project id, self-hosted",
+        projectId: undefined,
+        endpoint: SELF_HOSTED,
+        isSelfHosted: true,
+      },
+    ] as const;
+
+    const EXPECTED = {
+      "claude-code": {
+        "with a project id, cloud":
+          "claude mcp add langwatch --env LANGWATCH_PROJECT_ID=project-abc -- npx -y @langwatch/mcp-server --api-key sk-lw-real",
+        "with a project id, self-hosted":
+          "claude mcp add langwatch --env LANGWATCH_PROJECT_ID=project-abc -- npx -y @langwatch/mcp-server --api-key sk-lw-real --endpoint https://self.host",
+        "without a project id, cloud":
+          "claude mcp add langwatch -- npx -y @langwatch/mcp-server --api-key sk-lw-real",
+        "without a project id, self-hosted":
+          "claude mcp add langwatch -- npx -y @langwatch/mcp-server --api-key sk-lw-real --endpoint https://self.host",
+      },
+      codex: {
+        "with a project id, cloud":
+          "codex mcp add langwatch --env LANGWATCH_API_KEY=sk-lw-real --env LANGWATCH_PROJECT_ID=project-abc -- npx -y @langwatch/mcp-server",
+        "with a project id, self-hosted":
+          "codex mcp add langwatch --env LANGWATCH_API_KEY=sk-lw-real --env LANGWATCH_PROJECT_ID=project-abc --env LANGWATCH_ENDPOINT=https://self.host -- npx -y @langwatch/mcp-server",
+        "without a project id, cloud":
+          "codex mcp add langwatch --env LANGWATCH_API_KEY=sk-lw-real -- npx -y @langwatch/mcp-server",
+        "without a project id, self-hosted":
+          "codex mcp add langwatch --env LANGWATCH_API_KEY=sk-lw-real --env LANGWATCH_ENDPOINT=https://self.host -- npx -y @langwatch/mcp-server",
+      },
+    } as const satisfies Record<
+      string,
+      Record<(typeof COMBOS)[number]["label"], string>
+    >;
+
+    for (const key of Object.keys(EXPECTED) as Array<keyof typeof EXPECTED>) {
+      for (const combo of COMBOS) {
+        /** @scenario An assistant with an install command shows a terminal snippet */
+        it(`builds ${key}'s command exactly, ${combo.label}`, () => {
+          const assistant = CODE_ASSISTANTS.find((a) => a.key === key);
+          expect(assistant?.buildCommand).toBeDefined();
+
+          const context: Parameters<
+            NonNullable<CodeAssistant["buildCommand"]>
+          >[0] = {
+            apiKey: API_KEY,
+            projectId: combo.projectId,
+            endpoint: combo.endpoint,
+            isSelfHosted: combo.isSelfHosted,
+          };
+
+          expect(assistant!.buildCommand!(context)).toBe(
+            EXPECTED[key][combo.label],
+          );
+        });
+      }
+    }
+
+    /** @scenario An assistant with an install command shows a terminal snippet */
+    it("covers every installer in the registry", () => {
+      const withCommand = CODE_ASSISTANTS.filter((a) => a.buildCommand).map(
+        (a) => a.key,
+      );
+      // If someone adds an installer, this fails until its exact commands are
+      // pinned above — which is the whole point.
+      expect(Object.keys(EXPECTED).sort()).toEqual(withCommand.sort());
+    });
+
+    /** @scenario An assistant without an install command points at its config file */
+    it("gives every installer-less assistant a config path", () => {
+      const configOnly = CODE_ASSISTANTS.filter(
+        (assistant) => !assistant.buildCommand,
+      );
+      expect(configOnly.length).toBeGreaterThan(0);
+
+      for (const assistant of configOnly) {
+        expect(assistant.configPath).toBeTruthy();
+      }
+    });
+  });
+
+  describe("when checking that the Shiki engine stays out of the settings page bundle", () => {
+    /** @scenario The Shiki engine loads only when a code block renders */
+    it("CodePreview loads the engine inside its adapter, not statically", () => {
+      // `await import("shiki")` inside load() is what keeps a static import
+      // of CodePreview from pulling the engine into the page bundle.
+      expect(readFile(CODE_PREVIEW_PATH)).toContain('await import("shiki")');
+    });
+
+    /** @scenario The Shiki engine loads only when a code block renders */
+    it("TokenCreatedDialog has no value import of the shiki package", () => {
+      const dialog = readFile(
+        "src/pages/settings/api-keys/TokenCreatedDialog.tsx",
+      );
+      // Import statements are the invariant — comments may (and do) name
+      // shikiAdapter when explaining the pre-existing JsonHighlight chain.
+      expect(dialog).not.toMatch(/^import (?!type ).*from "shiki"/m);
+      expect(dialog).not.toMatch(/^import .*shikiAdapter/m);
+    });
+
+    /** @scenario The Shiki engine loads only when a code block renders */
     it("api-keys/index.tsx does not statically import shikiAdapter", () => {
       const indexPage = readFile("src/pages/settings/api-keys/index.tsx");
       expect(indexPage).not.toContain("shikiAdapter");
     });
 
-    /** @scenario TokenCreatedDialog lazy-loads the Shiki-backed command box on dialog open */
+    /** @scenario The Shiki engine loads only when a code block renders */
     it("ApiKeysSection.tsx does not statically import shikiAdapter", () => {
       const section = readFile(
         "src/pages/settings/api-keys/ApiKeysSection.tsx",

@@ -1,16 +1,18 @@
 Feature: Gateway auth cache — hot path is zero RTT after first hit
 
   # All scenarios in this file describe auth-cache behaviour in the Go
-  # gateway data plane (services/aigateway/). Three-tier cache, JWT
+  # gateway data plane (services/aigateway/). One cache tier, JWT
   # refresh, stale-on-failure fallback — none of this lives in the
   # TypeScript control plane. The parity check only scans TS test roots,
   # so these are aspirational at this layer; verified end-to-end via
   # Go integration tests in services/aigateway/.
 
   The gateway is in the hot path of every LLM request. Auth cannot add
-  measurable latency. We keep a three-tier cache (in-mem LRU → optional
-  Redis L2 → background refresh + optional bootstrap-pull) and verify the
-  JWT locally on every request (no control-plane round trip post-warmup).
+  measurable latency. Each pod keeps one in-memory LRU, refreshed in the
+  background, and verifies the JWT locally on every request (no
+  control-plane round trip post-warmup). The cache is per pod on purpose:
+  a shared tier buys a warm start that a rolling deploy already pays for
+  anyway, and costs an invalidation path that has to reach it.
 
   See contract.md §4.1 (resolve-key), §4.2 (config fetch), §4.3 (changes
   long-poll), §9 (cache strategy).
@@ -110,7 +112,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
     credentials must never be cached or served: dispatch would answer the
     terminal no_provider_configured 400 — telling an org with perfectly good
     keys to go add a provider API key — and the poisoned bundle would keep
-    that answer alive until expiry, on every node sharing the cache.
+    that answer alive until it expires.
 
     @unit
     Scenario: config fetch fails on a cold miss -> retryable error, nothing cached
@@ -118,7 +120,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       But the config fetch fails with a transport error
       When I send a request with that VK
       Then the request is rejected with error.type "auth_upstream_unavailable" (503, retryable)
-      And no bundle is cached in L1 or L2
+      And no bundle is cached
       And the next request retries the control plane and succeeds once it recovers
 
     @unit
@@ -148,9 +150,21 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then the existing entry keeps serving its credentials
       And the config-less fresh bundle does not replace it
 
+    @unit
+    Scenario: a negative hard grace disables stale-while-error
+      # Zero means "unset" and takes the 6h default, matching every other
+      # knob here, so the opt-out is a negative value: it places the hard cap
+      # before the JWT exp, leaving nothing that could be served stale.
+      Given LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS is negative
+      And the cache holds an entry past its JWT exp
+      And the control plane is unreachable
+      When I send a request with that VK
+      Then no stale bundle is served
+      And the request is rejected with error.type "auth_upstream_unavailable"
+
     @unit @unimplemented
     Scenario: hard expiry cap stops the stale-while-error chain
-      Given the cache holds an entry stale-extended past the LW_GATEWAY_AUTH_CACHE_HARD_GRACE cap (default 6h)
+      Given the cache holds an entry stale-extended past the LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS cap (default 21600, 6h)
       And the control plane is still unreachable
       When I send a request with that VK
       Then the gateway evicts the cached entry
@@ -180,7 +194,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Given the cache holds an entry whose JWT is 30 seconds from expiring
       And the control plane returns 403 Forbidden
       When the near-expiry background refresh fires
-      Then the entry is evicted from L1 (and L2 if configured)
+      Then the entry is evicted from the cache
       And the next request with that VK calls /resolve-key fresh and is rejected
 
   Rule: Short-lived JWT is refreshed before expiry
@@ -191,7 +205,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       When I send a request with that VK
       Then the gateway serves from cache immediately (zero added latency)
       And a background goroutine calls /resolve-key for a fresh JWT
-      And the replacement bundle is stored in L1 (and L2 if configured)
+      And the replacement bundle is stored in the cache
 
   Rule: Revocation propagates within 60 seconds via long-poll /changes
 
@@ -224,22 +238,162 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And the gateway immediately starts the next poll
       And the gateway never sleeps; the long-poll is the only wait
 
-  Rule: L2 Redis cache warms new gateway nodes
+  Rule: A routing-policy or cache-rule edit propagates through the change feed
+    Routing policies and cache rules are org-scoped artifacts that the
+    materialiser folds into every bundle it builds, and a bundle carries no
+    id to join either of them back on. So the organization is the finest
+    invalidation key available, and both kinds evict every cached bundle in
+    the polled organization, exactly like a budget change that carries no
+    project. Without this the only thing that reaches a running gateway is
+    the config TTL, which is a safety net rather than a propagation path.
 
-    @integration @unimplemented
-    Scenario: new gateway pod reads a cached bundle from Redis instead of calling /resolve-key
-      Given Redis is configured and pod A has cached VK "vk-lw-..." for 3 minutes
-      When pod B receives its first request with that VK
-      Then pod B finds the bundle in Redis (L2 hit)
-      And pod B populates its own L1
-      And pod B does NOT call /resolve-key
-      And the Redis value expires at the JWT's exp
+    @unit
+    Scenario: an edited routing policy evicts the organization's cached bundles
+      Given bundles for two organizations are cached
+      When the change feed for the first organization reports a routing-policy edit
+      Then every cached bundle belonging to that organization is evicted
+      And the other organization's bundles stay cached
+      And the next request for an evicted key re-resolves against the fresh policy
+
+    @unit
+    Scenario: a deleted routing policy evicts the organization's cached bundles
+      Given bundles for two organizations are cached
+      When the change feed for the first organization reports a routing-policy deletion
+      Then every cached bundle belonging to that organization is evicted
+      And the other organization's bundles stay cached
+
+    @unit
+    Scenario: a cache-rule mutation evicts the organization's cached bundles
+      Given bundles for two organizations are cached
+      When the change feed for the first organization reports a cache rule created, updated, or deleted
+      Then every cached bundle belonging to that organization is evicted
+      And the other organization's bundles stay cached
+
+    @unit
+    Scenario: every kind the control plane can emit is acted on or ignored on purpose
+      Given the kinds the control plane can emit are declared in one place
+      When the change feed reports each of them in turn
+      Then none of them is reported as a kind this build does not recognize
+      And a kind added upstream fails this check rather than becoming a warning in production
+
+    # The control plane may emit a kind this build predates, and doing
+    # nothing about it is usually right. Doing nothing SILENTLY is not:
+    # that is how the cache-rule kinds above stayed unhandled from the day
+    # the control plane started emitting them. A kind this build ignores on
+    # purpose is named in its own case, so a routine event never arrives
+    # looking like an incident.
+    @unit @regression
+    Scenario: A change kind this build does not act on is reported, not dropped
+      Given a bundle is cached
+      When the change feed reports a kind this gateway has no case for
+      Then nothing is evicted
+      And the gateway reports the unhandled kind by name
+
+    @unit
+    Scenario: the evict log names the change kind that caused it
+      Given bundles are cached for an organization
+      When the change feed reports any kind the gateway acts on
+      Then the eviction is logged under that kind's own name
+      And a deletion is never reported as an update
+
+    # The control-plane half of the same path: an edit that never reaches
+    # the feed can never be polled off it.
+    @integration
+    Scenario: editing a routing policy appends one change event and bumps its keys
+      Given a routing policy that two virtual keys reference and one does not
+      When an admin edits the policy
+      Then exactly one ROUTING_POLICY_UPDATED event is appended for the organization
+      And the revision of both referencing keys is bumped
+      And the revision of the unrelated key is unchanged
+      And an edit that is rejected writes neither the policy change nor the event
+
+    @integration
+    Scenario: deleting a routing policy releases the keys that pointed at it
+      Given a routing policy that a virtual key references in policy routing mode
+      When an admin deletes the policy
+      Then exactly one ROUTING_POLICY_DELETED event is appended for the organization
+      And the key no longer points at the deleted policy
+      And the key's routing mode moves off policy routing, so it is never left naming a policy that is gone
+      And the key's revision is bumped
+
+    @integration
+    Scenario: creating a policy or swapping the default emits nothing
+      Given an organization with an existing default routing policy
+      When an admin creates another policy, then makes it the default
+      Then no change event is appended
+      And already-issued keys keep the policy they were issued against
+
+  Rule: The config safety net revalidates, it does not re-download
+    The change feed is how a config edit reaches a running gateway. The config
+    TTL is the safety net under it, for the mutations that emit no event, and a
+    safety net fires mostly when nothing is wrong: almost every time it runs,
+    the key is exactly as it was. So it asks rather than downloads. The control
+    plane already versions each key's config with an ETag it derives from the
+    key's revision, which every mutation bumps, and answers 304 to a matching
+    If-None-Match. The gateway keeps that ETag beside the cached bundle and
+    offers it back, so an unchanged key costs a revision lookup instead of a
+    whole bundle materialized, serialized and parsed, on every cached key, every
+    TTL, on every pod.
+
+    A confirmation is worth as much as a download: the config was checked
+    against the control plane and found current, so it restarts the staleness
+    clock. What it must never do is answer with less than it was asked for. A
+    304 to a request that offered no ETag confirms nothing, and an error or an
+    unreadable answer leaves the cached config in place rather than replacing it
+    with an empty one.
+
+    @unit
+    Scenario: the staleness refresh revalidates instead of re-downloading
+      Given a cached bundle whose config the control plane served with a version token
+      When the config TTL elapses and the safety net runs
+      Then the refresh offers that token back to the control plane
+      And a key nobody changed is confirmed rather than sent again
+      And the confirmed entry keeps serving its credentials with its staleness clock restarted
+      And a key that did change comes back with the new config and the new token, which the next refresh offers in turn
+      And a response that carried no token leaves the next refresh unconditional
+
+    @unit
+    Scenario: a refresh the control plane cannot answer leaves the cached config serving
+      Given a cached bundle whose config has crossed the TTL
+      And the control plane cannot answer the refresh
+      When the safety net runs
+      Then the bundle keeps serving the credentials it already had
+      And the failed attempt is reported
+      And the next attempt waits a full TTL rather than retrying on every request
+
+    @unit
+    Scenario: an answer the gateway cannot read is a failed refresh, not an empty config
+      Given the control plane answers the refresh with a body the gateway cannot parse
+      When the safety net runs
+      Then the answer is treated as a failure
+      And no config is taken from it, so a working bundle is never replaced by an empty one
+      And no version token is stored from it, so the next refresh does not revalidate against one
+
+  Rule: The grace window moves the hard cap, not the bundle's own expiry
+    LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS sets how far past its JWT expiry
+    a cached bundle may keep serving while the control plane is unreachable,
+    and a negative value opts out by putting that cap BEFORE the expiry. What
+    it must never do is decide whether a bundle inside its own expiry is
+    servable: an unexpired bundle serves from cache wherever the cap sits, and
+    an expired one goes to the control plane first. Reading the cap before the
+    expiry gets the negative setting backwards and throws away credentials
+    that are perfectly good.
+
+    @unit
+    Scenario: the grace window moves the hard cap, not the bundle's own expiry
+      Given a cached bundle and a configured grace window
+      When a request is answered from the cache
+      Then a bundle inside its own expiry is served without consulting the control plane, whether the window is positive, zero or negative
+      And a bundle past its own expiry goes to the control plane before it serves
 
   Rule: Bootstrap-pull enables gateway to serve when control plane is cold
 
+    # The flag is named the way contract.md §6 and §9 name it. Nothing reads
+    # it yet, so the point of naming it here is that this file and the
+    # contract agree on one name rather than two.
     @integration @unimplemented
     Scenario: enterprise bootstrap-all pulls every non-revoked VK on startup
-      Given GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true
+      Given LW_GATEWAY_BOOTSTRAP_PULL=true
       And the control plane has 250 active VKs
       When the gateway starts
       Then the gateway calls GET /internal/gateway/bootstrap (paginated)

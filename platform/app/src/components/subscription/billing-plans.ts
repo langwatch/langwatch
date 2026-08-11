@@ -89,7 +89,7 @@ export const ENTERPRISE_PLAN_FEATURES = [
   "ISO27001 / SOC2 reports",
 ];
 
-export function buildTieredCapabilities({
+export function buildPlanCapabilities({
   maxMembers,
   maxMessagesPerMonth,
   maxMembersLite,

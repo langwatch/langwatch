@@ -43,8 +43,61 @@ Feature: Gateway errors are logged with fault attribution
     When the generic internal error is returned
     Then an error log records the failure with platform fault
 
+  # A failure that used to be a forwarded provider response was attributed
+  # from the status on that response. Once the gateway authors it as a handled
+  # error there is no response to read, so the code must carry the attribution
+  # itself — otherwise a routine customer condition (a dead Codex sign-in)
+  # lands on the platform-fault line operators page on.
+  @unit
+  Scenario: A customer-caused failure the gateway authors keeps its customer fault
+    Given the customer's own provider session has died and only they can restore it
+    When the gateway answers with its own handled error instead of forwarding a provider response
+    Then an info log records the failure with customer fault
+    And the rejection is counted against its error code and virtual key
+
   @unit
   Scenario: Failure logs identify the calling project
     Given an authenticated request fails
     When the failure is logged
     Then the log carries the project, organization and virtual key identifiers
+
+  # Logging customer faults at info is right, and it is also why they cannot be
+  # alerted on: one client looping on a body the gateway rejects can produce
+  # six figures of rejections in a week without moving anything an operator
+  # watches. gateway_http_requests_total cannot answer "who", either — a
+  # request rejected before model resolution is counted with model=unknown and
+  # no caller identity at all.
+  #
+  # Bindings: services/aigateway/adapters/gatewaymetrics/metrics_test.go,
+  # services/aigateway/adapters/httpapi/metrics_route_test.go
+  @unit
+  Scenario: A customer-fault rejection is counted against the key that sent it
+    Given an authenticated request is rejected as the caller's fault
+    When the error response is written
+    Then the rejection is counted against its error code and virtual key
+    And a missing-model rejection is counted as "missing_model", not generic "bad_request"
+    # Project is redundant with the key; model is caller-controlled.
+    And the count carries no project or model label
+
+  # The counter exists to name a misbehaving client, not to double-count outages.
+  @unit
+  Scenario: A provider or platform failure is not counted as a client rejection
+    Given a request fails upstream or through a gateway bug
+    When the error response is written
+    Then the client-rejection counter does not move
+
+  # A key sitting at its configured ceiling sustains rejections by design, and
+  # rate limiting already has its own counter with its own dimension label.
+  @unit
+  Scenario: A rate-limited caller is not counted as a client reject
+    Given an authenticated request is denied by a gateway rate limit
+    When the error response is written
+    Then the client-rejection counter does not move
+    And the denial is carried by the dedicated rate-limit counter instead
+
+  @unit
+  Scenario: A rejection on an unmetered path is still written
+    Given a request that never passed through the metrics middleware fails
+    When the error response is written
+    Then the response and the log are unaffected
+    And nothing panics for want of a recorder

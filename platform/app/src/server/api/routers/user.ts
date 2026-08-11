@@ -9,17 +9,13 @@ import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
 import { z } from "zod";
+import { getApp } from "~/server/app-layer/app";
 import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
 import {
   Auth0ApiError,
   changeAuth0Password,
 } from "~/server/auth0/passwordService";
 import { revokeOtherSessionsForUser } from "~/server/better-auth/revokeSessions";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRequestEmail";
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
@@ -28,6 +24,7 @@ import { trackServerEvent } from "~/server/posthog";
 import { rateLimit } from "~/server/rateLimit";
 import { AvatarRateLimitedError } from "~/server/user-avatar/avatar";
 import { UserAvatarService } from "~/server/user-avatar/avatar.service";
+import { EmailAlreadyRegisteredError } from "~/server/users/errors";
 import { UserService } from "~/server/users/user.service";
 import { getClientIp } from "~/utils/getClientIp";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
@@ -97,7 +94,14 @@ export const userRouter = createTRPCRouter({
     )
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
-      const { name, email, password } = input;
+      const { name, password } = input;
+      // BetterAuth lowercases the email on every one of its lookups and
+      // writes, and sign-in goes through BetterAuth. An account stored as
+      // typed, capitals and all, is therefore one that sign-in can never find
+      // again, no matter the password. Store the shape sign-in will search
+      // for. Customer report: onboarding signups that autocapitalised the
+      // address were permanently locked out with "User already exists".
+      const email = input.email.toLowerCase();
 
       // Keyed off the RESOLVED provider, not the raw env: on an SSO-capable
       // deployment with no genuine license the platform gate coerces the
@@ -128,17 +132,17 @@ export const userRouter = createTRPCRouter({
         });
       }
 
-      const user = await ctx.prisma.user.findUnique({
+      // Case-insensitive on purpose: rows written before the lowercasing
+      // above (or seeded by other means) may carry capitals, and minting a
+      // case-twin beside one would leave two Users answering for one human.
+      const user = await ctx.prisma.user.findFirst({
         where: {
-          email,
+          email: { equals: email, mode: "insensitive" },
         },
       });
 
       if (user) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "User already exists",
-        });
+        throw new EmailAlreadyRegisteredError();
       }
 
       const hashedPassword = await hash(password, 10);
@@ -689,7 +693,9 @@ export const userRouter = createTRPCRouter({
             }
           : undefined;
 
-      const usage = new PersonalUsageService();
+      const usage = PersonalUsageService.create(
+        getApp().governance.personalUsage,
+      );
 
       // Ingestion-source ledger rows (Claude Code OTLP, etc.) land under
       // the org's hidden Governance Project tenant. Resolve it read-only
@@ -787,18 +793,10 @@ export const userRouter = createTRPCRouter({
       // (`_ingestion_:<sourceId>`).
       const sentinelVk = `_ingestion_:user:${userId}`;
 
-      const chRepo = isClickHouseEnabled()
-        ? new GatewayBudgetClickHouseRepository(async (projectId) => {
-            const client = await getClickHouseClientForProject(projectId);
-            if (!client) {
-              throw new Error(
-                `ClickHouse enabled but no client for project ${projectId}`,
-              );
-            }
-            return client;
-          })
-        : undefined;
-      const budgetService = GatewayBudgetService.create(ctx.prisma, chRepo);
+      const budgetService = GatewayBudgetService.create(
+        ctx.prisma,
+        getApp().gateway.budgets,
+      );
       const decision = await budgetService.check({
         organizationId: input.organizationId,
         teamId: workspace.team.id,
@@ -882,7 +880,10 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }) => {
-      const service = CliBootstrapService.create(ctx.prisma);
+      const service = CliBootstrapService.create({
+        prisma: ctx.prisma,
+        budgetRepository: getApp().gateway.budgets,
+      });
       return await service.resolve({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,

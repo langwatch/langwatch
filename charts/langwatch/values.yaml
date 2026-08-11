@@ -41,6 +41,30 @@ global:
     readOnlyRootFilesystem: true
   ## @param global.automountServiceAccountToken [default: false] Mount the ServiceAccount token into first-party workload pods (app, workers, nlp, langevals, cronjobs, postgresql, redis). Defaults to false — none of these call the Kubernetes API, and many clusters deny pods that automount the token. Set true only if a sidecar needs in-cluster API access.
   automountServiceAccountToken: false
+
+  # ServiceAccount for the first-party workloads that touch object storage
+  # (app and workers; the cron pods only curl the app over HTTP, so they are
+  # deliberately left off it). Opt-in: disabled by default, so installs that
+  # do not need it render exactly as they did before and keep using the
+  # namespace `default` account.
+  #
+  # This is what cloud identity attaches to. Both providers grant storage
+  # access to a ServiceAccount rather than to a pod:
+  #   AWS  — annotate with eks.amazonaws.com/role-arn        (IRSA)
+  #   Azure— annotate with azure.workload.identity/client-id (workload identity)
+  #          AND label the pods azure.workload.identity/use: "true"
+  #
+  # Note this is NOT Azure-specific: without it, S3's existing keyless
+  # sign-in (the AWS SDK default provider chain) is unreachable through
+  # chart values too. See issues #6182 and #6087.
+  ## @extra global.serviceAccount ServiceAccount used by app, workers and cronjobs.
+  ## @param global.serviceAccount.create [default: false] Create a ServiceAccount for the first-party workloads.
+  ## @param global.serviceAccount.name [string] Name to use. Defaults to the release name when create is true; set to use an existing account.
+  ## @param global.serviceAccount.annotations [object] Annotations on the ServiceAccount — where the cloud identity binding goes.
+  serviceAccount:
+    create: false
+    name: ""
+    annotations: {}
   ## @extra global.scheduling Global scheduling defaults for all pods.
   ## @param global.scheduling.nodeSelector [object] Node selector labels for all pods.
   ## @param global.scheduling.affinity [object] Affinity rules for all pods.
@@ -119,21 +143,21 @@ images:
   ## @param images.app.pullPolicy [string] App image pull policy.
   app:
     repository: langwatch/langwatch
-    tag: 3.9.0 # x-release-please-version
+    tag: 3.12.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langwatch_nlp.repository [string] NLP image repository (Go nlpgo binary, published as langwatch_nlp).
   ## @param images.langwatch_nlp.tag [string] NLP image tag.
   ## @param images.langwatch_nlp.pullPolicy [string] NLP image pull policy.
   langwatch_nlp:
     repository: langwatch/langwatch_nlp
-    tag: 3.9.0 # x-release-please-version
+    tag: 3.12.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langevals.repository [string] Langevals image repository.
   ## @param images.langevals.tag [string] Langevals image tag.
   ## @param images.langevals.pullPolicy [string] Langevals image pull policy.
   langevals:
     repository: langwatch/langevals
-    tag: 3.9.0 # x-release-please-version
+    tag: 3.12.0 # x-release-please-version
     pullPolicy: IfNotPresent
 
 # =============================================================================
@@ -154,6 +178,15 @@ app:
   # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
   ## @param app.replicaCount [default: 1] Number of application replicas.
   replicaCount: 1
+
+  # Shutdown budget — same shape and the same rule as workers.* below. The app
+  # shares the workers' entrypoint watchdog and can host the worker stack
+  # itself (the `all` process role), so it is sized the same way. A web-only
+  # pod drains in well under this; the grace period is a ceiling, not a wait.
+  ## @param app.shutdownDrainSeconds [default: 25] Seconds the queue may spend draining in-flight jobs on shutdown.
+  shutdownDrainSeconds: 25
+  ## @param app.terminationGracePeriodSeconds [default: 55] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.
+  terminationGracePeriodSeconds: 55
 
   # Kubernetes service configuration
   # See: https://kubespec.dev/v1/Service
@@ -223,6 +256,16 @@ app:
     # chart-default installs boot past the post-#3541 required-env validation.
     langwatchEndpoint: ""
 
+  # Base URL for content-hashed frontend assets (JS/CSS chunks). Empty (default)
+  # serves them same-origin straight from the pod, exactly as before. Set to a
+  # commit-prefixed CDN base — e.g. "https://cdn.langwatch.ai/git-<short-sha>/" — so
+  # a rolling deploy never strands a browser on a 404: every past build's assets
+  # remain under their own immutable prefix. The deploy pipeline both uploads
+  # dist/client/assets to that prefix and sets this value for the same SHA. See
+  # ADR-086. Rendered into the LANGWATCH_ASSET_BASE env var when non-empty.
+  ## @param app.assetBase [string, default: ""] CDN base URL for content-hashed assets; empty = serve same-origin from the pod.
+  assetBase: ""
+
   # Feature flags to enable/disable specific functionality
   ## @extra app.features Feature flags for the app.
   ## @param app.features.skipEnvValidation [default: false] Skip env var validation (dev only).
@@ -290,7 +333,8 @@ app:
     # Storage provider to use. Options: awsS3 (default), azureBlob.
     # When set to 'awsS3', enables AWS S3 native integration.
     # When set to 'azureBlob', enables Azure Blob Storage (STORED_OBJECTS_BACKEND=azure,
-    # AC37 / issue #4133) — SharedKey auth only, mirrors the awsS3 shape.
+    # AC37 / issue #4133) — shared key or a Microsoft Entra identity, selected
+    # by providers.azureBlob.authMode; mirrors the awsS3 shape.
     provider: awsS3
     bucket: "langwatch-dataset" # Bucket name for dataset storage
 
@@ -321,13 +365,30 @@ app:
           secretKeyRef: { name: "", key: "" }
 
       # Azure Blob Storage configuration for dataset + stored-objects storage
-      # (AC37, issue #4133). SharedKey auth only — workload identity is a later
-      # issue (#6087), per-project Azure BYOC is #6088.
+      # (AC37, issue #4133). Shared key or a Microsoft Entra identity, selected
+      # by authMode below (#6087). Per-project Azure BYOC is still #6088.
       ## @extra app.dataplane.providers.azureBlob Azure Blob provider configuration.
       ## @param app.dataplane.providers.azureBlob.accountName.value [string] Azure Storage account name (not recommended in production — use accountName.secretKeyRef).
       ## @param app.dataplane.providers.azureBlob.accountKey.value [string] Azure Storage account key (not recommended in production — use accountKey.secretKeyRef).
       ## @param app.dataplane.providers.azureBlob.container.value [string] Azure Blob container name (not recommended in production — use container.secretKeyRef).
       azureBlob:
+        # How the app authenticates to Azure Blob. Explicit — never inferred
+        # from which values happen to be filled in (issue #6087).
+        #   sharedKey        the storage account key. Requires accountKey below.
+        #                    Unusable when the account sets
+        #                    allowSharedKeyAccess=false, which many enterprises
+        #                    enforce by policy.
+        #   workloadIdentity AKS workload identity. No key anywhere. Requires
+        #                    global.serviceAccount with the client-id
+        #                    annotation, and the pod label
+        #                    azure.workload.identity/use: "true".
+        #   managedIdentity  IMDS — Azure VM / VMSS / App Service.
+        #   azureCli         a developer's signed-in CLI. Local use only.
+        # Grant the identity "Storage Blob Data Contributor" on the account or
+        # container; the control-plane "Contributor" role does NOT grant data
+        # access.
+        ## @param app.dataplane.providers.azureBlob.authMode [string, default: sharedKey] Azure authentication mode: sharedKey, workloadIdentity, managedIdentity, or azureCli.
+        authMode: sharedKey
         accountName:
           value: ""
           ## @param app.dataplane.providers.azureBlob.accountName.secretKeyRef [object] Secret ref for the Azure Storage account name.
@@ -348,6 +409,21 @@ app:
           value: ""
           ## @param app.dataplane.providers.azureBlob.endpoint.secretKeyRef [object] Secret ref for a custom Azure Blob endpoint.
           secretKeyRef: { name: "", key: "" }
+        # Sovereign clouds (Azure Government, Azure China) issue tokens from a
+        # different identity authority and may use a different storage
+        # audience. Required alongside a non-public endpoint in any
+        # identity-based authMode — the app refuses to guess, because asking
+        # the public-cloud issuer for a sovereign token fails confusingly.
+        ## @param app.dataplane.providers.azureBlob.authorityHost.value [string] Entra authority host for sovereign clouds.
+        authorityHost:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.authorityHost.secretKeyRef [object] Secret ref for the identity authority host.
+          secretKeyRef: { name: "", key: "" }
+        ## @param app.dataplane.providers.azureBlob.tokenAudience.value [string] Storage token audience override for sovereign clouds.
+        tokenAudience:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.tokenAudience.secretKeyRef [object] Secret ref for the storage token audience.
+          secretKeyRef: { name: "", key: "" }
 
       # Migration aid: when provider is azureBlob, the chart still emits the
       # S3 read config below if it is populated, so legacy s3:// objects
@@ -356,6 +432,29 @@ app:
       # greenfield Azure install.
       ## @param app.dataplane.legacyS3ReadBucket [string] Existing S3 bucket to keep reading during an S3->Azure migration.
     legacyS3ReadBucket: ""
+
+    # Mirror of legacyS3ReadBucket for the Azure->S3 direction. Set true when
+    # moving writes back to S3 while objects written to Azure must stay
+    # readable: the Azure connection settings under providers.azureBlob keep
+    # being emitted, but STORED_OBJECTS_BACKEND does not, so new writes go to
+    # S3 and historical azure-blob:// URIs still resolve. Leave false unless
+    # Azure objects exist.
+    #
+    # SCOPE — this covers URI-addressed STORED OBJECTS only (externalized byte
+    # content, trace payloads, staged uploads): each one carries an
+    # `azure-blob://` URI whose scheme picks the driver, so a read re-derives
+    # its own provider regardless of the write toggle.
+    #
+    # It does NOT cover DATASET chunks. Those are addressed by
+    # {projectId, datasetId, index} with no provider recorded on the row, so
+    # dataset reads follow the CURRENT toggle and cannot reach chunks written
+    # to Azure. Switching a deployment that already has datasets makes them
+    # unreachable (not deleted — reachable again if the toggle is reverted).
+    # A migration that carries datasets needs per-dataset storage provenance,
+    # tracked in #6323. Do not use this flag on an install with datasets until
+    # that lands.
+    ## @param app.dataplane.legacyAzureRead [default: false] Keep Azure settings for reads after moving writes back to S3.
+    legacyAzureRead: false
 
   # Stored Objects - externalized byte content (audio, image, PDF, document).
   # By default, uses a local-filesystem PVC so the chart works plug-and-play
@@ -376,17 +475,22 @@ app:
       storageClassName: ""
 
   # Email notification configuration
-  # Enables sending alerts and notifications via email
+  # Naming a provider is what turns email on, so there is one switch rather
+  # than a toggle and a name that can disagree with each other.
   ## @extra app.email Email provider configuration.
-  ## @param app.email.enabled [default: false] Enable email notifications.
   ## @param app.email.defaultFrom [string] Default "from" address.
-  ## @param app.email.provider [string, default: sendgrid] Email provider.
+  ## @param app.email.provider [string] Email provider. Empty sends no email.
   email:
-    enabled: false
     defaultFrom: ""
-    # Email provider to use. Options: sendgrid (default)
-    # When set to 'sendgrid', enables SendGrid integration
-    provider: sendgrid
+    # Gateway to send through: sendgrid, ses, smtp or resend. Leave empty and
+    # LangWatch sends no email at all.
+    # Use 'smtp' for an internal relay, Azure Communication Services, Office 365,
+    # Postmark, Mailgun or any other gateway that speaks SMTP.
+    # Deployments whose only egress is a corporate proxy can set HTTPS_PROXY and
+    # NO_PROXY through app.extraEnvs; every gateway that calls a vendor API over
+    # HTTPS routes through it. Only smtp ignores them, on purpose, because an
+    # internal relay is reached directly.
+    provider: ""
 
     providers:
       ## @extra app.email.providers.sendgrid Sendgrid provider configuration.
@@ -395,6 +499,42 @@ app:
         apiKey:
           value: ""
           ## @param app.email.providers.sendgrid.apiKey.secretKeyRef [object] Secret ref for SendGrid API key.
+          secretKeyRef: { name: "", key: "" }
+
+      ## @extra app.email.providers.ses AWS SES provider configuration.
+      ## @param app.email.providers.ses.region [string] AWS region for SES.
+      ## @param app.email.providers.ses.endpoint [string] Override the SES endpoint (VPC endpoint or egress relay).
+      ses:
+        region: ""
+        endpoint: ""
+
+      ## @extra app.email.providers.smtp SMTP relay configuration.
+      ## @param app.email.providers.smtp.url.value [string] Full SMTP connection URL. Takes precedence over the discrete settings.
+      ## @param app.email.providers.smtp.host [string] SMTP host, when not using a URL.
+      ## @param app.email.providers.smtp.port [string] SMTP port. Defaults to 587.
+      ## @param app.email.providers.smtp.secure [string] Force implicit TLS ("true") or STARTTLS ("false"). Defaults to true on port 465.
+      ## @param app.email.providers.smtp.user [string] Username. Omit for an unauthenticated internal relay.
+      smtp:
+        url:
+          value: ""
+          ## @param app.email.providers.smtp.url.secretKeyRef [object] Secret ref for the SMTP URL.
+          secretKeyRef: { name: "", key: "" }
+        host: ""
+        port: ""
+        secure: ""
+        user: ""
+        ## @param app.email.providers.smtp.password.value [string] SMTP password.
+        password:
+          value: ""
+          ## @param app.email.providers.smtp.password.secretKeyRef [object] Secret ref for the SMTP password.
+          secretKeyRef: { name: "", key: "" }
+
+      ## @extra app.email.providers.resend Resend provider configuration.
+      ## @param app.email.providers.resend.apiKey.value [string] Resend API key.
+      resend:
+        apiKey:
+          value: ""
+          ## @param app.email.providers.resend.apiKey.secretKeyRef [object] Secret ref for the Resend API key.
           secretKeyRef: { name: "", key: "" }
 
   # Enterprise license, applied to the whole instance.
@@ -434,7 +574,8 @@ app:
   nextAuth:
     # Authentication provider to use. This value is passed to the app verbatim
     # as NEXTAUTH_PROVIDER, so it has to be one the app recognises:
-    #   email (default), google, github, gitlab, azure-ad, auth0, okta
+    #   email (default), google, github, gitlab, azure-ad, auth0, okta,
+    #   cognito, onelogin, oidc
     # Note that Azure AD is 'azure-ad' here while its credentials live under
     # providers.azureAd below — the first is the app's provider id, the second
     # is this chart's key for the AZURE_AD_* variables.
@@ -452,9 +593,6 @@ app:
     providers:
       # Auth0 OAuth integration
       ## @extra app.nextAuth.providers.auth0 Auth0 OAuth configuration.
-      ## @param app.nextAuth.providers.auth0.clientId.value [string] Auth0 client ID.
-      ## @param app.nextAuth.providers.auth0.clientSecret.value [string] Auth0 client secret.
-      ## @param app.nextAuth.providers.auth0.issuer.value [string] Auth0 issuer URL.
       auth0:
         clientId:
           ## @param app.nextAuth.providers.auth0.clientId.value [string] Auth0 client ID.
@@ -488,6 +626,27 @@ app:
           ## @param app.nextAuth.providers.azureAd.tenantId.value [string] Azure AD tenant ID.
           value: ""
           ## @param app.nextAuth.providers.azureAd.tenantId.secretKeyRef [object] Secret ref for Azure AD tenant ID.
+          secretKeyRef: { name: "", key: "" }
+      # AWS Cognito OAuth integration
+      ## @extra app.nextAuth.providers.cognito AWS Cognito OAuth configuration.
+      cognito:
+        clientId:
+          ## @param app.nextAuth.providers.cognito.clientId.value [string] Cognito client ID.
+          value: ""
+          ## @param app.nextAuth.providers.cognito.clientId.secretKeyRef [object] Secret ref for Cognito client ID.
+          secretKeyRef: { name: "", key: "" }
+        clientSecret:
+          ## @param app.nextAuth.providers.cognito.clientSecret.value [string] Cognito client secret.
+          value: ""
+          ## @param app.nextAuth.providers.cognito.clientSecret.secretKeyRef [object] Secret ref for Cognito client secret.
+          secretKeyRef: { name: "", key: "" }
+        issuer:
+          # The user pool's issuer, https://cognito-idp.<region>.amazonaws.com/<userPoolId>,
+          # not the hosted-UI domain. The hosted-UI endpoints are read from the
+          # issuer's discovery document.
+          ## @param app.nextAuth.providers.cognito.issuer.value [string] Cognito issuer URL.
+          value: ""
+          ## @param app.nextAuth.providers.cognito.issuer.secretKeyRef [object] Secret ref for Cognito issuer URL.
           secretKeyRef: { name: "", key: "" }
       # GitHub OAuth integration
       ## @extra app.nextAuth.providers.github GitHub OAuth configuration.
@@ -545,6 +704,44 @@ app:
           ## @param app.nextAuth.providers.okta.issuer.value [string] Okta issuer URL.
           value: ""
           ## @param app.nextAuth.providers.okta.issuer.secretKeyRef [object] Secret ref for Okta issuer URL.
+          secretKeyRef: { name: "", key: "" }
+      # OneLogin OAuth integration
+      ## @extra app.nextAuth.providers.onelogin OneLogin OAuth configuration.
+      onelogin:
+        clientId:
+          ## @param app.nextAuth.providers.onelogin.clientId.value [string] OneLogin client ID.
+          value: ""
+          ## @param app.nextAuth.providers.onelogin.clientId.secretKeyRef [object] Secret ref for OneLogin client ID.
+          secretKeyRef: { name: "", key: "" }
+        clientSecret:
+          ## @param app.nextAuth.providers.onelogin.clientSecret.value [string] OneLogin client secret.
+          value: ""
+          ## @param app.nextAuth.providers.onelogin.clientSecret.secretKeyRef [object] Secret ref for OneLogin client secret.
+          secretKeyRef: { name: "", key: "" }
+        issuer:
+          # https://<subdomain>.onelogin.com/oidc/2
+          ## @param app.nextAuth.providers.onelogin.issuer.value [string] OneLogin issuer URL.
+          value: ""
+          ## @param app.nextAuth.providers.onelogin.issuer.secretKeyRef [object] Secret ref for OneLogin issuer URL.
+          secretKeyRef: { name: "", key: "" }
+      # Any other OpenID Connect provider, configured by issuer alone
+      ## @extra app.nextAuth.providers.oidc Generic OpenID Connect configuration.
+      oidc:
+        clientId:
+          ## @param app.nextAuth.providers.oidc.clientId.value [string] OIDC client ID.
+          value: ""
+          ## @param app.nextAuth.providers.oidc.clientId.secretKeyRef [object] Secret ref for OIDC client ID.
+          secretKeyRef: { name: "", key: "" }
+        clientSecret:
+          ## @param app.nextAuth.providers.oidc.clientSecret.value [string] OIDC client secret.
+          value: ""
+          ## @param app.nextAuth.providers.oidc.clientSecret.secretKeyRef [object] Secret ref for OIDC client secret.
+          secretKeyRef: { name: "", key: "" }
+        issuer:
+          # Whatever your provider publishes .well-known/openid-configuration under.
+          ## @param app.nextAuth.providers.oidc.issuer.value [string] OIDC issuer URL.
+          value: ""
+          ## @param app.nextAuth.providers.oidc.issuer.secretKeyRef [object] Secret ref for OIDC issuer URL.
           secretKeyRef: { name: "", key: "" }
 
   # Telemetry and monitoring configuration
@@ -714,6 +911,24 @@ workers:
   # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
   ## @param workers.replicaCount [default: 1] Number of worker replicas.
   replicaCount: 1
+
+  # Shutdown budget. shutdownDrainSeconds is how long the GroupQueue may wait
+  # for in-flight jobs to finish their ClickHouse writes; it must match the
+  # app's own SHUTDOWN_DRAIN_TIMEOUT_MS, which the chart sets from this value.
+  #
+  # terminationGracePeriodSeconds is the kubelet's SIGKILL clock and must cover
+  # the drain plus 5s for App.close, 15s for process teardown and 10s of
+  # kubelet slack — so at least shutdownDrainSeconds + 30. Because it is set
+  # here, raising shutdownDrainSeconds alone always fails the render: raise
+  # both together. The chart refuses rather than installing a release the
+  # kubelet kills mid-drain. Both must be whole numbers of seconds greater
+  # than zero — a quoted or fractional value is rejected, because Helm's `int`
+  # would silently turn it into a zero budget.
+  # See: https://kubespec.dev/v1/Pod#spec.terminationGracePeriodSeconds
+  ## @param workers.shutdownDrainSeconds [default: 25] Seconds the queue may spend draining in-flight jobs on shutdown.
+  shutdownDrainSeconds: 25
+  ## @param workers.terminationGracePeriodSeconds [default: 55] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.
+  terminationGracePeriodSeconds: 55
 
   # Resource requirements for worker pods
   # Workers are CPU/memory intensive for processing evaluations and trace collection

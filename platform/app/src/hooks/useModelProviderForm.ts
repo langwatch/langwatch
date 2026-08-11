@@ -5,8 +5,8 @@ import {
   modelProviders as modelProvidersRegistry,
 } from "../server/modelProviders/registry";
 import {
-  hasUserEnteredNewApiKey,
-  hasUserModifiedNonApiKeyFields,
+  hasUserModifiedAnyCredential,
+  headerSignature,
 } from "../utils/modelProviderHelpers";
 
 // Mirrors the server's deriveDefaultName. Kept here so the drawer can
@@ -295,15 +295,19 @@ export function useModelProviderForm(
       humanizeProviderName(provider.provider);
     if (name.trim() !== initialName.trim()) return true;
 
-    if (hasUserEnteredNewApiKey(credentialKeysHook.customKeys)) return true;
+    // The same helper the submit path uses to decide whether to send
+    // credentials at all, so the button and the payload cannot disagree.
+    // Reading only "a new api key was typed" plus "a non-key field changed"
+    // left one edit invisible: emptying a key field is a change, and with
+    // Save disabled there was no way to remove a credential at all.
     if (
-      hasUserModifiedNonApiKeyFields(
-        credentialKeysHook.customKeys,
-        credentialKeysHook.originalStoredKeysRef.current as Record<
+      hasUserModifiedAnyCredential({
+        customKeys: credentialKeysHook.customKeys,
+        initialKeys: credentialKeysHook.originalStoredKeysRef.current as Record<
           string,
           unknown
         >,
-      )
+      })
     ) {
       return true;
     }
@@ -332,9 +336,14 @@ export function useModelProviderForm(
     // Headers and models: order-sensitive JSON compare. Reordering a list
     // counts as dirty here, which matches user intent (the user dragged
     // them on purpose).
+    //
+    // Headers are compared on key and value only. The form carries a
+    // `concealed` flag the stored header has no idea about, so comparing the
+    // objects whole made every provider that holds a header read as dirty the
+    // moment its drawer opened, with Save enabled over an untouched form.
     if (
-      JSON.stringify(extraHeadersHook.extraHeaders) !==
-      JSON.stringify(provider.extraHeaders ?? [])
+      headerSignature(extraHeadersHook.extraHeaders) !==
+      headerSignature(provider.extraHeaders)
     ) {
       return true;
     }

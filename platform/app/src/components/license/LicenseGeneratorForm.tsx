@@ -71,6 +71,9 @@ interface FormData {
   maxMembersLite: number;
   maxMessagesPerMonth: number;
   canPublish: boolean;
+  /** Undefined while a plan template says nothing about it; sent as a definite
+   * answer, so what the operator sees ticked is what the license carries. */
+  webhookEndpointsEnabled?: boolean;
   usageUnit: "traces" | "events";
 }
 
@@ -92,6 +95,7 @@ const defaultFormData: FormData = {
   maxMembersLite: ENTERPRISE_TEMPLATE.maxMembersLite ?? 50,
   maxMessagesPerMonth: ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
   canPublish: ENTERPRISE_TEMPLATE.canPublish,
+  webhookEndpointsEnabled: ENTERPRISE_TEMPLATE.webhookEndpointsEnabled,
   usageUnit: (ENTERPRISE_TEMPLATE.usageUnit as "traces" | "events") ?? "events",
 };
 
@@ -250,6 +254,7 @@ export const LicenseGeneratorForm = forwardRef<
         maxMembersLite: formData.maxMembersLite,
         maxMessagesPerMonth: formData.maxMessagesPerMonth,
         canPublish: formData.canPublish,
+        webhookEndpointsEnabled: !!formData.webhookEndpointsEnabled,
         usageUnit: formData.usageUnit,
       },
     });
@@ -567,6 +572,19 @@ export const LicenseGeneratorForm = forwardRef<
             <Checkbox.Control />
             <Checkbox.Label fontSize="xs" color="fg.muted">
               Enabled to publish Workflows publicly
+            </Checkbox.Label>
+          </Checkbox.Root>
+
+          <Checkbox.Root
+            checked={!!formData.webhookEndpointsEnabled}
+            onCheckedChange={(e) =>
+              handleInputChange("webhookEndpointsEnabled", !!e.checked)
+            }
+          >
+            <Checkbox.HiddenInput />
+            <Checkbox.Control />
+            <Checkbox.Label fontSize="xs" color="fg.muted">
+              Enable webhook endpoints and gateway spend APIs
             </Checkbox.Label>
           </Checkbox.Root>
         </VStack>

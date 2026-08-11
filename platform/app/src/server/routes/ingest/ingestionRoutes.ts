@@ -54,15 +54,11 @@ import type { IngestionSource } from "@prisma/client";
 import type { Context } from "hono";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
+import { usdToNanoUsd } from "~/server/gateway/wireMoney";
 import {
   parseOtlpLogs,
   parseOtlpMetrics,
@@ -710,19 +706,10 @@ secured
           });
           costEventCount = events.length;
 
-          if (events.length > 0 && isClickHouseEnabled()) {
+          const budgetCHRepo =
+            events.length > 0 ? getApp().gateway.budgets : undefined;
+          if (events.length > 0 && budgetCHRepo) {
             const budgetRepo = new GatewayBudgetRepository(prisma);
-            const budgetCHRepo = new GatewayBudgetClickHouseRepository(
-              async (projectId) => {
-                const client = await getClickHouseClientForProject(projectId);
-                if (!client) {
-                  throw new Error(
-                    `ClickHouse enabled but no client for project ${projectId}`,
-                  );
-                }
-                return client;
-              },
-            );
             const changeEvents = new ChangeEventRepository(prisma);
 
             for (const event of events) {
@@ -794,6 +781,10 @@ secured
                 ).filter((b) => b.scopeType !== "ATTRIBUTED_USER");
                 if (budgets.length === 0) continue;
 
+                // The reported cost is a float the caller sent, so it is
+                // pinned to an integer once, here, and every total downstream
+                // adds those integers rather than re-deriving from decimals.
+                const nano = usdToNanoUsd(event.costUsd.toFixed(10));
                 const rows = budgets.map((b) => ({
                   tenantId: govProject.id,
                   budgetId: b.id,
@@ -802,7 +793,7 @@ secured
                   window: b.window,
                   virtualKeyId: sentinelVK,
                   gatewayRequestId: event.requestId,
-                  amountUsd: event.costUsd.toFixed(10),
+                  amountNanoUsd: Number(nano),
                   tokensInput: event.inputTokens,
                   tokensOutput: event.outputTokens,
                   tokensCacheRead: event.cacheReadTokens,

@@ -71,6 +71,23 @@ runs:
       shell: bash
       run: npm install -g node-gyp@12.3.0
 
+    # The global install above only fixes PATH resolution for scripts that
+    # spawn `node-gyp` themselves. pnpm builds native modules with the copy
+    # bundled in its own dist, and that copy reaches the runner without an
+    # executable bit often enough to matter: the generated Makefile's
+    # regeneration rule invokes gyp_main.py by path, so `sh` answers
+    # "Permission denied" and make dies with error 126. It lands on a random
+    # shard each run, which reads as a flaky test rather than an install that
+    # never got to run.
+    - name: Restore the executable bit on pnpm's bundled node-gyp
+      if: inputs.install != ''
+      shell: bash
+      run: |
+        set -euo pipefail
+        pnpm_root="$(dirname "$(dirname "$(readlink -f "$(command -v pnpm)")")")"
+        find "${PNPM_HOME:-$pnpm_root}" "$pnpm_root" \
+          -name 'gyp_main.py' -type f ! -perm -u+x -exec chmod +x {} + 2>/dev/null || true
+
     - name: Install dependencies
       if: inputs.install != ''
       shell: bash

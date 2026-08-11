@@ -5,6 +5,10 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import {
+  API_KEY_PERMISSION_MODES,
+  refineRestrictedPermissions,
+} from "~/server/api-key/restricted-permissions";
 import { permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
 import { skipPermissionCheck } from "../rbac";
 
@@ -65,44 +69,6 @@ const roleBindingSchema = z.object({
   scopeType: z.nativeEnum(RoleBindingScopeType),
   scopeId: z.string(),
 });
-
-function refineRestrictedPermissions(
-  data: {
-    permissionMode?: string;
-    permissions?: string[];
-    bindings?: Array<{ role: string }>;
-  },
-  ctx: z.RefinementCtx,
-) {
-  const isRestricted = data.permissionMode === "restricted";
-  const hasCustomBinding =
-    data.bindings?.some((b) => b.role === "CUSTOM") ?? false;
-  const hasPermissions = !!data.permissions && data.permissions.length > 0;
-
-  if (isRestricted || hasCustomBinding || hasPermissions) {
-    if (!isRestricted) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "CUSTOM permissions require permissionMode 'restricted'",
-        path: ["permissionMode"],
-      });
-    }
-    if (!hasCustomBinding) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "restricted mode requires at least one CUSTOM binding",
-        path: ["bindings"],
-      });
-    }
-    if (!hasPermissions) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "restricted mode requires at least one permission",
-        path: ["permissions"],
-      });
-    }
-  }
-}
 
 // RBAC is intentionally bypassed via skipPermissionCheck on all endpoints.
 // Authorization is handled at the service layer: ensureCallerIsOrgMember + isOrgAdmin.
@@ -304,9 +270,7 @@ export const apiKeyRouter = createTRPCRouter({
           name: z.string().min(1).max(100),
           description: z.string().max(500).optional(),
           expiresAt: z.coerce.date().optional(),
-          permissionMode: z
-            .enum(["all", "readonly", "restricted"])
-            .default("all"),
+          permissionMode: z.enum(API_KEY_PERMISSION_MODES).default("all"),
           keyType: z.enum(["personal", "service"]).default("personal"),
           assignedToUserId: z.string().optional(),
           permissions: z.array(permissionFormatSchema).optional(),
@@ -399,7 +363,7 @@ export const apiKeyRouter = createTRPCRouter({
           apiKeyId: z.string(),
           name: z.string().min(1).max(100).optional(),
           description: z.string().max(500).nullish(),
-          permissionMode: z.enum(["all", "readonly", "restricted"]).optional(),
+          permissionMode: z.enum(API_KEY_PERMISSION_MODES).optional(),
           permissions: z.array(permissionFormatSchema).optional(),
           bindings: z.array(roleBindingSchema).min(1).max(20).optional(),
         })

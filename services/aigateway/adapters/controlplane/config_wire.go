@@ -435,6 +435,20 @@ func providerSlotToCredential(p providerSlotWire) domain.Credential {
 			"account_id":      getString("account_id"),
 			"provider_row_id": getString("provider_row_id"),
 		}
+	case domain.ProviderGemini:
+		// Gemini's second door: a credential carrying project_id + region
+		// is an Agent Platform key, and mapProvider routes it to
+		// aiplatform.googleapis.com off exactly these two Extra fields
+		// (credentialIsAgentPlatform). Dropping them here silently sends
+		// the key to the Gemini API host, where it is refused. Emitted by
+		// config.materialiser.ts's gemini branch together or not at all.
+		cred.APIKey = getString("api_key")
+		if project, region := getString("project_id"), getString("region"); project != "" && region != "" {
+			cred.Extra = map[string]string{
+				"project_id": project,
+				"region":     region,
+			}
+		}
 	default:
 		cred.APIKey = getString("api_key")
 	}

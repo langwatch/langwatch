@@ -7,14 +7,13 @@
  * installed account and the caller can refetch / replay the user's last prompt
  * so the conversation continues seamlessly.
  *
- * Spec: specs/langy/langy-github-install.feature. Issue: #4747.
+ * Spec: specs/integrations/github-connection.feature.
  */
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 import { GitHub } from "react-feather";
-
+import { useGitHubConnectPopup } from "~/features/github/useGitHubConnectPopup";
 import { useRouter } from "~/utils/compat/next-router";
-import { useGitHubConnectPopup } from "./useGitHubConnectPopup";
 
 // The in-app Integrations page — the SAME GitHub App flow the rest of the app
 // opens (Settings → Integrations), reachable without a popup.

@@ -97,6 +97,18 @@ EXCLUDES=(
   --exclude=Dockerfile*
   --exclude=.dockerignore
   --exclude=.github
+  # The server bundles' source maps, re-included ahead of the blanket *.map
+  # exclude below (rsync takes the FIRST matching rule). start:app and
+  # start:workers run node with --enable-source-maps, so without these every
+  # production stack trace an end user reports is a bundle offset instead of a
+  # real file and line. They are safe to publish: the bundles are built with
+  # sourcesContent:false, so a map carries path and position data only, never
+  # source text. ~15 MB total, against a 300 MB tarball ceiling.
+  # A new dist/server bundle needs its map listed here too.
+  --include=server.cjs.map
+  --include=workers.cjs.map
+  --include=task.cjs.map
+  --include=scenario-child-process.cjs.map
   --exclude=*.map
   --exclude=*.tsbuildinfo
   --exclude=.DS_Store

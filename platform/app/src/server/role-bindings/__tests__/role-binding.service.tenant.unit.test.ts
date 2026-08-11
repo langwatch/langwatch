@@ -10,14 +10,14 @@ import { RoleBindingService } from "../role-binding.service";
 
 const validateScopeInOrg = vi.fn();
 const validateRolesAssignable = vi.fn();
-const organizationUserCount = vi.fn();
+const organizationUserFindFirst = vi.fn();
 const groupFindFirst = vi.fn();
 const bindingCreate = vi.fn();
 const bindingFindMany = vi.fn();
 const groupMembershipFindMany = vi.fn();
 
 const prisma = {
-  organizationUser: { count: organizationUserCount },
+  organizationUser: { findFirst: organizationUserFindFirst },
   group: { findFirst: groupFindFirst },
   // The personal-team guard runs on every binding write; a shared team here.
   team: { findFirst: vi.fn().mockResolvedValue(null) },
@@ -43,7 +43,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   validateScopeInOrg.mockResolvedValue(undefined);
   validateRolesAssignable.mockResolvedValue(undefined);
-  organizationUserCount.mockResolvedValue(1);
+  organizationUserFindFirst.mockResolvedValue({ role: "MEMBER" });
   groupFindFirst.mockResolvedValue({ id: "group_1" });
   bindingCreate.mockResolvedValue({ id: "binding_1" });
   bindingFindMany.mockResolvedValue([]);
@@ -60,11 +60,11 @@ const bindingInput = {
 
 describe("RoleBindingService tenant references", () => {
   it("rejects a user principal from another organization", async () => {
-    organizationUserCount.mockResolvedValue(0);
+    organizationUserFindFirst.mockResolvedValue(null);
 
     await expect(
       service.create({ ...bindingInput, userId: "foreign_user" }),
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    ).rejects.toMatchObject({ code: "user_not_in_organization" });
 
     expect(bindingCreate).not.toHaveBeenCalled();
   });
@@ -74,13 +74,13 @@ describe("RoleBindingService tenant references", () => {
 
     await expect(
       service.create({ ...bindingInput, groupId: "foreign_group" }),
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    ).rejects.toMatchObject({ code: "group_not_in_organization" });
 
     expect(bindingCreate).not.toHaveBeenCalled();
   });
 
   it("rejects batch bindings for a user from another organization", async () => {
-    organizationUserCount.mockResolvedValue(0);
+    organizationUserFindFirst.mockResolvedValue(null);
 
     await expect(
       service.applyMemberBindings({
@@ -89,7 +89,7 @@ describe("RoleBindingService tenant references", () => {
         bindingIdsToDelete: [],
         bindingsToCreate: [],
       }),
-    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    ).rejects.toMatchObject({ code: "user_not_in_organization" });
   });
 
   it("filters stale foreign principals from organization reads", async () => {

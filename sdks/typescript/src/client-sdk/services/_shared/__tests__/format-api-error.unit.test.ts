@@ -129,6 +129,18 @@ describe("formatApiErrorMessage", () => {
       expect(formatApiErrorMessage({ error: body })).toBe("TagValidationError");
     });
 
+    it("never prefixes with a bare 'Error' label", () => {
+      // The versioned management families carry the class name in `error`
+      // and the stable code in `message`; the label adds nothing.
+      const body = {
+        error: "Error",
+        message: "enterprise_plan_required",
+      };
+      expect(formatApiErrorMessage({ error: body })).toBe(
+        "enterprise_plan_required",
+      );
+    });
+
     it("does not collapse to 'Internal server error' when other fields exist", () => {
       const body = {
         error: "Internal server error",
@@ -232,5 +244,90 @@ describe("extractStatusFromResponse", () => {
   it("returns undefined when no status is present", () => {
     expect(extractStatusFromResponse({ foo: "bar" })).toBeUndefined();
     expect(extractStatusFromResponse(null)).toBeUndefined();
+  });
+});
+
+describe("given a handled-error envelope whose message is just the code", () => {
+  describe("when the code is one the client writes copy for", () => {
+    it("renders the sentence instead of the slug", () => {
+      const body = {
+        code: "enterprise_plan_required",
+        message: "enterprise_plan_required",
+        meta: { feature: "MANAGEMENT_API" },
+      };
+
+      expect(
+        formatApiErrorForOperation({
+          operation: "fetch the organization",
+          error: body,
+        }),
+      ).toBe(
+        "Failed to fetch the organization: This capability needs the Enterprise plan",
+      );
+    });
+  });
+
+  describe("when the code has no entry", () => {
+    it("humanizes the slug rather than printing it raw", () => {
+      const body = {
+        code: "organization_slug_taken",
+        message: "organization_slug_taken",
+      };
+
+      expect(formatApiErrorMessage({ error: body })).toBe(
+        "Organization slug taken",
+      );
+    });
+  });
+
+  describe("when the server did send prose of its own", () => {
+    it("prefers the server's sentence", () => {
+      const body = {
+        code: "validation_error",
+        message: "name must not be empty",
+      };
+
+      expect(formatApiErrorMessage({ error: body })).toBe(
+        "name must not be empty",
+      );
+    });
+  });
+});
+
+describe("given the older envelope, which carries the code in `error`", () => {
+  describe("when it also carries prose", () => {
+    it("prints the prose without the code in front of it", () => {
+      const body = {
+        error: "invalid_credentials",
+        message: "That is not this instance's administrator credential",
+      };
+
+      expect(formatApiErrorMessage({ error: body })).toBe(
+        "That is not this instance's administrator credential",
+      );
+    });
+  });
+
+  describe("when the prose is missing", () => {
+    it("renders the client's copy for the code", () => {
+      const body = { error: "enterprise_plan_required" };
+
+      expect(formatApiErrorMessage({ error: body })).toBe(
+        "This capability needs the Enterprise plan",
+      );
+    });
+  });
+
+  describe("when the field holds a reason phrase rather than a code", () => {
+    it("keeps prefixing, because the phrase is prose the message does not repeat", () => {
+      const body = {
+        error: "Conflict",
+        message: "A role with that name already exists",
+      };
+
+      expect(formatApiErrorMessage({ error: body })).toBe(
+        "Conflict: A role with that name already exists",
+      );
+    });
   });
 });

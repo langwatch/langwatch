@@ -43,6 +43,7 @@ import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { normalizeEndpoint } from "../../../internal/endpoint";
 import {
 	codexHasGatewayBlock,
 	codexHasOtelBlock,
@@ -62,6 +63,11 @@ import {
 	installAppEnv,
 	removeAppEnvVars,
 } from "./app-settings";
+import { readClaudePluginState } from "./claude-plugin";
+import {
+	installSessionContextHooks,
+	removeSessionContextHooks,
+} from "./session-context-hooks";
 import {
 	extractLookupIdFromToken,
 	listIngestionKeys,
@@ -92,7 +98,7 @@ const LANGWATCH_OTLP_ENDPOINT_RE = /\/api\/otel\/?$/;
 
 /** The OTLP ingestion base endpoint a control plane serves. */
 export function otlpEndpointFor(controlPlaneUrl: string): string {
-	return `${controlPlaneUrl.replace(/\/+$/, "")}/api/otel`;
+	return `${normalizeEndpoint(controlPlaneUrl)}/api/otel`;
 }
 
 /**
@@ -212,6 +218,18 @@ export async function resolveLiveIngestionKey({
  * block is already present (presence = the user opted into persistence
  * on some earlier run) and its values differ. Returns the refreshed
  * target's label, or null when nothing was touched.
+ *
+ * Every run also re-asserts the session context seam in the same file, not only
+ * the runs that rewrite the env. It is part of the wiring the persisted block
+ * stands for, and the block outlived the CLI version that started writing it, so
+ * a device that persisted earlier has the env and none of the seam. The seam
+ * names no endpoint, so asserting it refreshes nothing to point at this login
+ * and the label stays null when it was the only change.
+ *
+ * A device carrying the LangWatch Claude Code plugin already has those hooks
+ * from the plugin, so the entries here are removed rather than asserted: wiring
+ * both runs the same two hooks twice per session. This path never installs the
+ * plugin, because nobody is being asked anything on a refresh.
  */
 export function refreshClaudeUserTelemetryEnv({
 	vars,
@@ -223,6 +241,15 @@ export function refreshClaudeUserTelemetryEnv({
 	if (!appEnvHasAnyVar(target, Object.keys(vars))) return null;
 	const current = appEnvValues(target);
 	if (!otelWiringLooksLangwatchAuthored(current)) return null;
+	try {
+		if (readClaudePluginState().pluginInstalled) {
+			removeSessionContextHooks({ tool: "claude_code" });
+		} else {
+			installSessionContextHooks({ tool: "claude_code" });
+		}
+	} catch {
+		// The env is the refresh that matters; the seam is best-effort.
+	}
 	if (appEnvHasAllVars(target, vars)) return null;
 	installAppEnv(target, vars);
 	return `claude telemetry env (${target.displayPath})`;

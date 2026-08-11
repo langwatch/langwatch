@@ -36,11 +36,11 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-// Auth cache tiers reported on the auth-cache metrics.
-const (
-	TierL1      = "l1"
-	TierL2Redis = "l2_redis"
-)
+// TierL1 is the auth cache tier reported on the auth-cache metrics. The
+// gateway caches virtual keys in each pod's own memory and nowhere else, so
+// the label carries one value; it stays a label because these metric names
+// are published and an operator's dashboard should not break to save a string.
+const TierL1 = "l1"
 
 // Guardrail verdict label values. Allow/block/modify mirror the control
 // plane's decision; FailOpen is recorded when the guardrail service could
@@ -114,6 +114,7 @@ type Recorder struct {
 	internalRTT    *prometheus.HistogramVec
 	controlPlane   *prometheus.CounterVec
 	rateLimits     *prometheus.CounterVec
+	clientRejects  *prometheus.CounterVec
 
 	draining      gaugeSource
 	authCacheSize gaugeSource
@@ -186,7 +187,7 @@ func New() *Recorder {
 
 	r.authHits = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "gateway_auth_cache_hits_total",
-		Help: "Virtual-key resolutions served from cache, by tier (l1, l2_redis).",
+		Help: "Virtual-key resolutions served from cache, by tier (l1).",
 	}, []string{"tier"})
 
 	r.authMisses = prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -235,6 +236,11 @@ func New() *Recorder {
 		Help: "Requests denied by a gateway rate limit, by the dimension that tripped (rpm, rpd) and the virtual key.",
 	}, []string{"dimension", "vk_id"})
 
+	r.clientRejects = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "gateway_client_rejects_total",
+		Help: "Requests the gateway itself rejected as the caller's fault, by gateway error code and virtual key.",
+	}, []string{"code", "vk_id"})
+
 	r.register(
 		prometheus.NewGaugeFunc(prometheus.GaugeOpts{
 			Name: "gateway_draining",
@@ -265,6 +271,7 @@ func New() *Recorder {
 		r.authHits, r.authMisses, r.authLookups,
 		r.budgetBlocks, r.cacheHits, r.cacheRuleHits,
 		r.guardrails, r.internalRTT, r.controlPlane, r.rateLimits,
+		r.clientRejects,
 	)
 	return r
 }
@@ -564,6 +571,24 @@ func (r *Recorder) RecordRateLimitDenied(dimension, vkID string) {
 		return
 	}
 	r.rateLimits.WithLabelValues(orUnknown(dimension), orUnknown(vkID)).Inc()
+}
+
+// RecordClientReject counts a request the gateway rejected as the caller's
+// fault, keyed by the error code and the virtual key that sent it.
+//
+// The label set is the whole point, so it is worth being explicit about what
+// is NOT here. Project and model are both omitted: project is redundant with
+// the key (a virtual key belongs to exactly one project, and the log line
+// already carries both), and model is caller-controlled on a key that permits
+// arbitrary names, which is the same unbounded-label trap modelLabel exists to
+// cap. Code is a closed enum of the gateway's own codes, and vk_id is minted
+// by the control plane and bounded by the keys a deployment has issued, which
+// is the pairing gateway_rate_limit_denied_total already uses.
+func (r *Recorder) RecordClientReject(code, vkID string) {
+	if r == nil {
+		return
+	}
+	r.clientRejects.WithLabelValues(orUnknown(code), orUnknown(vkID)).Inc()
 }
 
 // StreamOpened marks a streaming response as open.

@@ -60,6 +60,59 @@ const str = (
   return typeof value === "string" && value.length > 0 ? value : fallback;
 };
 
+type MissingModelRequestType =
+  | "chat"
+  | "messages"
+  | "responses"
+  | "embeddings"
+  | "speech"
+  | "transcription"
+  | "passthrough";
+
+const missingModelDescriptions = {
+  chat: 'Add a top-level "model" field to POST /v1/chat/completions, then try again.',
+  messages:
+    'Add a top-level "model" field to POST /v1/messages, then try again.',
+  responses:
+    'Add a top-level "model" field to POST /v1/responses, then try again.',
+  embeddings:
+    'Add a top-level "model" field to POST /v1/embeddings, then try again.',
+  speech:
+    'Add a top-level "model" field to POST /v1/audio/speech, then try again.',
+  transcription:
+    'Add a "model" field to the multipart form for POST /v1/audio/transcriptions, then try again.',
+  passthrough: "Put the model in the Gemini request URL, then try again.",
+} as const satisfies Record<MissingModelRequestType, string>;
+
+const describeMissingModel = (error: HandledErrorShape): string =>
+  (missingModelDescriptions as Record<string, string>)[
+    str(error, "request_type", "")
+  ] ?? "Set the model where this endpoint expects it, then try again.";
+
+/**
+ * Reads a number out of `meta` without trusting it. `meta` crosses a wire,
+ * so a value that arrives as a string or NaN has to read as absent rather
+ * than reach a sentence as "NaN projects".
+ */
+const num = (
+  error: HandledErrorShape,
+  key: string,
+  fallback: number,
+): number => {
+  const value = error.meta[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+};
+
+/**
+ * The two plan allowances an admin meets while reconciling seats, in words that
+ * read inside a sentence. Not taken from the license-enforcement labels, which
+ * are column headings ("Team Members") and land badly mid-sentence.
+ */
+const SEAT_LIMIT_LABELS: Record<string, string> = {
+  members: "full member seats",
+  membersLite: "Lite Member seats",
+};
+
 /**
  * Whether any code in the error's reason chain (depth-first, nested included)
  * is one of `codes`.
@@ -98,6 +151,39 @@ const PROVIDER_ALLOWANCE_REASONS: ReadonlySet<string> = new Set([
   "insufficient_quota",
   "billing_hard_limit_reached",
 ]);
+
+/**
+ * The upstream-HTTP-status fallback reasons (llmproxy.go's
+ * upstreamReasonCodes), used when the provider's own body carried no
+ * discriminant of its own. Grouped the same way PROVIDER_ALLOWANCE_REASONS
+ * is: one remediation, one sentence.
+ */
+const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
+  "upstream_unauthorized",
+  "upstream_forbidden",
+]);
+
+const PROVIDER_RATE_LIMIT_REASONS: ReadonlySet<string> = new Set([
+  "upstream_rate_limited",
+]);
+
+const PROVIDER_OUTAGE_REASONS: ReadonlySet<string> = new Set([
+  "upstream_unavailable",
+  "upstream_timeout",
+]);
+
+/**
+ * The provider a retired one was folded into, written the way the product
+ * writes it. Keyed by the registry slug that rides in `meta.replacement`.
+ *
+ * A table rather than a title-cased slug, because provider names are brand
+ * names ("OpenAI", "vLLM") that no casing rule gets right, and because an
+ * unmapped slug should fall back to a sentence that omits the name rather
+ * than print a raw identifier at a customer.
+ */
+const DEPRECATED_PROVIDER_REPLACEMENTS: Record<string, string> = {
+  gemini: "Gemini",
+};
 
 /**
  * Looks a label up in one of the tables below, without trusting the key.
@@ -147,6 +233,11 @@ const presentations = {
     title: "Time range is too wide",
     describe: () => "Pick a shorter range and try again.",
   },
+  page_too_deep: {
+    title: "That page is too deep to open by number",
+    describe: () =>
+      "Narrow the time range or filters, or step forward with Next.",
+  },
   filter_parse_error: {
     title: "This filter isn't valid",
     describe: () => "Check the syntax and try again.",
@@ -161,6 +252,11 @@ const presentations = {
   clickhouse_unavailable: {
     title: "Search is temporarily unavailable",
     describe: () => "We're on it. Try again in a moment.",
+  },
+  clickhouse_overloaded: {
+    title: "Too much running at once",
+    describe: () =>
+      "We paused this one to keep the rest responsive. Try again.",
   },
   broadcaster_not_active: {
     title: "Live updates disconnected",
@@ -271,6 +367,17 @@ const presentations = {
     describe: () =>
       "It may have been removed along with its run. Reload to see the current steps.",
   },
+  email_already_registered: {
+    // Reached from the sign-up screen, and the reader there is usually looking
+    // at their own account: either a previous sign-up created it and could not
+    // sign them in, or they were a member before and an invite asked them to
+    // create an account they already have. The screen retries the sign-in for
+    // them first, so by the time this copy renders the password they typed was
+    // not the account's, which leaves exactly two moves worth naming.
+    title: "That email already has an account",
+    describe: () =>
+      "Sign in with it, or reset the password if you don't have it.",
+  },
   prompt_not_found: {
     title: "Prompt not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
@@ -379,10 +486,32 @@ const presentations = {
         ? "Removing a provider by name needs a project. Pick one and try again."
         : "Choose a project or an organization, then try again.",
   },
+  model_provider_deprecated: {
+    // Reader tried to ADD a provider that has been absorbed into another
+    // one — from the API, an SDK, or a page open since before the change,
+    // since the Add menu no longer offers it. Their stored rows are fine
+    // and the copy says so, because "no longer available" otherwise reads
+    // as "the one I already have just broke".
+    title: "This provider has moved",
+    describe: (error) => {
+      const replacement = label(
+        DEPRECATED_PROVIDER_REPLACEMENTS,
+        str(error, "replacement", ""),
+      );
+      return replacement
+        ? `Add ${replacement} instead — it now covers this. Providers you already set up keep working.`
+        : "It has been merged into another provider. Providers you already set up keep working.";
+    },
+  },
   model_provider_scopes_required: {
     title: "Choose where this provider applies",
     describe: () =>
       "A provider added outside a project needs at least one scope, so pick the teams or projects it covers.",
+  },
+  model_provider_credentials_would_be_dropped: {
+    title: "That save would delete the stored credentials",
+    describe: () =>
+      "Saving this would remove the credentials already stored for this provider. Leave the credential fields as they are to keep them, or empty them yourself if removing them is what you want.",
   },
   missing_provider: {
     // fault: customer — a configuration choice they can change, so the copy
@@ -404,6 +533,21 @@ const presentations = {
     describe: () =>
       "Nothing has a model set yet. Pick one in your project's model settings, then try again.",
   },
+  model_restricted_for_feature: {
+    // Distinct from `model_not_configured`: a model IS set, but it's
+    // licensed for Langy and the quick assists only (see
+    // codex-account-provider.feature) and this feature needs full
+    // inference.
+    title: "This model can't be used here",
+    describe: (error) => {
+      const featureDisplayName = str(
+        error,
+        "featureDisplayName",
+        "this feature",
+      );
+      return `Pick a different default model for ${featureDisplayName} in your project's model settings.`;
+    },
+  },
   model_provider_disabled: {
     title: "This model provider is turned off",
     describe: () =>
@@ -424,6 +568,25 @@ const presentations = {
     describe: () =>
       "It may have been removed, or it isn't available here. Reload to see the current list.",
   },
+  model_provider_test_rate_limited: {
+    // Nothing is wrong with the credential — we simply stopped asking. Saying
+    // "wait" without saying how long invites the customer to keep clicking,
+    // which is the behaviour the limit exists to stop, so the number rides in
+    // `meta` and gets read back here.
+    title: "Too many connection tests",
+    describe: (error) => {
+      // Rounded up here rather than trusted from the wire. The server sends a
+      // whole number today, but this is a client contract read by whatever
+      // sends the code, and a fraction would print "about 30.427 seconds" and
+      // slip past the `=== 1` singular check. Up, not down: rounding down
+      // invites a retry the limiter is still going to refuse.
+      const raw = Number(error.meta.retryAfterSeconds);
+      const seconds = Number.isFinite(raw) ? Math.ceil(raw) : 0;
+      return seconds > 0
+        ? `Wait about ${seconds} second${seconds === 1 ? "" : "s"} and try again.`
+        : "Wait a moment and try again.";
+    },
+  },
   provider_key_invalid: {
     // The provider positively identified the credential as wrong, which is the
     // one refusal a new key actually fixes. Deliberately says nothing about
@@ -432,6 +595,14 @@ const presentations = {
     title: "That API key was refused",
     describe: () =>
       "The provider didn't recognise it. Check you copied the whole key, and that it belongs to the right account.",
+  },
+  provider_endpoint_redirected: {
+    // Not "we couldn't reach it" — something answered, and it wants us
+    // somewhere else. Saying so is the difference between the customer
+    // checking their network and the customer fixing a URL.
+    title: "That endpoint redirects somewhere else",
+    describe: () =>
+      "We don't follow redirects when sending a credential. Point the base URL at the address the provider actually serves — an http:// URL redirecting to https:// is the usual cause.",
   },
   provider_key_missing: {
     title: "No API key to check",
@@ -443,10 +614,20 @@ const presentations = {
     // what "invalid" would send them off to do. The reason is a discriminant
     // from a set Google enumerates, so branching copy on it is safe.
     title: "This key's restrictions block the request",
-    describe: (error) =>
-      error.meta.reason === "API_KEY_SERVICE_BLOCKED"
-        ? "Its API restrictions exclude the Generative Language API. Allow that API in the Google Cloud console, or set up a Vertex AI provider instead."
-        : "Its application restrictions don't allow a call from our servers. Adjust them in the Google Cloud console, then try again.",
+    // The same refusal reason means opposite remediations on Google's two
+    // doors, so the sentence follows `meta.googleDoor` (set by the
+    // validation walk): a key blocked on the Gemini API likely belongs on
+    // the Agent Platform door and needs the pair filled in, while a key
+    // blocked on Agent Platform likely belongs on the Gemini API and
+    // needs the pair cleared.
+    describe: (error) => {
+      if (error.meta.reason !== "API_KEY_SERVICE_BLOCKED") {
+        return "Its application restrictions don't allow a call from our servers. Adjust them in the Google Cloud console, then try again.";
+      }
+      return error.meta.googleDoor === "agent-platform"
+        ? "This key can't call the Agent Platform service. If it is an AI Studio key, clear the Google Cloud Project and Location fields and save again; otherwise allow the Agent Platform API in the Google Cloud console."
+        : "This key belongs to a different Google service. If it is a Gemini Enterprise Agent Platform key, fill in the Google Cloud Project and Location fields and save again; otherwise allow the Generative Language API in the Google Cloud console.";
+    },
   },
   provider_refused: {
     // fault: provider. It answered and said no, but not in terms we can map —
@@ -530,6 +711,33 @@ const presentations = {
     title: "Custom role not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
+  custom_role_name_taken: {
+    title: "That role name is already in use",
+    describe: () =>
+      "Role names are unique in an organization. Pick a different name, or edit the existing role.",
+  },
+  custom_role_name_reserved: {
+    title: "That role name is reserved",
+    describe: () =>
+      'Names starting with "apikey:" are managed by LangWatch. Pick a different name.',
+  },
+  custom_role_in_use: {
+    title: "This role is still in use",
+    describe: () =>
+      "Remove its member assignments and role bindings first, then delete it.",
+  },
+  custom_role_id_required: {
+    title: "Pick the custom role to use",
+    describe: () =>
+      "A custom role binding needs the role's id. Choose one, then try again.",
+  },
+  custom_role_not_assignable: {
+    // Covers a role from another organization and an API key's system role
+    // alike, deliberately: saying which would confirm what exists outside
+    // the caller's organization.
+    title: "That role can't be used here",
+    describe: () => "Pick one of this organization's own custom roles.",
+  },
   team_not_found: {
     title: "Team not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
@@ -539,9 +747,82 @@ const presentations = {
     describe: () =>
       "They may have been removed since this page loaded. Reload to see who's on it.",
   },
+  team_member_already_added: {
+    title: "They already hold that role here",
+    describe: () =>
+      "Nothing to add. Give them a different role on the team, or leave the one they have.",
+  },
+  team_name_taken: {
+    title: "A team here already has that name",
+    describe: () => "Pick a name no other team in this organization uses.",
+  },
   lite_member_restricted: {
     title: "Your account doesn't include this",
     describe: () => "Ask an admin on your team to upgrade your access.",
+  },
+  personal_project_key_required: {
+    // Reached with a key in hand, so the answer is which key to use instead.
+    // "Personal workspace" is the name the product uses on the page the right
+    // key comes from, which is what makes it findable rather than a rule.
+    title: "That API key isn't for a personal workspace",
+    describe: () =>
+      "This shows one person's own activity, so it needs the API key from your personal workspace. A shared or team workspace key covers everybody in it and can't answer for one person.",
+  },
+  personal_usage_key_mismatch: {
+    // A deliberate denial rather than a mistake to correct: being allowed to
+    // view somebody's workspace is not the same as it being yours, so the copy
+    // has to close the retry rather than invite one. Nothing here names whose
+    // workspace it is, which is the question the refusal exists to withhold.
+    title: "That workspace is somebody else's",
+    describe: () =>
+      "A key only reports on the personal workspace it belongs to, even where you can otherwise view the workspace. Use the API key from your own personal workspace.",
+  },
+  personal_workspace_not_managed_here: {
+    // Whoever reads this was managing somebody's access, so the answer has to
+    // say why there is nothing to manage here rather than restate the rule. An
+    // admin changing a seat needs to know the seat is elsewhere and that they
+    // do not have to touch this to change it.
+    title: "That workspace belongs to one person",
+    describe: (error) => {
+      const ownerName = str(error, "ownerName", "");
+      const workspace = ownerName
+        ? `"${ownerName}" is that member's own workspace`
+        : "A personal workspace belongs to one member";
+      return `${workspace}, so its access isn't managed from here. Their organization role already decides what they can do in it. To work together, use a shared team.`;
+    },
+  },
+  team_last_admin_required: {
+    // Names the team, because this is raised while editing one member who may
+    // be an admin of several, and it offers the one step that clears it. The
+    // reader holds the permission to promote somebody, so telling them to
+    // contact support or an admin would be sending them to themselves.
+    title: "That team would be left without an admin",
+    describe: (error) => {
+      const teamName = str(error, "teamName", "");
+      const team = teamName ? `"${teamName}"` : "This team";
+      return `${team} has no other admin, and a team needs at least one. Give somebody else the Admin role there first, then make this change.`;
+    },
+  },
+  cannot_remove_self_as_last_admin: {
+    // The same wall from the inside. Nobody else can promote a replacement for
+    // them, so the remedy is theirs to do in this order and the copy says so.
+    title: "You are the only admin of that team",
+    describe: (error) => {
+      const teamName = str(error, "teamName", "");
+      const team = teamName ? `"${teamName}"` : "that team";
+      return `You cannot give up the Admin role in ${team} while you are the only one holding it. Make somebody else an admin there first.`;
+    },
+  },
+  lite_member_viewer_only: {
+    // Not a field to correct: the seat sets the ceiling, so the two ways out
+    // are the two named here. The scope can be a team, a project, or the
+    // organization, so the copy names the seat rather than any of them.
+    title: "A Lite Member seat allows viewing only",
+    describe: (error) => {
+      const teamName = str(error, "teamName", "");
+      const scope = teamName ? ` in "${teamName}"` : "";
+      return `A Lite Member seat allows the Viewer role only${scope}. Leave the role as Viewer, or move them to a full member seat to give them more.`;
+    },
   },
   already_organization_member: {
     // An invite form takes several addresses at once, so the address has to be
@@ -553,6 +834,160 @@ const presentations = {
         ? `${email} is already a member. Change their role from the members list instead.`
         : "Change their role from the members list instead.";
     },
+  },
+
+  // ---- members, invites, role bindings (management surface) ----
+  member_not_found: {
+    title: "Member not found",
+    describe: () =>
+      "They may have been removed since this page loaded. Reload to see the members list.",
+  },
+  cannot_disable_self: {
+    // A deliberate refusal, not a mistake to correct: the guard exists so an
+    // organization cannot lock itself out through its own administrator.
+    title: "You can't disable your own membership",
+    describe: () => "Ask another organization admin to make this change.",
+  },
+  cannot_demote_last_admin: {
+    // Same lockout wall as disabling the last admin: with no admin remaining,
+    // nobody can sign in and undo the change.
+    title: "That would leave the organization without an admin",
+    describe: () =>
+      "This member is the only organization admin. Make somebody else an admin first, then change this member's role.",
+  },
+  cannot_disable_last_admin: {
+    // Same lockout wall seen from the other side: this member is the only
+    // administrator left, so the remedy is to appoint another one first.
+    title: "That would leave the organization without an admin",
+    describe: () =>
+      "This member is the only active organization admin. Make somebody else an admin first, then disable them.",
+  },
+  cannot_remove_last_admin: {
+    // The third face of the same lockout wall: removal is the irreversible
+    // one, so it gets the same refusal disabling and demoting do.
+    title: "That would leave the organization without an admin",
+    describe: () =>
+      "This member is the only active organization admin. Make somebody else an admin first, then remove them.",
+  },
+  cannot_remove_self: {
+    title: "You can't remove yourself from the organization",
+    describe: () => "Ask another organization admin to make this change.",
+  },
+  member_seat_limit_reached: {
+    title: "All member seats are in use",
+    describe: () =>
+      "Free a seat by disabling a membership, or upgrade the plan to add more.",
+  },
+  duplicate_invite: {
+    title: "They already have an invite",
+    describe: (error) => {
+      const email = str(error, "email", "");
+      return email
+        ? `${email} already has a pending invite. Revoke it first to send a new one.`
+        : "A pending invite for this address already exists. Revoke it first to send a new one.";
+    },
+  },
+  invite_not_found: {
+    title: "Invite not found",
+    describe: () =>
+      "It may have been revoked or already accepted. Reload to see the pending invites.",
+  },
+  team_not_in_organization: {
+    title: "That team isn't in this organization",
+    describe: () => "Pick a team that belongs to this organization.",
+  },
+  user_not_in_organization: {
+    title: "They're not in this organization",
+    describe: () =>
+      "Only current members can be added here. Invite them to the organization first.",
+  },
+  group_not_in_organization: {
+    title: "That group isn't in this organization",
+    describe: () => "Pick a group that belongs to this organization.",
+  },
+  group_not_found: {
+    title: "Group not found",
+    describe: () =>
+      "It may have been deleted, or the id may belong to another organization.",
+  },
+  group_member_already_added: {
+    title: "They're already in this group",
+    describe: () => "Nothing to do: the group already grants them its access.",
+  },
+  scim_managed_group: {
+    // The group, its name and its membership come from the directory on every
+    // sync, so a change made here is not merely refused, it would be undone.
+    title: "Your identity provider manages this group",
+    describe: () =>
+      "Rename it, change its members or remove it in the directory that provisions it; changes made here would be overwritten on the next sync.",
+  },
+  api_key_not_in_organization: {
+    title: "That API key isn't in this organization",
+    describe: () => "Pick an API key that belongs to this organization.",
+  },
+  scope_not_in_organization: {
+    // Names the KIND of scope, never the id: the id belongs to a record in
+    // another organization, which is exactly what this guard refuses to
+    // confirm the existence of. Same rule as `gateway_scope_org_mismatch`.
+    title: "That scope isn't in this organization",
+    describe: (error) => {
+      const scopeType = str(error, "scopeType", "");
+      return scopeType
+        ? `Pick a ${scopeType.toLowerCase()} that belongs to this organization.`
+        : "Pick a scope that belongs to this organization.";
+    },
+  },
+  role_binding_not_found: {
+    title: "Role binding not found",
+    describe: () =>
+      "It may have been removed already. Reload to see the current bindings.",
+  },
+  role_binding_already_exists: {
+    title: "That role is already bound",
+    describe: () =>
+      "An identical binding already exists, so there's nothing to add.",
+  },
+  role_binding_principal_invalid: {
+    title: "Choose who this role applies to",
+    describe: () => "Bind it to exactly one user, group, or API key.",
+  },
+  org_exclusive_permission_scope: {
+    // The permission key is the caller's own input, so naming it back is what
+    // lets them find the offending entry in a role with a dozen permissions.
+    title: "That permission is organization-wide only",
+    describe: (error) => {
+      const permission = str(error, "permission", "");
+      return permission
+        ? `"${permission}" only takes effect at organization scope. Bind it there instead.`
+        : "It only takes effect at organization scope. Bind it there instead.";
+    },
+  },
+  organization_slug_taken: {
+    title: "That organization slug is already in use",
+    describe: () =>
+      "Pick a different slug, or leave it out to generate one from the name.",
+  },
+  scim_token_not_found: {
+    title: "SCIM token not found",
+    describe: () =>
+      "It may already be revoked. Reload to see the current tokens.",
+  },
+  insufficient_permissions: {
+    // Names the permission when the server sent one, for the same reason
+    // `project_permission_denied` does: "ask an admin for access" is an
+    // errand with no address, whereas the exact grant can be forwarded as-is.
+    title: "You don't have permission to do this",
+    describe: (error) => {
+      const permission = str(error, "required_permission", "");
+      return permission
+        ? `Ask an organization admin to grant you "${permission}".`
+        : "Ask an organization admin for access.";
+    },
+  },
+  enterprise_plan_required: {
+    title: "This needs the Enterprise plan",
+    describe: () =>
+      "Your organization's plan doesn't include this. Talk to your account team about upgrading.",
   },
   project_permission_denied: {
     // Names the permission when the server sent one: "ask an admin for access"
@@ -585,7 +1020,17 @@ const presentations = {
   },
   resource_limit_exceeded: {
     title: "You've hit a plan limit",
-    describe: () => "Upgrade your plan to raise it.",
+    // Names the allowance and where it stands, because "a plan limit" leaves
+    // the reader to guess which of several they just met. The seat allowances
+    // get the reversible alternative too: an admin who hits one is usually
+    // working down to their plan, and "upgrade" is the answer they came here to
+    // avoid. Most seat refusals arrive as the upgrade modal rather than a toast,
+    // and it says the same thing.
+    describe: (error) => {
+      const label = SEAT_LIMIT_LABELS[str(error, "limitType", "")];
+      if (!label) return "Upgrade your plan to raise it.";
+      return `Your plan's ${label} are all in use. Upgrade to raise the allowance, or disable a membership from the members page to free one, which is reversible.`;
+    },
   },
   // Browser-telemetry ingest (ADR-058). These answer the RUM endpoint rather
   // than a screen, so the reader is usually an engineer with the network tab
@@ -622,9 +1067,24 @@ const presentations = {
       "Send an organization API key as Authorization: Bearer <api-key>.",
   },
   invalid_credentials: {
+    // Deliberately says nothing about which credential class the route
+    // wanted. A key of the wrong class gets `credential_class_mismatch` and
+    // is told so exactly; naming a class here as well would send everyone
+    // holding a typo or a revoked key to swap a working credential.
     title: "That API key was not accepted",
     describe: () =>
-      "Organization endpoints need an admin API key from Settings > API Keys. A project key cannot be used here.",
+      "Check the key is current and copied in full. If it was revoked or rotated, create a new one in Settings > API Keys.",
+  },
+  credential_class_mismatch: {
+    // Both classes are named, because the fix is to swap one for the other
+    // and a caller holding several keys cannot otherwise tell which is which.
+    title: "That's the wrong kind of API key for this endpoint",
+    describe: (error) => {
+      const required = str(error, "required", "");
+      return required === "organization_api_key"
+        ? "This endpoint needs an organization API key, created in Settings > API Keys. The key sent belongs to a single project."
+        : "Send the credential class this endpoint accepts. Organization API keys are created in Settings > API Keys.";
+    },
   },
   scenario_run_export_unauthenticated: {
     title: "Log in to export simulation runs",
@@ -888,6 +1348,12 @@ const presentations = {
         ? `Configure the ${channel} destination first.`
         : "Configure the destination first.";
     },
+  },
+  trigger_filters_required: {
+    title: "This automation needs a condition",
+    describe: () =>
+      "Add a filter or a query that says which traces it is about. " +
+      "Without one it would fire on every single trace.",
   },
 
   // ==========================================================================
@@ -1241,6 +1707,35 @@ const presentations = {
     title: "You don't have permission to attach guardrails",
     describe: () => "Ask an admin on your team for access to this project.",
   },
+  github_not_connected: {
+    title: "GitHub is not connected",
+    describe: () =>
+      "Connect GitHub for this organization in Settings, Integrations. An organization admin can do it.",
+  },
+  github_installation_suspended: {
+    // Only a person on github.com can lift a suspension, so there is nothing to
+    // retry and nothing to change in LangWatch.
+    title: "The GitHub connection is suspended",
+    describe: () =>
+      "GitHub has suspended the LangWatch app for this account. Resume it from the app's page on GitHub.",
+  },
+  github_repo_not_accessible: {
+    title: "That repository isn't available to LangWatch",
+    describe: () =>
+      "The GitHub app doesn't have access to that repository. Grant it access from Settings, Integrations, Configure, then try again.",
+  },
+  github_rate_limited: {
+    // fault: provider. Nobody did anything wrong, GitHub is simply throttling.
+    title: "GitHub is rate limiting requests",
+    describe: () => "Try again in a few minutes.",
+  },
+  github_pr_not_mapped: {
+    // Two causes, one sentence each: the repository was never connected, or it
+    // was and the mapping has not run yet. Both are waits, not mistakes.
+    title: "That pull request isn't linked yet",
+    describe: () =>
+      "Connect the repository in Settings, Integrations, or wait a few minutes for the linking to catch up.",
+  },
   virtual_key_not_found: {
     title: "Virtual key not found",
     describe: () =>
@@ -1249,6 +1744,67 @@ const presentations = {
   gateway_budget_not_found: {
     title: "Budget not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  gateway_budget_cycle_anchor_invalid: {
+    // Names the window back, because the fix is to change one of the two:
+    // drop the anchor, or pick a window that rolls.
+    title: "That window can't start on a chosen date",
+    describe: (error) => {
+      const window = str(error, "window", "");
+      return window
+        ? `A ${window.toLowerCase()} budget doesn't roll on a cycle, so it has no start date to set. Pick a minute, hour, day, week or month window, or drop the start date.`
+        : "This budget doesn't roll on a cycle, so it has no start date to set. Pick a minute, hour, day, week or month window, or drop the start date.";
+    },
+  },
+  trace_project_required: {
+    // Names the one field that fixes it, since the alternative fix (an
+    // administrator setting the organization's governance project up) is
+    // not something the person looking at this form can do.
+    title: "This key needs somewhere for its traces to land",
+    describe: () =>
+      "Pick the project where its traces and costs land, under Ownership. Without one its spend is invisible and no budget can cap it.",
+  },
+  gateway_trace_project_ambiguous: {
+    // The refusal is about what the key did NOT say, so the copy has to
+    // say it back: the caller believes they already picked the project.
+    title: "This key doesn't say where its traces land",
+    describe: (error) => {
+      const scopes = num(error, "project_scope_count", 0);
+      return scopes > 1
+        ? `It can reach ${scopes} projects, so its traces and costs would go to none of them. Pick the one they should land in.`
+        : "Pick the project where its traces and costs land. Without one they go to a hidden governance project, and every budget on the project you had in mind counts nothing.";
+    },
+  },
+  gateway_trace_project_unknown: {
+    // Says the destination is the problem, not the key, because the form
+    // shows a picker and the natural reading of a refusal there is that the
+    // whole key was rejected.
+    title: "That project isn't in this organization",
+    describe: () =>
+      "Pick a project this organization owns for its traces and costs to land in. The one saved on this key no longer resolves.",
+  },
+  gateway_budget_scope_unreachable: {
+    // Says what would have gone wrong rather than what was rejected: a budget
+    // that never fires looks identical to one that was never breached, so the
+    // reason this was worth refusing is the whole message.
+    title: "Nothing would count against this budget",
+    describe: (error) => {
+      const scopeType = str(error, "scope_type", "scope");
+      return `None of your keys send traffic to that ${scopeType}, so this budget would never spend and never stop anything. Put it where your keys already run, scope a key to that ${scopeType}, or save it anyway to set it up ahead of the keys that will use it.`;
+    },
+  },
+  gateway_spend_group_by_unstable: {
+    // Says what the numbers would have done, not what the walk does
+    // internally: "your totals could double-count" is actionable, "the
+    // cursor is not exact over a mutable group key" is not.
+    title: "These totals would not add up yet",
+    describe: (error) => {
+      const settlesAt = str(error, "settles_at", "");
+      const when = settlesAt
+        ? ` Requests in this range finish arriving at ${settlesAt}.`
+        : "";
+      return `Recent requests can still change which model or provider they are counted under, and which time bucket they fall in, so grouping this way now could count some twice and miss others. Ask for an older range, group by key or end user instead, or allow an approximate read if you only need a rough shape.${when}`;
+    },
   },
   gateway_scope_org_mismatch: {
     // Names the KIND of scope, never the id — the id belongs to a record in
@@ -1282,6 +1838,21 @@ const presentations = {
     describe: () =>
       "This deployment doesn't record spend per key, so there's no figure to show.",
   },
+  webhook_endpoint_not_found: {
+    // An archived endpoint reads the same as one that never existed, so the
+    // copy names archiving as the likely cause rather than only the typo.
+    title: "That webhook endpoint isn't there",
+    describe: () =>
+      "It may have been archived, or the id may belong to another organization. List your endpoints to see the ones that are live.",
+  },
+  webhook_endpoint_invalid: {
+    // Names the three things the endpoint form can get wrong, rather than
+    // echoing the server's sentence: `meta.message` on this code can carry
+    // an internal reason, and the customer channel is not where that goes.
+    title: "That webhook endpoint can't be saved",
+    describe: () =>
+      "Check the URL is reachable over HTTPS, that every subscribed event type is one the catalog lists, and that the delivery controls are inside their limits.",
+  },
   webhook_event_not_found: {
     // Says the two things a caller can act on: the log's horizon, and that
     // governance events were never in it to begin with.
@@ -1299,6 +1870,16 @@ const presentations = {
         ? `Another record in this organization already uses "${externalId}". Pick a different one, or update that record instead.`
         : "Another record in this organization already uses it. Pick a different one, or update that record instead.";
     },
+  },
+  idempotency_error: {
+    // Two refusals share one code because the caller's next move is the same
+    // shape in both cases: stop reusing this key, or wait for the first
+    // request to land. `meta.reason` is what lets the copy say which.
+    title: "That idempotency key can't answer this request",
+    describe: (error) =>
+      str(error, "reason", "") === "in_progress"
+        ? "The first request sent with this key is still running. Wait a moment, then retry with the same key."
+        : "This key was already used for a different request. Send a new key, or repeat the original request exactly.",
   },
   cache_rule_not_found: {
     title: "Cache rule not found",
@@ -1343,6 +1924,10 @@ const presentations = {
     // in the registry of a code whose meta must never be rendered.
     describe: () => "We've been notified. Try again in a moment.",
   },
+  missing_model: {
+    title: "Choose a model",
+    describe: describeMissingModel,
+  },
 
   // ---- Langy agent ----
   llm_upstream_error: {
@@ -1368,10 +1953,21 @@ const presentations = {
     // cannot name is exactly the ADR-045 "unknown" case, and a trace id serves
     // the customer better than a sentence we cannot vouch for.
     title: "The model provider rejected that",
-    describe: (error) =>
-      hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)
-        ? "Your account with this model provider has no allowance left. Check its billing or usage limits, or pick a model from a different provider."
-        : "Try again, or pick a different model.",
+    describe: (error) => {
+      if (hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)) {
+        return "Your account with this model provider has no allowance left. Check its billing or usage limits, or pick a model from a different provider.";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)) {
+        return "The model provider refused this key or its permissions. Check the credential configured for this model.";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_RATE_LIMIT_REASONS)) {
+        return "The model provider is rate-limiting these calls. Wait a moment and try again.";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_OUTAGE_REASONS)) {
+        return "The model provider is temporarily unavailable. Try again shortly, or pick a different model.";
+      }
+      return "Try again, or pick a different model.";
+    },
   },
   agent_error: {
     title: "Something went wrong mid-answer",

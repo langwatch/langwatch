@@ -1,28 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
+import { mergeStoredCustomKeys } from "../credentialMerge";
 
 /**
  * Unit tests for ModelProviderService business logic.
  * These test the pure transformation functions and business rules.
  */
-
-// Test the key merging logic (extracted for testing)
-function mergeCustomKeys(
-  validatedKeys: Record<string, unknown> | null,
-  existingKeys: Record<string, unknown> | null,
-): Record<string, unknown> {
-  if (!validatedKeys) return {};
-  if (!existingKeys) return validatedKeys;
-
-  return {
-    ...validatedKeys,
-    ...Object.fromEntries(
-      Object.entries(existingKeys)
-        .filter(([key]) => validatedKeys[key] === MASKED_KEY_PLACEHOLDER)
-        .map(([key, value]) => [key, value]),
-    ),
-  };
-}
 
 // Test the key masking logic (extracted for testing)
 function maskApiKeys(
@@ -64,85 +47,146 @@ function shouldKeepModelProvider(
 }
 
 describe("ModelProviderService business logic", () => {
-  describe("mergeCustomKeys", () => {
-    it("returns empty object when validatedKeys is null", () => {
-      const result = mergeCustomKeys(null, { existing: "value" });
-      expect(result).toEqual({});
+  describe("mergeStoredCustomKeys", () => {
+    describe("given a row with nothing worth keeping", () => {
+      it("returns an empty bag when the write carries no credentials", () => {
+        const result = mergeStoredCustomKeys({
+          incoming: null,
+          stored: { existing: "value" },
+        });
+        expect(result).toEqual({});
+      });
+
+      it("returns the write untouched when the row is empty", () => {
+        const result = mergeStoredCustomKeys({
+          incoming: { OPENAI_API_KEY: "new-key" },
+          stored: null,
+        });
+        expect(result).toEqual({ OPENAI_API_KEY: "new-key" });
+      });
     });
 
-    it("returns validatedKeys when existingKeys is null", () => {
-      const validatedKeys = { OPENAI_API_KEY: "new-key" };
-      const result = mergeCustomKeys(validatedKeys, null);
-      expect(result).toEqual({ OPENAI_API_KEY: "new-key" });
+    describe("when a field comes back masked", () => {
+      it("restores the stored value and takes the edited one", () => {
+        const result = mergeStoredCustomKeys({
+          incoming: {
+            OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            OPENAI_BASE_URL: "https://new-url.com",
+          },
+          stored: {
+            OPENAI_API_KEY: "sk-actual-secret",
+            OPENAI_BASE_URL: "https://old-url.com",
+          },
+        });
+
+        expect(result.OPENAI_API_KEY).toBe("sk-actual-secret");
+        expect(result.OPENAI_BASE_URL).toBe("https://new-url.com");
+      });
+
+      /** @scenario Preserve original subscription key when saving with masked placeholder */
+      it("restores every masked field at once", () => {
+        const result = mergeStoredCustomKeys({
+          incoming: {
+            AWS_ACCESS_KEY_ID: MASKED_KEY_PLACEHOLDER,
+            AWS_SECRET_ACCESS_KEY: MASKED_KEY_PLACEHOLDER,
+            AWS_REGION_NAME: "eu-west-1",
+          },
+          stored: {
+            AWS_ACCESS_KEY_ID: "AKIAEXAMPLE",
+            AWS_SECRET_ACCESS_KEY: "secretkey123",
+            AWS_REGION_NAME: "us-east-1",
+          },
+        });
+
+        expect(result.AWS_ACCESS_KEY_ID).toBe("AKIAEXAMPLE");
+        expect(result.AWS_SECRET_ACCESS_KEY).toBe("secretkey123");
+        expect(result.AWS_REGION_NAME).toBe("eu-west-1");
+      });
+
+      it("carries along a field the row never held", () => {
+        const result = mergeStoredCustomKeys({
+          incoming: {
+            OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            NEW_KEY: "new-value",
+          },
+          stored: { OPENAI_API_KEY: "sk-stored" },
+        });
+
+        expect(result.OPENAI_API_KEY).toBe("sk-stored");
+        expect(result.NEW_KEY).toBe("new-value");
+      });
     });
 
-    // Shape check against a copy of the rule. The scenario it belongs to is
-    // bound where the real path runs, in
-    // modelProvider.credentialPreservation.integration.test.ts and
-    // ModelProviderForm.credential-rules.integration.test.tsx: a copy stayed
-    // green while the credential was being dropped end to end.
-    it("preserves existing key when new value is masked placeholder", () => {
-      const validatedKeys = {
-        OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
-        OPENAI_BASE_URL: "https://new-url.com",
-      };
-      const existingKeys = {
-        OPENAI_API_KEY: "sk-actual-secret",
-        OPENAI_BASE_URL: "https://old-url.com",
-      };
+    describe("when a field is named with a value", () => {
+      it("takes the new value over the stored one", () => {
+        const result = mergeStoredCustomKeys({
+          incoming: { OPENAI_API_KEY: "sk-new-key" },
+          stored: { OPENAI_API_KEY: "sk-old-key" },
+        });
 
-      const result = mergeCustomKeys(validatedKeys, existingKeys);
+        expect(result.OPENAI_API_KEY).toBe("sk-new-key");
+      });
 
-      expect(result.OPENAI_API_KEY).toBe("sk-actual-secret");
-      expect(result.OPENAI_BASE_URL).toBe("https://new-url.com");
+      it("clears the stored secret when the value is empty", () => {
+        const result = mergeStoredCustomKeys({
+          incoming: { OPENAI_API_KEY: "" },
+          stored: { OPENAI_API_KEY: "sk-old-key" },
+        });
+
+        expect(result.OPENAI_API_KEY).toBe("");
+      });
     });
 
-    it("replaces key when new value is not masked placeholder", () => {
-      const validatedKeys = {
-        OPENAI_API_KEY: "sk-new-key",
-      };
-      const existingKeys = {
-        OPENAI_API_KEY: "sk-old-key",
-      };
+    // Secrets are masked on read, so no caller can resend one it did not type,
+    // and leaving one out cannot mean "delete it". Everything else is visible,
+    // so a write states it in full.
+    describe("when a field is left out of the write", () => {
+      /** @scenario A save that names one credential keeps the ones it leaves out */
+      it("keeps a stored secret", () => {
+        const result = mergeStoredCustomKeys({
+          incoming: { AZURE_OPENAI_ENDPOINT: "https://acme2.openai.azure.com" },
+          stored: {
+            AZURE_OPENAI_API_KEY: "sk-stored",
+            AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
+          },
+        });
 
-      const result = mergeCustomKeys(validatedKeys, existingKeys);
+        expect(result).toEqual({
+          AZURE_OPENAI_API_KEY: "sk-stored",
+          AZURE_OPENAI_ENDPOINT: "https://acme2.openai.azure.com",
+        });
+      });
 
-      expect(result.OPENAI_API_KEY).toBe("sk-new-key");
-    });
+      it("does not resurrect a secret the customer had already cleared", () => {
+        const result = mergeStoredCustomKeys({
+          incoming: { AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com" },
+          stored: { AZURE_OPENAI_API_KEY: "" },
+        });
 
-    /** @scenario Preserve original subscription key when saving with masked placeholder */
-    it("preserves multiple masked keys", () => {
-      const validatedKeys = {
-        AWS_ACCESS_KEY_ID: MASKED_KEY_PLACEHOLDER,
-        AWS_SECRET_ACCESS_KEY: MASKED_KEY_PLACEHOLDER,
-        AWS_REGION_NAME: "eu-west-1",
-      };
-      const existingKeys = {
-        AWS_ACCESS_KEY_ID: "AKIAEXAMPLE",
-        AWS_SECRET_ACCESS_KEY: "secretkey123",
-        AWS_REGION_NAME: "us-east-1",
-      };
+        expect(result).toEqual({
+          AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
+        });
+      });
 
-      const result = mergeCustomKeys(validatedKeys, existingKeys);
+      /** @scenario Switching Azure to its API gateway keeps the key and drops the direct endpoint */
+      it("drops a stored field that is not a secret", () => {
+        const result = mergeStoredCustomKeys({
+          incoming: {
+            AZURE_API_GATEWAY_BASE_URL: "https://apim.acme.com",
+            AZURE_API_GATEWAY_VERSION: "2024-05-01-preview",
+          },
+          stored: {
+            AZURE_OPENAI_API_KEY: "sk-stored",
+            AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
+          },
+        });
 
-      expect(result.AWS_ACCESS_KEY_ID).toBe("AKIAEXAMPLE");
-      expect(result.AWS_SECRET_ACCESS_KEY).toBe("secretkey123");
-      expect(result.AWS_REGION_NAME).toBe("eu-west-1");
-    });
-
-    it("handles new key not in existing", () => {
-      const validatedKeys = {
-        OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
-        NEW_KEY: "new-value",
-      };
-      const existingKeys = {
-        OPENAI_API_KEY: "sk-stored",
-      };
-
-      const result = mergeCustomKeys(validatedKeys, existingKeys);
-
-      expect(result.OPENAI_API_KEY).toBe("sk-stored");
-      expect(result.NEW_KEY).toBe("new-value");
+        expect(result).toEqual({
+          AZURE_API_GATEWAY_BASE_URL: "https://apim.acme.com",
+          AZURE_API_GATEWAY_VERSION: "2024-05-01-preview",
+          AZURE_OPENAI_API_KEY: "sk-stored",
+        });
+      });
     });
   });
 

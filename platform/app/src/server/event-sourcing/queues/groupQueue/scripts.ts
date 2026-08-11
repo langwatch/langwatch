@@ -5,6 +5,7 @@ import {
   BLOB_LEASE_SET_TTL_SECONDS,
   BLOB_LEASE_TTL_SECONDS,
   LEGACY_HOLDER_LEASE_GUARD,
+  MAX_BLOB_BYTES,
 } from "./blobConstants";
 import { GQ_BLOB_GRACE_LUA } from "./blobGraceLua";
 import { CachedLuaScript } from "./cachedLuaScript";
@@ -411,6 +412,57 @@ local function gqRoutingMeta(jobDataJson)
     return data["__pipelineName"], data["__jobType"], data["__jobName"]
   end
   return nil, nil, nil
+end
+`;
+
+// What a staged job will weigh once a worker holds it, which is NOT its stored
+// length: a body over the inline ceiling lives in the blob store and leaves a
+// ~200-byte reference behind, and a body over the compression threshold is
+// stored compressed. The encoder records the pre-compression, pre-offload
+// payload size in the envelope header (`s`), so the drain's byte budget can be
+// about the batch a worker will actually assemble rather than about Redis
+// occupancy.
+//
+// A value with no `s` gets the reading that cannot let the batch overshoot,
+// not simply its stored length: legacy bare JSON and a plain inline body
+// (`e:"j"`) ARE their stored length, but a pre-`s` compressed or offloaded body
+// is a fraction of one and the value does not say by how much. Those are worth
+// the payload cap, so they drain alone for the length of a rolling deploy
+// rather than reinstating the very blindness `s` closes — in the window where
+// the most jobs are queued. See the TS twin `readJobPayloadBytes` in
+// `jobEnvelope.ts` for the full reasoning.
+//
+// The two are one budget read from two ends, so an envelope-format change —
+// new prefix, renamed header field, different length-prefix encoding — has to
+// land in both or they silently disagree.
+const PAYLOAD_SIZE_HELPER_LUA = `
+local function gqPayloadSize(value)
+  local prefix = string.sub(value, 1, 4)
+  if prefix == "GQ1|" or prefix == "GQ2|" then
+    local barIdx = string.find(value, "|", 5, true)
+    if barIdx then
+      local headerLen = tonumber(string.sub(value, 5, barIdx - 1))
+      if headerLen and headerLen > 0 then
+        local ok, header = pcall(cjson.decode, string.sub(value, barIdx + 1, barIdx + headerLen))
+        if ok and type(header) == "table" then
+          local s = header["s"]
+          -- Non-negative integer within JS's safe-integer range, which is what
+          -- the TS twin's Number.isSafeInteger admits — the same set, or the
+          -- two ends of one budget disagree on a value. NaN fails the >= 0
+          -- test, and the upper bound is what rejects infinity: cjson decodes
+          -- 1e999 to inf, and math.floor(inf) == inf would pass an integer
+          -- check on its own.
+          if type(s) == "number" and s >= 0 and s <= ${Number.MAX_SAFE_INTEGER} and s == math.floor(s) then
+            return s
+          end
+          if header["e"] ~= "j" then
+            return ${MAX_BLOB_BYTES}
+          end
+        end
+      end
+    end
+  end
+  return #value
 end
 `;
 
@@ -1118,16 +1170,21 @@ return results
  *     coalesced batch stays inside the downstream append/flush budget. A job
  *     too large to fit is LEFT in staging (it becomes its own later dispatch),
  *     never dropped. maxBytes <= 0 disables the byte bound (count bound only,
- *     the pre-ADR-066 behaviour). Sizes are the stored envelope's `#value`,
- *     which is the append-shaped quantity — for the small inline appends this
- *     targets it equals the payload size.
+ *     the pre-ADR-066 behaviour). Sizes are the envelope header's recorded
+ *     payload size (`s`), falling back to the stored `#value` for values that
+ *     carry none — see `gqPayloadSize`. `#value` alone is NOT the append-shaped
+ *     quantity: a compressed or offloaded body stores a fraction of what the
+ *     batch then holds in memory, which let a 256-wide batch of megabyte
+ *     payloads pass a 4 MiB budget untouched.
  *
  * Mirrors the per-job bookkeeping DISPATCH does for the jobs it removes:
  * ZREM from the jobs zset, HDEL the job data, and DECR total-pending. It does
  * NOT mark anything active and does NOT re-score ready — the caller's active
  * job remains the one that frees the group on COMPLETE.
  */
-const DRAIN_GROUP_LUA = `
+const DRAIN_GROUP_LUA =
+  PAYLOAD_SIZE_HELPER_LUA +
+  `
 local jobsKey         = KEYS[1]
 local dataKey         = KEYS[2]
 local totalPendingKey = KEYS[3]
@@ -1157,7 +1214,12 @@ while i < #entries do
   local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
   local size = 0
   if jobDataJson then
-    size = #jobDataJson
+    -- Only pay the header parse when the budget can actually bind.
+    if maxBytes > 0 then
+      size = gqPayloadSize(jobDataJson)
+    else
+      size = #jobDataJson
+    end
   end
 
   -- Byte bound: stop before the first job that would overflow the budget.
@@ -1654,6 +1716,32 @@ export const DEFAULT_GROUP_QUARANTINE_THRESHOLD = 500;
  * group's next success clears it outright.
  */
 export const GROUP_QUARANTINE_TTL_SECONDS = 15 * 60;
+
+/**
+ * Splits one dispatch may perform before bisection gives up and hands the
+ * remainder to the normal retry/backoff path.
+ *
+ * Sized to cover every useful descent (isolating one unprocessable payload in a
+ * 256 batch costs 8 splits; converging to sub-batches of 8 costs 31) while
+ * cutting off the pathological singleton-degradation walk (~2N calls) that
+ * would otherwise run under the group lock for the whole tree.
+ */
+export const DEFAULT_BISECTION_SPLITS_PER_DISPATCH = 32;
+
+/**
+ * Read the bisection split budget from the environment. Mirrors
+ * {@link readGroupQuarantineThreshold}:
+ *   - unset / empty / non-numeric / negative → DEFAULT_BISECTION_SPLITS_PER_DISPATCH
+ *   - "0" → 0 (explicit kill switch — a failing batch is never split, which is
+ *     exactly the pre-bisection behaviour, recoverable without a deploy)
+ *   - positive integer → that integer
+ */
+export function readBisectionSplitBudget(): number {
+  return readNonNegativeIntEnv({
+    name: "LANGWATCH_GQ_BISECTION_SPLIT_BUDGET",
+    fallback: DEFAULT_BISECTION_SPLITS_PER_DISPATCH,
+  });
+}
 
 /**
  * Read the group-quarantine failure-streak threshold from the environment.
@@ -2391,4 +2479,16 @@ export class GroupStagingScripts {
  */
 export function pendingGroupsKey(keyPrefix: string): string {
   return `${keyPrefix}pending-groups`;
+}
+
+/**
+ * Key holding the drift the last reconcile pass measured for this queue, from
+ * its key prefix (`<name>:gq:`).
+ *
+ * Shared rather than per-process because the reconcile is single-flighted: only
+ * the instance that wins the marker computes a drift, so any other instance
+ * reporting its own local figure reports zero for a queue it never recomputed.
+ */
+export function pendingDriftKey(keyPrefix: string): string {
+  return `${keyPrefix}stats:pending-drift`;
 }

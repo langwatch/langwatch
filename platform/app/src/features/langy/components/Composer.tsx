@@ -83,6 +83,12 @@ const CONTEXT_ICON: Record<LangyContextChip["kind"], LucideIcon> = {
 // stays out of the way of what the person is trying to type.
 const COMPOSER_PLACEHOLDER = "Ask Langy or describe what you want…";
 
+// Shown under every composer, in every variant and at every viewport height. A
+// notice about what happens to what you type only does its job where you type,
+// so it is not gated on the layout the way the tagline below it is.
+const COMPOSER_DATA_USE_NOTICE =
+  "Note: these chats are used by LangWatch to improve Langy.";
+
 /**
  * The composer rail — affordances that sit beside the model picker.
  *
@@ -613,6 +619,16 @@ function ComposerImpl({
           Langy proposes, you review and apply.
         </Text>
       ) : null}
+      <Text
+        marginTop={1.5}
+        textStyle="2xs"
+        color="fg.subtle"
+        textAlign="center"
+        letterSpacing="0.01em"
+        lineHeight="1.2"
+      >
+        {COMPOSER_DATA_USE_NOTICE}
+      </Text>
     </Box>
   );
 }

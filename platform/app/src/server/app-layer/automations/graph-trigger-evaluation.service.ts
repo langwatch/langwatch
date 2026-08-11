@@ -41,6 +41,7 @@ import {
   aggregateSeriesValues,
   extractSeriesPoints,
 } from "~/server/app-layer/analytics/series-points";
+import type { TimeseriesReadOptions } from "~/server/app-layer/analytics/types";
 import {
   type GraphAlertDispatchInput,
   type GraphAlertDispatchResult,
@@ -71,6 +72,47 @@ export type GraphTriggerEvaluationReason =
   | "real-time"
   | "heartbeat-absence"
   | "heartbeat-resolve";
+
+/**
+ * Row ceiling for a graph-trigger timeseries read.
+ *
+ * A threshold evaluation collapses the whole result to ONE number
+ * (`aggregateSeriesValues`), and the alert template's sparkline needs only the
+ * time axis. But the query it issues carries the graph's `groupBy`, so
+ * ClickHouse returns `buckets x distinct group values` and
+ * `extractSeriesPoints` sums the group axis away in the worker — after every
+ * row has been materialised as a JS object.
+ *
+ * The time axis is already capped at 1,000 buckets
+ * (`adjustTimeScaleForBucketCap`). Cardinality is not capped and cannot be:
+ * it comes from the data, so a `groupBy` on something like a user id makes the
+ * result grow without limit while the answer stays one scalar. That is what
+ * killed the worker outright — the process dies mid-read, so the job never
+ * completes and never fails; three of those in a row and the poison guard
+ * parks the tenant's whole graph-trigger lane, which is how one project's
+ * misconfigured graph silently stopped ALL of its alerts for 19 hours on
+ * 2026-08-09.
+ *
+ * 10,000 rows is 10x the bucket cap, so any single-group-per-bucket read
+ * passes with room to spare, while a genuinely unbounded cardinality fails
+ * fast and cheap — server-side, before anything is materialised here.
+ */
+export const GRAPH_TRIGGER_MAX_RESULT_ROWS = 10_000;
+
+/**
+ * Did ClickHouse refuse this query for exceeding {@link
+ * GRAPH_TRIGGER_MAX_RESULT_ROWS}?
+ *
+ * `TOO_MANY_ROWS_OR_BYTES` (396) is what `result_overflow_mode: "throw"`
+ * raises. Matched on the code rather than the message, which is server copy
+ * and varies by ClickHouse version.
+ */
+function isResultTooLarge(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  if (code === 396 || code === "396") return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("TOO_MANY_ROWS_OR_BYTES");
+}
 
 export type GraphTriggerEvaluationStatus =
   | "fired"
@@ -127,7 +169,10 @@ export interface GraphTriggerEvaluationDeps {
     projectId: string;
   }): Promise<CustomGraph | null>;
   loadProject(projectId: string): Promise<Project | null>;
-  getTimeseries(input: TimeseriesInputType): Promise<TimeseriesResult>;
+  getTimeseries(
+    input: TimeseriesInputType,
+    options?: TimeseriesReadOptions,
+  ): Promise<TimeseriesResult>;
   triggerSent: GraphTriggerSentRepository;
   updateLastRunAt(params: {
     triggerId: string;
@@ -272,7 +317,38 @@ export async function evaluateGraphTrigger({
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
 
-  const timeseriesResult = await deps.getTimeseries(timeseriesInput);
+  let timeseriesResult: TimeseriesResult;
+  try {
+    timeseriesResult = await deps.getTimeseries(timeseriesInput, {
+      maxResultRows: GRAPH_TRIGGER_MAX_RESULT_ROWS,
+    });
+  } catch (error) {
+    if (!isResultTooLarge(error)) throw error;
+    // A configuration fault, not an outage: this graph's `groupBy` has more
+    // distinct values than a threshold read can carry. Retrying re-asks the
+    // identical question, so this must NOT reach the caller's failure count —
+    // an evaluation that throws is redelivered, and a permanently oversized
+    // trigger would then re-fail on every delivery until it quarantined its
+    // tenant's whole lane, taking every OTHER trigger in that project down
+    // with it. Skipping isolates the damage to the one misconfigured trigger.
+    logger.error(
+      {
+        projectId,
+        triggerId,
+        reason,
+        groupBy: graphData.groupBy,
+        timePeriodMinutes: timePeriod,
+        maxResultRows: GRAPH_TRIGGER_MAX_RESULT_ROWS,
+      },
+      "graph trigger evaluation skipped: timeseries result exceeds the row ceiling",
+    );
+    return skipped({
+      triggerId,
+      projectId,
+      reason,
+      detail: "timeseries result exceeds the row ceiling",
+    });
+  }
   // The stored `seriesName` identifies WHICH series the trigger watches
   // (`{index}/{key|metric}/{aggregation}` — parsed above via
   // `parseSeriesIndex`). Result buckets use a DIFFERENT encoding —

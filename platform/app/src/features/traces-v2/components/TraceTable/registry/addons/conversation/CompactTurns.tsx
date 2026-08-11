@@ -233,6 +233,24 @@ function turnCellContent({
       return <MonoCell>{formatCost(trace.totalCost)}</MonoCell>;
     case "tokens":
       return <MonoCell>{formatTokens(trace.totalTokens)}</MonoCell>;
+    case "contextSize":
+      // Nullish, not falsy: a reported zero is an answer, not a gap.
+      return trace.contextSizeTokens == null ? (
+        dash
+      ) : (
+        <MonoCell>
+          {trace.contextSizeTokens === 0
+            ? "0"
+            : formatTokens(trace.contextSizeTokens)}
+        </MonoCell>
+      );
+    // Session-level coding-agent facts have no per-turn meaning: the
+    // repository and the pull request belong to the whole session.
+    case "modelCalls":
+    case "compactions":
+    case "repository":
+    case "pullRequest":
+      return dash;
     case "model":
       return (
         <MonoCell truncate whiteSpace={undefined}>
@@ -323,11 +341,11 @@ const TurnPreviewCell: React.FC<{
         value={trace.spanCount}
       />
     )}
-    {trace.events.length > 0 && (
+    {trace.events.totalCount > 0 && (
       <CountChip
         icon={<Zap />}
         iconColor="orange.fg"
-        value={trace.events.length}
+        value={trace.events.totalCount}
       />
     )}
     {trace.evaluations.length > 0 && (

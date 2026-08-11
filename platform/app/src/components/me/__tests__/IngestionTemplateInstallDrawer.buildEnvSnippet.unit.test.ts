@@ -13,6 +13,15 @@ describe("buildEnvSnippet", () => {
       expect(snippet).toContain("export CLAUDE_CODE_ENABLE_TELEMETRY=1");
     });
 
+    it("enables the experimental span tracing flag", () => {
+      // Claude Code gates spans behind this flag and defaults it off, so
+      // the enable switch above buys metrics and logs but no spans. A
+      // snippet without it produces sessions with no tool call tree, no
+      // latencies and no subagent branches, and it takes TOOL_CONTENT
+      // down with it, since that rides the span path.
+      expect(snippet).toContain("export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1");
+    });
+
     it("recommends OTEL_TRACES_EXPORTER=otlp", () => {
       // Without traces exporter, claude-code never emits spans, every log
       // arrives without trace context, and the fold-skip in
@@ -39,8 +48,9 @@ describe("buildEnvSnippet", () => {
     //                      command, Edit diff, file paths) onto
     //                      tool_decision + tool_result events. Without
     //                      it the receiver gets only sizes-in-bytes.
-    //   TOOL_CONTENT       traces-only + beta tracing — no-op for claude
-    //                      2.x logs path today, set as forward-compat
+    //   TOOL_CONTENT       rides the span path, so it carries tool_input
+    //                      only while the experimental tracing flag
+    //                      above is set
     //   RAW_API_BODIES     emits api_request_body + api_response_body
     //                      events. THIS is the only OTel surface that
     //                      carries the assistant response text.

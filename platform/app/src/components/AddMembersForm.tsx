@@ -24,6 +24,7 @@ import {
 } from "react-hook-form";
 import { Checkbox } from "~/components/ui/checkbox";
 import { api } from "~/utils/api";
+import { getDefaultTeamRoleForOrganizationRole } from "~/utils/memberRoleConstraints";
 import { InfoWithoutSelecting } from "./settings/InfoWithoutSelecting";
 import {
   LITE_MEMBER_EXPLANATION,
@@ -163,7 +164,7 @@ export function AddMembersForm({
     if (available.length > 0) {
       appendTeam({
         teamId: available[0]?.value ?? "",
-        role: getDefaultTeamRole(orgRole),
+        role: getDefaultTeamRoleForOrganizationRole(orgRole),
       });
     }
   };
@@ -464,12 +465,6 @@ function getFilteredTeamRoles(
     ];
   }
   return [...baseRoles, ...customRoleOptions];
-}
-
-function getDefaultTeamRole(orgRole: OrganizationUserRole): TeamUserRole {
-  return orgRole === OrganizationUserRole.EXTERNAL
-    ? TeamUserRole.VIEWER
-    : TeamUserRole.MEMBER;
 }
 
 function TeamRoleSelect({
