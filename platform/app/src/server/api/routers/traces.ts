@@ -272,19 +272,20 @@ export const tracesRouter = createTRPCRouter({
       });
 
       // The digest is one more reading of the same spans the other columns are
-      // mapped from, so it is read the same way. Read without the correction it
-      // would spell out, in the one column that quotes the whole trace, the very
+      // mapped from, so the correction is read the same way. Read without it,
+      // the one column that quotes the whole trace would spell out the very
       // spans the reviewer deleted.
-      const traceService = TraceService.create(
-        ctx.prisma,
-        buildTraceBlobResolutionDeps(),
-      );
+      //
+      // It stays on previews all the same: this runs over a whole page of
+      // traces at once, and resolving every offloaded value on all of them is
+      // what #4991 kept off the grid. Applying a correction needs none of it.
+      const traceService = TraceService.create(ctx.prisma);
       const traces = await traceService.getTracesWithSpans(
         projectId,
         traceIds,
         protections,
         undefined,
-        { full: true, withEditOverlay: input.withEditOverlay },
+        { withEditOverlay: input.withEditOverlay },
       );
 
       return Object.fromEntries(

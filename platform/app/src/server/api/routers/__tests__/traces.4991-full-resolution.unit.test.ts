@@ -325,10 +325,14 @@ describe("traces router — #4991 AC5 list grid stays preview", () => {
       });
       expect(mockBuildDeps).not.toHaveBeenCalled();
       // getTracesWithSpans called with NO { full: true } opts (preview only).
+      // It does carry the correction flag: applying a correction needs neither
+      // the blob-resolution deps nor full resolution.
       expect(mockGetTracesWithSpans).toHaveBeenCalledWith(
         "project_123",
         ["t1"],
         expect.any(Object),
+        undefined,
+        expect.not.objectContaining({ full: true }),
       );
     });
   });
