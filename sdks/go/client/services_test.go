@@ -78,7 +78,7 @@ func TestTraces(t *testing.T) {
 				mu.Lock()
 				_ = json.Unmarshal(raw, &gotBody)
 				mu.Unlock()
-				_, _ = w.Write([]byte(`{"traces":[{"trace_id":"trace_1"}],"pagination":{"page":1,"limit":10,"total":1}}`))
+				_, _ = w.Write([]byte(`{"traces":[{"trace_id":"trace_1"}],"pagination":{"totalHits":1,"scrollId":"c1"}}`))
 			})
 
 			res, err := c.Traces.Search(context.Background(), TraceSearchParams{
@@ -89,9 +89,11 @@ func TestTraces(t *testing.T) {
 			mu.Lock()
 			defer mu.Unlock()
 			assert.Equal(t, "timeout", gotBody["query"])
-			require.NotNil(t, res.Traces)
-			require.Len(t, *res.Traces, 1)
-			assert.Equal(t, "trace_1", *(*res.Traces)[0].TraceId)
+			require.Len(t, res.Traces, 1)
+			assert.Equal(t, "trace_1", *res.Traces[0].TraceId)
+			assert.Equal(t, "c1", res.Pagination.ScrollID,
+				"the cursor reaches the caller, which is what makes a manual scroll drivable")
+			assert.Equal(t, 1, res.Pagination.TotalHits)
 		})
 	})
 

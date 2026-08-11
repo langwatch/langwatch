@@ -237,26 +237,32 @@ func TestProjectsAll(t *testing.T) {
 
 func TestTracesAll(t *testing.T) {
 	t.Run("given trace search results spanning three pages", func(t *testing.T) {
-		t.Run("when iterating by pageOffset", func(t *testing.T) {
+		t.Run("when iterating by scroll cursor", func(t *testing.T) {
 			var mu sync.Mutex
-			var offsets []int
+			var cursors []string
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, "/api/traces/search", r.URL.Path)
 				var body map[string]any
 				raw, _ := io.ReadAll(r.Body)
 				_ = json.Unmarshal(raw, &body)
-				off := int(body["pageOffset"].(float64))
+
+				// The parameter this walk used to advance is rejected by the
+				// API now, so sending it at all fails the export on page two.
+				_, sentOffset := body["pageOffset"]
+				assert.False(t, sentOffset, "pageOffset is never sent")
+
+				cur, _ := body["scrollId"].(string)
 				mu.Lock()
-				offsets = append(offsets, off)
+				cursors = append(cursors, cur)
 				mu.Unlock()
 				assert.Equal(t, float64(2), body["pageSize"], "page size is carried on every request")
 
-				switch off {
-				case 0:
-					_, _ = w.Write([]byte(`{"traces":[{"trace_id":"t0"},{"trace_id":"t1"}],"pagination":{"totalHits":5}}`))
-				case 2:
-					_, _ = w.Write([]byte(`{"traces":[{"trace_id":"t2"},{"trace_id":"t3"}],"pagination":{"totalHits":5}}`))
-				default: // offset 4: the short final page
+				switch cur {
+				case "":
+					_, _ = w.Write([]byte(`{"traces":[{"trace_id":"t0"},{"trace_id":"t1"}],"pagination":{"totalHits":5,"scrollId":"c1"}}`))
+				case "c1":
+					_, _ = w.Write([]byte(`{"traces":[{"trace_id":"t2"},{"trace_id":"t3"}],"pagination":{"totalHits":5,"scrollId":"c2"}}`))
+				default: // c2: the final page, and no cursor after it
 					_, _ = w.Write([]byte(`{"traces":[{"trace_id":"t4"}],"pagination":{"totalHits":5}}`))
 				}
 			})
@@ -271,7 +277,30 @@ func TestTracesAll(t *testing.T) {
 			assert.Equal(t, []string{"t0", "t1", "t2", "t3", "t4"}, ids, "yields every trace in order")
 			mu.Lock()
 			defer mu.Unlock()
-			assert.Equal(t, []int{0, 2, 4}, offsets, "advances pageOffset until a short page")
+			assert.Equal(t, []string{"", "c1", "c2"}, cursors,
+				"replays each response's cursor, and stops when one carries none")
+		})
+	})
+
+	t.Run("given a full final page carrying no cursor", func(t *testing.T) {
+		t.Run("when iterating", func(t *testing.T) {
+			// A short page is no longer the terminator, so a result set that is
+			// an exact multiple of the page size must still end. Only the
+			// missing cursor can say so.
+			var calls int32
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				atomic.AddInt32(&calls, 1)
+				_, _ = w.Write([]byte(`{"traces":[{"trace_id":"t0"},{"trace_id":"t1"}],"pagination":{"totalHits":2}}`))
+			})
+
+			var ids []string
+			for tr, err := range c.Traces.All(context.Background(), TraceSearchParams{PageSize: 2}) {
+				require.NoError(t, err)
+				ids = append(ids, *tr.TraceId)
+			}
+			assert.Equal(t, []string{"t0", "t1"}, ids)
+			assert.Equal(t, int32(1), atomic.LoadInt32(&calls),
+				"a page with no cursor ends the walk without a further request")
 		})
 	})
 
@@ -295,15 +324,17 @@ func TestTracesAll(t *testing.T) {
 		})
 	})
 
-	t.Run("given a single full page followed by an empty one", func(t *testing.T) {
-		t.Run("when the result count is an exact multiple of the page size", func(t *testing.T) {
+	t.Run("given a server that keeps handing back a cursor", func(t *testing.T) {
+		t.Run("when a page arrives empty", func(t *testing.T) {
+			// Following the cursor alone would loop here forever, so an empty
+			// page terminates the walk regardless of what the cursor says.
 			var calls int32
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				switch atomic.AddInt32(&calls, 1) {
 				case 1:
-					_, _ = w.Write([]byte(`{"traces":[{"trace_id":"t0"},{"trace_id":"t1"}],"pagination":{"totalHits":2}}`))
+					_, _ = w.Write([]byte(`{"traces":[{"trace_id":"t0"},{"trace_id":"t1"}],"pagination":{"totalHits":2,"scrollId":"c1"}}`))
 				default:
-					_, _ = w.Write([]byte(`{"traces":[],"pagination":{"totalHits":2}}`))
+					_, _ = w.Write([]byte(`{"traces":[],"pagination":{"totalHits":2,"scrollId":"c2"}}`))
 				}
 			})
 
@@ -313,7 +344,7 @@ func TestTracesAll(t *testing.T) {
 				ids = append(ids, *tr.TraceId)
 			}
 			assert.Equal(t, []string{"t0", "t1"}, ids)
-			assert.Equal(t, int32(2), atomic.LoadInt32(&calls), "an empty trailing page terminates the walk")
+			assert.Equal(t, int32(2), atomic.LoadInt32(&calls), "an empty page terminates the walk")
 		})
 	})
 }
