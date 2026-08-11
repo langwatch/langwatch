@@ -280,9 +280,16 @@ describe("evaluation_analytics — write path (ADR-034 Phase 6)", () => {
         SELECT Status AS status, Passed AS passed, Score AS score
         FROM evaluation_analytics
         WHERE TenantId = {tenantId:String}
+          AND OccurredAt >= fromUnixTimestamp64Milli({bucketStartMs:Int64})
+          AND OccurredAt < fromUnixTimestamp64Milli({bucketEndMs:Int64})
           AND EvaluationId = {evalId:String}
       `,
-      query_params: { tenantId, evalId },
+      query_params: {
+        tenantId,
+        evalId,
+        bucketStartMs: bucketMs - 60_000,
+        bucketEndMs: bucketMs + 60_000,
+      },
       format: "JSONEachRow",
     });
     const rows = (await result.json()) as Array<{

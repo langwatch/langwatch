@@ -104,33 +104,39 @@ function toStartOfMinute(unixMs: number): Date {
  * increments FailCount AND ErrorCount, so the counters double-count and
  * pass-rate reads an infrastructure error as a real fail.
  */
-function scoreOf(
-  status: string,
-  value: number | null | undefined,
-): {
+function scoreOf({
+  status,
+  score,
+}: {
+  status: string;
+  score: number | null | undefined;
+}): {
   scoreSum: number;
   scoreCount: number;
 } {
   if (
     status !== "processed" ||
-    typeof value !== "number" ||
-    !Number.isFinite(value)
+    typeof score !== "number" ||
+    !Number.isFinite(score)
   ) {
     return { scoreSum: 0, scoreCount: 0 };
   }
-  return { scoreSum: value, scoreCount: 1 };
+  return { scoreSum: score, scoreCount: 1 };
 }
 
-function passFailOf(
-  status: string,
-  value: boolean | null | undefined,
-): {
+function passFailOf({
+  status,
+  passed,
+}: {
+  status: string;
+  passed: boolean | null | undefined;
+}): {
   passCount: number;
   failCount: number;
 } {
   if (status !== "processed") return { passCount: 0, failCount: 0 };
-  if (value === true) return { passCount: 1, failCount: 0 };
-  if (value === false) return { passCount: 0, failCount: 1 };
+  if (passed === true) return { passCount: 1, failCount: 0 };
+  if (passed === false) return { passCount: 0, failCount: 1 };
   return { passCount: 0, failCount: 0 };
 }
 
@@ -185,8 +191,8 @@ export class EvaluationAnalyticsRollupMapProjection
     event: EvaluationCompletedEvent,
   ): EvaluationAnalyticsRollupRow {
     const { score, passed, status } = event.data;
-    const { scoreSum, scoreCount } = scoreOf(status, score);
-    const { passCount, failCount } = passFailOf(status, passed);
+    const { scoreSum, scoreCount } = scoreOf({ status, score });
+    const { passCount, failCount } = passFailOf({ status, passed });
     return {
       tenantId: event.tenantId,
       bucketStart: toStartOfMinute(event.occurredAt),
@@ -213,8 +219,8 @@ export class EvaluationAnalyticsRollupMapProjection
     event: EvaluationReportedEvent,
   ): EvaluationAnalyticsRollupRow {
     const { score, passed, status, evaluatorType } = event.data;
-    const { scoreSum, scoreCount } = scoreOf(status, score);
-    const { passCount, failCount } = passFailOf(status, passed);
+    const { scoreSum, scoreCount } = scoreOf({ status, score });
+    const { passCount, failCount } = passFailOf({ status, passed });
     return {
       tenantId: event.tenantId,
       bucketStart: toStartOfMinute(event.occurredAt),
