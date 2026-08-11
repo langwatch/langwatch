@@ -1522,4 +1522,59 @@ describe("webhookService", () => {
       });
     });
   });
+  // #5591: Stripe retries any webhook answered with a 5xx, so a notification
+  // that throws does not merely lose a message, it replays a handler that has
+  // already written. The rule was previously kept per call site and was kept in
+  // one place out of four. These pin it at the boundary that matters: the
+  // handler's own promise.
+  describe("given a notification that throws", () => {
+    const notificationFailure = new Error("slack is down");
+
+    describe("when a subscription is deleted", () => {
+      it("still cancels the subscription and resolves", async () => {
+        mockSendSlackSubscriptionEvent.mockRejectedValueOnce(
+          notificationFailure,
+        );
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE }),
+        );
+        subRepo.findLastNonCancelled.mockResolvedValue(null);
+
+        const promise = service.handleSubscriptionDeleted({
+          stripeSubscriptionId: "sub_stripe_1",
+        });
+        await vi.advanceTimersByTimeAsync(2000);
+
+        await expect(promise).resolves.not.toThrow();
+        expect(subRepo.cancel).toHaveBeenCalledWith({ id: "sub_db_1" });
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalled();
+      });
+    });
+
+    describe("when an invoice payment succeeds", () => {
+      it("still activates the subscription and resolves", async () => {
+        mockSendSlackSubscriptionEvent.mockRejectedValueOnce(
+          notificationFailure,
+        );
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({
+            status: SubscriptionStatus.ACTIVE,
+            organization: { name: "Acme", license: null },
+          }),
+        );
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+        await vi.advanceTimersByTimeAsync(2000);
+
+        await expect(promise).resolves.not.toThrow();
+        expect(subRepo.activate).toHaveBeenCalled();
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalled();
+      });
+    });
+  });
 });
