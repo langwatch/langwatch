@@ -60689,6 +60689,15 @@ openapi: "POST /api/track_event"
 
 ---
 
+# FILE: ./api-reference/experiments/attach-a-comparison-to-an-experiment.mdx
+
+---
+title: "Attach a comparison to an experiment"
+openapi: "POST /api/experiments/{slug}/comparison"
+---
+
+---
+
 # FILE: ./api-reference/experiments/create-an-experiment.mdx
 
 ---

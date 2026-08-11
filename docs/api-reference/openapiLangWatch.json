@@ -9220,6 +9220,365 @@
         ]
       }
     },
+    "/api/experiments/{slug}/comparison": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Comparison attached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "comparisonTargetId": {
+                      "type": "string",
+                      "description": "Identifier of the comparison target that was added"
+                    },
+                    "createdTargetIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Targets built for variants the experiment did not already have"
+                    },
+                    "reusedTargetIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Targets a variant matched, and so were used rather than copied"
+                    },
+                    "targets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      },
+                      "description": "The experiment's full target list after the comparison landed"
+                    }
+                  },
+                  "required": [
+                    "comparisonTargetId",
+                    "createdTargetIds",
+                    "reusedTargetIds",
+                    "targets"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A variant could not be resolved, or a named field is not a column on the dataset",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key, or the key lacks the permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such experiment or run in this project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The experiment changed while the update was being prepared; read it again and retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body did not match the expected shape",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Stable failure code; branch on this"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "fault": {
+                      "type": "string",
+                      "description": "Who the failure is attributable to: customer, platform, provider"
+                    },
+                    "tips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "docsUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiExperimentsBySlugComparison",
+        "tags": [
+          "Experiments"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slug",
+            "required": true
+          }
+        ],
+        "summary": "Attach a comparison to an experiment",
+        "description": "Add a comparison judge to a saved experiment, addressed by slug. Each variant names a target the experiment already has, or a prompt or agent to build one from; a variant that matches an existing target reuses it rather than adding a second column for the same thing.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "variants": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "existingTarget"
+                              ]
+                            },
+                            "targetId": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "targetId"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "prompt"
+                              ]
+                            },
+                            "handle": {
+                              "type": "string"
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "handle"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "agent"
+                              ]
+                            },
+                            "agentId": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "agentId"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "minItems": 2,
+                    "maxItems": 10
+                  },
+                  "goldenField": {
+                    "type": "string"
+                  },
+                  "hasGoldenAnswer": {
+                    "type": "boolean"
+                  },
+                  "inputField": {
+                    "type": "string"
+                  },
+                  "includeMetrics": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "cost",
+                        "duration"
+                      ]
+                    }
+                  },
+                  "randomizeOrder": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "variants"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
     "/api/experiments/runs": {
       "get": {
         "responses": {
