@@ -48808,7 +48808,7 @@
                           },
                           "failCount": {
                             "type": "number",
-                            "description": "Runs that failed, errored, or stalled. Cancelled runs are not failures and are reported in cancelledCount instead."
+                            "description": "Runs that failed or errored. Stalled and cancelled runs are reported separately in stalledCount and cancelledCount."
                           },
                           "cancelledCount": {
                             "type": "number",

@@ -620,6 +620,24 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.Status).toBe("FAILED");
     });
 
+    it("normalizes a historical FAILURE fold state on the snapshot path too", () => {
+      // A pre-fix row read back from ClickHouse can still carry "FAILURE";
+      // a snapshot without its own status must not re-persist the legacy
+      // string via the state fallback.
+      const fold = new SimulationRunStateFoldProjection({
+        store: { store: async () => {}, get: async () => null },
+      });
+      let state = fold.init();
+      state = fold.handleSimulationRunStarted(createRunStartedEvent(), state);
+      state = { ...state, Status: "FAILURE" };
+      state = fold.handleSimulationRunMessageSnapshot(
+        createMessageSnapshotEvent(),
+        state,
+      );
+
+      expect(state.Status).toBe("FAILED");
+    });
+
     it("defaults to FAILED when no verdict and no explicit status", () => {
       const state = foldEvents([
         createRunStartedEvent(),

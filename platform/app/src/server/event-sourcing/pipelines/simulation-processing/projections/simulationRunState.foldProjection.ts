@@ -192,6 +192,15 @@ export interface SimulationRunState extends Projection<SimulationRunStateData> {
  *      finished event's `status` is only typed `z.string().optional()` on the
  *      internal event schema — any string can reach the fold.
  */
+/**
+ * "FAILURE" was never a `ScenarioRunStatus` member — the enum has FAILED.
+ * Accept it from loose senders, pre-fix events, and historical fold state
+ * read back from ClickHouse, but never write it anew (#6834).
+ */
+function normalizeLegacyFailure(status: string): string {
+  return status === "FAILURE" ? "FAILED" : status;
+}
+
 function statusAfter({
   state,
   candidate,
@@ -397,11 +406,9 @@ export class SimulationRunStateFoldProjection
       Status: statusAfter({
         state,
         // Same normalization as the finished handler: nothing writes the
-        // non-enum "FAILURE" string, wherever the status rode in (#6834).
-        candidate:
-          event.data.status === "FAILURE"
-            ? "FAILED"
-            : (event.data.status ?? state.Status),
+        // non-enum "FAILURE" string, wherever the status rode in — the event
+        // payload or a historical state read back from ClickHouse (#6834).
+        candidate: normalizeLegacyFailure(event.data.status ?? state.Status),
       }),
     };
   }
@@ -545,12 +552,8 @@ export class SimulationRunStateFoldProjection
     let status: string;
     const explicit = event.data.status?.toUpperCase();
     if (explicit && isTerminalStatus(explicit)) {
-      // "FAILURE" was never a `ScenarioRunStatus` member — the enum has
-      // FAILED. Accept it from loose senders and historical replays, but
-      // never write it: every reader that isn't routed through
-      // `simulation-run.mappers.ts` would otherwise see a status outside the
-      // enum (#6834).
-      status = explicit === "FAILURE" ? "FAILED" : explicit;
+      // Never write the legacy string — see normalizeLegacyFailure (#6834).
+      status = normalizeLegacyFailure(explicit);
     } else if (verdict === "success") {
       status = "SUCCESS";
     } else if (verdict === "failure" || verdict === "inconclusive") {
