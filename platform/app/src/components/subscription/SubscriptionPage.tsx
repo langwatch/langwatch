@@ -41,7 +41,7 @@ import { api } from "~/utils/api";
 import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
 import {
   type BillingInterval,
-  buildTieredCapabilities,
+  buildPlanCapabilities,
   type Currency,
   FREE_PLAN_FEATURES as DEVELOPER_FEATURES,
   ENTERPRISE_PLAN_FEATURES,
@@ -154,7 +154,10 @@ export function SubscriptionPage() {
   const isLicenseOverride = plan?.planSource === "license";
   const isTieredPricingModel =
     organization?.pricingModel === PricingModel.TIERED;
-  const isEnterprisePlan = plan?.type === "ENTERPRISE" && !isLicenseOverride;
+  // An enterprise plan is an enterprise plan whichever leg resolved it. Tying
+  // this to the subscription leg made every licensed enterprise customer an
+  // upgrade candidate for a smaller plan they already exceed.
+  const isEnterprisePlan = plan?.type === "ENTERPRISE";
   const isTieredLegacyPaidPlan =
     isTieredPricingModel &&
     !isDeveloperPlan &&
@@ -343,7 +346,7 @@ export function SubscriptionPage() {
   }
 
   const currentPlanName = isLicenseOverride
-    ? `License: ${plan.name ?? "Growth"}`
+    ? `License: ${plan.name ?? formatPlanTypeLabel(plan.type)}`
     : isTieredPricingModel
       ? (plan.name ?? formatPlanTypeLabel(plan.type))
       : isDeveloperPlan
@@ -357,19 +360,20 @@ export function SubscriptionPage() {
           seatCount: plan?.maxMembers ?? 1,
           perSeatPrice: monthlyEquivalent,
         };
-  const currentPlanFeatures = isLicenseOverride
-    ? getGrowthFeatures(effectiveCurrency)
-    : isTieredLegacyPaidPlan
-      ? buildTieredCapabilities({
+  // A plan the customer already holds is described by what it grants. Only a
+  // plan we are selling gets marketing copy, which is why a license-sourced
+  // plan is read from its own numbers rather than handed another tier's list.
+  const currentPlanFeatures = isEnterprisePlan
+    ? ENTERPRISE_PLAN_FEATURES
+    : isLicenseOverride || isTieredLegacyPaidPlan
+      ? buildPlanCapabilities({
           maxMembers: plan?.maxMembers ?? 0,
           maxMessagesPerMonth: plan?.maxMessagesPerMonth ?? 0,
           maxMembersLite: plan?.maxMembersLite ?? 0,
         })
-      : isEnterprisePlan
-        ? ENTERPRISE_PLAN_FEATURES
-        : isDeveloperPlan
-          ? DEVELOPER_FEATURES
-          : getGrowthFeatures(effectiveCurrency);
+      : isDeveloperPlan
+        ? DEVELOPER_FEATURES
+        : getGrowthFeatures(effectiveCurrency);
 
   const isUpgradeSeatsRequired =
     !isDeveloperPlan &&
