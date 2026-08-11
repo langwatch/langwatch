@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { mergeSnapshots } from "../snapshot-reader";
 import type { DetailSnapshot, LiveSnapshot } from "../snapshot.types";
 import { SNAPSHOT_VERSION } from "../snapshot.types";
+import { mergeSnapshots } from "../snapshot-reader";
 
 const live = (over: Partial<LiveSnapshot> = {}): LiveSnapshot => ({
   version: SNAPSHOT_VERSION,

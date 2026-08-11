@@ -8,34 +8,40 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { CalendarClock } from "lucide-react";
+import { useMemo } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
+import { middleEllipsis } from "~/components/ops/queues/clusterGroups";
+import { SchedulerHeader } from "~/components/ops/scheduler/SchedulerHeader";
+import { SchedulerStatusBadge } from "~/components/ops/scheduler/SchedulerStatusBadge";
+import {
+  compareForAttention,
+  deriveLoopHealth,
+  deriveStatus,
+  latenessMs,
+  summarize,
+} from "~/components/ops/scheduler/schedulerStatus";
+import { formatTimeAgo } from "~/components/ops/shared/formatters";
 import { OpsPageShell } from "~/components/ops/shared/OpsPageShell";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { api } from "~/utils/api";
-
-function formatWhen(iso: string | null): string {
-  if (!iso) return "—";
-  const then = new Date(iso).getTime();
-  const deltaMs = then - Date.now();
-  const abs = Math.abs(deltaMs);
-  const mins = Math.round(abs / 60_000);
-  const rel =
-    mins < 1
-      ? "just now"
-      : mins < 60
-        ? `${mins}m`
-        : mins < 1440
-          ? `${Math.round(mins / 60)}h`
-          : `${Math.round(mins / 1440)}d`;
-  const suffix = deltaMs >= 0 ? `in ${rel}` : `${rel} ago`;
-  return `${new Date(iso).toLocaleString()} (${mins < 1 ? rel : suffix})`;
-}
 
 export default function OpsSchedulerPage() {
   const jobs = api.ops.listScheduledJobs.useQuery(
     { limit: 200 },
     { refetchInterval: 10_000 },
   );
+
+  const rows = jobs.data ?? [];
+  // One `now` for the whole render so a row cannot be judged against a
+  // different instant than the header that summarises it.
+  const now = Date.now();
+
+  const sorted = useMemo(
+    () => [...rows].sort((a, b) => compareForAttention(a, b, now)),
+    [rows, now],
+  );
+  const counts = useMemo(() => summarize(rows, now), [rows, now]);
+  const loop = useMemo(() => deriveLoopHealth(rows, now), [rows, now]);
 
   return (
     <OpsPageShell>
@@ -45,10 +51,10 @@ export default function OpsSchedulerPage() {
         </PageLayout.Header>
         <PageLayout.Container>
           <Text textStyle="sm" color="fg.muted" marginBottom={4}>
-            Durable <code>ScheduledJob</code> entries driving the in-process
-            calendar scheduler (reports and other schedule-triggered work). When
-            each next fires, when it last fired, and whether it is active.
+            Scheduled work across every project: when each next runs, when it
+            last ran, and whether anything is behind.
           </Text>
+
           {jobs.isLoading ? (
             <Center paddingY={20}>
               <EmptyState.Root>
@@ -60,7 +66,7 @@ export default function OpsSchedulerPage() {
                 </EmptyState.Content>
               </EmptyState.Root>
             </Center>
-          ) : (jobs.data?.length ?? 0) === 0 ? (
+          ) : rows.length === 0 ? (
             <Center paddingY={20}>
               <EmptyState.Root>
                 <EmptyState.Content>
@@ -75,101 +81,85 @@ export default function OpsSchedulerPage() {
               </EmptyState.Root>
             </Center>
           ) : (
-            <Table.Root variant="line" size="sm">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>Target</Table.ColumnHeader>
-                  <Table.ColumnHeader>Project</Table.ColumnHeader>
-                  <Table.ColumnHeader>Schedule</Table.ColumnHeader>
-                  <Table.ColumnHeader>Next run</Table.ColumnHeader>
-                  <Table.ColumnHeader>Last fired</Table.ColumnHeader>
-                  <Table.ColumnHeader>In progress</Table.ColumnHeader>
-                  <Table.ColumnHeader>Retries</Table.ColumnHeader>
-                  <Table.ColumnHeader>Last error</Table.ColumnHeader>
-                  <Table.ColumnHeader>Status</Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {jobs.data?.map((job) => (
-                  <Table.Row key={job.id}>
-                    <Table.Cell>
-                      <HStack gap={2}>
-                        <Badge colorPalette="purple" variant="subtle">
-                          {job.targetType}
-                        </Badge>
-                        <Text textStyle="xs" color="fg.muted" fontFamily="mono">
-                          {job.targetId}
-                        </Text>
-                      </HStack>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Text textStyle="xs" fontFamily="mono">
-                        {job.projectId}
-                      </Text>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Text textStyle="xs" fontFamily="mono">
-                        {job.cron}
-                      </Text>
-                      <Text textStyle="xs" color="fg.muted">
-                        {job.timezone}
-                      </Text>
-                    </Table.Cell>
-                    <Table.Cell>{formatWhen(job.nextRunAt)}</Table.Cell>
-                    <Table.Cell>{formatWhen(job.lastSlot)}</Table.Cell>
-                    <Table.Cell>
-                      {job.currentSlot ? (
-                        // A claimed slot with prior attempts is a retry in
-                        // backoff, not a long-running execution — say which.
-                        job.attempts > 0 ? (
-                          <Badge colorPalette="orange" variant="subtle">
-                            Retrying
-                          </Badge>
-                        ) : (
-                          <Badge colorPalette="blue" variant="subtle">
-                            Running
-                          </Badge>
-                        )
-                      ) : (
-                        <Text textStyle="xs" color="fg.muted">
-                          —
-                        </Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell>
-                      {job.attempts > 0 ? (
-                        <Badge
-                          colorPalette={job.attempts >= 3 ? "red" : "orange"}
-                          variant="subtle"
-                        >
-                          {job.attempts}
-                        </Badge>
-                      ) : (
-                        <Text textStyle="xs" color="fg.muted">
-                          —
-                        </Text>
-                      )}
-                    </Table.Cell>
-                    <Table.Cell maxWidth="280px">
-                      <Text textStyle="xs" color="fg.muted" truncate>
-                        {job.lastError ?? "—"}
-                      </Text>
-                    </Table.Cell>
-                    <Table.Cell>
-                      {job.active ? (
-                        <Badge colorPalette="green" variant="subtle">
-                          Active
-                        </Badge>
-                      ) : (
-                        <Badge colorPalette="gray" variant="subtle">
-                          Inactive
-                        </Badge>
-                      )}
-                    </Table.Cell>
+            <>
+              <SchedulerHeader
+                counts={counts}
+                loopHealthy={loop.healthy}
+                lastFiredAt={loop.lastFiredAt}
+              />
+              <Table.Root variant="line" size="sm">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>Target</Table.ColumnHeader>
+                    <Table.ColumnHeader>Schedule</Table.ColumnHeader>
+                    <Table.ColumnHeader>Next run</Table.ColumnHeader>
+                    <Table.ColumnHeader>Last run</Table.ColumnHeader>
+                    <Table.ColumnHeader>Status</Table.ColumnHeader>
                   </Table.Row>
-                ))}
-              </Table.Body>
-            </Table.Root>
+                </Table.Header>
+                <Table.Body>
+                  {sorted.map((job) => {
+                    const status = deriveStatus(job, now);
+                    return (
+                      <Table.Row key={job.id}>
+                        <Table.Cell>
+                          <HStack gap={2}>
+                            <Badge colorPalette="purple" variant="subtle">
+                              {job.targetType}
+                            </Badge>
+                            <Text
+                              textStyle="xs"
+                              fontFamily="mono"
+                              title={`${job.targetId} · project ${job.projectId}`}
+                            >
+                              {middleEllipsis(job.targetId, 28)}
+                            </Text>
+                          </HStack>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Text textStyle="xs" fontFamily="mono">
+                            {job.cron}
+                          </Text>
+                          <Text textStyle="xs" color="fg.muted">
+                            {job.timezone}
+                          </Text>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Text
+                            textStyle="xs"
+                            title={new Date(job.nextRunAt).toLocaleString()}
+                          >
+                            {formatTimeAgo(new Date(job.nextRunAt).getTime())}
+                          </Text>
+                        </Table.Cell>
+                        <Table.Cell color="fg.muted">
+                          <Text
+                            textStyle="xs"
+                            title={
+                              job.lastSlot
+                                ? new Date(job.lastSlot).toLocaleString()
+                                : undefined
+                            }
+                          >
+                            {job.lastSlot
+                              ? formatTimeAgo(new Date(job.lastSlot).getTime())
+                              : "never"}
+                          </Text>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <SchedulerStatusBadge
+                            status={status}
+                            latenessMs={latenessMs(job, now)}
+                            attempts={job.attempts}
+                            lastError={job.lastError}
+                          />
+                        </Table.Cell>
+                      </Table.Row>
+                    );
+                  })}
+                </Table.Body>
+              </Table.Root>
+            </>
           )}
         </PageLayout.Container>
       </DashboardLayout>
