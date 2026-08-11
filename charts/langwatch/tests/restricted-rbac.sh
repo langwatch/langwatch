@@ -49,10 +49,21 @@ templates() {
       \( -name "*.yaml" -o -name "*.yml" -o -name "*.tpl" -o -name "*.txt" \) \;
 }
 
+# Capture discovery's exit status before consuming its output. Feeding the loop
+# directly with `done <<< "$(templates)"` throws that status away: a find that
+# failed part-way still prints whatever it reached, and the loop then succeeds
+# over a partial corpus. The anchor below would not save us — it catches a
+# corpus that is EMPTY, not one that quietly lost a subtree, and a skipped
+# subtree is exactly where an unreviewed lookup would be sitting.
+if ! discovered=$(templates); then
+  echo "SCANNER ERROR: template discovery failed under ${CHARTS_DIR}" >&2
+  exit 2
+fi
+
 TEMPLATE_FILES=()
 while IFS= read -r template_file; do
   [[ -n "$template_file" ]] && TEMPLATE_FILES+=("$template_file")
-done <<< "$(templates)"
+done <<< "$discovered"
 
 # A guard that scans nothing passes silently, and every way this breaks — the
 # script moving, a templates/ directory being renamed, the wrong cwd — produces
