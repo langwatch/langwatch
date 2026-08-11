@@ -540,13 +540,21 @@ export class SimulationRunStateFoldProjection
     let status: string;
     const explicit = event.data.status?.toUpperCase();
     if (explicit && isTerminalStatus(explicit)) {
-      status = explicit;
+      // "FAILURE" was never a `ScenarioRunStatus` member — the enum has
+      // FAILED. Accept it from loose senders and historical replays, but
+      // never write it: every reader that isn't routed through
+      // `simulation-run.mappers.ts` would otherwise see a status outside the
+      // enum (#6834).
+      status = explicit === "FAILURE" ? "FAILED" : explicit;
     } else if (verdict === "success") {
       status = "SUCCESS";
     } else if (verdict === "failure" || verdict === "inconclusive") {
-      status = "FAILURE";
+      // DELIBERATE: inconclusive folds to FAILED until the SDK can emit it
+      // truthfully (langwatch/scenario#886/#889) — at that point this arm
+      // decides what INCONCLUSIVE means platform-side.
+      status = "FAILED";
     } else {
-      status = "FAILURE";
+      status = "FAILED";
     }
 
     return {
