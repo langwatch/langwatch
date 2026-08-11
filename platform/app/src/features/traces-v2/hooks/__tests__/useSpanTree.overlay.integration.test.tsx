@@ -57,7 +57,7 @@ vi.mock("../useTraceQueryArgs", () => ({
 
 import { useDrawerStore } from "../../stores/drawerStore";
 import { useTraceEditStore } from "../../stores/traceEditStore";
-import { useSpanTree } from "../useSpanTree";
+import { useSpanTree, useSpanTreeWithCaptured } from "../useSpanTree";
 
 function node(over: { spanId: string; parentSpanId?: string; name?: string }) {
   return {
@@ -96,11 +96,33 @@ describe("useSpanTree with a correction", () => {
 
   describe("given a correction that renames one span and deletes another", () => {
     describe("when the reader is on the corrected trace", () => {
-      /** @scenario "A deleted span is hidden in the corrected trace" */
+      /** @scenario "A deleted span is not part of the corrected trace" */
       it("drops the deleted span and its descendants", () => {
         const { result } = renderHook(() => useSpanTree());
 
         expect(result.current.data?.map((s) => s.spanId)).toEqual(["root"]);
+      });
+
+      /** @scenario "A deleted span is listed and struck through in the corrected trace" */
+      it("keeps them on the tree the drawer draws, for it to strike through", () => {
+        const { result } = renderHook(() => useSpanTreeWithCaptured());
+
+        expect(result.current.display.data?.map((s) => s.spanId)).toEqual([
+          "root",
+          "tool",
+          "child",
+        ]);
+      });
+
+      /** @scenario "A deleted span is listed and struck through in the corrected trace" */
+      it("leaves a removed row saying what the trace had, not what the edit renamed", () => {
+        const { result } = renderHook(() => useSpanTreeWithCaptured());
+        const kept = result.current.display.data?.find(
+          (s) => s.spanId === "root",
+        );
+
+        // The rename still lands on the rows the correction kept.
+        expect(kept?.name).toBe("conversation turn");
       });
 
       /** @scenario "The corrected trace is what the reader sees by default" */

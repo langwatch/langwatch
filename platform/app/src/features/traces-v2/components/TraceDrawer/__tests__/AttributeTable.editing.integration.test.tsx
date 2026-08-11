@@ -289,6 +289,67 @@ describe("AttributeTable editing", () => {
     });
   });
 
+  describe("given a stored correction that removed an attribute", () => {
+    describe("when the corrected trace renders", () => {
+      /** @scenario "An attribute the correction removes is listed struck through" */
+      it("still lists it, marked as removed and struck through", () => {
+        const { getByText, getByLabelText } = render(
+          <ChakraProvider value={defaultSystem}>
+            <AttributeTable
+              attributes={{ "gen_ai.request.model": "gpt-5" }}
+              correctedFrom={{
+                "gen_ai.request.model": "gpt-5",
+                "user.email": "someone@acme.test",
+              }}
+            />
+          </ChakraProvider>,
+        );
+
+        expect(getByText("user.email")).toBeInTheDocument();
+        expect(getByText("someone@acme.test")).toBeInTheDocument();
+        expect(
+          getByLabelText("user.email, removed by an edit"),
+        ).toBeInTheDocument();
+      });
+
+      /** @scenario "An attribute the correction removes is listed struck through" */
+      it("does not call the removal an edit", () => {
+        const { queryByText } = render(
+          <ChakraProvider value={defaultSystem}>
+            <AttributeTable
+              attributes={{ "gen_ai.request.model": "gpt-5" }}
+              correctedFrom={{
+                "gen_ai.request.model": "gpt-5",
+                "user.email": "someone@acme.test",
+              }}
+            />
+          </ChakraProvider>,
+        );
+
+        expect(queryByText("Edited")).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when the captured trace renders", () => {
+      /** @scenario "An attribute the correction removes reads plainly in the captured trace" */
+      it("reads like any other row, with nothing said about the removal", () => {
+        const { getByText, queryByText } = render(
+          <ChakraProvider value={defaultSystem}>
+            <AttributeTable
+              attributes={{
+                "gen_ai.request.model": "gpt-5",
+                "user.email": "someone@acme.test",
+              }}
+            />
+          </ChakraProvider>,
+        );
+
+        expect(getByText("user.email")).toBeInTheDocument();
+        expect(queryByText("Removed")).not.toBeInTheDocument();
+      });
+    });
+  });
+
   describe("given a stored correction that added an attribute", () => {
     describe("when the span detail renders", () => {
       /** @scenario "An attribute the correction added is marked as added" */

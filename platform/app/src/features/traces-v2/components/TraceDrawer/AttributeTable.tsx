@@ -257,6 +257,12 @@ interface AttributeTableProps {
 interface AttributeCorrection {
   /** The captured value rendered for the tooltip, or null when it is new. */
   original: string | null;
+  /**
+   * The correction takes this attribute away. The row is still listed, struck
+   * through: a row that simply stopped existing reads as one the trace never
+   * carried, and the removal is the whole of what the correction did here.
+   */
+  removed?: boolean;
 }
 
 /**
@@ -264,6 +270,37 @@ interface AttributeCorrection {
  * Walks the dotted path from the longest prefix down, so the nearest captured
  * ancestor wins.
  */
+/**
+ * How one row differs from what the trace captured, or null when it says the
+ * same thing. A key the correction took away is marked removed rather than
+ * dropped; one the capture never had at all was added, unless it is a leaf of a
+ * value the capture held as one string.
+ */
+function correctionForKey({
+  key,
+  capturedFlat,
+  correctedFlat,
+  removedKeys,
+}: {
+  key: string;
+  capturedFlat: Record<string, unknown>;
+  correctedFlat: Record<string, unknown>;
+  removedKeys: Record<string, unknown>;
+}): AttributeCorrection | null {
+  if (key in removedKeys) {
+    return { original: formatValue(capturedFlat[key]), removed: true };
+  }
+  if (key in capturedFlat) {
+    return sameAttributeValue(capturedFlat[key], correctedFlat[key])
+      ? null
+      : { original: formatValue(capturedFlat[key]) };
+  }
+  const ancestor = capturedAncestorKey({ key, capturedFlat });
+  return ancestor === null
+    ? { original: null }
+    : { original: formatValue(capturedFlat[ancestor]) };
+}
+
 function capturedAncestorKey({
   key,
   capturedFlat,
@@ -489,10 +526,34 @@ function RestrictionMarker({ visibleTo, canSee }: AttributeRestriction) {
 function CorrectionMarker({
   attrKey,
   original,
+  removed,
 }: {
   attrKey: string;
   original: string | null;
+  removed?: boolean;
 }) {
+  if (removed) {
+    return (
+      <Tooltip content="Removed by an edit" positioning={{ placement: "top" }}>
+        <Text
+          as="span"
+          textStyle="2xs"
+          fontWeight="semibold"
+          color="red.fg"
+          bg="red.subtle"
+          borderWidth="1px"
+          borderColor="red.muted"
+          borderRadius="sm"
+          paddingX={1.5}
+          flexShrink={0}
+          cursor="help"
+          aria-label={`${attrKey}, removed by an edit`}
+        >
+          Removed
+        </Text>
+      </Tooltip>
+    );
+  }
   const label =
     original === null
       ? `${attrKey}, added by an edit`
@@ -745,12 +806,21 @@ function RowValueCell({
     <HStack flex={1} minWidth={0} gap={1.5}>
       {restriction ? <RestrictionMarker {...restriction} /> : null}
       {correction ? (
-        <CorrectionMarker attrKey={attrKey} original={correction.original} />
+        <CorrectionMarker
+          attrKey={attrKey}
+          original={correction.original}
+          removed={correction.removed}
+        />
       ) : null}
       {editing ? (
         <EditableValueCell attrKey={attrKey} value={value} editing={editing} />
       ) : (
-        <Box flex={1} minWidth={0}>
+        <Box
+          flex={1}
+          minWidth={0}
+          textDecoration={correction?.removed ? "line-through" : undefined}
+          color={correction?.removed ? "fg.subtle" : undefined}
+        >
           {isApiKeyIdRow(attrKey, value) ? (
             <ApiKeyAttributeValue apiKeyId={value} />
           ) : (
@@ -1229,8 +1299,21 @@ export function AttributeTable({
     [baselineFlat],
   );
 
+  // Keys the capture had that the correction does not. They keep their captured
+  // value so the struck-through row still shows what is being taken away.
+  const removedKeys = useMemo(() => {
+    if (!correctedFrom) return {};
+    const corrected = flattenAttributes(attributes);
+    const captured = flattenAttributes(correctedFrom);
+    return Object.fromEntries(
+      Object.entries(captured).filter(([key]) => !(key in corrected)),
+    );
+  }, [attributes, correctedFrom]);
+
   const flatAttrs = useMemo(() => {
-    const flat = flattenAttributes(attributes);
+    // The removed rows go in first so a correction that re-adds the key under a
+    // different value still reads as that value.
+    const flat = { ...removedKeys, ...flattenAttributes(attributes) };
     // Attributes the correction adds are rows in their own right; ones it
     // removes keep their captured value so the struck-through row still shows
     // what is being taken away.
@@ -1241,7 +1324,7 @@ export function AttributeTable({
     // Prepend the span id as a synthetic, copyable first row. A real
     // `span_id` attribute (vanishingly unlikely) still wins via the spread.
     return spanId ? { [SPAN_ID_KEY]: spanId, ...flat } : flat;
-  }, [attributes, spanId, editing?.edits]);
+  }, [attributes, spanId, editing?.edits, removedKeys]);
   const flatResAttrs = useMemo(
     () =>
       resourceAttributes ? flattenAttributes(resourceAttributes) : undefined,
@@ -1256,21 +1339,14 @@ export function AttributeTable({
   const correctionFor = useMemo(() => {
     if (!correctedFrom) return undefined;
     const capturedFlat = flattenAttributes(correctedFrom);
-    return (key: string): AttributeCorrection | null => {
-      if (key in capturedFlat) {
-        return sameAttributeValue(capturedFlat[key], flatAttrs[key])
-          ? null
-          : { original: formatValue(capturedFlat[key]) };
-      }
-      // A correction that turned a value the trace recorded as one string into
-      // a structure gives every leaf under it a row the capture never had.
-      // Those rows correct the value above them rather than adding anything.
-      const ancestor = capturedAncestorKey({ key, capturedFlat });
-      return ancestor === null
-        ? { original: null }
-        : { original: formatValue(capturedFlat[ancestor]) };
-    };
-  }, [correctedFrom, flatAttrs]);
+    return (key: string): AttributeCorrection | null =>
+      correctionForKey({
+        key,
+        capturedFlat,
+        correctedFlat: flatAttrs,
+        removedKeys,
+      });
+  }, [correctedFrom, flatAttrs, removedKeys]);
 
   const filterAttrs = useMemo(
     () => filterAttributesBySearch(flatAttrs, searchTerm),

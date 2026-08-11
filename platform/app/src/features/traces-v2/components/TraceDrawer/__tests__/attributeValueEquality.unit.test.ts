@@ -119,11 +119,12 @@ describe("sameAttributeValue", () => {
       });
 
       it("reads a dropped key as a different value", () => {
-        const edited = structuredClone(TOOL_CALLS);
-        // biome-ignore lint/performance/noDelete: the point is the key going away
-        delete (edited[0] as Record<string, unknown>).providerMetadata;
+        const [first, ...rest] = structuredClone(TOOL_CALLS);
+        const { providerMetadata: _dropped, ...withoutMetadata } = first!;
 
-        expect(sameAttributeValue(TOOL_CALLS, edited)).toBe(false);
+        expect(sameAttributeValue(TOOL_CALLS, [withoutMetadata, ...rest])).toBe(
+          false,
+        );
       });
 
       it("reads text that only looks like a number as the text it is", () => {

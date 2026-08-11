@@ -667,8 +667,16 @@ Feature: Editing a trace in the drawer
       Then that span is listed and marked as deleted
       And its name and its type are struck through
 
-    # The tombstone says what the correction removes; it is not part of what the
-    # corrected trace contains.
+    # The tombstone is a row about what the correction did, not a span the
+    # corrected trace has. Everything that asks what the trace now contains
+    # leaves it out, which is what keeps the tombstone from reaching a dataset.
+    @integration
+    Scenario: A deleted span is not part of the corrected trace
+      Given the trace has a correction that deletes a span
+      When the corrected trace is read for what it contains
+      Then that span is not in it
+      And neither are its descendants
+
     @unit
     Scenario: The header counts the spans the corrected trace has
       Given the trace has a correction that deletes a span

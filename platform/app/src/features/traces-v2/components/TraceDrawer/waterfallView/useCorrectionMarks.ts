@@ -14,10 +14,13 @@ const NO_MARKS = {
 /**
  * Which rows a stored correction changed, and which ones it removed.
  *
- * The removed set is only populated while the reader is on the captured trace:
- * on the corrected one those rows are already gone, and while the correction is
- * being written the editing marks already say what is going away, so there is
- * nothing left to mark.
+ * The removed set belongs to the corrected trace, which is where a reader goes
+ * to see what the correction did: those rows are kept on screen and struck
+ * through rather than dropped, because a row that simply vanished reads as one
+ * that was never captured. The captured trace is the trace as it arrived and
+ * carries no marks about removal at all. While the correction is being written
+ * the editing marks already say what is going away, so there is nothing left
+ * to mark.
  */
 export function useCorrectionMarks(spans: SpanTreeNode[]): {
   correctedSpanIds: Set<string>;
@@ -43,7 +46,7 @@ export function useCorrectionMarks(spans: SpanTreeNode[]): {
         .filter((spanId) => overlayTouchesSpan({ patch, spanId })),
     );
     const deletedByCorrectionSpanIds =
-      !isEditing && overlayView === "original"
+      !isEditing && overlayView === "edited"
         ? expandDeletedSpanIds({
             links: spans.map((span) => ({
               id: span.spanId,
