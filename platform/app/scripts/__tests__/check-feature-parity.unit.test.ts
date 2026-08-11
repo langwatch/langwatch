@@ -341,6 +341,26 @@ describe("findScenarioAnnotations", () => {
     });
   });
 
+  describe("given the comment is open but the line carries no marker", () => {
+    it("reads a title from a block comment line with no continuation marker", () => {
+      // The marker run is allowed to be empty for this form. A bare
+      // `@scenario` at the start of a line cannot be loose prose in a source
+      // file: outside a comment or a string it does not parse in any of the
+      // languages collected here, so the open comment is what the missing
+      // marker means. Requiring at least one marker drops this form, and it
+      // drops silently, since the annotation simply stops being collected.
+      expect(titles("/*\n@scenario No continuation marker\n*/")).toEqual([
+        "No continuation marker",
+      ]);
+    });
+
+    it("reads a title from a python docstring", () => {
+      expect(titles('    """\n    @scenario Docstring form\n    """')).toEqual([
+        "Docstring form",
+      ]);
+    });
+  });
+
   describe("given punctuation that is not a comment marker", () => {
     it("binds nothing behind a lone slash", () => {
       expect(titles("/ @scenario Not a comment")).toEqual([]);
