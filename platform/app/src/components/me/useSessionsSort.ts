@@ -109,8 +109,10 @@ const SESSIONS_SORT_RULES: ColumnSortRules<
     compactions: (row) => row.compactions,
     activeTime: (row) => row.activeTimeCliSec,
     cost: (row) => row.costUsd,
-    // A session that drove several is ranked by the earliest of them, which is
-    // the one it started on; a session that drove none has nothing to rank.
+    // A session that drove several is ranked by its lowest pull request
+    // number, so the column orders by where a session's work sits in the
+    // repository's numbering rather than by when the session ran. A session
+    // that drove none has nothing to rank.
     pullRequests: (row) =>
       row.pullRequests.length === 0
         ? null
