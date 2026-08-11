@@ -110,8 +110,10 @@ function fallbackFragment(
  *   - No hint (`hintMs === null`): run the fallback window directly (a lookback
  *     frame, or unbounded). Outcome `unwindowed`.
  *   - Hint present: prune to `±windowMs` around it.
- *       - Non-empty, or `fallback === "none"`: accept it — we stayed on the
- *         cheap path. Outcome `hit` (regardless of row count).
+ *       - Non-empty: accept it — we stayed on the cheap path. Outcome `hit`.
+ *       - Empty under `fallback === "none"`: accept it without widening.
+ *         Outcome `windowed_empty` — the miss is recorded as a miss, because a
+ *         non-widening read has no widen outcome to surface it instead.
  *       - Empty and allowed to widen: re-run with the fallback window. Outcome
  *         `unbounded_{hit,empty}` for `"unbounded"`, `widened_{hit,empty}` for a
  *         lookback frame.
@@ -139,9 +141,20 @@ export async function queryWindowed<T>(
     );
 
     // `none` treats the hinted window as authoritative (empty means genuinely
-    // absent within the window), so it never widens. A non-empty hinted read on
-    // any fallback likewise needs no widening. Both stayed cheap: count as `hit`.
-    if (fallback === "none" || !isEmpty(hinted)) {
+    // absent within the window), so it never widens — which also means an empty
+    // result has no widen outcome to be recorded as. Give it its own: callers
+    // that resolve queued work through a `none` read retry on empty, so folding
+    // it into `hit` reports a permanently-failing lookup as a healthy one.
+    if (fallback === "none") {
+      incrementWindowedReadCount(
+        table,
+        isEmpty(hinted) ? "windowed_empty" : "hit",
+      );
+      return hinted;
+    }
+
+    // A non-empty hinted read needs no widening: it stayed cheap. Count as `hit`.
+    if (!isEmpty(hinted)) {
       incrementWindowedReadCount(table, "hit");
       return hinted;
     }

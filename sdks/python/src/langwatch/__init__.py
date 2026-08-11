@@ -66,6 +66,8 @@ if TYPE_CHECKING:
     from .spend_events import SpendEventsFacade
     from .webhooks import WebhooksFacade
     from .secrets import SecretsFacade
+    from .teams import TeamsFacade
+    from .projects import ProjectsFacade
 
     # Type hint for the prompts service specifically
     # required to get the instance typing correct
@@ -88,6 +90,8 @@ if TYPE_CHECKING:
     spend_events: SpendEventsFacade
     webhooks: WebhooksFacade
     secrets: SecretsFacade
+    teams: TeamsFacade
+    projects: ProjectsFacade
 
 
 @module_property
@@ -133,6 +137,8 @@ _LAZY_FACADES = {
     "spend_events": (".spend_events", "SpendEventsFacade"),
     "webhooks": (".webhooks", "WebhooksFacade"),
     "secrets": (".secrets", "SecretsFacade"),
+    "teams": (".teams", "TeamsFacade"),
+    "projects": (".projects", "ProjectsFacade"),
 }
 
 
@@ -265,6 +271,8 @@ __all__ = [
     "webhooks",
     "secrets",
     "monitors",
+    "teams",
+    "projects",
     "verify_webhook_signature",
     "WebhookSignatureVerificationError",
     "WebhookSignatureHeaderError",

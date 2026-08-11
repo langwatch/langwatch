@@ -1,6 +1,22 @@
 import type { TraceListItem } from "../../types/trace";
+import { NO_TRACE_EVENTS } from "../../types/trace";
 import type { ConversationGroup } from "./conversationGroups";
 import type { TraceGroup } from "./registry";
+
+/**
+ * What a placeholder row's `traceId` starts with. Placeholder ids address no
+ * trace, so anything that collects ids off the rendered rows and hands them to
+ * a bulk action filters them out first with {@link withoutPlaceholderTraceIds}.
+ */
+export const SKELETON_TRACE_ID_PREFIX = "__skeleton_trace_";
+
+/** Whether this id belongs to a loading placeholder rather than a real trace. */
+export const isPlaceholderTraceId = (traceId: string): boolean =>
+  traceId.startsWith(SKELETON_TRACE_ID_PREFIX);
+
+/** The ids that address a real trace, in their original order. */
+export const withoutPlaceholderTraceIds = (traceIds: string[]): string[] =>
+  traceIds.filter((traceId) => !isPlaceholderTraceId(traceId));
 
 /**
  * Synthetic `TraceListItem` rows that drive the loading skeleton via
@@ -17,7 +33,7 @@ import type { TraceGroup } from "./registry";
  */
 export function buildTracePlaceholderRows(count: number): TraceListItem[] {
   return Array.from({ length: count }, (_, i) => ({
-    traceId: `__skeleton_trace_${i}`,
+    traceId: `${SKELETON_TRACE_ID_PREFIX}${i}`,
     timestamp: Date.now(),
     name: "",
     serviceName: "",
@@ -35,7 +51,7 @@ export function buildTracePlaceholderRows(count: number): TraceListItem[] {
     output: "",
     origin: "application",
     evaluations: [],
-    events: [],
+    events: NO_TRACE_EVENTS,
   }));
 }
 
@@ -45,6 +61,7 @@ export function buildConversationPlaceholderRows(
   return Array.from({ length: count }, (_, i) => ({
     conversationId: `__skeleton_conv_${i}`,
     traces: [],
+    traceCount: 0,
     totalDuration: 0,
     totalCost: 0,
     totalTokens: 0,

@@ -5,7 +5,6 @@ import {
 } from "@ee/webhooks/entitlement";
 import { WEBHOOK_EVENT_TYPES } from "@ee/webhooks/eventRegistry";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
-import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import {
   WebhookEventNotFoundError,
   WebhookEventsService,
@@ -24,7 +23,7 @@ import {
 } from "~/server/api/idempotency";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import { toStoredEnum, toWireEnum } from "~/server/gateway/wireEnums";
@@ -54,17 +53,20 @@ const health = new WebhookHealthService({
   endpoints,
   processStore: new PrismaProcessStore(prisma),
 });
-const eventsRepository = new WebhookEventsClickHouseRepository(
-  async (tenantId) => {
-    const client = await getClickHouseClientForProject(tenantId);
-    if (!client) throw new Error("ClickHouse is not configured");
-    return client;
-  },
-);
-const eventsService = new WebhookEventsService({
-  prisma,
-  repository: eventsRepository,
-});
+
+/**
+ * Resolved per call rather than at module scope, so every route shares the
+ * one repository `getApp()` hands out instead of minting its own, and the
+ * deployment's ClickHouse configuration is read at request time, not once
+ * at import time. Undefined on a deployment without ClickHouse — the
+ * emitted-events log has no fallback store — which this reports the same
+ * way the old inline resolver did: a plain "not configured" refusal.
+ */
+function requireEventsService(): WebhookEventsService {
+  const repository = getApp().gateway.webhookEvents;
+  if (!repository) throw new Error("ClickHouse is not configured");
+  return new WebhookEventsService({ prisma, repository });
+}
 
 /**
  * Enterprise gate for the whole surface, delegating to the one shared
@@ -120,13 +122,20 @@ const deliveriesQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(200).optional().default(50),
 });
 
-const eventsQuerySchema = z.object({
-  type: z.string().min(1).max(200).optional(),
-  from: z.coerce.number().int().positive().optional(),
-  to: z.coerce.number().int().positive().optional(),
-  cursor: z.string().max(500).optional(),
-  limit: z.coerce.number().int().positive().max(200).optional().default(50),
-});
+const eventsQuerySchema = z
+  .object({
+    type: z.string().min(1).max(200).optional(),
+    // The events log is a RANGED read by contract, the same contract the
+    // spend-events pull carries and over the same table: without bounds the
+    // walk sorts the whole 13-month table under FINAL on every page.
+    from: z.coerce.number().int().positive().safe(),
+    to: z.coerce.number().int().positive().safe(),
+    cursor: z.string().max(500).optional(),
+    limit: z.coerce.number().int().positive().max(200).optional().default(50),
+  })
+  .refine((q) => q.from <= q.to, {
+    message: "from must be less than or equal to to",
+  });
 
 function endpointResponse(endpoint: {
   id: string;
@@ -748,7 +757,7 @@ secured.access(requires("webhookEndpoints:view")).get(
     tags: ["Webhooks"],
     summary: "List emitted events",
     description:
-      "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type and created range. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.",
+      "The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from` must not be later than `to` — a range that ends before it starts is rejected rather than answered with an empty page. They are required because the log is a ranged read over the 13-month spend table and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.",
     responses: okResponse(
       "One page of emitted-event envelopes, newest first",
       z.object({
@@ -764,7 +773,7 @@ secured.access(requires("webhookEndpoints:view")).get(
     // The service maps emitted types to row statuses and serves an empty
     // page for unknown types, so consumers can probe forward-compatibly
     // without an error.
-    const page = await eventsService.getEmittedEvents({
+    const page = await requireEventsService().getEmittedEvents({
       organizationId: organization.id,
       fromMs: query.from,
       toMs: query.to,
@@ -794,7 +803,7 @@ secured.access(requires("webhookEndpoints:view")).get(
   }),
   async (c) => {
     const organization = c.get("organization") as Organization;
-    const event = await eventsService.getEmittedEventById({
+    const event = await requireEventsService().getEmittedEventById({
       organizationId: organization.id,
       id: c.req.param("id"),
     });

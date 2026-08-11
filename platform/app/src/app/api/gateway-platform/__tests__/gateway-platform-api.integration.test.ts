@@ -48,6 +48,10 @@ import {
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { currentPeriodStart } from "~/server/gateway/budgetPeriod";
 import { nextAnchoredResetAt } from "~/server/gateway/budgetWindow";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
 import { expectCanonicalError } from "~/test-utils/expectCanonicalError";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
@@ -347,6 +351,12 @@ describe("gateway platform REST API (real PG + real CH)", () => {
   beforeAll(async () => {
     await startTestContainers();
 
+    // The routes and workers under test take their ClickHouse repositories
+    // from the App rather than resolving a client, so the fixture has to
+    // provide one or they fail with "App not initialized".
+    installClickHouseTestApp({
+      resolveClient: async () => getTestClickHouseClient(),
+    });
     await seedTenant({
       orgId: ORG_ID,
       teamId: TEAM_ID,
@@ -470,6 +480,7 @@ describe("gateway platform REST API (real PG + real CH)", () => {
   });
 
   afterAll(async () => {
+    await clearClickHouseTestApp();
     // Every filter names module-level constants (or `in` lists built from
     // them), so a failed setup can never widen a delete (see the
     // undefined-collapse footgun: prisma drops undefined keys entirely).
@@ -656,6 +667,10 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         {
           name: `org-scoped-${suffix}`,
           scopes: [{ scope_type: "organization", scope_id: ORG_ID }],
+          // An organization with projects to choose from must say which
+          // one its shared key traces into, rather than leave it to the
+          // governance fallback. RBAC stays the only thing under test.
+          trace_project_id: PROJECT_ID,
         },
         apiKeyAuth(adminToken),
       );
@@ -1293,6 +1308,10 @@ describe("gateway platform REST API (real PG + real CH)", () => {
           name: `group-budget-${suffix}`,
           window: "month",
           limit_usd: "40",
+          // None of these members hold a key, so the budget is unreachable
+          // and would be refused. What is under test is the per-member
+          // labelling, and reach has its own tests.
+          allow_unreachable: true,
         },
         legacyAuth(),
       );

@@ -269,24 +269,18 @@ export function useProviderFormSubmit({
         customKeysToSend = undefined;
       }
 
-      // Merge azure headers when applicable
-      if (!isUsingEnvVars && provider.provider === "azure") {
-        const headerMap: Record<string, string> = {};
-        (extraHeaders ?? []).forEach((header) => {
-          if (header.key.trim() && header.value.trim()) {
-            const sanitizedKey = header.key
-              .trim()
-              .replace(/[^a-zA-Z0-9_-]/g, "_");
-            if (sanitizedKey) headerMap[sanitizedKey] = header.value.trim();
-          }
-        });
-        customKeysToSend = { ...customKeysToSend, ...headerMap };
-      }
+      // Headers are not credentials. They have their own column, their own
+      // masked-placeholder merge (`mergeExtraHeaders`), and both readers take
+      // them from there: `prepareLitellmParams` builds `extra_headers` from
+      // `modelProvider.extraHeaders`, and the gateway materialiser reads
+      // `mp.extraHeaders`. Nothing reads a header out of `customKeys`, so
+      // folding them in wrote a value no one consumed and, when no credential
+      // had changed, replaced the whole credential bag with the headers.
 
-      // Safety net: if the steps above (placeholder stripping, azure-header
-      // merge) leave an empty customKeys object, send `undefined` so the
-      // server treats it as "no key change" and preserves the stored key,
-      // rather than validating `{}` against the provider's keysSchema.
+      // Safety net: if placeholder stripping leaves an empty customKeys
+      // object, send `undefined` so the server treats it as "no key change"
+      // and preserves the stored key, rather than validating `{}` against the
+      // provider's keysSchema.
       if (
         customKeysToSend !== undefined &&
         Object.keys(customKeysToSend).length === 0

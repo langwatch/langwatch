@@ -4,7 +4,7 @@ import pino, {
   type Logger as PinoLogger,
 } from "pino";
 import type SuperJSON from "superjson";
-import { DEFAULT_SERVICE_NAME } from "./constants";
+import { DEFAULT_SERVICE_NAME, REQUEST_CAUSE_FIELD } from "./constants";
 
 type LogContextProvider = () => Record<string, string | null>;
 
@@ -51,6 +51,23 @@ const superjsonErrorSerializer = (error: unknown) => {
     _superjson: serialized.meta,
   };
 };
+
+/**
+ * Every key a cause may be logged under, mapped to the same serializer.
+ *
+ * pino matches serializers by exact property name and nothing warns when a key
+ * has none: the value is passed to `JSON.stringify`, and an `Error` has no
+ * enumerable own properties, so it lands as `{}` with the message and stack -
+ * the only reasons it was logged - gone. Keeping the map in one exported
+ * constant is what lets a test drive the real thing rather than a copy of it.
+ *
+ * `error` for records that ARE failures; {@link REQUEST_CAUSE_FIELD} for the
+ * cause on records deliberately logged below error level.
+ */
+export const NODE_LOG_SERIALIZERS = {
+  error: superjsonErrorSerializer,
+  [REQUEST_CAUSE_FIELD]: superjsonErrorSerializer,
+} as const;
 
 export interface CreateLoggerOptions {
   /**
@@ -141,13 +158,71 @@ function createBrowserLogger(name: string): PinoLogger {
     name,
     level,
     timestamp: pino.stdTimeFunctions.isoTime,
-    serializers: { error: pino.stdSerializers.err },
+    // Both keys, same serializer. pino matches serializers by exact property
+    // name, so a cause moved to REQUEST_CAUSE_FIELD and not registered here is
+    // emitted as a bare Error - which serialises to `{}`, losing the message
+    // and stack that are the whole reason it was logged.
+    serializers: {
+      error: pino.stdSerializers.err,
+      [REQUEST_CAUSE_FIELD]: pino.stdSerializers.err,
+    },
     formatters: {
       bindings: (bindings) => bindings,
       level: (label) => ({ level: label.toUpperCase() }),
     },
     browser: { asObject: true },
   });
+}
+
+/**
+ * `service.version` for a log record, read from the same place the OTel
+ * resource reads it.
+ *
+ * `OTEL_RESOURCE_ATTRIBUTES` is the `k=v,k=v` form the deployment already sets.
+ * Parsing it keeps one source of truth — two ways to state the version is how
+ * they drift — and `SERVICE_VERSION` is accepted as an explicit override for
+ * anything that sets only that.
+ *
+ * Returns nothing when unset, so a local run adds no field rather than an empty
+ * one.
+ */
+/**
+ * `OTEL_RESOURCE_ATTRIBUTES` values are percent-encoded (the spec's W3C Baggage
+ * octet string), which is how a value containing `,` or `=` survives a format
+ * that separates on both. The OTel SDK's own envDetector decodes them, so this
+ * has to as well: the whole point of reading this variable rather than adding a
+ * second one is that a log and a span cannot disagree about the version, and
+ * emitting `git%2Dabc` where the trace says `git-abc` would be exactly that
+ * disagreement.
+ *
+ * A malformed escape falls back to the raw text. `decodeURIComponent` throws on
+ * a stray `%`, and a version we can print imperfectly beats no version at all.
+ */
+function decodeAttributeValue(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+export function serviceVersionField(): Record<string, string> {
+  const explicit = process.env.SERVICE_VERSION?.trim();
+  if (explicit) return { "service.version": explicit };
+
+  const attrs = process.env.OTEL_RESOURCE_ATTRIBUTES;
+  if (!attrs) return {};
+
+  for (const pair of attrs.split(",")) {
+    const separator = pair.indexOf("=");
+    if (separator === -1) continue;
+    if (pair.slice(0, separator).trim() !== "service.version") continue;
+
+    const value = decodeAttributeValue(pair.slice(separator + 1).trim());
+    if (value) return { "service.version": value };
+  }
+
+  return {};
 }
 
 function createNodeLogger(
@@ -163,7 +238,7 @@ function createNodeLogger(
     name,
     level,
     timestamp: pino.stdTimeFunctions.isoTime,
-    serializers: { error: superjsonErrorSerializer },
+    serializers: NODE_LOG_SERIALIZERS,
     formatters: {
       // Adds process identity alongside pino's own pid/hostname bindings,
       // distinct from `name` (the per-module label like "langwatch:api:hono").
@@ -177,6 +252,17 @@ function createNodeLogger(
       bindings: (bindings) => ({
         ...bindings,
         service: process.env.OTEL_SERVICE_NAME ?? DEFAULT_SERVICE_NAME,
+        // Which build produced the line.
+        //
+        // The deployment already states this — OTEL_RESOURCE_ATTRIBUTES carries
+        // `service.version=<tag>` and `envDetector` merges it into the OTel
+        // resource — but that resource only reaches telemetry we EXPORT.
+        // These logs go to stdout and are picked up from the pod's log file, a
+        // path the resource never touches, so no log line has ever carried a
+        // version: measured 2026-08-07, `service_version` appeared on no record
+        // in the fleet. Reading the same env var keeps one source of truth
+        // rather than introducing a second way to say it.
+        ...serviceVersionField(),
       }),
       level: (label) => ({ level: label.toUpperCase() }),
     },

@@ -11,11 +11,11 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import type { Context } from "hono";
-import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { extractCredentials } from "~/server/api-key/auth-middleware";
 import { submitBugReport } from "~/server/app-layer/bug-reports/bug-report.service";
+import { bodyLimit } from "./_lib/body-limit";
 
 const secured = createServiceApp({ basePath: "/api/bug-reports" });
 

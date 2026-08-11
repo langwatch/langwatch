@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { FilterService } from "~/server/filters/filter.service";
+import { getApp } from "~/server/app-layer/app";
 import { createInnerTRPCContext, createTRPCRouter } from "../../../trpc";
 import { dataForFilter } from "../dataForFilter";
 
@@ -17,10 +17,11 @@ vi.mock("../../../rbac", async (importOriginal) => {
   };
 });
 
-vi.mock("~/server/filters/filter.service", () => ({
-  FilterService: {
-    create: vi.fn(),
-  },
+// The route reaches ClickHouse the only way it may: a repository the App
+// hands out. Mocking `getApp` is therefore what standing in for the store
+// looks like from here.
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: vi.fn(),
 }));
 
 vi.mock("@ee/audit-log/auditLog", () => ({
@@ -28,7 +29,7 @@ vi.mock("@ee/audit-log/auditLog", () => ({
 }));
 
 const getFilterOptions = vi.fn();
-const mockedCreate = vi.mocked(FilterService.create);
+const mockedGetApp = vi.mocked(getApp);
 
 const testRouter = createTRPCRouter({ dataForFilter });
 
@@ -55,7 +56,9 @@ describe("dataForFilter", () => {
     getFilterOptions.mockResolvedValue([
       { field: "opt", label: "Opt", count: 1 },
     ]);
-    mockedCreate.mockReturnValue({ getFilterOptions } as any);
+    mockedGetApp.mockReturnValue({
+      filters: { options: { getFilterOptions } },
+    } as any);
   });
 
   describe("when the requested field is present in the scope filters", () => {

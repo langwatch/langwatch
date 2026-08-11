@@ -1,7 +1,7 @@
 /**
  * Claude Code span content enrichment (PURE core).
  *
- * Claude Code's real OTLP `llm_request` spans carry tokens / cost / model /
+ * Claude Code's real OTLP `llm_request` spans carry tokens / model /
  * `request_id` but NO message content — the content lives in separate OTLP LOG
  * records (`api_request_body`, `api_response_body`, `user_prompt`,
  * `assistant_response`). This module joins the two: given a trace's real
@@ -18,9 +18,6 @@
  *   text is pulled with {@link extractAssistantOutputFromResponseBody} (which
  *   keeps `tool_use` markers so a tool-deciding turn still shows what it did),
  *   or taken from the `assistant_response` body directly.
- * - Cost (exact): the real span carries tokens but NO cost — Anthropic reports
- *   the authoritative per-call cost on the `api_request` log's `cost_usd`, which
- *   also carries the `request_id`, so cost is joined exactly by `request_id`.
  * - Input (positional): `api_request_body` / `user_prompt` carry NO
  *   `request_id`. A single agent's model calls are sequential, so within one
  *   `query_source` the Nth request body pairs with the Nth span (both in call
@@ -62,12 +59,6 @@ export interface ClaudeContentLog {
    */
   body: string | null;
   /**
-   * Authoritative per-call cost (USD) — present on the `api_request` anchor
-   * event (Anthropic's own `cost_usd`), null on every other event. Joined onto
-   * the span by `request_id`.
-   */
-  costUsd?: number | null;
-  /**
    * The assistant's reply text, parsed out of the raw response body ONCE at
    * ingest (`deriveLogContentAttributes`) so reads don't re-parse a 60 KB blob.
    * Text only — it carries no `tool_use` markers, hence
@@ -96,16 +87,12 @@ export interface ClaudeSpanRef {
 export interface ClaudeSpanEnrichment {
   input: SpanInputOutput | null;
   output: SpanInputOutput | null;
-  /** Authoritative cost (USD) from the `api_request` log, joined by `request_id`. */
-  cost: number | null;
 }
 
 const INPUT_BODY_EVENT = "api_request_body";
 const OUTPUT_BODY_EVENT = "api_response_body";
 const USER_PROMPT_EVENT = "user_prompt";
 const ASSISTANT_RESPONSE_EVENT = "assistant_response";
-/** The anchor event carrying Anthropic's authoritative `cost_usd` + `request_id`. */
-const API_REQUEST_EVENT = "api_request";
 
 /**
  * Grouping key for logs / spans whose `query_source` is null (older claude
@@ -130,10 +117,10 @@ type ChatRole = (typeof CHAT_ROLES)[number];
 const CHAT_ROLE_SET: ReadonlySet<string> = new Set(CHAT_ROLES);
 
 /**
- * Compute the input/output content + authoritative cost to attach to each
- * `llm_request`-style span from the trace's claude_code content logs. Returns a
- * map keyed by `spanId`; a span appears only when it gained input, output, or
- * cost, so an unrelated span (or a trace with no claude logs) is left untouched.
+ * Compute the input/output content to attach to each `llm_request`-style span
+ * from the trace's claude_code content logs. Returns a map keyed by `spanId`; a
+ * span appears only when it gained input or output, so an unrelated span (or a
+ * trace with no claude logs) is left untouched.
  */
 export function computeClaudeSpanEnrichment({
   spans,
@@ -146,7 +133,6 @@ export function computeClaudeSpanEnrichment({
   if (spans.length === 0 || logs.length === 0) return result;
 
   const outputByRequestId = buildOutputIndex(logs);
-  const costByRequestId = buildCostIndex(logs);
   const inputBySpanId = buildInputIndex({ spans, logs });
 
   for (const span of spans) {
@@ -154,36 +140,12 @@ export function computeClaudeSpanEnrichment({
       span.requestId !== null
         ? (outputByRequestId.get(span.requestId) ?? null)
         : null;
-    const cost =
-      span.requestId !== null
-        ? (costByRequestId.get(span.requestId) ?? null)
-        : null;
     const input = inputBySpanId.get(span.spanId) ?? null;
-    if (input !== null || output !== null || cost !== null) {
-      result.set(span.spanId, { input, output, cost });
+    if (input !== null || output !== null) {
+      result.set(span.spanId, { input, output });
     }
   }
   return result;
-}
-
-/**
- * Index authoritative cost by `request_id` from the `api_request` anchor events
- * (Anthropic's own `cost_usd`). The anchor is the LIGHT structural event —
- * cost / tokens / request_id, not the heavy request/response body — so this
- * works with `OTEL_LOG_RAW_API_BODIES=0`. First finite, non-negative cost per
- * request id wins.
- */
-function buildCostIndex(logs: ClaudeContentLog[]): Map<string, number> {
-  const byRequestId = new Map<string, number>();
-  for (const log of logs) {
-    if (log.eventName !== API_REQUEST_EVENT || log.requestId === null) continue;
-    if (byRequestId.has(log.requestId)) continue;
-    const cost = log.costUsd;
-    if (typeof cost === "number" && Number.isFinite(cost) && cost >= 0) {
-      byRequestId.set(log.requestId, cost);
-    }
-  }
-  return byRequestId;
 }
 
 /**
@@ -246,8 +208,8 @@ function buildOutputIndex(
  * sub-agents that share a `query_source` (e.g. two parallel Task tools both
  * emitting under `repl_main_thread`) break the invariant: their spans and bodies
  * interleave in one group by time, so span index i can pair with the other
- * agent's body i. Output and cost stay correct (joined exactly by `request_id`);
- * only the input transcript can be mis-attributed. Real Claude Code sub-agents
+ * agent's body i. Output stays correct (joined exactly by `request_id`); only
+ * the input transcript can be mis-attributed. Real Claude Code sub-agents
  * carry distinct `query_source`s (each isolates into its own group above), so
  * this only bites a same-source concurrent emitter — narrow and content-only,
  * hence accepted rather than solved with per-turn correlation.

@@ -630,6 +630,10 @@ sidebarTitle: Audit Log
 keywords: audit log, langwatch, llm, ai, audit log
 ---
 
+<Note>
+  **Available on Enterprise plans.** Reading the audit log needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. Without one the audit log is refused, whoever asks for it. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
+
 LangWatch provides an audit log to track user actions and changes in the platform. This allows you to monitor and audit the activities of your users and ensure compliance with your organization's policies.
 
 ## Overview
@@ -889,6 +893,10 @@ description: "Manage user permissions and access levels in LangWatch with RBAC t
 sidebarTitle: Access Control (RBAC)
 keywords: rbac, langwatch, llm, ai, rbac, role-based access control
 ---
+
+<Note>
+  **Custom roles are available on Enterprise plans.** The built-in organization, team and project roles below work on every plan. Creating custom roles and assigning them needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. Calls to the [Roles API](/api-reference/roles/overview) without one are refused with HTTP 402 and the error code `enterprise_plan_required`. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
 
 LangWatch provides role-based access control (RBAC) to manage user permissions and access levels. This allows you to control who can access your LangWatch workspace and what they can do.
 
@@ -1336,6 +1344,10 @@ description: "Automatically provision and deprovision users in LangWatch using S
 sidebarTitle: SCIM Provisioning
 keywords: scim, provisioning, deprovisioning, okta, azure ad, identity provider, sso, user management
 ---
+
+<Note>
+  **Available on Enterprise plans.** SCIM provisioning needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. The plan is checked on every call, not only when a token is created, so if it lapses, tokens that already exist stop verifying and your identity provider's requests are refused. Minting a token through the [SCIM Tokens API](/api-reference/scim-tokens/overview) without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
 
 SCIM (System for Cross-domain Identity Management) 2.0 allows your identity provider to automatically manage user lifecycle in LangWatch, provisioning new users when they join your organization and deprovisioning them when they leave, without any manual intervention.
 
@@ -1907,6 +1919,7 @@ Errors (like successes) always carry:
 
 - `X-LangWatch-Gateway-Request-Id: req_<hex>`, use this when filing support tickets. It is the same id that appears as `gateway_request_id` on spend events and webhook envelopes, so it joins a failing call to its billing records.
 - `X-LangWatch-Provider`, present when the error originated from an upstream provider (absent for gateway-internal errors).
+- `X-LangWatch-Handled-Error`, the top-level `error.code`, present on every LangWatch-authored error. A forwarded provider error is not LangWatch-authored, so this header is absent (or stripped, if the provider's own response happened to set it) on those responses — use it to tell the two apart rather than guessing from the body shape.
 
 ## Type enum
 
@@ -1928,9 +1941,10 @@ Errors (like successes) always carry:
 | `provider_error` | `502` | An upstream provider returned a non-recoverable error and fallback (if any) was exhausted. |
 | `circuit_open` | `503` | Repeated upstream 5xx/timeout/network failures opened the credential's circuit breaker, so the gateway declined to dial the provider for this request. Retryable; the breaker probes the upstream again after its cooldown. Answered 4xx (rate limits, quota, bad requests) never open the breaker. |
 | `upstream_timeout` | `504` | An upstream provider exceeded `timeout_ms` and fallback (if any) was exhausted. |
-| `bad_request` | `400` | Validation error on the incoming payload (e.g. missing `model`). |
+| `bad_request` | `400` | Validation error on the incoming payload. |
+| `missing_model` | `400` | The request names no model. `message` and `meta.request_type` say where that endpoint expects one. |
 | `unsupported_parameter` | `400` | The parameter policy refused a request parameter for the target lane: either the request depends on it functionally and the lane cannot honor it, or `drop_tuning_params` is `false` and the lane has no mapping for it. The message names the parameter, the lane, and why. See [Parameter mapping](/ai-gateway/parameter-mapping). |
-| `payload_too_large` | `413` | Request body exceeded `GATEWAY_MAX_REQUEST_BODY_BYTES` (default 10 MiB). Rejected at the edge, before auth, resolve-key, or any upstream dispatch, so a 1 GB drive-by scan never pressures the pod memory limit. Declared `Content-Length` above the cap returns 413 immediately without draining the socket; chunked unknown-length bodies trip a `*http.MaxBytesError` at the cap. |
+| `payload_too_large` | `413` | Request body exceeded `SERVER_MAX_REQUEST_BODY_BYTES` (default 32 MiB). Rejected at the edge, before auth, resolve-key, or any upstream dispatch, so a 1 GB drive-by scan never pressures the pod memory limit. Declared `Content-Length` above the cap returns 413 immediately without draining the socket; chunked unknown-length bodies trip a `*http.MaxBytesError` at the cap. |
 | `internal_error` | `500` | Unclassified gateway error. `X-LangWatch-Gateway-Request-Id` is how we trace it. |
 
 ## Control-plane codes
@@ -1941,7 +1955,11 @@ The management and webhook APIs answer with the same envelope, and their `type` 
 |---|---|---|
 | `validation_error` | `400` | The body or query failed validation. `meta.field_errors` names the offending fields. |
 | `invalid_cursor` | `400` | A paging `cursor` this API did not issue. Restart the walk rather than guessing. |
-| `trace_project_required` | `400` | An organization- or team-scoped virtual key was created without a project for its traces and spend to land in. |
+| `trace_project_required` | `400` | An organization- or team-scoped virtual key was created without a project for its traces and spend to land in, in an organization with no governance project either. |
+| `gateway_trace_project_ambiguous` | `400` | A virtual key was created without saying which project its traces and spend land in, and the organization has projects to choose from. Send `trace_project_id`, or scope the key to exactly one project. |
+| `gateway_trace_project_unknown` | `400` | The `trace_project_id` a virtual key named is not a project of this organization, so its traces could not land there. The id is not echoed back. |
+| `gateway_budget_scope_unreachable` | `400` | A `team`, `project` or `group` budget was created that no active key can produce traffic for, so as things stand it cannot spend or block, and it stays that way until some key reaches it. `meta.reachable_project_ids` names where the traffic goes, capped at the first 10 with `meta.reachable_project_count` giving the real total, so a longer list is never mistaken for the whole set. Send `allow_unreachable` to keep it as written. |
+| `gateway_spend_group_by_unstable` | `400` | A spend rollup was grouped by `model` or `provider`, or into time buckets, over a window recent enough that outcomes can still arrive. Until a request settles, the model and provider recorded against it are the ones that were asked for, and they are replaced by the ones that actually served it, so a page walk over such a group counts some requests twice and misses others. `meta.group_by` names the dimensions that move and `meta.settles_at` is when the requested window becomes safe. Reconcile closed periods, or send `allow_unstable` when an approximate shape is enough. |
 | `gateway_budget_cycle_anchor_invalid` | `400` | A `cycle_anchor_at` was sent on a `total` or `manual` budget. Those windows do not cycle. |
 | `group_budget_requires_clickhouse` | `400` | A `group` or `attributed_user` budget needs the ClickHouse spend ledger to tell members apart. |
 | `webhook_endpoint_invalid` | `400` | A webhook endpoint's URL broke the [receiver URL policy](/features/webhooks#what-a-receiver-url-must-look-like). The `message` names the rule. |
@@ -2231,7 +2249,8 @@ Response:
       "purpose": "user",
       "display_prefix": "vk-lw-01HZX9",
       "principal_user_id": null,
-      "trace_project_id": null,
+      "trace_project_id": "proj_01HZ...",
+      "trace_project_archived": false,
       "scopes": [{ "scope_type": "project", "scope_id": "proj_01HZ..." }],
       "routing_policy_id": null,
       "routing_mode": "none",
@@ -2272,7 +2291,9 @@ Body (only `name` is required):
 ```
 
 - `scopes` defaults to the calling project. Team- and org-scoped keys need a scoped API key holding `virtualKeys:manage` at each requested scope; legacy project keys can only mint keys for their own project.
-- An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (requires `virtualKeys:manage` on that project; it is a destination, not a scope, and grants no access to the key), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists.
+- An org- or team-scoped key also needs a place for its traces and spend to land, and has to say where: pass `trace_project_id` (requires `virtualKeys:manage` on that project; it is a destination, not a scope, and grants no access to the key). Without it, and without exactly one project scope naming a live project to take it from, creation refuses with `gateway_trace_project_ambiguous`. The same refusal covers a key scoped to several projects at once. An organization with no other live projects is exempt and the key gets its oldest live governance project, because there is nothing else to name; one with no governance project either refuses with `trace_project_required`. A `trace_project_id` that names a project this organization does not have refuses with `gateway_trace_project_unknown` rather than quietly resolving to somewhere else.
+- `trace_project_id` is decided once, when the key is written, and stored on it. Changing what the key is scoped to therefore never moves where its traces and spend land; send `trace_project_id` on the update to move it, validated the same way create validates it. Sending it as explicit `null` does not clear it: it asks for the destination to be worked out again from what the key is now, under the same rules create uses, so it lands on the key's single project scope when exactly one names a live project, falls back to the organization's oldest live governance project when there are no other live projects to choose from, and is refused with `gateway_trace_project_ambiguous` when nothing selects a destination and the organization has live projects that could have been named. A key written before this was stored, in an organization that had no governance project to give it, can carry `null`: its traces are dropped and no budget counts its spend, so give it a `trace_project_id`.
+- `trace_project_archived` says the project the key traces into has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Point the key somewhere else if that is not what you want.
 - `budget` creates a budget atomically with the key and manages exactly that row on later updates: the key can never exist without the cap you asked for. Windows: `day`, `week`, `month`.
 - `routing_mode` is one of `none` (default: no silent failover), `fallback_all`, or `policy` (requires `routing_policy_id`).
 
@@ -2317,13 +2338,14 @@ Body (all fields optional):
 {
   "name": "new-name",
   "scopes": [{ "scope_type": "team", "scope_id": "team_..." }],
+  "trace_project_id": "proj_01HZ...", // or null to re-resolve it
   "routing_mode": "fallback_all",
   "budget": { "limit_usd": "50", "window": "month" },
   "config": { /* partial, merges with existing */ }
 }
 ```
 
-`scopes` replaces the whole visibility set and requires `virtualKeys:manage` at every NEW scope. `budget: null` archives the key's own cap (spend history is retained); omitting `budget` leaves it alone.
+`scopes` replaces the whole visibility set and requires `virtualKeys:manage` at every NEW scope, and does not move where the key's traces and spend land. `trace_project_id` does: omitting it leaves the destination alone, a value moves it, and explicit `null` re-resolves it under the create-time rules rather than clearing it. `budget: null` archives the key's own cap (spend history is retained); omitting `budget` leaves it alone.
 
 ### Rotate, disable, enable, revoke
 
@@ -3030,7 +3052,7 @@ GET /api/gateway/v1/spend-events?from=1751328000000&to=1753920000000&cursor=...
 
 - `from` and `to` (unix milliseconds) are **required**, must be safe integers, and `from <= to`; the walk is a ranged read by contract.
 - Pages are **stable under live writes**: rows are served in insert order, so a row folded late is picked up by a later page of the same walk instead of being skipped. Offset pagination cannot promise that; cursors can.
-- Filters: `virtual_key_id`, `end_user_id`, `project_id`, `model`, and `status` (`success`, `error`, `admitted`, `confirmed`, `failed`, `settled`). `limit` defaults to 50, max 200.
+- Filters: `project_id`, `team_id`, `external_id`, `virtual_key_id`, `end_user_id`, `principal_user_id`, `model`, `provider_key`, `request_type`, `label`, `metadata`, and `status` (`success`, `error`, `admitted`, `confirmed`, `failed`, `settled`). The same twelve narrow the summaries, with one exception: `status=admitted` is refused there, because a rollup sums the cost of requests past admission and an in-flight request has none to contribute. `limit` defaults to 50, max 200.
 - Rows come back as the same canonical envelopes the webhooks deliver, plus `next_cursor`. Diff by `gateway_request_id`.
 - A garbled `cursor` is refused with `400` rather than silently restarting the walk.
 - In-flight requests appear with `status=admitted` and null quantities (typed `gateway.request.admitted` on this surface only; they are never pushed). Treat them as not yet billable.
@@ -3065,7 +3087,7 @@ import os
 import langwatch
 
 langwatch.setup(api_key=os.environ["LANGWATCH_ORG_API_KEY"])
-from_ms, to_ms = 1782950400000, 1785628800000
+from_ms, to_ms = 1782864000000, 1785542400000  # 2026-07-01 to 2026-08-01 UTC
 
 # Checksums first, one row per key.
 for row in langwatch.spend_events.iter_summaries(group_by="virtual_key", from_ms=from_ms, to_ms=to_ms):
@@ -3079,6 +3101,43 @@ for event in langwatch.spend_events.iterate(from_ms=from_ms, to_ms=to_ms, virtua
 </CodeGroup>
 
 `iterSummaries` / `iter_summaries` and `iterate` stream rows and fetch pages behind you. Use `summariesPage` / `summaries_page` and `listPage` / `list_page` when you want to hold the cursor yourself, for example to checkpoint a long reconciliation across runs.
+
+Both grains take the same filters, so a divergence can be walked on exactly the narrowing that produced it. Pass an array to widen a filter and name two filters to narrow. The one filter the summaries take differently is `status`, which does not accept `admitted` there: list the events for in-flight requests.
+
+The window below is the closed month declared above, which matters: grouping by `model` or `provider`, or into time buckets, is refused on a window recent enough that outcomes can still arrive. Reconcile closed periods and you never meet it; for a live view, opt out and read the result as approximate: `allow_unstable=true` over REST, `allowUnstable` from the TypeScript SDK, `allow_unstable` from Python.
+
+
+<CodeGroup>
+
+```typescript TypeScript
+for await (const row of langwatch.spendEvents.iterSummaries({
+  groupBy: ["model", "end_user"],
+  bucket: "day",
+  timezone: "Europe/Amsterdam",
+  from, to,
+  model: ["gpt-5-mini", "claude-opus-5"],
+  metadata: { customer_tier: "gold" },
+})) {
+  bill(row.group, row.bucket_start, row.cost.nano_usd);
+}
+```
+
+```python Python
+for row in langwatch.spend_events.iter_summaries(
+    group_by=["model", "end_user"],
+    bucket="day",
+    timezone="Europe/Amsterdam",
+    from_ms=from_ms,
+    to_ms=to_ms,
+    model=["gpt-5-mini", "claude-opus-5"],
+    metadata={"customer_tier": "gold"},
+):
+    bill(row["group"], row["bucket_start"], row["cost"]["nano_usd"])
+```
+
+</CodeGroup>
+
+The full vocabulary, and the groupings that are refused rather than served approximately (`model`, `provider`, and time buckets), are in [Narrowing and grouping](/ai-gateway/cookbooks/metering-and-rebilling#narrowing-and-grouping).
 
 ### The settled work queue
 
@@ -3219,7 +3278,7 @@ The budget is in force immediately; the next request counts against it. Everythi
 | Scope | Applies to |
 |---|---|
 | `organization` | All gateway traffic across every project in the org. |
-| `team` | All gateway traffic in projects belonging to the team. |
+| `team` | All gateway traffic in projects belonging to the team, plus traffic on any key scoped to that team. |
 | `project` | All gateway traffic in this project. |
 | `virtual_key` | This specific VK. |
 | `principal` | This user or service account across any VK they use. |
@@ -3227,6 +3286,17 @@ The budget is in force immediately; the next request counts against it. Everythi
 | `attributed_user` | Each distinct **end user** seen on an anchor (a VK or a project), individually (see below). |
 
 A request is evaluated against **every** budget whose scope applies. A request by Alice in project `demo` of team `platform` in org `acme` with VK `prod-key` is checked against that org's, team's, project's and VK's budgets, Alice's principal budgets, and the per-member budgets of every group Alice belongs to. If any budget hard-blocks, the request is rejected; if any warn threshold is crossed, a warning header is added. Hard-block wins over warn.
+
+### A budget has to reach the traffic it names
+
+Which team and project a request belongs to is decided by the key that served it: the teams the key is scoped to, plus the team of the project its traces land in. So a `team`, `project` or `group` budget can be written, look correct on both sides, and match nothing at all, for instance a `project` budget on a project none of your keys send traffic to.
+
+A budget that could never accrue is refused when you create it, with `gateway_budget_scope_unreachable`. The refusal lists the projects your active keys do reach, in `error.meta.reachable_project_ids`. Two ways forward:
+
+- Point a key at the target: give it a scope on that team or project, or set the key's trace project.
+- Keep the budget as written by sending `allow_unreachable: true`, which is the right answer when you are provisioning ahead of the keys that will use it. In the app, the refusal offers "Create it anyway".
+
+An organization with no active keys is never refused, since budget first and key second is a normal setup order. On reads, `scope_reach` on each budget says `reachable` or `unreachable`, which is the only field that tells a budget nothing can reach apart from one that simply has not been breached.
 
 ### Group budgets are per member
 
@@ -3493,7 +3563,9 @@ The `/internal/gateway/budget/debit` call forwards all three so budget ledgers r
 
 **Simple match/action rules that let operators set cache behavior for groups of requests without touching client code.** Deliberately narrower than Cloudflare Page Rules, enough to demonstrate enterprise cache governance (force 5-min cache on prod internal-api, disable cache for benchmark VKs, etc.) without the matcher combinatorics that would slow the hot path.
 
-Latency budget: rules are resolved **once per VK bundle refresh** (every 30 s on `/changes`) and baked into the bundle as a pre-sorted array. At request time, the gateway walks the sorted array until a match fires, for the expected low single-digit rule count per VK, this is sub-microsecond. Hot-path total overhead stays at ~700 ns.
+Latency budget: rules are resolved **once per VK bundle refresh** and baked into the bundle as a pre-sorted array. At request time, the gateway walks the sorted array until a match fires, for the expected low single-digit rule count per VK, this is sub-microsecond. Hot-path total overhead stays at ~700 ns.
+
+Editing a rule triggers that refresh rather than waiting for one. Every create, edit and delete appends a change event in the same transaction as the write; the gateway's `/changes` long-poll returns it on the next cycle and drops the organization's cached bundles, so the following request rebuilds against the new rules.
 
 ### Shape
 
@@ -3537,7 +3609,7 @@ Each matcher is optional; all non-null matchers must match for the rule to apply
 ### Evaluation
 
 - **First-match wins**, sorted by `priority` descending.
-- Rules evaluated once per request, AT auth-resolve time (bundled with VK config), so zero additional upstream latency.
+- Rules are resolved once per VK bundle refresh, not once per request, and baked into the bundle as a pre-sorted array. A request only walks that array to find its match, so evaluation costs no upstream call.
 - Rule hits exposed in observability via `langwatch.cache.rule_id` span attribute + `gateway_cache_rule_hits_total{rule_id, mode_applied}` counter.
 
 ### Concrete example: "force 5-min cache on all prod internal-api calls"
@@ -5312,7 +5384,7 @@ Eight rows, top to bottom:
 |---|---|---|
 | Request health | rate, p50/p95/p99, error % | primary SLI row; everything else is causal |
 | Provider health | circuit state, upstream latency, fallback count | which provider is degrading and how often we're saved by fallback |
-| Auth cache | L1 hit rate, L2 hit rate, resolve-key RPS | cache degradation = spike in control-plane load |
+| Auth cache | hit rate, resolve-key RPS | cache degradation = spike in control-plane load |
 | Budgets | blocks by scope | which scope is actually rejecting traffic |
 | Guardrails | verdicts by direction, blocks by direction | catches both legit policy enforcement and regressions |
 | Streaming | active streams, usage-warning rate | streams that never reported usage = cost blind spot |
@@ -5461,12 +5533,11 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards �
     },
     {
       "type": "timeseries",
-      "title": "L1 + L2 hit rate",
+      "title": "Auth cache hit rate",
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 23, "w": 12, "h": 7 },
       "targets": [
-        { "expr": "sum(rate(gateway_auth_cache_hits_total{namespace=\"$namespace\", tier=\"l1\"}[$__rate_interval])) / sum(rate(gateway_auth_cache_lookups_total{namespace=\"$namespace\"}[$__rate_interval]))", "legendFormat": "L1 hit rate" },
-        { "expr": "sum(rate(gateway_auth_cache_hits_total{namespace=\"$namespace\", tier=\"l2_redis\"}[$__rate_interval])) / sum(rate(gateway_auth_cache_lookups_total{namespace=\"$namespace\"}[$__rate_interval]))", "legendFormat": "L2 hit rate" }
+        { "expr": "sum(rate(gateway_auth_cache_hits_total{namespace=\"$namespace\", tier=\"l1\"}[$__rate_interval])) / sum(rate(gateway_auth_cache_lookups_total{namespace=\"$namespace\"}[$__rate_interval]))", "legendFormat": "hit rate" }
       ],
       "fieldConfig": { "defaults": { "unit": "percentunit" } }
     },
@@ -5679,7 +5750,7 @@ When a page fires, the engineer lands on the dashboard, narrows the cause to a r
 
 ## Skipping panels you don't have metrics for
 
-The default deployment ships without an L2 Redis tier, so the L2 hit-rate line sits flat at zero, harmless. If you haven't enabled `networkPolicy`, the provider egress row doesn't need a custom panel since flow is unchanged. The JSON uses `label_values(...)` so missing labels degrade gracefully rather than breaking the dashboard.
+If you haven't enabled `networkPolicy`, the provider egress row doesn't need a custom panel since flow is unchanged. The JSON uses `label_values(...)` so missing labels degrade gracefully rather than breaking the dashboard.
 
 ## See also
 
@@ -5847,7 +5918,31 @@ curl -sS "$LW/api/gateway/v1/spend-summaries?group_by=virtual_key&from=$FROM_MS&
 # compare event_count and cost.nano_usd per key against your ledger
 ```
 
-Matching checksums end it. On divergence, walk `spend-events` for that key and window by cursor and diff by `gateway_request_id`; the missing or duplicated ids are your fix list. For a delivery gap (receiver outage, endpoint auto-disabled), [replay](/ai-gateway/billing-events#replay) the gap window to your endpoint, honoring your downstream biller's dedup window.
+Matching totals mean no aggregate divergence. They are not proof that both systems hold the same `gateway_request_id` set, since a different set can sum the same, so a biller that needs request-level certainty walks the events regardless. On divergence, walk `spend-events` for that key and window by cursor and compare `gateway_request_id` counts per id rather than set membership: one request dropped and another booked twice leaves the id sets looking close and the money wrong. The ids whose counts disagree are your drops and duplicates. If every count agrees and the totals still differ, no request is missing and the same request is priced differently on each side, so compare `cost.nano_usd` per id rather than its presence. Both reads take the same filters, so you can narrow the walk to exactly what the checksum covered. For a delivery gap (receiver outage, endpoint auto-disabled), [replay](/ai-gateway/billing-events#replay) the gap window to your endpoint, honoring your downstream biller's dedup window.
+
+### Narrowing and grouping
+
+Repeat a filter to widen it and name two filters to narrow. Both reads accept `project_id`, `team_id`, `external_id`, `virtual_key_id`, `end_user_id`, `principal_user_id`, `model`, `provider_key`, `request_type`, `label`, `metadata` and `status`. Only `status=admitted` differs: the summaries refuse it, because a rollup sums the cost of requests past admission and an in-flight request has none. Ask `spend-events` for those.
+
+```bash
+# Two models, one customer tier, one team, in one call
+curl -sS "$LW/api/gateway/v1/spend-summaries?group_by=model,end_user\
+&from=$FROM_MS&to=$TO_MS\
+&model=gpt-5-mini&model=claude-opus-5\
+&metadata=customer_tier:gold\
+&team_id=$TEAM_ID" \
+  -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY"
+```
+
+`metadata` is written `key:value` and splits on the first colon, so a value may contain colons of its own. A key may not contain a colon, and both halves must be non-empty. Repeating a key widens that key: `metadata=tier:gold&metadata=tier:silver` matches either.
+
+`group_by` takes one or two dimensions and `bucket=hour|day` adds a time column in the `timezone` you name. `key` stays the first dimension's value, so an integration written against the single-dimension response keeps working; read `group` to tell two dimensions apart.
+
+<Warning>
+Grouping by `model` or `provider`, or into time buckets, is refused with `gateway_spend_group_by_unstable` on a window recent enough that outcomes can still arrive. Until a request settles, the model and provider recorded against it are the ones that were **asked for**, and they are replaced by the ones that actually served it. A page walk over a group that can move counts some requests twice and misses others, which is the one failure a reconciliation cannot detect on its own.
+
+Reconcile closed periods and this never fires. For a live dashboard where an approximate shape is enough, send `allow_unstable=true`. The refusal carries `meta.settles_at`, so a scheduler can wait rather than guess.
+</Warning>
 
 ## 6. Breach handling and period close
 
@@ -6636,7 +6731,7 @@ go tool pprof http://localhost:6060/debug/pprof/heap
 
 - `internal/auth.(*Cache).Put` holding more than ~1 MB per cached bundle, unusual, a bundle should be ≤ 50 KB. Oversized `policy_rules.urls.allow` with thousands of entries can trigger this.
 - `internal/dispatch` buffered responses, if streaming responses are being accumulated instead of flushed per-chunk, every request consumes full response size. Check for `bufio.NewWriter` wrapping a streaming writer anywhere.
-- Cached bundles never being evicted, a very large tenant count with long `HARD_GRACE` keeps every bundle resident. Check `gateway_auth_cache_size{tier="l1"}` against your expected VK count.
+- Cached bundles never being evicted, a very large tenant count with long `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` keeps every bundle resident. Check `gateway_auth_cache_size{tier="l1"}` against your expected VK count.
 
 ## Recipe 4: Mutex or block profiling for contention
 
@@ -6703,7 +6798,7 @@ gateway request -> spend command -> local spool -> drainer -> control-plane inge
 
 **Symptom:** A pod stays in `Terminating` for the full `terminationGracePeriodSeconds`, then gets SIGKILLed. In-flight requests ended abruptly. Alertmanager fires on the `gateway_draining` gauge being 1 for > grace.
 
-The pod received SIGTERM but at least one request handler never returned before `shutdown.timeout` expired. The drain pipeline exposes this via two gauges:
+The pod received SIGTERM but at least one request handler never returned before `shutdown.timeoutSeconds` expired. The drain pipeline exposes this via two gauges:
 
 | Metric | During healthy drain | During stuck drain |
 |---|---|---|
@@ -6729,7 +6824,7 @@ curl -s http://localhost:6060/debug/pprof/goroutine?debug=1 | \
 
 **Common causes, in order of likelihood:**
 
-1. **Upstream dial hanging without a deadline.** Streaming fallback into a dead region that never returns TLS handshake. `LW_GATEWAY_UPSTREAM_TIMEOUT_MS` should be < `shutdown.timeout`; if it is, the handler should cancel on its own.
+1. **Upstream dial hanging without a deadline.** Streaming fallback into a dead region that never returns TLS handshake. `LW_GATEWAY_UPSTREAM_TIMEOUT_MS` should be < `shutdown.timeoutSeconds`; if it is, the handler should cancel on its own.
 2. **Guardrail evaluator hanging past its budget.** `pre`/`post` have a `guardrail.preTimeout`, `postTimeout` of 1500 ms, but a misconfigured evaluator can still hang if it doesn't respect context cancellation. Check the evaluator service's own SLO.
 3. **A breaker with `open` state but no surrounding deadline.** Rare; closed previously, but worth ruling out if the stack shows `internal/circuit` waiting.
 4. **Slow custom middleware.** If you've forked the gateway and added middleware that does I/O without context propagation, that's where to look first.
@@ -6738,17 +6833,17 @@ curl -s http://localhost:6060/debug/pprof/goroutine?debug=1 | \
 
 | Cause | Action |
 |---|---|
-| Upstream hang | Lower `LW_GATEWAY_UPSTREAM_TIMEOUT_MS` below `shutdown.timeout`. Default 60 s, bump `shutdown.timeout` to 65 s + `terminationGracePeriodSeconds` to 80 s if you genuinely need 60 s upstream calls |
+| Upstream hang | Lower `LW_GATEWAY_UPSTREAM_TIMEOUT_MS` below `shutdown.timeoutSeconds`. Default 60 s, bump `shutdown.timeoutSeconds` to 65 s + `terminationGracePeriodSeconds` to 80 s if you genuinely need 60 s upstream calls |
 | Guardrail hang | Raise evaluator SLO or set `guardrails.request_fail_open: true` on the VK to fall through on timeout |
 | Custom middleware | Thread `r.Context()` through every I/O call |
 
-**Temporary workaround:** bump `shutdown.timeout` + `terminationGracePeriodSeconds` to give the hanging request time to complete. Only appropriate while you diagnose the root cause, long grace periods slow down rolling deploys and make HPA scale-downs feel sluggish.
+**Temporary workaround:** bump `shutdown.timeoutSeconds` + `terminationGracePeriodSeconds` to give the hanging request time to complete. Only appropriate while you diagnose the root cause, long grace periods slow down rolling deploys and make HPA scale-downs feel sluggish.
 
 ## Recipe 8: Control-plane outage, stale-while-error
 
 **Symptom:** The LangWatch control plane is unreachable (deployment incident, DNS hiccup, network partition). The gateway's L1 auth cache is full of valid resolved-key bundles, but `/api/internal/gateway/resolve-key` is returning errors. Operator wants to know: are customers being rejected, or is the gateway riding through?
 
-The gateway's auth resolver runs **stale-while-error** by default: when the cached entry's JWT crosses its natural expiry AND the control-plane refresh fails for **transport-class reasons** (network error, dial timeout, 5xx, connection refused, malformed/unparseable response, JWT verify failure), it bumps the soft expiry by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP` (default `5m`) and serves the cached bundle. This continues every refresh attempt up to the hard cap of `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` past the JWT exp (default `6h`). The hard cap is deliberately generous, the soft-bump path runs on **every** refresh attempt without a successful response, so the hard cap is the true outage backstop, not a steady-state knob.
+The gateway's auth resolver runs **stale-while-error** by default: when the cached entry's JWT crosses its natural expiry AND the control-plane refresh fails for **transport-class reasons** (network error, dial timeout, 5xx, connection refused, malformed/unparseable response, JWT verify failure), it bumps the soft expiry by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` (default `300`, 5 minutes) and serves the cached bundle. This continues every refresh attempt up to the hard cap of `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` past the JWT exp (default `21600`, 6 hours). The hard cap is deliberately generous, the soft-bump path runs on **every** refresh attempt without a successful response, so the hard cap is the true outage backstop, not a steady-state knob.
 
 **Auth-class rejections**: explicit `401`, `403`, `404` from `/resolve-key`, bypass the grace window entirely and evict immediately. A revoked credential never gets stale-served.
 
@@ -6774,21 +6869,21 @@ The three log lines form a ladder operators read in order:
 |---|---|---|---|
 | `auth_cache_serve_stale` | INFO | Grace is active; cached bundle is being served past JWT exp | None, this is expected behaviour during outage. Includes `vk_id`, `stale_for`, `hard_grace_remaining`, `refresh_error_class` |
 | `auth_cache_refresh_transport_failure` | WARN | Each refresh attempt is failing; soft expiry bumped. Includes `error`, `error_class`, `new_soft_expires_at` | Investigate control plane (this is the actual outage signal). Stop bumping once CP returns |
-| `auth_cache_hard_evict` | ERROR | Grace cap exceeded OR auth rejection. `reason` field disambiguates: `hard_cap_exceeded` (outage too long) vs `auth_rejection` (real bad-credential evict) vs `auth_rejection_async`, `hard_cap_exceeded_on_lookup` | If `hard_cap_exceeded`, customers start seeing 401s. Bump `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` if outage is ongoing and you'd rather extend than reject |
+| `auth_cache_hard_evict` | ERROR | Grace cap exceeded OR auth rejection. `reason` field disambiguates: `hard_cap_exceeded` (outage too long) vs `auth_rejection` (real bad-credential evict) vs `auth_rejection_async`, `hard_cap_exceeded_on_lookup` | If `hard_cap_exceeded`, the grace is spent and customers start seeing `503 auth_upstream_unavailable`: the entry is evicted and the re-resolve hits the same unreachable control plane. A `401` on this line means `reason=auth_rejection`, a genuinely rejected credential rather than the outage. Bump `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` if the outage is ongoing and you'd rather extend than reject |
 
 **Customer-facing behaviour during the grace window:**
 
 - Requests against any VK that resolved successfully **before** the outage continue to work transparently.
-- Requests against any VK **never seen by this pod** (cold) still fail, the gateway has no bundle to fall back to. Today's mitigation is Redis L2 (`GATEWAY_REDIS_URL`): HPA-scaled pods inherit the warm set from L2 even while the control plane is unreachable. (`GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` is a planned v1.1 enhancement to also pre-warm L1 from a `/bootstrap` snapshot on startup; the flag is reserved in env wiring but has no Go-side implementation today, so setting it is currently a no-op.)
+- Requests against any VK **never seen by this pod** (cold) still fail, the gateway has no bundle to fall back to. The cache is per pod, so a pod added during the outage starts cold. (`GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` is a planned enhancement to pre-warm the cache from a `/bootstrap` snapshot on startup; the flag is reserved in env wiring but has no Go-side implementation today, so setting it is currently a no-op.)
 - Requests against any VK whose JWT was **revoked just before the outage** but the revocation `/changes` event hadn't propagated yet, these stay served until the cache entry crosses its hard cap. Acceptable trade-off for the grace; auth rejections from a healthy CP still evict instantly via `auth_cache_hard_evict reason=auth_rejection`.
 
 **Tune:**
 
 | Knob | When to lower | When to raise |
 |---|---|---|
-| `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP` | If you want refresh attempts to back off less aggressively (e.g. 1m for tighter retry density) | If your control plane is consistently slow under load and you want to reduce refresh-attempt churn during partial degradation |
-| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` | If you have strict revocation-latency SLOs (compliance, regulated deployments) and would rather hard-fail than serve a long-stale bundle | If your control plane has known multi-hour planned-maintenance windows and you'd rather ride through |
-| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE=0s` | **Restores legacy behaviour:** any refresh failure past JWT exp evicts immediately. Pick this if you operate under a security regime where stale-while-error is unacceptable | n/a (zero is the disable signal) |
+| `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` | If you want refresh attempts to back off less aggressively (e.g. `60` for tighter retry density) | If your control plane is consistently slow under load and you want to reduce refresh-attempt churn during partial degradation |
+| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` | If you have strict revocation-latency SLOs (compliance, regulated deployments) and would rather hard-fail than serve a long-stale bundle | If your control plane has known multi-hour planned-maintenance windows and you'd rather ride through |
+| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS=-1` | **Restores legacy behaviour:** any refresh failure past JWT exp evicts immediately. Pick this if you operate under a security regime where stale-while-error is unacceptable | n/a (a negative value is the disable signal; `0` means unset and takes the 6 h default) |
 
 **Alert pattern (log-based, no metric infra required):**
 
@@ -6809,10 +6904,9 @@ The gateway is a cache of the control plane, so a surprising amount continues to
 
 | Component down | Customer impact | How long gateway stays up | Notes |
 |---|---|---|---|
-| LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` (default 6 h) of stale-while-error; bootstrap cache + Redis L2 extend coverage to cold-for-pod VKs | Spend accounting is unaffected: cost rides the spend commands the gateway spools, and the ledger catches up once the control plane returns. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
+| LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default 21600, 6 h) of stale-while-error; a VK the pod has never resolved is not covered | Spend accounting is unaffected: cost rides the spend commands the gateway spools, and the ledger catches up once the control plane returns. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
 | One upstream provider | None for VKs with fallback; 502/504 for VKs without | Indefinite, circuit breaker + fallback chain absorb it | `gateway_circuit_state{credential_id}` shows which provider is down |
-| Redis L2 cache | +~30 ms on cold-for-pod VKs | Indefinite, L1 + `/resolve-key` cover the miss | Fail-open by design (poison entries `DEL`, network errors log and miss) |
-| Gateway pod (crash, eviction) | None, HPA replaces, PDB holds ≥ 2 replicas | N/A | Stateless; new pod warms from Redis L2 + `/bootstrap` |
+| Gateway pod (crash, eviction) | Streams in flight on that pod are cut; other requests retry onto a surviving replica | N/A | Stateless; the replacement pod warms from the control plane on its first request per key. The PDB (`minAvailable: 1` by default, against 2 replicas) only bounds voluntary disruptions like a drain, so it does not apply to a crash |
 
 For multi-region deployments with shared control plane: a gateway region down is handled by Route53 latency-based failover. See [Scaling → Regional placement](/ai-gateway/self-hosting/scaling#regional-placement).
 
@@ -8876,7 +8970,7 @@ The gateway serves `GET /metrics` on its main HTTP port (`5563` by default, the 
 | `gateway_auth_cache_lookups_total` | counter | none | Hits plus misses |
 | `gateway_auth_cache_size` | gauge | `tier` | Entries currently held |
 
-`tier` is `l1` (in-process) or `l2_redis`. Only `l1` is populated in the default deployment, which ships without an L2 Redis tier.
+`tier` is always `l1`: the auth cache is an in-process LRU, private to each pod.
 
 ### Governance
 
@@ -8887,6 +8981,25 @@ The gateway serves `GET /metrics` on its main HTTP port (`5563` by default, the 
 | `gateway_cache_rule_hits_total` | counter | `rule_id`, `mode_applied` | Bundle-baked cache rule matches. `mode_applied` is `RESPECT`, `FORCE`, or `DISABLE` |
 | `gateway_guardrail_verdicts_total` | counter | `direction`, `verdict` | Guardrail decisions. `direction` is `request`, `response`, or `stream_chunk`; `verdict` is `allow`, `block`, `modify`, or `fail_open`. `fail_open` means the traffic passed unchecked, on any direction. It is the default outcome for `stream_chunk`, which never stalls a stream on policy, and opt-in for the other two |
 | `gateway_rate_limit_denied_total` | counter | `dimension`, `vk_id` | Requests denied by the virtual-key rate limiter. `dimension` is `rpm` or `rpd` |
+| `gateway_client_rejects_total` | counter | `code`, `vk_id` | Requests **the gateway itself** rejected as the caller's fault after authentication, by gateway error code (`missing_model`, `bad_request`, `model_not_allowed`, `budget_exceeded`, `payload_too_large`, …) and by the virtual key that sent them. These are logged at `info`, so this counter is the only signal that will move when one client loops on a malformed body. Alert on a sustained per-key rate rather than on any single rejection |
+
+Three things this counter deliberately excludes, because all three would make a per-key alert on it fire for keys doing nothing wrong:
+
+- **Authentication failures.** A missing or unresolvable key is rejected before the request has a key to attribute it to. Watch `gateway_http_requests_total{status="401"}` instead.
+- **Provider rejections.** An upstream 4xx (an OpenAI 429, an Anthropic 402) is the caller's fault too, but it is not the gateway rejecting the client — counting it would turn a bad hour at a provider into an alert that reads as client misbehaviour. Those live on `gateway_provider_attempts_total{outcome="rate_limit"}` and the upstream status on `gateway_http_requests_total`.
+- **Gateway rate limiting.** A key legitimately sustained at its RPM/RPD ceiling would otherwise pin this counter too, muting the exact alert it exists for. Watch `gateway_rate_limit_denied_total` instead.
+
+To find a client stuck in a rejection loop, rank by key, then drill into the one that stands out:
+
+```promql
+topk(5, sum by (vk_id) (rate(gateway_client_rejects_total{code!=""}[15m])))
+```
+
+Copy the complete `vk_id` from that result, then replace `<full-vk-id>` for the code breakdown:
+
+```promql
+sum by (code) (rate(gateway_client_rejects_total{vk_id="<full-vk-id>"}[15m]))
+```
 
 ### Streaming
 
@@ -9076,7 +9189,7 @@ The LangWatch AI Gateway replaces every direct provider call with a single call 
                                                                      ▼
                                                 ┌───────────────────────────────────┐
                                                 │   LangWatch AI Gateway (Go)       │
-                                                │   - auth / JWT cache (L1+L2)      │
+                                                │   - auth / JWT cache (in-process) │
                                                 │   - virtual-key resolution        │
                                                 │   - budget pre-check              │
                                                 │   - guardrail pre-call            │
@@ -11104,7 +11217,7 @@ Signature verification happens **before** the timestamp check to avoid a secret-
 
 Once a VK is resolved, the gateway caches a short-lived JWT (15 min TTL) containing the minimum claims needed to authorize: `{vk_id, project_id, team_id, org_id, principal_id, revision, iat, exp, iss, aud}`. The full VK config is fetched separately with ETag revalidation so cache entries are invalidated atomically on any edit.
 
-**Never** persisted to disk. Every replica's L1 cache is in memory; the optional L2 Redis is also in-memory.
+**Never** persisted to disk, and never shared: the cache is in memory, private to each replica.
 
 ## Tenant isolation
 
@@ -11183,7 +11296,7 @@ ClickHouse:
 
 In a self-hosted deployment, the gateway and control plane both run in your infrastructure. Data never leaves your cluster except on outbound calls to LLM providers. You own every secret, every KMS key, every audit log, and every trace.
 
-The gateway Helm chart ships a deny-by-default `NetworkPolicy` (opt-in) that locks lateral traffic, only `ingress-nginx` and Prometheus can reach the pod, and egress is limited to DNS, the control plane, Redis (if configured), OTLP (if configured), and provider upstream IPs. The operator debug surface (pprof) is loopback-bound by default and unreachable over any Service; deployments that need direct access can bind non-loopback with a required bearer token, the gateway refuses to start in the bind-public-without-token configuration. See [Self-Hosting → Helm → NetworkPolicy](/ai-gateway/self-hosting/helm#networkpolicy) and [Self-Hosting → Helm → Admin listener](/ai-gateway/self-hosting/helm#admin-listener).
+The gateway Helm chart ships a deny-by-default `NetworkPolicy` (opt-in) that locks lateral traffic, only `ingress-nginx` and Prometheus can reach the pod, and egress is limited to DNS, the control plane, OTLP (if configured), and provider upstream IPs. There is no operator debug surface to lock down: the gateway binary exposes no admin or pprof listener, and the chart's `gateway.admin.*` keys are forward-compat surface that nothing reads. The planned listener is loopback-bound by default, with a required bearer token and a startup refusal for the bind-public-without-token configuration. See [Self-Hosting → Helm → NetworkPolicy](/ai-gateway/self-hosting/helm#networkpolicy) and [Self-Hosting → Helm → Admin listener](/ai-gateway/self-hosting/helm#admin-listener).
 
 See [Self-Hosting → Helm](/ai-gateway/self-hosting/helm) for the deployment topology.
 
@@ -11233,7 +11346,8 @@ For the zero-downtime rotation procedure, see [Secret rotation](#secret-rotation
 | Var                              | Default       | Purpose                                                                            |
 |----------------------------------|---------------|------------------------------------------------------------------------------------|
 | `SERVER_ADDR`                    | `:5563`       | HTTP listen address for the public + probe surface.                                |
-| `SERVER_GRACEFUL_SECONDS`        | `5`           | Drain window after `SIGTERM`. `/readyz` flips to 503 immediately; in-flight requests get this many seconds to complete before the listener closes. |
+| `SERVER_GRACEFUL_SECONDS`        | `60`          | Drain window after `SIGTERM`. `/readyz` flips to 503 immediately; in-flight requests get this many seconds to complete before the listener closes. Must be zero or positive: it is time spent waiting, so a negative value is refused at startup. The chart sets it from `shutdown.timeoutSeconds`. |
+| `SERVER_DRAIN_DELAY_SECONDS`     | `3`           | Pause between flipping `/readyz` to draining and closing the listener, so the load balancer stops routing here before the door shuts. Zero or positive, same as above. The chart sets it from `shutdown.preDrainWaitSeconds`. |
 | `SERVER_MAX_REQUEST_BODY_BYTES`  | `33554432` (32 MiB) | Hard cap on inbound request body size, enforced before auth. 32 MiB fits 1 M-context multimodal payloads with margin under a 512 Mi pod limit. Returns 413 immediately on declared `Content-Length` over the cap. |
 
 ## Control plane
@@ -11244,12 +11358,19 @@ For the zero-downtime rotation procedure, see [Secret rotation](#secret-rotation
 
 ## Auth cache (stale-while-error)
 
-The gateway is on the hot path of every LLM request, so a brief control-plane outage must not translate into mass authentication rejection. When a cached entry crosses its JWT exp AND the refresh fails for transport reasons (network/timeout/5xx/parse error), the entry's soft expiry is extended by `SOFT_BUMP` and the cached bundle continues to serve, up to a hard cap of `(JWT exp + HARD_GRACE)`. Auth-class rejections (401/403/404) evict immediately, no grace for known-bad credentials. Setting `HARD_GRACE=0` disables stale-while-error entirely (legacy hard-fail behaviour at JWT exp).
+The gateway is on the hot path of every LLM request, so a brief control-plane outage must not translate into mass authentication rejection. When a cached entry crosses its JWT exp AND the refresh fails for transport reasons (network/timeout/5xx/parse error), the entry's soft expiry is extended by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` and the cached bundle continues to serve, up to a hard cap of `(JWT exp + LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS)`. Auth-class rejections (401/403/404) evict immediately, no grace for known-bad credentials. Setting `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` to a negative value disables stale-while-error entirely (legacy hard-fail behaviour at JWT exp); `0` means unset and takes the default.
 
-| Var                                  | Default     | Purpose                                                                  |
-|--------------------------------------|-------------|--------------------------------------------------------------------------|
-| `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP`    | unset       | Per-failure soft-expiry extension during a control-plane outage.         |
-| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE`   | unset       | Outage cap measured from JWT exp. `0s` disables stale-while-error.       |
+The names without the `LW_GATEWAY_AUTH_CACHE_` prefix, and the duration-string forms they replaced (`LW_GATEWAY_AUTH_CACHE_HARD_GRACE=6h`), are not read. The gateway refuses to start when it finds one still set, naming the variable to use instead, rather than booting on the default and leaving the old setting looking applied.
+
+All three are a plain count of seconds, not a duration string: `300`, not `5m`.
+
+| Var                                          | Default        | Purpose                                                                                      |
+|----------------------------------------------|----------------|----------------------------------------------------------------------------------------------|
+| `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`    | `300` (5m)     | Per-failure soft-expiry extension during a control-plane outage.                             |
+| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`   | `21600` (6h)   | Outage cap measured from JWT exp. A negative value disables stale-while-error.                |
+| `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS`   | `60`           | How stale a cached key's config (credentials, base URLs, routing) can get before a background revalidation. A negative value disables the refresh. |
+
+The config refresh is conditional whenever the gateway has a version token to offer: it sends back the token the control plane stamped on the config it holds, and a key nobody changed is confirmed with a 304 instead of materialized and sent again. A key that did change still answers 200 with the whole bundle, which is the point of the refresh, so the saving is on the keys nobody edited. Since most keys are not edited in any given interval, lowering the TTL mostly buys revision lookups rather than bundles. The exception is a config the gateway holds no token for, which is what a response that arrived without an `ETag` leaves behind: that one is refreshed unconditionally and costs a full bundle every interval, so a proxy that strips `ETag` gives the saving up entirely.
 
 See [Auth Cache Architecture](/ai-gateway/observability#auth-cache-architecture) for the design and the [Production runbook → Control-plane outage](/ai-gateway/cookbooks/production-runbook#recipe-8--control-plane-outage--stale-while-error) for the operator playbook.
 
@@ -11333,7 +11454,7 @@ Canonical names always win when both are set. The aliases are scheduled for remo
 
 ## Forward-compat values.yaml knobs (v1.1)
 
-Several knobs are exposed in `charts/gateway/values.yaml` but the v1 gateway code does not yet read them. Setting them today is a no-op, they are documented in `values.yaml` so operator runbooks built ahead of v1.1 don't need rewriting. See [Scaling, Future tunables](/ai-gateway/self-hosting/scaling#future-tunables-forward-compat-in-valuesyaml) for the full list (cache LRU sizing, Redis L2, Bifrost pool sizing, admin, pprof listener, guardrail timeouts, startup netcheck).
+Several knobs are exposed in `charts/gateway/values.yaml` but the v1 gateway code does not yet read them. Setting them today is a no-op, they are documented in `values.yaml` so operator runbooks built ahead of v1.1 don't need rewriting. See [Scaling, Future tunables](/ai-gateway/self-hosting/scaling#future-tunables-forward-compat-in-valuesyaml) for the full list (cache LRU sizing, Bifrost pool sizing, admin, pprof listener, guardrail timeouts, startup netcheck).
 
 ---
 
@@ -11708,7 +11829,7 @@ readinessProbe:
 
 - **Per-provider live health.** If OpenAI is rate-limiting, the gateway still serves and falls back per the VK's configured chain. Reporting `not_ready` for one upstream would amplify the incident.
 - **The control plane.** A control-plane blip is a degradation the auth cache is built to absorb: warm keys keep serving from the in-process cache. Failing readiness on it would drop every replica from the load balancer at once and turn that degradation into a total outage. Control-plane reachability is reported on `/health` instead, where it informs a status page rather than gating traffic.
-- **Redis L2.** The current gateway has no Redis client; the auth cache is in-process LRU.
+- **Any shared cache.** The gateway has no Redis client; the auth cache is an in-process LRU, private to the pod.
 - **PostgreSQL.** The gateway never talks to Postgres directly; the control plane mediates persistence.
 
 The blast-radius of readiness is specifically: "is this pod still meant to serve traffic?", and the only condition today is `MarkDraining`.
@@ -11786,26 +11907,20 @@ Point the monitor at `https://gateway.your-corp.com/health`. Set `ingress.health
 
 ## Graceful shutdown
 
-`SIGTERM` triggers (the chart's `shutdown.preDrainWait` and `shutdown.timeout` knobs are not currently wired into the gateway code; the gateway uses `Server.GracefulSeconds` from `pkg/config/server.go`, default `5`, bump via `SERVER_GRACEFUL_SECONDS` if you need a longer window):
+`SIGTERM` triggers (the chart's `shutdown.preDrainWaitSeconds` and `shutdown.timeoutSeconds` knobs are wired into the gateway via `SERVER_DRAIN_DELAY_SECONDS`/`SERVER_GRACEFUL_SECONDS` — see [helm.mdx](/ai-gateway/self-hosting/helm#graceful-drain) for the full four-phase drain sequence):
 
 1. **Immediately**: `MarkDraining()` flips `/readyz` to 503 with `status:"draining"`. The Service's endpoint controller and the LB observe and stop routing new traffic.
-2. **Drain window**: existing in-flight requests continue. SSE streams continue until the upstream provider closes them or the request finishes naturally.
-3. **End of `GracefulSeconds`**: the HTTP server shuts down; remaining sockets close cleanly.
+2. **Pre-drain wait**: the pod keeps accepting connections for `shutdown.preDrainWaitSeconds` (default 5) while the LB catches up on the `/readyz` flip.
+3. **Drain window**: existing in-flight requests continue for up to `shutdown.timeoutSeconds` (default 60). SSE streams continue until the upstream provider closes them or the request finishes naturally.
 4. **Process exits 0**.
 
-Match your `terminationGracePeriodSeconds` to the drain window plus a few seconds of slack:
+Match your `terminationGracePeriodSeconds` to `preDrainWaitSeconds + timeoutSeconds` plus a few seconds of slack:
 
 ```yaml
-terminationGracePeriodSeconds: 30  # chart default
+terminationGracePeriodSeconds: 75  # chart default: 5 + 60 + 10 slack
 ```
 
-Without giving the LB time to notice `/readyz=503` before the listener closes, a small fraction of in-flight requests during rolling deploys hits a replica that has already shut down, the LB returns 502. If you observe this on rollout, add a `preStop` sleep so the pod stays around long enough for the LB to remove it:
-
-```yaml
-lifecycle:
-  preStop:
-    exec: { command: ["sleep", "3"] }
-```
+`preDrainWaitSeconds` exists precisely to give the LB time to notice `/readyz=503` before the listener stops accepting, so if you still see a fraction of in-flight requests hit an already-draining replica during rolling deploys, bump `shutdown.preDrainWaitSeconds` (and `terminationGracePeriodSeconds` to match) rather than reaching for a manual `preStop` sleep. A `preStop` hook does the same job less precisely: it delays SIGTERM instead of delaying the listener shutdown, so the pod is not yet reporting `/readyz=503` for any of that time and the LB has no signal to act on.
 
 ## End-to-end synthetic check
 
@@ -11834,7 +11949,7 @@ On alert:
 | `/health` 503 with `control_plane: unreachable for Ns`           | Control plane down, unroutable, or the shared internal secret does not match (a mismatch 401s the probe and reads the same) | Compare `LW_GATEWAY_INTERNAL_SECRET` byte-for-byte between gateway and control-plane pods, then check the Service and DNS. The `statusprobe_control_plane_unreachable` log line carries the underlying probe failure |
 | `/health` 503 while completions still succeed                    | Expected during a control-plane outage longer than 60 s: warm keys keep serving from the auth cache, cold ones do not | Confirm it is a real outage and not a secret mismatch (row above, which reads identically), then fix whichever side is wrong. `/readyz` stays 200 on purpose so warm traffic keeps flowing |
 | `/readyz` flips to 503 mid-life                                  | Pod received `SIGTERM` (rolling deploy, eviction, OOMKill) | `kubectl describe pod` for the termination reason                   |
-| 502 from LB for a small window during rolling deploy             | LB hasn't yet removed the draining replica             | Add a `preStop: sleep 3` lifecycle hook (see Graceful shutdown above) |
+| 502 from LB for a small window during rolling deploy             | LB hasn't yet removed the draining replica             | Raise `shutdown.preDrainWaitSeconds`, and `terminationGracePeriodSeconds` to match (see Graceful shutdown above) |
 
 ---
 
@@ -11925,7 +12040,7 @@ gateway:
   # Edge protection. Cap request body before auth runs so a misconfigured
   # caller can't OOM the pod. 10 MiB fits ~3 MiB prompts plus base64 images.
   security:
-    maxRequestBodyBytes: 10485760                 # 10 MiB
+    maxRequestBodyBytes: 33554432                 # 32 MiB
 ```
 
 The full set of overridable fields lives in `charts/gateway/values.yaml` (canonical for everything not exposed at the umbrella surface). All defaults are production-safe; you should only need to override `controlPlane.baseUrl`, `secrets.existingSecretName`, `ingress.host`, and the OTLP endpoint.
@@ -11940,7 +12055,7 @@ helm upgrade --install langwatch langwatch/langwatch \
 
 ## Env vars wired by the chart
 
-Source of truth: `charts/gateway/templates/configmap.yaml` (commit `d14576b1e`) and `charts/gateway/templates/deployment.yaml`. The chart wires only the env vars the Go gateway actually reads, knobs in `values.yaml` that don't appear here are forward-compat surface for v1.1 (e.g. `cache.bootstrapAllKeys`, `admin.*`, `redis.url`) and are silently ignored by the running binary. The canonical names are derived by `services/aigateway/config.go` `pkg/config.Hydrate`, which walks the Config struct's `env:"…"` tags and joins parent/child with `_`.
+Source of truth: `charts/gateway/templates/configmap.yaml` (commit `d14576b1e`) and `charts/gateway/templates/deployment.yaml`. The chart wires only the env vars the Go gateway actually reads, knobs in `values.yaml` that don't appear here are forward-compat surface for v1.1 (e.g. `cache.bootstrapAllKeys`, `admin.*`) and are silently ignored by the running binary. The canonical names are derived by `services/aigateway/config.go` `pkg/config.Hydrate`, which walks the Config struct's `env:"…"` tags and joins parent/child with `_`.
 
 | Env var | Source | Purpose |
 |---|---|---|
@@ -11953,7 +12068,7 @@ Source of truth: `charts/gateway/templates/configmap.yaml` (commit `d14576b1e`) 
 | `LW_GATEWAY_JWT_SECRET` | Secret `secrets.existingSecretName` | HS256 for resolve-key JWT |
 | `LW_GATEWAY_JWT_SECRET_PREVIOUS` | Secret (only when `secrets.jwtSecretPreviousKey` is set) | Retired key during rotation overlap |
 
-The deployment template intentionally does not inject `GATEWAY_REDIS_URL`, `GATEWAY_ADMIN_AUTH_TOKEN`, or `GATEWAY_OTEL_DEFAULT_AUTH_TOKEN`, the v1 gateway has no Redis client, admin/pprof listener, or OTLP auth-token field on its config struct, and silently dropping them at the env-var layer would mislead operators. OTLP authentication for self-hosters is delivered via `OTEL_OTLP_HEADERS` (e.g. `Authorization=Bearer …`) on the OTel config struct in `pkg/config/otel.go`. See `charts/gateway/templates/deployment.yaml` for the rationale comment.
+The deployment template intentionally does not inject `GATEWAY_ADMIN_AUTH_TOKEN` or `GATEWAY_OTEL_DEFAULT_AUTH_TOKEN`, the gateway has no admin/pprof listener and no OTLP auth-token field on its config struct, and silently dropping them at the env-var layer would mislead operators. OTLP authentication for self-hosters is delivered via `OTEL_OTLP_HEADERS` (e.g. `Authorization=Bearer …`) on the OTel config struct in `pkg/config/otel.go`. See `charts/gateway/templates/deployment.yaml` for the rationale comment.
 
 ## Secret rotation
 
@@ -11992,7 +12107,7 @@ See [Config → Secret rotation](/ai-gateway/self-hosting/config#secret-rotation
 
 Two control-plane components must be running for the gateway to function fully:
 
-- **`langwatch-app`** on `gateway.controlPlane.baseUrl` (default `http://langwatch-app:5560`). The gateway hits `/api/internal/gateway/resolve-key`, `/config`, `/changes`, and `/guardrail-check` synchronously. If unreachable, the gateway extends its cached entries via stale-while-error (see `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP`, `HARD_GRACE`) but new VKs cannot resolve and rate limits cannot tighten.
+- **`langwatch-app`** on `gateway.controlPlane.baseUrl` (default `http://langwatch-app:5560`). The gateway hits `/api/internal/gateway/resolve-key`, `/config`, `/changes`, and `/guardrail-check` synchronously. If unreachable, the gateway extends its cached entries via stale-while-error (see `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`, `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`) but new VKs cannot resolve and rate limits cannot tighten.
 - **`langwatch-workers`** running the event-sourcing pipelines. **Budget enforcement depends on this.** The gateway does NOT debit budgets directly: it emits spend commands, and the workers' debits process prices them and inserts ledger rows into ClickHouse. The `gateway_budget_scope_totals_mv` materialized view aggregates spend, and the bundle the gateway long-polls for is built from that view. **If `workers.enabled: false`, the gateway still serves traffic but spend never accumulates against budgets, so hard-cap scopes will not block at the configured limit.** Self-hosters running the umbrella chart get workers by default; standalone `charts/gateway` installs MUST point at a control plane that has the worker pipeline running.
 
   The gateway side of that pipeline is `spend.enabled`, on by default. It is what writes each request's spend record to the on-disk spool a background drainer ships to the control plane, so **turning it off leaves the gateway serving traffic that costs money and debits nothing**: budgets sit at zero and stop enforcing. Turn it off only while running a gateway newer than a control plane that has no spend ingest route yet, and even then leaving it on is the safer degraded state, because the drainer retries on backoff and the spool is bounded. Watch `gateway_spend_spool_dropped_total`: every drop is spend nobody bills.
@@ -12008,13 +12123,13 @@ Clients reach the gateway via the Ingress (`gateway.your-corp.com`) on port 443.
 
 ## Scaling
 
-See [Scaling](/ai-gateway/self-hosting/scaling) for HPA configuration, replica sizing, and Redis L2 cache guidance. Quick summary: the gateway is stateless and horizontally scalable; the chart's HPA defaults to 2-10 replicas at 70% CPU plus a custom `lw_gateway_rps` metric (requires Prometheus-adapter). In-flight streaming requests pin to a single replica, so HPA should scale on smoothed signals rather than chasing spikes.
+See [Scaling](/ai-gateway/self-hosting/scaling) for HPA configuration and replica sizing. Quick summary: the gateway is stateless and horizontally scalable; the chart's HPA defaults to 2-10 replicas at 70% CPU plus a custom `lw_gateway_rps` metric (requires Prometheus-adapter). In-flight streaming requests pin to a single replica, so HPA should scale on smoothed signals rather than chasing spikes.
 
 ## High availability
 
 - Run ≥2 replicas with a PodDisruptionBudget (chart default `minAvailable: 1`) so rolling updates don't remove every pod simultaneously.
-- The auth-cache stale-while-error grace window (`LW_GATEWAY_AUTH_CACHE_SOFT_BUMP`, `HARD_GRACE`) keeps replicas serving with cached VK bundles when the control plane is briefly offline. See [Auth-cache stale-while-error](/ai-gateway/self-hosting/config#auth-cache) for the soft/hard-grace knobs.
-- The Redis L2 cache (`gateway.redis.url`) is **forward-compat surface today**: the v1 gateway has no Redis client, so this knob is a no-op. v1.1 will wire it for replica-warm-up on HPA scale-out. Don't rely on it for cold-start coverage in v1; the auth-cache grace window is the only operational backstop.
+- The auth-cache stale-while-error grace window (`LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`, `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS`) keeps replicas serving with cached VK bundles when the control plane is briefly offline. See [Auth-cache stale-while-error](/ai-gateway/self-hosting/config#auth-cache) for the soft/hard-grace knobs.
+- The auth cache is per pod. A replica added by HPA scale-out warms from the control plane on its first request per key, the same first-request cost every replica pays after a rolling deploy, and the grace window above is the operational backstop for a control plane that is unreachable.
 
 ## Monitoring
 
@@ -12171,13 +12286,12 @@ gateway:
 - `ingress-nginx` namespace → port `5563` (customer traffic via your Ingress).
 - `monitoring` namespace Prometheus pod → port `5563` `/metrics`.
 
-Everything else is rejected, including traffic from other namespaces, lateral pod-to-pod dials, and direct NodePort hits. The pprof admin listener is loopback-bound on `127.0.0.1:6060` and is unaffected by `NetworkPolicy` because `kubectl port-forward` tunnels through the Kubernetes API server, not the pod network.
+Everything else is rejected, including traffic from other namespaces, lateral pod-to-pod dials, and direct NodePort hits. The v1 binary opens no admin or pprof listener at all, so there is nothing extra on the pod to reach; the planned listener binds `127.0.0.1:6060` and would be unaffected by `NetworkPolicy` anyway, because `kubectl port-forward` tunnels through the Kubernetes API server rather than the pod network.
 
 **Egress**:
 
 - DNS to `kube-system` on TCP+UDP `:53` (ordering matters, DNS rule MUST come first or other rules fail to resolve hostnames).
 - Control plane (`langwatch-app` label selector) on port `5560` for `/resolve-key`, `/config`, `/changes`, `/budget`, `/guardrail`. Matches the langwatch chart's `langwatch-app` Service (app=5560, nlp=5561, langevals=5562, gateway=5563).
-- Redis on `:6379`, only rendered when `gateway.redis.url` is set.
 - OTLP `:4318`, only rendered when `gateway.networkPolicy.egressToOTLP` is non-empty.
 - Provider upstreams on `:443`, default `any IP EXCEPT RFC1918` (10/8, 172.16/12, 192.168/16). Teams with explicit compliance posture should override `egressToProviders` with a concrete CIDR allowlist.
 
@@ -12215,29 +12329,33 @@ Rolling deploys, HPA scale-downs, and voluntary pod evictions all invoke SIGTERM
 
 1. **SIGTERM received.** `ctx.Done()` fires.
 2. **Flip readiness + gauge.** `/readyz` starts returning `503 {"status":"draining"}`; `gateway_draining{pod=...}` goes to 1.
-3. **Pre-drain wait** (`shutdown.preDrainWait`, default 5 s). Gives the LB endpoint controller (nginx-ingress + kube-proxy) time to remove the pod from service endpoints. EKS-observed propagation is 3-4 s; 5 s has margin. During this window the pod is refusing new work via `/readyz` but `/livez` + `/startupz` stay green so kubelet doesn't short-circuit the drain.
-4. **Graceful close.** `server.Shutdown(Timeout=15s)` blocks until every in-flight handler exits, then force-closes. Streaming handlers that honour request context cancellation finish cleanly within the grace.
+3. **Pre-drain wait** (`shutdown.preDrainWaitSeconds`, default 5). Gives the LB endpoint controller (nginx-ingress + kube-proxy) time to remove the pod from service endpoints. EKS-observed propagation is 3-4 s; 5 s has margin. During this window the pod is refusing new work via `/readyz` but `/healthz` + `/startupz` stay green so kubelet doesn't short-circuit the drain.
+4. **Graceful close.** `server.Shutdown` blocks up to `shutdown.timeoutSeconds` (default 60) until every in-flight handler exits, then force-closes. Streaming handlers that honour request context cancellation finish cleanly within the grace.
 
 ```yaml
 gateway:
   shutdown:
-    preDrainWait: 5s
-    timeout: 15s
-  terminationGracePeriodSeconds: 30   # MUST be ≥ preDrainWait + timeout + slack
+    preDrainWaitSeconds: 5
+    timeoutSeconds: 60
+  terminationGracePeriodSeconds: 75   # MUST be ≥ preDrainWaitSeconds + timeoutSeconds + slack
 ```
+
+`timeoutSeconds` defaults above the gateway's 45 s non-streaming heartbeat interval on purpose. That interval is the line between a request that is merely slow and one that is stuck, so a shorter window would cut off exactly the requests the heartbeat exists to keep alive. Narrow it and the gateway says so at boot with a `graceful_shutdown_shorter_than_heartbeat_interval` warning.
 
 ### Invariant
 
-`terminationGracePeriodSeconds ≥ preDrainWait + timeout + slack`. Violate this and k8s SIGKILLs the pod mid-drain. The chart defaults 5 + 15 + 10-slack = 30 which matches the template.
+`terminationGracePeriodSeconds ≥ preDrainWaitSeconds + timeoutSeconds + slack`. Violate this and k8s SIGKILLs the pod mid-drain. The chart defaults 5 + 60 + 10-slack = 75 which matches the template, enforced in CI (`.github/workflows/go-services.yaml`'s `helm` job renders the chart and checks this invariant directly).
 
-If your LB propagation is slower than EKS (e.g. cloud LB with 10+ second endpoint propagation), bump `preDrainWait` **and** `terminationGracePeriodSeconds` together:
+The two keys are a plain count of seconds. A values file still carrying the duration-string names `shutdown.preDrainWait` or `shutdown.timeout` fails `helm template` with a message naming the key to use instead, rather than installing a release whose drain timing silently ignores them.
+
+If your LB propagation is slower than EKS (e.g. cloud LB with 10+ second endpoint propagation), bump `preDrainWaitSeconds` **and** `terminationGracePeriodSeconds` together:
 
 ```yaml
 gateway:
   shutdown:
-    preDrainWait: 15s
-    timeout: 20s
-  terminationGracePeriodSeconds: 45   # 15 + 20 + 10 slack
+    preDrainWaitSeconds: 15
+    timeoutSeconds: 60
+  terminationGracePeriodSeconds: 85   # 15 + 60 + 10 slack
 ```
 
 ### Observability
@@ -12265,7 +12383,7 @@ Edge protection lives under a dedicated `security` stanza separate from per-upst
 ```yaml
 gateway:
   security:
-    maxRequestBodyBytes: 10485760   # 10 MiB, default
+    maxRequestBodyBytes: 33554432   # 32 MiB, default
 ```
 
 Why not `budget` or `upstream`? These three concerns fail in different directions and alert differently:
@@ -12298,14 +12416,14 @@ Notable omissions:
 - **`writeTimeout` is NOT exposed.** It would bound the whole response, which terminates long SSE streams (reasoning models, Claude thinking traces) at the cap. Per-chunk streaming deadlines live in the dispatcher, not here. If you're behind an ingress that enforces its own `proxy_read_timeout`, match it there instead.
 - **`idleTimeout` MUST exceed your nginx-ingress `keepalive_timeout`** (typical 75 s). If the gateway closes first, nginx's pool has dead sockets and a request fails mid-flight. The chart default 120 s is safe under the typical 75 s nginx value; if you run a custom ingress with a longer keepalive, bump this value proportionally.
 
-All three timeouts apply to the public listener and the admin listener identically.
+All three timeouts apply to the public listener, which is the only listener the v1 binary opens. They will cover the [admin listener](#admin-listener) identically once it ships.
 
 ## Chart and data-plane CI
 
 The upstream repo runs a dedicated `gateway-ci` workflow against every PR that touches `services/gateway/**` or `charts/gateway/**` (paths-filter gated so unrelated PRs don't trigger it). What it guarantees on the chart you're installing:
 
 - **Go data plane**: `go mod verify`, `go vet`, `go build`, `go test -count=1 -race ./...` across all 14 internal packages. Benchmarks compile under `-run=^$ -benchtime=1x` so Go API drift fails fast without adding benchmark noise to PR logs.
-- **Helm chart**: `helm lint` + two `helm template` renders, one with defaults (must render zero `NetworkPolicy` objects), one with `networkPolicy.enabled=true` + `redis.url=redis://…` (must render exactly one). Both invariants are asserted explicitly; violating either fails the job.
+- **Helm chart**: `helm lint` + two `helm template` renders, one with defaults (must render zero `NetworkPolicy` objects), one with `networkPolicy.enabled=true` (must render exactly one). Both invariants are asserted explicitly; violating either fails the job.
 
 Jobs are timeout-capped (15 m, 10 m) and use concurrency cancellation on force-push, so a runaway test can't burn runner minutes.
 
@@ -12318,7 +12436,7 @@ Gateway and control plane are versioned in **lockstep**: release-please bumps bo
 1. `helm diff upgrade langwatch langwatch/langwatch -f values.yaml --version <new>` to preview the change set.
 2. `helm upgrade langwatch langwatch/langwatch -f values.yaml --version <new>`. The umbrella's `langwatch-app` and gateway Deployments roll concurrently, both use Kubernetes' standard `RollingUpdate` strategy and the chart does not enforce ordering. Safety during the overlap window is handled by the dual-key signature contract documented under [Secret rotation](#secret-rotation): the new control-plane image accepts both old and new signatures, so a brief window where gateway pods on the new image talk to control-plane pods still on the old image (or vice versa) does not break authentication. If you want to enforce ordering for an extra-cautious rollout, run `helm upgrade ... --set gateway.enabled=false` first to roll the app alone, then re-enable the gateway in a second `helm upgrade`, but for the standard upgrade path the dual-key contract is what makes the concurrent roll safe.
 3. Monitor `gateway_provider_duration_seconds` and `gateway_http_requests_total{status=~"5.."}` for ~30 min.
-4. Roll back via `helm rollback langwatch <revision>` if anomalies appear, the gateway's cache survives restarts and requests resume immediately. Both sub-charts roll back together.
+4. Roll back via `helm rollback langwatch <revision>` if anomalies appear. Each replaced gateway pod starts with an empty auth cache and warms from the control plane on its first request per key, the same cost every rolling update pays. Both sub-charts roll back together.
 
 ---
 
@@ -12549,7 +12667,7 @@ There are no current `LW_GATEWAY_UPSTREAM_*` env vars to tune the transport dire
 
 There is no boot-time cache warm-up in the current gateway. The `auth_cache_warm` readiness probe was removed because it created a chicken-and-egg with `/startupz` (the warm-up itself called the control plane, which couldn't accept traffic until *its* startup gate flipped). Instead the resolver warms organically on the first request per VK; an unwarmed gateway adds at most one extra ~50–200 ms control-plane round-trip on cold-cache requests. Subsequent requests hit the in-process cache and skip the round-trip entirely until the cache entry's soft-expiry passes.
 
-The cache is in-process and per-replica. Replicas warm independently; there is no cross-replica L2 cache in the current gateway. A Bootstrap-pull design that pre-loads keys before flipping `/startupz` to 200 is tracked under `specs/ai-gateway/auth-cache.feature` for v1.1+ when tenant key counts make the first-request tax visible at scale.
+The cache is in-process and per-replica. Replicas warm independently; there is no cross-replica cache, by design. A Bootstrap-pull design that pre-loads keys before flipping `/startupz` to 200 is tracked under `specs/ai-gateway/auth-cache.feature` for v1.1+ when tenant key counts make the first-request tax visible at scale.
 
 ## Blue-green, canary
 
@@ -12629,7 +12747,6 @@ Several knobs are exposed in `charts/gateway/values.yaml` that the v1 gateway co
 - `cache.lruSize`, explicit auth-cache LRU bound (default 50,000)
 - `cache.refreshInterval`, `cache.jwtRefreshThreshold`, proactive auth-cache refresh cadence
 - `cache.bootstrapAllKeys`, full prefetch on boot (enterprise tier; control plane must support the bulk endpoint)
-- `redis.url`, `redis.existingSecretName`, L2 auth cache shared across replicas
 - `bifrost.poolSize`, `bifrost.streamBufferSize`, Bifrost-side connection sizing
 - `admin.addr`, `admin.existingAuthSecretName`, operator pprof, debug listener
 - `guardrails.preTimeout`, `guardrails.postTimeout`, `guardrails.streamChunkWindow`, guardrail evaluation budgets
@@ -13066,14 +13183,14 @@ kubectl logs <gateway-pod> | grep -E 'otlp|exporter'
 - Optionally accompanied by INFO `auth_cache_serve_stale` lines on the same `vk_id`s.
 - Customers report no rejection, traffic flows normally.
 
-This is the gateway's **stale-while-error** path running on a transient control-plane outage. Each cached auth bundle that crosses its JWT expiry while the control plane is unreachable is bumped by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP` (default `5m`) and continues to serve, up to a hard cap of `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` (default `6h`). Customers don't see 401s during this window; the WARN line is informational, not page-worthy.
+This is the gateway's **stale-while-error** path running on a transient control-plane outage. Each cached auth bundle that crosses its JWT expiry while the control plane is unreachable is bumped by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` (default `300`, 5 minutes) and continues to serve, up to a hard cap of `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default `21600`, 6 hours). Customers don't see 401s during this window; the WARN line is informational, not page-worthy.
 
 **What to do:**
 
 1. Check whether the control plane is actually unreachable (Kubernetes events, control-plane pod logs, `/api/health` from inside the gateway pod).
 2. If it is, no operator action on the gateway side, wait for control-plane recovery and the WARN spew will stop on the next successful refresh (followed by a DEBUG `auth_cache_refresh_success` line per VK).
 3. If you start seeing `auth_cache_hard_evict reason=hard_cap_exceeded` ERROR lines, **the grace cap has been crossed and customers are now being rejected**: see [Production runbook → Recipe 8](/ai-gateway/cookbooks/production-runbook#recipe-8--control-plane-outage--stale-while-error) for the operator playbook + how to extend the cap if the outage is ongoing.
-4. To disable stale-while-error entirely (regulated deployments where stale-served bundles are unacceptable), set `LW_GATEWAY_AUTH_CACHE_HARD_GRACE=0s`. Refresh failures past JWT exp will then evict immediately and customers will see 401 `invalid_api_key` for the duration of the outage.
+4. To disable stale-while-error entirely (regulated deployments where stale-served bundles are unacceptable), set `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS=-1`. Refresh failures past JWT exp will then evict immediately and customers will see 401 `invalid_api_key` for the duration of the outage.
 
 **What this is NOT:** an HMAC mismatch, a misconfigured `LW_GATEWAY_INTERNAL_SECRET`, or a credential issue. Auth-class failures (401/403/404 from `/resolve-key`) bypass the grace window entirely and emit `auth_cache_hard_evict reason=auth_rejection` instead.
 
@@ -13199,7 +13316,7 @@ kubectl logs -n langwatch "$POD" | grep -E 'dns resolution failed|tcp dial faile
 **Root cause:** cold start + auth cache miss. New replica's L1 cache is empty; first unknown-VK request triggers a `/resolve-key` round-trip.
 
 **Fix:**
-- Enable Redis L2 (`GATEWAY_REDIS_URL`), new replicas warm from Redis instead of control plane.
+- Expect it. The auth cache is per pod, so a new replica warms from the control plane on its first request for each key, exactly as every replica does after a rolling deploy.
 - Ensure pod readiness probe waits for the long-poll loop to be running (`/readyz` handles this correctly by default).
 - `GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` is a planned v1.1 enhancement that would pre-warm the L1 LRU with every active VK on startup; the flag is reserved in env wiring but currently has no Go-side implementation, so setting it does not help today.
 
@@ -13541,7 +13658,7 @@ The first time the gateway sees a presented VK:
 
 1. Calls `/internal/gateway/resolve-key` on the LangWatch control-plane → receives a signed JWT (15-minute TTL) with identity claims (`vk_id`, `project_id`, `principal_id`, etc.) plus a `revision` number.
 2. Calls `/internal/gateway/config/:vk_id` (with `If-None-Match: <revision>` on subsequent fetches) → receives the fat config (providers, fallback, guardrails, budgets).
-3. Caches both in-memory (L1 LRU) and optionally in Redis (L2, shared across gateway pods).
+3. Caches both in an in-memory LRU, private to that gateway pod.
 4. Subscribes to `/internal/gateway/changes?since=<revision>` long-poll, on any mutation to any VK, the gateway invalidates and re-fetches.
 
 Subsequent requests with the same VK are served entirely from cache. JWT verification is local (HS256 shared secret); no control-plane round-trip on the hot path.
@@ -18726,26 +18843,35 @@ An `ik-lw-` write-only key (obtainable via the governance REST endpoint) also au
 
 ### The two-file recipe
 
-Commit `.claude/settings.json` with the non-secret flags and keep the bearer token **plus the `CLAUDE_CODE_ENABLE_TELEMETRY` enable flag** in a gitignored `.claude/settings.local.json`. Telemetry is **off by default**: the enable flag lives only in the local file, so a fresh clone with just the committed `settings.json` (and no `settings.local.json`) never attempts to export. This matters because the committed flags include `OTEL_LOG_USER_PROMPTS` (prompt text); raw API bodies (`OTEL_LOG_RAW_API_BODIES`) are kept off in committed config as the highest-risk flag and opted into locally only when needed. None of this content ships until the repo owner opts in locally by adding the enable flag. `settings.local.json`'s `env` merges per-key with `settings.json`'s `env`, so the local enable flag combines with the committed flags rather than replacing them.
+Commit `.claude/settings.json` with the exporter wiring, and keep the bearer token, the `CLAUDE_CODE_ENABLE_TELEMETRY` enable flag and **every content flag** in a gitignored `.claude/settings.local.json`. Telemetry is **off by default**: nothing exports until the enable flag is set, so a fresh clone carrying only the committed `settings.json` sends nothing.
+
+The committed file decides the shape of the export. What that export carries is decided by four flags, and they stay out of the repository so each person turns them on for themselves: `OTEL_LOG_USER_PROMPTS` puts prompt text on the wire, `OTEL_LOG_TOOL_DETAILS` and `OTEL_LOG_TOOL_CONTENT` put the input and output of every tool call on it, and `OTEL_LOG_RAW_API_BODIES` puts the Messages API request and response JSON on it. Inline bodies are truncated at 60 KB (`CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH` raises the limit, `file:<dir>` writes untruncated bodies to disk instead) and extended thinking is redacted.
+
+<Warning>Those four flags are what put your session content in LangWatch: prompt text, the input and output of every tool call, including file contents, and the model request and response bodies of every turn. A committed content flag does not switch telemetry on by itself, because Claude Code exports nothing until `CLAUDE_CODE_ENABLE_TELEMETRY` is set. It does not have to be set in the repository for that to happen, though: a managed settings file, a shell export, or a contributor's own `~/.claude/settings.json` can each turn telemetry on, and from that moment a content flag sitting in the committed file applies to everyone who cloned the repo. That is why the recipe keeps all four in each person's own gitignored file.</Warning>
+
+`settings.local.json`'s `env` merges per-key with `settings.json`'s `env`, so the local flags combine with the committed ones rather than replacing them.
 
 **`.claude/settings.json`** (commit this):
 
 ```json
 {
   "env": {
-    "OTEL_LOG_USER_PROMPTS": "1",
-    "OTEL_LOG_TOOL_DETAILS": "1",
-    "OTEL_LOG_TOOL_CONTENT": "1",
-    "OTEL_LOG_RAW_API_BODIES": "0",
+    "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA": "1",
     "OTEL_TRACES_EXPORTER": "otlp",
     "OTEL_LOGS_EXPORTER": "otlp",
     "OTEL_METRICS_EXPORTER": "otlp",
     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "https://app.langwatch.ai/api/otel",
+    "OTEL_LOGS_EXPORT_INTERVAL": "1000",
+    "OTEL_METRIC_EXPORT_INTERVAL": "2000",
     "OTEL_RESOURCE_ATTRIBUTES": "project.repo=my-repo-name,cost_center=my-team"
   }
 }
 ```
+
+<Info>**`CLAUDE_CODE_ENHANCED_TELEMETRY_BETA` is an experimental Claude Code flag, and it is the one that turns spans on.** Without it `OTEL_TRACES_EXPORTER` does nothing and `OTEL_LOG_TOOL_CONTENT` has no span events to write to, so you get flat log records instead of a trace: no tool call tree, no latencies, and every subagent folded into the main session rather than branching off it. Keep it when you trim the rest of the block.</Info>
+
+The two export intervals set how often Claude Code flushes; the defaults are 5 seconds for logs and 60 seconds for metrics, which is long enough that a first check looks like a failure.
 
 For self-hosted (`npx @langwatch/server`), replace the endpoint with `http://localhost:5560/api/otel`. The SDK auto-appends `/v1/traces`, `/v1/logs`, `/v1/metrics` — never write the per-signal path yourself.
 
@@ -18755,6 +18881,10 @@ For self-hosted (`npx @langwatch/server`), replace the endpoint with `http://loc
 {
   "env": {
     "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "OTEL_LOG_USER_PROMPTS": "1",
+    "OTEL_LOG_TOOL_DETAILS": "1",
+    "OTEL_LOG_TOOL_CONTENT": "1",
+    "OTEL_LOG_RAW_API_BODIES": "1",
     "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer sk-lw-…",
     "OTEL_RESOURCE_ATTRIBUTES": "project.repo=my-repo-name,cost_center=my-team,enduser.id=you@example.com"
   }
@@ -18832,7 +18962,7 @@ Same pattern works for the other agent CLIs you might be running. The wrapper pi
 
 | Command | With Virtual Key | Without Virtual Key |
 |---|---|---|
-| `langwatch claude` | gateway via `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` | OTLP via `CLAUDE_CODE_ENABLE_TELEMETRY` + an ingestion key on `OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer sk-lw-…"` + the four `OTEL_LOG_*` unlock knobs (`USER_PROMPTS`, `TOOL_DETAILS`, `TOOL_CONTENT`, `RAW_API_BODIES`) so user prompt text, tool I/O content, and full api_response_body assistant text all land on the wire |
+| `langwatch claude` | gateway via `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` | OTLP via `CLAUDE_CODE_ENABLE_TELEMETRY` + `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA` (spans, and with them the tool call tree and subagent attribution) + an ingestion key on `OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer sk-lw-…"` + the four `OTEL_LOG_*` unlock knobs (`USER_PROMPTS`, `TOOL_DETAILS`, `TOOL_CONTENT`, `RAW_API_BODIES`) so user prompt text, tool input and output content, and assistant response text all land on the wire, with bodies truncated at 60 KB and extended thinking redacted |
 | `langwatch codex` | gateway via `OPENAI_BASE_URL` + `OPENAI_API_KEY` | OTLP via `[otel]` block in `~/.codex/config.toml` |
 | `langwatch gemini` | gateway via `GOOGLE_GEMINI_BASE_URL` + `GEMINI_API_KEY` | OTLP (gen_ai.* native) |
 | `langwatch opencode` | gateway via `OPENAI_*` + `ANTHROPIC_*` env pairs | OTLP (opencode 1.14 emits structural spans only; tokens / model / cost wait on upstream `gen_ai.*` adoption) |
@@ -30682,6 +30812,7 @@ Configure Claude Code to send telemetry to LangWatch using environment variables
 
 ```bash
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1
 export OTEL_TRACES_EXPORTER=otlp
 export OTEL_LOGS_EXPORTER=otlp
 export OTEL_METRICS_EXPORTER=otlp
@@ -30694,6 +30825,14 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=https://app.langwatch.ai/api/otel
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-langwatch-api-key"
 claude
 ```
+
+<Note>
+  `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA` is an experimental Claude Code flag, and it is the one that turns spans on. Without it `OTEL_TRACES_EXPORTER` does nothing and `OTEL_LOG_TOOL_CONTENT` has no span events to write to, so you get flat log records instead of a trace: no tool call tree, no latencies, and every subagent folded into the main session rather than branching off it.
+</Note>
+
+<Warning>
+  The four `OTEL_LOG_*` flags are what put your session content in LangWatch: prompt text, tool input and output, and the model request and response bodies of every turn. Claude Code sends none of it without them. Read [Security and Privacy](#security-and-privacy) before you run this somewhere the content matters.
+</Warning>
 
 ## Administrator Configuration
 
@@ -30711,6 +30850,7 @@ Example managed settings configuration for LangWatch:
 {
   "env": {
     "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA": "1",
     "OTEL_TRACES_EXPORTER": "otlp",
     "OTEL_LOGS_EXPORTER": "otlp",
     "OTEL_METRICS_EXPORTER": "otlp",
@@ -30800,6 +30940,7 @@ Claude Code traces include:
 ```bash
 # Enable telemetry and send to LangWatch
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1
 export OTEL_TRACES_EXPORTER=otlp
 export OTEL_LOGS_EXPORTER=otlp
 export OTEL_METRICS_EXPORTER=otlp
@@ -30817,6 +30958,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-api-key"
 ```bash
 # Basic telemetry setup
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1
 export OTEL_TRACES_EXPORTER=otlp
 export OTEL_LOGS_EXPORTER=otlp
 export OTEL_METRICS_EXPORTER=otlp
@@ -30839,6 +30981,7 @@ export OTEL_RESOURCE_ATTRIBUTES="department=engineering,team.id=platform"
 ```bash
 # Debug configuration with console output and LangWatch
 export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1
 export OTEL_TRACES_EXPORTER=console,otlp
 export OTEL_LOGS_EXPORTER=console,otlp
 export OTEL_METRICS_EXPORTER=console,otlp
@@ -30921,20 +31064,27 @@ echo "{\"Authorization\": \"Bearer $(get-langwatch-token.sh)\", \"X-API-Key\": \
 
 ## Verification and Testing
 
-### 1. Verify Configuration
+### 1. Check the shell overrides
 
 After setting up your configuration, verify that Claude Code is sending data to LangWatch:
 
 ```bash
-# Check if telemetry is enabled
+# Shell override for telemetry
 echo $CLAUDE_CODE_ENABLE_TELEMETRY
 
-# Verify endpoint configuration
+# Shell override for span tracing
+echo $CLAUDE_CODE_ENHANCED_TELEMETRY_BETA
+
+# Shell override for the endpoint
 echo $OTEL_EXPORTER_OTLP_ENDPOINT
 
-# Check authentication headers
+# Shell override for the authentication headers
 echo $OTEL_EXPORTER_OTLP_HEADERS
 ```
+
+<Note>
+  These read your shell and nothing else. Claude Code also takes the same variables from the `env` block of a settings file, so an empty line here does not mean the setting is missing: check `.claude/settings.json`, `.claude/settings.local.json`, and your managed settings file too. The one check that covers every source is whether traces arrive in LangWatch, which is the next step.
+</Note>
 
 ### 2. Test Data Flow
 
@@ -30955,6 +31105,10 @@ echo $OTEL_EXPORTER_OTLP_HEADERS
     - Verify the OTLP protocol is supported (http/json or grpc)
   </Accordion>
 
+  <Accordion title="Trace lands but has no tool call tree, latencies, or subagents">
+    Set `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`. It is the experimental flag that turns span tracing on, and `OTEL_TRACES_EXPORTER` is a no-op without it. Cost and token events still arrive over the logs exporter, so the session shows up, but with no spans LangWatch has no structure to hang them on: every subagent folds into the main session instead of branching off it. `OTEL_LOG_TOOL_CONTENT` also depends on this flag, because the tool input and output it unlocks are written as span events.
+  </Accordion>
+
   <Accordion title="Trace shows but input/prompt is empty">
     Set `OTEL_LOG_USER_PROMPTS=1`. Claude Code redacts the prompt body on its `user_prompt` event by default — without this env, the receiver has no input text to attach to the synthesized trace.
   </Accordion>
@@ -30973,7 +31127,7 @@ echo $OTEL_EXPORTER_OTLP_HEADERS
   </Accordion>
 
   <Accordion title="Large payloads or truncated content">
-    The content flags ship the full request and response JSON on every turn, so `api_request_body` / `api_response_body` events can reach tens of KB each. LangWatch caps oversized log records on ingestion to protect the pipeline, keeping the lifted input and output text while trimming the rest. If you only need cost and token data, drop `OTEL_LOG_RAW_API_BODIES` and `OTEL_LOG_TOOL_DETAILS` to keep payloads small. The other flags (`OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_CONTENT`) are lightweight.
+    `OTEL_LOG_RAW_API_BODIES` is the flag that carries the large payload: it ships the Messages API request and response JSON on every turn, so `api_request_body` / `api_response_body` events can reach tens of KB each. Claude Code truncates each inline body at 60 KB (raise the limit with `CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH`) and redacts extended thinking. LangWatch caps oversized log records on ingestion to protect the pipeline, keeping the lifted input and output text while trimming the rest. If you only need cost and token data, drop all four content flags. The other three send smaller records than the raw bodies do, but they are content too: `OTEL_LOG_USER_PROMPTS` sends the whole prompt, `OTEL_LOG_TOOL_DETAILS` sends what each tool call was asked to do (the Bash command text, the Edit diff, the path a Read opened), and `OTEL_LOG_TOOL_CONTENT` sends what the tool gave back, including the contents of files a tool read or wrote.
   </Accordion>
 
   <Accordion title="Configuration not taking effect">
@@ -31008,6 +31162,10 @@ export OTEL_RESOURCE_ATTRIBUTES="environment=production,region=us-west-2,team=pl
 
 With LangWatch integration, you can gain insights into Claude Code usage:
 
+<Note>
+  Which of these you get depends on which flags are set, and nothing is exported at all without `CLAUDE_CODE_ENABLE_TELEMETRY=1`. With that alone you get the usage fields: token counts, cost, model and latency. The tool call tree, per-tool timings, session structure and subagent attribution need `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`, which is what turns spans on. Prompt text, tool input and output, and the model request and response bodies each need their own content flag (`OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_DETAILS`, `OTEL_LOG_TOOL_CONTENT`, `OTEL_LOG_RAW_API_BODIES`).
+</Note>
+
 ### **Productivity Tracking**
 - Monitor code generation patterns
 - Track tool usage and acceptance rates
@@ -31031,8 +31189,9 @@ For comprehensive monitoring resources, see the [Claude Code Monitoring Guide](h
 ## Security and Privacy
 
 - **Telemetry is opt-in** and requires explicit configuration
-- **Prompts, tool I/O, and full request/response bodies are off by default** - only token counts and cost ship until you opt in with the content flags (`OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_DETAILS`, `OTEL_LOG_TOOL_CONTENT`, `OTEL_LOG_RAW_API_BODIES`)
+- **Prompts, tool input and output, and model request and response bodies are off by default** - without the content flags (`OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_DETAILS`, `OTEL_LOG_TOOL_CONTENT`, `OTEL_LOG_RAW_API_BODIES`) the export still carries usage: token counts, cost, latency, the tool call tree and subagent attribution. What it leaves out is the content itself
 - **Once enabled, prompt text, tool outputs, and file contents passed to tools will appear in traces** - enable the flags only where capturing that content is acceptable
+- **Every example on this page enables the content flags**, because that is what makes a trace worth reading. Trim them to the ones you want before rolling the configuration out to a team, and keep the same decision in mind for managed settings, which apply to everyone at once
 
 <Note>
   All data sent to LangWatch is encrypted in transit and stored securely. Review LangWatch's [privacy policy](https://langwatch.ai/privacy) and [security practices](https://langwatch.ai/security) for more details.
@@ -36040,7 +36199,9 @@ Endpoint deliveries and the [webhooks fired by your automation triggers](#signin
 **Do not reconcile billing against this log.** It holds only the request families, it is a delivery-recovery aid rather than the money record, and it carries no retention contract. Reconcile against the spend ledger: [`spend-summaries` and `spend-events`](/ai-gateway/billing-events#reconciliation-two-grains-one-ledger), which include settled rows and keep 13 months.
 </Warning>
 
-`GET /api/webhooks/v1/events?type=&from=&to=&cursor=&limit=` is the organization's emitted-events log: cursor-paged, newest first, filterable by type and `created` range (unix milliseconds). Webhooks are push over this log, never the only copy of it, so a consumer that missed deliveries can list what was emitted and recover.
+`GET /api/webhooks/v1/events?from=&to=&type=&cursor=&limit=` is the organization's emitted-events log: cursor-paged, newest first, filterable by type. Webhooks are push over this log, never the only copy of it, so a consumer that missed deliveries can list what was emitted and recover.
+
+`from` and `to` bound the `created` range in unix milliseconds and are **required**, and `from` must be less than or equal to `to`. The log reads the same 13-month spend table the reconciliation pull reads, so an unbounded listing sorts every month the organization has, cold storage included, to serve one page. A read with no range, with only one of the two bounds, or with a range that ends before it starts is rejected with the canonical `400` this surface answers every validation failure with, naming the offending parameter.
 
 `GET /api/webhooks/v1/events/{id}` reads one event back by the `id` its envelope carried. A `404` means the log cannot answer for that id, and deliberately does not say which reason applies.
 
@@ -36745,8 +36906,6 @@ For measuring the quality of your RAG, check for hallucinations with faithfulnes
 
 | Evaluator | Description |
 | --------- | ----------- |
-| [Ragas Context Precision](/api-reference/evaluators/ragas-context-precision) | This metric evaluates whether all of the ground-truth relevant items present in the contexts are ranked higher or not. Higher scores indicate better precision. |
-| [Ragas Context Recall](/api-reference/evaluators/ragas-context-recall) | This evaluator measures the extent to which the retrieved context aligns with the annotated answer, treated as the ground truth. Higher values indicate better performance. |
 | [Ragas Faithfulness](/api-reference/evaluators/ragas-faithfulness) | This evaluator assesses the extent to which the generated answer is consistent with the provided context. Higher scores indicate better faithfulness to the context, useful for detecting hallucinations. |
 | [Context F1](/api-reference/evaluators/context-f1) | Balances between precision and recall for context retrieval, increasing it means a better signal-to-noise ratio. Uses traditional string distance metrics. |
 | [Context Precision](/api-reference/evaluators/context-precision) | Measures how accurate is the retrieval compared to expected contexts, increasing it means less noise in the retrieval. Uses traditional string distance metrics. |
@@ -36787,10 +36946,6 @@ Miscellaneous evaluators
 | [Off Topic Evaluator](/api-reference/evaluators/off-topic-evaluator) | Detect off-topic messages using LangWatch’s Off Topic Evaluator to enforce domain boundaries during AI agent testing. |
 | [Query Resolution](/api-reference/evaluators/query-resolution) | This evaluator checks if all the user queries in the conversation were resolved. Useful to detect when the bot doesn't know how to answer or can't help the user. |
 | [Semantic Similarity Evaluator](/api-reference/evaluators/semantic-similarity-evaluator) | Allows you to check for semantic similarity or dissimilarity between input and output and a target value, so you can avoid sentences that you don't want to be present without having to match on the exact text. |
-| [Ragas Answer Correctness](/api-reference/evaluators/ragas-answer-correctness) | Computes with an LLM a weighted combination of factual as well as semantic similarity between the generated answer and the expected output. |
-| [Ragas Answer Relevancy](/api-reference/evaluators/ragas-answer-relevancy) | Legacy version of [Ragas Response Relevancy](/api-reference/evaluators/ragas-response-relevancy) — kept for backward compatibility. Prefer Response Relevancy for new evaluations. |
-| [Ragas Context Relevancy](/api-reference/evaluators/ragas-context-relevancy) | This metric gauges the relevancy of the retrieved context, calculated based on both the question and contexts. The values fall within the range of (0, 1), with higher values indicating better relevancy. |
-| [Ragas Context Utilization](/api-reference/evaluators/ragas-context-utilization) | This metric evaluates whether all of the output relevant items present in the contexts are ranked higher or not. Higher scores indicate better utilization. |
 
 
 ## Quick Start
@@ -38494,6 +38649,12 @@ description: Run experiments programmatically from notebooks or scripts to batch
 
 LangWatch makes it easy to run experiments from code.
 Just add a few lines to start tracking your experiments.
+
+Not using Python or TypeScript? The SDKs call the same REST endpoints you can call
+yourself: [create an experiment](/api-reference/experiments/create-an-experiment),
+[run it](/api-reference/experiments/run-an-experiment), then
+[poll the run](/api-reference/experiments/poll-a-run) and
+[read its results](/api-reference/experiments/read-run-results).
 
 ## Quickstart
 
@@ -53051,7 +53212,7 @@ floor narrow enough to be free-as-in-beer-AND-as-in-speech:
   default 5-role RBAC catalog (ADMIN, MEMBER, EXTERNAL + per-resource
   view/manage actions) is Apache 2.0.
 - **SCIM provisioning** is Enterprise. Apache 2.0 customers can still
-  use SSO (Okta, Auth0, Azure AD) for sign-in.
+  use SSO (Okta, Auth0, Azure AD, AWS Cognito, OneLogin) for sign-in.
 
 ## Migrating from Apache 2.0 to Enterprise
 
@@ -53080,7 +53241,7 @@ queryable; gated surfaces re-gate.
 - [AI Governance → Compliance architecture](/ai-governance/compliance-architecture): substrate mechanisms underlying the table above
 - [AI Governance → Open-core licensing](/ai-governance/overview#open-core-licensing): the layered enforcement (UI, tRPC, service, CLI)
 - [Self-hosting → Security](/self-hosting/security): TLS, env secrets, network boundaries
-- [Self-hosting → Configuration → SSO](/self-hosting/configuration/sso): Okta, Auth0, Azure AD wiring
+- [Self-hosting → Configuration → SSO](/self-hosting/configuration/sso): Okta, Auth0, Azure AD, AWS Cognito and OneLogin wiring
 
 ---
 
@@ -53590,13 +53751,100 @@ Precedence, evaluated in this order: a per-project BYOC S3 bucket (if configured
 |----------|-------------|---------|
 | `STORED_OBJECTS_BACKEND` | Explicit write-destination toggle: `azure`, or `s3` (the default when unset). `s3` selects nothing by itself — S3 is still chosen by `S3_BUCKET_NAME`, so the value only exists to say "not azure" | — |
 | `AZURE_BLOB_ACCOUNT_NAME` | Azure Storage account name | — |
-| `AZURE_BLOB_ACCOUNT_KEY` | Azure Storage account key (SharedKey auth) | — |
+| `AZURE_BLOB_ACCOUNT_KEY` | Azure Storage account key. Required by — and only by — `AZURE_BLOB_AUTH_MODE=sharedKey` | — |
+| `AZURE_BLOB_AUTH_MODE` | How to authenticate: `sharedKey`, `workloadIdentity`, `managedIdentity`, or `azureCli` | `sharedKey` |
+| `AZURE_BLOB_AUTHORITY_HOST` | Entra authority host. Required for sovereign clouds | Public cloud |
+| `AZURE_BLOB_TOKEN_AUDIENCE` | Token audience override. Sovereign clouds only | `https://storage.azure.com` |
 | `AZURE_BLOB_CONTAINER` | Azure Blob container name | — |
 | `AZURE_BLOB_ENDPOINT` | Blob endpoint base URL. Optional on the Azure public cloud; required for sovereign clouds (`*.usgovcloudapi.net`, `*.chinacloudapi.cn`), private endpoints, and the Azurite emulator | `https://{accountName}.blob.core.windows.net` |
 
 <Warning>
-When `STORED_OBJECTS_BACKEND=azure` is set, all three of `AZURE_BLOB_ACCOUNT_NAME`, `AZURE_BLOB_ACCOUNT_KEY`, and `AZURE_BLOB_CONTAINER` are required together. An incomplete config fails loud when the destination is resolved, naming the missing variable — it never silently falls back to S3 or the local filesystem. During an S3→Azure migration, keep `S3_BUCKET_NAME` set: legacy S3 surfaces (persisted `s3://` objects, the trace spool, staged payloads) continue to read from and write to the S3 bucket, while new stored-objects and dataset writes target Azure. On an azure-only install (no `S3_BUCKET_NAME`), those legacy S3 surfaces are unavailable and fail with a clear error instead of writing to a bucket nobody reads. In the Helm chart, set `app.dataplane.legacyS3ReadBucket` to the pre-migration bucket (keeping the `awsS3` credential fields populated) to get exactly this state; leave it empty on a greenfield Azure install. Set `AZURE_BLOB_ENDPOINT` (chart: `app.dataplane.providers.azureBlob.endpoint`) for sovereign clouds or private endpoints; it defaults to `https://{accountName}.blob.core.windows.net`. Authentication is SharedKey only; workload identity and per-project Azure BYOC are tracked separately (issues #6087, #6088).
+When `STORED_OBJECTS_BACKEND=azure` is set, `AZURE_BLOB_ACCOUNT_NAME` and `AZURE_BLOB_CONTAINER` are required, plus `AZURE_BLOB_ACCOUNT_KEY` when `AZURE_BLOB_AUTH_MODE` is `sharedKey` (the default). Under an identity mode the key must be absent — see below. An incomplete active Azure configuration fails loudly and never falls back to S3 or the local filesystem. Inactive Azure settings are validated only when an `azure-blob://` address is used, so they cannot break global or private-bucket S3 traffic. Set `AZURE_BLOB_ENDPOINT` (chart: `app.dataplane.providers.azureBlob.endpoint`) for sovereign clouds or private endpoints; it defaults to `https://{accountName}.blob.core.windows.net`. Per-project Azure BYOC is tracked separately (issue #6088).
 </Warning>
+
+### Migrating an existing installation
+
+Do not switch `STORED_OBJECTS_BACKEND` before copying existing data. The migration task uses its own `OBJECT_STORAGE_MIGRATION_*` credentials, so source reads and destination writes do not depend on the app's active provider:
+
+```bash
+pnpm run task migrateObjectStorage plan
+pnpm run task migrateObjectStorage copy
+
+# Stop all app and worker read/write traffic, drain GroupQueue, then:
+OBJECT_STORAGE_MIGRATION_WRITES_PAUSED=1 \
+OBJECT_STORAGE_MIGRATION_READS_PAUSED=1 \
+  pnpm run task migrateObjectStorage finalize
+
+# Switch STORED_OBJECTS_BACKEND and active credentials, then deploy while
+# traffic remains paused.
+pnpm run task migrateObjectStorage verify
+```
+
+`plan` is read-only. `copy` is resumable, verifies SHA-256 at the destination, and repairs a mismatched destination object. `finalize` refuses to run unless both reads and writes are explicitly paused, dataset uploads are idle, and GroupQueue has no pending, delayed, active, blocked, or staged durable references. Reads must remain paused because finalization publishes destination storage addresses before the target-provider deployment is active. It publishes newer ClickHouse stored-object rows only after the final verified copy; it does not rewrite or delete history. No phase deletes source bytes.
+
+After `finalize` succeeds, update `STORED_OBJECTS_BACKEND` and the active provider credentials while traffic remains paused, deploy that configuration, run `verify`, then resume traffic. A global migration excludes projects with private S3 buckets; they remain on their tenant-owned S3 destination.
+
+**Keep the source provider's read credentials configured through the rollback window.** Finalization rewrites stored-object addresses to the destination scheme, so a rollback that reverts `STORED_OBJECTS_BACKEND` *and* removes the destination provider's credentials leaves every rewritten address unreadable — the bytes still exist on both providers (no phase deletes them), but the deployment can no longer serve that scheme. Concretely:
+
+- **S3 → Azure**: after cutover, keep `S3_BUCKET_NAME` + S3 credentials configured (Helm: `app.dataplane.legacyS3ReadBucket`) so pre-migration `s3://` history stays readable. If you roll back to S3, keep the `AZURE_BLOB_*` settings configured (Helm: `app.dataplane.legacyAzureRead: true`) so the finalized `azure-blob://` addresses stay readable.
+- **Azure → S3**: the mirror image — keep `AZURE_BLOB_*` (Helm: `legacyAzureRead`) after cutover, and keep the S3 settings if you roll back.
+
+A rollback with the flag set is fully non-destructive: reads resolve per address scheme, and a reverse migration can later re-home the bytes. Also note: the plan reports rows addressed by a scheme outside both providers (for example `file://` from a local-storage era) — those rows are out of the migration's scope, stay on their current addresses, and remain readable as long as that scheme's backend stays configured.
+
+| Migration variable | Description |
+|---|---|
+| `OBJECT_STORAGE_MIGRATION_SOURCE_PROVIDER` | `s3` or `azure` |
+| `OBJECT_STORAGE_MIGRATION_TARGET_PROVIDER` | The other provider |
+| `OBJECT_STORAGE_MIGRATION_WRITES_PAUSED` | Must be `1` for `finalize` |
+| `OBJECT_STORAGE_MIGRATION_READS_PAUSED` | Must be `1` for `finalize` |
+| `OBJECT_STORAGE_MIGRATION_S3_BUCKET` | Global S3 source or destination bucket |
+| `OBJECT_STORAGE_MIGRATION_S3_ENDPOINT` | Optional custom S3 endpoint |
+| `OBJECT_STORAGE_MIGRATION_S3_REGION` | Optional S3 region. AWS uses its normal SDK region chain when omitted; custom endpoints default to `auto` |
+| `OBJECT_STORAGE_MIGRATION_S3_ACCESS_KEY_ID` | Optional explicit migration access key |
+| `OBJECT_STORAGE_MIGRATION_S3_SECRET_ACCESS_KEY` | Optional explicit migration secret key |
+| `OBJECT_STORAGE_MIGRATION_S3_SESSION_TOKEN` | Optional temporary-session token |
+| `OBJECT_STORAGE_MIGRATION_AZURE_ACCOUNT_NAME` | Azure source or destination account |
+| `OBJECT_STORAGE_MIGRATION_AZURE_CONTAINER` | Azure source or destination container |
+| `OBJECT_STORAGE_MIGRATION_AZURE_ENDPOINT` | Optional sovereign/private endpoint |
+| `OBJECT_STORAGE_MIGRATION_AZURE_AUTH_MODE` | `sharedKey`, `workloadIdentity`, `managedIdentity`, or `azureCli` |
+| `OBJECT_STORAGE_MIGRATION_AZURE_ACCOUNT_KEY` | Required only for `sharedKey` |
+| `OBJECT_STORAGE_MIGRATION_AZURE_AUTHORITY_HOST` | Optional sovereign authority host |
+| `OBJECT_STORAGE_MIGRATION_AZURE_TOKEN_AUDIENCE` | Optional sovereign token audience |
+
+### Authenticating without an account key
+
+`AZURE_BLOB_AUTH_MODE` selects how the app proves who it is. It defaults to `sharedKey`, so existing installs are unaffected.
+
+Many organisations set `allowSharedKeyAccess=false` on the storage account, frequently enforced through Azure Policy. On such an account the shared-key mode does not degrade — **every request is refused**. Use one of the identity modes instead:
+
+| Mode | Where it fits | Requires |
+| --- | --- | --- |
+| `sharedKey` | Anywhere account keys are permitted | `AZURE_BLOB_ACCOUNT_KEY` |
+| `workloadIdentity` | AKS. The enterprise path | A ServiceAccount annotated with the identity's client id, and the pod label `azure.workload.identity/use: "true"`. Both are chart values — see below |
+| `managedIdentity` | Azure VM, VMSS, App Service | The identity assigned to the machine |
+| `azureCli` | A developer laptop | Being signed in with `az login` |
+
+Whichever identity you use, grant it **Storage Blob Data Contributor** on the storage account or the specific container. The control-plane **Contributor** role does *not* grant data access — this is the single most common setup mistake, and it surfaces as a permission error rather than a sign-in error.
+
+Three rules worth knowing before you configure it:
+
+- **There is no fallback.** If an identity mode is selected and the identity is missing or unauthorised, storage fails loudly and stays down until it is fixed. It never quietly reverts to an account key, because that would reverse your security decision at the moment you are least likely to notice.
+- **An account key alongside an identity mode is rejected.** A key that would be silently ignored is worse than no key, since you would believe it was in use.
+- **Bearer tokens require HTTPS.** A plaintext `AZURE_BLOB_ENDPOINT` is refused before any token is sent.
+
+In the chart, set `app.dataplane.providers.azureBlob.authMode` and enable `global.serviceAccount` (`create: true` plus the `azure.workload.identity/client-id` annotation). The chart refuses to render `workloadIdentity` without a ServiceAccount, since the identity would have nothing to bind to. Federated Kubernetes identity is supported on **AKS only** — the token injection depends on the Azure workload-identity webhook. On clusters without it, use `managedIdentity` or `sharedKey`.
+
+On AKS, three things must line up or the token exchange fails with `AADSTS70021` before any storage call is made. The app surfaces that code and this remedy in the error, but they are easier to get right up front:
+
+- The **federated identity credential's issuer** must match the cluster's OIDC issuer exactly — *including the trailing slash*. Read it with `az aks show --query oidcIssuerProfile.issuerUrl`. If the cluster is ever recreated the issuer changes and every federated credential silently stops working.
+- Its **subject** must be `system:serviceaccount:<namespace>:<service-account-name>`, matched case-exactly against the ServiceAccount the chart creates.
+- Its **audience** must be `api://AzureADTokenExchange`.
+
+The pod label and the ServiceAccount annotation are both emitted by the chart; the federated credential itself is configured on the Azure side and is the piece the chart cannot do for you.
+
+The ServiceAccount and the workload-identity label are applied to the app and the workers only. Cron pods call the app over HTTP and never touch storage themselves, so giving them a Blob-capable token would grant every cron image storage access it has no use for.
+
+The same identity must be available to any out-of-band job that writes bytes, such as the dataset backfill task; run it with the same ServiceAccount as the app and workers.
 
 ## Email
 
@@ -53719,13 +53967,18 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.evaluators.google.enabled` | `GOOGLE_EVALUATOR_ENABLED` |
 | `app.evaluators.google.credentials.value` | `GOOGLE_CREDENTIALS_JSON` |
 | `app.telemetry.usage.enabled` | Inverse of `DISABLE_USAGE_STATS` |
-| `app.dataplane.enabled` | `USE_S3_STORAGE` (provider: `awsS3`) or `STORED_OBJECTS_BACKEND=azure` (provider: `azureBlob`) |
+| `app.dataplane.enabled` | `STORED_OBJECTS_BACKEND=s3` + `USE_S3_STORAGE` (provider: `awsS3`) or `STORED_OBJECTS_BACKEND=azure` (provider: `azureBlob`) |
 | `app.dataplane.bucket` | `S3_BUCKET_NAME` |
 | `app.dataplane.providers.azureBlob.accountName.value` | `AZURE_BLOB_ACCOUNT_NAME` |
-| `app.dataplane.providers.azureBlob.accountKey.value` | `AZURE_BLOB_ACCOUNT_KEY` |
+| `app.dataplane.providers.azureBlob.accountKey.value` | `AZURE_BLOB_ACCOUNT_KEY` (sharedKey mode only) |
+| `app.dataplane.providers.azureBlob.authMode` | `AZURE_BLOB_AUTH_MODE` |
+| `global.serviceAccount.create` / `.name` / `.annotations` | ServiceAccount the cloud identity binds to (also enables AWS IRSA) |
 | `app.dataplane.providers.azureBlob.container.value` | `AZURE_BLOB_CONTAINER` |
 | `app.dataplane.providers.azureBlob.endpoint.value` | `AZURE_BLOB_ENDPOINT` (sovereign clouds, private endpoints, emulator) |
-| `app.dataplane.legacyS3ReadBucket` | `S3_BUCKET_NAME` — set during an S3→Azure migration so pre-migration objects stay readable; leave empty on a greenfield Azure install |
+| `app.dataplane.providers.azureBlob.authorityHost.value` | `AZURE_BLOB_AUTHORITY_HOST` — required alongside a sovereign endpoint in a token-based mode |
+| `app.dataplane.providers.azureBlob.tokenAudience.value` | `AZURE_BLOB_TOKEN_AUDIENCE` — sovereign storage audience override |
+| `app.dataplane.legacyS3ReadBucket` | Keeps persisted `s3://` stored-object URIs and true legacy bucket/key consumers readable after moving writes to Azure. It does not route provider-derived dataset chunks or GroupQueue durable payloads; run the migration and drain GroupQueue before switching |
+| `app.dataplane.legacyAzureRead` | Keeps `AZURE_BLOB_*` settings emitted after moving writes to S3 so persisted `azure-blob://` stored objects remain readable. It is not a dataset migration mechanism: dataset chunks require a verified copy before switching providers |
 | `postgresql.external.connectionString.value` | `DATABASE_URL` |
 | `redis.external.connectionString.value` | `REDIS_URL` |
 | `workers.enabled` | Inverse of `START_WORKERS` |
@@ -54148,6 +54401,8 @@ description: "Set up Single Sign-On for LangWatch with your identity provider"
 
 LangWatch supports SSO with the identity providers below. Choose one and configure it as described.
 
+If your provider is not named here and speaks OpenID Connect, use the generic [`oidc`](#any-other-openid-connect-provider) provider. The named entries exist because each has setup steps worth spelling out, not because the others are unsupported.
+
 <Warning>
 **SSO requires an Enterprise license.** Setting the environment variables is not enough on its own: a deployment with an identity provider configured but no license runs in email mode, the identity-provider button is not shown on the sign-in page, and SSO sign-in routes are refused. Email sign-in and **Forgot password** stay available so nobody is locked out, though **Forgot password** can only deliver if outbound email is configured. If everyone on an unlicensed deployment signs in through SSO, set `LANGWATCH_LICENSE_KEY` or configure SMTP before upgrading, see [Editions and licensing](/self-hosting/licensing).
 
@@ -54160,11 +54415,14 @@ The decision is made once at startup, so a license activated on a running server
 |----------|--------------------------|----------|
 | Email/Password | `email` (default) | Nothing extra |
 | Auth0 | `auth0` | Client ID, Client Secret, Issuer |
+| AWS Cognito | `cognito` | Client ID, Client Secret, Issuer |
 | Azure AD | `azure-ad` | Client ID, Client Secret, Tenant ID |
 | GitHub | `github` | Client ID, Client Secret |
 | GitLab | `gitlab` | Client ID, Client Secret |
 | Google | `google` | Client ID, Client Secret |
 | Okta | `okta` | Client ID, Client Secret, Issuer |
+| OneLogin | `onelogin` | Client ID, Client Secret, Issuer |
+| Any other OpenID Connect provider | `oidc` | Client ID, Client Secret, Issuer |
 
 ## OAuth Redirect URL
 
@@ -54174,7 +54432,7 @@ When configuring your identity provider, set the redirect/callback URL to:
 https://your-langwatch-domain.com/api/auth/callback/{provider}
 ```
 
-Replace `{provider}` with: `auth0`, `azure-ad`, `github`, `gitlab`, `google`, or `okta`. This is the same value you set as `NEXTAUTH_PROVIDER`.
+Replace `{provider}` with: `auth0`, `azure-ad`, `cognito`, `github`, `gitlab`, `google`, `okta`, `onelogin`, or `oidc`. This is the same value you set as `NEXTAUTH_PROVIDER`.
 
 <Note>
 A `NEXTAUTH_PROVIDER` value LangWatch does not recognise, or one whose client credentials are missing, starts the deployment in email mode and logs which provider it could not mount. That keeps a licensed deployment signable-in while you correct the value, rather than pointing the sign-in page at an identity provider that was never wired up.
@@ -54220,6 +54478,44 @@ Or via environment variables:
 | `AUTH0_CLIENT_ID` | Your Auth0 client ID |
 | `AUTH0_CLIENT_SECRET` | Your Auth0 client secret |
 | `AUTH0_ISSUER` | `https://your-tenant.auth0.com` |
+
+### AWS Cognito
+
+1. In the [Cognito console](https://console.aws.amazon.com/cognito/), open your user pool and give it a hosted-UI domain if it does not have one yet (**App integration > Domain**)
+2. Create an app client with a client secret, and set its **Allowed callback URL** to `https://your-domain.com/api/auth/callback/cognito`
+3. Under the app client's login pages, enable the **Authorization code grant** flow and the `openid`, `email` and `profile` scopes
+4. Configure in Helm:
+
+```yaml
+app:
+  nextAuth:
+    provider: cognito
+    providers:
+      cognito:
+        clientId:
+          secretKeyRef: { name: langwatch-sso, key: cognitoClientId }
+        clientSecret:
+          secretKeyRef: { name: langwatch-sso, key: cognitoClientSecret }
+        issuer:
+          value: "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_abc123"
+```
+
+Or via environment variables:
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `cognito` |
+| `COGNITO_CLIENT_ID` | Your app client ID |
+| `COGNITO_CLIENT_SECRET` | Your app client secret |
+| `COGNITO_ISSUER` | `https://cognito-idp.<region>.amazonaws.com/<userPoolId>` |
+
+<Note>
+The issuer is the user pool's own issuer, not the hosted-UI domain. LangWatch reads the hosted-UI endpoints from the issuer's discovery document, so the domain never has to be configured separately. You can confirm a pool's issuer is reachable with:
+
+```bash
+curl https://cognito-idp.<region>.amazonaws.com/<userPoolId>/.well-known/openid-configuration
+```
+</Note>
 
 ### Azure AD
 
@@ -54325,6 +54621,75 @@ app:
 | `OKTA_CLIENT_ID` | Client ID |
 | `OKTA_CLIENT_SECRET` | Client secret |
 | `OKTA_ISSUER` | `https://your-org.okta.com` |
+
+### OneLogin
+
+1. In the [OneLogin Admin portal](https://www.onelogin.com/), add an **OpenID Connect (OIDC)** application
+2. Set the **Redirect URI** to `https://your-domain.com/api/auth/callback/onelogin`
+3. Under **SSO**, set the application type to **Web** so it is issued a client secret, and note the Client ID and Client Secret
+
+```yaml
+app:
+  nextAuth:
+    provider: onelogin
+    providers:
+      onelogin:
+        clientId:
+          secretKeyRef: { name: langwatch-sso, key: oneloginClientId }
+        clientSecret:
+          secretKeyRef: { name: langwatch-sso, key: oneloginClientSecret }
+        issuer:
+          value: "https://your-subdomain.onelogin.com/oidc/2"
+```
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `onelogin` |
+| `ONELOGIN_CLIENT_ID` | Client ID |
+| `ONELOGIN_CLIENT_SECRET` | Client secret |
+| `ONELOGIN_ISSUER` | `https://your-subdomain.onelogin.com/oidc/2` |
+
+<Note>
+If OneLogin sits behind another identity provider, for example a Cognito user pool that federates to it, point LangWatch at whichever one it talks to directly and let that one handle the hop. LangWatch only needs one OIDC issuer.
+</Note>
+
+### Any other OpenID Connect provider
+
+Any provider that publishes an OpenID Connect discovery document and supports the authorization code flow with PKCE works without being named above: Keycloak, Authentik, Zitadel, Ping, JumpCloud, a self-hosted IdP, whatever you run.
+
+1. Register an OIDC client with your provider, with the authorization code flow and the `openid`, `email` and `profile` scopes
+2. Set its redirect URI to `https://your-domain.com/api/auth/callback/oidc`
+
+```yaml
+app:
+  nextAuth:
+    provider: oidc
+    providers:
+      oidc:
+        clientId:
+          secretKeyRef: { name: langwatch-sso, key: oidcClientId }
+        clientSecret:
+          secretKeyRef: { name: langwatch-sso, key: oidcClientSecret }
+        issuer:
+          value: "https://idp.example.com"
+```
+
+| Variable | Value |
+|----------|-------|
+| `NEXTAUTH_PROVIDER` | `oidc` |
+| `OIDC_CLIENT_ID` | Client ID |
+| `OIDC_CLIENT_SECRET` | Client secret |
+| `OIDC_ISSUER` | Whatever your provider publishes `.well-known/openid-configuration` under |
+
+<Note>
+Check the issuer is right by fetching its discovery document, which is exactly what LangWatch does at sign-in:
+
+```bash
+curl https://idp.example.com/.well-known/openid-configuration
+```
+
+JSON back means the issuer is right. LangWatch then reads `authorization_endpoint`, `token_endpoint` and `userinfo_endpoint` from that document, so all three have to be there, and the client you registered has to allow the authorization code flow with PKCE.
+</Note>
 
 ## Domain-to-Organization Mapping
 
@@ -59201,6 +59566,15 @@ Query analytics timeseries data with metrics, aggregations, and filters.
 
 ---
 
+# FILE: ./api-reference/analytics/query-analytics-timeseries-legacy-path.mdx
+
+---
+title: "Query analytics timeseries (legacy path)"
+openapi: "POST /api/analytics"
+---
+
+---
+
 # FILE: ./api-reference/annotations/create-annotation-trace.mdx
 
 ---
@@ -59294,6 +59668,15 @@ openapi: "POST /api/api-keys"
 
 ---
 
+# FILE: ./api-reference/api-keys/get-api-key.mdx
+
+---
+title: "Get an API key"
+openapi: "GET /api/api-keys/{id}"
+---
+
+---
+
 # FILE: ./api-reference/api-keys/list-api-keys.mdx
 
 ---
@@ -59319,19 +59702,47 @@ The API Keys API lets you create, list, and revoke API keys for your organizatio
 
 ## Authentication
 
-Requires an **organization-level API key** with `organization:manage` permission. Pass it as a Bearer token:
+Requires an **organization-level API key**. Pass it as a Bearer token:
 
 ```
 Authorization: Bearer sk-lw-<id>_<secret>
 ```
 
+Reading your own keys needs `organization:view`. Creating, updating and revoking need `organization:manage`. Reading or listing keys that belong to somebody else needs `organization:manage` **and** organization administrator membership.
+
+Service keys are the exception, because they belong to nobody. A member credential with `organization:view` sees the organization's service keys in its own listing and may read one by id: administrator membership is what minting a service key takes, not what reading one takes. A service credential acts as nobody and so owns no keys at all, which makes its only listing the organization-wide one, and that needs `organization:manage`.
+
 ## Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/api-keys` | List all API keys in the organization |
+| `GET` | `/api/api-keys` | List API keys |
 | `POST` | `/api/api-keys` | Create a new API key |
+| `GET` | `/api/api-keys/{id}` | Read one key and the access it carries |
+| `PATCH` | `/api/api-keys/{id}` | Update a key's name, description or access |
 | `DELETE` | `/api/api-keys/{id}` | Revoke an API key |
+
+## Reading a key back
+
+`GET /api/api-keys/{id}` and `PATCH /api/api-keys/{id}` return the same body, and it contains every field a write accepts. `bindings` comes back in exactly the shape `POST` and `PATCH` take, so comparing what you asked for against what the key has is a comparison rather than a translation. The secret itself is never returned: it exists only in the create response.
+
+A personal key belonging to somebody else is readable only with organization administrator membership plus `organization:manage`. Without both, the id answers 404 rather than 403, because a 403 would confirm the key exists. Service keys are the exception described above: a member credential with `organization:view` reads one by id.
+
+## Updating
+
+`PATCH` is partial at the field level: send `name` alone and only the name changes. `bindings`, when you send them, replace the key's bindings outright, so what you send is what the key has afterward.
+
+```bash
+curl -X PATCH https://app.langwatch.ai/api/api-keys/<api_key_id> \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "CI pipeline (staging only)",
+    "bindings": [
+      { "role": "MEMBER", "scopeType": "PROJECT", "scopeId": "project_abc123" }
+    ]
+  }'
+```
 
 ## Key Types
 
@@ -59349,6 +59760,8 @@ Created for a specific user. The key's effective permissions are the intersectio
 }
 ```
 
+A personal key is capped by the access of the person it belongs to. It defaults to the caller; `assignedToUserId` mints one for somebody else, and that key is then capped by their access rather than yours.
+
 ### Service Keys
 
 Created without a user association (`userId: null`). Scoped to specific projects via `projectIds`. Each project gets an ADMIN binding automatically.
@@ -59365,6 +59778,30 @@ Created without a user association (`userId: null`). Scoped to specific projects
 Service keys without `projectIds` get org-wide ADMIN access. Always scope to specific projects when possible.
 </Info>
 
+Because a service key has no person capping it, and a key minted for somebody else is capped by their access rather than yours, both are reserved for organization administrators. A caller who holds `organization:manage` without being an administrator is refused with 403. Minting a personal key for yourself is always allowed: your own access caps it.
+
+## Narrowing what a key may do
+
+Three fields decide how far a key reaches:
+
+- `bindings`, the roles the key holds and where, in the same `role` / `scopeType` / `scopeId` shape [role bindings](/api-reference/role-bindings/overview) use.
+- `permissionMode`, one of `all`, `readonly` or `restricted`. `all` and `readonly` take their meaning from the bindings alone.
+- `permissions`, a list of `resource:action` keys. Only for `restricted` mode, where it is the exact set the key's `CUSTOM` bindings grant.
+
+```json
+{
+  "keyType": "service",
+  "name": "Nightly evaluation runner",
+  "permissionMode": "restricted",
+  "permissions": ["project:view", "traces:view", "evaluations:create"],
+  "bindings": [
+    { "role": "CUSTOM", "scopeType": "PROJECT", "scopeId": "project_abc123" }
+  ]
+}
+```
+
+A key can never grant more than the person or organization behind it already has, whatever you put in these fields.
+
 ---
 
 # FILE: ./api-reference/api-keys/revoke-api-key.mdx
@@ -59376,12 +59813,52 @@ openapi: "DELETE /api/api-keys/{id}"
 
 ---
 
+# FILE: ./api-reference/api-keys/update-api-key.mdx
+
+---
+title: "Update an API key"
+openapi: "PATCH /api/api-keys/{id}"
+---
+
+---
+
 # FILE: ./api-reference/automations/create-slack-automation.mdx
 
 ---
 title: 'Create Slack automation'
 openapi: 'POST /api/trigger/slack'
 ---
+
+---
+
+# FILE: ./api-reference/coding-agents/get-pull-request-coding-agent-usage.mdx
+
+---
+title: "Get pull request coding agent usage"
+openapi: "GET /api/coding-agent/pull-request-usage"
+---
+
+---
+
+# FILE: ./api-reference/coding-agents/list-coding-agent-session-events.mdx
+
+---
+title: "List coding agent session events"
+openapi: "GET /api/coding-agent/sessions/{sessionId}/events"
+---
+
+---
+
+# FILE: ./api-reference/coding-agents/overview.mdx
+
+---
+title: "Overview"
+description: "Read what a coding agent session did and what it cost. Walk one session's events call by call, with the tokens, cost and compactions of each, or roll a whole pull request up into sessions, tokens and cost per project, user and agent."
+---
+
+## Intro
+
+Read what a coding agent session did and what it cost. Walk one session's events call by call, with the tokens, cost and compactions of each, or roll a whole pull request up into sessions, tokens and cost per project, user and agent.
 
 ---
 
@@ -59542,6 +60019,15 @@ openapi: "DELETE /api/dataset/{slugOrId}/records"
 
 ---
 
+# FILE: ./api-reference/datasets/evaluate-a-dataset.mdx
+
+---
+title: "Evaluate a dataset"
+openapi: "POST /api/dataset/evaluate"
+---
+
+---
+
 # FILE: ./api-reference/datasets/get-dataset.mdx
 
 ---
@@ -59618,20 +60104,11 @@ openapi: "PUT /api/dataset/direct-upload/staging/{uploadId}"
 
 ---
 
-# FILE: ./api-reference/evaluations/action-run.mdx
+# FILE: ./api-reference/evaluations/list-the-built-in-evaluators.mdx
 
 ---
-title: "Create Run"
-openapi: "POST /api/evaluations/v3/{slug}/run"
----
-
----
-
-# FILE: ./api-reference/evaluations/get-runs.mdx
-
----
-title: "Get evaluation run status"
-openapi: "GET /api/evaluations/v3/runs/{runId}"
+title: "List the built-in evaluators"
+openapi: "GET /api/evaluations/list"
 ---
 
 ---
@@ -59640,12 +60117,62 @@ openapi: "GET /api/evaluations/v3/runs/{runId}"
 
 ---
 title: "Overview"
-description: "Run and monitor evaluation experiments. Start evaluation runs and poll for progress and results."
+description: "Run an evaluator over a single input and get its score back, or run it as a guardrail and gate on one boolean. List the built-in evaluators to see which ids you can address and what each one needs."
 ---
 
 ## Intro
 
-Run and monitor evaluation experiments. Start evaluation runs and poll for progress and results.
+Run an evaluator over a single input and get its score back, or run it as a guardrail and gate on one boolean. List the built-in evaluators to see which ids you can address and what each one needs.
+
+## Addressing an evaluator
+
+The `{evaluator}` segment takes any of three things:
+
+- a built-in id, such as `ragas/faithfulness`. Two-segment ids use the two-segment form of the path.
+- the slug of a monitor configured in your project, which brings that monitor's saved settings with it
+- `evaluators/{slug|id}` for an evaluator you saved, including workflow and code evaluators
+
+`GET /api/evaluations/list` returns the built-in ids along with the `data` fields each one requires. For what an individual evaluator scores and which settings it accepts, see its page under Built-in Evaluators.
+
+## Guardrails
+
+`POST /api/guardrails/{evaluator}/evaluate` is the same call in gating mode. Every outcome carries `passed`, including a skip and an evaluator error, so a request you are guarding is never blocked by the guard itself failing. Check `passed` and let the request through when it is true.
+
+---
+
+# FILE: ./api-reference/evaluations/report-batch-evaluation-results.mdx
+
+---
+title: "Report batch evaluation results"
+openapi: "POST /api/evaluations/batch/log_results"
+---
+
+---
+
+# FILE: ./api-reference/evaluations/run-a-namespaced-evaluator.mdx
+
+---
+title: "Run a namespaced evaluator"
+openapi: "POST /api/evaluations/{evaluator}/{subpath}/evaluate"
+---
+
+---
+
+# FILE: ./api-reference/evaluations/run-an-evaluator-as-a-guardrail.mdx
+
+---
+title: "Run an evaluator as a guardrail"
+openapi: "POST /api/guardrails/{evaluator}/evaluate"
+---
+
+---
+
+# FILE: ./api-reference/evaluations/run-an-evaluator.mdx
+
+---
+title: "Run an evaluator"
+openapi: "POST /api/evaluations/{evaluator}/evaluate"
+---
 
 ---
 
@@ -59897,8 +60424,6 @@ For measuring the quality of your RAG, check for hallucinations with faithfulnes
 
 | Evaluator | Description |
 | --------- | ----------- |
-| [Ragas Context Precision](/api-reference/evaluators/ragas-context-precision) | This metric evaluates whether all of the ground-truth relevant items present in the contexts are ranked higher or not. Higher scores indicate better precision. |
-| [Ragas Context Recall](/api-reference/evaluators/ragas-context-recall) | This evaluator measures the extent to which the retrieved context aligns with the annotated answer, treated as the ground truth. Higher values indicate better performance. |
 | [Ragas Faithfulness](/api-reference/evaluators/ragas-faithfulness) | This evaluator assesses the extent to which the generated answer is consistent with the provided context. Higher scores indicate better faithfulness to the context, useful for detecting hallucinations. |
 | [Context F1](/api-reference/evaluators/context-f1) | Balances between precision and recall for context retrieval, increasing it means a better signal-to-noise ratio. Uses traditional string distance metrics. |
 | [Context Precision](/api-reference/evaluators/context-precision) | Measures how accurate is the retrieval compared to expected contexts, increasing it means less noise in the retrieval. Uses traditional string distance metrics. |
@@ -59939,10 +60464,6 @@ Miscellaneous evaluators
 | [Off Topic Evaluator](/api-reference/evaluators/off-topic-evaluator) | Detect off-topic messages using LangWatch’s Off Topic Evaluator to enforce domain boundaries during AI agent testing. |
 | [Query Resolution](/api-reference/evaluators/query-resolution) | This evaluator checks if all the user queries in the conversation were resolved. Useful to detect when the bot doesn't know how to answer or can't help the user. |
 | [Semantic Similarity Evaluator](/api-reference/evaluators/semantic-similarity-evaluator) | Allows you to check for semantic similarity or dissimilarity between input and output and a target value, so you can avoid sentences that you don't want to be present without having to match on the exact text. |
-| [Ragas Answer Correctness](/api-reference/evaluators/ragas-answer-correctness) | Computes with an LLM a weighted combination of factual as well as semantic similarity between the generated answer and the expected output. |
-| [Ragas Answer Relevancy](/api-reference/evaluators/ragas-answer-relevancy) | Legacy version of [Ragas Response Relevancy](/api-reference/evaluators/ragas-response-relevancy) — kept for backward compatibility. Prefer Response Relevancy for new evaluations. |
-| [Ragas Context Relevancy](/api-reference/evaluators/ragas-context-relevancy) | This metric gauges the relevancy of the retrieved context, calculated based on both the question and contexts. The values fall within the range of (0, 1), with higher values indicating better relevancy. |
-| [Ragas Context Utilization](/api-reference/evaluators/ragas-context-utilization) | This metric evaluates whether all of the output relevant items present in the contexts are ranked higher or not. Higher scores indicate better utilization. |
 
 
 ## Running Evaluations
@@ -60067,59 +60588,10 @@ openapi: post /langevals/query_resolution/evaluate
 ---
 ---
 
-# FILE: ./api-reference/evaluators/ragas-answer-correctness.mdx
-
----
-openapi: post /legacy/ragas_answer_correctness/evaluate
----
----
-
-# FILE: ./api-reference/evaluators/ragas-answer-relevancy.mdx
-
----
-openapi: post /legacy/ragas_answer_relevancy/evaluate
----
----
-
-# FILE: ./api-reference/evaluators/ragas-context-precision.mdx
-
----
-openapi: post /legacy/ragas_context_precision/evaluate
----
----
-
-# FILE: ./api-reference/evaluators/ragas-context-recall.mdx
-
----
-openapi: post /legacy/ragas_context_recall/evaluate
----
----
-
-# FILE: ./api-reference/evaluators/ragas-context-relevancy.mdx
-
----
-openapi: post /legacy/ragas_context_relevancy/evaluate
----
----
-
-# FILE: ./api-reference/evaluators/ragas-context-utilization.mdx
-
----
-openapi: post /legacy/ragas_context_utilization/evaluate
----
----
-
-# FILE: ./api-reference/evaluators/ragas-faithfulness-1.mdx
-
----
-openapi: post /ragas/faithfulness/evaluate
----
----
-
 # FILE: ./api-reference/evaluators/ragas-faithfulness.mdx
 
 ---
-openapi: post /legacy/ragas_faithfulness/evaluate
+openapi: post /ragas/faithfulness/evaluate
 ---
 ---
 
@@ -60184,6 +60656,113 @@ openapi: post /ragas/summarization_score/evaluate
 ---
 openapi: post /langevals/valid_format/evaluate
 ---
+---
+
+# FILE: ./api-reference/events/create-track.mdx
+
+---
+title: "Record a user event"
+openapi: "POST /api/events/track"
+---
+
+---
+
+# FILE: ./api-reference/events/overview.mdx
+
+---
+title: "Overview"
+description: "Record customer events against a trace or thread, so behaviour like a thumbs-up, a conversion or a refund sits alongside the trace that produced it."
+---
+
+## Intro
+
+Record customer events against a trace or thread, so behaviour like a thumbs-up, a conversion or a refund sits alongside the trace that produced it.
+
+---
+
+# FILE: ./api-reference/events/track-an-event-legacy-path.mdx
+
+---
+title: "Track an event (legacy path)"
+openapi: "POST /api/track_event"
+---
+
+---
+
+# FILE: ./api-reference/experiments/create-an-experiment.mdx
+
+---
+title: "Create an experiment"
+openapi: "POST /api/experiment/init"
+---
+
+---
+
+# FILE: ./api-reference/experiments/list-experiments-for-the-project.mdx
+
+---
+title: "List experiments for the project"
+openapi: "GET /api/experiments"
+---
+
+---
+
+# FILE: ./api-reference/experiments/list-runs-of-an-experiment.mdx
+
+---
+title: "List runs of an experiment"
+openapi: "GET /api/experiments/runs"
+---
+
+---
+
+# FILE: ./api-reference/experiments/overview.mdx
+
+---
+title: "Overview"
+description: "Create experiments, run them, and read their results over HTTP. Create an experiment against a slug you choose, start a run, then poll it and pull the per-row results. This is the same surface the SDKs use, so anything they do you can do directly."
+---
+
+## Intro
+
+Create experiments, run them, and read their results over HTTP. Create an experiment against a slug you choose, start a run, then poll it and pull the per-row results. This is the same surface the SDKs use, so anything they do you can do directly.
+
+---
+
+# FILE: ./api-reference/experiments/poll-a-run.mdx
+
+---
+title: "Poll a run"
+openapi: "GET /api/experiments/runs/{runId}"
+---
+
+---
+
+# FILE: ./api-reference/experiments/read-run-results.mdx
+
+---
+title: "Read run results"
+openapi: "GET /api/experiments/runs/{runId}/results"
+---
+
+---
+
+# FILE: ./api-reference/experiments/report-dspy-optimizer-steps.mdx
+
+---
+title: "Report DSPy optimizer steps"
+openapi: "POST /api/dspy/log_steps"
+---
+
+---
+
+# FILE: ./api-reference/experiments/run-an-experiment.mdx
+
+---
+title: "Run an experiment"
+openapi: "POST /api/experiments/{slug}/run"
+---
+
 ---
 
 # FILE: ./api-reference/gateway-budgets/archive-budget.mdx
@@ -60591,15 +61170,15 @@ title: 'Overview'
 description: 'Create and manage access groups, their members, and role bindings via the REST API. Enterprise feature.'
 ---
 
+<Note>
+  **Available on Enterprise plans.** An organization without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments need an Enterprise license for the same endpoints. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
+
 ## Intro
 
 The Groups API lets you manage LangWatch access groups via REST. Groups are collections of users that share the same role bindings — when you assign a role to a group, every member inherits that access.
 
 Groups can be created manually via the API or provisioned automatically from your identity provider via [SCIM](/platform/scim).
-
-<Info>
-Groups are an **Enterprise** feature. Contact your account team to enable them.
-</Info>
 
 ## Authentication
 
@@ -60681,6 +61260,20 @@ Bindings can target three scope levels:
 
 Available roles: `ADMIN`, `MEMBER`, `VIEWER`, `CUSTOM` (requires `customRoleId`).
 
+## Errors
+
+| Code | Status | Meaning |
+|------|--------|---------|
+| `group_not_found` | 404 | No such group in this organization |
+| `scim_managed_group` | 409 | The group is provisioned over SCIM, so it is renamed, changed and deleted in the directory |
+| `user_not_in_organization` | 422 | The user is not a member here |
+| `group_member_already_added` | 409 | They are already in the group |
+| `scope_not_in_organization` | 422 | The team or project belongs to another organization |
+| `custom_role_id_required` | 422 | Role is `CUSTOM` with no `customRoleId` |
+| `custom_role_not_assignable` | 422 | That custom role cannot be granted here |
+| `role_binding_not_found` | 404 | No such binding on this group |
+| `personal_workspace_not_managed_here` | 403 | The scope is somebody's personal workspace |
+
 ---
 
 # FILE: ./api-reference/groups/remove-binding.mdx
@@ -60706,6 +61299,262 @@ openapi: "DELETE /api/groups/{id}/members/{userId}"
 ---
 title: "Rename group"
 openapi: "PATCH /api/groups/{id}"
+---
+
+---
+
+# FILE: ./api-reference/invites/create-invites.mdx
+
+---
+title: "Create invites"
+openapi: "POST /api/organization/invites"
+---
+
+---
+
+# FILE: ./api-reference/invites/list-invites.mdx
+
+---
+title: "List invites"
+openapi: "GET /api/organization/invites"
+---
+
+---
+
+# FILE: ./api-reference/invites/overview.mdx
+
+---
+title: "Overview"
+description: "Invite people into the organization in batches, with the teams and roles they land on, and list or revoke the invites still waiting to be accepted."
+---
+
+<Note>
+  **Available on Enterprise plans.** An organization without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments need an Enterprise license for the same endpoints. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
+
+## Intro
+
+The Invites API creates the invitations people accept to join your organization, up to 50 in one call. Each invite carries the organization role the person gets and the teams they land on, so someone who accepts is immediately where they need to be.
+
+Accepting stays a browser step: the person opens the link, signs in or signs up, and joins. This API covers the other three quarters of the job, creating, listing, and revoking.
+
+## Authentication
+
+Requires an **organization-level API key** with `organization:manage`. Pass it as a Bearer token:
+
+```
+Authorization: Bearer sk-lw-<id>_<secret>
+```
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/organization/invites` | List pending invites with their acceptance links |
+| `POST` | `/api/organization/invites` | Create up to 50 invites in one batch |
+| `DELETE` | `/api/organization/invites/{id}` | Revoke a pending invite |
+
+## The acceptance link is part of the response
+
+Every invite comes back with its `inviteCode` and a ready `inviteUrl`. A deployment with no email provider configured still has something to hand the person, and `emailNotSent` tells you, per invite, whether LangWatch managed to deliver the mail itself.
+
+```json
+{
+  "invites": [
+    {
+      "id": "<invite_id>",
+      "email": "engineer@acme.example",
+      "role": "MEMBER",
+      "inviteCode": "...",
+      "inviteUrl": "https://app.langwatch.ai/invite/accept?inviteCode=...",
+      "emailNotSent": true,
+      "teams": [{ "teamId": "team_abc123", "role": "MEMBER", "customRoleId": null }]
+    }
+  ]
+}
+```
+
+## The batch is all or nothing
+
+Validation runs over the whole batch before anything is written, and a problem refuses the batch rather than creating part of it. This is deliberate: silently granting someone less access than the call asked for is worse than an error you can read.
+
+The refusals to expect:
+
+| Code | Status | Meaning |
+|------|--------|---------|
+| `already_organization_member` | 409 | One of the addresses is already in the organization |
+| `duplicate_invite` | 409 | An invite for that address is already pending |
+| `member_seat_limit_reached` | 403 | The batch would take the organization past its seats |
+| `team_not_in_organization` | 422 | A `teamId` belongs to another organization |
+| `personal_workspace_not_managed_here` | 403 | A `teamId` names somebody's personal workspace, which is not shareable |
+| `custom_role_id_required` | 422 | A team assignment names a custom role without a `customRoleId` |
+| `custom_role_not_assignable` | 422 | The custom role cannot be handed out on that team |
+
+## Typical flow
+
+```bash
+curl -X POST https://app.langwatch.ai/api/organization/invites \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "invites": [
+      {
+        "email": "engineer@acme.example",
+        "role": "MEMBER",
+        "teams": [{ "teamId": "team_abc123", "role": "MEMBER" }]
+      }
+    ]
+  }'
+```
+
+Someone who never accepts leaves a pending invite behind. List them, then revoke the ones that have gone stale:
+
+```bash
+curl https://app.langwatch.ai/api/organization/invites \
+  -H "Authorization: Bearer sk-lw-..."
+
+curl -X DELETE https://app.langwatch.ai/api/organization/invites/<invite_id> \
+  -H "Authorization: Bearer sk-lw-..."
+```
+
+---
+
+# FILE: ./api-reference/invites/revoke-invite.mdx
+
+---
+title: "Revoke invite"
+openapi: "DELETE /api/organization/invites/{id}"
+---
+
+---
+
+# FILE: ./api-reference/members/get-member-access.mdx
+
+---
+title: "Get member access"
+openapi: "GET /api/organization/members/{userId}/access"
+---
+
+---
+
+# FILE: ./api-reference/members/get-member.mdx
+
+---
+title: "Get member"
+openapi: "GET /api/organization/members/{userId}"
+---
+
+---
+
+# FILE: ./api-reference/members/list-members.mdx
+
+---
+title: "List members"
+openapi: "GET /api/organization/members"
+---
+
+---
+
+# FILE: ./api-reference/members/overview.mdx
+
+---
+title: "Overview"
+description: "Manage the people in the organization: list them, read one with the teams they reach, change an organization role, disable or re-enable access, remove someone, and read the full breakdown of what a member can reach."
+---
+
+<Note>
+  **Available on Enterprise plans.** An organization without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments need an Enterprise license for the same endpoints. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
+
+## Intro
+
+The Members API manages the people already in your organization. The organization comes from the credential, so the paths carry only the member's user id.
+
+Adding someone new is a different thing: people join through an invite they accept, so start at [Invites](/api-reference/invites/overview).
+
+## Authentication
+
+Requires an **organization-level API key**. Pass it as a Bearer token:
+
+```
+Authorization: Bearer sk-lw-<id>_<secret>
+```
+
+Reading the list and a single member needs `organization:view`. Changing, removing, and reading the access breakdown need `organization:manage`.
+
+## Endpoints
+
+| Method | Path | Permission | Description |
+|--------|------|------------|-------------|
+| `GET` | `/api/organization/members` | `organization:view` | List members with their role and status |
+| `GET` | `/api/organization/members/{userId}` | `organization:view` | Read one member and the teams they reach |
+| `PATCH` | `/api/organization/members/{userId}` | `organization:manage` | Change the organization role, or disable and re-enable access |
+| `DELETE` | `/api/organization/members/{userId}` | `organization:manage` | Remove a member from the organization and its teams |
+| `GET` | `/api/organization/members/{userId}/access` | `organization:manage` | Read everything the member can reach and where it comes from |
+
+Disabled members are left out of the list unless you pass `includeDisabled=true`.
+
+## Disable, or remove
+
+Disabling keeps the membership and everything attached to it, and takes away the role that membership carried, so the person reaches nothing in the organization any more. Their live sessions are ended in the same call rather than running until the token happens to expire. Removing takes them out of the organization and every team in it.
+
+Both are undoable in the sense that you can bring the person back, but only disabling keeps the membership in place, so it is the safer move while an offboarding is still in progress.
+
+Re-enabling a member takes a seat back, so it is checked against your plan and can be refused with `member_seat_limit_reached`.
+
+## Guard rails
+
+- The member the credential acts as cannot remove or disable themselves: `cannot_remove_self` and `cannot_disable_self`.
+- The last active administrator cannot be disabled, demoted, or removed: `cannot_disable_last_admin`, `cannot_demote_last_admin`, and `cannot_remove_last_admin`. An organization with nobody who can administer it cannot be recovered from inside the product, and removal is the only one of the three that cannot be undone.
+- A `PATCH` carries exactly one of `role` or `disabled`. Sending both, or neither, is a `validation_error`.
+- Personal workspaces are not organization access, so they are not listed on a member and cannot be managed here.
+- Changing a role can leave a team with no administrator. The response reports those teams in `teamsLeftWithoutAdmin` so the caller can fix it rather than discovering it later.
+
+## The access breakdown
+
+`GET /api/organization/members/{userId}/access` answers the question an auditor asks: not what roles someone has, but what they can reach and why. It returns the organization role and its permissions, every group the member belongs to with the bindings that group carries, and the bindings held directly, each with the permissions it grants and the scope it grants them on.
+
+```bash
+curl https://app.langwatch.ai/api/organization/members/user_abc123/access \
+  -H "Authorization: Bearer sk-lw-..."
+```
+
+## Typical flow
+
+```bash
+# Who is in the organization
+curl "https://app.langwatch.ai/api/organization/members?includeDisabled=true" \
+  -H "Authorization: Bearer sk-lw-..."
+
+# Promote someone
+curl -X PATCH https://app.langwatch.ai/api/organization/members/user_abc123 \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{"role": "ADMIN"}'
+
+# Offboard: disable first, remove once the handover is done
+curl -X PATCH https://app.langwatch.ai/api/organization/members/user_abc123 \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{"disabled": true}'
+```
+
+---
+
+# FILE: ./api-reference/members/remove-member.mdx
+
+---
+title: "Remove member"
+openapi: "DELETE /api/organization/members/{userId}"
+---
+
+---
+
+# FILE: ./api-reference/members/update-member.mdx
+
+---
+title: "Update member"
+openapi: "PATCH /api/organization/members/{userId}"
 ---
 
 ---
@@ -60805,6 +61654,182 @@ Manage online evaluation monitors that automatically evaluate traces as they arr
 title: "Update a monitor"
 openapi: "PATCH /api/monitors/{id}"
 ---
+
+---
+
+# FILE: ./api-reference/organization/get-organization.mdx
+
+---
+title: "Get organization"
+openapi: "GET /api/organization"
+---
+
+---
+
+# FILE: ./api-reference/organization/overview.mdx
+
+---
+title: "Overview"
+description: "Read and update the organization the calling credential belongs to: its name, support contact, presence and trace sharing settings, and its stored-object storage."
+---
+
+<Note>
+  **Available on Enterprise plans.** An organization without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments need an Enterprise license for the same endpoints. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
+
+## Intro
+
+The Organization API reads and updates the organization your API key belongs to. There is no organization id in the path: the credential decides which organization you are addressing, so the same script runs unchanged against any organization once you swap the key.
+
+`PATCH` is partial. Only the fields you send are written, and the response body is exactly what a following `GET` returns, so a provisioning tool can compare what it asked for against what it got.
+
+## Authentication
+
+Requires an **organization-level API key**. Pass it as a Bearer token:
+
+```
+Authorization: Bearer sk-lw-<id>_<secret>
+```
+
+Reading needs `organization:view`; updating needs `organization:manage`. A key without the permission is refused with HTTP 403 and the code `insufficient_permissions`.
+
+## Endpoints
+
+| Method | Path | Permission | Description |
+|--------|------|------------|-------------|
+| `GET` | `/api/organization` | `organization:view` | Read the organization profile |
+| `PATCH` | `/api/organization` | `organization:manage` | Update part of the organization profile |
+
+Members and invites are families of their own: see [Members](/api-reference/members/overview) and [Invites](/api-reference/invites/overview).
+
+## What this API does not own
+
+- **Single sign-on settings.** The single sign-on domain and provider are not returned and cannot be set here. Claiming a domain reroutes signups for everyone on it, so it stays with the LangWatch team.
+- **The stored-object secret.** `s3SecretAccessKey` is accepted on `PATCH` and never read back, the same way a password field works. Every other storage field round-trips.
+
+## Typical flow
+
+```bash
+# Read the profile
+curl https://app.langwatch.ai/api/organization \
+  -H "Authorization: Bearer sk-lw-..."
+
+# Rename it and set a support contact, leaving everything else alone
+curl -X PATCH https://app.langwatch.ai/api/organization \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Acme", "supportContact": "support@acme.example"}'
+```
+
+Setting `traceSharingEnabled` to `false` revokes every trace share link already handed out across the organization's projects, not only the ones created from then on, so a trace someone shared externally stops resolving straight away.
+
+---
+
+# FILE: ./api-reference/organization/update-organization.mdx
+
+---
+title: "Update organization"
+openapi: "PATCH /api/organization"
+---
+
+---
+
+# FILE: ./api-reference/organizations/create-organization.mdx
+
+---
+title: "Create an organization"
+openapi: "POST /api/organizations"
+---
+
+---
+
+# FILE: ./api-reference/organizations/get-organization.mdx
+
+---
+title: "Get an organization"
+openapi: "GET /api/organizations/{id}"
+---
+
+---
+
+# FILE: ./api-reference/organizations/list-organizations.mdx
+
+---
+title: "List organizations"
+openapi: "GET /api/organizations"
+---
+
+---
+
+# FILE: ./api-reference/organizations/overview.mdx
+
+---
+title: "Overview"
+description: "Create organizations on a self-hosted instance with an instance administrator credential, and read the ones already there."
+---
+
+<Note>
+  **Self-hosted only.** These endpoints exist on a self-hosted LangWatch deployment that has `LANGWATCH_INSTANCE_ADMIN_API_KEY` configured. Without that variable, and on LangWatch Cloud, they answer 404: the family is absent rather than forbidden. Creating organizations on LangWatch Cloud is not part of this API.
+</Note>
+
+## Intro
+
+This is the one LangWatch API that exists before any organization does, which is what makes it the starting point for provisioning an instance as code. Everything else authenticates as an organization; this authenticates as the instance.
+
+Creating an organization hands back an organization admin API key along with it. That key is what the rest of the management APIs take, so a run can go from an empty deployment to a fully configured organization without a browser step:
+
+```
+instance key  ->  POST /api/organizations  ->  organization + admin API key
+                                                     |
+                                                     v
+                      teams, groups, roles, role bindings, members,
+                      invites, projects, API keys, SCIM tokens
+```
+
+## Authentication
+
+The instance administrator credential, as a Bearer token:
+
+```
+Authorization: Bearer <LANGWATCH_INSTANCE_ADMIN_API_KEY>
+```
+
+Set the variable on the deployment, generate it the way you generate any other secret (`openssl rand -hex 32` is fine), and treat it as the most powerful credential in the instance: it can create organizations, and each organization comes with an admin key. It is not an organization API key and cannot be used anywhere else in the API.
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/organizations` | List the organizations on this instance |
+| `POST` | `/api/organizations` | Create an organization and its bootstrap admin API key |
+| `GET` | `/api/organizations/{id}` | Read one organization |
+
+There is no `DELETE`. Deleting an organization takes everything in it, so it stays a deliberate operation rather than one an automated run can reach.
+
+## Creating an organization
+
+```bash
+curl -X POST https://langwatch.acme.internal/api/organizations \
+  -H "Authorization: Bearer $LANGWATCH_INSTANCE_ADMIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Acme", "slug": "acme", "adminApiKeyName": "Provisioning admin"}'
+```
+
+```json
+{
+  "organization": { "id": "organization_abc123", "name": "Acme", "slug": "acme" },
+  "team": { "id": "team_abc123", "name": "Acme" },
+  "adminApiKey": { "id": "<api_key_id>", "token": "sk-lw-..." }
+}
+```
+
+The slug is optional and is derived from the name when you leave it out. It is also the natural key: taking a slug that already exists is refused with 409 `organization_slug_taken` rather than creating a near-duplicate organization.
+
+`adminApiKey.token` is returned once, here. It is an organization-scoped service key with an admin binding on the whole organization, and it is the credential the [Organization](/api-reference/organization/overview), [Members](/api-reference/members/overview), [Roles](/api-reference/roles/overview) and [Role Bindings](/api-reference/role-bindings/overview) APIs expect. Store it before you do anything else.
+
+## Reading back
+
+`GET /api/organizations` and `GET /api/organizations/{id}` return the organizations on the instance, which is what lets a provisioning run check whether it has work to do before it does any. An id that does not exist answers 404.
 
 ---
 
@@ -61099,6 +62124,292 @@ openapi: "PUT /api/prompts/{id}/tags/{tag}"
 
 ---
 
+# FILE: ./api-reference/role-bindings/create-role-binding.mdx
+
+---
+title: "Create role binding"
+openapi: "POST /api/role-bindings"
+---
+
+---
+
+# FILE: ./api-reference/role-bindings/delete-role-binding.mdx
+
+---
+title: "Delete role binding"
+openapi: "DELETE /api/role-bindings/{id}"
+---
+
+---
+
+# FILE: ./api-reference/role-bindings/list-role-bindings.mdx
+
+---
+title: "List role bindings"
+openapi: "GET /api/role-bindings"
+---
+
+---
+
+# FILE: ./api-reference/role-bindings/overview.mdx
+
+---
+title: "Overview"
+description: "Grant a role to one principal, a user, a group or an API key, at one scope: the organization, a team, or a single project."
+---
+
+<Note>
+  **Available on Enterprise plans.** An organization without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments need an Enterprise license for the same endpoints. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
+
+## Intro
+
+A role binding is one sentence: **this principal has this role, here**. It is how every kind of access in LangWatch is expressed, so this is the API to read when you want to know who can reach what.
+
+Each binding names exactly one principal, and there are three kinds:
+
+| Principal | Field | Used for |
+|-----------|-------|----------|
+| A person | `userId` | Access someone has directly, on top of anything their groups give them |
+| A group | `groupId` | Access every member of the group inherits, including groups synced from your identity provider |
+| An API key | `apiKeyId` | What a service credential may reach, independent of any person |
+
+## Authentication
+
+Requires an **organization-level API key** with `organization:manage`. Pass it as a Bearer token:
+
+```
+Authorization: Bearer sk-lw-<id>_<secret>
+```
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/role-bindings` | List bindings, filtered by principal or scope |
+| `POST` | `/api/role-bindings` | Grant one role to one principal at one scope |
+| `PATCH` | `/api/role-bindings/{id}` | Change the role a binding grants |
+| `DELETE` | `/api/role-bindings/{id}` | Delete a binding |
+
+`GET` filters on `userId`, `groupId`, `apiKeyId`, `scopeType` and `scopeId`, and pages with `offset` and `limit`. `limit` defaults to 50 and cannot exceed 200. `totalCount` counts the filtered set, not the organization.
+
+## Scopes
+
+| `scopeType` | `scopeId` | What it reaches |
+|-------------|-----------|-----------------|
+| `ORGANIZATION` | the organization id | Every team and project in the organization |
+| `TEAM` | a team id | That team and all its projects |
+| `PROJECT` | a project id | That project only |
+
+The roles are `ADMIN`, `MEMBER`, `VIEWER`, and `CUSTOM`. `CUSTOM` carries a `customRoleId` from the [Roles](/api-reference/roles/overview) API, and is refused without one (`custom_role_id_required`).
+
+Some permissions only mean something for the organization as a whole, membership and billing among them. Granting one through a team- or project-scoped binding is refused at write time with `org_exclusive_permission_scope`, rather than being accepted and quietly having no effect.
+
+## Creating is idempotent-friendly
+
+A binding is identified by its principal, its role, and its scope. Creating the same combination twice answers 409 `role_binding_already_exists`, which a provisioning tool can read as "already done" instead of a failure. A `PATCH` changes the role; the principal and the scope stay as they are, so moving a grant somewhere else means a new binding.
+
+```bash
+# A group of engineers gets MEMBER on one team
+curl -X POST https://app.langwatch.ai/api/role-bindings \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "groupId": "group_abc123",
+    "role": "MEMBER",
+    "scopeType": "TEAM",
+    "scopeId": "team_abc123"
+  }'
+
+# A CI key gets a narrow custom role on one project
+curl -X POST https://app.langwatch.ai/api/role-bindings \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "apiKeyId": "<api_key_id>",
+    "role": "CUSTOM",
+    "customRoleId": "<custom_role_id>",
+    "scopeType": "PROJECT",
+    "scopeId": "project_abc123"
+  }'
+```
+
+## `hasLegacyAccessNotice`
+
+A create response can carry `hasLegacyAccessNotice: true`. It means this is the person's first explicit binding, and until now their access came from plain team membership, which this write switches off. Nothing failed, and nothing is blocked: it is there so a tool can tell an operator that this user's access is now described entirely by bindings.
+
+## Errors
+
+| Code | Status | Meaning |
+|------|--------|---------|
+| `role_binding_principal_invalid` | 422 | Not exactly one of `userId`, `groupId`, `apiKeyId` |
+| `user_not_in_organization` | 422 | The user is not a member here |
+| `group_not_in_organization` | 422 | The group belongs to another organization |
+| `api_key_not_in_organization` | 422 | The API key belongs to another organization |
+| `scope_not_in_organization` | 422 | The team or project belongs to another organization |
+| `custom_role_id_required` | 422 | Role is `CUSTOM` with no `customRoleId` |
+| `custom_role_not_assignable` | 422 | That custom role cannot be granted here |
+| `org_exclusive_permission_scope` | 422 | The role carries organization-only permissions, and the scope is a team or project |
+| `role_binding_already_exists` | 409 | That principal already has that role at that scope |
+| `role_binding_not_found` | 404 | No such binding in this organization |
+
+---
+
+# FILE: ./api-reference/role-bindings/update-role-binding.mdx
+
+---
+title: "Update role binding"
+openapi: "PATCH /api/role-bindings/{id}"
+---
+
+---
+
+# FILE: ./api-reference/roles/create-role.mdx
+
+---
+title: "Create role"
+openapi: "POST /api/roles"
+---
+
+---
+
+# FILE: ./api-reference/roles/delete-role.mdx
+
+---
+title: "Delete role"
+openapi: "DELETE /api/roles/{id}"
+---
+
+---
+
+# FILE: ./api-reference/roles/get-role.mdx
+
+---
+title: "Get role"
+openapi: "GET /api/roles/{id}"
+---
+
+---
+
+# FILE: ./api-reference/roles/list-permissions.mdx
+
+---
+title: "List permissions"
+openapi: "GET /api/roles/permissions"
+---
+
+---
+
+# FILE: ./api-reference/roles/list-roles.mdx
+
+---
+title: "List roles"
+openapi: "GET /api/roles"
+---
+
+---
+
+# FILE: ./api-reference/roles/overview.mdx
+
+---
+title: "Overview"
+description: "Build custom roles out of the permission catalog and keep them up to date. A role is a named set of resource and action permissions that a role binding then grants to someone, somewhere."
+---
+
+<Note>
+  **Available on Enterprise plans.** An organization without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments need an Enterprise license for the same endpoints. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
+
+## Intro
+
+The Roles API manages custom roles: named permission sets your organization defines, for when the built-in `ADMIN`, `MEMBER` and `VIEWER` roles are not the shape you need.
+
+A role on its own grants nothing. It becomes access when a [role binding](/api-reference/role-bindings/overview) hands it to a user, a group or an API key at a scope. Roles are what, bindings are who and where.
+
+## Authentication
+
+Requires an **organization-level API key** with `organization:manage`. Pass it as a Bearer token:
+
+```
+Authorization: Bearer sk-lw-<id>_<secret>
+```
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/roles/permissions` | The permission catalog roles are built from |
+| `GET` | `/api/roles` | List the organization's custom roles |
+| `POST` | `/api/roles` | Create a custom role |
+| `GET` | `/api/roles/{id}` | Read one custom role |
+| `PATCH` | `/api/roles/{id}` | Update a custom role |
+| `DELETE` | `/api/roles/{id}` | Delete a custom role |
+
+## Permissions are `resource:action` keys
+
+Start at the catalog. It lists every resource with the actions it takes, and flags the resources that only mean anything at organization scope, which is worth knowing before you build a role a team-scoped binding can never fully grant.
+
+```bash
+curl https://app.langwatch.ai/api/roles/permissions \
+  -H "Authorization: Bearer sk-lw-..."
+```
+
+Then create a role from the keys it gave you:
+
+```bash
+curl -X POST https://app.langwatch.ai/api/roles \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Release reviewer",
+    "description": "Reads traces and runs evaluations, changes nothing",
+    "permissions": ["project:view", "analytics:view", "evaluations:create"]
+  }'
+```
+
+## Names are the natural key
+
+A role name is unique inside the organization, which makes it the handle an infrastructure-as-code run can rely on. Reusing a name is refused with 409 `custom_role_name_taken` rather than quietly creating a second role that looks identical in every list.
+
+Names beginning with `apikey:` are reserved for LangWatch's own use and are refused with 422 `custom_role_name_reserved`.
+
+## Updating replaces the permission set
+
+`PATCH` is partial at the field level: send `name` alone and only the name changes. A `permissions` list, when you send one, replaces the whole set rather than adding to it, so what you send is what the role has afterward. That is what lets a declarative tool converge without reading first.
+
+## Deleting a role something still holds
+
+A role that a role binding or a team assignment still points at cannot be deleted. The refusal is 409 `custom_role_in_use`, with the counts in `meta` so you know how much is holding it:
+
+```json
+{
+  "code": "custom_role_in_use",
+  "meta": { "userCount": 1, "bindingCount": 3 }
+}
+```
+
+`bindingCount` counts role bindings, `userCount` counts direct team assignments. Remove or re-point those first, then delete the role.
+
+## Errors
+
+| Code | Status | Meaning |
+|------|--------|---------|
+| `custom_role_not_found` | 404 | No such role in this organization. An id from another organization reads the same way |
+| `custom_role_name_taken` | 409 | Another role in this organization already has that name |
+| `custom_role_name_reserved` | 422 | The name starts with `apikey:`, which is reserved |
+| `custom_role_in_use` | 409 | Something still holds the role |
+
+---
+
+# FILE: ./api-reference/roles/update-role.mdx
+
+---
+title: "Update role"
+openapi: "PATCH /api/roles/{id}"
+---
+
+---
+
 # FILE: ./api-reference/saved-evaluators/create-evaluator.mdx
 
 ---
@@ -61295,6 +62606,307 @@ Manage test scenarios for agent simulations. Create, update, and organize scenar
 ---
 title: "Update an existing scenario"
 openapi: "PUT /api/scenarios/{id}"
+---
+
+---
+
+# FILE: ./api-reference/scim-tokens/create-scim-token.mdx
+
+---
+title: "Create SCIM token"
+openapi: "POST /api/scim-tokens"
+---
+
+---
+
+# FILE: ./api-reference/scim-tokens/list-scim-tokens.mdx
+
+---
+title: "List SCIM tokens"
+openapi: "GET /api/scim-tokens"
+---
+
+---
+
+# FILE: ./api-reference/scim-tokens/overview.mdx
+
+---
+title: "Overview"
+description: "Mint, list and revoke the bearer tokens an identity provider uses to reach the SCIM endpoints. Token values are shown once, when they are created, and never again."
+---
+
+<Note>
+  **Available on Enterprise plans.** An organization without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments need an Enterprise license for the same endpoints. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
+
+## Intro
+
+A SCIM token is the credential your identity provider presents to the [SCIM 2.0 endpoints](/api-reference/scim/overview). This API mints them, lists the ones that exist, and revokes them, which is everything you need to rotate a provider's credential without opening the dashboard.
+
+## Authentication
+
+Requires an **organization-level API key** with `organization:manage`. Pass it as a Bearer token:
+
+```
+Authorization: Bearer sk-lw-<id>_<secret>
+```
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/scim-tokens` | List the organization's SCIM tokens |
+| `POST` | `/api/scim-tokens` | Mint a token, returned once |
+| `DELETE` | `/api/scim-tokens/{id}` | Revoke a token |
+
+## The value is returned once
+
+`POST` is the only response that ever contains the token itself. The list returns the id, the description, when it was created and when it was last used, and never the value or its hash. If the token is lost, mint a new one and revoke the old one.
+
+```bash
+curl -X POST https://app.langwatch.ai/api/scim-tokens \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{"description": "Okta production"}'
+```
+
+Give each token a description that says where it lives. `lastUsedAt` then tells you which one your provider is actually presenting, which is what makes a rotation safe to finish.
+
+## Rotating
+
+1. Mint a second token and store it in the identity provider.
+2. Watch `lastUsedAt` on the new token move.
+3. Revoke the old one.
+
+Revoking takes effect on the next call: a revoked token stops verifying immediately, and any provider still presenting it starts failing to sync. An id that does not exist, or was already revoked, answers 404 `scim_token_not_found`.
+
+## Tokens are checked against the plan on every call
+
+Entitlement is not only checked when a token is minted. If the Enterprise plan lapses, tokens that already exist stop verifying, and your identity provider's requests are refused. See [SCIM](/api-reference/scim/overview) for what the provider sees.
+
+---
+
+# FILE: ./api-reference/scim-tokens/revoke-scim-token.mdx
+
+---
+title: "Revoke SCIM token"
+openapi: "DELETE /api/scim-tokens/{id}"
+---
+
+---
+
+# FILE: ./api-reference/scim/create-group.mdx
+
+---
+title: "Provision a group"
+openapi: "POST /api/scim/v2/Groups"
+---
+
+---
+
+# FILE: ./api-reference/scim/create-user.mdx
+
+---
+title: "Provision a user"
+openapi: "POST /api/scim/v2/Users"
+---
+
+---
+
+# FILE: ./api-reference/scim/delete-group.mdx
+
+---
+title: "Deprovision a group"
+openapi: "DELETE /api/scim/v2/Groups/{id}"
+---
+
+---
+
+# FILE: ./api-reference/scim/delete-user.mdx
+
+---
+title: "Deprovision a user"
+openapi: "DELETE /api/scim/v2/Users/{id}"
+---
+
+---
+
+# FILE: ./api-reference/scim/get-group.mdx
+
+---
+title: "Get a provisioned group"
+openapi: "GET /api/scim/v2/Groups/{id}"
+---
+
+---
+
+# FILE: ./api-reference/scim/get-user.mdx
+
+---
+title: "Get a provisioned user"
+openapi: "GET /api/scim/v2/Users/{id}"
+---
+
+---
+
+# FILE: ./api-reference/scim/list-groups.mdx
+
+---
+title: "List provisioned groups"
+openapi: "GET /api/scim/v2/Groups"
+---
+
+---
+
+# FILE: ./api-reference/scim/list-users.mdx
+
+---
+title: "List provisioned users"
+openapi: "GET /api/scim/v2/Users"
+---
+
+---
+
+# FILE: ./api-reference/scim/overview.mdx
+
+---
+title: "Overview"
+description: "The SCIM 2.0 endpoints an identity provider calls to provision and deprovision users and groups in LangWatch."
+---
+
+<Note>
+  **Available on Enterprise plans.** SCIM provisioning needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. The plan is checked on every call, not only when a token is minted, so if the plan lapses, tokens that already exist stop verifying and your identity provider's requests are refused with HTTP 403. Minting a token through the [SCIM Tokens](/api-reference/scim-tokens/overview) API without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
+
+## Intro
+
+These are the endpoints your identity provider calls, not endpoints you normally call yourself. Point Okta, Entra ID, or any other SCIM 2.0 provider at the base URL below with a SCIM token, and it creates, updates and deactivates LangWatch users and groups as people join, move, and leave.
+
+For the setup walkthrough on the provider side, see [SCIM Provisioning](/platform/scim). This reference is the wire contract underneath it.
+
+## Base URL
+
+```
+https://app.langwatch.ai/api/scim/v2
+```
+
+Self-hosted: the same path on your own domain.
+
+## Authentication
+
+A SCIM bearer token, minted through the [SCIM Tokens](/api-reference/scim-tokens/overview) API or under **Settings > SCIM**:
+
+```
+Authorization: Bearer <scim-token>
+```
+
+The token identifies the organization, so there is no organization id anywhere in these paths. Organization API keys do not work here, and SCIM tokens do not work anywhere else.
+
+The three discovery endpoints (`/ServiceProviderConfig`, `/ResourceTypes`, `/Schemas`) are served without authentication: a provider reads them before it has anywhere to put a credential.
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/ServiceProviderConfig` | What this SCIM implementation supports |
+| `GET` | `/ResourceTypes` | The resource types served here |
+| `GET` | `/Schemas` | The schemas for those resource types |
+| `GET` | `/Users` | List provisioned users |
+| `POST` | `/Users` | Provision a user |
+| `GET` | `/Users/{id}` | Get a provisioned user |
+| `PUT` | `/Users/{id}` | Replace a provisioned user |
+| `PATCH` | `/Users/{id}` | Update a provisioned user |
+| `DELETE` | `/Users/{id}` | Deprovision a user |
+| `GET` | `/Groups` | List provisioned groups |
+| `POST` | `/Groups` | Provision a group |
+| `GET` | `/Groups/{id}` | Get a provisioned group |
+| `PUT` | `/Groups/{id}` | Replace a provisioned group |
+| `PATCH` | `/Groups/{id}` | Update a provisioned group |
+| `DELETE` | `/Groups/{id}` | Deprovision a group |
+
+## How SCIM objects map onto LangWatch
+
+A SCIM **User** is a member of your organization. Deprovisioning one, either by setting `active` to `false` or with `DELETE`, deactivates the account rather than deleting the person, so their history stays intact and setting `active` back to `true` restores them.
+
+A SCIM **Group** is a LangWatch [access group](/api-reference/groups/overview), not a team. Groups carry role bindings, and every member of the group inherits them, which is what makes an identity provider group meaningful here: put someone in the group upstream, and their LangWatch access follows.
+
+A group your identity provider owns is marked with a `scimSource`. It cannot be renamed or have members changed by hand, because the provider is the source of truth for both, but you can still attach and remove its [role bindings](/api-reference/role-bindings/overview) in LangWatch. That is the intended division: the provider decides who is in the group, you decide what the group can reach.
+
+## Errors
+
+Responses follow the SCIM error format (RFC 7644), with `Content-Type: application/scim+json`, because the caller is an identity provider rather than one of our own clients:
+
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+  "status": "403",
+  "detail": "SCIM provisioning requires an Enterprise plan"
+}
+```
+
+A missing or unknown token is 401, so the provider retries with the right credential. A real token on an organization whose Enterprise plan has lapsed is 403: the credential is fine, the plan is not, and telling the provider to retry would be a lie.
+
+---
+
+# FILE: ./api-reference/scim/replace-group.mdx
+
+---
+title: "Replace a provisioned group"
+openapi: "PUT /api/scim/v2/Groups/{id}"
+---
+
+---
+
+# FILE: ./api-reference/scim/replace-user.mdx
+
+---
+title: "Replace a provisioned user"
+openapi: "PUT /api/scim/v2/Users/{id}"
+---
+
+---
+
+# FILE: ./api-reference/scim/resource-types.mdx
+
+---
+title: "List the SCIM resource types"
+openapi: "GET /api/scim/v2/ResourceTypes"
+---
+
+---
+
+# FILE: ./api-reference/scim/schemas.mdx
+
+---
+title: "List the SCIM resource schemas"
+openapi: "GET /api/scim/v2/Schemas"
+---
+
+---
+
+# FILE: ./api-reference/scim/service-provider-config.mdx
+
+---
+title: "Get the SCIM service provider configuration"
+openapi: "GET /api/scim/v2/ServiceProviderConfig"
+---
+
+---
+
+# FILE: ./api-reference/scim/update-group.mdx
+
+---
+title: "Update a provisioned group"
+openapi: "PATCH /api/scim/v2/Groups/{id}"
+---
+
+---
+
+# FILE: ./api-reference/scim/update-user.mdx
+
+---
+title: "Update a provisioned user"
+openapi: "PATCH /api/scim/v2/Users/{id}"
 ---
 
 ---
@@ -61572,6 +63184,19 @@ Project API keys (`X-Auth-Token`) cannot be used here — they lack organization
 | `POST` | `/api/teams/{id}/members` | Add a member to the team |
 | `DELETE` | `/api/teams/{id}/members/{userId}` | Remove a member from the team |
 | `GET` | `/api/teams/{id}/projects` | List projects in the team |
+
+## Errors
+
+Every refusal carries a stable `code`. Branch on that, not on the message.
+
+| Code | Status | Meaning |
+|------|--------|---------|
+| `team_not_found` | 404 | No such team in this organization, or it is archived |
+| `team_name_taken` | 409 | Another team here already uses that name |
+| `team_member_already_added` | 409 | They already hold that role on the team |
+| `team_membership_not_found` | 404 | They hold no role on this team |
+| `user_not_in_organization` | 422 | The user is not a member of this organization |
+| `personal_workspace_not_managed_here` | 403 | The team is somebody's personal workspace |
 
 ## Soft Delete
 
@@ -62104,6 +63729,15 @@ openapi: "PATCH /api/traces/{traceId}/metadata"
 
 ---
 
+# FILE: ./api-reference/triggers/create-a-slack-alert-trigger.mdx
+
+---
+title: "Create a Slack alert trigger"
+openapi: "POST /api/trigger/slack"
+---
+
+---
+
 # FILE: ./api-reference/triggers/create-triggers.mdx
 
 ---
@@ -62329,6 +63963,33 @@ description: "Manage Optimization Studio workflows. List, update, and archive wo
 ## Intro
 
 Manage Optimization Studio workflows. List, update, and archive workflows used for prompt optimization and agent design.
+
+---
+
+# FILE: ./api-reference/workflows/run-a-specific-workflow-version.mdx
+
+---
+title: "Run a specific workflow version"
+openapi: "POST /api/workflows/{workflowId}/{versionId}/run"
+---
+
+---
+
+# FILE: ./api-reference/workflows/run-a-workflow-version-legacy-path.mdx
+
+---
+title: "Run a workflow version (legacy path)"
+openapi: "POST /api/optimization/{workflowId}/{versionId}"
+---
+
+---
+
+# FILE: ./api-reference/workflows/run-a-workflow.mdx
+
+---
+title: "Run a workflow"
+openapi: "POST /api/workflows/{workflowId}/run"
+---
 
 ---
 

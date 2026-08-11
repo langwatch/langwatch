@@ -423,6 +423,11 @@ async function mintVk(input: {
     scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
     scopeId: string;
   }>;
+  /**
+   * Where the key's traces and costs land. Stored on the key, so a row
+   * written straight to PG has to carry it: nothing derives it later.
+   */
+  traceProjectId: string;
 }): Promise<MintedVk> {
   // Always mint a fresh secret on first run; on re-run, idempotency falls
   // back to the existing row (we detect by organizationId+name).
@@ -450,6 +455,7 @@ async function mintVk(input: {
       principalUserId: input.principalUserId,
       routingPolicyId: input.routingPolicyId,
       createdById: input.createdById,
+      traceProjectId: input.traceProjectId,
       scopes: { create: input.scopes },
     },
   });
@@ -472,6 +478,7 @@ async function ensureVirtualKeys(handles: SeedHandles): Promise<MintedVk[]> {
       principalUserId: null,
       createdById: handles.userId,
       scopes: [{ scopeType: "ORGANIZATION", scopeId: handles.organizationId }],
+      traceProjectId: handles.demoProjectId,
     }),
   );
   vks.push(
@@ -483,6 +490,7 @@ async function ensureVirtualKeys(handles: SeedHandles): Promise<MintedVk[]> {
       principalUserId: null,
       createdById: handles.userId,
       scopes: [{ scopeType: "TEAM", scopeId: handles.platformTeamId }],
+      traceProjectId: handles.demoProjectId,
     }),
   );
   vks.push(
@@ -495,6 +503,7 @@ async function ensureVirtualKeys(handles: SeedHandles): Promise<MintedVk[]> {
       principalUserId: null,
       createdById: handles.userId,
       scopes: [{ scopeType: "PROJECT", scopeId: handles.demoProjectId }],
+      traceProjectId: handles.demoProjectId,
     }),
   );
   vks.push(
@@ -507,6 +516,7 @@ async function ensureVirtualKeys(handles: SeedHandles): Promise<MintedVk[]> {
       principalUserId: handles.userId,
       createdById: handles.userId,
       scopes: [{ scopeType: "ORGANIZATION", scopeId: handles.organizationId }],
+      traceProjectId: handles.demoProjectId,
     }),
   );
   return vks;

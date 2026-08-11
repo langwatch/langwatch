@@ -561,6 +561,72 @@ describe("useProviderFormSubmit()", () => {
         });
       });
     });
+
+    // Headers used to be folded into customKeys for Azure. When no credential
+    // had changed the credential branch had already settled on `undefined`,
+    // and the fold turned that into an object holding only the headers, which
+    // the server then wrote over the stored credentials.
+    describe("when an extra header is added and no credential was touched", () => {
+      /** @scenario Adding an extra header keeps the stored Azure credentials */
+      it("still sends customKeys undefined rather than a header-only object", async () => {
+        const snapshot = buildSnapshot({
+          isUsingEnvVars: false,
+          useAsDefaultProvider: false,
+          providerKeysSchema: passthroughSchema,
+          customKeys: {
+            AZURE_OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            AZURE_OPENAI_ENDPOINT: MASKED_KEY_PLACEHOLDER,
+          },
+          initialKeys: {
+            AZURE_OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            AZURE_OPENAI_ENDPOINT: MASKED_KEY_PLACEHOLDER,
+          },
+          extraHeaders: [{ key: "api-key", value: "header-secret" }],
+        });
+        const { result } = renderSubmitHook({ snapshot });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        const payload = mockUpdateMutateAsync.mock.calls[0]?.[0];
+        expect(payload?.customKeys).toBeUndefined();
+        expect(payload?.extraHeaders).toEqual([
+          { key: "api-key", value: "header-secret" },
+        ]);
+      });
+    });
+
+    describe("when a header is present and a credential was genuinely edited", () => {
+      it("sends the credentials only, with no header folded in", async () => {
+        const snapshot = buildSnapshot({
+          isUsingEnvVars: false,
+          useAsDefaultProvider: false,
+          providerKeysSchema: passthroughSchema,
+          customKeys: {
+            AZURE_OPENAI_API_KEY: "sk-newly-typed",
+            AZURE_OPENAI_ENDPOINT: MASKED_KEY_PLACEHOLDER,
+          },
+          initialKeys: {
+            AZURE_OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            AZURE_OPENAI_ENDPOINT: MASKED_KEY_PLACEHOLDER,
+          },
+          extraHeaders: [{ key: "api-key", value: "header-secret" }],
+        });
+        const { result } = renderSubmitHook({ snapshot });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        const payload = mockUpdateMutateAsync.mock.calls[0]?.[0];
+        expect(payload?.customKeys).toEqual({
+          AZURE_OPENAI_API_KEY: "sk-newly-typed",
+          AZURE_OPENAI_ENDPOINT: MASKED_KEY_PLACEHOLDER,
+        });
+        expect(payload?.customKeys).not.toHaveProperty("api-key");
+      });
+    });
   });
 
   describe("given the parent form opts out of the advanced payload (FF off)", () => {

@@ -43,6 +43,52 @@ export function clampSpanReadLimit(
 export const MAX_LIGHT_SPAN_READ_ROWS = 10_000;
 
 /**
+ * How many distinct event names one trace contributes to a list-page rollup.
+ *
+ * A trace's events collapse to one entry per name, so this is a distinct-name
+ * ceiling, not an event ceiling: 474 `tool.output` events are one entry. It
+ * exists for instrumentation that mints a fresh name per call site (an OTel
+ * bridge naming events after `file.rs:236` produces dozens per trace), where
+ * the untrimmed list would be neither renderable nor useful. `totalCount` and
+ * `distinctCount` are computed before the trim, so a trimmed rollup still
+ * reports its true size.
+ */
+export const MAX_EVENT_NAMES_PER_TRACE = 12;
+
+/** One event name a trace recorded, with how often and when it first fired. */
+export interface TraceEventNameCount {
+  name: string;
+  count: number;
+  /** Epoch ms of the earliest event under this name — the display order. */
+  firstTimestamp: number;
+}
+
+/** A trace's events as the list renders them: named groups plus true totals. */
+export interface TraceEventRollup {
+  /**
+   * Ordered by first occurrence, at most {@link MAX_EVENT_NAMES_PER_TRACE}
+   * entries. Shorter than `distinctCount` when the trim bit.
+   */
+  names: TraceEventNameCount[];
+  /** Every event the trace recorded, counting names beyond the trim. */
+  totalCount: number;
+  /** Distinct event names the trace recorded, counting those beyond the trim. */
+  distinctCount: number;
+}
+
+export interface TraceEventRollupParams {
+  tenantId: string;
+  /** The visible page's trace ids. An empty list issues no query. */
+  traceIds: string[];
+  /**
+   * The list's time range. Every trace on the page occurred inside it, so the
+   * read is padded by {@link DEFAULT_PARTITION_WINDOW_MS} and pruned to those
+   * partitions rather than scanning every week including the cold tier.
+   */
+  timeRange: { from: number; to: number };
+}
+
+/**
  * Cursor for keyed span-summary pagination: the page starts strictly after
  * `(startTimeMs, spanId)` in `(StartTimeMs ASC, SpanId ASC)` order. Keyed
  * instead of offset-based so pages stay stable while spans are still being
@@ -190,6 +236,8 @@ export interface ModelSpanSampleRow {
   outputTokens: number | null;
   cacheReadTokens: number | null;
   cacheCreationTokens: number | null;
+  /** The portion of the writes that bought an hour-long cache entry. */
+  cacheCreation1hTokens: number | null;
   startTimeMs: number;
 }
 
@@ -232,6 +280,10 @@ export interface SpanStorageRepository {
    * Claim-check resolution read (ADR-069): one canonical span by identity,
    * windowed by the reference's partition hint with no unbounded fallback —
    * a miss stays cheap because the caller retries via the queue.
+   *
+   * Derivation-shaped: the returned span carries empty `events` and `links`.
+   * Consumers of this read lift scalar span/resource attributes; a caller that
+   * needs a whole span wants `getSpanByIds`.
    */
   findNormalizedSpanById(
     params: NormalizedSpanByIdParams,
@@ -246,6 +298,17 @@ export interface SpanStorageRepository {
   getTraceEventsByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<DerivedTraceEvent[]>;
+  /**
+   * Event rollups for a page of traces, for the trace list's Events column.
+   *
+   * Same `Events.*` ARRAY JOIN as {@link getTraceEventsByTraceId}, but grouped
+   * by name and batched across the page so the list issues one query instead
+   * of one per row. Attributes are not read: a badge needs a name and a count,
+   * and the attribute map is the expensive part of an event.
+   */
+  getTraceEventRollupsByTraceIds(
+    params: TraceEventRollupParams,
+  ): Promise<Record<string, TraceEventRollup>>;
   getEventsByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<ElasticSearchEvent[]>;
@@ -380,6 +443,12 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     _params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<DerivedTraceEvent[]> {
     return [];
+  }
+
+  async getTraceEventRollupsByTraceIds(
+    _params: TraceEventRollupParams,
+  ): Promise<Record<string, TraceEventRollup>> {
+    return {};
   }
 
   async getEventsByTraceId(

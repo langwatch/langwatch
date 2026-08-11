@@ -119,6 +119,21 @@ Feature: License-Gated SSO
     Then it says single sign-on is configured but not licensed on this deployment
     And it explains that users are signing in by email until a license is activated
 
+  # The email fallback above is the no-lockout guarantee working as designed, but
+  # a licensed deployment that simply mistyped a provider name or left a client
+  # secret unset lands in the same email mode with nothing on screen to say so.
+  # An operator reading only the sign-in page cannot tell "single sign-on is off
+  # because I misconfigured it" from "single sign-on was never set up", and may
+  # believe federation is being enforced when it is not.
+  @integration
+  Scenario: An operator whose identity provider could not be started is told so
+    Given a self-hosted deployment holding a genuine license
+    And the configured identity provider is one this build cannot wire up
+    When an admin opens the authentication settings page
+    Then it says single sign-on is configured but could not be started
+    And it names the provider it could not start
+    And it explains that users are signing in by email until it is fixed
+
   @unit
   Scenario: An SSO-only deployment recovers by setting the instance license key
     Given a self-hosted deployment where every user signs in only through SSO

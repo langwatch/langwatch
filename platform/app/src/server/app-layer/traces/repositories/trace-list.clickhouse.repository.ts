@@ -1,4 +1,5 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { isStorageAnchoredVersion } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { FacetQuery } from "../facet-registry";
 import type { TraceSummaryData } from "../types";
@@ -43,6 +44,10 @@ interface ClickHouseSummaryRow extends TraceSummaryFieldsBase {
   AttrInputMediaRefs: string;
   AttrOutputMediaRefs: string;
   LastEventOccurredAt: number;
+  /** The row's projection stamp; see the OccurredAt decode in `toTraceListItem`. */
+  Version?: string;
+  /** The span timing baseline column added by migration 00072 (ADR-087). */
+  EarliestSpanStartMs?: number | string;
 }
 
 /**
@@ -54,11 +59,26 @@ function isLiveUpperBound(timeRange: { to: number; live?: boolean }): boolean {
   return timeRange.live === true;
 }
 
+/**
+ * The predicates a read is bounded by, split in two.
+ *
+ * `baseSql` is the tenant and the time window, which are what prune partitions
+ * and are the same for every version of a trace. `sql` adds the user's filter
+ * on top and is what the rows the caller asked for have to satisfy.
+ *
+ * The split is load-bearing. `trace_summaries` is a ReplacingMergeTree, so a
+ * trace keeps every version of its row until a merge collapses them, and the
+ * latest-version dedup has to be decided on `baseSql` alone: folding the filter
+ * into it makes the newest row that MATCHES THE FILTER the "latest" version, so
+ * a freshly annotated trace answers to `annotation:annotated` and
+ * `annotation:unannotated` at once and the facet counts it in both buckets.
+ * Filter after the dedup, never inside it.
+ */
 function buildWhereClause(
   tenantId: string,
   timeRange: { from: number; to: number; live?: boolean },
   filterWhere?: { sql: string; params: Record<string, unknown> },
-): { sql: string; params: Record<string, unknown> } {
+): { sql: string; baseSql: string; params: Record<string, unknown> } {
   const parts = [
     "TenantId = {tenantId:String}",
     "OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64})",
@@ -73,12 +93,14 @@ function buildWhereClause(
     params.timeTo = timeRange.to;
   }
 
+  const baseSql = parts.join(" AND ");
+
   if (filterWhere) {
     parts.push(filterWhere.sql);
     Object.assign(params, filterWhere.params);
   }
 
-  return { sql: parts.join(" AND "), params };
+  return { sql: parts.join(" AND "), baseSql, params };
 }
 
 function buildWhereClauseForTable(
@@ -112,11 +134,11 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       "TraceListClickHouseRepository.findAll",
     );
 
-    const { sql: whereClause, params } = buildWhereClause(
-      query.tenantId,
-      query.timeRange,
-      query.filterWhere,
-    );
+    const {
+      sql: whereClause,
+      baseSql: baseWhereClause,
+      params,
+    } = buildWhereClause(query.tenantId, query.timeRange, query.filterWhere);
 
     const rawSortExpression =
       query.sort.column === "TotalTokens"
@@ -144,10 +166,12 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     const client = await this.resolveClient(query.tenantId);
 
     // Latest-version dedup, shared by the page, the heavy read, and the count.
+    // Decided on the base predicates alone, so the filter chooses among current
+    // traces rather than deciding which version is current.
     const dedupFilter = `(TenantId, TraceId, UpdatedAt) IN (
           SELECT TenantId, TraceId, max(UpdatedAt)
           FROM ${TABLE_NAME}
-          WHERE ${whereClause}
+          WHERE ${baseWhereClause}
           GROUP BY TenantId, TraceId
         )`;
 
@@ -184,6 +208,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           AttrContextSizeTokens,
           AttrLabels,
           toUnixTimestamp64Milli(OccurredAt) AS OccurredAt,
+          Version,
+          EarliestSpanStartMs,
           toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
           toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
           ComputedIOSchemaVersion,
@@ -239,6 +265,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             Attributes['langwatch.reserved.context_size_tokens'] AS AttrContextSizeTokens,
             Attributes['langwatch.labels'] AS AttrLabels,
             OccurredAt,
+            Version,
+            EarliestSpanStartMs,
             CreatedAt,
             UpdatedAt,
             ComputedIOSchemaVersion,
@@ -345,11 +373,11 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       "TraceListClickHouseRepository.findFacetCounts",
     );
 
-    const { sql: whereClause, params: queryParams } = buildWhereClause(
-      params.tenantId,
-      params.timeRange,
-      params.filterWhere,
-    );
+    const {
+      sql: whereClause,
+      baseSql: baseWhereClause,
+      params: queryParams,
+    } = buildWhereClause(params.tenantId, params.timeRange, params.filterWhere);
 
     const client = await this.resolveClient(params.tenantId);
     const result = await client.query({
@@ -362,7 +390,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           AND (TenantId, TraceId, UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM ${TABLE_NAME}
-            WHERE ${whereClause}
+            WHERE ${baseWhereClause}
             GROUP BY TenantId, TraceId
           )
           AND ${params.facetExpression} != ''
@@ -393,11 +421,11 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       "TraceListClickHouseRepository.findRangeStats",
     );
 
-    const { sql: whereClause, params: queryParams } = buildWhereClause(
-      params.tenantId,
-      params.timeRange,
-      params.filterWhere,
-    );
+    const {
+      sql: whereClause,
+      baseSql: baseWhereClause,
+      params: queryParams,
+    } = buildWhereClause(params.tenantId, params.timeRange, params.filterWhere);
 
     const client = await this.resolveClient(params.tenantId);
     const result = await client.query({
@@ -410,7 +438,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           AND (TenantId, TraceId, UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM ${TABLE_NAME}
-            WHERE ${whereClause}
+            WHERE ${baseWhereClause}
             GROUP BY TenantId, TraceId
           )
       `,
@@ -447,7 +475,11 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       params.timeRange.from,
       params.since - SINCE_WINDOW_BUFFER_MS,
     );
-    const { sql: whereClause, params: queryParams } = buildWhereClause(
+    const {
+      sql: whereClause,
+      baseSql: baseWhereClause,
+      params: queryParams,
+    } = buildWhereClause(
       params.tenantId,
       { ...params.timeRange, from: effectiveFrom },
       params.filterWhere,
@@ -463,7 +495,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           AND (TenantId, TraceId, UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM ${TABLE_NAME}
-            WHERE ${whereClause}
+            WHERE ${baseWhereClause}
               AND OccurredAt > fromUnixTimestamp64Milli({since:Int64})
             GROUP BY TenantId, TraceId
           )
@@ -1008,7 +1040,14 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       annotationIds: row.AnnotationIds ?? [],
       sizeBytes: Number(row.SizeBytes ?? 0),
       attributes: buildListAttributes(row),
-      occurredAt: Number(row.OccurredAt),
+      // `OccurredAt` is the frozen storage anchor since ADR-087 and
+      // `EarliestSpanStartMs` is the span timing baseline it used to double as.
+      // A row at an older stamp predates the split and carries both in the one
+      // column, which is why this is version-gated rather than a bare read.
+      storageAnchorMs: Number(row.OccurredAt),
+      occurredAt: isStorageAnchoredVersion(row.Version)
+        ? Number(row.EarliestSpanStartMs ?? 0)
+        : Number(row.OccurredAt),
       createdAt: Number(row.CreatedAt),
       updatedAt: Number(row.UpdatedAt),
       LastEventOccurredAt: Number(row.LastEventOccurredAt ?? 0),

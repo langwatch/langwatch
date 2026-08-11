@@ -4,7 +4,7 @@ import { env } from "~/env.mjs";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
-import { getAnalyticsService } from "~/server/app-layer/analytics";
+import { getApp } from "~/server/app-layer/app";
 import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
@@ -13,6 +13,10 @@ import {
   consumeTenantEmailCapSlot,
 } from "~/server/app-layer/automations/dispatch/emailCaps";
 import { dispatchGraphAlertAction } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
+import {
+  consumePersistCapSlot,
+  resolvePersistDailyCap,
+} from "~/server/app-layer/automations/dispatch/persistCap";
 import type { EmailSuppressionService } from "~/server/app-layer/automations/emailSuppression.service";
 import {
   evaluateGraphTrigger,
@@ -26,6 +30,8 @@ import {
   type GraphTriggerSweepCandidate,
 } from "~/server/app-layer/automations/graph-trigger-heartbeat";
 import { PrismaGraphTriggerSentRepository } from "~/server/app-layer/automations/repositories/trigger.prisma.repository";
+import { defaultRunawayContainmentDeps } from "~/server/app-layer/automations/runaway-containment.deps";
+import { handlePersistCapBreach } from "~/server/app-layer/automations/runaway-containment.service";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import { WebhookDeliveryService } from "~/server/app-layer/automations/webhook-delivery.service";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
@@ -34,6 +40,7 @@ import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositor
 import type { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceReadDerivationService } from "~/server/app-layer/traces/trace-read-derivation.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { TraceSummaryStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.store";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 import { RedisCachedFoldStore } from "~/server/event-sourcing/projections/redisCachedFoldStore";
@@ -73,6 +80,7 @@ export function buildAutomationDispatchPorts({
   evaluations,
   traces,
   traceSummaryRepository,
+  resolveClickHouseClient,
 }: {
   prisma: PrismaClient;
   redis: Redis | Cluster | null;
@@ -82,6 +90,9 @@ export function buildAutomationDispatchPorts({
   evaluations: { runs: EvaluationRunService };
   traces: { spans: SpanStorageService };
   traceSummaryRepository: TraceSummaryRepository;
+  /** The composition root's ClickHouse resolver — the heartbeat's recency
+   *  probe reads through it. Passed down, never imported. */
+  resolveClickHouseClient: ClickHouseClientResolver;
 }): AutomationDispatchPorts {
   // Fail loud if BASE_HOST is missing: every alert dispatch interpolates it
   // into deep links; an empty baseHost silently ships broken links.
@@ -147,7 +158,8 @@ export function buildAutomationDispatchPorts({
     loadCustomGraph: async ({ customGraphId, projectId }) =>
       customGraphs.getById({ customGraphId, projectId }),
     loadProject: async (projectId) => projects.getById(projectId),
-    getTimeseries: async (input) => getAnalyticsService().getTimeseries(input),
+    getTimeseries: async (input, options) =>
+      getApp().analytics.service.getTimeseries(input, options),
     triggerSent: graphTriggerSentRepo,
     updateLastRunAt: async ({ triggerId, projectId }) =>
       triggers.updateLastRunAt(triggerId, projectId),
@@ -220,7 +232,11 @@ export function buildAutomationDispatchPorts({
     });
   };
 
-  const heartbeatDeps = defaultGraphTriggerHeartbeatDeps({ triggers, prisma });
+  const heartbeatDeps = defaultGraphTriggerHeartbeatDeps({
+    triggers,
+    prisma,
+    resolveClickHouseClient,
+  });
   const heartbeatSources = defaultCandidateSources(prisma);
 
   const settlementDeps: TriggerSettlementDispatchDeps = {
@@ -267,6 +283,20 @@ export function buildAutomationDispatchPorts({
       await createManyDatasetRecords(params);
     },
     recordWebhookDelivery,
+    resolvePersistDailyCap: (projectId) => resolvePersistDailyCap(projectId),
+    consumePersistCapSlot: (params) => consumePersistCapSlot(params),
+    handlePersistCapBreach: (breach) =>
+      handlePersistCapBreach(
+        defaultRunawayContainmentDeps({
+          prisma,
+          triggers,
+          projects,
+          emailSuppressions,
+          baseHost,
+          resolveClickHouseClient,
+        }),
+        breach,
+      ),
   };
 
   return {

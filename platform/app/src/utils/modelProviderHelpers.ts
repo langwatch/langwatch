@@ -319,6 +319,22 @@ export function hasUserModifiedAnyCredential({
 }
 
 /**
+ * An extra-header list reduced to what the customer can actually change:
+ * the ordered key and value pairs.
+ *
+ * The form's own header objects carry a `concealed` flag that drives the
+ * show/hide eye and never leaves the browser, so a whole-object compare
+ * against the stored list always differs and reports a dirty form over an
+ * untouched one. Order is kept, because dragging headers into a new order is
+ * a real edit.
+ */
+export function headerSignature(
+  headers: { key: string; value: string }[] | null | undefined,
+): string {
+  return JSON.stringify((headers ?? []).map(({ key, value }) => [key, value]));
+}
+
+/**
  * Filters customKeys to remove masked API keys before sending to backend.
  * Used when env var provider has modified URL fields.
  *

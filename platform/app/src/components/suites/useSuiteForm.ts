@@ -14,6 +14,7 @@ import type { SimulationSuite } from "@prisma/client";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import type { FieldMapping } from "~/components/variables/VariableMappingInput";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
 import {
   parseSuiteTargets,
@@ -83,6 +84,31 @@ interface UseSuiteFormParams {
   agents: Agent[] | undefined;
   /** Available prompts from the project. */
   prompts: Prompt[] | undefined;
+}
+
+const isSameTarget = (a: SuiteTarget, b: SuiteTarget) =>
+  a.type === b.type && a.referenceId === b.referenceId;
+
+/** One target with a single mapping set (or cleared, for an undefined mapping). */
+function withTargetMapping({
+  target,
+  identifier,
+  mapping,
+}: {
+  target: SuiteTarget;
+  identifier: string;
+  mapping: FieldMapping | undefined;
+}): SuiteTarget {
+  const mappings = { ...(target.scenarioMappings ?? {}) };
+  if (mapping) {
+    mappings[identifier] = mapping;
+  } else {
+    delete mappings[identifier];
+  }
+  return {
+    ...target,
+    scenarioMappings: Object.keys(mappings).length > 0 ? mappings : undefined,
+  };
 }
 
 const defaultValues: SuiteFormData = {
@@ -260,6 +286,33 @@ export function useSuiteForm({
     form.setValue("selectedTargets", next);
   };
 
+  /**
+   * Set (or clear) one binding on a selected target.
+   *
+   * Only prompt targets use this: an agent is configured, so its mappings live
+   * on the agent record; a prompt is authored elsewhere and pointed at, so the
+   * binding between a simulation and its declared inputs belongs to the run
+   * plan that made the pairing.
+   */
+  const setTargetMapping = ({
+    target,
+    identifier,
+    mapping,
+  }: {
+    target: SuiteTarget;
+    identifier: string;
+    mapping: FieldMapping | undefined;
+  }) => {
+    const next = form
+      .getValues("selectedTargets")
+      .map((candidate) =>
+        isSameTarget(candidate, target)
+          ? withTargetMapping({ target: candidate, identifier, mapping })
+          : candidate,
+      );
+    form.setValue("selectedTargets", next, { shouldDirty: true });
+  };
+
   const isTargetSelected = (type: string, referenceId: string) =>
     selectedTargets.some(
       (t) => t.type === type && t.referenceId === referenceId,
@@ -375,6 +428,7 @@ export function useSuiteForm({
     availableTargets,
     filteredTargets,
     toggleTarget,
+    setTargetMapping,
     selectAllTargets,
     clearTargets,
     isTargetSelected,

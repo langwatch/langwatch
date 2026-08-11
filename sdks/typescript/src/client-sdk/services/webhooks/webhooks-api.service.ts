@@ -139,6 +139,13 @@ export class WebhooksApiError extends Error {
  * rejected by the server. The surface is anchored on the organization alone,
  * so there is no project id to give this client.
  *
+ * The key MUST be an organization API key (`sk-lw-{id}_{secret}`, from
+ * Settings > API Keys). A project API key is refused with
+ * `credential_class_mismatch` before any permission is consulted, and no
+ * header makes it work. The same organization key also reaches the
+ * project-scoped surfaces when given `X-Project-Id`, so one key covers both
+ * families and a project key covers only one.
+ *
  * The endpoint entity and the create/update bodies mirror the wire verbatim,
  * so their fields are lowercase snake_case: virtual keys and gateway budgets
  * already take the wire body as it is, and translating field by field here
@@ -362,19 +369,20 @@ export class WebhooksApiService {
    * that missed a delivery reads the window back from here. Walk the whole
    * window with `iterEvents()`.
    */
-  async eventsPage(options?: {
+  async eventsPage(options: {
     type?: string;
-    from?: number;
-    to?: number;
+    /** Required: the log is a ranged read by contract. Epoch milliseconds. */
+    from: number;
+    to: number;
     cursor?: string;
     limit?: number;
   }): Promise<EmittedEventsPage> {
     const params = new URLSearchParams();
-    if (options?.type) params.set("type", options.type);
-    if (options?.from !== undefined) params.set("from", String(options.from));
-    if (options?.to !== undefined) params.set("to", String(options.to));
-    if (options?.cursor) params.set("cursor", options.cursor);
-    if (options?.limit !== undefined) params.set("limit", String(options.limit));
+    if (options.type) params.set("type", options.type);
+    params.set("from", String(options.from));
+    params.set("to", String(options.to));
+    if (options.cursor) params.set("cursor", options.cursor);
+    if (options.limit !== undefined) params.set("limit", String(options.limit));
     const qs = params.toString() !== "" ? `?${params.toString()}` : "";
     const { data, next_cursor } = await this.request<{
       data: EmittedEvent[];
@@ -387,15 +395,16 @@ export class WebhooksApiService {
    * Every emitted event matching the filter, one at a time, fetching each
    * page only when the consumer reaches it.
    */
-  async *iterEvents(options?: {
+  async *iterEvents(options: {
     type?: string;
-    from?: number;
-    to?: number;
+    /** Required: the log is a ranged read by contract. Epoch milliseconds. */
+    from: number;
+    to: number;
     cursor?: string;
     limit?: number;
   }): AsyncGenerator<EmittedEvent> {
     const pages = walkCursorPages<EmittedEventsPage>({
-      startCursor: options?.cursor,
+      startCursor: options.cursor,
       nextCursorOf: (page) => page.next_cursor,
       onEndlessWalk: (reason) =>
         new WebhooksApiError(
@@ -406,7 +415,7 @@ export class WebhooksApiService {
         this.eventsPage({
           ...options,
           cursor,
-          limit: options?.limit ?? CURSOR_WALK_PAGE_SIZE,
+          limit: options.limit ?? CURSOR_WALK_PAGE_SIZE,
         }),
     });
     for await (const page of pages) {

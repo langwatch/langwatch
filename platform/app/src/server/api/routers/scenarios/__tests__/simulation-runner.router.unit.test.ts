@@ -258,10 +258,19 @@ describe("simulationRunnerRouter.run", () => {
             promptId: "prompt_123",
             systemPrompt: "You are helpful",
             messages: [],
+            inputs: [],
           },
           modelParams: {
             api_key: "test-key",
             model: "openai/gpt-4",
+          },
+          simulatorModelParams: {
+            api_key: "test-key",
+            model: "openai/gpt-5-mini",
+          },
+          judgeModelParams: {
+            api_key: "test-key",
+            model: "openai/gpt-5-mini",
           },
           nlpServiceUrl: "http://localhost:8080",
           target: { type: "prompt", referenceId: "prompt_123" },
@@ -316,10 +325,19 @@ describe("simulationRunnerRouter.run", () => {
             promptId: "prompt_123",
             systemPrompt: "You are helpful",
             messages: [],
+            inputs: [],
           },
           modelParams: {
             api_key: "test-key",
             model: "openai/gpt-4",
+          },
+          simulatorModelParams: {
+            api_key: "test-key",
+            model: "openai/gpt-5-mini",
+          },
+          judgeModelParams: {
+            api_key: "test-key",
+            model: "openai/gpt-5-mini",
           },
           nlpServiceUrl: "http://localhost:8080",
           target: { type: "prompt", referenceId: "prompt_123" },

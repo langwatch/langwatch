@@ -1,5 +1,5 @@
-import { Box, Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { Lightbulb } from "lucide-react";
+import { Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { useMemo } from "react";
 import {
   LuBookMarked,
   LuCircleAlert,
@@ -12,12 +12,12 @@ import {
   LuSparkles,
   LuTriangleAlert,
 } from "react-icons/lu";
-import { UserAvatar } from "~/components/UserAvatar";
-import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { EvalChipDisplay } from "~/utils/evaluationResults";
 import { getEvalChipDisplay } from "~/utils/evaluationResults";
+import { useConversationAnnotations } from "../../hooks/useConversationAnnotations";
 import { useConversationTurns } from "../../hooks/useConversationTurns";
+import { useSpanTree } from "../../hooks/useSpanTree";
 import type { RichEval } from "../../hooks/useTraceEvaluations";
 import {
   type PromptChipState,
@@ -25,6 +25,8 @@ import {
   type TraceHeaderChipData,
   useTraceHeaderChips,
 } from "../../hooks/useTraceHeaderChips";
+import { useDrawerStore } from "../../stores/drawerStore";
+import { TraceCommentList } from "./anchoredComments/TraceCommentList";
 import type { ChipDef } from "./ChipBar";
 import { ChipBar } from "./ChipBar";
 import { buildScenarioChipDef } from "./ScenarioChip";
@@ -88,29 +90,43 @@ export function useTraceHeaderChipDefs(
 
 /**
  * Header chip listing annotations on this trace + every other turn in the
- * same conversation. Hidden when there are zero. Click to peek at the list;
- * clicking an entry doesn't edit (kept lightweight) — the conversation
- * view's Annotations mode is the place for editing the rollup.
+ * same conversation. Hidden when there are zero. Click to peek at the list and
+ * land in the Conversation view, where each annotation reads beside the turn
+ * it is about and can be edited there.
  */
 function useAnnotationsChip(trace: TraceHeader): ChipDef | null {
-  const { project, hasPermission } = useOrganizationTeamProject();
   const conversation = useConversationTurns(trace.conversationId ?? null);
-  const traceIds = [
-    trace.traceId,
-    ...(conversation.data?.items ?? [])
-      .map((t) => t.traceId)
-      .filter((id) => id !== trace.traceId),
-  ];
+  const setViewMode = useDrawerStore((s) => s.setViewMode);
+  const traceIds = useMemo(
+    () => [
+      trace.traceId,
+      ...(conversation.data?.items ?? [])
+        .map((t) => t.traceId)
+        .filter((id) => id !== trace.traceId),
+    ],
+    [trace.traceId, conversation.data?.items],
+  );
 
-  const annotations = useAnnotationsByTraceIds({
-    projectId: project?.id ?? "",
-    traceIds,
-    enabled: !!project?.id && hasPermission("annotations:view"),
-  });
+  const annotations = useConversationAnnotations(traceIds);
+  // The trace as the reader sees it, corrections applied: a span a correction
+  // removed is not a part of it any more, which is what makes a comment left on
+  // that span read as being about a part that is no longer there.
+  const spans = useSpanTree().data;
+  const spanNames = useMemo(
+    () => new Map((spans ?? []).map((span) => [span.spanId, span.name])),
+    [spans],
+  );
+  const resolvable = useMemo(
+    () =>
+      new Set<string>([
+        trace.traceId,
+        ...(spans ?? []).map((span) => span.spanId),
+      ]),
+    [trace.traceId, spans],
+  );
 
-  const items = annotations.data ?? [];
+  const items = annotations.all;
   if (items.length === 0) return null;
-  const hasCorrection = items.some((a) => a.expectedOutput);
 
   return {
     id: "annotations",
@@ -119,64 +135,18 @@ function useAnnotationsChip(trace: TraceHeader): ChipDef | null {
     icon: LuMessageSquare,
     tone: "yellow",
     priority: 1,
+    // A threadless trace has no conversation to switch to; the popover list
+    // is all there is.
+    onClick: trace.conversationId
+      ? () => setViewMode("conversation")
+      : undefined,
     popover: (
-      <VStack
-        align="stretch"
-        gap={3}
-        minWidth="300px"
-        maxWidth="380px"
-        paddingX={3}
-        paddingY={2.5}
-      >
-        <HStack gap={2}>
-          <Text textStyle="xs" fontWeight="600">
-            {items.length} annotation{items.length === 1 ? "" : "s"}
-          </Text>
-          {hasCorrection && (
-            <HStack gap={1} color="yellow.fg">
-              <Icon as={Lightbulb} boxSize={3} />
-              <Text textStyle="2xs">includes corrections</Text>
-            </HStack>
-          )}
-        </HStack>
-        <Box height="1px" bg="border.muted" marginX={-3} />
-        <VStack align="stretch" gap={3} maxHeight="280px" overflowY="auto">
-          {items.map((a) => (
-            <HStack key={a.id} gap={2.5} align="start">
-              <UserAvatar
-                size="xs"
-                background="gray.solid"
-                color="white"
-                name={a.user?.name ?? a.email ?? "?"}
-                image={a.user?.image}
-              />
-              <VStack align="start" gap={0.5} flex={1} minWidth={0}>
-                <HStack gap={1.5} width="full">
-                  <Text textStyle="2xs" fontWeight="600">
-                    {a.user?.name ?? a.email ?? "anonymous"}
-                  </Text>
-                  {a.expectedOutput && (
-                    <Icon as={Lightbulb} boxSize={2.5} color="yellow.fg" />
-                  )}
-                  <Box flex={1} />
-                  <Text textStyle="2xs" color="fg.subtle">
-                    {new Date(a.createdAt).toLocaleDateString()}
-                  </Text>
-                </HStack>
-                {a.comment && (
-                  <Text textStyle="2xs" color="fg.muted" lineClamp={3}>
-                    {a.comment}
-                  </Text>
-                )}
-              </VStack>
-            </HStack>
-          ))}
-        </VStack>
-        <Box height="1px" bg="border.muted" marginX={-3} />
-        <Text textStyle="2xs" color="fg.subtle">
-          Open Conversation → Annotations to edit.
-        </Text>
-      </VStack>
+      <TraceCommentList
+        traceId={trace.traceId}
+        comments={items}
+        spanNames={spanNames}
+        resolvable={resolvable}
+      />
     ),
   };
 }
@@ -446,6 +416,41 @@ function buildLastUsedPromptChipDef({
   };
 }
 
+/**
+ * The chip's trailing verdict: a tinted badge for skipped/error, the category
+ * for a categorising evaluator, the numeral for a scoring one, colored
+ * Pass/Fail for a judging one. Mirrors the trace-table EvalChip.
+ */
+function EvalChipVerdict({ display }: { display: EvalChipDisplay }) {
+  if (display.status === "skipped")
+    return <NoVerdictMicroBadge icon={LuCircleSlash} label="SKIPPED" />;
+  if (display.status === "error")
+    return <NoVerdictMicroBadge icon={LuCircleAlert} label="ERROR" />;
+  if (display.categoryLabel)
+    return (
+      <Text textStyle="2xs" fontWeight="semibold" color="blue.fg" truncate>
+        {display.categoryLabel}
+      </Text>
+    );
+  if (display.scoreText)
+    return (
+      <Text textStyle="2xs" fontWeight="semibold" color="fg.muted">
+        {display.scoreText}
+      </Text>
+    );
+  if (display.passLabel)
+    return (
+      <Text
+        textStyle="2xs"
+        fontWeight="semibold"
+        color={display.passLabel.color}
+      >
+        {display.passLabel.text}
+      </Text>
+    );
+  return null;
+}
+
 function buildEvalChipDef(ev: RichEval, onClick: () => void): ChipDef {
   // Single source of truth for color / status label / score formatting.
   // The trace-list `EvalChip`, the v3 EvaluatorChip, and this header
@@ -456,6 +461,7 @@ function buildEvalChipDef(ev: RichEval, onClick: () => void): ChipDef {
     evaluatorId: ev.evaluatorId,
     status: ev.status,
     score: ev.score,
+    scoreType: ev.scoreType,
     label: ev.label,
     passed: ev.passed,
   });
@@ -470,26 +476,7 @@ function buildEvalChipDef(ev: RichEval, onClick: () => void): ChipDef {
       <Text textStyle="xs" color="fg" fontWeight="medium" truncate>
         {display.displayName}
       </Text>
-      {/* Trailing verdict — for skipped/error this is a tinted badge;
-          for boolean Pass/Fail it's colored text; for numeric it's
-          a muted-foreground numeral. Mirrors the trace-table EvalChip. */}
-      {display.status === "skipped" ? (
-        <NoVerdictMicroBadge icon={LuCircleSlash} label="SKIPPED" />
-      ) : display.status === "error" ? (
-        <NoVerdictMicroBadge icon={LuCircleAlert} label="ERROR" />
-      ) : display.scoreText ? (
-        <Text textStyle="2xs" fontWeight="semibold" color="fg.muted">
-          {display.scoreText}
-        </Text>
-      ) : display.passLabel ? (
-        <Text
-          textStyle="2xs"
-          fontWeight="semibold"
-          color={display.passLabel.color}
-        >
-          {display.passLabel.text}
-        </Text>
-      ) : null}
+      <EvalChipVerdict display={display} />
     </HStack>
   );
   return {
@@ -503,7 +490,7 @@ function buildEvalChipDef(ev: RichEval, onClick: () => void): ChipDef {
     dot: display.color,
     tone,
     onClick,
-    ariaLabel: `Eval ${display.displayName}: ${display.statusLabel}${display.scoreText ? ` ${display.scoreText}` : ""}`,
+    ariaLabel: `Eval ${display.displayName}: ${display.categoryLabel ?? display.statusLabel}${display.scoreText ? ` ${display.scoreText}` : ""}`,
     tooltip: (
       <VStack align="stretch" gap={1.5} minWidth="240px" maxWidth="340px">
         <HStack gap={2}>

@@ -1,7 +1,6 @@
 package langwatch
 
 import (
-	"encoding/base64"
 	"os"
 	"strings"
 )
@@ -15,25 +14,19 @@ func IsPersonalAccessToken(token string) bool {
 	return strings.HasPrefix(token, patPrefix)
 }
 
-// buildAuthHeaders returns the HTTP headers required to authenticate
-// against the LangWatch API.
+// buildAuthHeaders returns the HTTP headers required to authenticate against the
+// LangWatch API. The credential is always carried as `Authorization: Bearer
+// <token>`, and the project is identified with the `X-Project-Id` header when
+// known. Both token families use the same shape:
 //
-// Two token families share the same surface:
+//   - sk-lw-* project keys carry project identity themselves, so X-Project-Id is
+//     optional — it pins the request to a specific project when supplied.
 //
-//  1. sk-lw-* legacy project keys — the token itself carries project
-//     identity, so we emit `Authorization: Bearer <token>` plus
-//     `X-Auth-Token: <token>` for backwards compatibility with older
-//     endpoints that only read the legacy header.
+//   - pat-lw-* Personal Access Tokens are user-owned and require X-Project-Id so
+//     the server can resolve the correct role binding.
 //
-//  2. pat-lw-* Personal Access Tokens — user-owned and must be paired
-//     with a projectID so the server can resolve the correct role
-//     binding. When projectID is available, both are encoded as
-//     `Authorization: Basic base64(projectID:token)` — the canonical
-//     PAT carrier. Without a projectID, we fall back to Bearer +
-//     X-Auth-Token so the server returns a clean 401 rather than
-//     silently accepting an unresolvable request.
-//
-// When apiKey is empty, no auth headers are emitted.
+// projectID falls back to $LANGWATCH_PROJECT_ID. When apiKey is empty, no auth
+// headers are emitted.
 func buildAuthHeaders(apiKey, projectID string) map[string]string {
 	if apiKey == "" {
 		return map[string]string{}
@@ -43,17 +36,11 @@ func buildAuthHeaders(apiKey, projectID string) map[string]string {
 		projectID = os.Getenv("LANGWATCH_PROJECT_ID")
 	}
 
-	if IsPersonalAccessToken(apiKey) && projectID != "" {
-		credential := projectID + ":" + apiKey
-		encoded := base64.StdEncoding.EncodeToString([]byte(credential))
-		return map[string]string{
-			"Authorization": "Basic " + encoded,
-		}
-	}
-
-	// sk-lw-* or PAT without projectID: preserve dual-header shape.
-	return map[string]string{
+	headers := map[string]string{
 		"Authorization": "Bearer " + apiKey,
-		"X-Auth-Token":  apiKey,
 	}
+	if projectID != "" {
+		headers["X-Project-Id"] = projectID
+	}
+	return headers
 }

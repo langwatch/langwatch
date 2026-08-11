@@ -24,6 +24,7 @@ import {
   type VirtualKeyScopeEntry,
 } from "./eligibleModelProviders";
 import { humanizeGatewayError } from "./gatewayErrorCopy";
+import { resolveTracesHrefForKey } from "./tracesHrefForKey";
 import {
   budgetInvalidReason,
   EMPTY_BUDGET,
@@ -61,6 +62,8 @@ type VirtualKeyDetail = {
   routingPolicyId: string | null;
   routingMode?: "NONE" | "FALLBACK_ALL" | "POLICY";
   traceProjectId?: string | null;
+  /** True when the project the key traces into has been deleted. */
+  traceProjectArchived?: boolean;
   principalUserId?: string | null;
   principalUser?: { name: string | null; email: string | null } | null;
   config: {
@@ -159,6 +162,18 @@ export function VirtualKeyEditDrawer({
         })),
       ) ?? [],
     [organization?.teams],
+  );
+  const viewTracesHref = useMemo(
+    () =>
+      vk
+        ? resolveTracesHrefForKey({
+            teams: organization?.teams ?? [],
+            virtualKeyId: vk.id,
+            traceProjectId: vk.traceProjectId,
+            traceProjectArchived: vk.traceProjectArchived,
+          })
+        : undefined,
+    [vk, organization?.teams],
   );
 
   const utils = api.useContext();
@@ -369,6 +384,9 @@ export function VirtualKeyEditDrawer({
                       ? vk.principalUser
                       : undefined
                   }
+                  traceProjectId={vk.traceProjectId ?? null}
+                  traceProjectArchived={vk.traceProjectArchived ?? false}
+                  viewTracesHref={viewTracesHref}
                   ctx={{
                     organizationName: organization?.name,
                     availableTeams,

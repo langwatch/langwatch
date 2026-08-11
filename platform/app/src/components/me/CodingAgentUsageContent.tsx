@@ -77,7 +77,10 @@ export function CodingAgentUsageContent({ projectId }: { projectId: string }) {
           value={numeral(totals.sessionCount).format("0,0")}
         />
         <Stat label="Cost" value={formatBudgetUsd(totals.costUsd)} />
-        <Stat label="Tokens" value={formatTokens(totals.totalTokens)} />
+        <Stat
+          label="Tokens"
+          value={numeral(totals.totalTokens).format("0,0")}
+        />
         <Stat
           label="Active time"
           value={formatDuration(totals.activeTimeSec)}
@@ -114,12 +117,6 @@ function Stat({ label, value }: { label: string; value: string }) {
       </Text>
     </Box>
   );
-}
-
-/** Compact token count: 999 → "999", 12_345 → "12.3k", 4_500_000 → "4.5m". */
-function formatTokens(tokens: number): string {
-  if (tokens < 1_000) return numeral(tokens).format("0,0");
-  return numeral(tokens).format("0.[0]a");
 }
 
 /** Whole-second duration as "45s" / "12m" / "3h 20m". */

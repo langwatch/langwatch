@@ -6,6 +6,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   context as otelContext,
   ROOT_CONTEXT,
+  type Span,
   SpanKind,
   TraceFlags,
   trace,
@@ -15,6 +16,7 @@ import { Cluster, Redis as IORedis } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
 import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { SHUTDOWN_BUDGET } from "~/server/shutdown/budget";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   createContextFromJobData,
@@ -62,6 +64,7 @@ import {
 } from "./jobEnvelope";
 import { legacyStagedJobAttempt } from "./legacyStagedJobAttempt";
 import {
+  gqBatchBisectionsTotal,
   gqForeignSiblingsRestagedTotal,
   gqGroupAttemptReadFailuresTotal,
   gqGroupsBlockedTotal,
@@ -76,19 +79,34 @@ import {
   gqJobsNonRetryableTotal,
   gqJobsRetriedTotal,
   gqJobsStagedTotal,
+  gqReadyScoreImplausibleTotal,
   gqRetryAttempt,
   gqRetryBackoffMilliseconds,
   gqRetryEncodeFailuresTotal,
 } from "./metrics";
 import { GroupQueueMetricsCollector } from "./metricsCollector";
 import {
+  fallbackReadyScore,
+  isPlausibleReadyScore,
+  resolveReadyScore,
+} from "./readyScore";
+import {
   type DispatchResult,
   type DrainedJob,
   GroupStagingScripts,
+  readBisectionSplitBudget,
   readClaimStrikeThreshold,
   readGroupQuarantineThreshold,
 } from "./scripts";
 import { type ObjectStore, TransientBlobStoreError } from "./tieredBlobStore";
+
+/** Mutable state shared across one dispatch's bisection descent. */
+interface BisectionDispatchState {
+  /** True once any sub-batch of this dispatch committed successfully. */
+  hasCommitted: boolean;
+  /** Splits performed so far — compared against the budget above. */
+  splits: number;
+}
 
 /**
  * How long the group's retry-chain counter survives without a refresh.
@@ -128,12 +146,16 @@ const GROUP_QUEUE_CONFIG = {
   signalTimeoutSec: 5,
   /** Interval for collecting queue metrics in milliseconds */
   metricsIntervalMs: 15000,
-  /** Maximum time to wait for graceful shutdown in milliseconds */
-  shutdownTimeoutMs:
-    process.env.NODE_ENV === "development" ||
-    process.env.ENVIRONMENT === "local"
-      ? 2000
-      : 20000,
+  /**
+   * Maximum time to wait for graceful shutdown in milliseconds.
+   *
+   * The innermost of the four nested shutdown clocks — see
+   * server/shutdown/budget.ts, which derives App.close's backstop, the
+   * entrypoint watchdog and the required terminationGracePeriodSeconds from
+   * this one number. Do not hardcode a value here: an increase that the outer
+   * clocks do not hear about is an increase the pod never gets to use.
+   */
+  shutdownTimeoutMs: SHUTDOWN_BUDGET.queueDrainMs,
 } as const;
 
 /** Default TTL for deduplication in milliseconds */
@@ -299,6 +321,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   private readonly quarantineFailStreakThreshold =
     readGroupQuarantineThreshold();
 
+  /**
+   * Splits allowed per dispatch before bisection yields to retry/backoff. Read
+   * once at construction; 0 disables bisection outright, which restores the
+   * pre-bisection behaviour without a deploy. See
+   * {@link readBisectionSplitBudget}.
+   */
+  private readonly bisectionSplitBudget = readBisectionSplitBudget();
+
   private shutdownRequested = false;
   /** Tracks in-flight jobs for active count metrics. */
   private activeJobCount = 0;
@@ -416,7 +446,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       featureFlagService,
     );
 
-    // fastq promise-based queue — replaces BullMQ Queue + Worker
+    // fastq promise-based queue: bounds concurrency on this node
     this.processingQueue = fastq.promise(
       this.processWithRetries.bind(this),
       this.globalConcurrency,
@@ -459,6 +489,62 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }
 
   /**
+   * Resolves a ready score and reports what it had to refuse.
+   *
+   * Every path that writes a ready score goes through here, so the counter is
+   * raised at the one moment the information exists. Counting it later, by
+   * scanning the ready set for out-of-range scores, cannot work: by then the
+   * bad value has already been replaced by this function and the scan finds
+   * nothing while the broken producer carries on.
+   *
+   * `delay` is deliberately NOT part of this. Deferral is a queue decision
+   * added to the resolved score by the caller; only the producer's own claim
+   * about when the work occurred is judged here.
+   */
+  private resolveScore(rawScore: unknown, nowMs: number = Date.now()): number {
+    const { score, isRejected } = resolveReadyScore({
+      score: rawScore,
+      nowMs,
+    });
+    if (isRejected) {
+      gqReadyScoreImplausibleTotal.inc({ queue_name: this.queueName });
+    }
+    return score;
+  }
+
+  /**
+   * Ready score for a job the queue is putting BACK - an exhausted retry, a
+   * poison park, a drained sibling after a failed batch.
+   *
+   * Only the absolute check applies, not the two-sided one. The score was
+   * already judged against the producer's clock when the job was first staged,
+   * and re-judging it against a later clock would rewrite a legitimately old
+   * job (a long retry chain, a batch exported a day late) for no reason. What
+   * is still worth catching is a value that is not a timestamp at all, i.e. a
+   * row staged before this guard existed.
+   *
+   * All three re-stage paths share this so they cannot disagree. They used to:
+   * the exhausted-retry path re-scored an unusable value while drained siblings
+   * kept theirs verbatim, so one failure could move the failed job to now and
+   * leave its siblings at 0 - and on unblock the siblings dispatched ahead of
+   * the job they were drained behind.
+   *
+   * Deliberately does NOT raise `gq_ready_score_implausible_total`, which
+   * counts producers, not us. `originalScore` is always a value this queue
+   * wrote and then read back out of Redis, and staging already required it to
+   * clear MIN_PLAUSIBLE_EPOCH_MS - an ABSOLUTE floor, so a score that cleared
+   * it once clears it for ever. This check can therefore only ever fire for a
+   * row staged before the guard existed, or one corrupted in Redis. Neither is
+   * a broken score function, and counting them here would dilute the one
+   * signal that is with our own bookkeeping.
+   */
+  private restageScore(originalScore: unknown): number {
+    return isPlausibleReadyScore(originalScore)
+      ? originalScore
+      : fallbackReadyScore();
+  }
+
+  /**
    * Stages a job into the group queue's Redis staging layer.
    */
   async send(
@@ -483,7 +569,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
     const groupId = this.groupKey(payload);
     const stagedJobId = this.generateStagedJobId(payload);
-    const score = this.score?.(payload) ?? Date.now();
+    // Not `?? Date.now()`: a score function returning 0 or NaN (a payload with
+    // no usable occurrence time) survives `??` and stages the job at the epoch.
+    const score = this.resolveScore(this.score?.(payload));
     const dispatchAfterMs = score + (delay ?? 0);
 
     // Get dedup config
@@ -614,7 +702,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       payloads.map(async (payload, index) => {
         const groupId = this.groupKey(payload);
         const stagedJobId = this.generateStagedJobId(payload);
-        const score = this.score?.(payload) ?? now;
+        // Same guard as send(); `now` is shared so a batch that falls back
+        // keeps its FIFO order, and so every payload is judged against one
+        // clock reading rather than drifting across the batch.
+        const score = this.resolveScore(this.score?.(payload), now);
         // Add index to ensure FIFO order within the batch even if timestamps are identical
         const dispatchAfterMs = score + (delay ?? 0) + index;
 
@@ -921,6 +1012,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // per-job path below is unchanged.
     const maxBatch = this.coalesceMaxBatch?.(payload) ?? 1;
     let batchPayloads: Payload[] | null = null;
+    // Staged-job id per batch member, index-aligned with batchPayloads, so a
+    // bisected failure can name the payload it narrowed to.
+    let batchJobIds: string[] = [];
     let drainedSiblings: DrainedJob[] = [];
     if (maxBatch > 1 && this.processBatch) {
       // Byte bound (ADR-066 pillar 2): the drain also stops before a job that
@@ -1006,6 +1100,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           drainedSiblings = liveSiblings;
           if (siblingPayloads.length > 0) {
             batchPayloads = [payload, ...siblingPayloads];
+            batchJobIds = [
+              stagedJobId,
+              ...liveSiblings.map((sibling) => sibling.stagedJobId),
+            ];
           }
         } catch (err) {
           if (err instanceof TransientBlobStoreError) {
@@ -1166,7 +1264,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                     "queue.coalesced_batch_size",
                     batchPayloads.length,
                   );
-                  await this.processBatch(batchPayloads, { attempt });
+                  await this.processBatchBisecting({
+                    entries: batchPayloads.map((batchPayload, index) => ({
+                      payload: batchPayload,
+                      stagedJobId: batchJobIds[index] ?? stagedJobId,
+                    })),
+                    attempt,
+                    routingLabels,
+                    span,
+                  });
                 } else {
                   await this.process(payload, { attempt });
                 }
@@ -1696,6 +1802,259 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     }
   }
 
+  /**
+   * Runs a coalesced batch, halving it on a retryable failure until it either
+   * succeeds or the failure is attributable to a single payload.
+   *
+   * Why this exists: a coalesced batch is all-or-nothing, so without bisection
+   * ONE unprocessable payload fails the whole batch, and the retry re-drains
+   * the same siblings into the same batch — the poison payload takes up to
+   * `coalesceMaxBatch - 1` healthy payloads down with it on every attempt until
+   * the group blocks. Recovery from a *size*-driven failure (a batch too heavy
+   * for a downstream query's memory budget) was equally undirected: it only
+   * succeeded if the retry happened to re-assemble a lighter set.
+   *
+   * One split handles both, because both are "this set of payloads fails but a
+   * smaller set might not": a too-heavy batch halves until it fits, and a
+   * poison payload halves until it is alone, at which point the throw is
+   * attributable to it and the existing retry / quarantine path takes over.
+   *
+   * Ordering is preserved: the halves are CONTIGUOUS and awaited in sequence,
+   * never concurrently, because a fold derives fields from arrival order (the
+   * same invariant that makes splitting a group across lanes unsafe).
+   *
+   * That invariant also sets the limit of what this can do. A throw propagates
+   * immediately, so payloads AFTER the offender are not attempted — stepping
+   * over it would apply them across a gap the fold cannot see, producing wrong
+   * values silently. So bisection recovers everything BEFORE the offender and
+   * names it; it does not rescue what queued behind it. Doing that needs an
+   * explicit decision about the gap, which is the side-lining work in #6482.
+   *
+   * Re-running a payload that already applied is safe — fold redelivery is
+   * idempotent via the store's applied-event-id set (#6016) — but ONLY because
+   * every sub-batch call after the first successful commit carries
+   * `delivery.isContinuation`, which tells the fold commit to EXTEND that set
+   * rather than replace it. Without the flag, each sub-batch commit would erase
+   * the ids the earlier sub-batches recorded, and a retry after a failed later
+   * sub-batch would re-apply the committed prefix (#6578).
+   *
+   * Non-retryable failures are NOT split: they will fail identically at every
+   * size, so bisecting one only multiplies the work before the same verdict.
+   *
+   * Work within one locked attempt is BOUNDED. Splitting happens while this
+   * job holds the group's active key (heartbeat-renewed), so an unbounded
+   * descent — a handler that only accepts singletons turns a full batch into
+   * ~2N sequential calls — would hold the group lock and a worker slot for the
+   * whole walk instead of yielding to retry/backoff. After
+   * the split budget is spent the current failure propagates
+   * un-split: committed prefixes stay committed, the failed remainder re-stages
+   * through the normal failure path, and backoff takes over.
+   */
+  private async processBatchBisecting({
+    entries,
+    attempt,
+    routingLabels,
+    span,
+    isNarrowed = false,
+    dispatch = { hasCommitted: false, splits: 0 },
+  }: {
+    /**
+     * Payloads paired with the staged job each came from, so a failure that
+     * narrows to one payload can name it. Carrying the id is the whole reason
+     * bisection is worth more than a retry: without it the throw is anonymous
+     * and the terminal record anchors to the DISPATCHED job, which for a failing
+     * drained sibling is the wrong job entirely.
+     */
+    entries: { payload: Payload; stagedJobId: string }[];
+    attempt: number;
+    routingLabels: Record<string, string>;
+    span: Span;
+    /** True in a recursive call — i.e. this batch is the product of a split. */
+    isNarrowed?: boolean;
+    /**
+     * State shared across the whole descent of ONE dispatch, deliberately
+     * mutable: `hasCommitted` flips once the first sub-batch commits (every later
+     * call is a continuation and must carry the flag — see JobDelivery), and
+     * `splits` is the call budget that bounds work under the group lock.
+     */
+    dispatch?: BisectionDispatchState;
+  }): Promise<void> {
+    if (!this.processBatch) {
+      throw new Error("processBatchBisecting called without a batch handler");
+    }
+
+    let failure: { err: unknown } | undefined;
+    try {
+      await this.processBatch(
+        entries.map((entry) => entry.payload),
+        { attempt, ...(dispatch.hasCommitted ? { isContinuation: true } : {}) },
+      );
+    } catch (err) {
+      failure = { err };
+    }
+
+    // Set on BOTH outcomes, and before the split recurses. The flag means "an
+    // earlier call in this descent MAY have written", which is what a later
+    // commit needs to know — a handler that stored and then threw (a reactor
+    // failing after the fold committed) has written just as surely as one that
+    // returned. Treating that as a fresh delivery lets the next sub-batch's
+    // commit REPLACE the applied set the failed call recorded (#6578). The
+    // flag only ever turns a replace into a merge, so over-setting it is the
+    // safe direction and under-setting it is what double-applies.
+    dispatch.hasCommitted = true;
+
+    if (failure) {
+      await this.splitFailedBatch({
+        entries,
+        attempt,
+        routingLabels,
+        span,
+        isNarrowed,
+        dispatch,
+        err: failure.err,
+      });
+    }
+  }
+
+  /**
+   * The failure half of {@link processBatchBisecting}: decide whether this
+   * batch can usefully be made smaller, and if so run both halves in order.
+   *
+   * Split out so each half of the decision stays readable on its own — the
+   * happy path is one call, and everything about *why* a failure does or does
+   * not warrant a split lives here.
+   */
+  private async splitFailedBatch({
+    entries,
+    attempt,
+    routingLabels,
+    span,
+    isNarrowed,
+    dispatch,
+    err,
+  }: {
+    entries: { payload: Payload; stagedJobId: string }[];
+    attempt: number;
+    routingLabels: Record<string, string>;
+    span: Span;
+    isNarrowed: boolean;
+    dispatch: BisectionDispatchState;
+    err: unknown;
+  }): Promise<void> {
+    // Fails the same way at every size, so splitting only multiplies the work
+    // before reaching the identical verdict.
+    if (!isRetryableJobError(err)) {
+      throw err;
+    }
+
+    if (entries.length <= 1) {
+      // Smallest attributable unit — report it, then let the existing retry
+      // and quarantine path take over.
+      this.reportBisectedIsolate({
+        entry: isNarrowed ? entries[0] : undefined,
+        attempt,
+        span,
+        err,
+      });
+      throw err;
+    }
+
+    // Call budget: splitting runs under the group's heartbeat-renewed active
+    // key, so a batch degrading toward singletons must not walk the whole tree
+    // (~2N sequential handler calls for N payloads) inside one locked attempt.
+    // Past the budget the failure propagates un-split: committed prefixes stay
+    // committed, the remainder re-stages via the normal failure path, and
+    // exponential backoff takes over. The budget comfortably covers the useful
+    // descents — isolating one poison payload in a 256 batch costs 8 splits,
+    // converging to sub-batches of 8 costs 31 — and cuts off only the
+    // pathological walk where backoff is the right behaviour anyway.
+    if (dispatch.splits >= this.bisectionSplitBudget) {
+      this.logger.warn(
+        {
+          queueName: this.queueName,
+          batchSize: entries.length,
+          splits: dispatch.splits,
+          attempt,
+          error: err instanceof Error ? err : new Error(String(err)),
+        },
+        "Bisection split budget exhausted; failing the remainder to the normal retry path",
+      );
+      span.addEvent("queue.batch_bisection_budget_exhausted", {
+        "queue.batch_size": entries.length,
+        "queue.batch_splits": dispatch.splits,
+      });
+      throw err;
+    }
+    dispatch.splits += 1;
+
+    const mid = Math.ceil(entries.length / 2);
+    gqBatchBisectionsTotal.inc(routingLabels);
+    span.addEvent("queue.batch_bisected", {
+      "queue.batch_size": entries.length,
+      "queue.batch_split_at": mid,
+    });
+    this.logger.warn(
+      {
+        queueName: this.queueName,
+        batchSize: entries.length,
+        splitAt: mid,
+        attempt,
+        error: err instanceof Error ? err : new Error(String(err)),
+      },
+      "Coalesced batch failed; splitting in half and retrying each half in order",
+    );
+
+    // Sequential and contiguous — see the ordering note on the caller.
+    await this.processBatchBisecting({
+      entries: entries.slice(0, mid),
+      attempt,
+      routingLabels,
+      span,
+      isNarrowed: true,
+      dispatch,
+    });
+    await this.processBatchBisecting({
+      entries: entries.slice(mid),
+      attempt,
+      routingLabels,
+      span,
+      isNarrowed: true,
+      dispatch,
+    });
+  }
+
+  /**
+   * Names the payload a bisection narrowed to, so the offender is attributable
+   * rather than "something in that batch".
+   *
+   * `entry` is undefined when the failing batch of one was never split — an
+   * un-split single is just a job that failed, and reporting it as an isolate
+   * would send an investigator hunting for a bisection that never happened.
+   */
+  private reportBisectedIsolate({
+    entry,
+    attempt,
+    span,
+    err,
+  }: {
+    entry: { payload: Payload; stagedJobId: string } | undefined;
+    attempt: number;
+    span: Span;
+    err: unknown;
+  }): void {
+    if (!entry) return;
+    this.logger.error(
+      {
+        queueName: this.queueName,
+        offendingStagedJobId: entry.stagedJobId,
+        attempt,
+        error: err instanceof Error ? err : new Error(String(err)),
+      },
+      "Coalesced batch narrowed to a single failing payload; this staged job is the offender",
+    );
+    span.setAttribute("queue.batch_offending_job_id", entry.stagedJobId);
+  }
+
   private async restageDrainedSiblings(
     groupId: string,
     siblings: DrainedJob[],
@@ -1705,7 +2064,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         await this.scripts.stage({
           stagedJobId: sibling.stagedJobId,
           groupId,
-          dispatchAfterMs: sibling.originalScore,
+          // Guarded like every other re-stage. Unvalidated, a legacy row at 0
+          // was rewritten at 0 on every batch failure and never healed, and
+          // because the exhausted-retry path DID re-score, one failure could
+          // leave the siblings ordered ahead of the job they were drained
+          // behind.
+          dispatchAfterMs: this.restageScore(sibling.originalScore),
           dedupId: "",
           dedupTtlMs: 0,
           jobDataJson: sibling.jobDataJson,
@@ -1791,10 +2155,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     contextMetadata: JobContextMetadata | undefined;
     routingLabels: Record<string, string>;
   }): Promise<void> {
-    const score =
-      typeof originalScore === "number"
-        ? originalScore
-        : (this.score?.(payload) ?? Date.now());
+    // The re-staged job keeps its original ready score so an operator sees it
+    // where it belongs in the queue - unless that score is not a usable
+    // timestamp, in which case re-staging it would park the group at the epoch
+    // for as long as it stays blocked.
+    const score = this.restageScore(originalScore);
 
     // Re-stage under the id the job was dispatched under (ADR-080), so the
     // staged job an operator inspects is named by the id its producer knows.
@@ -2023,8 +2388,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     reason: "claim_strikes" | "oversized_payload";
     errorMessage: string;
   }): Promise<void> {
-    const score =
-      typeof originalScore === "number" ? originalScore : Date.now();
+    // Same reasoning as handleExhaustedRetries: keep the original score when it
+    // is a real timestamp, otherwise the parked group reads as decades old.
+    const score = this.restageScore(originalScore);
     await this.scripts.restageAndBlock({
       groupId,
       // Parked under the id it was dispatched under (ADR-080). This used to

@@ -9,6 +9,7 @@ import { createHash } from "node:crypto";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { GovernanceCliError } from "./cli-api";
 import { type CodexTurnIO, parseCodexRollout } from "./codex-rollout";
 
 /** Deterministic 16-hex span id derived from the turn's trace_id. */
@@ -86,42 +87,152 @@ export function buildCodexIOExportRequest(
 }
 
 /**
+ * How many of a session's most recent completed turns the per-turn hook
+ * re-sends. One would do for correctness; a few give a turn whose POST failed
+ * a chance to land on the next turn without making the upload grow with the
+ * session.
+ */
+const RECENT_TURN_WINDOW = 3;
+
+/**
+ * Walk codex's `YYYY/MM/DD` session tree, handing every rollout file to
+ * `onFile`. The depth bound encodes that layout, so it lives here once rather
+ * than in each caller, where a layout change would be fixed in one and missed
+ * in the other.
+ *
+ * Newest first: the per-turn hook is looking for the session that just ended,
+ * which is under today's date, and `readdir` order is whatever the filesystem
+ * says. The path segments are zero-padded, so a descending name sort is a
+ * descending date sort. A caller that stops on a match (`onFile` returning
+ * true) therefore finds a recent session in the first directory it opens,
+ * rather than after walking a long-lived account's older ones.
+ */
+async function walkRolloutFiles(
+  root: string,
+  onFile: (path: string, name: string) => Promise<boolean | void> | boolean,
+): Promise<void> {
+  async function walk(dir: string, depth: number): Promise<boolean> {
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return false;
+    }
+    entries.sort((a, b) => b.name.localeCompare(a.name));
+    for (const e of entries) {
+      const full = join(dir, e.name);
+      if (e.isDirectory()) {
+        if (depth < 3 && (await walk(full, depth + 1))) return true;
+      } else if (e.isFile() && (await onFile(full, e.name))) {
+        return true;
+      }
+    }
+    return false;
+  }
+  await walk(root, 0);
+}
+
+/**
+ * Where codex keeps its session transcripts. Honours `CODEX_HOME` the same way
+ * codex itself does: with it set, codex writes transcripts under
+ * `$CODEX_HOME/sessions`, and a harvest hard-coded to the home directory would
+ * find the config but never the conversations it points at.
+ */
+export function defaultCodexSessionsRoot(): string {
+  const codexHome = process.env.CODEX_HOME;
+  return codexHome
+    ? join(codexHome, "sessions")
+    : join(homedir(), ".codex", "sessions");
+}
+
+/**
+ * The rollout transcript for one codex session, or null when it is not on
+ * disk. Codex names the file `rollout-<timestamp>-<threadId>.jsonl`, so the
+ * thread id a completed turn reports pins the exact file with no time-window
+ * guessing and no reading of unrelated sessions.
+ */
+export async function findRolloutForThread(
+  threadId: string,
+  sessionsRoot = defaultCodexSessionsRoot(),
+): Promise<string | null> {
+  if (!/^[A-Za-z0-9_-]+$/.test(threadId)) return null;
+  const suffix = `-${threadId}.jsonl`;
+  let found: string | null = null;
+  await walkRolloutFiles(sessionsRoot, (full, name) => {
+    if (!name.endsWith(suffix)) return false;
+    found = full;
+    return true;
+  });
+  return found;
+}
+
+/**
+ * Recover and emit the turns of ONE codex session, named by the thread id its
+ * turn-completion payload reported. Returns the number of turns emitted.
+ *
+ * Only the last {@link RECENT_TURN_WINDOW} completed turns are posted, not the
+ * whole transcript. The hook fires once per turn in a fresh process, so posting
+ * everything each time would upload N(N+1)/2 spans over a session of N turns,
+ * each carrying the whole accumulated history — quadratic in turns to record
+ * work that is linear. The small window still gives a turn whose POST failed
+ * a free retry on the next turn, which is the only reason to re-send at all.
+ *
+ * Receiver-side dedup is by span id, derived from the turn's trace id, so a
+ * re-sent turn is dropped rather than duplicated. That dedup keeps the FIRST
+ * version to arrive — a later re-post cannot correct it. Harmless here only
+ * because a turn is never emitted until it has a reply, so what we send is
+ * already final. Worth knowing before making the emitted content depend on
+ * anything that keeps changing after the turn ends.
+ */
+export async function harvestCodexThread(args: {
+  threadId: string;
+  nowMs: number;
+  endpoint: string;
+  token: string;
+  sessionsRoot?: string;
+  fetchImpl?: typeof fetch;
+}): Promise<number> {
+  const root = args.sessionsRoot ?? defaultCodexSessionsRoot();
+  const file = await findRolloutForThread(args.threadId, root);
+  if (!file) return 0;
+  let parsed: CodexTurnIO[];
+  try {
+    parsed = parseCodexRollout(await readFile(file, "utf8"));
+  } catch {
+    return 0;
+  }
+  const turns = parsed.slice(-RECENT_TURN_WINDOW);
+  if (turns.length === 0) return 0;
+  await postCodexTurns({
+    turns,
+    nowMs: args.nowMs,
+    endpoint: args.endpoint,
+    token: args.token,
+    fetchImpl: args.fetchImpl,
+  });
+  return turns.length;
+}
+
+/**
  * Find rollout files codex wrote at or after `sinceMs`. Codex lays them out as
  * ~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<sessionid>.jsonl; we walk the
  * date subdirs and keep files whose mtime is within the session window.
  */
 export async function findRecentRollouts(
   sinceMs: number,
-  sessionsRoot = join(homedir(), ".codex", "sessions"),
+  sessionsRoot = defaultCodexSessionsRoot(),
 ): Promise<string[]> {
   const out: string[] = [];
-  async function walk(dir: string, depth: number): Promise<void> {
-    let entries;
+  await walkRolloutFiles(sessionsRoot, async (full, name) => {
+    if (!name.startsWith("rollout-") || !name.endsWith(".jsonl")) return false;
     try {
-      entries = await readdir(dir, { withFileTypes: true });
+      const s = await stat(full);
+      if (s.mtimeMs >= sinceMs) out.push(full);
     } catch {
-      return;
+      /* skip unreadable */
     }
-    for (const e of entries) {
-      const full = join(dir, e.name);
-      if (e.isDirectory()) {
-        // Year/month/day nesting is 3 deep; don't descend forever.
-        if (depth < 3) await walk(full, depth + 1);
-      } else if (
-        e.isFile() &&
-        e.name.startsWith("rollout-") &&
-        e.name.endsWith(".jsonl")
-      ) {
-        try {
-          const s = await stat(full);
-          if (s.mtimeMs >= sinceMs) out.push(full);
-        } catch {
-          /* skip unreadable */
-        }
-      }
-    }
-  }
-  await walk(sessionsRoot, 0);
+    return false;
+  });
   return out;
 }
 
@@ -143,9 +254,36 @@ async function readRolloutTurns(
 }
 
 /**
+ * A refusal from the ingest endpoint, named so the caller can act on it.
+ *
+ * The key codex posts with lives in its config file and is the normal thing to
+ * go stale, so a refusal of the key reads as a key problem rather than as a
+ * status code the reader has to look up.
+ */
+function ingestRefusal(status: number): GovernanceCliError {
+  if (status === 401 || status === 403) {
+    return new GovernanceCliError(
+      status,
+      "ingest_key_rejected",
+      "LangWatch refused the ingest key codex is configured with. Run `langwatch ingest install codex` to issue a new one.",
+    );
+  }
+  return new GovernanceCliError(
+    status,
+    "ingest_rejected",
+    `LangWatch did not accept the conversation (HTTP ${status}).`,
+  );
+}
+
+/**
  * POST a batch of turns as OTLP IO spans. Capped at 5s so a slow or unreachable
- * endpoint can't wedge the user's shell; the caller swallows failures (content
- * recovery must never break a coding session).
+ * endpoint can't wedge the user's shell.
+ *
+ * A refused upload throws, the same as an unreachable one: a response that
+ * arrived is not the same as content that landed, and the turn-completion path
+ * runs after every turn of every session, so "the key expired" would otherwise
+ * read as success forever. Each caller decides what to do with the throw: the
+ * turn-completion path swallows it, the backfill reports it.
  */
 async function postCodexTurns(args: {
   turns: CodexTurnIO[];
@@ -159,8 +297,9 @@ async function postCodexTurns(args: {
   const doFetch = fetchImpl ?? fetch;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5_000);
+  let response: Response;
   try {
-    await doFetch(endpoint, {
+    response = await doFetch(endpoint, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -172,13 +311,14 @@ async function postCodexTurns(args: {
   } finally {
     clearTimeout(timeout);
   }
+  if (!response.ok) throw ingestRefusal(response.status);
 }
 
 /**
  * Recover codex turn I/O from rollouts written during this session and POST it
- * as OTLP spans. Best-effort and fully swallowed: a coding session must never
- * fail because the post-hoc content harvest hit a snag. Returns the number of
- * turns emitted (0 when nothing was found).
+ * as OTLP spans. Returns the number of turns emitted (0 when nothing was
+ * found), and rejects when the upload did not land, so a caller that reports a
+ * count is only ever reporting content the server took.
  */
 export async function harvestAndEmitCodexIO(args: {
   sinceMs: number;
@@ -191,7 +331,7 @@ export async function harvestAndEmitCodexIO(args: {
   const { sinceMs, nowMs, endpoint, token, sessionsRoot, fetchImpl } = args;
   const turns = await readRolloutTurns(
     sinceMs,
-    sessionsRoot ?? join(homedir(), ".codex", "sessions"),
+    sessionsRoot ?? defaultCodexSessionsRoot(),
   );
   if (turns.length === 0) return 0;
   await postCodexTurns({ turns, nowMs, endpoint, token, fetchImpl });
@@ -215,7 +355,7 @@ export function createCodexIOStreamer(args: {
   sessionsRoot?: string;
   fetchImpl?: typeof fetch;
 }): { harvest: (nowMs: number) => Promise<number> } {
-  const root = args.sessionsRoot ?? join(homedir(), ".codex", "sessions");
+  const root = args.sessionsRoot ?? defaultCodexSessionsRoot();
   const emitted = new Set<string>();
   return {
     async harvest(nowMs: number): Promise<number> {

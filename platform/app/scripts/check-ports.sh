@@ -88,9 +88,12 @@ if [ "${#conflicts[@]}" -eq 0 ]; then
   exit 0
 fi
 
-# Find the next free PORT slot in increments of 10. We need vite/api/metrics
-# free; the gateway port is reuse-OK (start.sh shares it across worktrees)
-# so we don't gate the suggestion on it being free.
+# Find the next free PORT slot in increments of 10. We need vite/api free, plus
+# worker metrics only when this topology actually binds it — gating on a port
+# the single-process default never opens would skip usable slots, and in the
+# degenerate case (every candidate's metrics port busy) would leave no
+# suggestion at all. The gateway port is reuse-OK (start.sh shares it across
+# worktrees) so we don't gate the suggestion on it being free.
 suggested_port=""
 slot="$PORT"
 for _ in $(seq 1 30); do
@@ -100,7 +103,7 @@ for _ in $(seq 1 30); do
   metrics_p=$((slot - 2561))
   if [ -z "$(port_holder "$vite_p")" ] && \
      [ -z "$(port_holder "$api_p")" ] && \
-     [ -z "$(port_holder "$metrics_p")" ]; then
+     { [ "$IN_PROCESS_WORKERS" = "true" ] || [ -z "$(port_holder "$metrics_p")" ]; }; then
     suggested_port="$slot"
     break
   fi
@@ -136,9 +139,7 @@ fi
 PORT_LIST_CSV=$(IFS=,; echo "${PORTS_TO_CHECK[*]}")
 echo "  ${CYA}2)${RST} kill the existing langwatch dev tree (safe — only kills node procs holding our ports, leaves Docker etc alone):"
 echo ""
-echo "       ${BLD}lsof -t -a -iTCP:${PORT_LIST_CSV} -sTCP:LISTEN -c node 2>/dev/null \\"
-echo "         | xargs -I{} ps -o pgid= -p {} 2>/dev/null | tr -d ' ' | sort -u \\"
-echo "         | xargs -I{} kill -TERM -{}${RST}"
+echo "       ${BLD}bash $(dirname "$0")/kill-dev-tree.sh ${PORT_LIST_CSV}${RST}"
 echo ""
 
 exit 1

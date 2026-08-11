@@ -219,7 +219,7 @@ describe("resolveWrapperPath", () => {
           "keep your own plan, send only telemetry to LangWatch",
         );
         expect(promptArg.choices[1]!.description).toBe(
-          "route calls through LangWatch with a virtual key, billed per token",
+          "route calls through LangWatch with a virtual key",
         );
         // Remembered for next time.
         expect(save).toHaveBeenCalledTimes(1);
@@ -356,6 +356,160 @@ describe("resolveWrapperPath", () => {
     });
   });
 
+  describe("when the tool is copilot (ingestion-first defaults, ADR-039)", () => {
+    // Copilot's gateway path switches it into BYOK mode, moving spend off
+    // the user's paid Copilot seat onto the org's provider keys — not
+    // billing-neutral like the claude/codex base-URL swap. The resolver is
+    // ingestion-first for every tool, which keeps copilot safe by default;
+    // these tests pin that copilot rides those defaults and that every
+    // gateway route names the seat bypass. Explicit choices are honored.
+
+    /** @scenario Non-interactive copilot run with no pinned mode resolves to direct OTLP */
+    it("defaults copilot to ingestion on non-TTY runs (billing neutrality)", async () => {
+      const save = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg(),
+        tool: "copilot",
+        args: [],
+        isTTY: false,
+        promptImpl: neverPrompt,
+        saveImpl: save,
+        env: {},
+      });
+      expect(out.mode).toBe("ingestion");
+      expect(out.prompted).toBe(false);
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    /** @scenario The copilot path prompt pre-selects direct OTLP */
+    it("pre-selects the direct OTLP choice on the copilot prompt", async () => {
+      const prompt = vi.fn(async () => ({
+        path: "ingestion",
+      })) as unknown as Parameters<typeof resolveWrapperPath>[0]["promptImpl"];
+      await resolveWrapperPath({
+        cfg: baseCfg(),
+        tool: "copilot",
+        args: [],
+        isTTY: true,
+        promptImpl: prompt,
+        saveImpl: vi.fn(),
+        writeImpl: vi.fn(),
+        env: {},
+      });
+      const promptArg = (prompt as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]![0] as {
+        choices: Array<{ value: string; description: string }>;
+        initial: number;
+      };
+      const values = promptArg.choices.map((c) => c.value);
+      expect(values[promptArg.initial]).toBe("ingestion");
+      expect(promptArg.choices[values.indexOf("gateway")]!.description).toBe(
+        "route calls through LangWatch with a virtual key",
+      );
+    });
+
+    /** @scenario An explicit --tool-mode=gateway flag routes copilot through the gateway */
+    it("honors an explicit gateway override for copilot and names the seat bypass", async () => {
+      const write = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg(),
+        tool: "copilot",
+        args: [],
+        override: "gateway",
+        isTTY: false,
+        promptImpl: neverPrompt,
+        writeImpl: write,
+        env: {},
+      });
+      expect(out.mode).toBe("gateway");
+      expect(write).toHaveBeenCalledWith(
+        expect.stringContaining("Copilot seat"),
+      );
+    });
+
+    it("names the seat bypass when copilot's gateway path is chosen at the prompt", async () => {
+      // The prompt answer is the route that actually moves spend off the
+      // user's Copilot seat — the saved-choice line must name the shift.
+      const write = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg(),
+        tool: "copilot",
+        args: [],
+        isTTY: true,
+        promptImpl: (async () => ({
+          path: "gateway",
+        })) as unknown as Parameters<
+          typeof resolveWrapperPath
+        >[0]["promptImpl"],
+        saveImpl: vi.fn(),
+        writeImpl: write,
+        env: {},
+      });
+      expect(out.mode).toBe("gateway");
+      expect(write).toHaveBeenCalledWith(
+        expect.stringContaining("Copilot seat"),
+      );
+    });
+
+    it("suppresses the seat-bypass notice when policy will downgrade the pinned gateway anyway", async () => {
+      // Warning about a billing shift the downgrade then cancels would be
+      // false; resolveWrapperMode's downgrade branch prints its own notice.
+      const write = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg({
+          tool_mode: { copilot: "gateway" },
+          tool_policies: { copilot: { allowVk: false, allowOtelDirect: true } },
+        }),
+        tool: "copilot",
+        args: [],
+        isTTY: true,
+        promptImpl: neverPrompt,
+        env: {},
+        writeImpl: write,
+      });
+      expect(out.mode).toBe("gateway");
+      expect(write).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A pinned gateway mode for copilot is honored without prompting */
+    it("honors a pinned gateway mode for copilot without prompting and names the seat bypass", async () => {
+      const write = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg({ tool_mode: { copilot: "gateway" } }),
+        tool: "copilot",
+        args: [],
+        isTTY: true,
+        promptImpl: neverPrompt,
+        writeImpl: write,
+        env: {},
+      });
+      expect(out.mode).toBe("gateway");
+      expect(out.prompted).toBe(false);
+      expect(write).toHaveBeenCalledWith(
+        expect.stringContaining("Copilot seat"),
+      );
+    });
+
+    /** @scenario Policy-forced gateway routing for copilot names the seat bypass */
+    it("names the Copilot seat bypass when policy forces the gateway path", async () => {
+      const write = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg({
+          tool_policies: { copilot: { allowVk: true, allowOtelDirect: false } },
+        }),
+        tool: "copilot",
+        args: [],
+        isTTY: false,
+        promptImpl: neverPrompt,
+        writeImpl: write,
+        env: {},
+      });
+      expect(out.mode).toBe("gateway");
+      const written = write.mock.calls.map((c) => c[0]).join("");
+      expect(written).toContain("Copilot seat");
+    });
+  });
+
   describe("when there is no remembered answer (run-time policy refresh)", () => {
     it("re-checks the policy at run time and honors a freshly-disabled gateway", async () => {
       // Login cached BOTH paths; the admin has since turned the gateway off.
@@ -435,7 +589,9 @@ describe("resolveWrapperPath", () => {
         "keep your own plan, send only telemetry to LangWatch",
       );
       expect(gatewayChoiceTitle()).toBe("Using an API key");
-      expect(gatewayChoiceDescription()).toContain("billed per token");
+      expect(gatewayChoiceDescription()).toBe(
+        "route calls through LangWatch with a virtual key",
+      );
     });
 
     it("names the right subscription per tool, with a neutral fallback", () => {

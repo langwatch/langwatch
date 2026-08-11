@@ -22,6 +22,8 @@ const metricNames = [
   "gq_retry_backoff_milliseconds",
   "gq_job_duration_milliseconds",
   "gq_oldest_pending_age_milliseconds",
+  "gq_oldest_backlog_age_milliseconds",
+  "gq_ready_score_implausible_total",
   // ADR-030 hardening + review 2026-06-24
   "gq_blob_reclaim_s3_failures_total",
   "gq_blob_decode_cap_exceeded_total",
@@ -38,6 +40,7 @@ const metricNames = [
   // ADR-066 pillar 2 mixed-command isolation
   "gq_foreign_siblings_restaged_total",
   "gq_jobs_unroutable_total",
+  "gq_batch_bisections_total",
 ] as const;
 
 for (const name of metricNames) {
@@ -190,6 +193,41 @@ export const gqOldestPendingAgeMilliseconds = new Gauge({
   labelNames: ["queue_name"] as const,
 });
 
+/**
+ * Backlog age the eligible-waiting gauge is structurally blind to. A group
+ * pinned in retry backoff has its ready score REWRITTEN to now+backoff on every
+ * failed attempt, so `gq_oldest_pending_age_milliseconds` (which clocks off the
+ * ready score) reads seconds even while the group's head job has been due for a
+ * day. This gauge clocks off the per-group jobs zset instead, whose scores are
+ * preserved across retries/blocks/parks, sampling the most-deferred ready
+ * groups — exactly where retry-pinned and in-flight groups live.
+ */
+export const gqOldestBacklogAgeMilliseconds = new Gauge({
+  name: "gq_oldest_backlog_age_milliseconds",
+  help: "Age of the oldest due job across sampled groups regardless of dispatch eligibility (catches groups pinned in retry backoff)",
+  labelNames: ["queue_name"] as const,
+});
+
+/**
+ * Jobs whose producer supplied a ready score the queue refused.
+ *
+ * Raised at the staging fallback, once per job, the moment the value is
+ * rejected - not by scanning the ready set afterwards. That ordering is the
+ * whole point: the guard replaces the bad score before it is written, so a scan
+ * would find nothing and report zero for ever while the broken producer carried
+ * on. This is a true monotonic count of events, so `rate()` and `increase()`
+ * mean what they usually mean.
+ *
+ * Only a value the producer actually supplied counts. A payload with no
+ * occurrence time at all (`deferredOriginResolution` and friends) is scored at
+ * staging time by design, and is not a defect to report.
+ */
+export const gqReadyScoreImplausibleTotal = new Counter({
+  name: "gq_ready_score_implausible_total",
+  help: "Jobs staged with a producer score the queue rejected (not a timestamp, or outside the allowed skew around now) and replaced with the staging time",
+  labelNames: ["queue_name"] as const,
+});
+
 // --- Blob lifecycle observability (ADR-030 hardening + review 2026-06-24) ---
 
 /** A stored blob exceeded the decode cap — possible tamper / zip-bomb. Distinct from a missing blob. */
@@ -331,7 +369,7 @@ export const gqJobsUnroutableTotal = new Counter({
  */
 export const gqBlobReleaseGraceTotal = new Counter({
   name: "gq_blob_release_grace_total",
-  help: "Blobs whose last lease was retired via terminal retirement, moving them from the 4-day backstop onto the release grace window (excludes the dedup-squash release path — a floor, not a total)",
+  help: 'Blobs whose last lease was retired via terminal retirement, moving them from the 4-day backstop onto the release grace window (excludes the dedup-squash release path — a floor, not a total). The "tier" label is where the blob lived, not which provider stored it: "redis" or "s3", where "s3" means the durable object store whatever its scheme — an Azure Blob deployment reports "s3" here.',
   labelNames: ["queue_name", "tier"] as const,
 });
 
@@ -374,4 +412,36 @@ export const gqForeignSiblingsRestagedTotal = new Counter({
   name: "gq_foreign_siblings_restaged_total",
   help: "Drained siblings restaged untouched because their __jobName differed from the dispatched job (ADR-066 mixed-command isolation) — excludes the batch-failure restage paths",
   labelNames: ["queue_name"] as const,
+});
+
+/**
+ * A coalesced batch failed retryably and was split in half to isolate the
+ * cause.
+ *
+ * Increments ONCE PER SPLIT, not once per batch, so one failing batch produces
+ * a burst rather than a single event. Read it as a rate, not a total, and do
+ * not infer a batch count from it — how many splits a batch costs depends on
+ * why it failed:
+ * - a single unprocessable payload costs one split per level of the descent to
+ *   it, so roughly `log2(batchSize)` — but the exact count moves with the
+ *   payload's position (a batch of 5 costs 2 or 3, not 2.32).
+ * - a batch that fails purely on size keeps splitting until every part fits, so
+ *   the cost is driven by how far the working size is below the batch bound and
+ *   approaches `batchSize - 1` in the worst case, far above `log2(batchSize)`.
+ *
+ * A steady non-zero rate is the signal worth acting on, and it means one of two
+ * things — both real:
+ * - the batch bound is too generous for what the handler can process in one
+ *   pass (size-driven; the fix is a tighter budget, not more bisection), or
+ * - a payload in this pipeline is persistently unprocessable (poison; bisection
+ *   is containing the blast radius but something still needs to look at it).
+ *
+ * Zero means batches either succeed whole or fail non-retryably. Correlate with
+ * `gq_jobs_retried_total` to tell "we recovered inside the dispatch" from "we
+ * gave the whole batch back to the queue".
+ */
+export const gqBatchBisectionsTotal = new Counter({
+  name: "gq_batch_bisections_total",
+  help: "Retryable coalesced-batch failures that were split in half to isolate the cause — increments once per split, so one failing batch costs several",
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
 });

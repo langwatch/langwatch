@@ -23,12 +23,9 @@
 import type { PrismaClient } from "@prisma/client";
 
 import { env } from "~/env.mjs";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
+import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import { AiToolEntryService } from "./aiToolEntry.service";
 import { resolveGatewayBaseUrl } from "./gatewayUrl";
 import { PersonalVirtualKeyService } from "./personalVirtualKey.service";
@@ -90,9 +87,9 @@ export interface CliBootstrapResult {
   /**
    * Mailto target the CLI can render when preflight fails (gateway
    * down, no provider configured, no personal VK). First org admin by
-   * createdAt, same selection used by the budget-exceeded payload so
-   * the user sees a consistent "ask this person" address across
-   * surfaces. Null when the org has no admin row yet.
+   * createdAt, resolved through {@link resolveOrgAdminEmail} so the
+   * budget-exceeded payload and this one name the same person. Null when
+   * the org has no admin the CLI can reach.
    */
   adminEmail: string | null;
   /**
@@ -121,10 +118,34 @@ const SCOPE_RANK: Record<string, number> = {
 };
 
 export class CliBootstrapService {
-  constructor(private readonly prisma: PrismaClient) {}
+  private readonly prisma: PrismaClient;
+  /**
+   * The gateway budget ledger, from the App. `undefined` on a deployment
+   * without ClickHouse, in which case {@link resolveBudget} short-circuits
+   * to the empty budget rather than falling back to Postgres spend — the
+   * CLI ceremony has always reported "no budget data" when the ledger
+   * isn't reachable, not a stale PG figure.
+   */
+  private readonly budgetRepository:
+    | GatewayBudgetClickHouseRepository
+    | undefined;
 
-  static create(prisma: PrismaClient): CliBootstrapService {
-    return new CliBootstrapService(prisma);
+  constructor({
+    prisma,
+    budgetRepository,
+  }: {
+    prisma: PrismaClient;
+    budgetRepository: GatewayBudgetClickHouseRepository | undefined;
+  }) {
+    this.prisma = prisma;
+    this.budgetRepository = budgetRepository;
+  }
+
+  static create(deps: {
+    prisma: PrismaClient;
+    budgetRepository: GatewayBudgetClickHouseRepository | undefined;
+  }): CliBootstrapService {
+    return new CliBootstrapService(deps);
   }
 
   async resolve(input: {
@@ -154,7 +175,10 @@ export class CliBootstrapService {
       displayName: p.displayName,
       configured: p.configured,
     }));
-    const adminEmail = await this.resolveAdminEmail(input.organizationId);
+    const adminEmail = await resolveOrgAdminEmail({
+      prisma: this.prisma,
+      organizationId: input.organizationId,
+    });
 
     const workspaceService = new PersonalWorkspaceService(this.prisma);
     const workspace = await workspaceService.findExisting({
@@ -208,17 +232,6 @@ export class CliBootstrapService {
     return map;
   }
 
-  private async resolveAdminEmail(
-    organizationId: string,
-  ): Promise<string | null> {
-    const admin = await this.prisma.organizationUser.findFirst({
-      where: { organizationId, role: "ADMIN" },
-      include: { user: { select: { email: true } } },
-      orderBy: { createdAt: "asc" },
-    });
-    return admin?.user.email ?? null;
-  }
-
   private async resolveBudget(input: {
     userId: string;
     organizationId: string;
@@ -232,20 +245,14 @@ export class CliBootstrapService {
     });
     const personalVk = vks[0];
 
-    if (!personalVk || !isClickHouseEnabled()) {
+    if (!personalVk || !this.budgetRepository) {
       return { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "MONTHLY" };
     }
 
-    const chRepo = new GatewayBudgetClickHouseRepository(async (projectId) => {
-      const client = await getClickHouseClientForProject(projectId);
-      if (!client) {
-        throw new Error(
-          `ClickHouse enabled but no client for project ${projectId}`,
-        );
-      }
-      return client;
-    });
-    const budgetService = GatewayBudgetService.create(this.prisma, chRepo);
+    const budgetService = GatewayBudgetService.create(
+      this.prisma,
+      this.budgetRepository,
+    );
     const decision = await budgetService.check({
       organizationId: input.organizationId,
       teamId: input.teamId,

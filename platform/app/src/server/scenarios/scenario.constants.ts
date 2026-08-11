@@ -8,7 +8,7 @@ import { makeQueueName } from "../queues/makeQueueName";
 
 /** Queue configuration */
 export const SCENARIO_QUEUE = {
-  /** Queue name for BullMQ - scoped under simulations domain */
+  /** Queue name - scoped under simulations domain */
   NAME: makeQueueName("simulations/scenarios/executions"),
   /** Job name for queue.add() */
   JOB: "scenario",

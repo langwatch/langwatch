@@ -9,6 +9,14 @@ import {
   type PlanType,
 } from "../planFormDefaults";
 
+/**
+ * Spec: specs/licensing/license-generation.feature
+ *
+ * These defaults are both what the generator form shows and what it sends, so
+ * a field missing here is a field silently missing from every license minted
+ * through the product.
+ */
+
 describe("planFormDefaults", () => {
   describe("getPlanDefaults", () => {
     it("returns PRO template defaults for PRO plan", () => {
@@ -17,14 +25,9 @@ describe("planFormDefaults", () => {
       expect(defaults).toEqual({
         maxMembers: PRO_TEMPLATE.maxMembers,
         maxMembersLite: PRO_TEMPLATE.maxMembersLite,
-        maxProjects: PRO_TEMPLATE.maxProjects,
         maxMessagesPerMonth: PRO_TEMPLATE.maxMessagesPerMonth,
-        maxWorkflows: PRO_TEMPLATE.maxWorkflows,
-        maxPrompts: PRO_TEMPLATE.maxPrompts,
-        maxEvaluators: PRO_TEMPLATE.maxEvaluators,
-        maxScenarios: PRO_TEMPLATE.maxScenarios,
-        maxAgents: PRO_TEMPLATE.maxAgents,
         canPublish: PRO_TEMPLATE.canPublish,
+        webhookEndpointsEnabled: PRO_TEMPLATE.webhookEndpointsEnabled,
         usageUnit: PRO_TEMPLATE.usageUnit,
       });
     });
@@ -35,18 +38,14 @@ describe("planFormDefaults", () => {
       expect(defaults).toEqual({
         maxMembers: ENTERPRISE_TEMPLATE.maxMembers,
         maxMembersLite: ENTERPRISE_TEMPLATE.maxMembersLite,
-        maxProjects: ENTERPRISE_TEMPLATE.maxProjects,
         maxMessagesPerMonth: ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
-        maxWorkflows: ENTERPRISE_TEMPLATE.maxWorkflows,
-        maxPrompts: ENTERPRISE_TEMPLATE.maxPrompts,
-        maxEvaluators: ENTERPRISE_TEMPLATE.maxEvaluators,
-        maxScenarios: ENTERPRISE_TEMPLATE.maxScenarios,
-        maxAgents: ENTERPRISE_TEMPLATE.maxAgents,
         canPublish: ENTERPRISE_TEMPLATE.canPublish,
+        webhookEndpointsEnabled: ENTERPRISE_TEMPLATE.webhookEndpointsEnabled,
         usageUnit: ENTERPRISE_TEMPLATE.usageUnit,
       });
     });
 
+    /** @scenario A custom contract carries only what it was given */
     it("returns empty object for CUSTOM plan", () => {
       const defaults = getPlanDefaults("CUSTOM");
 
@@ -90,6 +89,19 @@ describe("planFormDefaults", () => {
       expect(enterpriseDefaults.maxMessagesPerMonth).toBe(
         ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
       );
+    });
+
+    describe("when the operator picks a plan for the webhook entitlement", () => {
+      /** @scenario The generator form mints what it shows */
+      it("ticks it for ENTERPRISE and clears it on a lesser plan", () => {
+        expect(PLAN_DEFAULTS.ENTERPRISE.webhookEndpointsEnabled).toBe(true);
+
+        // Present and undefined, not absent: the form spreads these over the
+        // current values, so an absent key would leave the box ticked after
+        // switching down from ENTERPRISE.
+        expect("webhookEndpointsEnabled" in PLAN_DEFAULTS.PRO).toBe(true);
+        expect(PLAN_DEFAULTS.PRO.webhookEndpointsEnabled).toBeUndefined();
+      });
     });
   });
 });

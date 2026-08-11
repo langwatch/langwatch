@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { AggregateTypeSchema } from "../../../domain/aggregateType";
+import { TenantIdSchema } from "../../../domain/tenantId";
 import { EventSchema } from "../../../domain/types";
 import { logTraceContributionSchema } from "../../log-processing/schemas/logRecord";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
@@ -13,9 +15,9 @@ import {
   METRIC_DATA_POINT_CORRELATED_EVENT_TYPE,
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
-  SPAN_REFERENCED_EVENT_TYPE,
-  SPAN_REFERENCED_EVENT_VERSION_LATEST,
-  SPAN_REFERENCED_EVENT_VERSIONS,
+  SPAN_REFERENCED_PAYLOAD_TYPE,
+  SPAN_REFERENCED_PAYLOAD_VERSION_LATEST,
+  SPAN_REFERENCED_PAYLOAD_VERSIONS,
   TOPIC_ASSIGNED_EVENT_TYPE,
   TRACE_NAME_CHANGED_EVENT_TYPE,
   TRACE_NAME_MAX_LENGTH,
@@ -70,10 +72,16 @@ export function isSpanReceivedEvent(
 /**
  * The claim-check twin of `span_received` (ADR-069): the routing seam stages
  * this in place of the full event for a subscriber that opted in, and the
- * handler reads the span back from its canonical store. Never appended to the
- * event log — see the constant's docblock for the versioning contract.
+ * handler reads the span back from its canonical store.
+ *
+ * This is a STAGED QUEUE PAYLOAD, not an event — a plain versioned DTO owned
+ * by the staging lane. It is never appended to the event log (the durable
+ * event stays `span_received`); see the constant's docblock for the
+ * versioning contract. Its fields mirror the event envelope field-for-field
+ * (same names, same validators) so the wire shape is byte-identical to what
+ * earlier builds staged and parsed.
  */
-export const spanReferencedEventDataSchema = z.object({
+export const spanReferencedPayloadDataSchema = z.object({
   traceId: z.string(),
   spanId: z.string(),
   /** The raw wire span name, mirrored so gates and debugging never need the store. */
@@ -86,7 +94,7 @@ export const spanReferencedEventDataSchema = z.object({
    * time, which trails a long-lived span's start by the span's whole
    * duration, and a fixed window around it goes permanently blind past that.
    * Nullable for forward compatibility only — **the current producer never
-   * emits null.** `makeSpanReferencedEvent` stages the WHOLE event instead
+   * emits null.** `makeSpanReferencedPayload` stages the WHOLE event instead
    * when it cannot parse a start, precisely because an `occurredAt`-centered
    * window is the permanently-blind case described above. So the reader's
    * `?? occurredAt` fallback is a total-function backstop for a shape only a
@@ -96,16 +104,24 @@ export const spanReferencedEventDataSchema = z.object({
   startTimeUnixMs: z.number().nullable(),
 });
 
-export const spanReferencedEventSchema = EventSchema.extend({
-  type: z.literal(SPAN_REFERENCED_EVENT_TYPE),
-  version: z.enum(SPAN_REFERENCED_EVENT_VERSIONS),
-  data: spanReferencedEventDataSchema,
+export const spanReferencedPayloadSchema = z.object({
+  id: z.string(),
+  aggregateId: z.string(),
+  aggregateType: AggregateTypeSchema,
+  tenantId: TenantIdSchema,
+  createdAt: z.number().int().nonnegative(),
+  occurredAt: z.number().int().nonnegative(),
+  type: z.literal(SPAN_REFERENCED_PAYLOAD_TYPE),
+  version: z.enum(SPAN_REFERENCED_PAYLOAD_VERSIONS),
+  data: spanReferencedPayloadDataSchema,
+  metadata: eventMetadataBaseSchema.optional(),
+  idempotencyKey: z.string().optional(),
 });
 
-export type SpanReferencedEventData = z.infer<
-  typeof spanReferencedEventDataSchema
+export type SpanReferencedPayloadData = z.infer<
+  typeof spanReferencedPayloadDataSchema
 >;
-export type SpanReferencedEvent = z.infer<typeof spanReferencedEventSchema>;
+export type SpanReferencedPayload = z.infer<typeof spanReferencedPayloadSchema>;
 
 /**
  * Discriminate-then-validate read of a staged payload.
@@ -116,14 +132,14 @@ export type SpanReferencedEvent = z.infer<typeof spanReferencedEventSchema>;
  * queue's retry — falling through would let a mixed-deploy job be mistaken
  * for another kind of payload and silently no-op.
  */
-export function parseSpanReferencedEvent(
+export function parseSpanReferencedPayload(
   value: unknown,
-): SpanReferencedEvent | null {
+): SpanReferencedPayload | null {
   if (typeof value !== "object" || value === null) return null;
-  if ((value as { type?: unknown }).type !== SPAN_REFERENCED_EVENT_TYPE) {
+  if ((value as { type?: unknown }).type !== SPAN_REFERENCED_PAYLOAD_TYPE) {
     return null;
   }
-  return spanReferencedEventSchema.parse(value);
+  return spanReferencedPayloadSchema.parse(value);
 }
 
 /**
@@ -140,9 +156,9 @@ export function parseSpanReferencedEvent(
  * wire data behind a cast, so an absent span is read as "no identity to
  * reference" rather than trusted into a TypeError.
  */
-export function makeSpanReferencedEvent(
+export function makeSpanReferencedPayload(
   event: SpanReceivedEvent,
-): SpanReferencedEvent | SpanReceivedEvent {
+): SpanReferencedPayload | SpanReceivedEvent {
   const span = event.data.span as
     | {
         spanId?: unknown;
@@ -165,13 +181,13 @@ export function makeSpanReferencedEvent(
   }
   return {
     id: event.id,
-    version: SPAN_REFERENCED_EVENT_VERSION_LATEST,
+    version: SPAN_REFERENCED_PAYLOAD_VERSION_LATEST,
     aggregateId: event.aggregateId,
     aggregateType: event.aggregateType,
     tenantId: event.tenantId,
     createdAt: event.createdAt,
     occurredAt: event.occurredAt,
-    type: SPAN_REFERENCED_EVENT_TYPE,
+    type: SPAN_REFERENCED_PAYLOAD_TYPE,
     data: {
       traceId: String(event.aggregateId),
       spanId: span.spanId,

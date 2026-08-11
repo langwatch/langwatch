@@ -40,6 +40,7 @@ describe("useDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockQuery = {};
+    window.history.replaceState({}, "", "/test");
     clearDrawerStack();
     clearFlowCallbacks();
   });
@@ -121,6 +122,14 @@ describe("useDrawer", () => {
 
     it("builds drawer stack on navigation", () => {
       mockQuery = { "drawer.open": "targetTypeSelector" };
+      // Seeding an empty stack reads the address bar rather than the router's
+      // render snapshot, so the drawer this test opened "from the URL" has to
+      // be in the URL.
+      window.history.replaceState(
+        {},
+        "",
+        "/test?drawer.open=targetTypeSelector",
+      );
       const { result } = renderHook(() => useDrawer());
 
       // First drawer opens from URL - stack is empty initially

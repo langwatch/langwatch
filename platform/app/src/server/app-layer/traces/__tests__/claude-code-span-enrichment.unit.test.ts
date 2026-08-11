@@ -203,13 +203,13 @@ describe("computeClaudeSpanEnrichment", () => {
      * group, so when the span array order and the body time order disagree, span
      * i pairs with the OTHER agent's body i — input is mis-attributed.
      *
-     * This is accepted: output and cost still join EXACTLY by `request_id`
-     * (asserted below), only the input transcript can cross; and real Claude
-     * Code sub-agents each carry a distinct `query_source`, which isolates them
+     * This is accepted: output still joins EXACTLY by `request_id` (asserted
+     * below), only the input transcript can cross; and real Claude Code
+     * sub-agents each carry a distinct `query_source`, which isolates them
      * into separate groups (see the two-query_sources test above). This test
      * pins the behavior so a future correlation fix has a red-to-green target.
      */
-    it("joins output/cost exactly by request_id but can cross the positional input", () => {
+    it("joins output exactly by request_id but can cross the positional input", () => {
       const REQ_A = "req_agentA";
       const REQ_B = "req_agentB";
       // Array/call order: agent A's span first, then agent B's.
@@ -235,29 +235,13 @@ describe("computeClaudeSpanEnrichment", () => {
           timeUnixMs: 200,
           body: requestBody({ userText: "AGENT_A_PROMPT" }),
         },
-        // Output + cost carry request_id, so they join exactly regardless of order.
-        {
-          eventName: "api_request",
-          requestId: REQ_A,
-          querySource: REPL,
-          timeUnixMs: 205,
-          body: null,
-          costUsd: 0.03,
-        },
+        // Output carries request_id, so it joins exactly regardless of order.
         {
           eventName: "api_response_body",
           requestId: REQ_A,
           querySource: REPL,
           timeUnixMs: 210,
           body: responseBody("ANSWER_A"),
-        },
-        {
-          eventName: "api_request",
-          requestId: REQ_B,
-          querySource: REPL,
-          timeUnixMs: 105,
-          body: null,
-          costUsd: 0.07,
         },
         {
           eventName: "api_response_body",
@@ -270,15 +254,13 @@ describe("computeClaudeSpanEnrichment", () => {
 
       const result = computeClaudeSpanEnrichment({ spans, logs });
 
-      // Output + cost: EXACT by request_id — never crossed.
+      // Output: EXACT by request_id, never crossed.
       expect((result.get("span-A")?.output as { value: string }).value).toBe(
         "ANSWER_A",
       );
-      expect(result.get("span-A")?.cost).toBe(0.03);
       expect((result.get("span-B")?.output as { value: string }).value).toBe(
         "ANSWER_B",
       );
-      expect(result.get("span-B")?.cost).toBe(0.07);
 
       // Input: POSITIONAL — span-A (array index 0) pairs with the earliest body
       // (agent B's), so the transcript crosses. Documented limitation.
@@ -367,8 +349,13 @@ describe("computeClaudeSpanEnrichment", () => {
     });
   });
 
-  describe("given an api_request anchor with cost_usd sharing the span's request_id", () => {
-    it("attaches the authoritative cost to the span", () => {
+  describe("given an api_request anchor carrying the provider's own cost", () => {
+    /**
+     * Cost is not part of this join. It is computed from the span's own tokens
+     * at ingest, so every surface reads the same stored number instead of the
+     * drawer reading a log the analytics graphs cannot see.
+     */
+    it("leaves the span out of the enrichment entirely", () => {
       const spans: ClaudeSpanRef[] = [
         { spanId: "span-1", requestId: REQUEST_ID, querySource: REPL },
       ];
@@ -379,72 +366,17 @@ describe("computeClaudeSpanEnrichment", () => {
           querySource: REPL,
           timeUnixMs: 1000,
           body: null,
-          costUsd: 0.0421,
-        },
-      ];
-
-      const enrichment = computeClaudeSpanEnrichment({ spans, logs }).get(
-        "span-1",
-      );
-
-      expect(enrichment?.cost).toBe(0.0421);
-    });
-
-    it("does not attach cost to a span whose request_id matches no api_request", () => {
-      const spans: ClaudeSpanRef[] = [
-        { spanId: "span-1", requestId: "req_unmatched", querySource: REPL },
-      ];
-      const logs: ClaudeContentLog[] = [
-        {
-          eventName: "api_request",
-          requestId: REQUEST_ID,
-          querySource: REPL,
-          timeUnixMs: 1000,
-          body: null,
-          costUsd: 0.5,
-        },
-      ];
-
-      expect(
-        computeClaudeSpanEnrichment({ spans, logs }).get("span-1")?.cost ??
-          null,
-      ).toBeNull();
-    });
-  });
-
-  describe("given an api_request with an invalid cost_usd", () => {
-    it("does not attach a negative or non-finite cost", () => {
-      const spans: ClaudeSpanRef[] = [
-        { spanId: "span-neg", requestId: "req_neg", querySource: REPL },
-        { spanId: "span-nan", requestId: "req_nan", querySource: REPL },
-      ];
-      const logs: ClaudeContentLog[] = [
-        {
-          eventName: "api_request",
-          requestId: "req_neg",
-          querySource: REPL,
-          timeUnixMs: 1,
-          body: null,
-          costUsd: -1,
-        },
-        {
-          eventName: "api_request",
-          requestId: "req_nan",
-          querySource: REPL,
-          timeUnixMs: 2,
-          body: null,
-          costUsd: Number.NaN,
         },
       ];
 
       const result = computeClaudeSpanEnrichment({ spans, logs });
-      expect(result.get("span-neg") ?? null).toBeNull();
-      expect(result.get("span-nan") ?? null).toBeNull();
+
+      expect(result.size).toBe(0);
     });
   });
 
-  describe("given the light events only (RAW_API_BODIES off: assistant_response + user_prompt + api_request)", () => {
-    it("joins output + cost exactly by request_id and input from the user_prompt, without any api_*_body", () => {
+  describe("given the light events only (RAW_API_BODIES off: assistant_response + user_prompt)", () => {
+    it("joins output exactly by request_id and input from the user_prompt, without any api_*_body", () => {
       const spans: ClaudeSpanRef[] = [
         { spanId: "span-1", requestId: REQUEST_ID, querySource: REPL },
       ];
@@ -455,14 +387,6 @@ describe("computeClaudeSpanEnrichment", () => {
           querySource: REPL,
           timeUnixMs: 100,
           body: "summarise the repo",
-        },
-        {
-          eventName: "api_request",
-          requestId: REQUEST_ID,
-          querySource: REPL,
-          timeUnixMs: 200,
-          body: null,
-          costUsd: 0.0123,
         },
         {
           eventName: "assistant_response",
@@ -481,7 +405,6 @@ describe("computeClaudeSpanEnrichment", () => {
         type: "text",
         value: "Here is the summary.",
       });
-      expect(enrichment?.cost).toBe(0.0123);
       expect(enrichment?.input).toEqual({
         type: "text",
         value: "summarise the repo",

@@ -7,6 +7,8 @@ import {
   gateEvaluations,
   gateHeaderCost,
   gateResources,
+  gateSessionCost,
+  gateSessionTitle,
   gateTreeCost,
 } from "../tracesV2.gates";
 import type {
@@ -20,6 +22,9 @@ import type {
  * never receives spend, restricted attributes, captured event content or
  * evaluator text that quotes the trace. These assert the leak-prevention
  * contract directly. See ADR-057.
+ *
+ * @see specs/traces-v2/sharing.feature
+ * @see specs/traces-v2/sessions-lens.feature (the session-rollup cost gate)
  */
 
 const anonProtections: Protections = {
@@ -58,6 +63,131 @@ describe("sharedTrace share-safe gates", () => {
         expect(out.map((n) => n.cost)).toEqual([null, null]);
       });
     });
+
+    describe("when gating Sessions lens rows", () => {
+      /** @scenario A viewer without cost:view sees no session spend */
+      it("strips every session rollup cost", () => {
+        const sessions = [
+          {
+            conversationId: "s-1",
+            totalCost: 4.2,
+            totalTokens: 100,
+            traceCount: 7,
+          },
+          {
+            conversationId: "s-2",
+            totalCost: 0,
+            totalTokens: 5,
+            traceCount: 1,
+          },
+        ];
+        const out = gateSessionCost({
+          sessions,
+          protections: anonProtections,
+        });
+        expect(out.map((session) => session.totalCost)).toEqual([0, 0]);
+        // Spend is the only field the gate touches. Asserting the whole row
+        // rather than one survivor is what catches a rollup column added
+        // later being mangled on its way through.
+        expect(out).toEqual(
+          sessions.map((session) => ({ ...session, totalCost: 0 })),
+        );
+      });
+    });
+  });
+
+  describe("given a viewer whose captured content is hidden", () => {
+    const sessionWith = (title: string | null) => ({
+      conversationId: "s-1",
+      totalCost: 4.2,
+      codingAgent: {
+        modelCalls: 12,
+        title,
+        repositoryOwner: "acme",
+        gitBranch: "feat/git-context",
+      },
+    });
+
+    describe("when gating a session that has a title", () => {
+      /** @scenario A viewer who cannot read captured content sees no session title */
+      it("strips the title and marks it redacted", () => {
+        const out = gateSessionTitle({
+          sessions: [sessionWith("Fix the flaky session fold test")],
+          protections: anonProtections,
+        });
+
+        expect(out[0]!.codingAgent!.title).toBeNull();
+        expect(out[0]!.codingAgent!.titleRedacted).toBe(true);
+        // Where the session ran is operational metadata, not content.
+        expect(out[0]!.codingAgent!.repositoryOwner).toBe("acme");
+        expect(out[0]!.codingAgent!.gitBranch).toBe("feat/git-context");
+        expect(out[0]!.codingAgent!.modelCalls).toBe(12);
+        expect(out[0]!.totalCost).toBe(4.2);
+      });
+    });
+
+    describe("when gating a session that never had a title", () => {
+      /** @scenario A viewer who cannot read captured content sees no session title */
+      it("marks nothing redacted, so no placeholder is rendered", () => {
+        const out = gateSessionTitle({
+          sessions: [sessionWith(null)],
+          protections: anonProtections,
+        });
+
+        expect(out[0]!.codingAgent!.title).toBeNull();
+        expect(out[0]!.codingAgent!.titleRedacted).toBe(false);
+      });
+    });
+
+    describe("when gating a session with no coding-agent row", () => {
+      it("passes it through untouched", () => {
+        const sessions = [{ conversationId: "s-2", codingAgent: null }];
+        expect(
+          gateSessionTitle({ sessions, protections: anonProtections }),
+        ).toEqual(sessions);
+      });
+    });
+
+    describe("when the viewer may read one side of the content only", () => {
+      /** @scenario A viewer who cannot read captured content sees no session title */
+      it("still strips the title, which paraphrases both sides", () => {
+        const out = gateSessionTitle({
+          sessions: [sessionWith("Fix the flaky session fold test")],
+          protections: {
+            ...anonProtections,
+            canSeeCapturedInput: true,
+            canSeeCapturedOutput: false,
+          },
+        });
+
+        expect(out[0]!.codingAgent!.title).toBeNull();
+        expect(out[0]!.codingAgent!.titleRedacted).toBe(true);
+      });
+    });
+  });
+
+  describe("given a viewer who may read captured content", () => {
+    /** @scenario A viewer with full content visibility sees the title verbatim */
+    it("leaves the session title untouched", () => {
+      const out = gateSessionTitle({
+        sessions: [
+          {
+            conversationId: "s-1",
+            codingAgent: {
+              title: "Fix the flaky session fold test",
+              gitBranch: "feat/git-context",
+            },
+          },
+        ],
+        protections: memberProtections,
+      });
+
+      expect(out[0]!.codingAgent!.title).toBe(
+        "Fix the flaky session fold test",
+      );
+      expect(out[0]!.codingAgent!.titleRedacted).toBe(false);
+      expect(out[0]!.codingAgent!.gitBranch).toBe("feat/git-context");
+    });
   });
 
   describe("given a member with cost:view", () => {
@@ -74,6 +204,14 @@ describe("sharedTrace share-safe gates", () => {
       expect(
         gateTreeCost({ nodes, protections: memberProtections })[0]?.cost,
       ).toBe(0.1);
+    });
+
+    it("leaves Sessions lens spend untouched", () => {
+      const sessions = [{ conversationId: "s-1", totalCost: 4.2 }];
+      expect(
+        gateSessionCost({ sessions, protections: memberProtections })[0]
+          ?.totalCost,
+      ).toBe(4.2);
     });
   });
 

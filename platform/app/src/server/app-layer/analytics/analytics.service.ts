@@ -3,11 +3,15 @@
  *
  * Public entrypoint for the analytics read API. Owns NO SQL. Orchestrates:
  *
- *   1. Feature-flag check (`release_event_sourced_analytics_read`)
- *   2. Route-table lookup (`pickAnalyticsTable`)
- *   3. Dispatch to the right repository (rollup / slim / legacy shim)
- *   4. Optional tripwire (`release_event_sourced_analytics_read_tripwire`)
- *   5. Return the routed result
+ *   1. Route-table lookup (`pickAnalyticsTable`) — by query SHAPE
+ *   2. Dispatch to the right repository (rollup / slim / legacy shim)
+ *   3. Optional tripwire (`release_event_sourced_analytics_read_tripwire`)
+ *   4. Return the routed result
+ *
+ * `release_event_sourced_analytics_read` no longer appears here. It is
+ * permanently on, so gating on it spent a feature-flag round trip per query to
+ * be told "yes". Routing to the legacy tables survives it — that is a property
+ * of the query's shape, not of any flag (see `resolveAnalyticsTable`).
  *
  * Routes call this service; this service calls repositories. The legacy
  * `~/server/analytics/analytics.service.ts` has been deleted as part of
@@ -20,7 +24,6 @@
 
 import { createHash } from "crypto";
 import { getLangWatchTracer } from "langwatch";
-import { getClickHouseAnalyticsService } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import type { TimeseriesInputType } from "~/server/analytics/registry";
 import type {
   AnalyticsBackend,
@@ -30,7 +33,6 @@ import type {
 } from "~/server/analytics/types";
 import { currentVsPreviousDates } from "~/server/api/routers/analytics/common";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { featureFlagService } from "~/server/featureFlag";
 import type { FilterField } from "~/server/filters/types";
 import { TtlCache } from "~/server/utils/ttlCache";
@@ -48,6 +50,7 @@ import {
 } from "./repositories/legacy.shim";
 import { type AnalyticsTable, pickAnalyticsTable } from "./routing/route-table";
 import { compareForTripwire } from "./tripwire/divergence-compare";
+import type { TimeseriesReadOptions } from "./types";
 
 const TIMESERIES_CACHE_TTL_MS = 30_000 as const;
 
@@ -89,32 +92,41 @@ export class AnalyticsService {
   /**
    * Get timeseries analytics data (with 30s TTL cache).
    *
-   * Phase 3 routing: when `release_event_sourced_analytics_read` is ON for the
-   * project, `pickAnalyticsTable` picks one of trace_analytics_rollup /
-   * trace_analytics / trace_summaries per query shape. When OFF (default)
-   * every call hits trace_summaries — behaviour unchanged. Tripwire
+   * `pickAnalyticsTable` picks one of trace_analytics_rollup / trace_analytics
+   * / trace_summaries / evaluation_runs per query shape. Tripwire
    * (`release_event_sourced_analytics_read_tripwire`) runs the legacy query
    * alongside the routed query and logs divergence.
+   *
+   * `options` is the CALLER's safety envelope — currently a hard row ceiling
+   * for background readers that collapse a timeseries to a scalar. It is not
+   * part of the wire input, so an API client cannot raise its own limit.
    */
-  async getTimeseries(input: TimeseriesInputType): Promise<TimeseriesResult> {
+  async getTimeseries(
+    input: TimeseriesInputType,
+    options?: TimeseriesReadOptions,
+  ): Promise<TimeseriesResult> {
     return this.tracer.withActiveSpan(
       "AnalyticsService.getTimeseries",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
         const hash = createHash("sha256")
-          .update(JSON.stringify(input))
+          // `options` is part of the cache identity, not a side channel: a
+          // bounded read and an unbounded one are different questions, and a
+          // shared key would let an unbounded UI result satisfy a bounded
+          // background read (or the reverse) purely by arrival order.
+          .update(JSON.stringify({ input, options: options ?? null }))
           .digest("hex");
         const cacheKey = `${input.projectId}:${hash}`;
         const cached = await this.timeseriesCache.get(cacheKey);
         if (cached) return cached;
 
-        const table = await this.resolveAnalyticsTable(input);
+        const table = this.resolveAnalyticsTable(input);
 
-        // OFF (legacy) or routed → a legacy table: single call, no overhead.
-        // Both `trace_summaries` and `evaluation_runs` dispatch through the
-        // same legacy shim — `buildTimeseriesQuery` handles both registries.
+        // Routed → a legacy table: single call, no overhead. Both
+        // `trace_summaries` and `evaluation_runs` dispatch through the same
+        // legacy shim — `buildTimeseriesQuery` handles both registries.
         if (table === "trace_summaries" || table === "evaluation_runs") {
-          const result = await this.deps.legacyShim.run(input);
+          const result = await this.deps.legacyShim.run(input, options);
           await this.timeseriesCache.set(cacheKey, result);
           return result;
         }
@@ -125,7 +137,7 @@ export class AnalyticsService {
         );
 
         if (!tripwireEnabled) {
-          const result = await this.runRouted(table, input);
+          const result = await this.runRouted(table, input, options);
           await this.timeseriesCache.set(cacheKey, result);
           return result;
         }
@@ -136,8 +148,12 @@ export class AnalyticsService {
         // eval-routed query is compared against `evaluation_runs`, not
         // `trace_summaries`.
         const [routedResult, legacyResult] = await Promise.all([
-          this.runRouted(table, input),
-          legacyForTripwire(input),
+          this.runRouted(table, input, options),
+          // The comparison read carries the caller's ceiling too. Without it a
+          // tripwire-enabled project would still materialise the unbounded
+          // legacy result alongside the bounded routed one — the bound would
+          // hold everywhere except the projects we turned extra reads on for.
+          legacyForTripwire(input, options),
         ]);
         compareForTripwire({
           projectId: input.projectId,
@@ -204,18 +220,19 @@ export class AnalyticsService {
   }
 
   /**
-   * Resolve which analytics table should serve this `getTimeseries` call.
-   * Flag OFF → always `"trace_summaries"` (legacy code path, unchanged).
-   * Flag ON  → delegate to `pickAnalyticsTable(...)` per query shape.
+   * Which table answers this query — a pure function of the query's SHAPE.
+   *
+   * `release_event_sourced_analytics_read` used to gate this: off meant every
+   * call fell back to `trace_summaries`. The flag is permanently on, so the
+   * gate only cost a feature-flag round trip per query to answer "yes".
+   *
+   * The legacy tables are NOT dead with the gate gone: `pickAnalyticsTable`
+   * still routes to `trace_summaries` / `evaluation_runs` for the shapes the
+   * slim and rollup builders cannot express (mixed sources, keyed series,
+   * `metadata.model` group-bys, trace-id filters). That routing is by shape,
+   * never by flag, which is why the shim stays.
    */
-  private async resolveAnalyticsTable(
-    input: TimeseriesInputType,
-  ): Promise<AnalyticsTable> {
-    const enabled = await featureFlagService.isEnabled(
-      "release_event_sourced_analytics_read",
-      { distinctId: input.projectId, projectId: input.projectId },
-    );
-    if (!enabled) return "trace_summaries";
+  private resolveAnalyticsTable(input: TimeseriesInputType): AnalyticsTable {
     return pickAnalyticsTable({
       series: input.series,
       filters: input.filters,
@@ -234,6 +251,7 @@ export class AnalyticsService {
   private async runRouted(
     table: Exclude<AnalyticsTable, "trace_summaries" | "evaluation_runs">,
     input: TimeseriesInputType,
+    options?: TimeseriesReadOptions,
   ): Promise<TimeseriesResult> {
     const { previousPeriodStartDate, startDate, endDate } =
       currentVsPreviousDates(
@@ -267,6 +285,7 @@ export class AnalyticsService {
         series: input.series,
         groupBy: input.groupBy,
         originalTimeScale: input.timeScale,
+        maxResultRows: options?.maxResultRows,
       });
     }
     if (table === "trace_analytics") {
@@ -276,6 +295,7 @@ export class AnalyticsService {
         series: input.series,
         groupBy: input.groupBy,
         originalTimeScale: input.timeScale,
+        maxResultRows: options?.maxResultRows,
       });
     }
     if (table === "evaluation_analytics_rollup") {
@@ -285,6 +305,7 @@ export class AnalyticsService {
         series: input.series,
         groupBy: input.groupBy,
         originalTimeScale: input.timeScale,
+        maxResultRows: options?.maxResultRows,
       });
     }
     if (table === "evaluation_analytics") {
@@ -294,6 +315,7 @@ export class AnalyticsService {
         series: input.series,
         groupBy: input.groupBy,
         originalTimeScale: input.timeScale,
+        maxResultRows: options?.maxResultRows,
       });
     }
     // Exhaustiveness check — if AnalyticsTable ever gains a new variant,
@@ -316,44 +338,24 @@ async function isTripwireEnabled(projectId: string): Promise<boolean> {
 }
 
 /**
- * Default ClickHouse resolver — same shape as `app-layer/presets.ts`:
- * `getClickHouseClientForProject` returns `null` for "not configured"; the
- * resolver contract is "throw if no client", which lets the repository
- * `await` it without a null-check.
+ * Production wiring for `AnalyticsService`. Takes the resolver and the
+ * legacy backend from the caller (`presets.ts`) instead of resolving a
+ * ClickHouse client here — the instance this builds is handed out once as
+ * `getApp().analytics.service`, not constructed per call site.
  */
-const defaultResolveClient: ClickHouseClientResolver = async (tenantId) => {
-  const client = await getClickHouseClientForProject(tenantId);
-  if (!client)
-    throw new Error(`ClickHouse not available for tenant ${tenantId}`);
-  return client;
-};
-
-/**
- * Factory using production dependencies (real ClickHouse resolver, legacy
- * backend singleton).
- */
-export function createAnalyticsService(
-  resolveClient: ClickHouseClientResolver = defaultResolveClient,
-): AnalyticsService {
+export function createAnalyticsService({
+  resolveClient,
+  legacyBackend,
+}: {
+  resolveClient: ClickHouseClientResolver;
+  legacyBackend: AnalyticsBackend;
+}): AnalyticsService {
   return new AnalyticsService({
     rollupRepository: createTraceRollupReadRepo(resolveClient),
     slimRepository: createTraceSlimReadRepo(resolveClient),
     legacyShim: new ClickHouseLegacyAnalyticsShim(resolveClient),
     evalRollupRepository: createEvalRollupReadRepo(resolveClient),
     evalSlimRepository: createEvalSlimReadRepo(resolveClient),
-    legacyBackend: getClickHouseAnalyticsService(),
+    legacyBackend,
   });
-}
-
-let analyticsService: AnalyticsService | null = null;
-
-export function getAnalyticsService(): AnalyticsService {
-  if (!analyticsService) {
-    analyticsService = createAnalyticsService();
-  }
-  return analyticsService;
-}
-
-export function resetAnalyticsService(): void {
-  analyticsService = null;
 }

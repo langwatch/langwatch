@@ -36,6 +36,8 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 import {
   assertOverThreshold,
   insertEventLogRow,
@@ -248,6 +250,25 @@ beforeAll(async () => {
   const chModule = await import("~/server/clickhouse/clickhouseClient");
   vi.mocked(chModule.getClickHouseClientForProject).mockResolvedValue(ch);
 
+  // ExportService reaches buildTraceBlobResolutionDeps() with no override,
+  // which now takes its default resolver from getApp().clickhouse rather
+  // than isClickHouseEnabled()/getClickHouseClientForProject directly — so
+  // the production wiring this test wants to exercise needs a real App
+  // singleton whose resolver dials the same (mocked) testcontainer client.
+  await resetApp();
+  globalForApp.__langwatch_app = createTestApp({
+    clickhouse: {
+      enabled: true,
+      resolveClient: async (tenantId: string) => {
+        const resolved = await chModule.getClickHouseClientForProject(tenantId);
+        if (!resolved) {
+          throw new Error(`ClickHouse not available for tenant ${tenantId}`);
+        }
+        return resolved;
+      },
+    },
+  });
+
   assertOverThreshold(LARGE_VALUE);
   await seedOffloadedTrace();
 }, 120_000);
@@ -261,6 +282,7 @@ afterAll(async () => {
       });
     }
   }
+  await resetApp();
   await stopTestContainers();
 });
 

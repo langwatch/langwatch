@@ -62,7 +62,7 @@ function makePrisma({
     user: { findFirst: vi.fn().mockResolvedValue(null) },
     teamUser: { findFirst: vi.fn().mockResolvedValue(null) },
     customRole: {
-      findUnique: vi.fn().mockImplementation(async ({ where }: any) => ({
+      findFirst: vi.fn().mockImplementation(async ({ where }: any) => ({
         permissions:
           where.id === KEY_ROLE
             ? ["scenarios:view", "scenarios:manage"]
