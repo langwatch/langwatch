@@ -15,8 +15,12 @@ import Head from "~/utils/compat/next-head";
  * Spec: specs/coding-agent/sessions-screen.feature.
  */
 function MySessionsPage() {
-  const { ready, personalProjectId, personalProjectSlug } =
-    usePersonalContext();
+  const {
+    ready,
+    isPersonalProjectResolved,
+    personalProjectId,
+    personalProjectSlug,
+  } = usePersonalContext();
 
   return (
     <MyLayout>
@@ -35,10 +39,13 @@ function MySessionsPage() {
           </Text>
         </VStack>
 
-        {/* The workspace is resolved before anything is claimed about it: an
-            unresolved context has no project id yet, and saying "no sessions"
-            in the meantime states a fact that is not known to be true. */}
-        {!ready ? (
+        {/* The workspace is resolved before anything is claimed about it, and
+            that takes both flags: `ready` covers the session and the
+            organization, and the project is read only once those land, so
+            `ready` alone still leaves a window with no project id yet. Saying
+            "no sessions" in that window states a fact that is not known to be
+            true. */}
+        {!ready || !isPersonalProjectResolved ? (
           <Skeleton height="180px" borderRadius="md" />
         ) : personalProjectId ? (
           <SessionsTable

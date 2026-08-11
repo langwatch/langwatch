@@ -1085,8 +1085,8 @@ describe("PullRequestUsageService", () => {
 
       const detail = await service.getPullRequestDetail(QUERY);
 
-      // Both fixtures started at the same moment, so the order the sort leaves
-      // them in says nothing; each is found by the session it is.
+      // Both fixtures started at the same moment, so sort order says nothing
+      // about which is which. Each is found by its sessionId instead.
       const titled = detail.sessions.find((s) => s.sessionId === "session-a");
       const untitled = detail.sessions.find((s) => s.sessionId === "session-b");
 

@@ -43,7 +43,11 @@ export const SessionRow: React.FC<{
     _hover={{ bg: "bg.subtle" }}
   >
     <Table.Cell maxWidth="320px">
-      <SessionNameCell row={row} isOpening={isOpening} />
+      <SessionNameCell
+        row={row}
+        isOpening={isOpening}
+        onOpenReplay={onOpenReplay}
+      />
     </Table.Cell>
     <Table.Cell fontSize="sm" color="fg.muted" whiteSpace="nowrap">
       {row.agent ? <AgentLabel agent={row.agent} /> : MISSING_VALUE}

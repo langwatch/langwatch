@@ -741,6 +741,59 @@ describe("the pull request detail drawer", () => {
       });
     });
 
+    describe("when the reader has no pointer", () => {
+      // A click handler on the row alone cannot be reached from a keyboard: a
+      // table row takes no focus and has no activation behaviour. The replay
+      // is therefore carried by a real button with its own accessible name,
+      // which is what makes it focusable and what gives Enter and Space their
+      // meaning for free. Asserting the role is what pins that: a row that
+      // went back to being only clickable has no button to find.
+      it("exposes the replay as a focusable control, not just a clickable row", async () => {
+        utils.tracesV2.conversationContext.fetch.mockResolvedValue({
+          turns: [{ traceId: "trace-last", timestamp: 2_000 }],
+        });
+        const user = userEvent.setup();
+        renderDrawer();
+
+        const control = screen.getByRole("button", {
+          name: "Open the terminal replay of Teach the fold about branches",
+        });
+        expect(control.tagName).toBe("BUTTON");
+        control.focus();
+        expect(control).toHaveFocus();
+
+        await user.click(control);
+
+        await waitFor(() => expect(mockOpenDrawer).toHaveBeenCalledTimes(1));
+      });
+    });
+
+    describe("when the reader double-clicks the same session", () => {
+      it("looks it up once rather than opening two replays", async () => {
+        let releaseTurns: (value: unknown) => void = () => undefined;
+        utils.tracesV2.conversationContext.fetch.mockReturnValue(
+          new Promise((resolve) => {
+            releaseTurns = resolve;
+          }),
+        );
+        const user = userEvent.setup();
+        renderDrawer();
+
+        const title = screen.getByText("Teach the fold about branches");
+        await user.click(title);
+        await user.click(title);
+
+        // The second click lands while the first lookup is still in flight,
+        // and is the same request, so it is dropped rather than answered.
+        expect(utils.tracesV2.conversationContext.fetch).toHaveBeenCalledTimes(
+          1,
+        );
+
+        releaseTurns({ turns: [{ traceId: "trace-last", timestamp: 2_000 }] });
+        await waitFor(() => expect(mockOpenDrawer).toHaveBeenCalledTimes(1));
+      });
+    });
+
     describe("when the reader hovers a session row", () => {
       it("pays for the lookup the click needs ahead of the click", async () => {
         const user = userEvent.setup();

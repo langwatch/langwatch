@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -50,9 +50,17 @@ export function useTerminalReplay({
   const router = useRouter();
   const { openDrawer } = useDrawer();
   const [openingSessionId, setOpeningSessionId] = useState<string | null>(null);
+  /** Sessions whose turn is being looked up right now. */
+  const inFlightRef = useRef<Set<string>>(new Set());
 
   const withLastTurn = useCallback(
     async (row: ReplayableSession, open: (turn: ConversationTurn) => void) => {
+      // A second click on a session already being looked up is the same
+      // request, and answering it twice opens the replay twice. The guard is a
+      // ref rather than state because both clicks land before React has
+      // re-rendered either of them.
+      if (inFlightRef.current.has(row.sessionId)) return;
+      inFlightRef.current.add(row.sessionId);
       setOpeningSessionId(row.sessionId);
       try {
         const turn = await lastTurnOfSession({
@@ -68,7 +76,14 @@ export function useTerminalReplay({
           fallbackTitle: "Couldn't open the terminal replay",
         });
       } finally {
-        setOpeningSessionId(null);
+        inFlightRef.current.delete(row.sessionId);
+        // Only this session's own spinner is cleared. A reader who chose a
+        // second session while the first was still resolving is waiting on
+        // that one, and clearing whatever happens to be current would take
+        // its spinner away while it is still loading.
+        setOpeningSessionId((current) =>
+          current === row.sessionId ? null : current,
+        );
       }
     },
     [projectId, utils],

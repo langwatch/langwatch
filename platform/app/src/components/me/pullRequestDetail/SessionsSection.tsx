@@ -1,4 +1,4 @@
-import { HStack, Spinner, Table, Text } from "@chakra-ui/react";
+import { chakra, HStack, Spinner, Table, Text } from "@chakra-ui/react";
 import type React from "react";
 
 import { ListTable } from "~/components/ui/ListTable";
@@ -101,10 +101,39 @@ const SessionRow: React.FC<{
   >
     <Table.Cell fontSize="sm">
       <HStack gap={2} minWidth={0}>
-        {session.title ?? (
-          <Text as="span" color="fg.muted">
-            Untitled session
-          </Text>
+        {/* The whole row opens the replay for a pointer, but a row is not
+            focusable and cannot be activated from a keyboard, so the name
+            carries the same action as a real button. A row with nothing to
+            open renders the name and no control at all. */}
+        {onOpenReplay ? (
+          <chakra.button
+            type="button"
+            aria-label={`Open the terminal replay of ${session.title ?? "untitled session"}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenReplay();
+            }}
+            minWidth={0}
+            textAlign="start"
+            bg="transparent"
+            border="none"
+            padding={0}
+            cursor="pointer"
+            color="inherit"
+            font="inherit"
+          >
+            {session.title ?? (
+              <Text as="span" color="fg.muted">
+                Untitled session
+              </Text>
+            )}
+          </chakra.button>
+        ) : (
+          (session.title ?? (
+            <Text as="span" color="fg.muted">
+              Untitled session
+            </Text>
+          ))
         )}
         {isOpening ? (
           <Spinner size="xs" color="fg.muted" flexShrink={0} />
