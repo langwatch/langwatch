@@ -147,6 +147,11 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   "pkg",
   "tools/thuishaven",
   "tools/herrgen",
+  // CI's own behaviour is behaviour too — how a job checks out, which
+  // toolchain it compiles with. The ciguard tests are the only thing that
+  // asserts it, so scenarios under specs/ci/ can only bind from this root.
+  // Without it those feature files report "all bound" while binding nothing.
+  "tools/ciguard",
 ];
 
 /**

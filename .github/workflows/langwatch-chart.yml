@@ -59,6 +59,15 @@ on:
       - "pnpm-lock.yaml"
       - "package.json"
 
+# The e2e jobs here are the most expensive in the repo — `e2e: infra` runs to
+# 697s and `e2e: overlays` to 348s — and without a group every push to a chart
+# PR left its predecessors running to completion alongside it. Same rule as
+# langwatch-app-ci: supersede on a PR branch, never on main, because every
+# commit that lands on main has to keep its own validation.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   lint-template:
     name: "template (${{ matrix.name }})"

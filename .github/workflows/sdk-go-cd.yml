@@ -25,7 +25,8 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25"
+          # The SDK's floor lives in its go.mod; read it rather than restate it.
+          go-version-file: sdks/go/go.mod
           cache-dependency-path: sdks/go/go.sum
 
       - name: Run tests
