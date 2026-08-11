@@ -75,15 +75,10 @@ export function MessageCard({
     : [];
   // Skipped and errored runs never produced a verdict, so they stay out of
   // both sides of the pass count — a skipped run counted as a pass and an
-  // errored run counted as a fail both invent verdicts (#6835).
+  // errored run counted as a fail both invent verdicts (#6835). Guardrails
+  // get the same treatment: a skipped or errored guardrail is not a pass.
   const evalSummary = summarizeEvaluationsTag(evaluations);
-  const guardrailsPasses = guardrails.filter(
-    (check) => check.passed !== false,
-  ).length;
-
-  const allGuardrailsSkipped = guardrails.every(
-    (check) => check.status === "skipped",
-  );
+  const guardSummary = summarizeEvaluationsTag(guardrails);
 
   const totalEvaluations = evaluations.length;
   const totalGuardrails = guardrails.length;
@@ -384,11 +379,13 @@ export function MessageCard({
                 borderWidth="1px"
                 borderColor="border"
                 color={
-                  allGuardrailsSkipped
+                  !guardSummary.done || guardSummary.hasOnlySkippedRuns
                     ? "yellow.fg"
-                    : guardrailsPasses == totalGuardrails
-                      ? "green.fg"
-                      : "blue.fg"
+                    : guardSummary.failed > 0
+                      ? "blue.fg"
+                      : guardSummary.errored > 0
+                        ? "red.fg"
+                        : "green.fg"
                 }
                 paddingY={1}
                 paddingX={2}
@@ -398,31 +395,59 @@ export function MessageCard({
               >
                 <Tag.Label>
                   <HStack gap={2}>
-                    {allGuardrailsSkipped ? (
+                    {!guardSummary.done ? (
+                      // Still running: passes so far out of every guardrail on
+                      // the trace — without this branch an all-pending trace
+                      // would render a green "0/0 guardrails".
+                      <>
+                        <Box>
+                          <Clock />
+                        </Box>
+                        {guardSummary.passes}/{guardSummary.total} guardrails
+                      </>
+                    ) : guardSummary.hasOnlySkippedRuns ? (
                       <>
                         <Box>
                           <MinusCircle />
                         </Box>
                         Guardrails skipped
                       </>
-                    ) : guardrailsPasses == totalGuardrails ? (
-                      <>
-                        <Box>
-                          <CheckCircle />
-                        </Box>
-                        {guardrailsPasses}/{totalGuardrails} guardrails
-                      </>
-                    ) : (
+                    ) : guardSummary.failed > 0 ? (
                       <>
                         <Box>
                           <Shield />
                         </Box>
-                        {totalGuardrails - guardrailsPasses}{" "}
+                        {guardSummary.failed}{" "}
                         {pluralize(
-                          totalGuardrails - guardrailsPasses,
+                          guardSummary.failed,
                           "guardrail block",
                           "guardrail blocks",
                         )}
+                      </>
+                    ) : guardSummary.errored > 0 ? (
+                      // A crashed guardrail is neither a pass nor a block —
+                      // name it instead of counting it green (#6835).
+                      <>
+                        <Box>
+                          <XCircle />
+                        </Box>
+                        {guardSummary.errored}{" "}
+                        {pluralize(
+                          guardSummary.errored,
+                          "guardrail errored",
+                          "guardrails errored",
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <Box>
+                          <CheckCircle />
+                        </Box>
+                        {guardSummary.passes}/{guardSummary.verdictTotal}{" "}
+                        guardrails
+                        {guardSummary.skipped > 0
+                          ? `, ${guardSummary.skipped} skipped`
+                          : ""}
                       </>
                     )}
                   </HStack>
@@ -455,7 +480,7 @@ export function MessageCard({
                 borderWidth="1px"
                 borderColor="border"
                 color={
-                  !evalSummary.done || evalSummary.allSkipped
+                  !evalSummary.done || evalSummary.hasOnlySkippedRuns
                     ? "yellow.fg"
                     : evalSummary.failed > 0 || evalSummary.errored > 0
                       ? "red.fg"
@@ -473,7 +498,7 @@ export function MessageCard({
                   <HStack gap={2}>
                     {!evalSummary.done ? (
                       <Clock />
-                    ) : evalSummary.allSkipped ? (
+                    ) : evalSummary.hasOnlySkippedRuns ? (
                       <MinusCircle />
                     ) : evalSummary.failed > 0 || evalSummary.errored > 0 ? (
                       <XCircle />
@@ -481,10 +506,10 @@ export function MessageCard({
                       <CheckCircle />
                     )}
                     {!evalSummary.done
-                      ? // Still running: the denominator is every evaluation
-                        // on the trace, so "0/3" reads as three in flight.
+                      ? // Still running: passes so far out of every evaluation
+                        // on the trace — terminal and in-flight alike.
                         `${evalSummary.passes}/${evalSummary.total} evaluations`
-                      : evalSummary.allSkipped
+                      : evalSummary.hasOnlySkippedRuns
                         ? "Evaluations skipped"
                         : evalSummary.failed > 0
                           ? `${evalSummary.failed} ${

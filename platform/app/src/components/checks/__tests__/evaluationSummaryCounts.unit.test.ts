@@ -24,7 +24,7 @@ function makeEvaluation(
 }
 
 describe("summarizeEvaluationsTag", () => {
-  describe("given a mixed passed + skipped trace", () => {
+  describe("when the trace mixes passed and skipped runs", () => {
     const summary = summarizeEvaluationsTag([
       makeEvaluation({ passed: true }),
       makeEvaluation({
@@ -48,11 +48,11 @@ describe("summarizeEvaluationsTag", () => {
     });
 
     it("is not reported as all-skipped", () => {
-      expect(summary.allSkipped).toBe(false);
+      expect(summary.hasOnlySkippedRuns).toBe(false);
     });
   });
 
-  describe("given a processed fail verdict", () => {
+  describe("when a processed run carries a fail verdict", () => {
     it("counts it as failed", () => {
       const summary = summarizeEvaluationsTag([
         makeEvaluation({ passed: false }),
@@ -62,7 +62,7 @@ describe("summarizeEvaluationsTag", () => {
     });
   });
 
-  describe("given a crashed evaluator", () => {
+  describe("when an evaluator crashed", () => {
     const summary = summarizeEvaluationsTag([
       makeEvaluation({ status: "error", passed: null }),
       makeEvaluation({ evaluation_id: "eval-2", passed: true }),
@@ -79,17 +79,17 @@ describe("summarizeEvaluationsTag", () => {
     });
   });
 
-  describe("given only skipped evaluations", () => {
+  describe("when every evaluation was skipped", () => {
     it("reports all-skipped", () => {
       const summary = summarizeEvaluationsTag([
         makeEvaluation({ status: "skipped", passed: null }),
       ]);
-      expect(summary.allSkipped).toBe(true);
+      expect(summary.hasOnlySkippedRuns).toBe(true);
       expect(summary.verdictTotal).toBe(0);
     });
   });
 
-  describe("given an evaluation still running", () => {
+  describe("when an evaluation is still running", () => {
     it("is not done", () => {
       const summary = summarizeEvaluationsTag([
         makeEvaluation({ status: "in_progress", passed: null }),

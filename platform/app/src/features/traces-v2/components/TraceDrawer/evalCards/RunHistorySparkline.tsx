@@ -1,6 +1,19 @@
 import { Circle, HStack, Text } from "@chakra-ui/react";
 import type { EvalRunHistoryEntry } from "./utils";
 
+/** Dot color per run status. `processed` (a verdict-less completed run) is
+ *  neutral blue, matching EVALUATION_STATUS_COLORS.processed — not a warning
+ *  (#6835). Everything unrecognized keeps the legacy warning yellow. */
+const DOT_COLOR_BY_STATUS: Record<string, string> = {
+  pass: "green.solid",
+  fail: "red.solid",
+  processed: "blue.solid",
+};
+
+function dotColorFor(status: string): string {
+  return DOT_COLOR_BY_STATUS[status] ?? "yellow.solid";
+}
+
 export function RunHistorySparkline({ runs }: { runs: EvalRunHistoryEntry[] }) {
   if (runs.length <= 1) return null;
 
@@ -15,21 +28,7 @@ export function RunHistorySparkline({ runs }: { runs: EvalRunHistoryEntry[] }) {
     return (
       <HStack gap={0.5}>
         {runs.slice(-8).map((r, i) => (
-          <Circle
-            key={i}
-            size="4px"
-            bg={
-              r.status === "pass"
-                ? "green.solid"
-                : r.status === "fail"
-                  ? "red.solid"
-                  : r.status === "processed"
-                    ? // Neutral, matching EVALUATION_STATUS_COLORS.processed —
-                      // a verdict-less run is not a warning (#6835).
-                      "blue.solid"
-                    : "yellow.solid"
-            }
-          />
+          <Circle key={i} size="4px" bg={dotColorFor(r.status)} />
         ))}
         <Text textStyle="2xs" color="fg.subtle" marginLeft={0.5}>
           ({runs.length})

@@ -16,7 +16,7 @@ export interface EvaluationsTagSummary {
   /** Every evaluation reached a terminal status. */
   done: boolean;
   /** Every evaluation was skipped — "nothing to evaluate", not a verdict. */
-  allSkipped: boolean;
+  hasOnlySkippedRuns: boolean;
   /** Every evaluation on the trace, whatever its state. */
   total: number;
   /** Processed runs — the only ones that can carry a verdict. */
@@ -40,7 +40,7 @@ export function summarizeEvaluationsTag(
       check.status === "skipped" ||
       check.status === "error",
   );
-  const allSkipped =
+  const hasOnlySkippedRuns =
     evaluations.length > 0 &&
     evaluations.every((check) => check.status === "skipped");
   const processed = evaluations.filter((check) => check.status === "processed");
@@ -50,7 +50,7 @@ export function summarizeEvaluationsTag(
 
   return {
     done,
-    allSkipped,
+    hasOnlySkippedRuns,
     total: evaluations.length,
     verdictTotal: processed.length,
     passes: processed.length - failed,
