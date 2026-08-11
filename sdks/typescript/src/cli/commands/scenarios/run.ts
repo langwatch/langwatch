@@ -10,6 +10,7 @@ import { failSpinner } from "../../utils/spinnerError";
 import { resolveOutputFormat } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { fetchBatchRuns, tallyBatchRuns } from "../../utils/batchRunProgress";
 
 function parseTarget(targetStr: string): SuiteTarget {
   const colonIndex = targetStr.indexOf(":");
@@ -120,46 +121,37 @@ export const runScenarioCommand = async (
       await new Promise((resolve) => setTimeout(resolve, 3000));
 
       try {
-        const statusResponse = await fetch(
-          `${endpoint}/api/scenario-events?batchRunId=${encodeURIComponent(result.batchRunId)}`,
-          {
-            method: "GET",
+        const progress = tallyBatchRuns(
+          await fetchBatchRuns({
+            endpoint,
+            batchRunId: result.batchRunId,
             headers: buildAuthHeaders({ apiKey }),
-          },
+          }),
         );
 
-        if (statusResponse.ok) {
-          const statusData = await statusResponse.json() as {
-            totalCount?: number;
-            completedCount?: number;
-            passedCount?: number;
-            failedCount?: number;
-          };
+        // The run knows how many it dispatched; the endpoint only knows how
+        // many exist so far. Take whichever is larger, or a batch whose runs
+        // have not all been created yet reads as finished on the first poll.
+        const total = Math.max(progress.total, result.jobCount);
+        const { completed: completedCount, passed, failed } = progress;
 
-          const total = statusData.totalCount ?? result.jobCount;
-          const completedCount = statusData.completedCount ?? 0;
-          const passed = statusData.passedCount ?? 0;
-          const failed = statusData.failedCount ?? 0;
+        pollSpinner.text = `Running... ${completedCount}/${total} completed (${passed} passed, ${failed} failed)`;
 
-          pollSpinner.text = `Running... ${completedCount}/${total} completed (${passed} passed, ${failed} failed)`;
-
-          if (completedCount >= total && total > 0) {
-            completed = true;
-            if (failed > 0) {
-              pollSpinner.warn(
-                `Scenario run completed: ${passed}/${total} passed, ${chalk.red(`${failed} failed`)}`,
-              );
-              // `--wait` exists to report the verdict. Exiting 0 on a failed
-              // run hides it from every machine caller — see suites/run.ts.
-              process.exitCode = 1;
-            } else {
-              pollSpinner.succeed(
-                `Scenario run completed: ${chalk.green(`${passed}/${total} passed`)}`,
-              );
-            }
+        if (completedCount >= total && total > 0) {
+          completed = true;
+          if (failed > 0) {
+            pollSpinner.warn(
+              `Scenario run completed: ${passed}/${total} passed, ${chalk.red(`${failed} failed`)}`,
+            );
+            // `--wait` exists to report the verdict. Exiting 0 on a failed
+            // run hides it from every machine caller — see suites/run.ts.
+            process.exitCode = 1;
           }
-        } else {
-          throw new Error(`status endpoint answered ${statusResponse.status}`);
+          else {
+            pollSpinner.succeed(
+              `Scenario run completed: ${chalk.green(`${passed}/${total} passed`)}`,
+            );
+          }
         }
       } catch {
         // Polling error — continue waiting, but bounded: a status endpoint that

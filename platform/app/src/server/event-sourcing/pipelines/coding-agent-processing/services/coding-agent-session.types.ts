@@ -68,6 +68,37 @@ export interface CodingAgentSessionData {
    * them this stays null rather than guessing.
    */
   userId: string | null;
+  /**
+   * Spawn lineage, when the agent stamps it: the session that spawned this
+   * one, and whether this session FORKED the parent's context (inheriting the
+   * whole window, and its cost) rather than starting fresh. No agent observed
+   * to date stamps lineage, so these stay null/false: empty means it was
+   * never reported, not that the session has no parent.
+   */
+  parentSessionId: string | null;
+  isFork: boolean;
+  /**
+   * Where the session ran and what it was called, from the LangWatch companion
+   * event (`langwatch.session_context`) and the agent's generated title.
+   *
+   * Semantics differ per field, on purpose:
+   *   - repository host / owner / name and worktree are ONCE-SET. A session is
+   *     one checkout; a later event naming a different repository is a
+   *     correlation accident, not a move, so the first answer stands.
+   *   - branch is LAST-WRITE-WINS. A session that starts on the default branch
+   *     and cuts a feature branch mid-run belongs to the branch it ended on,
+   *     which is the one its pull request comes from.
+   *   - title is LAST-NON-EMPTY-WINS, like every other regenerated label.
+   *
+   * Degradation, stated: agents with no companion emitter carry nulls here.
+   * Null means nothing reported it, never "this session has no repository".
+   */
+  repositoryHost: string | null;
+  repositoryOwner: string | null;
+  repositoryName: string | null;
+  gitBranch: string | null;
+  gitWorktree: string | null;
+  title: string | null;
 
   // ── Shape ─────────────────────────────────────────────────────────────
   modelCalls: number;
@@ -146,6 +177,12 @@ export interface CodingAgentSessionData {
   compactionTokensBefore: number;
   compactionTokensAfter: number;
   /**
+   * Compactions by trigger kind, e.g. `{"auto": 3, "manual": 1}`. A session
+   * that keeps auto-compacting is out of headroom, one the user compacts is
+   * being STEERED; "unknown" buckets telemetry predating the attribute.
+   */
+  compactionTriggers: Record<string, number>;
+  /**
    * The biggest single model call's context (`cacheReadTokens +
    * cacheCreationTokens` for that ONE call) — "how big did the context
    * window get", as distinct from `cacheReadTokens`/`cacheCreationTokens`
@@ -178,6 +215,13 @@ export interface CodingAgentSessionData {
   apiErrors: number;
   /** Rate limits (429) — worth telling apart from every other failure. */
   rateLimited: number;
+  /**
+   * Rate-limit EVENTS the agent reported (`rate_limit_event` /
+   * `rate_limit_info`), kept apart from the 429-inferred `rateLimited` above:
+   * the event also fires on warnings and status updates, so the two counters
+   * answer different questions.
+   */
+  rateLimitEvents: number;
   retriesExhausted: number;
   /** Total wall-clock burned on retries. Time paid for nothing. */
   retryMs: number;

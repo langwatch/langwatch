@@ -98,6 +98,24 @@ export const FEATURE_FLAGS = [
       "Skips the strict PII redaction pass that calls the external analysis service (Presidio via langevals). The native secrets and essential PII redaction in the ingestion pipeline are unaffected. Emergency operator override to shed analysis-service load.",
     family: "Collector",
   },
+  // Kill switch for the evaluator settings recovery (langwatch#6397). The
+  // recovery is ON by default: an evaluator whose prompt was stored at the top
+  // level of `config` instead of under `config.settings` has it recovered on the
+  // online path, instead of being silently dropped and replaced by langevals'
+  // own strict default prompt — which scored every trace 0.
+  //
+  // SYSTEM scope is load-bearing, not incidental. A PRODUCT-scoped flag resolves
+  // env -> PostHog -> postgres -> default, so a 0%-rollout PostHog definition
+  // would leave the registry default reading `true` while production still ran
+  // the old behavior — shipping the fix inert with every test green.
+  {
+    key: "ops_evaluator_settings_recovery_disabled",
+    scope: "SYSTEM",
+    defaultValue: false,
+    description:
+      "Disables recovery of evaluator settings stored at the top level of `config` on the online evaluation path. While on, such evaluators fall back to `monitor.parameters` and, when that is empty, run against the judge's own default prompt. Emergency operator rollback for langwatch#6397.",
+    family: "Event sourcing",
+  },
   // Kill switch for the evaluation-inputs offload (ADR-040). The offload is ON
   // by default: oversized evaluator inputs go to the durable stored-objects
   // service and the event/row carry a bounded marker instead of the full
@@ -142,17 +160,25 @@ export const FEATURE_FLAGS = [
     description:
       "Surfaces the AI Gateway menu in the project sidebar. Default flipped to on: operators can hide the surface per project via a PostHog rule or operator-store row.",
   },
-  // Per-project gate for trace blob offload (#4215 / ADR-022). Checked ONCE per
-  // ingestion request (not per span) via the postgres-cached store, so the
-  // hot-path cost is one cached lookup. When on, over-threshold spans get
-  // routed via the transient S3 spool at the edge (ADR-022). Off = today's
-  // behavior — the existing capOversizedAttributes(256 KB) is the only cap.
+  // Per-project gate for the transient S3 spool at the ingestion edge
+  // (#4215 / ADR-022). ON by default, so a deployment with object storage
+  // configured keeps oversized span content intact with no flag setup: a span
+  // whose serialized command exceeds 256 KB is written to the spool and the
+  // queued command carries only a spool ref. Resolved per span against the
+  // postgres-cached store, so the hot-path cost is one cached lookup.
+  //
+  // The flag stays the kill switch and the per-project opt-out: an operator
+  // row in /ops/feature-flags turns the spool off fleet-wide or for a single
+  // project. When the spool cannot run at all (no reachable object storage,
+  // or an Azure-only install where the S3 client refuses to build) the edge
+  // fails open: ingestion proceeds inline and capOversizedAttributes truncates
+  // each attribute value at 256 KB.
   {
     key: "release_trace_blob_offload",
     scope: "PRODUCT",
-    defaultValue: false,
+    defaultValue: true,
     description:
-      "Routes over-threshold OTLP spans via a transient S3 spool at the ingestion edge (ADR-022). Off = current behavior (full value flows through the command queue; capOversizedAttributes(256 KB) is the only cap).",
+      "Routes over-threshold OTLP spans through a transient S3 spool at the ingestion edge so oversized attribute values reach the trace intact (ADR-022). On by default; switch it off fleet-wide or per project to keep spans inline, where the 256 KB per-value cap applies. Deployments with no reachable object storage keep ingesting either way: the edge falls back inline and the same 256 KB cap applies.",
   },
   // Externalizes inline media (base64 audio turns, data-URI images, file
   // attachments) from span attributes into the content-addressed

@@ -1,0 +1,87 @@
+---
+title: "Overview"
+description: "Build custom roles out of the permission catalog and keep them up to date. A role is a named set of resource and action permissions that a role binding then grants to someone, somewhere."
+---
+
+<Note>
+  **Available on Enterprise plans.** An organization without an Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`. Self-hosted deployments need an Enterprise license for the same endpoints. To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+</Note>
+
+## Intro
+
+The Roles API manages custom roles: named permission sets your organization defines, for when the built-in `ADMIN`, `MEMBER` and `VIEWER` roles are not the shape you need.
+
+A role on its own grants nothing. It becomes access when a [role binding](/api-reference/role-bindings/overview) hands it to a user, a group or an API key at a scope. Roles are what, bindings are who and where.
+
+## Authentication
+
+Requires an **organization-level API key** with `organization:manage`. Pass it as a Bearer token:
+
+```
+Authorization: Bearer sk-lw-<id>_<secret>
+```
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/roles/permissions` | The permission catalog roles are built from |
+| `GET` | `/api/roles` | List the organization's custom roles |
+| `POST` | `/api/roles` | Create a custom role |
+| `GET` | `/api/roles/{id}` | Read one custom role |
+| `PATCH` | `/api/roles/{id}` | Update a custom role |
+| `DELETE` | `/api/roles/{id}` | Delete a custom role |
+
+## Permissions are `resource:action` keys
+
+Start at the catalog. It lists every resource with the actions it takes, and flags the resources that only mean anything at organization scope, which is worth knowing before you build a role a team-scoped binding can never fully grant.
+
+```bash
+curl https://app.langwatch.ai/api/roles/permissions \
+  -H "Authorization: Bearer sk-lw-..."
+```
+
+Then create a role from the keys it gave you:
+
+```bash
+curl -X POST https://app.langwatch.ai/api/roles \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Release reviewer",
+    "description": "Reads traces and runs evaluations, changes nothing",
+    "permissions": ["project:view", "analytics:view", "evaluations:create"]
+  }'
+```
+
+## Names are the natural key
+
+A role name is unique inside the organization, which makes it the handle an infrastructure-as-code run can rely on. Reusing a name is refused with 409 `custom_role_name_taken` rather than quietly creating a second role that looks identical in every list.
+
+Names beginning with `apikey:` are reserved for LangWatch's own use and are refused with 422 `custom_role_name_reserved`.
+
+## Updating replaces the permission set
+
+`PATCH` is partial at the field level: send `name` alone and only the name changes. A `permissions` list, when you send one, replaces the whole set rather than adding to it, so what you send is what the role has afterward. That is what lets a declarative tool converge without reading first.
+
+## Deleting a role something still holds
+
+A role that a role binding or a team assignment still points at cannot be deleted. The refusal is 409 `custom_role_in_use`, with the counts in `meta` so you know how much is holding it:
+
+```json
+{
+  "code": "custom_role_in_use",
+  "meta": { "userCount": 1, "bindingCount": 3 }
+}
+```
+
+`bindingCount` counts role bindings, `userCount` counts direct team assignments. Remove or re-point those first, then delete the role.
+
+## Errors
+
+| Code | Status | Meaning |
+|------|--------|---------|
+| `custom_role_not_found` | 404 | No such role in this organization. An id from another organization reads the same way |
+| `custom_role_name_taken` | 409 | Another role in this organization already has that name |
+| `custom_role_name_reserved` | 422 | The name starts with `apikey:`, which is reserved |
+| `custom_role_in_use` | 409 | Something still holds the role |

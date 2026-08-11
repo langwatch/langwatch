@@ -8,7 +8,7 @@ import { SCENARIO_QUEUE } from "../scenario.constants";
 
 describe("Stalled jobs fail without retry", () => {
   describe("given a scenario job has stalled", () => {
-    describe("when BullMQ processes the stalled job", () => {
+    describe("when the queue processes the stalled job", () => {
       it("fails immediately with no retry attempted", () => {
         // The queue is configured with attempts=1, meaning after a job stalls
         // and is detected, it transitions directly to failed state without retry

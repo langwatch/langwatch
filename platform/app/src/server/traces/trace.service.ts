@@ -1,15 +1,13 @@
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
+import { getApp } from "~/server/app-layer/app";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import {
   CODING_AGENT_ORIGIN,
   enrichCodingAgentSpansFromLogs,
 } from "~/server/app-layer/traces/claude-code-log-enrichment";
-import {
-  createDefaultLogRecordStorageService,
-  type LogRecordStorageService,
-} from "~/server/app-layer/traces/log-record-storage.service";
+import type { LogRecordStorageService } from "~/server/app-layer/traces/log-record-storage.service";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { prisma as defaultPrisma } from "~/server/db";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
@@ -18,6 +16,9 @@ import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-pro
 import type { Evaluation, Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
+import { applyOverlayToTrace } from "./edit-overlay/applyTraceEditOverlay";
+import { redactPatchForViewer } from "./edit-overlay/redactTraceEditOverlayPatch";
+import { TraceEditOverlayService } from "./edit-overlay/traceEditOverlay.service";
 import { resolveOffloadedTraces } from "./resolve-offloaded-traces";
 import { resolveOffloadedTracesBatch } from "./resolve-offloaded-traces-batch";
 
@@ -184,6 +185,7 @@ export class TraceService {
   private readonly evaluationService: EvaluationService;
   private readonly injectedLogRecordStorage?: LogRecordStorageService;
   private cachedLogRecordStorage?: LogRecordStorageService;
+  private cachedEditOverlayService?: TraceEditOverlayService;
   constructor(
     readonly prisma: PrismaClient,
     blobResolutionDeps?: BlobResolutionDeps,
@@ -208,7 +210,7 @@ export class TraceService {
     );
     this.evaluationService = EvaluationService.create();
     // Injected store for the read-time Claude Code content enrichment; the
-    // default comes from the app-layer factory built LAZILY on first use (see
+    // default comes LAZILY from the App on first use (see
     // logRecordStorageService), so construction here stays free of ClickHouse
     // wiring. Non-enriching callers and unit tests that never hit the
     // coding-agent path pay nothing.
@@ -216,15 +218,93 @@ export class TraceService {
   }
 
   /**
-   * The log-record store for read-time Claude Code content enrichment, built
-   * lazily so a TraceService that never enriches (or a unit test that never
-   * exercises the coding-agent-origin path) never constructs the
-   * ClickHouse-backed default.
+   * The log-record store for read-time Claude Code content enrichment, taken
+   * lazily from `getApp().traces.logRecords` so a TraceService that never
+   * enriches (or a unit test that never exercises the coding-agent-origin
+   * path) never touches the App singleton.
    */
   private logRecordStorageService(): LogRecordStorageService {
     if (this.injectedLogRecordStorage) return this.injectedLogRecordStorage;
-    return (this.cachedLogRecordStorage ??=
-      createDefaultLogRecordStorageService());
+    return (this.cachedLogRecordStorage ??= getApp().traces.logRecords);
+  }
+
+  /**
+   * Reviewer corrections, built lazily so a read that never opts into them
+   * never touches Postgres for the overlay table.
+   */
+  private editOverlayService(): TraceEditOverlayService {
+    return (this.cachedEditOverlayService ??= TraceEditOverlayService.create(
+      this.prisma,
+    ));
+  }
+
+  /**
+   * The single-trace tail shared by every branch of {@link getById}: coding-agent
+   * enrichment first, then the reviewer correction if the caller asked for one.
+   */
+  private async enrichAndCorrect({
+    projectId,
+    trace,
+    protections,
+    withEditOverlay,
+  }: {
+    projectId: string;
+    trace: Trace;
+    protections: Protections;
+    withEditOverlay?: boolean;
+  }): Promise<Trace> {
+    const enriched = await this.enrichCodingAgentTrace(projectId, trace);
+    if (!withEditOverlay) return enriched;
+    const [corrected] = await this.applyEditOverlays(
+      projectId,
+      [enriched],
+      protections,
+    );
+    return corrected ?? enriched;
+  }
+
+  /**
+   * Overlays reviewer corrections onto a page of traces, in one read for the
+   * whole page. Runs LAST on every opted-in path, after blob resolution and
+   * coding-agent enrichment, so a correction wins over whatever the resolvers
+   * put in the field.
+   *
+   * A correction never widens what a viewer may read. The trace it lands on has
+   * already been through `applyTraceProtections`, so each patch is first cut
+   * down to the edits this viewer may read, and only then applied: content
+   * categories they cannot see, content teased by the plan's visibility
+   * window, and attributes a restrict rule hides from them all drop out.
+   * Without that, a corrected `params` or output would put back exactly what
+   * the redaction pass had just removed, and a dataset record would carry it.
+   */
+  private async applyEditOverlays(
+    projectId: string,
+    traces: Trace[],
+    protections: Protections,
+  ): Promise<Trace[]> {
+    if (traces.length === 0) return traces;
+    const patches = await this.editOverlayService().getPatchesByTraceIds({
+      projectId,
+      traceIds: traces.map((trace) => trace.trace_id),
+    });
+    if (patches.size === 0) return traces;
+
+    let changed = false;
+    const corrected = traces.map((trace) => {
+      const patch = patches.get(trace.trace_id);
+      if (!patch) return trace;
+      const next = applyOverlayToTrace({
+        trace,
+        patch: redactPatchForViewer({
+          patch,
+          protections,
+          isWindowRedacted: trace.redacted_by_visibility_window === true,
+        }),
+      });
+      if (next !== trace) changed = true;
+      return next;
+    });
+    return changed ? corrected : traces;
   }
 
   /**
@@ -254,18 +334,30 @@ export class TraceService {
    *   offloaded eventref pointers from event_log so over-threshold IO values
    *   read back full (#4888). Default (undefined/false) returns the ≤64 KB
    *   preview — identical to pre-#4888 behavior.
+   * @param opts.withEditOverlay - When true, a reviewer's saved correction is
+   *   applied over the captured trace. Opt-in per caller: only the
+   *   add-to-dataset path asks for it, so evaluations, exports, shares and the
+   *   REST API keep reading exactly what was ingested.
    * @returns The trace if found, undefined otherwise
    */
   async getById(
     projectId: string,
     traceId: string,
     protections: Protections,
-    opts?: { full?: boolean },
+    opts?: { full?: boolean; withEditOverlay?: boolean },
   ): Promise<Trace | undefined> {
     return this.tracer.withActiveSpan(
       "TraceService.getById",
       { attributes: { "tenant.id": projectId, "trace.id": traceId } },
       async (span) => {
+        const finish = (trace: Trace) =>
+          this.enrichAndCorrect({
+            projectId,
+            trace,
+            protections,
+            withEditOverlay: opts?.withEditOverlay,
+          });
+
         const traces = await this.clickHouseService.getTracesWithSpans(
           projectId,
           [traceId],
@@ -274,7 +366,7 @@ export class TraceService {
           { resolveBlobs: opts?.full },
         );
         if (traces[0]) {
-          return this.enrichCodingAgentTrace(projectId, traces[0]);
+          return finish(traces[0]);
         }
 
         // No exact match. If the input looks like a truncated hex prefix
@@ -315,9 +407,7 @@ export class TraceService {
             undefined,
             { resolveBlobs: opts?.full },
           );
-          return resolved[0]
-            ? this.enrichCodingAgentTrace(projectId, resolved[0])
-            : undefined;
+          return resolved[0] ? finish(resolved[0]) : undefined;
         }
 
         return undefined;
@@ -404,6 +494,8 @@ export class TraceService {
    * @param opts.full - When true AND blob-resolution deps are present, resolves
    *   offloaded eventref pointers from event_log so over-threshold IO values
    *   read back full (#4888). Default (undefined/false) returns previews.
+   * @param opts.withEditOverlay - When true, reviewer corrections are applied
+   *   over the captured traces (see {@link getById}).
    * @returns Array of Trace objects with spans
    */
   async getTracesWithSpans(
@@ -411,7 +503,7 @@ export class TraceService {
     traceIds: string[],
     protections: Protections,
     occurredAt?: { from: number; to: number },
-    opts?: { full?: boolean },
+    opts?: { full?: boolean; withEditOverlay?: boolean },
   ): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesWithSpans",
@@ -426,7 +518,9 @@ export class TraceService {
           occurredAt,
           { resolveBlobs: opts?.full },
         );
-        return this.enrichCodingAgentTraces(projectId, traces);
+        const enriched = await this.enrichCodingAgentTraces(projectId, traces);
+        if (!opts?.withEditOverlay) return enriched;
+        return this.applyEditOverlays(projectId, enriched, protections);
       },
     );
   }
@@ -581,13 +675,15 @@ export class TraceService {
    *   content-consuming thread tRPC both pass `{ full: true }` with deps. A
    *   caller that omits it — or a deps-free TraceService — stays on the ≤64 KB
    *   preview and issues zero event_log reads (#4888 / ADR-022).
+   * @param opts.withEditOverlay - When true, each trace in the conversation
+   *   carries its own reviewer correction (see {@link getById}).
    * @returns Array of traces
    */
   async getTracesWithSpansByThreadIds(
     projectId: string,
     threadIds: string[],
     protections: Protections,
-    opts?: { full?: boolean },
+    opts?: { full?: boolean; withEditOverlay?: boolean },
   ): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesWithSpansByThreadIds",
@@ -605,7 +701,9 @@ export class TraceService {
             protections,
             { resolveBlobs: opts?.full },
           );
-        return this.enrichCodingAgentTraces(projectId, traces);
+        const enriched = await this.enrichCodingAgentTraces(projectId, traces);
+        if (!opts?.withEditOverlay) return enriched;
+        return this.applyEditOverlays(projectId, enriched, protections);
       },
     );
   }

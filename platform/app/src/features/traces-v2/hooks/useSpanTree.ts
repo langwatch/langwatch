@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import { applyOverlayToSpanTreeNodes } from "~/server/traces/edit-overlay/applyTraceEditOverlayToViews";
 import { api } from "~/utils/api";
 import { LIVE_REFETCH_MS } from "../constants/freshness";
 import {
@@ -14,9 +15,15 @@ import {
   spanTreeQueryFn,
   spanTreeQueryKey,
 } from "./spanTreePagedQuery";
+import { useAppliedTraceEditPatch } from "./useTraceEditOverlay";
 import { useTraceQueryArgs } from "./useTraceQueryArgs";
 
-export function useSpanTree() {
+/**
+ * The span tree exactly as captured, before any correction. Read it when the
+ * captured trace is the point: the Original view, the hover-original marks and
+ * the difference view.
+ */
+export function useSpanTreeCanonical() {
   const shared = useSharedTrace();
   const { isLive, isReady, queryArgs } = useTraceQueryArgs();
   // SSE health decides the delta poll's CADENCE, not whether it runs at all.
@@ -124,4 +131,61 @@ export function useSpanTree() {
     return asSharedQueryResult(shared.spanTree) as unknown as typeof treeQuery;
   }
   return treeQuery;
+}
+
+/**
+ * Both readings of the span tree from one read: the trace as captured, and the
+ * trace as the reader sees it. A caller that needs each of them (the drawer
+ * scaffold, whose header counts captured spans while its panes render corrected
+ * ones) takes them from here rather than instantiating the query twice, which
+ * would put a second observer on the live delta poll for the same data.
+ *
+ * The correction is applied to the query's result and never written back into
+ * the cache, so the delta poll's high-water mark keeps tracking what was
+ * actually ingested.
+ */
+export function useSpanTreeWithCaptured() {
+  const captured = useSpanTreeCanonical();
+  const patch = useAppliedTraceEditPatch();
+  const nodes = captured.data;
+
+  const data = useMemo(
+    () => (nodes ? applyOverlayToSpanTreeNodes({ nodes, patch }) : nodes),
+    [nodes, patch],
+  );
+
+  const corrected = useMemo(
+    () => (data === nodes ? captured : { ...captured, data }),
+    [captured, data, nodes],
+  );
+
+  // The same tree with the removed rows still on it, for the waterfall to show
+  // struck through. It is what the correction did, not what the trace now is,
+  // so it never stands in for `corrected`.
+  const displayData = useMemo(
+    () =>
+      nodes
+        ? applyOverlayToSpanTreeNodes({ nodes, patch, shouldKeepDeleted: true })
+        : nodes,
+    [nodes, patch],
+  );
+
+  const display = useMemo(
+    () =>
+      displayData === nodes ? captured : { ...captured, data: displayData },
+    [captured, displayData, nodes],
+  );
+
+  return useMemo(
+    () => ({ captured, corrected, display }),
+    [captured, corrected, display],
+  );
+}
+
+/**
+ * The span tree the reader sees: corrected when a correction applies, captured
+ * otherwise.
+ */
+export function useSpanTree() {
+  return useSpanTreeWithCaptured().corrected;
 }

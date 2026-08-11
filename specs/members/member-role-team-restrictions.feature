@@ -177,14 +177,22 @@ Feature: Member Role Team Restrictions
     Then the change should remain pending
     And the persisted organization role should stay "Member" until I click "Save"
 
+  # The correction reaches the teams the organization shares, not the workspace
+  # each member gets to themselves. That workspace has a single admin, its
+  # owner, so including it would ask the organization to remove a team's last
+  # admin and the whole save would be refused. See
+  # specs/ai-gateway/governance/personal-workspace-integrity.feature for the
+  # scenarios that hold that line.
+
   @integration @unimplemented
-  Scenario: Saving a Lite Member update enforces Viewer team role in every team
+  Scenario: Saving a Lite Member update enforces Viewer team role in every shared team
     Given I am editing a member with organization role "Member"
     And the member has team roles "Admin" and "Member"
     When I change the organization role to "Lite Member"
     And I click "Save"
     Then the member should be saved as "Lite Member"
-    And all of the member team roles should be "Viewer"
+    And all of the member shared team roles should be "Viewer"
+    And their own personal workspace should be untouched
 
   @integration @unimplemented
   Scenario: API rejects non-Viewer team role assignments for Lite Members
@@ -209,3 +217,115 @@ Feature: Member Role Team Restrictions
     And the team role fields should be read-only
     And I should not see Save or Cancel buttons
     And I should see a Back button
+
+  # ============================================================================
+  # A seat decision and a team's last admin
+  # ============================================================================
+
+  # The correction to Viewer can take away the only team-scoped admin a shared
+  # team has, and the last-admin guard used to refuse that, which took the whole
+  # seat change down with it: the organization role never changed either, and no
+  # amount of editing the member's access in the dialog helped, because the seat
+  # change is applied before it and always saw the roles as they still were.
+  #
+  # The guard protects a team from having nobody who can administer it. An
+  # ORGANIZATION-scoped ADMIN binding grants team permissions in every shared
+  # team, so an organization admin still administers a team whose last
+  # team-scoped admin is gone, and the state the guard exists to prevent is not
+  # the state this produces. So a seat decision, which is the organization's to
+  # make, goes through, and the teams it changed are named back to the admin who
+  # made it. Editing a single team's own members is a team-local decision and
+  # keeps the guard.
+
+  @integration
+  Scenario: Moving the only admin of a shared team to a Lite Member seat goes through
+    Given a member is the only admin of a shared team
+    When an organization admin moves them to a Lite Member seat
+    Then the seat change is saved
+    And their role on that team becomes Viewer
+
+  @integration
+  Scenario: The teams left without a team admin are named back to the admin
+    Given a member is the only admin of two shared teams
+    When an organization admin moves them to a Lite Member seat
+    Then the save reports both teams as left without a team admin
+    And it does not report a team that still has another admin
+
+  @integration
+  Scenario: A seat change that names team roles outright still keeps the guard
+    Given a member is the only admin of a shared team
+    When a caller asks for that team role to be Viewer as part of the seat change
+    Then the change is refused
+    And the refusal names the team
+
+  @integration
+  Scenario: Saving the team form cannot take its last admin away
+    Given a member is the only admin of a shared team
+    When the team is saved with that member demoted or dropped from the list
+    Then the save is refused
+    And the refusal names the team
+    And the team keeps its admin
+
+  @integration
+  Scenario: The team form hands the admin role to somebody else in one save
+    Given a member is the only admin of a shared team
+    When the team is saved promoting somebody else to admin and demoting them
+    Then the save goes through
+
+  @integration
+  Scenario: A team already without a team admin stays editable
+    Given a seat correction left a team with no team admin
+    When its members are changed, from the team form or one member at a time
+    Then the changes are saved
+    And promoting a member back to Admin repairs the team
+
+  @integration
+  Scenario: Editing one team's members still refuses to remove its last admin
+    Given a member is the only admin of a shared team
+    When an organization admin changes that team role from the team's own members
+    Then the change is refused
+    And the refusal names the team
+
+  # "Has an admin" counts people. A group given the Admin role on a team
+  # administers it through every one of its members, so a change the group can
+  # absorb is not taking the team's last admin away, and a team administered
+  # entirely through a group is not a team without an admin.
+
+  @integration
+  Scenario: A group that administers the team counts as its admin
+    Given a member is the only directly assigned admin of a shared team
+    And a group with at least one member holds the Admin role on that team
+    When they are demoted, from the team form or from the team's own members
+    Then the save goes through
+
+  @integration
+  Scenario: A group with no members does not keep a team administered
+    Given a member is the only directly assigned admin of a shared team
+    And a group with no members holds the Admin role on that team
+    When the team is saved with that member demoted
+    Then the save is refused
+    And the refusal names the team
+
+  @integration
+  Scenario: A team administered only through a group accepts member edits
+    Given a team whose only Admin role is held by a group with members
+    When an organization admin changes another member's role on that team
+    Then the change is saved
+
+  # The seat correction reaches everything the seat caps: team access and
+  # project access alike, on the surfaces the organization shares. The member's
+  # own personal workspace is the documented exception, held by
+  # specs/ai-gateway/governance/personal-workspace-integrity.feature.
+
+  @integration
+  Scenario: Moving a member to a Lite Member seat corrects their project access rows to Viewer
+    Given a member holds project access above Viewer on a shared project
+    When an organization admin moves them to a Lite Member seat
+    Then their project access on that project becomes Viewer
+    And moving them back to a full seat leaves project access as it is
+
+  @integration
+  Scenario: A seat correction leaves the personal workspace access row alone
+    Given a member with a personal workspace
+    When an organization admin moves them to a Lite Member seat
+    Then their personal workspace access rows are untouched

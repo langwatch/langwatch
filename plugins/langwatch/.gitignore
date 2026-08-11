@@ -1,0 +1,4 @@
+# Build output: bundled from sdks/typescript by build.mjs, published by
+# .github/workflows/agent-plugin-publish.yml. Committing it would let the copy
+# drift from the source it was built from.
+scripts/

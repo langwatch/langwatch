@@ -25,6 +25,10 @@ function buildStatusTone(
 
 export const STATUS = {
   pass: buildStatusTone("passed", "PASS"),
+  // The evaluator ran to completion but produced no pass/fail verdict
+  // (score-only or verdict-less runs). Neutral blue, matching the shared
+  // `processed` tone — a run that judged nothing must not read as a pass.
+  processed: buildStatusTone("processed", "PROCESSED"),
   // "Warning" is a legacy trace-summary status with no v3 equivalent;
   // it reads as a not-quite-pass, so route it through the `failed` tone
   // so the chip still turns red rather than picking up a bespoke yellow.
@@ -49,8 +53,33 @@ export function isNoVerdict(status: EvalSummary["status"]): boolean {
   return status === "skipped" || status === "error";
 }
 
+/**
+ * Whether the evaluator answered with a category and nothing else — a label,
+ * no numeric score, no pass/fail. `langevals/llm_category` is the archetype:
+ * it classifies ("resolved", "escalated") rather than judging.
+ *
+ * Such a run reaches the UI carrying a `pass` status and a score of `0`, both
+ * of which are stand-ins the mapping invents for absent fields rather than
+ * anything the evaluator reported. A card that shows them says the run passed
+ * with a score of zero, which is untrue twice, and buries the category. So
+ * these render as the category alone.
+ *
+ * `scoreType` is the discriminator rather than `score`, because by this point
+ * `score` is one of those stand-ins: `scoreType` is derived from the raw
+ * evaluation and is `categorical` exactly when it reported a label and neither
+ * a number nor a verdict.
+ */
+export function isCategoryOnly(eval_: EvalEntry): boolean {
+  return (
+    !isNoVerdict(eval_.status) &&
+    eval_.scoreType === "categorical" &&
+    !!eval_.label &&
+    eval_.passed == null
+  );
+}
+
 export interface EvalRunHistoryEntry {
-  score: number | boolean;
+  score: number | boolean | null;
   timestamp: number;
   status: string;
 }

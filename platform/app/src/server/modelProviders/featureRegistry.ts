@@ -77,6 +77,19 @@ const REGISTRY: FeatureDescriptor[] = [
       "Model that judges whether a scenario met its success criteria.",
   },
   {
+    // DEFAULT-role (never codex-eligible) so a project whose FAST/coding
+    // default is a subscription-billed model still resolves a real
+    // inference model to run the prompt under test — see
+    // specs/scenarios/simulation-run-model-resolution.feature. Distinct
+    // from "scenarios.generator" (FAST role), which is the authoring
+    // assist scenario generation uses, not a run.
+    key: "scenarios.agent_under_test",
+    role: "DEFAULT",
+    displayName: "Scenario prompt model",
+    description:
+      "Model used when a scenario tests a prompt that doesn't already have one set.",
+  },
+  {
     key: "workflows.create_default",
     role: "DEFAULT",
     displayName: "New workflow model",

@@ -1,9 +1,13 @@
 import { z } from "zod";
-import { EventSchema } from "../../../domain/types";
+import { AggregateTypeSchema } from "../../../domain/aggregateType";
+import { TenantIdSchema } from "../../../domain/tenantId";
+import { EventMetadataBaseSchema, EventSchema } from "../../../domain/types";
 import {
   LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
   METRIC_FACTS_CONTRIBUTED_EVENT_TYPE,
   SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
+  SPAN_FACTS_LIFTED_PAYLOAD_TYPE,
+  SPAN_FACTS_LIFTED_PAYLOAD_VERSIONS,
 } from "./constants";
 import {
   logFactsContributionSchema,
@@ -39,3 +43,53 @@ export type CodingAgentProcessingEvent =
   | SpanFactsContributedEvent
   | LogFactsContributedEvent
   | MetricFactsContributedEvent;
+
+/**
+ * The staged bounded derivation (ADR-069): a matched span's facts, lifted at
+ * the routing seam and carried on the job so the handler needs no read-back.
+ *
+ * This is a STAGED QUEUE PAYLOAD, not an event — a plain versioned DTO owned
+ * by the dispatch lane. It is never appended to the event log; the durable
+ * record of the contribution is `span_facts_contributed`. Its fields mirror
+ * the event envelope field-for-field (same names, same validators) because
+ * the payload travels the queue in a trace event's place and the handler
+ * discriminates on `type` and `version` and reads `tenantId` + `data`.
+ * Keeping the wire shape byte-identical is what leaves the rolling deploy
+ * (consumer half first, R2 flips the producer) unaffected.
+ */
+export const spanFactsLiftedPayloadSchema = z.object({
+  id: z.string(),
+  aggregateId: z.string(),
+  aggregateType: AggregateTypeSchema,
+  tenantId: TenantIdSchema,
+  createdAt: z.number().int().nonnegative(),
+  occurredAt: z.number().int().nonnegative(),
+  type: z.literal(SPAN_FACTS_LIFTED_PAYLOAD_TYPE),
+  version: z.enum(SPAN_FACTS_LIFTED_PAYLOAD_VERSIONS),
+  data: spanFactsContributionSchema,
+  metadata: EventMetadataBaseSchema.optional(),
+  idempotencyKey: z.string().optional(),
+});
+export type SpanFactsLiftedPayload = z.infer<
+  typeof spanFactsLiftedPayloadSchema
+>;
+
+/**
+ * Discriminate-then-validate read of a staged payload, mirroring
+ * `parseSpanReferencedPayload`.
+ *
+ * Returns `null` when the payload does not even claim to be a lifted
+ * derivation, so the caller falls through to its other shapes. But once the
+ * payload claims the type, a shape or version this build cannot read THROWS
+ * into the queue's retry — falling through would let a mixed-deploy job be
+ * mistaken for another kind of payload and silently no-op.
+ */
+export function parseSpanFactsLiftedPayload(
+  value: unknown,
+): SpanFactsLiftedPayload | null {
+  if (typeof value !== "object" || value === null) return null;
+  if ((value as { type?: unknown }).type !== SPAN_FACTS_LIFTED_PAYLOAD_TYPE) {
+    return null;
+  }
+  return spanFactsLiftedPayloadSchema.parse(value);
+}

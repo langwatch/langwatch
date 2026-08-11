@@ -61,6 +61,9 @@ spec:
         {{- if .Values.app.pod.labels }}
         {{- toYaml .Values.app.pod.labels | nindent 8 }}
         {{- end }}
+        {{- with (include "langwatch.cloudIdentityPodLabels" .) }}
+        {{- . | nindent 8 }}
+        {{- end }}
       annotations:
         {{- with (coalesce .Values.app.pod.annotations .Values.global.podAnnotations) }}
         {{- toYaml . | nindent 8 }}
@@ -70,8 +73,19 @@ spec:
         prometheus.io/port: "{{ .Values.app.service.port }}"
         {{- end }}
     spec:
+      {{- with (include "langwatch.serviceAccountName" .) }}
+      serviceAccountName: {{ . }}
+      {{- end }}
       # The app does not call the Kubernetes API, so don't mount the SA token.
+      # Cloud workload identity is unaffected by this flag: the platform
+      # webhook injects its own projected token volume, which the chart
+      # deliberately does not hand-roll.
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
+      # The app runs the same shutdown budget as the workers, because it can be
+      # the process hosting the worker stack (the `all` process role) and its
+      # entrypoint watchdog is the same one. Even web-only, the drain finishes
+      # in well under this — the grace period is a ceiling, not a wait.
+      terminationGracePeriodSeconds: {{ include "langwatch.terminationGracePeriod" (dict "component" .Values.app "name" "app") }}
       # Pod security context - https://kubespec.dev/v1/Pod#spec.securityContext
       securityContext:
         {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.app) | nindent 8 }}
@@ -124,6 +138,7 @@ spec:
               protocol: TCP
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
+            {{- include "langwatch.shutdownEnv" (dict "component" .Values.app "name" "app") | nindent 12 }}
 
             # Names this process in telemetry. It becomes the OTel resource
             # `service.name` and the `service` field on every stdout log line,
@@ -147,6 +162,14 @@ spec:
             # through a different URL.
             - name: LANGWATCH_ENDPOINT
               value: {{ .Values.app.http.langwatchEndpoint | default (printf "http://localhost:%v" (.Values.app.service.port | default 5560)) | quote }}
+
+            # Content-hashed asset base (ADR-086). Empty by default → assets are
+            # served same-origin from the pod. Set to a commit-prefixed CDN base
+            # so a rolling deploy never strands a browser on a stale-chunk 404.
+            {{- if .Values.app.assetBase }}
+            - name: LANGWATCH_ASSET_BASE
+              value: {{ .Values.app.assetBase | quote }}
+            {{- end }}
 
             # Cron API key
             {{- if .Values.app.cronApiKey.secretKeyRef.name }}
@@ -284,16 +307,20 @@ spec:
             - name: NEXTAUTH_PROVIDER
               value: {{ .Values.app.nextAuth.provider | quote }}
 
-            # NextAuth - SSO OAuth providers (auth0, azureAd, github, gitlab, google, okta).
+            # NextAuth - SSO OAuth providers (auth0, azureAd, cognito, github,
+            # gitlab, google, okta, onelogin, oidc).
             # These are this chart's values keys, which map to env prefixes; the
             # provider id the app selects on is app.nextAuth.provider.
             {{- $oauthProviders := list
-              (dict "key" "auth0"   "prefix" "AUTH0"    "fields" (list "clientId" "clientSecret" "issuer"))
-              (dict "key" "azureAd" "prefix" "AZURE_AD" "fields" (list "clientId" "clientSecret" "tenantId"))
-              (dict "key" "github"  "prefix" "GITHUB"   "fields" (list "clientId" "clientSecret"))
-              (dict "key" "gitlab"  "prefix" "GITLAB"   "fields" (list "clientId" "clientSecret"))
-              (dict "key" "google"  "prefix" "GOOGLE"   "fields" (list "clientId" "clientSecret"))
-              (dict "key" "okta"    "prefix" "OKTA"     "fields" (list "clientId" "clientSecret" "issuer"))
+              (dict "key" "auth0"    "prefix" "AUTH0"    "fields" (list "clientId" "clientSecret" "issuer"))
+              (dict "key" "azureAd"  "prefix" "AZURE_AD" "fields" (list "clientId" "clientSecret" "tenantId"))
+              (dict "key" "cognito"  "prefix" "COGNITO"  "fields" (list "clientId" "clientSecret" "issuer"))
+              (dict "key" "github"   "prefix" "GITHUB"   "fields" (list "clientId" "clientSecret"))
+              (dict "key" "gitlab"   "prefix" "GITLAB"   "fields" (list "clientId" "clientSecret"))
+              (dict "key" "google"   "prefix" "GOOGLE"   "fields" (list "clientId" "clientSecret"))
+              (dict "key" "okta"     "prefix" "OKTA"     "fields" (list "clientId" "clientSecret" "issuer"))
+              (dict "key" "onelogin" "prefix" "ONELOGIN" "fields" (list "clientId" "clientSecret" "issuer"))
+              (dict "key" "oidc"     "prefix" "OIDC"     "fields" (list "clientId" "clientSecret" "issuer"))
             }}
             {{- range $provider := $oauthProviders }}
             {{- $providerValues := index $.Values.app.nextAuth.providers $provider.key }}

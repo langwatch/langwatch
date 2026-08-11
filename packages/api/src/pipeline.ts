@@ -1,6 +1,10 @@
 import { updateCurrentContext } from "@langwatch/observability/context";
 import type { Context, MiddlewareHandler } from "hono";
-import { type DescribeRouteOptions, describeRoute } from "hono-openapi";
+import {
+  type DescribeRouteOptions,
+  describeRoute,
+  uniqueSymbol,
+} from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import type { ZodType } from "zod";
 
@@ -37,6 +41,10 @@ export function buildEndpointMiddlewareStack<TProject>(
 ): MiddlewareHandler[] {
   const { ep } = options;
   const stack = [versionContextMiddleware(options)];
+  const documented = isDocumentedMount({
+    config: ep.config,
+    status: options.status,
+  });
 
   appendAccessMiddleware({
     stack,
@@ -44,12 +52,34 @@ export function buildEndpointMiddlewareStack<TProject>(
     includeResourceLimit: true,
     serviceConfig: options.serviceConfig,
   });
-  appendOpenApiMiddleware({ stack, config: ep.config });
-  appendValidationMiddleware({ stack, ep });
+  appendOpenApiMiddleware({ stack, config: ep.config, documented });
+  appendValidationMiddleware({ stack, ep, documented });
   stack.push(providerMiddleware(options.providers));
   stack.push(handlerMiddleware(options));
 
   return stack;
+}
+
+/**
+ * Whether this mount is the one that reaches the OpenAPI document.
+ *
+ * Only the bare alias (`status === "unversioned"`) is ever documented; dated,
+ * `latest`, and `preview` mounts serve traffic (with version headers) but stay
+ * out of the published spec, so the document contains exactly one path per
+ * endpoint. `docs.hide` opts the endpoint out entirely, and endpoints that
+ * declare nothing documentable are skipped rather than published as bare
+ * stubs.
+ */
+function isDocumentedMount({
+  config,
+  status,
+}: {
+  config: EndpointConfig;
+  status: VersionStatus;
+}): boolean {
+  if (status !== "unversioned") return false;
+  if (config.docs?.hide === true) return false;
+  return Boolean(config.output || config.description || config.docs);
 }
 
 /** Composes the inherited access pipeline and 410 response for a withdrawal. */
@@ -136,15 +166,18 @@ function appendAccessMiddleware({
 function appendOpenApiMiddleware({
   stack,
   config,
+  documented,
 }: {
   stack: MiddlewareHandler[];
   config: EndpointConfig;
+  documented: boolean;
 }): void {
-  if (!config.output && !config.description) return;
+  if (!documented) return;
 
   const successStatus = String(config.status ?? 200);
-  const responses: NonNullable<DescribeRouteOptions["responses"]> = {};
-  responses[successStatus] = config.output
+  const generatedSuccess: NonNullable<
+    DescribeRouteOptions["responses"]
+  >[string] = config.output
     ? {
         description: "Success",
         content: {
@@ -153,31 +186,48 @@ function appendOpenApiMiddleware({
       }
     : { description: "Success" };
 
-  stack.push(
-    describeRoute({
-      description: config.description,
-      responses,
-    }) as unknown as MiddlewareHandler,
-  );
+  const docs = config.docs;
+  const options: DescribeRouteOptions = {
+    responses: { [successStatus]: generatedSuccess, ...docs?.responses },
+  };
+  if (config.description !== undefined)
+    options.description = config.description;
+  if (docs?.summary !== undefined) options.summary = docs.summary;
+  if (docs?.tags !== undefined) options.tags = docs.tags;
+  if (docs?.operationId !== undefined) options.operationId = docs.operationId;
+  if (docs?.security !== undefined) options.security = docs.security;
+
+  stack.push(describeRoute(options) as unknown as MiddlewareHandler);
 }
 
 function appendValidationMiddleware({
   stack,
   ep,
+  documented,
 }: {
   stack: MiddlewareHandler[];
   ep: EndpointRegistration;
+  documented: boolean;
 }): void {
   const addValidator = (
     target: "param" | "query" | "json",
     schema: ZodType | undefined,
   ) => {
     if (!schema) return;
-    stack.push(
-      zValidator(target, schema, (result) => {
-        if (!result.success) throw result.error;
-      }) as unknown as MiddlewareHandler,
-    );
+    const middleware = zValidator(target, schema, (result) => {
+      if (!result.success) throw result.error;
+    }) as unknown as MiddlewareHandler;
+    if (!documented) {
+      // hono-openapi's validator carries OpenAPI metadata under uniqueSymbol,
+      // and generateSpecs indexes EVERY handler carrying it, so an
+      // undocumented mount (dated, latest, preview, hidden) would otherwise
+      // still surface its path in the spec. Validation is not documentation:
+      // strip the metadata, keep the validator.
+      delete (middleware as Partial<Record<typeof uniqueSymbol, unknown>>)[
+        uniqueSymbol
+      ];
+    }
+    stack.push(middleware);
   };
 
   addValidator("param", ep.config.params);

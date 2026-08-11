@@ -27,12 +27,28 @@ describe("STARTER_PACK_TILES", () => {
     });
   });
 
+  describe("given the github copilot coding-assistant tile (ADR-039)", () => {
+    const copilot = STARTER_PACK_TILES.find((t) => t.slug === "github-copilot");
+
+    it("wires the unified `langwatch copilot` setup command", () => {
+      expect(copilot?.type).toBe("coding_assistant");
+      expect(copilot?.config.setupCommand).toBe("langwatch copilot");
+      expect(copilot?.config.assistantKind).toBe("github_copilot");
+    });
+  });
+
   describe("given every platform coding assistant", () => {
     it("ships each unified CLI as a coding_assistant starter tile", () => {
       const codingTiles = STARTER_PACK_TILES.filter(
         (t) => t.type === "coding_assistant",
       ).map((t) => t.slug);
-      for (const slug of ["claude-code", "codex", "gemini", "opencode"]) {
+      for (const slug of [
+        "claude-code",
+        "codex",
+        "gemini",
+        "opencode",
+        "github-copilot",
+      ]) {
         expect(codingTiles).toContain(slug);
       }
     });

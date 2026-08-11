@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { CodingAgentSessionRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-session.repository";
+import type {
+  CodingAgentBranchSessionRow,
+  CodingAgentSessionRepository,
+} from "~/server/app-layer/coding-agent/repositories/coding-agent-session.repository";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import { createInitCodingAgentSession } from "../../services/coding-agent-session.derivation";
@@ -103,6 +106,10 @@ class FakeRepo implements CodingAgentSessionRepository {
   }
 
   async findManyRecent(): Promise<CodingAgentSessionRow[]> {
+    return [];
+  }
+
+  async listByRepositoryBranch(): Promise<CodingAgentBranchSessionRow[]> {
     return [];
   }
 }

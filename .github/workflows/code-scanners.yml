@@ -44,12 +44,61 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  # Gate for the two DEPENDENCY scanners only. gitleaks, trufflehog and
+  # semgrep stay ungated on purpose: a credential or an injection can arrive
+  # in any file type, including the ones a language filter would exclude, so
+  # a secret/SAST scanner that only runs on "relevant" paths is a scanner
+  # with a documented blind spot. govulncheck and pip-audit have no such
+  # property — they read a manifest, so on a PR that touches no Go and no
+  # Python manifest they can only report what the last run already reported.
+  #
+  # Non-PR events force both filters true, the same rule
+  # .github/actions/detect-changes and go-services.yaml already use. That
+  # keeps the weekly cron (where the report-only scanners are actually
+  # actioned), merge_group, push and workflow_dispatch running everything.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ github.event_name != 'pull_request' || steps.filter.outputs.go }}
+      python: ${{ github.event_name != 'pull_request' || steps.filter.outputs.python }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+          # dorny/paths-filter reads the PR diff from the API; nothing here
+          # touches the working tree.
+          sparse-checkout: .github
+      - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        if: github.event_name == 'pull_request'
+        id: filter
+        with:
+          # NO NEGATION PATTERNS — dorny ORs a filter's patterns, so a lone
+          # `!x` matches everything. See specs/ci/path-filters.feature.
+          filters: |
+            # `**/*.go` is a superset of what govulncheck walks
+            # (./services/... ./pkg/... ./cmd/... ./tools/...), which is what
+            # keeps this filter correct when a new Go root appears.
+            go:
+              - '**/*.go'
+              - 'go.mod'
+              - 'go.sum'
+              - 'go.work'
+              - 'go.work.sum'
+              - '.github/workflows/code-scanners.yml'
+            # pip-audit reads requirements files and the two audited
+            # pyprojects; `**/pyproject.toml` is deliberately wider than the
+            # two it audits today so a newly audited manifest is covered.
+            python:
+              - '**/requirements*.txt'
+              - '**/pyproject.toml'
+              - '.github/workflows/code-scanners.yml'
+
   secrets:
     name: secrets (gitleaks + trufflehog)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           # Both scanners diff a commit range, which needs the range present.
           fetch-depth: 0
@@ -58,71 +107,79 @@ jobs:
       # A committed credential is never acceptable, so this is blocking from
       # the start rather than phased. #5708 is the precedent.
       #
-      # The binary, not gitleaks-action: that action requires a paid
-      # GITLEAKS_LICENSE for organisation-owned repositories and fails without
-      # one. The CLI is Apache-2.0 and unrestricted.
-      - name: gitleaks
+      # The binaries, not gitleaks-action / trufflesecurity/trufflehog. The
+      # gitleaks action requires a paid GITLEAKS_LICENSE for organisation-owned
+      # repositories and fails without one; the CLI is Apache-2.0 and
+      # unrestricted. For trufflehog, every other `uses:` in this repo is a
+      # first-party actions/* or an already-approved pin, and this workflow's
+      # first run ended in startup_failure with the third-party action as its
+      # only unapproved reference. A pinned release tarball needs no allowlist.
+      # Each tarball is verified against the checksum file its release
+      # publishes before anything is extracted — this job exists to catch
+      # compromised credentials, so its own supply chain does not get to be a
+      # `curl | tar`. The checksum file comes from the same release, so this
+      # does not defend against a compromised release, only against a swapped
+      # or truncated asset — which is also what pipefail is for: without it a
+      # failed curl is masked by the tar it feeds.
+      - name: Install scanners
         run: |
-          version=8.30.0
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_linux_x64.tar.gz" \
-            | tar -xz -C /usr/local/bin gitleaks
-          gitleaks --version
-          # Scoped to this branch's own commits, not all history. A repository
-          # this age has rotated credentials still sitting in old objects
-          # (#5708); scanning everything would fail every PR for something no
-          # PR author did, and the gate would be off within a day.
-          # --verbose because without it gitleaks prints only "leaks found: N"
-          # and nothing about WHERE, which makes a blocking gate impossible to
-          # act on from the log alone. --redact keeps the matched value itself
-          # out of CI output; the file, line, rule id and fingerprint still
-          # print, which is what an author needs. Rule + path is also exactly
-          # what an entry in `.gitleaks.toml` is keyed on.
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE="${{ github.base_ref }}"
-            git fetch --no-tags origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
-            gitleaks git --redact --no-banner --no-color --verbose --log-opts="origin/$BASE..HEAD" .
-          else
-            gitleaks git --redact --no-banner --no-color --verbose --log-opts="-1" .
-          fi
+          set -euo pipefail
+          install_verified() {
+            local name="$1" version="$2" repo="$3" asset="$4" checksums="$5"
+            local dir
+            dir="$(mktemp -d)"
+            curl -sSfL "https://github.com/${repo}/releases/download/v${version}/${asset}" -o "$dir/$asset"
+            curl -sSfL "https://github.com/${repo}/releases/download/v${version}/${checksums}" -o "$dir/checksums.txt"
+            (cd "$dir" && grep -F "  $asset" checksums.txt | sha256sum --check --strict)
+            tar -xz -C /usr/local/bin -f "$dir/$asset" "$name"
+            rm -rf "$dir"
+            "$name" --version
+          }
+          install_verified gitleaks 8.30.0 gitleaks/gitleaks \
+            gitleaks_8.30.0_linux_x64.tar.gz gitleaks_8.30.0_checksums.txt
+          install_verified trufflehog 3.96.0 trufflesecurity/trufflehog \
+            trufflehog_3.96.0_linux_amd64.tar.gz trufflehog_3.96.0_checksums.txt
+
+      # Runs BEFORE the gate it protects, against throwaway repositories built
+      # to match the ref layout actions/checkout leaves behind. A gate scoped to
+      # the wrong commits is indistinguishable from a correct one by exit code
+      # alone — this is what tells them apart, on this runner, with these binary
+      # versions. See specs/ci/secrets-scan-scoping.feature.
+      - name: Scoping tests
+        run: bash .github/scripts/__tests__/secrets-scan.test.sh
+
+      # Both scanners are scoped to the commits under test and nothing else, by
+      # .github/scripts/secrets-scan.sh. They ran inline here until #6681, when
+      # only one of the two turned out to be scoped: trufflehog's git source
+      # walks `git log --all` — every ref in the clone — unless it is given a
+      # `--branch`, so one branch's finding failed every open pull request in
+      # the repository. Separate steps so a failure names which scanner found it.
+      - name: gitleaks
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: bash .github/scripts/secrets-scan.sh gitleaks
 
       # gitleaks matches patterns; trufflehog additionally VERIFIES a candidate
-      # against the provider, so it catches live credentials that do not match
-      # a known shape. --only-verified keeps it to secrets proven live, which
-      # is what makes it safe to block on.
-      #
-      # The binary rather than trufflesecurity/trufflehog, for the same reason
-      # as gitleaks above: every other `uses:` in this repo is a first-party
-      # actions/* or an already-approved pin, and this workflow's first run
-      # ended in startup_failure with the third-party action as its only
-      # unapproved reference. A pinned release tarball needs no allowlist.
+      # against the provider, so it catches live credentials that do not match a
+      # known shape, and blocks only on ones the provider confirms are live.
       - name: trufflehog
-        run: |
-          version=3.96.0
-          curl -sSfL "https://github.com/trufflesecurity/trufflehog/releases/download/v${version}/trufflehog_${version}_linux_amd64.tar.gz" \
-            | tar -xz -C /usr/local/bin trufflehog
-          trufflehog --version
-          # Same scoping as gitleaks. --only-verified means it blocks only on a
-          # credential the provider confirms is live, so a historical rotated
-          # one does not stop the queue.
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            trufflehog git "file://$(pwd)" \
-              --since-commit "$(git merge-base HEAD "origin/${{ github.base_ref }}")" \
-              --only-verified --fail --no-update
-          else
-            trufflehog git "file://$(pwd)" --max-depth=1 --only-verified --fail --no-update
-          fi
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: bash .github/scripts/secrets-scan.sh trufflehog
 
   sast:
     name: semgrep (changed lines)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
 
@@ -168,14 +225,16 @@ jobs:
 
   go-advisories:
     name: govulncheck (blocking)
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           persist-credentials: false
 
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
@@ -200,14 +259,16 @@ jobs:
 
   python-advisories:
     name: pip-audit (report-only)
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           persist-credentials: false
 
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
 

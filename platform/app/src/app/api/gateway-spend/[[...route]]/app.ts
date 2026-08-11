@@ -13,7 +13,6 @@ import {
   WebhookEndpointService,
   type WebhookEndpointView,
 } from "@ee/webhooks/webhookEndpoint.service";
-import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { WebhookEventsService } from "@ee/webhooks/webhookEvents.service";
 import type { Organization } from "@prisma/client";
 import type { Context, Next } from "hono";
@@ -24,15 +23,30 @@ import { z } from "zod";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { ClickHouseUnavailableError } from "~/server/app-layer/traces/errors";
 import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import { applicableEndUserCaps } from "~/server/gateway/endUserCaps.service";
 import {
   decodeSpendEventsCursor,
   decodeSpendSummariesCursor,
-  GatewaySpendEventsRepository,
 } from "~/server/gateway/spendEvents.clickhouse.repository";
+import { GatewaySpendEventsService } from "~/server/gateway/spendEvents.service";
+import {
+  SPEND_SUMMARY_STATUS_DESCRIPTION,
+  spendFilterQueryShape,
+  spendFiltersFromQuery,
+  spendSummaryStatusFilter,
+} from "~/server/gateway/spendFilters";
+import {
+  assertGroupingIsWalkable,
+  isIanaTimeZone,
+  MAX_GROUP_BY_KEYS,
+  SPEND_BUCKETS,
+  SPEND_GROUP_BY_KEYS,
+  type SpendGroupByKey,
+} from "~/server/gateway/spendGrouping";
+import { resolveSpendScope } from "~/server/gateway/spendScope";
 import { USD_DISPLAY_STRING_FORMAT } from "~/server/gateway/wireMoney";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { canonicalBaseResponses } from "../../shared/base-responses";
@@ -40,16 +54,24 @@ import { BadRequestError, ForbiddenError } from "../../shared/errors";
 import {
   END_USER_SPEND_DESCRIPTION,
   SPEND_EVENTS_PULL_DESCRIPTION,
+  SPEND_SUMMARIES_DESCRIPTION,
 } from "./contract";
 import { handleGatewaySpendApiError } from "./error-handler";
 
 patchZodOpenapi();
 
-const spendEvents = new GatewaySpendEventsRepository(async (tenantId) => {
-  const client = await getClickHouseClientForProject(tenantId);
-  if (!client) throw new Error("ClickHouse is not configured");
-  return client;
-});
+/**
+ * The App's spend-events repository, undefined on a deployment without
+ * ClickHouse — the ledger is the only store spend accrues in, so a route
+ * that reaches this surface with no repository has no figures to report.
+ * Resolved per call, not at module scope, so every route shares the one
+ * instance `getApp()` hands out instead of each minting its own (#6248).
+ */
+function requireSpendEventsService(): GatewaySpendEventsService {
+  const repository = getApp().gateway.spendEvents;
+  if (!repository) throw new ClickHouseUnavailableError();
+  return new GatewaySpendEventsService(repository);
+}
 
 /**
  * The billing reconciliation surface rides the webhook platform's plan flag
@@ -71,21 +93,38 @@ async function requireBillingPlan(c: Context, next: Next): Promise<void> {
   await next();
 }
 
+/**
+ * One end of a read window, in milliseconds.
+ *
+ * The unit is published rather than left to the reader: seconds and
+ * milliseconds are both plausible for a bare integer, and a caller who picks
+ * the wrong one gets a valid-looking response over the wrong window instead of
+ * an error. An epoch in seconds lands in 1970 and reads as empty.
+ *
+ * Bounded by hand rather than with `.safe()`, which publishes a symmetric
+ * minimum of -9007199254740991 and so documents a negative epoch as
+ * acceptable while the server refuses it.
+ */
+const epochMs = z.coerce
+  .number()
+  .int()
+  .positive()
+  .max(Number.MAX_SAFE_INTEGER)
+  .openapi({
+    description:
+      "Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error.",
+    example: 1782864000000,
+  });
+
 const spendEventsQuerySchema = z
   .object({
     // The reconciliation pull is a RANGED read by contract: without bounds
     // the walk sorts the whole 13-month table under FINAL on every page.
-    from: z.coerce.number().int().positive().safe(),
-    to: z.coerce.number().int().positive().safe(),
+    from: epochMs,
+    to: epochMs,
     cursor: z.string().max(500).optional(),
     limit: z.coerce.number().int().positive().max(200).optional().default(50),
-    virtual_key_id: z.string().min(1).max(100).optional(),
-    end_user_id: z.string().min(1).max(256).optional(),
-    project_id: z.string().min(1).max(100).optional(),
-    model: z.string().min(1).max(200).optional(),
-    status: z
-      .enum(["success", "error", "admitted", "confirmed", "failed", "settled"])
-      .optional(),
+    ...spendFilterQueryShape,
   })
   .refine((q) => q.from <= q.to, {
     message: "from must be less than or equal to to",
@@ -103,24 +142,6 @@ const endUserSpendQuerySchema = z.object({
   to: z.coerce.number().int().positive().optional(),
   virtual_key_id: z.string().min(1).max(100).optional(),
 });
-
-/** The org's project ids, optionally narrowed to one the caller asked for. */
-async function orgTenantIds(
-  organizationId: string,
-  projectId?: string,
-): Promise<string[]> {
-  // Ordered so downstream client routing by the first tenant is stable.
-  const projects = await prisma.project.findMany({
-    where: { team: { organizationId } },
-    select: { id: true },
-    orderBy: { id: "asc" },
-  });
-  const ids = projects.map((p) => p.id);
-  if (projectId !== undefined) {
-    return ids.includes(projectId) ? [projectId] : [];
-  }
-  return ids;
-}
 
 // ── Response DTO schemas (used by describeRoute for OpenAPI gen) ────────
 // These mirror the shapes the handlers below return. Without them the
@@ -154,7 +175,13 @@ const costSchema = z.object({
 const nextCursorSchema = z.string().nullable();
 
 const spendSummaryRowSchema = z.object({
+  /** The first grouping dimension's value, unchanged from when a rollup could
+   *  only be grouped one way. Read `group` to tell two dimensions apart. */
   key: z.string(),
+  /** Every grouping dimension by name, e.g. `{ "model": "gpt-5-mini" }`. */
+  group: z.record(z.string()),
+  /** Start of the time bucket in the requested timezone, null when unbucketed. */
+  bucket_start: z.string().nullable(),
   event_count: z.number().int(),
   settled_count: z.number().int(),
   usage: usageSchema,
@@ -247,15 +274,125 @@ const secured = createOrgApp({
 
 secured.hono.onError(handleGatewaySpendApiError);
 
-const spendSummariesQuerySchema = z.object({
-  group_by: z.enum(["virtual_key", "end_user"]),
-  from: z.coerce.number().int().positive(),
-  to: z.coerce.number().int().positive(),
-  project_id: z.string().min(1).max(100).optional(),
-  cursor: z.string().max(500).optional(),
-  limit: z.coerce.number().int().positive().max(1000).optional().default(500),
-  virtual_key_id: z.string().min(1).max(100).optional(),
-});
+/**
+ * One or two dimensions, comma separated. Two is the ceiling because a third
+ * multiplies the group count past what a single cursor walk serves at a
+ * useful page size, and a caller who wants a third is really asking for the
+ * events read.
+ *
+ * Validated inside the transform rather than piped into an array schema so a
+ * refusal names `group_by` and not `group_by.0`. The caller sent one string;
+ * an index they never wrote maps onto nothing a client can point at, and
+ * `meta.fields` exists precisely so a client can point at something.
+ */
+const groupBySchema = z
+  .string()
+  .transform((raw, ctx): SpendGroupByKey[] => {
+    const keys = raw.split(",").map((part) => part.trim());
+    const refuse = (message: string): typeof z.NEVER => {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+      return z.NEVER;
+    };
+    const unknown = keys.filter(
+      (key) => !SPEND_GROUP_BY_KEYS.includes(key as SpendGroupByKey),
+    );
+    if (unknown.length > 0) {
+      return refuse(
+        `group_by must name one or two of ${SPEND_GROUP_BY_KEYS.join(", ")}`,
+      );
+    }
+    if (keys.length > MAX_GROUP_BY_KEYS) {
+      return refuse(`group_by takes at most ${MAX_GROUP_BY_KEYS} dimensions`);
+    }
+    if (new Set(keys).size !== keys.length) {
+      return refuse("group_by cannot repeat a dimension");
+    }
+    return keys as SpendGroupByKey[];
+  })
+  .openapi({
+    description: `One or two dimensions, comma separated: ${SPEND_GROUP_BY_KEYS.join(", ")}. A dimension may not repeat. Each row's \`key\` is the first dimension's value and \`group\` names them all, so two rows may share a key.`,
+    example: "model,end_user",
+  });
+
+/** What a query string may say for yes and for no. Compared case-folded. */
+const QUERY_BOOLEAN_TRUE = ["true", "1", "yes"];
+const QUERY_BOOLEAN_FALSE = ["false", "0", "no", ""];
+
+/**
+ * A boolean spelled in a query string.
+ *
+ * `z.coerce.boolean()` is JavaScript `Boolean()`, so every non-empty string is
+ * true and `allow_unstable=false` would turn the guard OFF. The most obvious
+ * way to spell "off" must not mean "on", and a spelling this does not know is
+ * refused by name rather than guessed at.
+ *
+ * Case is folded because the caller's HTTP library picks it, not the caller:
+ * `requests` renders a Python `True` as `True`, `httpx` renders it as `true`.
+ * This parameter is documented for Python, so refusing `True` would reject the
+ * exact request our own documentation asks that caller to make.
+ */
+const queryBoolean = z
+  .string()
+  .optional()
+  .default("false")
+  .transform((raw, ctx): boolean | typeof z.NEVER => {
+    const spelling = raw.toLowerCase();
+    if (QUERY_BOOLEAN_TRUE.includes(spelling)) return true;
+    if (QUERY_BOOLEAN_FALSE.includes(spelling)) return false;
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `must be one of ${[...QUERY_BOOLEAN_TRUE, ...QUERY_BOOLEAN_FALSE.filter(Boolean)].join(", ")}`,
+    });
+    return z.NEVER;
+  })
+  .openapi({
+    description: [
+      `${QUERY_BOOLEAN_TRUE.join(", ")} for yes;`,
+      `${QUERY_BOOLEAN_FALSE.filter(Boolean).join(", ")} or omitted for no.`,
+      "Case does not matter, so a Python True is accepted as sent.",
+    ].join(" "),
+    example: "true",
+  });
+
+const spendSummariesQuerySchema = z
+  .object({
+    group_by: groupBySchema,
+    bucket: z.enum(SPEND_BUCKETS).optional().default("none"),
+    // An IANA zone, because a day boundary is the caller's local midnight and
+    // re-bucketing UTC days afterwards cannot recover the requests that fell
+    // on the other side of it. Checked here so an unknown zone is a 400 that
+    // names the parameter rather than a ClickHouse error the caller cannot act
+    // on.
+    timezone: z
+      .string()
+      .min(1)
+      .max(64)
+      .refine(isIanaTimeZone, {
+        message: "timezone must be an IANA zone name, e.g. Europe/Amsterdam",
+      })
+      .optional()
+      .default("UTC"),
+    allow_unstable: queryBoolean,
+    from: epochMs,
+    to: epochMs,
+    cursor: z.string().max(500).optional(),
+    limit: z.coerce.number().int().positive().max(1000).optional().default(500),
+    ...spendFilterQueryShape,
+    // The one filter this read narrows further than /spend-events does. A
+    // rollup excludes in-flight rows from every sum, so accepting `admitted`
+    // would answer a real question with a confident zero. The refusal names
+    // the parameter, so a caller can act on it, and the events read still
+    // serves those envelopes.
+    status: spendSummaryStatusFilter
+      .optional()
+      .openapi({ description: SPEND_SUMMARY_STATUS_DESCRIPTION }),
+  })
+  // An inverted window is an empty window, so a caller who swapped the two
+  // reads a confident zero and reconciles against it. /spend-events has
+  // refused this since it shipped; this surface answered instead.
+  .refine((q) => q.from <= q.to, {
+    message: "from must be less than or equal to to",
+  });
 
 secured.access(requires("gatewaySpend:view")).get(
   "/spend-summaries",
@@ -270,34 +407,65 @@ secured.access(requires("gatewaySpend:view")).get(
     ),
     tags: ["Gateway Spend"],
     summary: "List spend summaries",
-    description:
-      "Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more.",
+    description: SPEND_SUMMARIES_DESCRIPTION,
   }),
   zValidator("query", spendSummariesQuerySchema),
   async (c) => {
     const organization = c.get("organization") as Organization;
     const query = c.req.valid("query");
     // Same contract as /spend-events: a present-but-garbled cursor is refused
-    // rather than silently restarting the walk from the first key.
-    if (
-      query.cursor !== undefined &&
-      decodeSpendSummariesCursor(query.cursor) === null
-    ) {
-      throw new BadRequestError("Invalid cursor.");
+    // rather than silently restarting the walk from the first key. A cursor
+    // that decodes but names a different number of dimensions is refused for
+    // the same reason: it belongs to a walk over another shape, and carrying
+    // on without it would re-serve the first page under a fresh cursor with
+    // nothing in the response to say the walk had reset. That reaches a
+    // caller who changed `group_by` or `bucket` mid-walk, and a caller
+    // holding a cursor minted before a rollup could group by two dimensions.
+    if (query.cursor !== undefined) {
+      const parts = decodeSpendSummariesCursor(query.cursor);
+      const dimensionCount =
+        query.group_by.length + (query.bucket === "none" ? 0 : 1);
+      if (parts === null) {
+        throw new BadRequestError("Invalid cursor.");
+      }
+      if (parts.length !== dimensionCount) {
+        throw new BadRequestError(
+          "This cursor belongs to a walk over a different grouping. Start a new walk without a cursor.",
+        );
+      }
     }
-    const tenantIds = await orgTenantIds(organization.id, query.project_id);
-    const page = await spendEvents.readSpendSummaries({
-      tenantIds,
+    assertGroupingIsWalkable({
+      keys: query.group_by,
+      bucket: query.bucket,
+      toMs: query.to,
+      nowMs: Date.now(),
+      allowUnstable: query.allow_unstable,
+    });
+    const scope = await resolveSpendScope({
+      organizationId: organization.id,
+      projectIds: query.project_id,
+      teamIds: query.team_id,
+      externalIds: query.external_id,
+    });
+    const page = await requireSpendEventsService().getSpendSummaries({
+      tenantIds: scope.tenantIds,
       groupBy: query.group_by,
+      bucket: query.bucket,
+      timezone: query.timezone,
       fromMs: query.from,
       toMs: query.to,
       cursor: query.cursor ?? null,
       limit: query.limit,
-      virtualKeyId: query.virtual_key_id,
+      filters: spendFiltersFromQuery({
+        query,
+        overrides: { virtualKeyIds: scope.virtualKeyIds },
+      }),
     });
     return c.json({
       data: page.rows.map((r) => ({
         key: r.key,
+        group: r.group,
+        bucket_start: r.bucketStart,
         event_count: r.eventCount,
         settled_count: r.settledCount,
         usage: {
@@ -338,17 +506,22 @@ secured.access(requires("gatewaySpend:view")).get(
     if (query.cursor !== undefined && !decodeSpendEventsCursor(query.cursor)) {
       throw new BadRequestError("Invalid cursor.");
     }
-    const tenantIds = await orgTenantIds(organization.id, query.project_id);
-    const page = await spendEvents.walkSpendEvents({
-      tenantIds,
+    const scope = await resolveSpendScope({
+      organizationId: organization.id,
+      projectIds: query.project_id,
+      teamIds: query.team_id,
+      externalIds: query.external_id,
+    });
+    const page = await requireSpendEventsService().walkSpendEvents({
+      tenantIds: scope.tenantIds,
       fromMs: query.from,
       toMs: query.to,
       cursor: query.cursor ?? null,
       limit: query.limit,
-      virtualKeyId: query.virtual_key_id,
-      endUserId: query.end_user_id,
-      model: query.model,
-      status: query.status,
+      filters: spendFiltersFromQuery({
+        query,
+        overrides: { virtualKeyIds: scope.virtualKeyIds },
+      }),
     });
     return c.json({
       data: page.rows.map(spendRowToEnvelope),
@@ -377,16 +550,25 @@ secured.access(requires("gatewaySpend:view")).get(
     const now = Date.now();
     const fromMs = query.from ?? now - END_USER_WINDOWS[query.window];
     const toMs = query.to ?? now;
-    const tenantIds = await orgTenantIds(organization.id);
-    const rollup = await spendEvents.readEndUserSpend({
+    const { tenantIds } = await resolveSpendScope({
+      organizationId: organization.id,
+    });
+    const rollup = await requireSpendEventsService().getEndUserSpend({
       tenantIds,
       endUserId,
       fromMs,
       toMs,
       virtualKeyId: query.virtual_key_id,
     });
+    const budgetRepository = getApp().gateway.budgets;
+    if (!budgetRepository) {
+      // The ledger is the only store spend accrues in, so without ClickHouse
+      // there are no figures to report against these caps.
+      throw new ClickHouseUnavailableError();
+    }
     const caps = await applicableEndUserCaps({
       prisma,
+      budgetRepository,
       organizationId: organization.id,
       endUserId,
       tenantIds,
@@ -568,13 +750,13 @@ secured.access(requires("gatewaySpend:manage")).post(
       );
     }
 
+    const webhookEventsRepository = getApp().gateway.webhookEvents;
+    if (!webhookEventsRepository) {
+      throw new ClickHouseUnavailableError();
+    }
     const events = new WebhookEventsService({
       prisma,
-      repository: new WebhookEventsClickHouseRepository(async (tenantId) => {
-        const client = await getClickHouseClientForProject(tenantId);
-        if (!client) throw new Error("ClickHouse is not configured");
-        return client;
-      }),
+      repository: webhookEventsRepository,
     });
     const deliveryDeps: WebhookDeliveryProcessDeps = {
       processStore: new PrismaProcessStore(prisma),

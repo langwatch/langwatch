@@ -23,6 +23,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { resetApp } from "~/server/app-layer/app";
 import {
   AGGREGATE_TYPE,
   assertOverThreshold,
@@ -52,6 +53,10 @@ import type { Span, Trace } from "~/server/tracer/types";
 import { openProtections } from "~/server/traces/__tests__/open-protections";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
+import {
+  clearClickHouseTestApp,
+  installClickHouseTestApp,
+} from "~/test-utils/clickhouseTestApp";
 
 // Gate identically to the canonical event_log integration tests: skip unless a
 // real ClickHouse is reachable, run against the testcontainer otherwise.
@@ -334,6 +339,16 @@ describe.skipIf(!hasTestcontainers)(
       vi.mocked(
         clickhouseClientModule.getClickHouseClientForProject,
       ).mockResolvedValue(client);
+
+      // buildTraceBlobResolutionDeps()'s no-arg call — the exact shape the
+      // production routers use — now takes its default resolver from
+      // getApp().clickhouse, so this test needs a real App singleton whose
+      // resolver dials the same (mocked) testcontainer client above.
+      await resetApp();
+      installClickHouseTestApp({
+        resolveClient: (tenantId) =>
+          clickhouseClientModule.getClickHouseClientForProject(tenantId),
+      });
     }, 60_000);
 
     afterAll(async () => {
@@ -345,6 +360,7 @@ describe.skipIf(!hasTestcontainers)(
           });
         }
       }
+      await clearClickHouseTestApp();
       await stopTestContainers();
     });
 

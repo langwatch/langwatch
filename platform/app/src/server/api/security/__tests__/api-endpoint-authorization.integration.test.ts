@@ -117,13 +117,13 @@ describe("API router endpoint authorization guarantee", () => {
   // both under one policy made the registry lie about what is actually open to
   // the internet. Pin the policies separately so a future edit can't quietly
   // re-merge them.
-  describe("when the GitHub OAuth endpoints are registered", () => {
-    it("treats /github-langy/install as handler-managed and /github-langy/setup as public", () => {
+  describe("when the GitHub connection endpoints are registered", () => {
+    it("treats /github/install as handler-managed and /github/setup as public", () => {
       const byPath = new Map(
         allRegisteredRoutes().map((r) => [`${r.method} ${r.path}`, r.policy]),
       );
-      const install = byPath.get("GET /api/github-langy/install");
-      const setup = byPath.get("GET /api/github-langy/setup");
+      const install = byPath.get("GET /api/github/install");
+      const setup = byPath.get("GET /api/github/setup");
       expect(install, "/install must be registered").toBeDefined();
       expect(setup, "/setup must be registered").toBeDefined();
       expect(install?.kind).toBe("handlerManaged");

@@ -1,3 +1,4 @@
+import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import { LambdaClient } from "@aws-sdk/client-lambda";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -30,6 +31,12 @@ describe("getProjectLambdaArn", () => {
 
   beforeEach(async () => {
     setConfig("123456789012.dkr.ecr.us-east-1.amazonaws.com/test:latest");
+    // Creating a project Lambda also provisions its log group. Stubbed so the
+    // suite never reaches the network, which otherwise costs a real AWS
+    // round trip per create-path test and fails noisily without credentials.
+    vi.spyOn(CloudWatchLogsClient.prototype as any, "send").mockResolvedValue(
+      {},
+    );
     await clearLambdaArnCache();
   });
 

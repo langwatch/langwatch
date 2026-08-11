@@ -1,5 +1,5 @@
 import { sharedFiltersInputSchema } from "../../../analytics/types";
-import { getAnalyticsService } from "../../../app-layer/analytics";
+import { getApp } from "../../../app-layer/app";
 import { checkProjectPermission } from "../../rbac";
 import { protectedProcedure } from "../../trpc";
 
@@ -10,7 +10,7 @@ export const feedbacks = protectedProcedure
   .input(sharedFiltersInputSchema)
   .use(checkProjectPermission("cost:view"))
   .query(async ({ input }) => {
-    const analyticsService = getAnalyticsService();
+    const analyticsService = getApp().analytics.service;
     return analyticsService.getFeedbacks(
       input.projectId,
       input.startDate,

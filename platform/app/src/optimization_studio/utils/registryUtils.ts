@@ -1,5 +1,5 @@
-import { evaluatorTempNameMap } from "../../components/checks/EvaluatorSelection";
 import type { useAvailableEvaluators } from "../../hooks/useAvailableEvaluators";
+import { evaluatorDisplayName } from "../../server/evaluations/evaluatorDisplayNames";
 import type { EvaluatorTypes } from "../../server/evaluations/evaluators";
 import type { Evaluator, Field } from "../types/dsl";
 
@@ -98,9 +98,7 @@ export const buildEvaluatorFromType = (
   return {
     cls: "LangWatchEvaluator",
     evaluator: evaluatorType,
-    name: (evaluatorTempNameMap[definition.name] ?? definition.name)
-      .replace("Evaluator", "")
-      .trim(),
+    name: evaluatorDisplayName(definition.name).replace("Evaluator", "").trim(),
     description: definition.description,
     inputs,
     outputs,

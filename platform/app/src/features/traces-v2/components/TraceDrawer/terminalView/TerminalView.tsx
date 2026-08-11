@@ -291,7 +291,12 @@ export const TerminalView = memo(function TerminalView({
     () => modelAt(entries, trackedFullIndex) ?? banner?.model ?? null,
     [entries, trackedFullIndex, banner?.model],
   );
-  const trackedStep = Math.max(0, visibleIndices.indexOf(trackedFullIndex)) + 1;
+  // An agent that reported usage but no content has entries and no beats to
+  // walk, which read as "step 1/0" while standing on nothing.
+  const trackedStep =
+    visibleIndices.length === 0
+      ? 0
+      : Math.max(0, visibleIndices.indexOf(trackedFullIndex)) + 1;
 
   if (entries.length === 0) {
     return (

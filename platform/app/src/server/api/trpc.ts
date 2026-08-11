@@ -835,6 +835,12 @@ function handledErrorToTRPCCode(error: HandledError): TRPCError["code"] {
   const map: Partial<Record<number, TRPCError["code"]>> = {
     400: "BAD_REQUEST",
     401: "UNAUTHORIZED",
+    // tRPC v10 has no PAYMENT_REQUIRED. FORBIDDEN is what the tRPC-side
+    // enterprise guard (`requireEnterprisePlan`) already answers for the same
+    // refusal, so a 402 handled error crossing this boundary reads the same
+    // as that guard rather than as a server fault. The domain status survives
+    // as `data.error.httpStatus`, and the client keys its copy off `code`.
+    402: "FORBIDDEN",
     403: "FORBIDDEN",
     404: "NOT_FOUND",
     409: "CONFLICT",

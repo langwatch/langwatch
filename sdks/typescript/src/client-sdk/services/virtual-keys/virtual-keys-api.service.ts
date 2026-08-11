@@ -42,10 +42,19 @@ export interface VirtualKey {
   display_prefix: string;
   principal_user_id: string | null;
   /**
-   * Where an org- or team-owned key's traces and costs land. Not a
-   * scope: it grants no access to the key.
+   * Where this key's traces and costs land. Not a scope: it grants no
+   * access to the key. Decided when the key is written and stored on it,
+   * so editing what the key is scoped to never moves it. Null only on a
+   * key created before this was stored, in an organization that had no
+   * governance project to fall back to.
    */
   trace_project_id: string | null;
+  /**
+   * True when the project in `trace_project_id` has been deleted. The key
+   * goes on sending its traces there, so the data stays whole and
+   * reappears if the project is restored, and traffic is never refused.
+   */
+  trace_project_archived: boolean;
   scopes: VirtualKeyScope[];
   routing_policy_id: string | null;
   routing_mode: VirtualKeyRoutingMode;

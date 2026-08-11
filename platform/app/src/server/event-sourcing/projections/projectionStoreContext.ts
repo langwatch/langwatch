@@ -97,4 +97,10 @@ export interface ProjectionStoreContext {
    * or a later attempt re-applies the batch the first attempt already folded.
    */
   deliveryAttempt?: number;
+  /**
+   * True when this commit belongs to a later sub-batch of the same locked
+   * dispatch whose earlier sub-batch already committed (batch bisection). The
+   * applied-event-id set must be extended, not replaced (#6578).
+   */
+  isDeliveryContinuation?: boolean;
 }

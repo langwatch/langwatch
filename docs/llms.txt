@@ -636,6 +636,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [List all non-archived datasets for the project](https://langwatch.ai/docs/api-reference/datasets/list-dataset.md)
 - [Create a new dataset](https://langwatch.ai/docs/api-reference/datasets/create-dataset.md)
 - [Start a direct browser→S3 dataset upload](https://langwatch.ai/docs/api-reference/datasets/create-direct-upload.md)
+- [Evaluate a dataset](https://langwatch.ai/docs/api-reference/datasets/evaluate-a-dataset.md)
 - [Create a new dataset from an uploaded file](https://langwatch.ai/docs/api-reference/datasets/create-upload.md)
 - [Get a dataset by its slug or id](https://langwatch.ai/docs/api-reference/datasets/get-dataset.md)
 - [List records for a dataset](https://langwatch.ai/docs/api-reference/datasets/get-records.md)
@@ -685,14 +686,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ### RAG Quality
 
-- [Ragas Answer Correctness](https://langwatch.ai/docs/api-reference/evaluators/ragas-answer-correctness.md)
-- [Ragas Answer Relevancy](https://langwatch.ai/docs/api-reference/evaluators/ragas-answer-relevancy.md)
-- [Ragas Context Precision](https://langwatch.ai/docs/api-reference/evaluators/ragas-context-precision.md)
-- [Ragas Context Recall](https://langwatch.ai/docs/api-reference/evaluators/ragas-context-recall.md)
-- [Ragas Context Relevancy](https://langwatch.ai/docs/api-reference/evaluators/ragas-context-relevancy.md)
-- [Ragas Context Utilization](https://langwatch.ai/docs/api-reference/evaluators/ragas-context-utilization.md)
 - [Ragas Faithfulness](https://langwatch.ai/docs/api-reference/evaluators/ragas-faithfulness.md)
-- [Ragas Faithfulness 1](https://langwatch.ai/docs/api-reference/evaluators/ragas-faithfulness-1.md)
 - [Ragas Response Context Precision](https://langwatch.ai/docs/api-reference/evaluators/ragas-response-context-precision.md)
 - [Ragas Response Context Recall](https://langwatch.ai/docs/api-reference/evaluators/ragas-response-context-recall.md)
 - [Ragas Response Relevancy](https://langwatch.ai/docs/api-reference/evaluators/ragas-response-relevancy.md)
@@ -717,6 +711,26 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Competitor Blocklist](https://langwatch.ai/docs/api-reference/evaluators/competitor-blocklist.md)
 - [Competitor Allowlist Check](https://langwatch.ai/docs/api-reference/evaluators/competitor-allowlist-check.md)
 - [Competitor Llm Check](https://langwatch.ai/docs/api-reference/evaluators/competitor-llm-check.md)
+
+## Evaluations
+
+- [Overview](https://langwatch.ai/docs/api-reference/evaluations/overview.md): Run an evaluator over a single input and get its score back, or run it as a guardrail and gate on one boolean. List the built-in evaluators to see which ids you can address and what each one needs.
+- [List the built-in evaluators](https://langwatch.ai/docs/api-reference/evaluations/list-the-built-in-evaluators.md)
+- [Run an evaluator](https://langwatch.ai/docs/api-reference/evaluations/run-an-evaluator.md)
+- [Run a namespaced evaluator](https://langwatch.ai/docs/api-reference/evaluations/run-a-namespaced-evaluator.md)
+- [Run an evaluator as a guardrail](https://langwatch.ai/docs/api-reference/evaluations/run-an-evaluator-as-a-guardrail.md)
+- [Report batch evaluation results](https://langwatch.ai/docs/api-reference/evaluations/report-batch-evaluation-results.md)
+
+## Experiments
+
+- [Overview](https://langwatch.ai/docs/api-reference/experiments/overview.md): Create experiments, run them, and read their results over HTTP. Create an experiment against a slug you choose, start a run, then poll it and pull the per-row results. This is the same surface the SDKs use, so anything they do you can do directly.
+- [Create an experiment](https://langwatch.ai/docs/api-reference/experiments/create-an-experiment.md)
+- [List experiments for the project](https://langwatch.ai/docs/api-reference/experiments/list-experiments-for-the-project.md)
+- [Run an experiment](https://langwatch.ai/docs/api-reference/experiments/run-an-experiment.md)
+- [List runs of an experiment](https://langwatch.ai/docs/api-reference/experiments/list-runs-of-an-experiment.md)
+- [Poll a run](https://langwatch.ai/docs/api-reference/experiments/poll-a-run.md)
+- [Read run results](https://langwatch.ai/docs/api-reference/experiments/read-run-results.md)
+- [Report DSPy optimizer steps](https://langwatch.ai/docs/api-reference/experiments/report-dspy-optimizer-steps.md)
 
 ## Monitors
 
@@ -798,14 +812,27 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Update an agent by its id](https://langwatch.ai/docs/api-reference/agents/update-agents.md)
 - [Archive an agent](https://langwatch.ai/docs/api-reference/agents/delete-agents.md)
 
+## Coding Agents
+
+- [Overview](https://langwatch.ai/docs/api-reference/coding-agents/overview.md): Read what a coding agent session did and what it cost. Walk one session's events call by call, with the tokens, cost and compactions of each, or roll a whole pull request up into sessions, tokens and cost per project, user and agent.
+- [Get pull request coding agent usage](https://langwatch.ai/docs/api-reference/coding-agents/get-pull-request-coding-agent-usage.md)
+- [List coding agent session events](https://langwatch.ai/docs/api-reference/coding-agents/list-coding-agent-session-events.md)
+
 ## Triggers
 
 - [Overview](https://langwatch.ai/docs/api-reference/triggers/overview.md): Manage automation triggers that fire actions based on trace events. Create Slack notifications, webhooks, and other automated responses.
 - [List all active triggers](https://langwatch.ai/docs/api-reference/triggers/list-triggers.md)
+- [Create a Slack alert trigger](https://langwatch.ai/docs/api-reference/triggers/create-a-slack-alert-trigger.md)
 - [Create a new trigger](https://langwatch.ai/docs/api-reference/triggers/create-triggers.md)
 - [Get a trigger by its ID](https://langwatch.ai/docs/api-reference/triggers/get-triggers.md)
 - [Update a trigger](https://langwatch.ai/docs/api-reference/triggers/update-triggers.md)
 - [Delete a trigger](https://langwatch.ai/docs/api-reference/triggers/delete-triggers.md)
+
+## Events
+
+- [Overview](https://langwatch.ai/docs/api-reference/events/overview.md): Record customer events against a trace or thread, so behaviour like a thumbs-up, a conversion or a refund sits alongside the trace that produced it.
+- [Record a user event](https://langwatch.ai/docs/api-reference/events/create-track.md)
+- [Track an event (legacy path)](https://langwatch.ai/docs/api-reference/events/track-an-event-legacy-path.md)
 
 ## Workflows
 
@@ -813,7 +840,10 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [List all non-archived workflows for the project](https://langwatch.ai/docs/api-reference/workflows/list-workflows.md)
 - [Get a workflow by its ID](https://langwatch.ai/docs/api-reference/workflows/get-workflows.md)
 - [Update a workflow's metadata](https://langwatch.ai/docs/api-reference/workflows/update-workflows.md)
+- [Run a workflow version (legacy path)](https://langwatch.ai/docs/api-reference/workflows/run-a-workflow-version-legacy-path.md)
 - [Create Evaluate](https://langwatch.ai/docs/api-reference/workflows/action-evaluate.md)
+- [Run a specific workflow version](https://langwatch.ai/docs/api-reference/workflows/run-a-specific-workflow-version.md)
+- [Run a workflow](https://langwatch.ai/docs/api-reference/workflows/run-a-workflow.md)
 - [Archive a workflow](https://langwatch.ai/docs/api-reference/workflows/delete-workflows.md)
 
 ## Dashboards
@@ -838,6 +868,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Analytics
 
 - [Overview](https://langwatch.ai/docs/api-reference/analytics/overview.md): Query analytics timeseries data with metrics, aggregations, and filters.
+- [Query analytics timeseries (legacy path)](https://langwatch.ai/docs/api-reference/analytics/query-analytics-timeseries-legacy-path.md)
 - [Create Timeseries](https://langwatch.ai/docs/api-reference/analytics/create-timeseries.md)
 
 ## Secrets
@@ -861,7 +892,9 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [List projects](https://langwatch.ai/docs/api-reference/projects/list-projects.md)
 - [Create project](https://langwatch.ai/docs/api-reference/projects/create-project.md)
 - [Get project](https://langwatch.ai/docs/api-reference/projects/get-project.md)
+- [Get project API key](https://langwatch.ai/docs/api-reference/projects/get-api-key.md)
 - [Update project](https://langwatch.ai/docs/api-reference/projects/update-project.md)
+- [Regenerate project API key](https://langwatch.ai/docs/api-reference/projects/regenerate-api-key.md)
 - [Archive project](https://langwatch.ai/docs/api-reference/projects/archive-project.md)
 
 ## Teams
@@ -892,11 +925,86 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Remove group binding](https://langwatch.ai/docs/api-reference/groups/remove-binding.md)
 - [Remove group member](https://langwatch.ai/docs/api-reference/groups/remove-member.md)
 
+## Organization
+
+- [Overview](https://langwatch.ai/docs/api-reference/organization/overview.md): Read and update the organization the calling credential belongs to: its name, support contact, presence and trace sharing settings, and its stored-object storage.
+- [Get organization](https://langwatch.ai/docs/api-reference/organization/get-organization.md)
+- [Update organization](https://langwatch.ai/docs/api-reference/organization/update-organization.md)
+
+## Members
+
+- [Overview](https://langwatch.ai/docs/api-reference/members/overview.md): Manage the people in the organization: list them, read one with the teams they reach, change an organization role, disable or re-enable access, remove someone, and read the full breakdown of what a member can reach.
+- [List members](https://langwatch.ai/docs/api-reference/members/list-members.md)
+- [Get member](https://langwatch.ai/docs/api-reference/members/get-member.md)
+- [Get member access](https://langwatch.ai/docs/api-reference/members/get-member-access.md)
+- [Update member](https://langwatch.ai/docs/api-reference/members/update-member.md)
+- [Remove member](https://langwatch.ai/docs/api-reference/members/remove-member.md)
+
+## Invites
+
+- [Overview](https://langwatch.ai/docs/api-reference/invites/overview.md): Invite people into the organization in batches, with the teams and roles they land on, and list or revoke the invites still waiting to be accepted.
+- [List invites](https://langwatch.ai/docs/api-reference/invites/list-invites.md)
+- [Create invites](https://langwatch.ai/docs/api-reference/invites/create-invites.md)
+- [Revoke invite](https://langwatch.ai/docs/api-reference/invites/revoke-invite.md)
+
+## Roles
+
+- [Overview](https://langwatch.ai/docs/api-reference/roles/overview.md): Build custom roles out of the permission catalog and keep them up to date. A role is a named set of resource and action permissions that a role binding then grants to someone, somewhere.
+- [List permissions](https://langwatch.ai/docs/api-reference/roles/list-permissions.md)
+- [List roles](https://langwatch.ai/docs/api-reference/roles/list-roles.md)
+- [Create role](https://langwatch.ai/docs/api-reference/roles/create-role.md)
+- [Get role](https://langwatch.ai/docs/api-reference/roles/get-role.md)
+- [Update role](https://langwatch.ai/docs/api-reference/roles/update-role.md)
+- [Delete role](https://langwatch.ai/docs/api-reference/roles/delete-role.md)
+
+## Role Bindings
+
+- [Overview](https://langwatch.ai/docs/api-reference/role-bindings/overview.md): Grant a role to one principal, a user, a group or an API key, at one scope: the organization, a team, or a single project.
+- [List role bindings](https://langwatch.ai/docs/api-reference/role-bindings/list-role-bindings.md)
+- [Create role binding](https://langwatch.ai/docs/api-reference/role-bindings/create-role-binding.md)
+- [Update role binding](https://langwatch.ai/docs/api-reference/role-bindings/update-role-binding.md)
+- [Delete role binding](https://langwatch.ai/docs/api-reference/role-bindings/delete-role-binding.md)
+
+## SCIM Tokens
+
+- [Overview](https://langwatch.ai/docs/api-reference/scim-tokens/overview.md): Mint, list and revoke the bearer tokens an identity provider uses to reach the SCIM endpoints. Token values are shown once, when they are created, and never again.
+- [List SCIM tokens](https://langwatch.ai/docs/api-reference/scim-tokens/list-scim-tokens.md)
+- [Create SCIM token](https://langwatch.ai/docs/api-reference/scim-tokens/create-scim-token.md)
+- [Revoke SCIM token](https://langwatch.ai/docs/api-reference/scim-tokens/revoke-scim-token.md)
+
+## SCIM
+
+- [Overview](https://langwatch.ai/docs/api-reference/scim/overview.md): The SCIM 2.0 endpoints an identity provider calls to provision and deprovision users and groups in LangWatch.
+- [Get the SCIM service provider configuration](https://langwatch.ai/docs/api-reference/scim/service-provider-config.md)
+- [List the SCIM resource types](https://langwatch.ai/docs/api-reference/scim/resource-types.md)
+- [List the SCIM resource schemas](https://langwatch.ai/docs/api-reference/scim/schemas.md)
+- [List provisioned users](https://langwatch.ai/docs/api-reference/scim/list-users.md)
+- [Provision a user](https://langwatch.ai/docs/api-reference/scim/create-user.md)
+- [Get a provisioned user](https://langwatch.ai/docs/api-reference/scim/get-user.md)
+- [Replace a provisioned user](https://langwatch.ai/docs/api-reference/scim/replace-user.md)
+- [Update a provisioned user](https://langwatch.ai/docs/api-reference/scim/update-user.md)
+- [Deprovision a user](https://langwatch.ai/docs/api-reference/scim/delete-user.md)
+- [List provisioned groups](https://langwatch.ai/docs/api-reference/scim/list-groups.md)
+- [Provision a group](https://langwatch.ai/docs/api-reference/scim/create-group.md)
+- [Get a provisioned group](https://langwatch.ai/docs/api-reference/scim/get-group.md)
+- [Replace a provisioned group](https://langwatch.ai/docs/api-reference/scim/replace-group.md)
+- [Update a provisioned group](https://langwatch.ai/docs/api-reference/scim/update-group.md)
+- [Deprovision a group](https://langwatch.ai/docs/api-reference/scim/delete-group.md)
+
+## Organizations (Self-Hosted)
+
+- [Overview](https://langwatch.ai/docs/api-reference/organizations/overview.md): Create organizations on a self-hosted instance with an instance administrator credential, and read the ones already there.
+- [List organizations](https://langwatch.ai/docs/api-reference/organizations/list-organizations.md)
+- [Create an organization](https://langwatch.ai/docs/api-reference/organizations/create-organization.md)
+- [Get an organization](https://langwatch.ai/docs/api-reference/organizations/get-organization.md)
+
 ## API Keys
 
 - [Overview](https://langwatch.ai/docs/api-reference/api-keys/overview.md): Create and manage API keys programmatically. Supports personal keys (user-scoped) and service keys (project-scoped, for automation).
 - [List API keys](https://langwatch.ai/docs/api-reference/api-keys/list-api-keys.md)
 - [Create API key](https://langwatch.ai/docs/api-reference/api-keys/create-api-key.md)
+- [Get an API key](https://langwatch.ai/docs/api-reference/api-keys/get-api-key.md)
+- [Update an API key](https://langwatch.ai/docs/api-reference/api-keys/update-api-key.md)
 - [Revoke API key](https://langwatch.ai/docs/api-reference/api-keys/revoke-api-key.md)
 
 ## Gateway: Virtual Keys

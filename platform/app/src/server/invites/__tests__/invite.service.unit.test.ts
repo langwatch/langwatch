@@ -8,12 +8,16 @@
  * Tests the service in isolation with mocked dependencies.
  */
 
-import { OrganizationUserRole } from "@prisma/client";
+import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PlanProvider } from "../../app-layer/subscription/plan-provider";
 import { LimitExceededError } from "../../license-enforcement/errors";
 import type { ILicenseEnforcementRepository } from "../../license-enforcement/license-enforcement.repository";
-import { classifyInvitesByMemberType, InviteService } from "../invite.service";
+import {
+  classifyInvitesByMemberType,
+  InviteService,
+  resolveInviteTeamMemberships,
+} from "../invite.service";
 
 const { mockSendInviteEmail } = vi.hoisted(() => ({
   mockSendInviteEmail: vi.fn(),
@@ -172,6 +176,153 @@ describe("InviteService", () => {
    * Asserted on `code`, not prose: the sentence a customer reads comes from the
    * presentation registry keyed by that code (ADR-045).
    */
+  describe("createAdminInviteRecord()", () => {
+    describe("when a Lite Member invitation carries team access above Viewer", () => {
+      /** @scenario An invitation cannot carry team access above the invited seat */
+      it("refuses it naming the seat rule", async () => {
+        mockPrisma.organization.findFirst.mockResolvedValue({
+          id: "org-1",
+          name: "ACME",
+        });
+
+        await expect(
+          service.createAdminInviteRecord({
+            email: "new@example.com",
+            role: OrganizationUserRole.EXTERNAL,
+            organizationId: "org-1",
+            teamIds: "team-1",
+            teamAssignments: [{ teamId: "team-1", role: TeamUserRole.ADMIN }],
+          }),
+        ).rejects.toMatchObject({ code: "lite_member_viewer_only" });
+
+        expect(mockPrisma.organizationInvite.create).not.toHaveBeenCalled();
+      });
+
+      /** @scenario An invitation cannot carry team access above the invited seat */
+      it("refuses a custom role the same way", async () => {
+        mockPrisma.organization.findFirst.mockResolvedValue({
+          id: "org-1",
+          name: "ACME",
+        });
+
+        await expect(
+          service.createAdminInviteRecord({
+            email: "new@example.com",
+            role: OrganizationUserRole.EXTERNAL,
+            organizationId: "org-1",
+            teamIds: "team-1",
+            teamAssignments: [
+              {
+                teamId: "team-1",
+                role: TeamUserRole.CUSTOM,
+                customRoleId: "role-1",
+              },
+            ],
+          }),
+        ).rejects.toMatchObject({ code: "lite_member_viewer_only" });
+      });
+    });
+
+    describe("when a Lite Member invitation carries Viewer access", () => {
+      it("lets it through", async () => {
+        mockPrisma.organization.findFirst.mockResolvedValue({
+          id: "org-1",
+          name: "ACME",
+        });
+        mockPrisma.organizationInvite.create.mockResolvedValue({
+          id: "invite-1",
+        });
+
+        await expect(
+          service.createAdminInviteRecord({
+            email: "new@example.com",
+            role: OrganizationUserRole.EXTERNAL,
+            organizationId: "org-1",
+            teamIds: "team-1",
+            teamAssignments: [{ teamId: "team-1", role: TeamUserRole.VIEWER }],
+          }),
+        ).resolves.toMatchObject({ invite: { id: "invite-1" } });
+      });
+    });
+  });
+
+  describe("resolveInviteTeamMemberships()", () => {
+    describe("when a stored Lite Member invitation carries team access above Viewer", () => {
+      /** @scenario An invitation cannot carry team access above the invited seat */
+      it("corrects it to Viewer at acceptance", () => {
+        // Invitations written before the seat ceiling may still promise more;
+        // the seat corrects them the way a seat change corrects stored rows.
+        expect(
+          resolveInviteTeamMemberships({
+            role: OrganizationUserRole.EXTERNAL,
+            teamIds: "",
+            teamAssignments: [
+              {
+                teamId: "team-1",
+                role: TeamUserRole.ADMIN,
+              },
+              {
+                teamId: "team-2",
+                role: TeamUserRole.CUSTOM,
+                customRoleId: "role-1",
+              },
+            ],
+          }),
+        ).toEqual([
+          {
+            teamId: "team-1",
+            role: TeamUserRole.VIEWER,
+            customRoleId: undefined,
+          },
+          {
+            teamId: "team-2",
+            role: TeamUserRole.VIEWER,
+            customRoleId: undefined,
+          },
+        ]);
+      });
+    });
+
+    describe("when a full seat invitation carries team assignments", () => {
+      it("keeps them as stored", () => {
+        expect(
+          resolveInviteTeamMemberships({
+            role: OrganizationUserRole.MEMBER,
+            teamIds: "",
+            teamAssignments: [
+              {
+                teamId: "team-1",
+                role: TeamUserRole.CUSTOM,
+                customRoleId: "role-1",
+              },
+            ],
+          }),
+        ).toEqual([
+          {
+            teamId: "team-1",
+            role: TeamUserRole.CUSTOM,
+            customRoleId: "role-1",
+          },
+        ]);
+      });
+    });
+
+    describe("when the invitation carries only a team id list", () => {
+      it("derives each team role from the seat", () => {
+        expect(
+          resolveInviteTeamMemberships({
+            role: OrganizationUserRole.EXTERNAL,
+            teamIds: "team-1, team-1, team-2",
+            teamAssignments: null,
+          }),
+        ).toEqual([
+          { teamId: "team-1", role: TeamUserRole.VIEWER },
+          { teamId: "team-2", role: TeamUserRole.VIEWER },
+        ]);
+      });
+    });
+  });
+
   describe("assertNotAlreadyMembers()", () => {
     describe("when one of the addresses already belongs to a member", () => {
       /** @scenario "Inviting an existing member is refused with a reason" */

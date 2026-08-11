@@ -1,8 +1,25 @@
+import type { ClickHouseClient } from "@clickhouse/client";
+import type { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import type Stripe from "stripe";
+import type { AnalyticsService } from "~/server/app-layer/analytics/analytics.service";
+import type { InstanceUsageStatsRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
+import type { BillableEventsRepository } from "~/server/event-sourcing/projections/global/repositories/billable-events.clickhouse.repository";
+import type { FilterService } from "~/server/filters/filter.service";
+import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
+import type { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
+import type { OrphanedRunFinder } from "~/server/scenarios/orphaned-run-reconciliation";
+import type { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import type { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import type { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 import type { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
+import type { BillableEventsClickHouseRepository } from "../../../ee/billing/services/billableEvents.clickhouse.repository";
 import type { WebhookService } from "../../../ee/billing/services/webhookService";
+import type { GovernanceKpisClickHouseRepository } from "../../../ee/governance/services/governanceKpis.clickhouse.repository";
+import type { GovernanceOcsfEventsClickHouseRepository } from "../../../ee/governance/services/governanceOcsfEvents.clickhouse.repository";
+import type { GovernanceTraceActivityClickHouseRepository } from "../../../ee/governance/services/governanceTraceActivity.clickhouse.repository";
+import type { PersonalUsageClickHouseRepository } from "../../../ee/governance/services/personalUsage.clickhouse.repository";
+import type { ClickHouseClientResolver } from "../clickhouse/clickhouseClient";
 import type { StorageMeterService } from "../data-retention/metering/storageMeter.service";
 import type { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
 import type { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
@@ -12,6 +29,8 @@ import type { EventSourcing } from "../event-sourcing/eventSourcing";
 import type { AppCommands } from "../event-sourcing/pipelineRegistry";
 import type { ExperimentService } from "../experiments/experiment.service";
 import type { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";
+import type { OpsExplainService } from "../ops/opsExplain.service";
+import type { TraceEditOverlayService } from "../traces/edit-overlay/traceEditOverlay.service";
 import type { EmailSuppressionService } from "./automations/emailSuppression.service";
 import type { TriggerService } from "./automations/trigger.service";
 import type {
@@ -20,15 +39,20 @@ import type {
 } from "./automations/trigger-template.service";
 import type { BroadcastService } from "./broadcast/broadcast.service";
 import type { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
+import type { PullRequestUsageService } from "./coding-agent/pull-request-usage.service";
 import type { AppConfig } from "./config";
 import type { DspyStepService } from "./dspy-steps/dspy-step.service";
 import type { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
 import type { EvaluationRunService } from "./evaluations/evaluation-run.service";
 import type { MonitorPerformanceService } from "./evaluations/monitor-performance.service";
+import type { TraceEvaluationsRepository } from "./evaluations/repositories/trace-evaluations.clickhouse.repository";
+import type { GithubInstallationsService } from "./github/github-installations.service";
+import type { GithubPullRequestMappingService } from "./github/github-pull-request-mapping.service";
+import type { GithubPullRequestStatusService } from "./github/github-pull-request-status.service";
+import type { GithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
 import type { LangyCredentialService } from "./langy/LangyCredentialService";
 import type { LangyConversationService } from "./langy/langy-conversation.service";
 import type { LangyFeedbackPromptService } from "./langy/langy-feedback-prompt.service";
-import type { LangyGithubInstallationsService } from "./langy/langy-github-installations.service";
 import type { LangyMessageService } from "./langy/langy-message.service";
 import type { LangyTurnService } from "./langy/langy-turn.service";
 import type { BlobStoreService } from "./ops/blob-store.service";
@@ -47,11 +71,16 @@ import type { SimulationRunService } from "./simulations/simulation-run.service"
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import type { SuiteRunService } from "./suites/suite-run.service";
+import type {
+  ClusteringPageOutcome,
+  ClusteringRunContext,
+} from "./topic-clustering/clustering";
 import type { TopicService } from "./topic-clustering/topic.service";
 import type { TopicClusteringStatusService } from "./topic-clustering/topic-clustering-status.service";
 import type { LogRecordStorageService } from "./traces/log-record-storage.service";
 import type { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import type { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
+import type { SessionGroupsService } from "./traces/session-groups.service";
 import type { SpanStorageService } from "./traces/span-storage.service";
 import type { TokenizerService } from "./traces/tokenizer.service";
 import type { TraceListService } from "./traces/trace-list.service";
@@ -85,19 +114,35 @@ export interface AppDependencies {
   traces: {
     summary: TraceSummaryService;
     list: TraceListService;
+    /** Sessions lens: server-side per-conversation rollups (specs/traces-v2/sessions-lens.feature). */
+    sessionGroups: SessionGroupsService;
     spans: SpanStorageService;
     logRecords: LogRecordStorageService;
     collection: TraceRequestCollectionService;
     logCollection: LogRequestCollectionService;
     metricCollection: MetricRequestCollectionService;
+    /** Reviewer corrections applied over a captured trace at read time. */
+    editOverlay: TraceEditOverlayService;
   };
   evaluations: {
     runs: EvaluationRunService;
     execution: EvaluationExecutionService;
     performance: MonitorPerformanceService;
+    /** Per-trace evaluation reads. Built over the composition root's
+     *  ClickHouse resolver, like every other repository here. */
+    traceEvaluations: TraceEvaluationsRepository;
   };
   dspySteps: {
     steps: DspyStepService;
+  };
+  /**
+   * The ADR-034 analytics read API, built once in presets.ts and
+   * handed out here instead of each of its ~6 callers (routers, REST apps,
+   * the graph-trigger dispatch closure) constructing — and each resolving a
+   * ClickHouse client — its own.
+   */
+  analytics: {
+    service: AnalyticsService;
   };
   simulations: {
     runs: SimulationRunService;
@@ -120,17 +165,134 @@ export interface AppDependencies {
   topicClustering: {
     status: TopicClusteringStatusService;
     topics: TopicService;
+    /**
+     * One clustering page, already bound to the composition root's ClickHouse
+     * resolver. Callers outside the event-sourcing runtime take the page from
+     * here instead of resolving a client of their own.
+     */
+    runPage: (params: {
+      projectId: string;
+      searchAfter?: [number, string];
+      runContext?: ClusteringRunContext;
+    }) => Promise<ClusteringPageOutcome>;
   };
+  /**
+   * The gateway's ClickHouse-backed repositories. Undefined on a deployment
+   * without ClickHouse, where the budget service falls back to Postgres.
+   *
+   * Repositories rather than a service because the surfaces above them
+   * genuinely differ - some build a `GatewayBudgetService` around the budget
+   * ledger, others read virtual-key spend directly. What they must not do is
+   * each construct their own, which is the duplication this replaces.
+   */
+  gateway: {
+    budgets: GatewayBudgetClickHouseRepository | undefined;
+    virtualKeySpend: GatewayVirtualKeySpendRepository | undefined;
+    /** Reconciliation reads for the spend-events pull API and its tRPC
+     *  ledger-screen counterpart (ADR-072). */
+    spendEvents: GatewaySpendEventsRepository | undefined;
+    /** The webhook platform's emitted-events log (`gateway_spend` read
+     *  through the webhook envelope shape), shared by the REST events
+     *  list/get endpoints and spend-events replay. */
+    webhookEvents: WebhookEventsClickHouseRepository | undefined;
+  };
+  /** The values a filter can offer, read from the trace store. */
+  filters: {
+    options: FilterService;
+  };
+  /**
+   * The canonical per-tenant ClickHouse resolver, identical to the closure
+   * `presets.ts` uses to build every other repository. Exposed so the few
+   * call sites outside the composition root that build their own
+   * ClickHouse-backed repository (replay, the opt-in blob-resolution path)
+   * share the resolution policy instead of re-deriving it.
+   */
+  clickhouse: {
+    enabled: boolean;
+    resolveClient: ClickHouseClientResolver;
+  };
+  /** Deduplicated usage counters written to ClickHouse for billing. */
+  billing: {
+    events: BillableEventsRepository;
+  };
+  /** Org-wide counts for the self-hosted daily usage telemetry sender.
+   *  Organization-keyed rather than tenant-keyed, like `billing.events`. */
+  usageStats: {
+    instance: InstanceUsageStatsRepository;
+  };
+  /**
+   * Cross-tenant boot-sweep dependencies for the two orphaned-run
+   * reconciliation sweeps (QUEUED and IN_PROGRESS). Null when ClickHouse is
+   * not configured, in which case both sweeps no-op.
+   */
+  scenarios: {
+    orphanReconciliation: {
+      client: ClickHouseClient | null;
+      finder: OrphanedRunFinder | null;
+    };
+  };
+  /**
+   * Governance's OCSF SIEM-export sink (`governance_ocsf_events`). One
+   * repository for both directions — the puller worker, the workspace-view
+   * audit trail and the reactor sync write through it; the SIEM export
+   * procedure reads through it. Undefined on a deployment without
+   * ClickHouse.
+   */
+  governance: {
+    ocsfEvents: GovernanceOcsfEventsClickHouseRepository | undefined;
+    /** Governance-domain reads over the shared `trace_summaries` table —
+     *  the persona-detection activity probe and the quarantine-fill
+     *  per-source breakdown. */
+    traceActivity: GovernanceTraceActivityClickHouseRepository | undefined;
+    /** The `governance_kpis` rollup — the spend-spike anomaly evaluator's
+     *  current/baseline window comparison. */
+    kpis: GovernanceKpisClickHouseRepository | undefined;
+    /** The /me dashboard's spend/token/model rollups. */
+    personalUsage: PersonalUsageClickHouseRepository | undefined;
+  };
+  /** Billing-month usage rollups (billable_events + trace_summaries) behind
+   *  `billableEventsQuery.ts`'s exported query functions. */
+  billableEvents: BillableEventsClickHouseRepository | undefined;
   /** ADR-056: read side of the coding-agent session aggregate. */
   codingAgents: {
     sessions: CodingAgentSessionService;
+    /** What a pull request cost in assistant usage, RBAC-scoped. */
+    pullRequestUsage: PullRequestUsageService;
+  };
+  /**
+   * The organization's GitHub connection, consumed by Langy for writes and by
+   * pull-request linkage for reads.
+   */
+  github: {
+    installations: GithubInstallationsService;
+    /**
+     * Branch to pull-request linkage: the mapping that discovers and stores
+     * them, the live status read, and the store both sit on.
+     */
+    pullRequests: {
+      mapping: GithubPullRequestMappingService;
+      status: GithubPullRequestStatusService;
+      repository: GithubPullRequestsRepository;
+    };
+  };
+  /** Cross-tenant stored-object lookups — the documented, project-filter-free
+   *  exception `/api/files/:id` uses to resolve an id's owning project before
+   *  every subsequent read switches back to a project-scoped client. */
+  storedObjects: {
+    crossTenantOwnerLookup: StoredObjectOwnerClickHouseRepository;
+  };
+  /** The operator-only `/api/ops/clickhouse/explain` endpoint's service —
+   *  no tenant scoping, by design (see the repository's own doc comment).
+   *  A service rather than the repository it reads, so the route calls a
+   *  service like every other route does. */
+  opsExplain: {
+    service: OpsExplainService;
   };
   /** ADR-046: Langy conversations as an event-sourced projection. */
   langy: {
     conversations: LangyConversationService;
     turns: LangyTurnService;
     messages: LangyMessageService;
-    githubInstallations: LangyGithubInstallationsService;
     credentials: LangyCredentialService;
     feedbackPrompt: LangyFeedbackPromptService;
   };

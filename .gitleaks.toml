@@ -79,6 +79,28 @@ matchCondition = "AND"
 paths = ['''\.github/workflows/langwatch-app-ci\.yml''']
 regexes = ['''(0123456789abcdef){4}''']
 
+# The two AWS-shaped literals the secrets-gate tests plant into throwaway
+# repositories. The tests exist to prove the gate fails on a credential a pull
+# request adds and passes on one it did not (#6681), and a fixture that no
+# scanner recognises would prove neither half. No such AWS account exists, and
+# the tests run the scanners in offline mode precisely because these values
+# cannot verify against a provider.
+#
+# Scoped by VALUE and by nothing else, so any OTHER credential — in this file
+# or any other — is still caught by every rule. Deliberately NOT scoped by path
+# with `matchCondition = "AND"`, the shape the CREDENTIALS_SECRET entry above
+# uses: gitleaks 8.30 does not narrow that way. A `paths` entry allowlists the
+# whole file, AND or no AND, and the accompanying `regexes` change nothing —
+# verified by planting a second, unrelated AWS key in this file and watching it
+# go unreported. Fixing that entry (and its comment, which claims a narrowing it
+# does not get) is tracked in #6684.
+[[allowlists]]
+description = "AWS-shaped fixture credentials planted by the secrets-gate scoping tests"
+regexes = [
+  '''AKIAQYLPMN5HHHFPZAM2''',
+  '''A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0''',
+]
+
 # `Idempotency-Key: signup-acme-4171` and its SDK equivalents in the billing
 # docs. An idempotency key is a value the CALLER invents to make a retry safe,
 # and it is meaningless to anyone who is not already authenticated: it names a
@@ -96,3 +118,25 @@ paths = [
   '''docs/ai-gateway/cookbooks/metering-and-rebilling\.mdx''',
   '''docs/llms-full\.txt''',
 ]
+
+# `azure-secret-hygiene.unit.test.ts` proves the opposite of a leak: that
+# `redactAuthorizationMaterial` strips bearer tokens out of Azure error text
+# before it reaches a log. To prove that, the fixture has to be shaped exactly
+# like the thing a real leak would be — so gitleaks flags it, correctly, on
+# shape alone.
+#
+# Naming the value, as this file requires. `LEAKED_TOKEN` is three base64
+# segments that decode to:
+#   header    {"alg":"RS256","typ":"JWT"}
+#   payload   {"aud":"https://storage"}
+#   signature the literal ASCII word `signature`
+# No key signed it, it names no tenant, no account and no subject, and it
+# authenticates against nothing. Decode it and there is nothing to revoke.
+#
+# Scoped to this one file and to the two rules its shape trips, so every other
+# rule still applies here: a real Azure account key or SAS token landing in this
+# file is still caught.
+[[allowlists]]
+description = "Synthetic JWT-shaped fixture proving bearer-token redaction; signs nothing, grants nothing"
+targetRules = ["jwt", "generic-api-key"]
+paths = ['''platform/app/src/server/stored-objects/__tests__/azure-secret-hygiene\.unit\.test\.ts''']

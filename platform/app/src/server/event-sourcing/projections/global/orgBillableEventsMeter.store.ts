@@ -1,12 +1,10 @@
 import { createLogger } from "@langwatch/observability";
-import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
+import { getApp } from "~/server/app-layer/app";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import type { AppendStore } from "../mapProjection.types";
 import type { ProjectionStoreContext } from "../projectionStoreContext";
 
 const logger = createLogger("langwatch:billing:orgBillableEventsMeter");
-
-const TABLE_NAME = "billable_events" as const;
 
 export interface BillableEventRecord {
   organizationId: string;
@@ -23,7 +21,7 @@ export interface BillableEventRecord {
  * - Resolves organizationId from tenantId (projectId) via shared cache
  * - Inserts into the billable_events ClickHouse table
  * - If ClickHouse client is null (not configured), silently skips (non-SaaS)
- * - If ClickHouse insert fails, throws for BullMQ retry
+ * - If ClickHouse insert fails, throws so the queue retries
  * - If org not found (orphan project), skips with warn log
  */
 export const orgBillableEventsMeterStore: AppendStore<BillableEventRecord> = {
@@ -40,26 +38,6 @@ export const orgBillableEventsMeterStore: AppendStore<BillableEventRecord> = {
       return;
     }
 
-    const client = await getClickHouseClientForOrganization(organizationId);
-    if (!client) {
-      logger.debug("ClickHouse not configured, skipping billable event insert");
-      return;
-    }
-
-    await client.insert({
-      table: TABLE_NAME,
-      values: [
-        {
-          OrganizationId: organizationId,
-          TenantId: record.tenantId,
-          EventId: record.eventId,
-          EventType: record.eventType,
-          DeduplicationKey: record.deduplicationKey,
-          EventTimestamp: new Date(record.eventTimestamp),
-        },
-      ],
-      format: "JSONEachRow",
-      clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
-    });
+    await getApp().billing.events.insert({ record, organizationId });
   },
 };

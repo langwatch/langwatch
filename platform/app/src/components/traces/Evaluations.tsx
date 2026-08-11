@@ -148,27 +148,45 @@ export const EvaluationsCount = (
 
   const groups = groupEvaluationsByEvaluator(evaluations);
 
-  const totalErrors = groups.filter(
-    (group) =>
-      group.latest.status === "error" ||
-      evaluationPassed(group.latest) === false,
+  // A fail is a verdict; a crashed evaluator is not (#6835). Keep the two
+  // apart so an infrastructure error never reads as "the output failed".
+  const totalFailed = groups.filter(
+    (group) => evaluationPassed(group.latest) === false,
+  ).length;
+  const totalErrored = groups.filter(
+    (group) => group.latest.status === "error",
   ).length;
 
-  if (totalErrors > 0) {
+  if (totalFailed > 0 || totalErrored > 0) {
     if (trace.countGuardrails) {
       return null;
     }
 
     return (
-      <Text
-        borderRadius={"md"}
-        paddingX={2}
-        backgroundColor={"red.solid"}
-        color={"white"}
-        fontSize={"sm"}
-      >
-        {totalErrors} failed
-      </Text>
+      <HStack gap={1}>
+        {totalFailed > 0 && (
+          <Text
+            borderRadius={"md"}
+            paddingX={2}
+            backgroundColor={"red.solid"}
+            color={"white"}
+            fontSize={"sm"}
+          >
+            {totalFailed} failed
+          </Text>
+        )}
+        {totalErrored > 0 && (
+          <Text
+            borderRadius={"md"}
+            paddingX={2}
+            backgroundColor={"orange.solid"}
+            color={"white"}
+            fontSize={"sm"}
+          >
+            {totalErrored} errored
+          </Text>
+        )}
+      </HStack>
     );
   }
 

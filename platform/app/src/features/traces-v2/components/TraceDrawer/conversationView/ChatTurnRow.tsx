@@ -4,16 +4,33 @@ import {
   Flex,
   HStack,
   Icon,
+  Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { AlertTriangle, Lightbulb, MessageSquare } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Fragment,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { Markdown } from "~/components/Markdown";
+import { TraceMediaStrip } from "~/components/traces/TraceMediaStrip";
 import { RedactedInline } from "~/components/ui/RedactedField";
+import type { MediaPartData } from "~/shared/traces/mediaParts";
 import type { RouterOutputs } from "~/utils/api";
 import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
-import { useTextTranslation } from "../../../hooks/useTextTranslation";
+import {
+  type UseTextTranslationResult,
+  useTextTranslation,
+} from "../../../hooks/useTextTranslation";
+import {
+  isSessionMarked,
+  useAnnotationQueueSessionStore,
+} from "../../../stores/annotationQueueSessionStore";
 import type { TraceListItem } from "../../../types/trace";
 import {
   formatCost,
@@ -30,20 +47,100 @@ import {
 import { getDisplayRoleVisuals, useIsScenarioRole } from "../scenarioRoles";
 import { getRolePalette, ReasoningBlock } from "../transcript";
 import { useConversationExpand } from "./expandContext";
+import {
+  MessageAnnotateCluster,
+  type MessageAnnotateTarget,
+  type MessageTranslation,
+} from "./MessageAnnotateCluster";
 import { MessageExpandToggle } from "./MessageExpandToggle";
-import { TurnActionRow, TurnAnnotationBadges } from "./TurnAnnotations";
+import {
+  TurnAnnotationBadges,
+  TurnEditTraceAction,
+  TurnSessionCheckbox,
+} from "./TurnAnnotations";
 import { TurnSteps } from "./TurnSteps";
 import type { TurnLayout } from "./types";
 import { formatGap } from "./utils";
 
 type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
 const EMPTY_ANNOTATIONS: AnnotationItem[] = [];
+const EMPTY_MEDIA: MediaPartData[] = [];
+
+interface MessageAnnotationSummary {
+  count: number;
+  hasCorrection: boolean;
+}
+
+/**
+ * Which of a turn's comments read on which of its two messages.
+ *
+ * A comment about the turn as a whole is a judgement on the answer it gave, so
+ * it counts on the reply, beside the comments left on the reply itself. A
+ * comment on the turn's input counts on the message the user sent. Anything
+ * narrower belongs to the surface where that part is read and counts on
+ * neither.
+ */
+function splitAnnotationsBySide({
+  traceId,
+  turnAnnotations,
+  anchoredAnnotations,
+}: {
+  traceId: string;
+  turnAnnotations: AnnotationItem[];
+  anchoredAnnotations: AnnotationItem[];
+}): {
+  userAnnotations: MessageAnnotationSummary | undefined;
+  assistantAnnotations: MessageAnnotationSummary | undefined;
+} {
+  const onField = (path: "input" | "output") =>
+    anchoredAnnotations.filter(
+      (a) =>
+        a.anchorKind === "field" &&
+        a.anchorId === traceId &&
+        a.anchorPath === path,
+    );
+  return {
+    userAnnotations: summarizeAnnotations(onField("input")),
+    assistantAnnotations: summarizeAnnotations([
+      ...turnAnnotations,
+      ...onField("output"),
+    ]),
+  };
+}
+
+/** What one message's cluster needs of its translation: the state, and the toggle. */
+function toMessageTranslation(
+  translation: UseTextTranslationResult,
+): MessageTranslation {
+  return {
+    isActive: translation.isActive,
+    isLoading: translation.isLoading,
+    onToggle: translation.toggle,
+  };
+}
+
+function summarizeAnnotations(
+  items: AnnotationItem[],
+): MessageAnnotationSummary | undefined {
+  if (items.length === 0) return undefined;
+  return {
+    count: items.length,
+    hasCorrection: items.some((a) => !!a.expectedOutput),
+  };
+}
 
 interface ChatTurnRowProps {
   turn: TraceListItem;
   userText: string;
   assistantText: string;
   assistantReasoning: string;
+  /**
+   * Media recorded on the turn's input side, rendered under the user message
+   * in thread layout. The side bubbles render no media yet.
+   */
+  userMedia?: MediaPartData[];
+  /** Media recorded on the turn's output side, rendered under the reply. */
+  assistantMedia?: MediaPartData[];
   /** Wall-clock seconds between the previous turn's end and this turn's start. */
   gapSecs: number;
   /** Whether the inter-turn gap is long enough to surface as a divider. */
@@ -59,6 +156,17 @@ interface ChatTurnRowProps {
    * marker and seeds the inline badge popover.
    */
   annotationItems?: AnnotationItem[];
+  /**
+   * Comments about the parts inside this turn. Only the ones left on the turn's
+   * own input and output read here, on the message they were left on; the rest
+   * belong to the surfaces those parts are read from.
+   */
+  anchoredAnnotationItems?: AnnotationItem[];
+  /**
+   * Whether the separator offers to count this turn's trace into the annotation
+   * session. Only the queue, which has a session to count into, asks for it.
+   */
+  showSessionCheckbox?: boolean;
 }
 
 export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
@@ -66,6 +174,8 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   userText: originalUserText,
   assistantText: originalAssistantText,
   assistantReasoning,
+  userMedia = EMPTY_MEDIA,
+  assistantMedia = EMPTY_MEDIA,
   gapSecs,
   showGap,
   index,
@@ -73,37 +183,46 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   onSelect,
   layout = "bubbles",
   annotationItems = EMPTY_ANNOTATIONS,
+  anchoredAnnotationItems = EMPTY_ANNOTATIONS,
+  showSessionCheckbox = false,
 }) {
   const handleSelect = useCallback(
     () => onSelect(turn.traceId),
     [onSelect, turn.traceId],
   );
 
-  // Per-turn translate-to-English (specs/traces-v2/message-translation
-  // .feature): the separator's action row toggles it, and both bubbles
-  // swap between original and translated text. Sliced to the translate
-  // endpoint's payload cap so a pathological turn can't become one
-  // giant prompt.
-  const translation = useTextTranslation({
+  // Translate-to-English per message rather than per turn
+  // (specs/traces-v2/message-translation.feature): a reader flips exactly the
+  // side they cannot read, and the other side is left as it was written.
+  // Sliced to the translate endpoint's payload cap so a pathological message
+  // can't become one giant prompt.
+  const userTranslation = useTextTranslation({
     texts: useMemo(
-      () => ({
-        user: originalUserText.slice(0, TRANSLATE_TEXT_MAX_CHARS),
-        assistant: originalAssistantText.slice(0, TRANSLATE_TEXT_MAX_CHARS),
-      }),
-      [originalUserText, originalAssistantText],
+      () => ({ user: originalUserText.slice(0, TRANSLATE_TEXT_MAX_CHARS) }),
+      [originalUserText],
     ),
   });
-  const userText = translation.displayTexts.user ?? originalUserText;
+  const assistantTranslation = useTextTranslation({
+    texts: useMemo(
+      () => ({
+        assistant: originalAssistantText.slice(0, TRANSLATE_TEXT_MAX_CHARS),
+      }),
+      [originalAssistantText],
+    ),
+  });
+  const userText = userTranslation.displayTexts.user ?? originalUserText;
   const assistantText =
-    translation.displayTexts.assistant ?? originalAssistantText;
+    assistantTranslation.displayTexts.assistant ?? originalAssistantText;
 
-  const annotationSummary = useMemo(() => {
-    if (annotationItems.length === 0) return undefined;
-    return {
-      count: annotationItems.length,
-      hasCorrection: annotationItems.some((a) => !!a.expectedOutput),
-    };
-  }, [annotationItems]);
+  const { userAnnotations, assistantAnnotations } = useMemo(
+    () =>
+      splitAnnotationsBySide({
+        traceId: turn.traceId,
+        turnAnnotations: annotationItems,
+        anchoredAnnotations: anchoredAnnotationItems,
+      }),
+    [turn.traceId, annotationItems, anchoredAnnotationItems],
+  );
 
   // Scenario-aware visual mapping. The text fields stay role-faithful
   // (`userText` is whatever the source `user` message said), but the
@@ -122,6 +241,50 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   // carries `assistantText`. The fallback comes from the helper so it
   // reads "Assistant" normally and "Agent" in scenario mode.
   const assistantLabel = turn.models[0] || assistantVisuals.bubbleLabel;
+
+  // A field a privacy rule hid never renders the media that was hidden with
+  // it. The server drops the references alongside the text; this is the
+  // render-side half of the same rule, so a reference that outlives its
+  // content still shows nothing.
+  const visibleUserMedia = turn.inputRedacted ? EMPTY_MEDIA : userMedia;
+  const visibleAssistantMedia = turn.outputRedacted
+    ? EMPTY_MEDIA
+    : assistantMedia;
+  // Only the thread layout has a message body to hang media off, so it is the
+  // only one where media on its own is reason enough to draw a message: a
+  // voice turn that recorded no transcript would otherwise lose its recording.
+  const hasUserMedia = layout === "thread" && visibleUserMedia.length > 0;
+  const hasAssistantMedia =
+    layout === "thread" && visibleAssistantMedia.length > 0;
+
+  // Each side carries what it said, so a correction of it starts from that
+  // text: the reply's from the turn's output, the user message's from the
+  // turn's input, which is the field a correction of it replaces.
+  const userAnnotateTarget = useMemo(
+    () => ({
+      traceId: turn.traceId,
+      anchorPath: "input" as const,
+      text: turn.input,
+    }),
+    [turn.traceId, turn.input],
+  );
+  const assistantAnnotateTarget = useMemo(
+    () => ({
+      traceId: turn.traceId,
+      anchorPath: "output" as const,
+      text: turn.output,
+    }),
+    [turn.traceId, turn.output],
+  );
+
+  // Only a side with text of its own can be translated: an empty message has
+  // nothing to flip, and offering it would be a button that does nothing.
+  const userTranslate = originalUserText.trim()
+    ? toMessageTranslation(userTranslation)
+    : undefined;
+  const assistantTranslate = originalAssistantText.trim()
+    ? toMessageTranslation(assistantTranslation)
+    : undefined;
 
   return (
     <VStack align="stretch" gap={layout === "thread" ? 1 : 2}>
@@ -144,14 +307,10 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
         // no "opposite side" to anchor the inline actions to — pin them right.
         assistantSide={layout === "thread" ? "right" : assistantSide}
         annotationItems={annotationItems}
-        translation={{
-          isActive: translation.isActive,
-          isLoading: translation.isLoading,
-          onToggle: translation.toggle,
-        }}
+        showSessionCheckbox={showSessionCheckbox}
       />
 
-      {userText ? (
+      {userText || hasUserMedia ? (
         <TurnMessage
           layout={layout}
           side={userSide}
@@ -159,8 +318,12 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           label={userVisuals.bubbleLabel}
           icon={<UserIcon />}
           text={userText}
+          media={visibleUserMedia}
           isSelected={isCurrent}
           onClick={handleSelect}
+          annotation={userAnnotations}
+          annotate={userAnnotateTarget}
+          translate={userTranslate}
         />
       ) : turn.inputRedacted ? (
         // Input hidden by a privacy rule — show the shared "Redacted" marker on
@@ -205,9 +368,12 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           icon={<AssistantIcon />}
           text={assistantText}
           reasoning={assistantReasoning}
+          media={visibleAssistantMedia}
           isSelected={isCurrent}
           onClick={handleSelect}
-          annotation={annotationSummary}
+          annotation={assistantAnnotations}
+          annotate={assistantAnnotateTarget}
+          translate={assistantTranslate}
         />
       ) : turn.error ? (
         <TurnMessage
@@ -218,11 +384,14 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           icon={<AlertTriangle />}
           text={turn.error}
           reasoning={assistantReasoning}
+          media={visibleAssistantMedia}
           isSelected={isCurrent}
           onClick={handleSelect}
-          annotation={annotationSummary}
+          annotation={assistantAnnotations}
+          annotate={assistantAnnotateTarget}
+          translate={assistantTranslate}
         />
-      ) : assistantReasoning ? (
+      ) : assistantReasoning || hasAssistantMedia ? (
         <TurnMessage
           layout={layout}
           side={assistantSide}
@@ -231,9 +400,12 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           icon={<AssistantIcon />}
           text=""
           reasoning={assistantReasoning}
+          media={visibleAssistantMedia}
           isSelected={isCurrent}
           onClick={handleSelect}
-          annotation={annotationSummary}
+          annotation={assistantAnnotations}
+          annotate={assistantAnnotateTarget}
+          translate={assistantTranslate}
         />
       ) : turn.outputRedacted ? (
         // Output hidden by a privacy rule — the shared "Redacted" marker on the
@@ -335,9 +507,15 @@ interface TurnMessageProps {
   icon: React.ReactNode;
   text: string;
   reasoning?: string;
+  /** Media recorded on this message's side of the turn. Thread layout only. */
+  media?: MediaPartData[];
   isSelected?: boolean;
   onClick?: () => void;
-  annotation?: { count: number; hasCorrection: boolean };
+  annotation?: MessageAnnotationSummary;
+  /** What a comment left on this message is about. */
+  annotate?: MessageAnnotateTarget;
+  /** Flipping this message to English, when it has text to flip. */
+  translate?: MessageTranslation;
 }
 
 /**
@@ -346,9 +524,9 @@ interface TurnMessageProps {
  * same tone / label / annotation inputs so toggling the layout never changes
  * what's shown, only how it's arranged.
  */
-function TurnMessage({ layout, side, ...rest }: TurnMessageProps) {
+function TurnMessage({ layout, side, media, ...rest }: TurnMessageProps) {
   if (layout === "thread") {
-    return <ThreadMessage {...rest} />;
+    return <ThreadMessage media={media} {...rest} />;
   }
   return <Bubble side={side} size="compact" maxChars={500} {...rest} />;
 }
@@ -369,8 +547,11 @@ function ThreadMessage({
   icon,
   text,
   reasoning,
+  media = EMPTY_MEDIA,
   onClick,
   annotation,
+  annotate,
+  translate,
 }: Omit<TurnMessageProps, "layout" | "side">) {
   const palette = getRolePalette(TONE_ROLE[tone]);
   const isError = tone === "error";
@@ -406,6 +587,12 @@ function ThreadMessage({
       cursor={onClick ? "pointer" : "default"}
       transition="background 0.15s ease"
       _hover={onClick ? { bg: "bg.subtle" } : undefined}
+      // `className="group"` is what the comment cluster's `_groupHover`
+      // resolves against; the role is what tells a reader the message and its
+      // actions are one thing. The turn separator's own group sits on a
+      // sibling, so the two scopes never nest.
+      className="group"
+      role="group"
       onClick={(e: React.MouseEvent) => {
         if (!onClick) return;
         e.stopPropagation();
@@ -454,6 +641,15 @@ function ThreadMessage({
               )}
             </HStack>
           )}
+          {annotate && (
+            <>
+              <Spacer />
+              <MessageAnnotateCluster
+                target={annotate}
+                translation={translate}
+              />
+            </>
+          )}
         </HStack>
 
         {reasoning && (
@@ -489,8 +685,111 @@ function ThreadMessage({
             onToggle={() => setExpanded((v) => !v)}
           />
         )}
+
+        {/* Recordings, images and attachments sit under the prose they came
+            with, the way attachments sit under an email body. Clicks stay on
+            the widget so scrubbing a player doesn't navigate to the turn. */}
+        {media.length > 0 && (
+          <Box
+            paddingTop={2}
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          >
+            <TraceMediaStrip parts={media} />
+          </Box>
+        )}
       </Box>
     </Flex>
+  );
+}
+
+interface LedgerSegment {
+  id: string;
+  text: string;
+}
+
+/**
+ * The scannable few fields a separator carries, in reading order: duration,
+ * latency, cost, how many events the turn recorded, and how long ago it ran. A
+ * field the turn has nothing to say about is left out rather than shown as
+ * zero. The model abbreviation and the raw input→output token count read as
+ * cryptic here, and live in the trace header and metrics instead.
+ */
+function turnLedgerSegments(turn: TraceListItem): LedgerSegment[] {
+  const segments: LedgerSegment[] = [
+    { id: "duration", text: formatDuration(turn.durationMs) },
+  ];
+  if (turn.ttft != null && turn.ttft > 0) {
+    segments.push({ id: "ttft", text: `ttft ${formatDuration(turn.ttft)}` });
+  }
+  if ((turn.totalCost ?? 0) > 0) {
+    segments.push({ id: "cost", text: formatCost(turn.totalCost) });
+  }
+  // The count only: the legacy thread view also drew the vote an event
+  // carried, and the conversation's turn data has no event metrics for it.
+  const eventCount = turn.events.totalCount;
+  if (eventCount > 0) {
+    segments.push({
+      id: "events",
+      text: `${eventCount} ${eventCount === 1 ? "event" : "events"}`,
+    });
+  }
+  segments.push({ id: "age", text: formatRelativeTimeAgo(turn.timestamp) });
+  return segments;
+}
+
+function Sep() {
+  return (
+    <Text textStyle="2xs" color="fg.subtle">
+      ·
+    </Text>
+  );
+}
+
+/** Which turn this is, what it cost to run, and whether it failed. */
+function TurnLedger({
+  index,
+  turn,
+  isHighlighted,
+}: {
+  index: number;
+  turn: TraceListItem;
+  /** True on the turn under review, and on one the sitting counts. */
+  isHighlighted: boolean;
+}) {
+  return (
+    <HStack gap={1.5} flexShrink={0} flexWrap="wrap" justify="center">
+      <Text
+        textStyle="2xs"
+        color={isHighlighted ? "blue.fg" : "fg.subtle"}
+        fontWeight="600"
+        textTransform="uppercase"
+        letterSpacing="0.06em"
+      >
+        Turn {index}
+      </Text>
+      {turnLedgerSegments(turn).map((segment) => (
+        <Fragment key={segment.id}>
+          <Sep />
+          <Text textStyle="2xs" color="fg.subtle">
+            {segment.text}
+          </Text>
+        </Fragment>
+      ))}
+      {turn.status === "error" && (
+        <>
+          <Sep />
+          <Text
+            textStyle="2xs"
+            color="red.fg"
+            fontWeight="600"
+            textTransform="uppercase"
+            letterSpacing="0.06em"
+          >
+            error
+          </Text>
+        </>
+      )}
+    </HStack>
   );
 }
 
@@ -501,11 +800,7 @@ const TurnSeparator: React.FC<{
   onSelect: () => void;
   assistantSide: "left" | "right";
   annotationItems: AnnotationItem[];
-  translation: {
-    isActive: boolean;
-    isLoading: boolean;
-    onToggle: () => void;
-  };
+  showSessionCheckbox: boolean;
 }> = ({
   index,
   turn,
@@ -513,22 +808,58 @@ const TurnSeparator: React.FC<{
   onSelect,
   assistantSide,
   annotationItems,
-  translation,
+  showSessionCheckbox,
 }) => {
-  // Keep the separator to a scannable few fields: duration, latency, cost,
-  // relative time, error state. The model abbreviation and the raw
-  // input→output token count read as cryptic here (they live in the trace
-  // header / metrics), so they're intentionally left off.
-  const hasCost = (turn.totalCost ?? 0) > 0;
-  const isError = turn.status === "error";
-
-  const Sep = () => (
-    <Text textStyle="2xs" color="fg.subtle">
-      ·
-    </Text>
+  // A turn the sitting counts reads the way the turn under review does: the
+  // tick alone is a small thing to find again on a long conversation, and the
+  // separator is what the eye follows down it.
+  const countsInSession = useAnnotationQueueSessionStore(
+    (s) => showSessionCheckbox && isSessionMarked(s.marks, turn.traceId),
   );
-
+  const readsSelected = isCurrent || countsInSession;
   const annotationsOnLeft = assistantSide === "left";
+  /*
+   * Hover actions float over one end of the separator instead of sitting in
+   * flow: the hidden chrome used to reserve ~180px of width, stopping the
+   * divider line short of the edge. Absolutely positioned, the lines span the
+   * full width and the actions overlay the end while the pointer is on the
+   * turn.
+   *
+   * The badge stays in flow, because it is on screen the whole time a turn
+   * carries an annotation and overlaying it would cover the ledger. That puts
+   * it at the same end as the actions, so the actions anchor to the badge
+   * rather than to the separator: a hidden action row is still a click target,
+   * and one lying across the badge swallows the click that opens the
+   * annotation list.
+   */
+  const badgeAnchor = annotationsOnLeft
+    ? { left: "100%", marginLeft: 2 }
+    : { right: "100%", marginRight: 2 };
+  const badgesWithActions = (
+    <Box position="relative" display="flex" alignItems="center" flexShrink={0}>
+      <TurnAnnotationBadges
+        traceId={turn.traceId}
+        output={turn.output}
+        prefetchedItems={annotationItems}
+      />
+      <HStack
+        position="absolute"
+        top="50%"
+        transform="translateY(-50%)"
+        gap={1}
+        // Shrink-to-fit would size the actions against the badge slot they are
+        // anchored to and let them wrap, or spill back over the badge.
+        width="max-content"
+        {...badgeAnchor}
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+      >
+        <TurnEditTraceAction
+          traceId={turn.traceId}
+          occurredAtMs={turn.timestamp}
+        />
+      </HStack>
+    </Box>
+  );
   return (
     <Flex
       position="relative"
@@ -536,96 +867,38 @@ const TurnSeparator: React.FC<{
       gap={2}
       cursor="pointer"
       onClick={onSelect}
+      // `className="group"` is what `_groupHover` on the action row resolves
+      // against; the role is what tells a reader the separator and its actions
+      // are one thing.
+      className="group"
       role="group"
+      // Says in one place what the lines and the ledger read from: the turn
+      // under review, or one the sitting counts.
+      data-highlighted={readsSelected ? "true" : "false"}
       _hover={{ "& > .turn-line": { bg: "border.emphasized" } }}
     >
+      {/* The session's tick leads the separator: ticked state is scanned down
+          the left of a list of turns, and it is on screen the whole time the
+          queue is being walked rather than arriving with the pointer like the
+          actions do. */}
+      {showSessionCheckbox && <TurnSessionCheckbox traceId={turn.traceId} />}
+      {annotationsOnLeft && badgesWithActions}
       <Box
         className="turn-line"
         height="1px"
         flex={1}
-        bg={isCurrent ? "blue.solid" : "border.muted"}
+        bg={readsSelected ? "blue.solid" : "border.muted"}
         transition="background 0.12s ease"
       />
-      <HStack gap={1.5} flexShrink={0} flexWrap="wrap" justify="center">
-        <Text
-          textStyle="2xs"
-          color={isCurrent ? "blue.fg" : "fg.subtle"}
-          fontWeight="600"
-          textTransform="uppercase"
-          letterSpacing="0.06em"
-        >
-          Turn {index}
-        </Text>
-        <Sep />
-        <Text textStyle="2xs" color="fg.subtle">
-          {formatDuration(turn.durationMs)}
-        </Text>
-        {turn.ttft != null && turn.ttft > 0 && (
-          <>
-            <Sep />
-            <Text textStyle="2xs" color="fg.subtle">
-              ttft {formatDuration(turn.ttft)}
-            </Text>
-          </>
-        )}
-        {hasCost && (
-          <>
-            <Sep />
-            <Text textStyle="2xs" color="fg.subtle">
-              {formatCost(turn.totalCost)}
-            </Text>
-          </>
-        )}
-        <Sep />
-        <Text textStyle="2xs" color="fg.subtle">
-          {formatRelativeTimeAgo(turn.timestamp)}
-        </Text>
-        {isError && (
-          <>
-            <Sep />
-            <Text
-              textStyle="2xs"
-              color="red.fg"
-              fontWeight="600"
-              textTransform="uppercase"
-              letterSpacing="0.06em"
-            >
-              error
-            </Text>
-          </>
-        )}
-      </HStack>
+      <TurnLedger index={index} turn={turn} isHighlighted={readsSelected} />
       <Box
         className="turn-line"
         height="1px"
         flex={1}
-        bg={isCurrent ? "blue.solid" : "border.muted"}
+        bg={readsSelected ? "blue.solid" : "border.muted"}
         transition="background 0.12s ease"
       />
-      {/* Inline actions float over one end of the separator instead of
-          sitting in flow — the hidden hover chrome used to reserve ~180px of
-          width, stopping the divider line short of the edge. Absolutely
-          positioned, the lines now span the full width and the badge/actions
-          overlay the end (badges only when present, actions on hover). */}
-      <HStack
-        position="absolute"
-        top="50%"
-        transform="translateY(-50%)"
-        gap={1}
-        {...(annotationsOnLeft ? { left: 0 } : { right: 0 })}
-        onClick={(e: React.MouseEvent) => e.stopPropagation()}
-      >
-        <TurnAnnotationBadges
-          traceId={turn.traceId}
-          output={turn.output}
-          prefetchedItems={annotationItems}
-        />
-        <TurnActionRow
-          traceId={turn.traceId}
-          output={turn.output}
-          translation={translation}
-        />
-      </HStack>
+      {!annotationsOnLeft && badgesWithActions}
     </Flex>
   );
 };

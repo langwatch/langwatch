@@ -111,6 +111,8 @@ model User {
   ingestionSourcesCreated       IngestionSource[]        @relation("IngestionSourceCreatedBy")
   anomalyRulesCreated           AnomalyRule[]            @relation("AnomalyRuleCreatedBy")
   pinnedTraces                  PinnedTrace[]
+  traceEditOverlaysCreated      TraceEditOverlay[]       @relation("TraceEditOverlayCreatedBy")
+  traceEditOverlaysUpdated      TraceEditOverlay[]       @relation("TraceEditOverlayUpdatedBy")
 }
 
 model VerificationToken {
@@ -298,7 +300,9 @@ model Organization {
   anomalyAlerts            AnomalyAlert[]
   aiToolEntries            AiToolEntry[]
   ingestionTemplates       IngestionTemplate[]
-  langyGithubInstallations LangyGithubInstallation[]
+  githubInstallations      GithubInstallation[]
+  githubPullRequests       GithubPullRequest[]
+  githubBranchPrChecks     GithubBranchPullRequestCheck[]
 
   @@index([ssoProvider])
 }
@@ -420,6 +424,7 @@ model Project {
   gatewayGuardrails   GatewayGuardrail[]        @relation("ProjectGatewayGuardrails")
   gatewayChangeEvents GatewayChangeEvent[]
   pinnedTraces        PinnedTrace[]
+  traceEditOverlays   TraceEditOverlay[]
   emailSuppressions   EmailSuppression[]
 
   // Denormalised mirror of parent Team's personal flag for fast
@@ -823,6 +828,12 @@ model Trigger {
   createdAt            DateTime                  @default(now())
   updatedAt            DateTime                  @default(now()) @updatedAt
   active               Boolean                   @default(true)
+  // Why the platform paused this automation, and when. NULL means it was not
+  // paused by the platform: `active = false` alone cannot distinguish an
+  // automation a customer switched off from one runaway containment stopped,
+  // and resuming must clear both. Today the only value is "runaway_volume".
+  pausedReason         String?
+  pausedAt             DateTime? @db.Timestamptz(3)
   message              String?
   deleted              Boolean                   @default(false)
   alertType            AlertType?
@@ -991,6 +1002,15 @@ model Experiment {
   @@index([projectId, archivedAt])
 }
 
+// Annotation - a reviewer's comment on a trace, or on one part of it.
+//
+// anchorKind/anchorId/anchorPath record which part the comment is about. All
+// three null means the trace as a whole, which is what every surface that reads
+// whole traces (the annotations list, the queue, the trace projections that
+// feed the table and the dataset columns, the REST list endpoints) reads.
+// Plain strings rather than an enum: a fourth kind of part is then a code
+// change and not a schema migration, and a kind this build does not recognise
+// reads as a comment about the trace rather than failing the list.
 model Annotation {
   id             String   @id @default(nanoid())
   projectId      String
@@ -1005,11 +1025,20 @@ model Annotation {
   email          String?
   scoreOptions   Json?
   expectedOutput String?
+  // "span" | "field" | "message"; null = the trace as a whole
+  anchorKind     String?
+  // The element the comment names: a spanId for span and field anchors, the
+  // turn's traceId for a message anchor
+  anchorId       String?
+  // What inside that element: "output", "params.temperature", or a message's
+  // key; null = the whole element
+  anchorPath     String?
 
   @@index([projectId])
   @@index([traceId])
   @@index([userId])
   @@index([projectId, traceId])
+  @@index([projectId, traceId, anchorKind])
 }
 
 // ModelProvider - org-scoped, multi-scope provider configuration.
@@ -1174,17 +1203,18 @@ model ModelDefaultConfigScope {
   @@index([configId])
 }
 
-/// A GitHub App installation mapped to a LangWatch organization. Langy mints
-/// short-lived (1h) installation access tokens against these rows to open
-/// bot-authored pull requests, scoped to the installation's repositories. No
-/// user token and no secret are stored here — the crown jewel is the App
-/// private key, held only in the control-plane env. Issue: #4747. Spec:
-/// specs/langy/langy-github-install.feature.
+/// The organization's GitHub connection: a GitHub App installation mapped to a
+/// LangWatch organization. Short-lived (1h) installation access tokens are
+/// minted against these rows on demand, by Langy for writes (bot-authored pull
+/// requests, scoped to the installation's repositories) and by pull-request
+/// linkage for reads. No user token and no secret are stored here, the crown
+/// jewel is the App private key, held only in the control-plane env.
+/// Spec: specs/integrations/github-connection.feature.
 ///
-/// installationId is globally unique (one GitHub installation → one row); a
+/// installationId is globally unique (one GitHub installation, one row); a
 /// single LangWatch organization may own MANY installations (different GitHub
-/// accounts), so the org↔installation relationship is one-to-many.
-model LangyGithubInstallation {
+/// accounts), so the org to installation relationship is one-to-many.
+model GithubInstallation {
   id                  String       @id @default(nanoid())
   /// GitHub installation id (numeric; stored as string). Globally unique.
   installationId      String       @unique
@@ -1209,6 +1239,86 @@ model LangyGithubInstallation {
   updatedAt           DateTime     @default(now()) @updatedAt
 
   @@index([organizationId])
+}
+
+/// A pull request discovered through the organization's GitHub connection and
+/// mapped to the branch it was opened from, so a coding-agent session that
+/// knows only its branch can name the pull request it produced.
+/// Spec: specs/integrations/github-connection.feature.
+///
+/// The stored title, state, draft and timestamp columns are SNAPSHOTS taken
+/// when the mapping was last refreshed. They are fallback labels only: the
+/// frontend reads live status from GitHub, so a stale row never presents
+/// itself as current truth.
+model GithubPullRequest {
+  id                 String       @id @default(nanoid())
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// The GitHub host the repository lives on, e.g. "github.com".
+  repositoryHost     String
+  /// "owner/repo", stored LOWERCASED so a lookup matches whatever casing the
+  /// session reported.
+  repositoryFullName String
+  /// The branch the pull request was opened from.
+  headBranch         String
+  prNumber           Int
+  htmlUrl            String
+  title              String
+  /// GitHub's own state string: "open" or "closed".
+  state              String
+  isDraft            Boolean      @default(false)
+  authorLogin        String?
+  prCreatedAt        DateTime
+  prClosedAt         DateTime?
+  prMergedAt         DateTime?
+  /// When this row was first mapped to its branch.
+  mappedAt           DateTime     @default(now())
+  /// When the snapshot columns were last refreshed from GitHub.
+  lastCheckedAt      DateTime     @default(now())
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @default(now()) @updatedAt
+
+  @@unique([organizationId, repositoryHost, repositoryFullName, prNumber])
+  @@index([organizationId, repositoryHost, repositoryFullName, headBranch])
+}
+
+/// The per-branch bookkeeping behind pull-request mapping: when a branch was
+/// last looked up on GitHub, how many pull requests it resolved to, and when it
+/// may be asked about again. A branch with no pull request is the common case,
+/// so `notFoundAt` plus `recheckAfter` is what keeps an unmapped branch from
+/// costing a GitHub call on every read.
+/// Spec: specs/integrations/github-connection.feature.
+model GithubBranchPullRequestCheck {
+  id                 String       @id @default(nanoid())
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  repositoryHost     String
+  /// "owner/repo", stored LOWERCASED, matching GithubPullRequest.
+  repositoryFullName String
+  headBranch         String
+  lastCheckedAt      DateTime
+  prCount            Int          @default(0)
+  /// Set while the branch resolves to no pull request; cleared once one is
+  /// found.
+  notFoundAt         DateTime?
+  /// The earliest instant GitHub may be asked about this branch again.
+  recheckAfter       DateTime?
+  /// Consecutive lookups that found nothing, backing off the recheck.
+  attempts           Int          @default(0)
+  /// When a reader last asked about this branch, whether or not GitHub was
+  /// called.
+  lastRequestedAt    DateTime
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @default(now()) @updatedAt
+
+  @@unique([organizationId, repositoryHost, repositoryFullName, headBranch])
+  /// The branch-recheck sweep's index, matched to the sweep's query shape:
+  /// `recheckAfter <= now` bounds the scan AND supplies the ordering,
+  /// `lastRequestedAt` cuts the activity horizon in the index, and
+  /// `notFoundAt IS NOT NULL` is checked there too rather than by fetching the
+  /// heap row. Leading with organizationId cannot serve it, because the sweep
+  /// is the one read in this feature with no organization to name.
+  @@index([recheckAfter, lastRequestedAt, notFoundAt])
 }
 
 /// Rebuildable operational state folded from Langy's canonical event stream.
@@ -1508,6 +1618,10 @@ model AnnotationQueueItem {
   traceId           String
   projectId         String
   doneAt            DateTime?
+  /// Set while the annotator wants this item's trace added to a dataset once
+  /// the queue walk is finished. Persisted rather than kept in the browser so
+  /// the selection survives a refresh and stays visible to teammates.
+  markedForDatasetAt DateTime?
   project           Project          @relation(fields: [projectId], references: [id])
 
   @@unique([traceId, userId, projectId])
@@ -1565,6 +1679,31 @@ model PinnedTrace {
   source    PinSource @default(manual)
   reason    String?
   createdAt DateTime  @default(now())
+
+  @@unique([projectId, traceId])
+  @@index([projectId])
+}
+
+// A reviewer's correction to one trace, stored beside the captured trace and
+// applied at read time. The captured data in ClickHouse is never rewritten.
+//
+// `patch` holds a version-1 correction shaped like the canonical trace model:
+// whole-field replacements per span plus the ids of the spans that were
+// removed (see traceEditOverlay.schemas.ts). It is validated on write and
+// re-validated on read, so a row this build cannot interpret degrades to "no
+// correction" instead of failing the trace read.
+model TraceEditOverlay {
+  id          String   @id
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id])
+  traceId     String
+  patch       Json
+  createdById String?
+  createdBy   User?    @relation("TraceEditOverlayCreatedBy", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?    @relation("TraceEditOverlayUpdatedBy", fields: [updatedById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
 
   @@unique([projectId, traceId])
   @@index([projectId])
@@ -1659,6 +1798,7 @@ model CustomLLMModelCost {
   outputCostPerToken        Float?
   cacheReadCostPerToken     Float?
   cacheCreationCostPerToken Float?
+  cacheCreation1hCostPerToken Float?
   createdAt                 DateTime                    @default(now())
   updatedAt                 DateTime                    @default(now()) @updatedAt
 
@@ -2364,6 +2504,8 @@ enum GatewayChangeEventKind {
   CACHE_RULE_CREATED
   CACHE_RULE_UPDATED
   CACHE_RULE_DELETED
+  ROUTING_POLICY_UPDATED
+  ROUTING_POLICY_DELETED
 }
 
 // Gateway audit action codes - kept as a TypeScript const union in
@@ -2441,10 +2583,22 @@ model VirtualKey {
   principalUserId String?
   principalUser   User?   @relation("PrincipalScopedVirtualKeys", fields: [principalUserId], references: [id], onDelete: SetNull)
 
-  // Where this key's traces and costs land, for keys whose access scopes
-  // do not name a single project (org- and team-owned keys). Deliberately
-  // NOT a VirtualKeyScope row: scope rows grant access and visibility,
-  // and the trace destination must grant neither.
+  // Where this key's traces and costs land. Decided once, when the key is
+  // written, and stored: it used to be derived on every read by trying this
+  // column, then the key's single project scope, then the organization's
+  // governance project, which is three lookups that each had to remember
+  // that a deleted project is not a destination.
+  //
+  // Deliberately NOT a VirtualKeyScope row: scope rows grant access and
+  // visibility, and the trace destination must grant neither. Editing the
+  // scopes therefore does not move it.
+  //
+  // Nullable at the database level, and the invariant that every key
+  // written carries a destination is enforced in the app. A NOT NULL would
+  // fail a self-hosted migration on an organization whose data predates
+  // governance projects, where there is genuinely nothing to write; those
+  // keys read as null, the gateway skips span export rather than failing,
+  // and the next edit of the key is refused until it is given a home.
   traceProjectId String?
 
   // Slim config blob - per-key state only. The "gateway-config bundle"
@@ -3402,6 +3556,12 @@ model ProcessManagerInbox {
 
   @@unique([processName, projectId, sourceEventKey])
   @@index([processName, projectId, processKey, consumedAt])
+  // Do not add an index on `consumedAt` here. The retention sweep can use one,
+  // but a deploy-time CREATE INDEX holds a SHARE lock that blocks INSERT on
+  // this table, the highest-volume write path in the system. The index is
+  // ops-managed instead: built with CREATE INDEX CONCURRENTLY, see
+  // dev/docs/runbooks/process-manager-table-purge.md. The sweep works without
+  // it on the bounded table it maintains.
 }
 
 enum ProcessManagerOutboxStatus {
@@ -3435,6 +3595,13 @@ model ProcessManagerOutbox {
   @@unique([processName, projectId, messageKey])
   @@index([processName, projectId, processKey, createdAt])
   @@index([status, nextAttemptAt, leasedUntil])
+  // Do not add an index on `dispatchedAt` here. The retention sweep can use a
+  // partial one (WHERE status = 'dispatched'), but Prisma cannot express a
+  // partial index and a deploy-time CREATE INDEX holds a SHARE lock that
+  // blocks INSERT on this table, the highest-volume write path in the system.
+  // The index is ops-managed instead: built with CREATE INDEX CONCURRENTLY,
+  // see dev/docs/runbooks/process-manager-table-purge.md. The sweep works
+  // without it on the bounded table it maintains.
 }
 
 /// Per-project topic clustering run status (ADR-051): the rebuildable

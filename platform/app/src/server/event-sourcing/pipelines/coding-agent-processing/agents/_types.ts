@@ -30,6 +30,7 @@ export type CodingAgentEvent =
   | "api_error"
   | "api_refusal"
   | "retries_exhausted"
+  | "rate_limit"
   | "tool_result"
   | "tool_decision"
   | "compaction"
@@ -40,6 +41,11 @@ export type CodingAgentEvent =
   | "at_mention"
   | "internal_error"
   | "session_created"
+  /**
+   * The LangWatch companion event: the session's repository, branch and
+   * worktree identity, which no agent exports on its own telemetry.
+   */
+  | "session_context"
   | "session_idle"
   | "session_error"
   | "subtask_invoked"

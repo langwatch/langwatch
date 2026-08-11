@@ -26,6 +26,16 @@ interface EndpointGroup {
   dirName: string;
   pathPrefixes: string[];
   overviewDescription: string;
+  /**
+   * `METHOD /path` keys, in the order a reader should meet them.
+   *
+   * The default sort is CRUD-shaped — list, create, get, update, delete — which
+   * is right for a resource but wrong for a family that is a sequence of steps.
+   * A group whose overview describes a lifecycle sets this so the sidebar and
+   * the prose agree; anything the list omits falls in behind, still sorted the
+   * default way.
+   */
+  endpointOrder?: string[];
 }
 
 const METHOD_ORDER = ["get", "post", "put", "patch", "delete"] as const;
@@ -38,9 +48,6 @@ const METHOD_ORDER = ["get", "post", "put", "patch", "delete"] as const;
  */
 const RETIRED_GATEWAY_PROVIDER_BINDINGS =
   "Retired surface, intentionally undocumented: the gateway provider binding routes answer 410 Gone, and the credentials they wrapped are managed under /api/model-providers.";
-
-const UNDOCUMENTED_EXPERIMENT_RUNS =
-  "Not yet documented in the API reference: the Evaluations v3 experiment run routes have no reference pages yet.";
 
 const UNDOCUMENTED_INGESTION_TEMPLATES =
   "Not yet documented in the API reference: the governance ingestion template routes have no reference pages yet.";
@@ -64,10 +71,6 @@ const SKIP_PATHS: Record<string, string> = {
     "Retired surface, intentionally undocumented: superseded by /api/traces/{traceId}.",
   "/api/gateway/v1/providers": RETIRED_GATEWAY_PROVIDER_BINDINGS,
   "/api/gateway/v1/providers/{id}": RETIRED_GATEWAY_PROVIDER_BINDINGS,
-  "/api/events/track":
-    "Not yet documented in the API reference: the trace event tracking route has no reference page yet.",
-  "/api/experiments/runs/{runId}": UNDOCUMENTED_EXPERIMENT_RUNS,
-  "/api/experiments/{slug}/run": UNDOCUMENTED_EXPERIMENT_RUNS,
   "/api/governance/ingestion-templates": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/admin": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/clone": UNDOCUMENTED_INGESTION_TEMPLATES,
@@ -103,11 +106,40 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Manage evaluator configurations for your project. Create, update, and organize evaluators used for online evaluations, guardrails, and experiments.",
   },
   {
-    name: "Evaluations v3",
+    name: "Evaluations",
     dirName: "evaluations",
-    pathPrefixes: ["/api/evaluations"],
+    // The guardrail path is the same call in gating mode, so it reads with the
+    // evaluate endpoints rather than in a section of its own.
+    pathPrefixes: ["/api/evaluations", "/api/guardrails"],
     overviewDescription:
-      "Run and monitor evaluation experiments. Start evaluation runs and poll for progress and results.",
+      "Run an evaluator over a single input and get its score back, or run it as a guardrail and gate on one boolean. List the built-in evaluators to see which ids you can address and what each one needs.",
+    endpointOrder: [
+      "GET /api/evaluations/list",
+      "POST /api/evaluations/{evaluator}/evaluate",
+      "POST /api/evaluations/{evaluator}/{subpath}/evaluate",
+      "POST /api/guardrails/{evaluator}/evaluate",
+    ],
+  },
+  {
+    name: "Experiments",
+    dirName: "experiments",
+    // Two prefixes, because the create endpoint is singular: `/api/experiments`
+    // does not start with `/api/experiment/`, so one prefix would leave either
+    // the create call or the rest of the family unowned.
+    pathPrefixes: ["/api/experiments", "/api/experiment", "/api/dspy"],
+    overviewDescription:
+      "Create experiments, run them, and read their results over HTTP. Create an experiment against a slug you choose, start a run, then poll it and pull the per-row results. This is the same surface the SDKs use, so anything they do you can do directly.",
+    // The order the overview describes, so a reader going down the sidebar
+    // meets the calls in the order they would make them.
+    endpointOrder: [
+      "POST /api/experiment/init",
+      "GET /api/experiments",
+      "POST /api/experiments/{slug}/run",
+      "GET /api/experiments/runs",
+      "GET /api/experiments/runs/{runId}",
+      "GET /api/experiments/runs/{runId}/results",
+      "POST /api/dspy/log_steps",
+    ],
   },
   {
     name: "Monitors",
@@ -165,16 +197,35 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Manage AI agent configurations. Create, update, and organize agents that are tracked and evaluated in LangWatch.",
   },
   {
+    name: "Coding Agents",
+    dirName: "coding-agents",
+    pathPrefixes: ["/api/coding-agent"],
+    overviewDescription:
+      "Read what a coding agent session did and what it cost. Walk one session's events call by call, with the tokens, cost and compactions of each, or roll a whole pull request up into sessions, tokens and cost per project, user and agent.",
+  },
+  {
     name: "Triggers",
     dirName: "triggers",
-    pathPrefixes: ["/api/triggers"],
+    pathPrefixes: ["/api/triggers", "/api/trigger"],
     overviewDescription:
       "Manage automation triggers that fire actions based on trace events. Create Slack notifications, webhooks, and other automated responses.",
   },
   {
+    name: "Events",
+    dirName: "events",
+    // `/api/track_event` is the older spelling of the same call, still the one
+    // most SDK versions in the wild send.
+    pathPrefixes: ["/api/events", "/api/track_event"],
+    overviewDescription:
+      "Record customer events against a trace or thread, so behaviour like a thumbs-up, a conversion or a refund sits alongside the trace that produced it.",
+    endpointOrder: ["POST /api/events/track", "POST /api/track_event"],
+  },
+  {
     name: "Workflows",
     dirName: "workflows",
-    pathPrefixes: ["/api/workflows"],
+    // `/api/optimization/...` is the older spelling of the version-pinned
+    // workflow run, and reads as part of the same family.
+    pathPrefixes: ["/api/workflows", "/api/optimization"],
     overviewDescription:
       "Manage Optimization Studio workflows. List, update, and archive workflows used for prompt optimization and agent design.",
   },
@@ -233,6 +284,96 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     pathPrefixes: ["/api/groups"],
     overviewDescription:
       "Manage groups: named sets of members that carry role bindings and can hold a per-member spend allowance.",
+  },
+  {
+    name: "Organization",
+    dirName: "organization",
+    // Members and invites live under this prefix but read as families of their
+    // own, so they carry longer prefixes below and win ownership of their paths.
+    pathPrefixes: ["/api/organization"],
+    overviewDescription:
+      "Read and update the organization the calling credential belongs to: its name, support contact, presence and trace sharing settings, and its stored-object storage.",
+  },
+  {
+    name: "Members",
+    dirName: "members",
+    pathPrefixes: ["/api/organization/members"],
+    overviewDescription:
+      "Manage the people in the organization: list them, read one with the teams they reach, change an organization role, disable or re-enable access, remove someone, and read the full breakdown of what a member can reach.",
+  },
+  {
+    name: "Invites",
+    dirName: "invites",
+    pathPrefixes: ["/api/organization/invites"],
+    overviewDescription:
+      "Invite people into the organization in batches, with the teams and roles they land on, and list or revoke the invites still waiting to be accepted.",
+  },
+  {
+    name: "Roles",
+    dirName: "roles",
+    pathPrefixes: ["/api/roles"],
+    overviewDescription:
+      "Build custom roles out of the permission catalog and keep them up to date. A role is a named set of resource and action permissions that a role binding then grants to someone, somewhere.",
+    // The catalog comes first because it is where the permission keys a role is
+    // built from come from, and the overview walks a reader in that order.
+    endpointOrder: [
+      "GET /api/roles/permissions",
+      "GET /api/roles",
+      "POST /api/roles",
+      "GET /api/roles/{id}",
+      "PATCH /api/roles/{id}",
+      "DELETE /api/roles/{id}",
+    ],
+  },
+  {
+    name: "Role Bindings",
+    dirName: "role-bindings",
+    pathPrefixes: ["/api/role-bindings"],
+    overviewDescription:
+      "Grant a role to one principal, a user, a group or an API key, at one scope: the organization, a team, or a single project. Role bindings are how every kind of access in LangWatch is expressed.",
+  },
+  {
+    name: "SCIM Tokens",
+    dirName: "scim-tokens",
+    pathPrefixes: ["/api/scim-tokens"],
+    overviewDescription:
+      "Mint, list and revoke the bearer tokens an identity provider uses to reach the SCIM endpoints. Token values are shown once, when they are created, and never again.",
+  },
+  {
+    name: "SCIM",
+    dirName: "scim",
+    pathPrefixes: ["/api/scim/v2"],
+    overviewDescription:
+      "The SCIM 2.0 endpoints an identity provider calls to provision and deprovision users and groups. Point Okta, Entra ID or any other SCIM 2.0 provider at this base URL with a SCIM token.",
+    // Discovery first, then the two resource types whole, because a provider
+    // reads the service provider configuration before it calls anything else,
+    // and the default sort would interleave Users and Groups.
+    endpointOrder: [
+      "GET /api/scim/v2/ServiceProviderConfig",
+      "GET /api/scim/v2/ResourceTypes",
+      "GET /api/scim/v2/Schemas",
+      "GET /api/scim/v2/Users",
+      "POST /api/scim/v2/Users",
+      "GET /api/scim/v2/Users/{id}",
+      "PUT /api/scim/v2/Users/{id}",
+      "PATCH /api/scim/v2/Users/{id}",
+      "DELETE /api/scim/v2/Users/{id}",
+      "GET /api/scim/v2/Groups",
+      "POST /api/scim/v2/Groups",
+      "GET /api/scim/v2/Groups/{id}",
+      "PUT /api/scim/v2/Groups/{id}",
+      "PATCH /api/scim/v2/Groups/{id}",
+      "DELETE /api/scim/v2/Groups/{id}",
+    ],
+  },
+  {
+    name: "Organizations (Self-Hosted)",
+    dirName: "organizations",
+    // Plural, and a different family from `/api/organization`: this one
+    // authenticates against the instance, before any organization exists.
+    pathPrefixes: ["/api/organizations"],
+    overviewDescription:
+      "Create organizations on a self-hosted instance with an instance administrator credential, and read the ones already there. This is where an infrastructure-as-code run starts, because it hands back the first organization admin API key.",
   },
   {
     name: "API Keys",
@@ -464,6 +605,76 @@ function main() {
     process.exit(1);
   }
 
+  // An `endpointOrder` key only sorts the group that declares it, so a key is
+  // invisible unless it names an operation THAT group owns: the sort silently
+  // falls back to the default for it. A drifted path parameter name, a casing
+  // slip, or a key naming a sibling group's path therefore reshuffles the
+  // sidebar with no diagnostic at all, which is exactly what a hand-written
+  // key list is prone to. The two failures get separate reports because their
+  // remedies differ: one is a typo, the other is a key in the wrong group.
+  const specOperations = new Set<string>();
+  const operationOwner = new Map<string, EndpointGroup>();
+  const groupOperations = new Map<EndpointGroup, Set<string>>(
+    ENDPOINT_GROUPS.map((group) => [group, new Set<string>()])
+  );
+  for (const [apiPath, methods] of Object.entries(spec.paths)) {
+    const owner = owners.get(apiPath);
+    for (const method of Object.keys(methods)) {
+      if (!METHOD_ORDER.includes(method)) continue;
+      const key = `${method.toUpperCase()} ${apiPath}`;
+      specOperations.add(key);
+      if (owner) {
+        operationOwner.set(key, owner);
+        groupOperations.get(owner)?.add(key);
+      }
+    }
+  }
+
+  const unknownOrder: string[] = [];
+  const misownedOrder: string[] = [];
+  for (const group of ENDPOINT_GROUPS) {
+    for (const key of group.endpointOrder ?? []) {
+      if (groupOperations.get(group)?.has(key)) continue;
+      if (!specOperations.has(key)) {
+        unknownOrder.push(`${group.name}: ${key}`);
+        continue;
+      }
+      const owner = operationOwner.get(key);
+      misownedOrder.push(
+        `${group.name}: ${key} (${
+          owner ? `owned by ${owner.name}` : "excluded by SKIP_PATHS"
+        })`
+      );
+    }
+  }
+
+  if (unknownOrder.length > 0) {
+    const noun = unknownOrder.length === 1 ? "key matches" : "keys match";
+    console.error(
+      `ERROR: ${unknownOrder.length} endpointOrder ${noun} no operation in the spec:`
+    );
+    for (const entry of unknownOrder.sort()) console.error(`  ${entry}`);
+    console.error(
+      "\nSpell the METHOD and path exactly as the spec does, path parameter names and casing included, or drop the key from endpointOrder in docs/scripts/generate-api-reference-pages.ts."
+    );
+  }
+  if (misownedOrder.length > 0) {
+    const noun =
+      misownedOrder.length === 1
+        ? "key names an operation"
+        : "keys name operations";
+    console.error(
+      `ERROR: ${misownedOrder.length} endpointOrder ${noun} the declaring group does not own, so the key sorts nothing:`
+    );
+    for (const entry of misownedOrder.sort()) console.error(`  ${entry}`);
+    console.error(
+      "\nMove the key to the group that owns the path, widen that group's pathPrefixes, or drop the key from endpointOrder in docs/scripts/generate-api-reference-pages.ts. A path excluded by SKIP_PATHS gets no page at all, so it can never be ordered."
+    );
+  }
+  if (unknownOrder.length > 0 || misownedOrder.length > 0) {
+    process.exit(1);
+  }
+
   for (const group of ENDPOINT_GROUPS) {
     const dirPath = path.join(API_REF_DIR, group.dirName);
     fs.mkdirSync(dirPath, { recursive: true });
@@ -487,7 +698,24 @@ function main() {
 
     if (endpoints.length === 0) continue;
 
+    // A declared order wins; everything it does not name keeps the CRUD sort
+    // and follows behind, so adding a route never silently reshuffles the rest.
+    const declaredOrder = group.endpointOrder ?? [];
+    const declaredIndex = ({
+      method,
+      apiPath,
+    }: {
+      method: string;
+      apiPath: string;
+    }): number => {
+      const at = declaredOrder.indexOf(`${method.toUpperCase()} ${apiPath}`);
+      return at === -1 ? Number.MAX_SAFE_INTEGER : at;
+    };
+
     endpoints.sort((a, b) => {
+      const aDeclared = declaredIndex({ method: a.method, apiPath: a.path });
+      const bDeclared = declaredIndex({ method: b.method, apiPath: b.path });
+      if (aDeclared !== bDeclared) return aDeclared - bDeclared;
       const aScore = sortScore(a.method, a.path);
       const bScore = sortScore(b.method, b.path);
       if (aScore !== bScore) return aScore - bScore;
@@ -593,14 +821,7 @@ const BUILTIN_EVALUATOR_CATEGORIES: Record<string, string[]> = {
     "summarization-score",
   ],
   "RAG Quality": [
-    "ragas-answer-correctness",
-    "ragas-answer-relevancy",
-    "ragas-context-precision",
-    "ragas-context-recall",
-    "ragas-context-relevancy",
-    "ragas-context-utilization",
     "ragas-faithfulness",
-    "ragas-faithfulness-1",
     "ragas-response-context-precision",
     "ragas-response-context-recall",
     "ragas-response-relevancy",

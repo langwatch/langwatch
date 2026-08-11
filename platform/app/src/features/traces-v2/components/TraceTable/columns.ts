@@ -221,11 +221,21 @@ const traceColumnDefs = {
     maxSize: 640,
     enableSorting: false,
   }),
-  events: traceCol.accessor((row) => row.events.length, {
+  events: traceCol.accessor((row) => row.events.totalCount, {
     id: "events",
     header: "Events",
     size: 250,
     minSize: 140,
+    enableSorting: false,
+  }),
+  annotations: traceCol.accessor((row) => row.annotations?.length ?? 0, {
+    id: "annotations",
+    header: "Annotations",
+    // Wide enough for the four counts a thoroughly reviewed trace carries on
+    // one line; past that they wrap rather than overflow. The floor fits the
+    // "ANNOTATIONS" header, which is wider than any single chip.
+    size: 240,
+    minSize: 130,
     enableSorting: false,
   }),
   status: traceCol.accessor("status", {
@@ -297,7 +307,7 @@ const conversationColumnDefs: Record<
 > = {
   conversation: convCol.accessor("conversationId", {
     id: "conversation",
-    header: "Conversation",
+    header: "Session",
     size: 9999,
     minSize: 320,
     meta: flex,
@@ -315,15 +325,17 @@ const conversationColumnDefs: Record<
   }),
   lastTurn: convCol.accessor("latestTimestamp", {
     id: "lastTurn",
-    header: "Last Turn",
-    size: 110,
-    minSize: 100,
+    header: "Last Activity",
+    size: 115,
+    minSize: 105,
   }),
-  turns: convCol.accessor((row) => row.traces.length, {
+  // True per-session rollup, NOT the page-local `traces.length`: server
+  // grouping counts every trace of the session in range.
+  turns: convCol.accessor("traceCount", {
     id: "turns",
-    header: "Turns",
-    size: 75,
-    minSize: 70,
+    header: "Traces",
+    size: 80,
+    minSize: 72,
     meta: num,
   }),
   duration: convCol.accessor("totalDuration", {
@@ -346,6 +358,57 @@ const conversationColumnDefs: Record<
     size: 95,
     minSize: 85,
     meta: num,
+  }),
+  contextSize: convCol.accessor((row) => row.contextSizeTokens ?? 0, {
+    id: "contextSize",
+    header: "Context Size",
+    size: 110,
+    minSize: 100,
+    meta: num,
+    enableSorting: false,
+  }),
+  // Pre-folded coding-agent counters, only populated when the session's
+  // conversation id matches a coding-agent session row.
+  modelCalls: convCol.accessor((row) => row.modelCalls ?? 0, {
+    id: "modelCalls",
+    header: "Model Calls",
+    size: 105,
+    minSize: 95,
+    meta: num,
+    enableSorting: false,
+  }),
+  compactions: convCol.accessor((row) => row.compactions ?? 0, {
+    id: "compactions",
+    header: "Compactions",
+    size: 110,
+    minSize: 100,
+    meta: num,
+    enableSorting: false,
+  }),
+  // Where the session ran and what it produced. The session rollup does not
+  // order by either, so neither offers a sort.
+  repository: convCol.accessor(
+    (row) =>
+      row.repositoryOwner && row.repositoryName
+        ? `${row.repositoryOwner}/${row.repositoryName}`
+        : "",
+    {
+      id: "repository",
+      header: "Repository",
+      size: 180,
+      minSize: 120,
+      enableSorting: false,
+    },
+  ),
+  // `null` when the session has no mapped pull request, never `0`: zero is a
+  // number a reader would take for a pull request. The cell renders the
+  // missing case as a dash.
+  pullRequest: convCol.accessor((row) => row.pullRequest?.number ?? null, {
+    id: "pullRequest",
+    header: "Pull Request",
+    size: 115,
+    minSize: 105,
+    enableSorting: false,
   }),
   model: convCol.accessor("primaryModel", {
     id: "model",

@@ -19,13 +19,11 @@
  */
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { getAllClickHouseInstances } from "~/server/clickhouse/clickhouseClient";
+import { getApp } from "~/server/app-layer/app";
 
 const tracer = getLangWatchTracer(
   "langwatch.stored-objects.cross-tenant-lookup",
 );
-
-const TABLE_NAME = "stored_objects";
 
 /**
  * Thrown when no instance returned a hit AND at least one instance failed.
@@ -86,52 +84,17 @@ export async function resolveStoredObjectOwner({
       },
     },
     async (span) => {
-      const instances = await getAllClickHouseInstances();
-      if (instances.length === 0) {
-        throw new Error(
-          "ClickHouse is not configured — cannot resolve owner project for stored object",
-        );
-      }
-      span.setAttribute("clickhouse.instances_searched", instances.length);
+      const repository = getApp().storedObjects.crossTenantOwnerLookup;
+      const { hit, failedTargets, instancesSearched } =
+        await repository.findOwner(id);
 
-      const lookups = instances.map(async ({ client, target }) => {
-        const result = await client.query({
-          query: `
-            SELECT project_id
-            FROM ${TABLE_NAME}
-            WHERE id = {id:String}
-            LIMIT 1
-          `,
-          query_params: { id },
-          format: "JSONEachRow",
-        });
-        const rows = await result.json<{ project_id: string }>();
-        return rows.length > 0
-          ? { projectId: rows[0]!.project_id, target }
-          : null;
-      });
-
-      const settled = await Promise.allSettled(lookups);
-
-      const failedTargets: string[] = [];
-      let hit: { projectId: string; target: string } | null = null;
-      settled.forEach((r, index) => {
-        if (r.status === "fulfilled") {
-          if (r.value !== null && hit === null) {
-            hit = r.value;
-          }
-        } else {
-          failedTargets.push(instances[index]!.target);
-        }
-      });
-
+      span.setAttribute("clickhouse.instances_searched", instancesSearched);
       span.setAttribute("clickhouse.instances_failed", failedTargets.length);
 
       if (hit) {
-        const found: { projectId: string; target: string } = hit;
         span.setAttribute("result.found", true);
-        span.setAttribute("result.matched_instance", found.target);
-        return { projectId: found.projectId };
+        span.setAttribute("result.matched_instance", hit.target);
+        return { projectId: hit.projectId };
       }
 
       if (failedTargets.length > 0) {

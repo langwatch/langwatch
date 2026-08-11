@@ -82,14 +82,18 @@ import {
   initializeInProcessApp,
   initializeWebApp,
 } from "./server/app-layer/presets";
+import { assetBaseOrigin, getAssetBase } from "./server/asset-base";
 import {
   getWorkerMetricsPort,
   isMetricsAuthorized,
   normalizeMetricsPath,
 } from "./server/metrics";
+import { canonicalOtlpPath } from "./server/otel/otlpPathCanonicalisation";
 import { shutdownPostHog } from "./server/posthog";
 import { verifyRedisReady } from "./server/redis";
 import { buildSecurityHeaders } from "./server/securityHeaders";
+import { SHUTDOWN_BUDGET } from "./server/shutdown/budget";
+import { installShutdownHandlers } from "./server/shutdown/runGracefulShutdown";
 import { serveStaticOrFallback } from "./server/static-handler";
 import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
 import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
@@ -105,7 +109,17 @@ export const metricsMiddleware = promBundle({
   customLabels: { project_name: "langwatch" },
   bypass: {
     onRequest: (req) => {
-      if (/^\/(api|assets|auth|settings|share|$)/.test(req.url ?? "")) {
+      // The three root-level OTLP paths a misconfigured exporter posts to are
+      // served by the API (see the handler below), so leaving them out would
+      // hide exactly the traffic worth watching. The OTLP branch is the only
+      // one anchored at the end: the others are deliberately prefixes, while
+      // this one must not let `/v1/traces-anything` in and turn a claim of
+      // three bounded labels into an open set.
+      if (
+        /^\/(?:api|assets|auth|settings|share|v1\/(?:traces|logs|metrics)\/?(?:\?.*)?$|$)/.test(
+          req.url ?? "",
+        )
+      ) {
         return false;
       }
       return true;
@@ -199,7 +213,12 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
   // In production, resolve the built client assets directory
   const clientDistDir = dev ? null : path.join(dir, "dist/client");
 
-  const securityHeaders = buildSecurityHeaders({ dev });
+  // ADR-086: getAssetBase() throws here at boot when the base is misconfigured
+  // — fail fast rather than serve broken asset URLs.
+  const securityHeaders = buildSecurityHeaders({
+    dev,
+    assetOrigin: assetBaseOrigin(getAssetBase()),
+  });
 
   // Optional HTTPS + HTTP/2 path for local dev. Set
   // `LANGWATCH_DEV_HTTP2=1` and a self-signed cert is auto-generated on
@@ -271,7 +290,15 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
       });
 
       // ---- API Routes (all go through Hono) ----
-      if (pathname.startsWith("/api/")) {
+      // An exporter given the site root as its OTLP endpoint posts to
+      // `/v1/traces`, which the SPA fallback below answers with the HTML shell
+      // and a 200 — the exporter reads that as success and drops the batch.
+      // Those paths belong to the API, which canonicalises them
+      // (src/server/routes/otel-path-aliases.ts).
+      if (
+        pathname.startsWith("/api/") ||
+        canonicalOtlpPath(pathname) !== null
+      ) {
         await apiListener(req, res);
         return;
       }
@@ -370,42 +397,66 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
   // it just doesn't wait for the still-booting workers to drain).
   let workerHandle: WorkerHandle | undefined;
 
-  // Graceful shutdown
-  const shutdown = async (signal: string) => {
-    logger.info({ signal }, "Received signal, shutting down...");
-    const forceExitTimer = setTimeout(() => {
-      logger.warn("Graceful shutdown timed out after 5s, forcing exit");
-      process.exit(1);
-    }, 5_000);
-    forceExitTimer.unref();
-    // Politely tell WS clients to reconnect *before* tearing down the
-    // socket — gives them tRPC's staggered reconnect path instead of a
-    // hard TCP RST and a thundering herd on the next pod.
-    try {
-      wsHandle.broadcastReconnectNotification();
-      await wsHandle.close();
-    } catch (error) {
-      logger.warn({ error }, "error while closing tRPC websocket server");
-    }
-    server.close();
-    if ("closeAllConnections" in server) server.closeAllConnections();
-    mcpHandler.closeAllSessions();
-    // Drain in-process workers (if any) before closing the shared App below,
-    // so jobs stop accepting/draining before ClickHouse / Redis / Prisma go away.
-    try {
-      await workerHandle?.shutdown();
-    } catch (error) {
-      logger.error({ error }, "error shutting down in-process workers");
-    }
-    try {
-      await Promise.all([getApp().close(), shutdownPostHog()]);
-    } catch (error) {
-      logger.error({ error }, "Failed to close App");
-    }
-    process.exit(0);
-  };
-  process.on("SIGTERM", () => void shutdown("SIGTERM"));
-  process.on("SIGINT", () => void shutdown("SIGINT"));
+  // Graceful shutdown. The deadline comes from server/shutdown/budget.ts
+  // rather than a literal here: this handler used to force-exit after 5s,
+  // which is inside the GroupQueue's own drain budget, so under the `all`
+  // role (this process hosting the worker stack) a drain could never finish
+  // however long the queue was told it had.
+  installShutdownHandlers((signal) => ({
+    signal,
+    logger,
+    phases: [
+      // Politely tell WS clients to reconnect *before* tearing down the
+      // socket — gives them tRPC's staggered reconnect path instead of a
+      // hard TCP RST and a thundering herd on the next pod.
+      {
+        name: "websockets",
+        run: async () => {
+          wsHandle.broadcastReconnectNotification();
+          await wsHandle.close();
+        },
+      },
+      {
+        name: "http-server",
+        run: async () => {
+          // Stop accepting, then let requests already in flight finish.
+          // closeAllConnections() destroys active sockets, so calling it
+          // outright turned every rolling deploy into a burst of 502s for
+          // whatever was mid-request. Idle connections go immediately; the
+          // rest get the phase's budget and are only destroyed if they
+          // outlast it.
+          const closed = new Promise<void>((resolve) =>
+            server.close(() => resolve()),
+          );
+          if ("closeIdleConnections" in server) server.closeIdleConnections();
+          mcpHandler.closeAllSessions();
+          try {
+            await closed;
+          } finally {
+            if ("closeAllConnections" in server) server.closeAllConnections();
+          }
+        },
+      },
+      // Drain in-process workers (if any) before closing the shared App below,
+      // so jobs stop accepting/draining before ClickHouse / Redis / Prisma go
+      // away.
+      {
+        name: "in-process-workers",
+        run: async () => await workerHandle?.shutdown(),
+      },
+      // Carries the queue drain when this process hosts the worker stack, so
+      // it gets the whole budget rather than the default per-phase ceiling;
+      // App.close bounds it from the inside.
+      {
+        name: "app",
+        // See workers.ts: below the watchdog on purpose, so this bound can
+        // actually fire before the process deadline does.
+        timeoutMs: SHUTDOWN_BUDGET.appCloseMs + 5_000,
+        run: async () => await getApp().close({ terminating: true }),
+      },
+      { name: "posthog", run: async () => await shutdownPostHog() },
+    ],
+  }));
 
   process.on("uncaughtException", (err) => {
     logger.fatal({ error: err }, "uncaught exception detected");
