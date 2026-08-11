@@ -19,8 +19,13 @@ The required AI reviewers are:
 - **CodeRabbit** (`coderabbitai[bot]`) — counted from its latest review's
   commit SHA.
 - **The LangWatch PR reviewer** (`langwatch-agent`) — counted only from a
-  review containing its machine-readable `LangWatch-Review:` verdict trailer;
-  the trailer's SHA states which head the agent actually read.
+  review containing its machine-readable `LangWatch-Review:` verdict trailer.
+  The trailer's SHA states which head the agent actually read, and its
+  verdict must be `clean`: a `findings` verdict never counts as coverage —
+  the agent must post a fresh clean review once the findings are addressed.
+
+A dismissed review never counts, for either reviewer — a dismissal is an
+explicit statement that the review no longer stands.
 
 A review counts for the current head when its SHA matches the head, **or**
 the changes since the reviewed SHA are only minor tweaks: a small number of
@@ -47,7 +52,8 @@ absolutely — a PR is **never** AI-reviewed-mergeable if it touches:
 - Database schemas, migrations, or data models.
 - Business-critical logic (billing, reporting, financial calculations).
 - Integrations with third-party systems or external APIs.
-- CI/CD workflows or the policy documents governing this process.
+- CI/CD workflows, anything under `.github/` (the automation's own rules
+  live there), or the policy documents governing this process.
 
 These changes always require human review, no matter how clean the AI
 reviews are.

@@ -54,10 +54,12 @@ concurrency:
 
 env:
   # Paths never eligible for ANY automated approval lane. Includes every
-  # policy/prompt document the evaluator reads — changes to the rules are
-  # never themselves auto-approvable. Kept as an ERE that is also a valid
-  # JS RegExp: shell steps use it with grep -E, script steps with RegExp().
-  RESTRICTED_PATTERN: '^(\.github/workflows/|dev/docs/LOW_RISK_PULL_REQUESTS\.md$|dev/docs/AI_REVIEWED_PULL_REQUESTS\.md$|dev/docs/PR_IMPACT_EVALUATION\.md$|(auth|security|migrations|prisma)/|.*/(auth|security|migrations|prisma)/)'
+  # policy/prompt document the evaluator reads AND all of `.github/` — the
+  # workflows, the decisions module (`.github/scripts/`), and the composite
+  # action are the rules, and changes to the rules are never themselves
+  # auto-approvable. Kept as an ERE that is also a valid JS RegExp: shell
+  # steps use it with grep -E, script steps with RegExp().
+  RESTRICTED_PATTERN: '^(\.github/|dev/docs/LOW_RISK_PULL_REQUESTS\.md$|dev/docs/AI_REVIEWED_PULL_REQUESTS\.md$|dev/docs/PR_IMPACT_EVALUATION\.md$|(auth|security|migrations|prisma)/|.*/(auth|security|migrations|prisma)/)'
 
 jobs:
   preflight:
@@ -252,13 +254,21 @@ jobs:
       github.event.pull_request.user.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
-      - name: Verify every commit is Dependabot-authored, then approve
+      # Base-branch checkout: the decisions module must come from the base,
+      # never from the PR being judged.
+      - name: Checkout repo (decisions module)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Verify every commit is Dependabot-authored and verified, then approve
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ needs.preflight.outputs.head_sha }}
         with:
           script: |
+            const decisions = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/pr-auto-approve-decisions.cjs`);
             const prNumber = parseInt(process.env.PR_NUMBER, 10);
             const commits = await github.paginate(github.rest.pulls.listCommits, {
               owner: context.repo.owner,
@@ -267,11 +277,13 @@ jobs:
             });
             // A human pushing to the branch (a fix-up, a rebase with edits)
             // means the diff is no longer purely machine-generated — the
-            // fast lane no longer applies and normal review does.
-            const foreign = commits.filter(c => c.author?.login !== "dependabot[bot]");
-            if (foreign.length > 0) {
-              const who = [...new Set(foreign.map(c => c.author?.login ?? "unknown"))].join(", ");
-              core.info(`PR #${prNumber} has ${foreign.length} non-Dependabot commit(s) (${who}); normal review applies.`);
+            // fast lane no longer applies and normal review does. Commits
+            // must also carry GitHub-verified signatures: the author field
+            // alone is spoofable by anyone who can push to the branch.
+            const verdict = decisions.dependabotLaneVerdict(commits);
+            if (!verdict.approve) {
+              const who = [...new Set(verdict.foreign.map(c => `${c.login}${c.verified ? "" : " (unverified)"}`))].join(", ");
+              core.info(`PR #${prNumber} has ${verdict.foreign.length} commit(s) outside the Dependabot lane (${who}); normal review applies.`);
               return;
             }
             await github.rest.pulls.createReview({
@@ -280,7 +292,7 @@ jobs:
               pull_number: prNumber,
               commit_id: process.env.HEAD_SHA,
               event: "APPROVE",
-              body: "Approved by automation: Dependabot-authored dependency update — every commit on the branch is authored by `dependabot[bot]`. Required status checks still gate the merge.",
+              body: "Approved by automation: Dependabot-authored dependency update — every commit on the branch is authored by `dependabot[bot]` with a GitHub-verified signature. Required status checks still gate the merge.",
             });
             core.info(`PR #${prNumber} approved via the Dependabot lane.`);
 
@@ -297,12 +309,13 @@ jobs:
       github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     outputs:
-      qualifies: ${{ steps.oversized.outputs.qualifies || steps.restricted.outputs.qualifies || steps.llm.outputs.qualifies }}
+      qualifies: ${{ steps.apply.outputs.qualifies }}
     steps:
       # Deliberately checkout the base branch, not the PR head, because this is
       # a `pull_request_target` workflow with write permissions and access to
-      # secrets. Reading the policy docs from the base prevents a PR from
-      # changing the policy that evaluates itself.
+      # secrets. Reading the policy docs, the composite action, and the
+      # decisions module from the base prevents a PR from changing the policy
+      # that evaluates itself.
       - name: Checkout repo (policy docs)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -330,190 +343,41 @@ jobs:
               }
             }
 
-      - name: Fetch PR diff and metadata
-        id: pr-data
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json title,body --template '{{.title}}' > /tmp/pr_title.txt
-          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json title,body --template '{{.body}}' > /tmp/pr_body.txt
-          gh api --paginate \
-            "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" \
-            --jq '.[].filename' > /tmp/pr_files.txt
+      - name: Evaluate PR impact
+        id: impact
+        uses: ./.github/actions/pr-impact-eval
+        with:
+          pr-number: ${{ github.event.pull_request.number }}
+          github-token: ${{ github.token }}
+          openai-api-key: ${{ secrets.LOW_RISK_OPENAI_API_KEY }}
+          restricted-pattern: ${{ env.RESTRICTED_PATTERN }}
 
-          # GitHub's PR diff endpoint returns HTTP 406 on a PR it will not
-          # serve: above 300 changed files, and independently above 20000 diff
-          # lines. Only the file count is knowable before the call, so it is
-          # checked first and the 406 from the call itself lands on the same
-          # oversized verdict rather than killing the step. The paginated files
-          # endpoint has no such ceiling and remains useful for the audit trail.
-          FILE_LIMIT=300
-          FILE_COUNT=$(wc -l < /tmp/pr_files.txt)
-          DIFF_LIMIT=100000
-          if [ "$FILE_COUNT" -gt "$FILE_LIMIT" ]; then
-            echo "PR changes ${FILE_COUNT} files (> ${FILE_LIMIT}); too large for automated evaluation."
-            echo "oversized=true" >> "$GITHUB_OUTPUT"
-          elif ! gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" > /tmp/pr_diff.txt; then
-            echo "PR diff exceeds what the API will serve; too large for automated evaluation."
-            echo "oversized=true" >> "$GITHUB_OUTPUT"
-          else
-            DIFF_SIZE=$(wc -c < /tmp/pr_diff.txt)
-            if [ "$DIFF_SIZE" -gt "$DIFF_LIMIT" ]; then
-              echo "PR diff is ${DIFF_SIZE} chars (> ${DIFF_LIMIT}); too large for automated evaluation."
-              echo "oversized=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "oversized=false" >> "$GITHUB_OUTPUT"
-              cp /tmp/pr_diff.txt /tmp/pr_diff_truncated.txt
-            fi
-          fi
-
-      - name: Fail fast for oversized diffs
-        id: oversized
-        if: steps.pr-data.outputs.oversized == 'true'
-        run: |
-          {
-            echo "qualifies=false"
-            echo "scope=Diff too large for automated evaluation"
-            echo "reasoning=This PR's diff exceeds the size limit for automated evaluation. Manual review required."
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Check for restricted paths
-        id: path-check
-        if: steps.pr-data.outputs.oversized == 'false'
-        run: |
-          if grep -qE "$RESTRICTED_PATTERN" /tmp/pr_files.txt; then
-            echo "Restricted paths detected:"
-            grep -E "$RESTRICTED_PATTERN" /tmp/pr_files.txt
-            echo "blocked=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "blocked=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Fail fast for restricted paths
-        id: restricted
-        if: steps.path-check.outputs.blocked == 'true'
-        run: |
-          {
-            echo "qualifies=false"
-            echo "scope=Changes include restricted paths (workflows, auth, migrations, etc.)"
-            echo "reasoning=This PR modifies files in restricted directories that require manual review per policy."
-          } >> "$GITHUB_OUTPUT"
-
-      # Keep this step in sync with the ai-reviewed job's `llm-ai` step: same
-      # evaluator prompt, same schema — only the qualification rule differs
-      # (low lane: impact=low + low_risk_qualifies; ai lane: impact ≤ medium).
-      - name: Evaluate PR impact with OpenAI
-        id: llm
-        if: steps.pr-data.outputs.oversized == 'false' && steps.path-check.outputs.blocked == 'false'
-        env:
-          OPENAI_API_KEY: ${{ secrets.LOW_RISK_OPENAI_API_KEY }}
-        run: |
-          EVALUATOR=$(cat dev/docs/PR_IMPACT_EVALUATION.md)
-          LOW_POLICY=$(cat dev/docs/LOW_RISK_PULL_REQUESTS.md)
-          AI_POLICY=$(cat dev/docs/AI_REVIEWED_PULL_REQUESTS.md)
-          PR_TITLE=$(cat /tmp/pr_title.txt)
-          PR_BODY=$(cat /tmp/pr_body.txt)
-          PR_DIFF=$(cat /tmp/pr_diff_truncated.txt)
-
-          PAYLOAD=$(jq -n \
-            --arg evaluator "$EVALUATOR" \
-            --arg low_policy "$LOW_POLICY" \
-            --arg ai_policy "$AI_POLICY" \
-            --arg title "$PR_TITLE" \
-            --arg body "$PR_BODY" \
-            --arg diff "$PR_DIFF" \
-            '{
-              model: "gpt-5-mini",
-              response_format: {
-                type: "json_schema",
-                json_schema: {
-                  name: "pr_impact_evaluation",
-                  strict: true,
-                  schema: {
-                    type: "object",
-                    properties: {
-                      impact: { type: "string", enum: ["low", "medium", "high"], description: "overall change impact per the rubric" },
-                      touches_excluded_areas: { type: "boolean", description: "true if the diff touches any always-excluded area" },
-                      low_risk_qualifies: { type: "boolean", description: "true if the PR fits the low-risk policy allowed categories AND impact is low" },
-                      reasoning: { type: "string", description: "2-4 sentence explanation of the assessment" },
-                      scope: { type: "string", description: "one-line summary of what the PR changes" }
-                    },
-                    required: ["impact", "touches_excluded_areas", "low_risk_qualifies", "reasoning", "scope"],
-                    additionalProperties: false
-                  }
-                }
-              },
-              messages: [
-                {
-                  role: "system",
-                  content: ($evaluator
-                    + "\n\n# Low-risk policy (allowed categories for low_risk_qualifies)\n\n" + $low_policy
-                    + "\n\n# AI-reviewed policy (context for the medium tier)\n\n" + $ai_policy)
-                },
-                {
-                  role: "user",
-                  content: ("BEGIN UNTRUSTED PR DATA\n\nPR Title: " + $title + "\n\nPR Description:\n" + $body + "\n\nDiff:\n" + $diff)
-                }
-              ]
-            }')
-
-          RESPONSE=$(curl -s --max-time 60 https://api.openai.com/v1/chat/completions \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $OPENAI_API_KEY" \
-            -d "$PAYLOAD")
-
-          RESULT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
-
-          if [ "$RESULT" = "null" ] || [ -z "$RESULT" ]; then
-            echo "OpenAI API error:"
-            echo "$RESPONSE" | jq .
-            exit 1
-          fi
-
-          IMPACT=$(echo "$RESULT" | jq -r '.impact')
-          EXCLUDED=$(echo "$RESULT" | jq -r '.touches_excluded_areas')
-          LOW_OK=$(echo "$RESULT" | jq -r '.low_risk_qualifies')
-          REASONING=$(echo "$RESULT" | jq -r '.reasoning')
-          SCOPE=$(echo "$RESULT" | jq -r '.scope')
-
-          if [ "$LOW_OK" = "true" ] && [ "$EXCLUDED" = "false" ] && [ "$IMPACT" = "low" ]; then
-            echo "qualifies=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "qualifies=false" >> "$GITHUB_OUTPUT"
-          fi
-          echo "impact=$IMPACT" >> "$GITHUB_OUTPUT"
-
-          SCOPE_DELIM="$(openssl rand -hex 16)"
-          {
-            echo "scope<<$SCOPE_DELIM"
-            echo "$SCOPE"
-            echo "$SCOPE_DELIM"
-          } >> "$GITHUB_OUTPUT"
-
-          REASONING_DELIM="$(openssl rand -hex 16)"
-          {
-            echo "reasoning<<$REASONING_DELIM"
-            echo "$REASONING"
-            echo "$REASONING_DELIM"
-          } >> "$GITHUB_OUTPUT"
-
-      # The three eval steps (oversized / restricted / llm) are mutually
-      # exclusive — exactly one populates outputs, so the `||` chain picks
-      # the populated one.
       - name: Apply outcome — label, comment, and bot review
+        id: apply
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ needs.preflight.outputs.head_sha }}
-          QUALIFIES: ${{ steps.oversized.outputs.qualifies || steps.restricted.outputs.qualifies || steps.llm.outputs.qualifies }}
-          SCOPE: ${{ steps.oversized.outputs.scope || steps.restricted.outputs.scope || steps.llm.outputs.scope }}
-          REASONING: ${{ steps.oversized.outputs.reasoning || steps.restricted.outputs.reasoning || steps.llm.outputs.reasoning }}
+          OVERSIZED: ${{ steps.impact.outputs.oversized }}
+          BLOCKED: ${{ steps.impact.outputs.blocked }}
+          IMPACT: ${{ steps.impact.outputs.impact }}
+          EXCLUDED: ${{ steps.impact.outputs.excluded }}
+          LOW_OK: ${{ steps.impact.outputs.low-risk-qualifies }}
+          SCOPE: ${{ steps.impact.outputs.scope }}
+          REASONING: ${{ steps.impact.outputs.reasoning }}
         with:
           script: |
+            const decisions = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/pr-auto-approve-decisions.cjs`);
             const prNumber = parseInt(process.env.PR_NUMBER, 10);
             const headSha = process.env.HEAD_SHA;
-            const qualifies = process.env.QUALIFIES === "true";
+            const qualifies = decisions.lowRiskLaneVerdict({
+              oversized: process.env.OVERSIZED === "true",
+              blocked: process.env.BLOCKED === "true",
+              impact: process.env.IMPACT,
+              touchesExcludedAreas: process.env.EXCLUDED === "true",
+              lowRiskQualifies: process.env.LOW_OK === "true",
+            });
+            core.setOutput("qualifies", qualifies ? "true" : "false");
             const scope = process.env.SCOPE;
             const reasoning = process.env.REASONING;
 
@@ -603,13 +467,15 @@ jobs:
 
   ai-reviewed:
     needs: [preflight, evaluate]
-    # Runs on every trigger event. `always()` is required because `evaluate`
-    # is skipped on review/thread events and a plain `needs` would then skip
-    # this job too; the explicit conditions below re-establish every guard.
-    # When `evaluate` qualified and approved, this lane is redundant and
-    # skips; when it failed or was skipped, this lane evaluates on its own.
+    # Runs on every trigger event. `!cancelled()` is required because
+    # `evaluate` is skipped on review/thread events and a plain `needs`
+    # would then skip this job too; the explicit conditions below
+    # re-establish every guard (and unlike `always()`, a cancelled run
+    # stays cancelled). When `evaluate` qualified and approved, this lane
+    # is redundant and skips; when it failed or was skipped, this lane
+    # evaluates on its own.
     if: >-
-      always() &&
+      !cancelled() &&
       needs.preflight.result == 'success' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       needs.preflight.outputs.short_circuit != 'true' &&
@@ -633,22 +499,9 @@ jobs:
           HEAD_SHA: ${{ needs.preflight.outputs.head_sha }}
         with:
           script: |
+            const decisions = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/pr-auto-approve-decisions.cjs`);
             const prNumber = parseInt(process.env.PR_NUMBER, 10);
             const headSha = process.env.HEAD_SHA;
-            const restricted = new RegExp(process.env.RESTRICTED_PATTERN);
-            // "A few tweaks here and there" stay covered by an earlier
-            // review; anything past this is a fundamental change that
-            // needs a fresh review of the new head.
-            const TRIVIAL_LINE_LIMIT = 50;
-            // CodeRabbit counts via its review's commit_id; the LangWatch
-            // reviewer only via its verdict trailer (author identity +
-            // trailer SHA are the trusted parts — parsed leniently from
-            // anywhere in the body, last trailer wins).
-            const REQUIRED = [
-              { name: "CodeRabbit", login: "coderabbitai[bot]", requireTrailer: false },
-              { name: "LangWatch PR reviewer", login: "langwatch-agent", requireTrailer: true },
-            ];
-            const TRAILER_RE = /LangWatch-Review:\s*verdict=(clean|findings)\s+sha=([0-9a-fA-F]{7,40})/g;
 
             const reviews = await github.paginate(github.rest.pulls.listReviews, {
               owner: context.repo.owner,
@@ -656,77 +509,7 @@ jobs:
               pull_number: prNumber,
             });
 
-            function latestReviewFor({ login, requireTrailer }) {
-              const own = reviews
-                .filter(r => r.user?.login === login && r.submitted_at)
-                .sort((a, b) => new Date(a.submitted_at) - new Date(b.submitted_at));
-              for (let i = own.length - 1; i >= 0; i--) {
-                const r = own[i];
-                if (!requireTrailer) return { review: r, sha: r.commit_id };
-                const matches = [...(r.body || "").matchAll(TRAILER_RE)];
-                if (matches.length) return { review: r, sha: matches[matches.length - 1][2] };
-              }
-              return null;
-            }
-
-            async function freshness(sha) {
-              if (headSha === sha || (sha.length >= 7 && headSha.startsWith(sha))) {
-                return { fresh: true, why: "reviewed the current head" };
-              }
-              let cmp;
-              try {
-                cmp = await github.rest.repos.compareCommitsWithBasehead({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  basehead: `${sha}...${headSha}`,
-                });
-              } catch (error) {
-                // 404 = the reviewed SHA is gone (force-push). Always stale.
-                return { fresh: false, why: `reviewed SHA ${sha} is not comparable to the head (force-push?)` };
-              }
-              if (cmp.data.status !== "ahead") {
-                return { fresh: false, why: `branch is ${cmp.data.status} relative to the reviewed SHA` };
-              }
-              const files = cmp.data.files ?? [];
-              // compareCommits caps the file list; a capped list means the
-              // interdiff is far past trivial anyway.
-              if (files.length >= 300 || (cmp.data.total_commits > 0 && files.length === 0)) {
-                return { fresh: false, why: "interdiff too large to verify as trivial" };
-              }
-              const changed = files.reduce((n, f) => n + f.additions + f.deletions, 0);
-              if (changed > TRIVIAL_LINE_LIMIT) {
-                return { fresh: false, why: `${changed} lines changed since the review (> ${TRIVIAL_LINE_LIMIT})` };
-              }
-              if (files.some(f => f.status !== "modified")) {
-                return { fresh: false, why: "files were added, removed, or renamed since the review" };
-              }
-              if (files.some(f => restricted.test(f.filename))) {
-                return { fresh: false, why: "restricted paths were touched since the review" };
-              }
-              return { fresh: true, why: `only trivial tweaks since the reviewed SHA (${changed} lines)` };
-            }
-
-            const gaps = [];
-            const summaryLines = [];
-            for (const reviewer of REQUIRED) {
-              const latest = latestReviewFor(reviewer);
-              if (!latest) {
-                gaps.push(`${reviewer.name} has not reviewed this PR${reviewer.requireTrailer ? " (no review with a verdict trailer)" : ""}`);
-                continue;
-              }
-              const { fresh, why } = await freshness(latest.sha);
-              if (!fresh) {
-                gaps.push(`${reviewer.name}'s latest review (${latest.sha.slice(0, 12)}) is stale: ${why}`);
-                continue;
-              }
-              summaryLines.push(`- **${reviewer.name}** — [review](${latest.review.html_url}) at \`${latest.sha.slice(0, 12)}\` (${why})`);
-            }
-
-            // Unresolved threads from the required AI reviewers. GraphQL
-            // reports Bot actors without the "[bot]" suffix, so normalize
-            // both sides before comparing.
-            const requiredLogins = new Set(REQUIRED.map(r => r.login.replace(/\[bot\]$/, "")));
-            let unresolved = 0;
+            const threads = [];
             let cursor = null;
             while (true) {
               const resp = await github.graphql(
@@ -745,195 +528,52 @@ jobs:
                 }`,
                 { owner: context.repo.owner, repo: context.repo.repo, number: prNumber, cursor },
               );
-              const threads = resp.repository.pullRequest.reviewThreads;
-              for (const t of threads.nodes) {
-                const author = t.comments.nodes[0]?.author?.login?.replace(/\[bot\]$/, "");
-                if (!t.isResolved && author && requiredLogins.has(author)) unresolved++;
+              const page = resp.repository.pullRequest.reviewThreads;
+              for (const t of page.nodes) {
+                threads.push({
+                  isResolved: t.isResolved,
+                  firstAuthorLogin: t.comments.nodes[0]?.author?.login,
+                });
               }
-              if (!threads.pageInfo.hasNextPage) break;
-              cursor = threads.pageInfo.endCursor;
-            }
-            if (unresolved > 0) {
-              gaps.push(`${unresolved} unresolved review thread(s) from required AI reviewers`);
-            } else {
-              summaryLines.push("- **Outstanding comments:** none — no unresolved threads from required AI reviewers.");
+              if (!page.pageInfo.hasNextPage) break;
+              cursor = page.pageInfo.endCursor;
             }
 
-            if (gaps.length > 0) {
+            const result = await decisions.checkSignals({
+              reviews,
+              threads,
+              headSha,
+              restrictedPattern: process.env.RESTRICTED_PATTERN,
+              compare: (basehead) =>
+                github.rest.repos
+                  .compareCommitsWithBasehead({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    basehead,
+                  })
+                  .then((r) => r.data),
+            });
+
+            if (!result.ok) {
               core.setOutput("signals_ok", "false");
               core.info(`AI-reviewed lane waiting on signals for head ${headSha}:`);
-              for (const gap of gaps) core.info(`  - ${gap}`);
+              for (const gap of result.gaps) core.info(`  - ${gap}`);
               core.info("No comment posted — these states are transient; review/thread events re-run this evaluation.");
             } else {
               core.setOutput("signals_ok", "true");
-              core.setOutput("summary", summaryLines.join("\n"));
+              core.setOutput("summary", result.summaryLines.join("\n"));
               core.info(`All AI review signals green for head ${headSha}.`);
             }
 
-      - name: Fetch PR diff and metadata
-        id: pr-data-ai
+      - name: Evaluate PR impact
+        id: impact
         if: steps.signals.outputs.signals_ok == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json title,body --template '{{.title}}' > /tmp/pr_title.txt
-          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json title,body --template '{{.body}}' > /tmp/pr_body.txt
-          gh api --paginate \
-            "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" \
-            --jq '.[].filename' > /tmp/pr_files.txt
-
-          # Same limits and 406 handling as the evaluate job's pr-data step.
-          FILE_LIMIT=300
-          FILE_COUNT=$(wc -l < /tmp/pr_files.txt)
-          DIFF_LIMIT=100000
-          if [ "$FILE_COUNT" -gt "$FILE_LIMIT" ]; then
-            echo "PR changes ${FILE_COUNT} files (> ${FILE_LIMIT}); too large for automated evaluation."
-            echo "oversized=true" >> "$GITHUB_OUTPUT"
-          elif ! gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" > /tmp/pr_diff.txt; then
-            echo "PR diff exceeds what the API will serve; too large for automated evaluation."
-            echo "oversized=true" >> "$GITHUB_OUTPUT"
-          else
-            DIFF_SIZE=$(wc -c < /tmp/pr_diff.txt)
-            if [ "$DIFF_SIZE" -gt "$DIFF_LIMIT" ]; then
-              echo "PR diff is ${DIFF_SIZE} chars (> ${DIFF_LIMIT}); too large for automated evaluation."
-              echo "oversized=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "oversized=false" >> "$GITHUB_OUTPUT"
-              cp /tmp/pr_diff.txt /tmp/pr_diff_truncated.txt
-            fi
-          fi
-
-      - name: Fail fast for oversized diffs
-        id: oversized-ai
-        if: steps.signals.outputs.signals_ok == 'true' && steps.pr-data-ai.outputs.oversized == 'true'
-        run: |
-          {
-            echo "qualifies=false"
-            echo "scope=Diff too large for automated evaluation"
-            echo "reasoning=This PR's diff exceeds the size limit for automated evaluation. Manual review required."
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Check for restricted paths
-        id: path-check-ai
-        if: steps.signals.outputs.signals_ok == 'true' && steps.pr-data-ai.outputs.oversized == 'false'
-        run: |
-          if grep -qE "$RESTRICTED_PATTERN" /tmp/pr_files.txt; then
-            echo "Restricted paths detected:"
-            grep -E "$RESTRICTED_PATTERN" /tmp/pr_files.txt
-            echo "blocked=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "blocked=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Fail fast for restricted paths
-        id: restricted-ai
-        if: steps.path-check-ai.outputs.blocked == 'true'
-        run: |
-          {
-            echo "qualifies=false"
-            echo "scope=Changes include restricted paths (workflows, auth, migrations, etc.)"
-            echo "reasoning=This PR modifies files in restricted directories that always require manual review per policy."
-          } >> "$GITHUB_OUTPUT"
-
-      # Keep this step in sync with the evaluate job's `llm` step: same
-      # evaluator prompt, same schema — only the qualification rule differs.
-      - name: Evaluate PR impact with OpenAI
-        id: llm-ai
-        if: >-
-          steps.signals.outputs.signals_ok == 'true' &&
-          steps.pr-data-ai.outputs.oversized == 'false' &&
-          steps.path-check-ai.outputs.blocked == 'false'
-        env:
-          OPENAI_API_KEY: ${{ secrets.LOW_RISK_OPENAI_API_KEY }}
-        run: |
-          EVALUATOR=$(cat dev/docs/PR_IMPACT_EVALUATION.md)
-          LOW_POLICY=$(cat dev/docs/LOW_RISK_PULL_REQUESTS.md)
-          AI_POLICY=$(cat dev/docs/AI_REVIEWED_PULL_REQUESTS.md)
-          PR_TITLE=$(cat /tmp/pr_title.txt)
-          PR_BODY=$(cat /tmp/pr_body.txt)
-          PR_DIFF=$(cat /tmp/pr_diff_truncated.txt)
-
-          PAYLOAD=$(jq -n \
-            --arg evaluator "$EVALUATOR" \
-            --arg low_policy "$LOW_POLICY" \
-            --arg ai_policy "$AI_POLICY" \
-            --arg title "$PR_TITLE" \
-            --arg body "$PR_BODY" \
-            --arg diff "$PR_DIFF" \
-            '{
-              model: "gpt-5-mini",
-              response_format: {
-                type: "json_schema",
-                json_schema: {
-                  name: "pr_impact_evaluation",
-                  strict: true,
-                  schema: {
-                    type: "object",
-                    properties: {
-                      impact: { type: "string", enum: ["low", "medium", "high"], description: "overall change impact per the rubric" },
-                      touches_excluded_areas: { type: "boolean", description: "true if the diff touches any always-excluded area" },
-                      low_risk_qualifies: { type: "boolean", description: "true if the PR fits the low-risk policy allowed categories AND impact is low" },
-                      reasoning: { type: "string", description: "2-4 sentence explanation of the assessment" },
-                      scope: { type: "string", description: "one-line summary of what the PR changes" }
-                    },
-                    required: ["impact", "touches_excluded_areas", "low_risk_qualifies", "reasoning", "scope"],
-                    additionalProperties: false
-                  }
-                }
-              },
-              messages: [
-                {
-                  role: "system",
-                  content: ($evaluator
-                    + "\n\n# Low-risk policy (allowed categories for low_risk_qualifies)\n\n" + $low_policy
-                    + "\n\n# AI-reviewed policy (context for the medium tier)\n\n" + $ai_policy)
-                },
-                {
-                  role: "user",
-                  content: ("BEGIN UNTRUSTED PR DATA\n\nPR Title: " + $title + "\n\nPR Description:\n" + $body + "\n\nDiff:\n" + $diff)
-                }
-              ]
-            }')
-
-          RESPONSE=$(curl -s --max-time 60 https://api.openai.com/v1/chat/completions \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $OPENAI_API_KEY" \
-            -d "$PAYLOAD")
-
-          RESULT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
-
-          if [ "$RESULT" = "null" ] || [ -z "$RESULT" ]; then
-            echo "OpenAI API error:"
-            echo "$RESPONSE" | jq .
-            exit 1
-          fi
-
-          IMPACT=$(echo "$RESULT" | jq -r '.impact')
-          EXCLUDED=$(echo "$RESULT" | jq -r '.touches_excluded_areas')
-          REASONING=$(echo "$RESULT" | jq -r '.reasoning')
-          SCOPE=$(echo "$RESULT" | jq -r '.scope')
-
-          if [ "$EXCLUDED" = "false" ] && { [ "$IMPACT" = "low" ] || [ "$IMPACT" = "medium" ]; }; then
-            echo "qualifies=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "qualifies=false" >> "$GITHUB_OUTPUT"
-          fi
-          echo "impact=$IMPACT" >> "$GITHUB_OUTPUT"
-
-          SCOPE_DELIM="$(openssl rand -hex 16)"
-          {
-            echo "scope<<$SCOPE_DELIM"
-            echo "$SCOPE"
-            echo "$SCOPE_DELIM"
-          } >> "$GITHUB_OUTPUT"
-
-          REASONING_DELIM="$(openssl rand -hex 16)"
-          {
-            echo "reasoning<<$REASONING_DELIM"
-            echo "$REASONING"
-            echo "$REASONING_DELIM"
-          } >> "$GITHUB_OUTPUT"
+        uses: ./.github/actions/pr-impact-eval
+        with:
+          pr-number: ${{ github.event.pull_request.number }}
+          github-token: ${{ github.token }}
+          openai-api-key: ${{ secrets.LOW_RISK_OPENAI_API_KEY }}
+          restricted-pattern: ${{ env.RESTRICTED_PATTERN }}
 
       # Only runs once the review signals are green — signal gaps above are
       # transient and log-only. From here the outcome is a real verdict
@@ -944,16 +584,24 @@ jobs:
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ needs.preflight.outputs.head_sha }}
-          QUALIFIES: ${{ steps.oversized-ai.outputs.qualifies || steps.restricted-ai.outputs.qualifies || steps.llm-ai.outputs.qualifies }}
-          SCOPE: ${{ steps.oversized-ai.outputs.scope || steps.restricted-ai.outputs.scope || steps.llm-ai.outputs.scope }}
-          REASONING: ${{ steps.oversized-ai.outputs.reasoning || steps.restricted-ai.outputs.reasoning || steps.llm-ai.outputs.reasoning }}
-          IMPACT: ${{ steps.llm-ai.outputs.impact }}
+          OVERSIZED: ${{ steps.impact.outputs.oversized }}
+          BLOCKED: ${{ steps.impact.outputs.blocked }}
+          IMPACT: ${{ steps.impact.outputs.impact }}
+          EXCLUDED: ${{ steps.impact.outputs.excluded }}
+          SCOPE: ${{ steps.impact.outputs.scope }}
+          REASONING: ${{ steps.impact.outputs.reasoning }}
           SIGNAL_SUMMARY: ${{ steps.signals.outputs.summary }}
         with:
           script: |
+            const decisions = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/pr-auto-approve-decisions.cjs`);
             const prNumber = parseInt(process.env.PR_NUMBER, 10);
             const headSha = process.env.HEAD_SHA;
-            const qualifies = process.env.QUALIFIES === "true";
+            const qualifies = decisions.aiReviewedLaneVerdict({
+              oversized: process.env.OVERSIZED === "true",
+              blocked: process.env.BLOCKED === "true",
+              impact: process.env.IMPACT,
+              touchesExcludedAreas: process.env.EXCLUDED === "true",
+            });
             const scope = process.env.SCOPE;
             const reasoning = process.env.REASONING;
             const impact = process.env.IMPACT || "n/a";

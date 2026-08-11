@@ -940,6 +940,14 @@ jobs:
       - name: Test start-clickhouse-with-storage-policy.sh
         run: bash .github/scripts/__tests__/start-clickhouse-with-storage-policy.test.sh
 
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 24
+
+      - name: Test pr-auto-approve decision logic
+        run: node --test --experimental-strip-types .github/scripts/pr-auto-approve-decisions.test.ts
+
   ci-self-test:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'

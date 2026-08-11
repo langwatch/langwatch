@@ -79,6 +79,11 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // assistant's rules are tested here (and nowhere else), so scenarios about
   // what an instruction teaches can only bind from this root.
   "skills/_tests",
+  // CI's own decision logic: the pr-auto-approve lane rules live beside the
+  // workflow that requires them and are tested with node:test (run by the
+  // ci-scripts-test job), not vitest — without this root, scenarios about
+  // which PRs the bot may approve could only be @unimplemented.
+  ".github/scripts",
 ];
 
 /**
