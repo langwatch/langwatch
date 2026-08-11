@@ -23,6 +23,7 @@ import {
 } from "./ApiKeyAttribute";
 import { AttributeValue } from "./AttributeValue";
 import { AnchorCommentButton } from "./anchoredComments/AnchorCommentButton";
+import { sameAttributeValue } from "./attributeValueEquality";
 import { PinnedAwareJsonView } from "./JsonHighlight";
 import { SegmentedToggle } from "./SegmentedToggle";
 
@@ -1248,18 +1249,18 @@ export function AttributeTable({
   );
 
   // A row is marked when the correction gave it a different value than the one
-  // captured, or added it outright. The comparison is per row, on the rendered
-  // value, which is what the reader is looking at: a correction may replace a
-  // whole attribute record and leave most of it saying exactly what it said.
+  // captured, or added it outright. The comparison is per row: a correction may
+  // replace a whole attribute record and leave most of it saying exactly what it
+  // said. It compares what the values mean rather than how they are written, so
+  // a row that came back re-serialised does not read as one someone edited.
   const correctionFor = useMemo(() => {
     if (!correctedFrom) return undefined;
     const capturedFlat = flattenAttributes(correctedFrom);
     return (key: string): AttributeCorrection | null => {
       if (key in capturedFlat) {
-        const captured = formatValue(capturedFlat[key]);
-        return captured === formatValue(flatAttrs[key])
+        return sameAttributeValue(capturedFlat[key], flatAttrs[key])
           ? null
-          : { original: captured };
+          : { original: formatValue(capturedFlat[key]) };
       }
       // A correction that turned a value the trace recorded as one string into
       // a structure gives every leaf under it a row the capture never had.

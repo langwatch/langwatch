@@ -255,6 +255,37 @@ describe("AttributeTable editing", () => {
 
         expect(queryByLabelText(/edited\. Original/)).not.toBeInTheDocument();
       });
+
+      // A correction rewrites the whole attribute record, so an attribute
+      // holding JSON comes back re-serialised whether or not anyone touched it.
+      /** @scenario "JSON that only changed its formatting is not marked as edited" */
+      it("leaves an attribute the correction only re-serialised unmarked", () => {
+        const toolCalls = [
+          {
+            type: "tool-call",
+            toolName: "bash",
+            toolCallId: "call_VXJC9uzjpxa99ESxuMwQPEyF",
+            input: { command: "langwatch trace search", timeout: 120000 },
+          },
+        ];
+
+        const { queryByText } = renderCorrected(
+          { "ai.response.toolCalls": JSON.stringify(toolCalls, null, 2) },
+          { "ai.response.toolCalls": JSON.stringify(toolCalls) },
+        );
+
+        expect(queryByText("Edited")).not.toBeInTheDocument();
+      });
+
+      /** @scenario "JSON that only changed its formatting is not marked as edited" */
+      it("still marks one whose content the correction changed", () => {
+        const { getByText } = renderCorrected(
+          { "ai.response.toolCalls": '[{"toolName":"read"}]' },
+          { "ai.response.toolCalls": '[{"toolName":"bash"}]' },
+        );
+
+        expect(getByText("Edited")).toBeInTheDocument();
+      });
     });
   });
 
