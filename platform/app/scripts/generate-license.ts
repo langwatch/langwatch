@@ -132,6 +132,46 @@ interface CliArgs {
   email?: string;
 }
 
+/**
+ * A quota is a whole number of seats or messages, so anything else is a typo
+ * worth stopping on. `Number.parseInt` would read "50GB" as 50 and "1.9" as 1,
+ * and the operator would sign a license carrying a number they never asked
+ * for.
+ */
+function parseQuota(flag: string, value: string): number {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 0) {
+    process.stderr.write(
+      `Error: ${flag} must be a whole number, got: ${value}\n\n`,
+    );
+    printUsage();
+    process.exit(2);
+  }
+  return parsed;
+}
+
+/**
+ * `new Date("2025-02-31")` rolls forward to March 3rd rather than refusing, so
+ * a mistyped day silently mints a license expiring on a date nobody chose. The
+ * round trip through the parsed date is what catches it.
+ */
+function parseExpiresAt(value: string): Date {
+  const parsed = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? new Date(`${value}T00:00:00.000Z`)
+    : new Date(Number.NaN);
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.toISOString().slice(0, 10) !== value
+  ) {
+    process.stderr.write(
+      `Error: --expires-at must be a calendar date as YYYY-MM-DD, got: ${value}\n\n`,
+    );
+    printUsage();
+    process.exit(2);
+  }
+  return parsed;
+}
+
 function parseArgs(argv: string[]): CliArgs {
   const args: Partial<CliArgs> = { plan: "ENTERPRISE" };
   for (let i = 0; i < argv.length; i++) {
@@ -144,22 +184,16 @@ function parseArgs(argv: string[]): CliArgs {
       args.plan = value.toUpperCase();
       i++;
     } else if (flag === "--max-members" && value) {
-      args.maxMembers = Number.parseInt(value, 10);
+      args.maxMembers = parseQuota(flag, value);
       i++;
     } else if (flag === "--max-members-lite" && value) {
-      args.maxMembersLite = Number.parseInt(value, 10);
+      args.maxMembersLite = parseQuota(flag, value);
       i++;
     } else if (flag === "--max-messages-per-month" && value) {
-      args.maxMessagesPerMonth = Number.parseInt(value, 10);
+      args.maxMessagesPerMonth = parseQuota(flag, value);
       i++;
     } else if (flag === "--expires-at" && value) {
-      const parsed = new Date(value);
-      if (Number.isNaN(parsed.getTime())) {
-        process.stderr.write(`Error: --expires-at is not a date: ${value}\n\n`);
-        printUsage();
-        process.exit(2);
-      }
-      args.expiresAt = parsed;
+      args.expiresAt = parseExpiresAt(value);
       i++;
     } else if (flag === "--email" && value) {
       args.email = value;

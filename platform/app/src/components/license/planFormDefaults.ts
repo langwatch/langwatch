@@ -15,8 +15,8 @@ export interface PlanFormDefaults {
 }
 
 /**
- * Record map of plan defaults following OCP - add new plans without modifying existing code.
- * Templates already define all values, no fallbacks needed.
+ * What the mint form fills in for each plan the operator can pick. Templates
+ * already define all values, no fallbacks needed.
  *
  * Only the enforced levers (seats, messages, entitlements) + identity are
  * templated — projects, teams, and experimentation resources are OSS/uncapped

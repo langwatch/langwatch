@@ -2,7 +2,7 @@ import type { PrismaClient, Subscription } from "@prisma/client";
 import { env } from "../../src/env.mjs";
 import type { PlanInfo } from "../licensing/planInfo";
 import { getFreePlanLimits, PLAN_LIMITS } from "./planLimits";
-import { PlanTypes, SubscriptionStatus } from "./planTypes";
+import { ACTIVE_SUBSCRIPTION_ORDER_BY, SubscriptionStatus } from "./planTypes";
 
 // Fields that exist on both PlanInfo (as number) and Subscription (as Int?)
 type NumericOverrideField = {
@@ -50,22 +50,22 @@ export const createSaaSPlanProvider = (db: PrismaClient): SaaSPlanProvider => {
       const overrideAddingLimitations =
         !!user?.impersonator && isAdmin(user.impersonator);
 
-      // Unreachable through the wiring: a self-hosted deployment resolves
-      // its plan from the license provider, and this one is only constructed
-      // on the SaaS branch. It answers Enterprise, so a future caller that
-      // constructs this directly off Cloud would self-report Enterprise
-      // without a license.
+      // Unreachable through the wiring: a self-hosted deployment resolves its
+      // plan from the license provider, and this one is only constructed on
+      // the SaaS branch. It answers the free baseline rather than a tier,
+      // because a plan resolved without a subscription and without a license
+      // is not a plan anyone bought. Answering Enterprise here would hand a
+      // deployment that reached this line by mistake every entitlement the
+      // top tier carries, signed webhook delivery included.
       if (!env.IS_SAAS) {
         return {
-          ...PLAN_LIMITS[PlanTypes.ENTERPRISE],
+          ...getFreePlanLimits(),
           overrideAddingLimitations,
         };
       }
 
       // An organization is not supposed to hold two active subscriptions, but
-      // it can, and then which one answers decides the plan. Newest contract
-      // wins, with the id as a total order so the same row answers every time
-      // rather than whichever the database happens to hand back first.
+      // it can, and then which one answers decides the plan.
       const activeSubscription = await db.subscription.findFirst({
         where: {
           organizationId,
@@ -73,7 +73,7 @@ export const createSaaSPlanProvider = (db: PrismaClient): SaaSPlanProvider => {
             in: [SubscriptionStatus.ACTIVE],
           },
         },
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        orderBy: [...ACTIVE_SUBSCRIPTION_ORDER_BY],
       });
 
       const customLimits: Partial<PlanInfo> = {};

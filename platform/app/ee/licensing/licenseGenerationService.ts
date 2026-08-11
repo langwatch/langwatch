@@ -56,6 +56,12 @@ export function generateLicenseKey({
   const oneYearOut = new Date(now);
   oneYearOut.setFullYear(oneYearOut.getFullYear() + 1);
   const expiresAt = requestedExpiresAt ?? oneYearOut;
+  // An unparseable date compares false against everything, so it would slip
+  // past the expiry check below and only fail further down, as a RangeError
+  // out of toISOString that names nothing.
+  if (Number.isNaN(expiresAt.getTime())) {
+    throw new Error("Expiration date is not a date");
+  }
   // Same refusal the license router makes: an already-expired license reads as
   // no license at all, which on Cloud silently drops the org onto whatever
   // sits underneath it.

@@ -109,7 +109,8 @@ Feature: License Generation
     Scenario: A licensed webhook entitlement survives the PlanInfo mapping
       Given a validated license whose plan enables webhook endpoints
       When the license is mapped to the active PlanInfo
-      Then the entitlement is present, and a payload that omits it leaves the tier to decide
+      Then webhook endpoints stay available
+      And they are available too on an enterprise license that never mentioned them
 
     @unit
     Scenario: The generator form mints what it shows

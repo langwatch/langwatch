@@ -156,4 +156,4 @@ Feature: Subscription Page Plan Management
     Scenario: A licensed plan below enterprise lists what it actually grants
       Given my organization's plan resolves from a license below enterprise
       When I view the subscription page
-      Then the features listed are read from that plan's own numbers
+      Then I see the features and limits that apply to my plan
