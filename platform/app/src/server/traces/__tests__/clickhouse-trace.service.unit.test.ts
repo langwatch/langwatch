@@ -52,7 +52,6 @@ describe("ClickHouseTraceService", () => {
     startDate: Date.now() - 86400000,
     endDate: Date.now(),
     pageSize: 2,
-    pageOffset: 0,
   } as GetAllTracesForProjectInput;
 
   // A minimal trace summary row from ClickHouse

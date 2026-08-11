@@ -111,13 +111,18 @@ class TracesFacade:
             params: Dictionary of search parameters including:
                 - query: Optional text query.
                 - filters: Optional filter conditions.
-                - pageOffset: Pagination offset.
                 - pageSize: Number of results per page.
+                - scrollId: Cursor for the next page, taken from the previous
+                  response's ``pagination.scrollId``. This is how paging works;
+                  ``pageOffset`` is no longer supported and a non-zero value is
+                  rejected.
                 - sortBy: Field to sort by.
                 - sortDirection: 'asc' or 'desc'.
 
         Returns:
             Dictionary containing the search results with traces and pagination.
+            To walk every page, keep passing the ``scrollId`` from the previous
+            response until the response no longer carries one.
         """
         body = params or {}
         response = self._http().post("/api/traces/search", json=body)
