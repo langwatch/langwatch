@@ -59,6 +59,7 @@ const genieConfig = {
 
 describe("given a source whose stored config holds fields no client is shown", () => {
   describe("when an update arrives without them, as the edit form sends it", () => {
+    /** @scenario "Saving an unrelated change keeps the secret and the rotation window" */
     it("keeps the stored secret rather than clearing it", async () => {
       const { service, captured } = serviceWith({ ...genieConfig });
 
@@ -77,6 +78,7 @@ describe("given a source whose stored config holds fields no client is shown", (
       );
     });
 
+    /** @scenario "Saving an unrelated change keeps the secret and the rotation window" */
     it("keeps the rotation grace slot rather than cutting the window short", async () => {
       const { service, captured } = serviceWith({ ...genieConfig });
 
@@ -118,6 +120,7 @@ describe("given a source whose stored config holds fields no client is shown", (
   });
 
   describe("when the update replays the stored secret back at us", () => {
+    /** @scenario "A secret cannot be kept while the destination is changed" */
     it("refuses it rather than letting a caller keep a secret it cannot read", async () => {
       const { service } = serviceWith({ ...genieConfig });
 

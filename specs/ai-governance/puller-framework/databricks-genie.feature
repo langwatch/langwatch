@@ -125,3 +125,32 @@ Feature: Databricks AI/BI Genie puller
     When the source is saved
     Then the token is held encrypted
     And the token is not readable from the source's configuration
+
+  @unit
+  Scenario: The token may only be sent to a Databricks workspace
+    Given a Genie source whose workspace address is not a Databricks one
+    When someone saves it
+    Then the save is refused
+    And the reason names the addresses that are allowed
+    # The worker attaches the stored token to every request it sends to this
+    # address, so whoever sets it decides where the secret goes. Checked when
+    # it is saved, because by the time a run uses it the person is long gone.
+
+  @unit
+  Scenario: A secret cannot be kept while the destination is changed
+    Given a source that already holds a workspace token
+    When someone saves it with the stored secret sent back verbatim
+    Then the save is refused
+    And the stored secret is unchanged
+    # Otherwise a caller who cannot read the secret could still keep it while
+    # pointing the source at an address of their choosing.
+
+  @unit
+  Scenario: Saving an unrelated change keeps the secret and the rotation window
+    Given a source that already holds a workspace token
+    And a rotation of its ingest secret is still inside its grace window
+    When someone renames the source without re-entering the token
+    Then the stored token is unchanged
+    And the rotation grace window is unchanged
+    # A client is never shown either of them, so it cannot send them back, and
+    # absent has to mean unchanged rather than cleared.

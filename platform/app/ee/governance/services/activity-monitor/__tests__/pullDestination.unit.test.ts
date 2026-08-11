@@ -22,6 +22,7 @@ describe("given a Genie config naming a real workspace", () => {
 
 describe("given a Genie config pointed somewhere the token must never go", () => {
   describe("when the destination is checked", () => {
+    /** @scenario "The token may only be sent to a Databricks workspace" */
     it("refuses a host the attacker controls", () => {
       expect(() =>
         assertPullDestinationAllowed(genie("https://attacker.example.com")),
