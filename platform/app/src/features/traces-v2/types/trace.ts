@@ -9,7 +9,7 @@ export type TraceStatus = "ok" | "error" | "warning";
  */
 export interface EvalSummary {
   name: string;
-  score: number | boolean;
+  score: number | boolean | null;
   scoreType: "numeric" | "boolean" | "categorical";
   /**
    * - `pass` / `fail` / `warning` — the evaluator ran and produced a verdict.
@@ -18,7 +18,7 @@ export interface EvalSummary {
    * - `error` — the evaluator crashed / errored out. Distinct from a "fail"
    *   verdict — the evaluator never produced a real score.
    */
-  status: "pass" | "warning" | "fail" | "skipped" | "error";
+  status: "pass" | "warning" | "fail" | "skipped" | "error" | "processed";
 }
 
 /**

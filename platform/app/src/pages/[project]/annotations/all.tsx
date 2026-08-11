@@ -155,7 +155,11 @@ export default function Annotations() {
           suggestionExportLine({ annotation, traceId: annotation.traceId }),
           annotation.comment ?? "",
           annotation.traceId ?? "",
-          annotation.isThumbsUp ? "Thumbs Up" : "Thumbs Down",
+          annotation.isThumbsUp == null
+            ? "—"
+            : annotation.isThumbsUp
+              ? "Thumbs Up"
+              : "Thumbs Down",
           JSON.stringify(annotation.scoreOptions ?? {}),
           annotation.createdAt?.toLocaleString() ?? "",
         ];

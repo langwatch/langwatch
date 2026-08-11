@@ -80,10 +80,11 @@ export function MessageCard({
       check.status == "error",
   );
   const evaluationsPasses = evaluations.filter(
-    (check) =>
-      evaluationPassed(check) !== false &&
-      (check.status === "processed" || check.status === "skipped"),
+    (check) => check.status === "processed" && evaluationPassed(check) === true,
   ).length;
+  const someEvaluationsSkipped = evaluations.some(
+    (check) => check.status === "skipped",
+  );
   const guardrailsPasses = guardrails.filter(
     (check) => check.passed !== false,
   ).length;
@@ -467,9 +468,11 @@ export function MessageCard({
                 color={
                   !evaluationsDone || allEvaluationsSkipped
                     ? "yellow.fg"
-                    : evaluationsPasses == totalEvaluations
-                      ? "green.fg"
-                      : "red.fg"
+                    : someEvaluationsSkipped
+                      ? "yellow.fg"
+                      : evaluationsPasses == totalEvaluations
+                        ? "green.fg"
+                        : "red.fg"
                 }
                 paddingY={1}
                 paddingX={2}
@@ -483,7 +486,7 @@ export function MessageCard({
                   <HStack gap={2}>
                     {!evaluationsDone ? (
                       <Clock />
-                    ) : allEvaluationsSkipped ? (
+                    ) : allEvaluationsSkipped || someEvaluationsSkipped ? (
                       <MinusCircle />
                     ) : evaluationsPasses == totalEvaluations ? (
                       <CheckCircle />
@@ -492,12 +495,14 @@ export function MessageCard({
                     )}
                     {allEvaluationsSkipped
                       ? "Evaluations skipped"
-                      : evaluationsDone && evaluationsPasses != totalEvaluations
-                        ? `${totalEvaluations - evaluationsPasses} ${
-                            totalEvaluations - evaluationsPasses == 1
-                              ? "evaluation failed"
-                              : "evaluations failed"
-                          }`
+                      : someEvaluationsSkipped
+                        ? `${evaluationsPasses}/${totalEvaluations} evaluations`
+                        : evaluationsDone && evaluationsPasses != totalEvaluations
+                          ? `${totalEvaluations - evaluationsPasses} ${
+                              totalEvaluations - evaluationsPasses == 1
+                                ? "evaluation failed"
+                                : "evaluations failed"
+                            }`
                         : `${evaluationsPasses}/${totalEvaluations} evaluations`}
                   </HStack>
                 </Tag.Label>

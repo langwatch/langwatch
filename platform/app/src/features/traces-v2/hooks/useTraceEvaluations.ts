@@ -71,7 +71,7 @@ function mapStatus(ev: Evaluation): EvalSummary["status"] {
   if (ev.status === "processed") {
     if (ev.passed === true) return "pass";
     if (ev.passed === false) return "fail";
-    return "pass";
+    return "processed";
   }
   return "warning";
 }
@@ -83,10 +83,10 @@ function mapScoreType(ev: Evaluation): EvalSummary["scoreType"] {
   return "numeric";
 }
 
-function mapScore(ev: Evaluation): number | boolean {
+function mapScore(ev: Evaluation): number | boolean | null {
   if (typeof ev.score === "number") return ev.score;
   if (ev.passed != null) return ev.passed;
-  return 0;
+  return null;
 }
 
 export function useTraceEvaluations(): TraceEvaluationsResult {
