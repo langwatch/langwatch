@@ -325,14 +325,31 @@ describe("traces router — #4991 AC5 list grid stays preview", () => {
       });
       expect(mockBuildDeps).not.toHaveBeenCalled();
       // getTracesWithSpans called with NO { full: true } opts (preview only).
-      // It does carry the correction flag: applying a correction needs neither
-      // the blob-resolution deps nor full resolution.
       expect(mockGetTracesWithSpans).toHaveBeenCalledWith(
         "project_123",
         ["t1"],
         expect.any(Object),
         undefined,
-        expect.not.objectContaining({ full: true }),
+        { withEditOverlay: false },
+      );
+    });
+
+    it("stays on previews when it is asked for the corrected trace", async () => {
+      await caller.getFormattedSpansDigest({
+        projectId: "project_123",
+        traceIds: ["t1"],
+        withEditOverlay: true,
+      });
+      // Applying a correction needs neither the blob-resolution deps nor full
+      // resolution, so asking for one must not drag a whole page of offloaded
+      // values in behind it.
+      expect(mockBuildDeps).not.toHaveBeenCalled();
+      expect(mockGetTracesWithSpans).toHaveBeenCalledWith(
+        "project_123",
+        ["t1"],
+        expect.any(Object),
+        undefined,
+        { withEditOverlay: true },
       );
     });
   });

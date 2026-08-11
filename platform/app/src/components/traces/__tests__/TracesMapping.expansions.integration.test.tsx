@@ -148,7 +148,10 @@ function unmappedColumnSelect(): HTMLSelectElement {
   return unmapped;
 }
 
-/** The source dropdown reading the given source, of the only column there is. */
+/**
+ * Matched on what it reads rather than on where it sits: a mapped column also
+ * renders a key dropdown beside its source one, and both are comboboxes.
+ */
 function columnSourceSelect(source: string): HTMLSelectElement {
   const selects = screen.getAllByRole<HTMLSelectElement>("combobox");
   const mapped = selects.find((select) => select.value === source);
