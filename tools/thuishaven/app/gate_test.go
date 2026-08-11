@@ -3,6 +3,8 @@ package app
 import (
 	"bytes"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -104,6 +106,136 @@ func TestGateRewriteCarriesWhatItDecided(t *testing.T) {
 			reply := ask(t, gateOrch(store, sys), bashPayload("git status"))
 			if reply.Specific.PermissionDecision != "defer" || reply.Specific.UpdatedInput != nil {
 				t.Fatalf("gating `git status` is its own outage; got %+v", reply.Specific)
+			}
+		})
+	})
+}
+
+// hugeTranscript writes a transcript whose SIZE is above the warning threshold
+// without writing its contents.
+//
+// Sparse on purpose, and it exercises the real path rather than dodging it: the
+// gate stats the transcript instead of reading it, precisely because the fast
+// path cannot afford to read a file that reaches hundreds of MB. Sizing it from
+// the threshold rather than from a literal keeps the fixture honest if the
+// threshold moves.
+func hugeTranscript(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "transcript.jsonl")
+	f, err := os.Create(path) // #nosec G304 -- t.TempDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = f.Close() }()
+	if err := f.Truncate(int64(domain.WarnThresholdTokens)*4 + 1024); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// editPayload is a main session editing an instructions file mid-session, on a
+// transcript large enough to be worth pricing.
+func editPayload(t *testing.T, tool string) map[string]any {
+	t.Helper()
+	return map[string]any{
+		"tool_name":       tool,
+		"transcript_path": hugeTranscript(t),
+		"permission_mode": "default",
+		"tool_input":      map[string]any{"file_path": "/repo/CLAUDE.md"},
+	}
+}
+
+// isBareDefer reports that the gate said nothing at all — no decision, no
+// warning, no rewrite.
+func isBareDefer(reply hookReply) bool {
+	return reply.Specific.PermissionDecision == "defer" &&
+		reply.SystemMessage == "" &&
+		reply.Specific.UpdatedInput == nil
+}
+
+// gatedToolPayload builds a payload that SHOULD produce an answer for one tool.
+// The default case is the point of the function: a tool added to GatedTools
+// without a branch to serve it fails here, naming itself.
+func gatedToolPayload(t *testing.T, tool string) map[string]any {
+	t.Helper()
+	switch tool {
+	case "Bash":
+		return bashPayload("pnpm test:unit run src/x")
+	case "Edit", "Write":
+		return editPayload(t, tool)
+	default:
+		t.Fatalf("%q is routed to the gate but nothing here answers for it; "+
+			"either give it a branch or take it out of domain.GatedTools", tool)
+		return nil
+	}
+}
+
+// The gate is woken for the tools domain.GatedTools names, so a tool listed there
+// that reaches no branch is a process launch per call to reach an unconditional
+// defer — and a branch whose tool is NOT listed is dead code that cannot fire at
+// all. The second is what happened: the matcher named Bash and Agent while the
+// cache-cost warning ran only for Edit and Write.
+//
+// @scenario "A branch of the gate is never left waiting for a tool nobody sends it"
+// @scenario "Every tool that wakes the gate reaches something that answers"
+func TestEveryGatedToolReachesALiveBranch(t *testing.T) {
+	for _, tool := range domain.GatedTools {
+		t.Run("given the gate is woken for "+tool, func(t *testing.T) {
+			// Full slots and a timed short run, so the Bash case has something to
+			// decide rather than waving the command through.
+			store := &fakeStore{heavyRuns: 1, observed: map[string]time.Duration{"unit": 20 * time.Second}}
+			sys := &fakeSystem{memStat: domain.MemStat{TotalBytes: 4 << 30}, now: time.Now()}
+
+			t.Run("when it answers, it has something to say", func(t *testing.T) {
+				reply := ask(t, gateOrch(store, sys), gatedToolPayload(t, tool))
+				if isBareDefer(reply) {
+					t.Fatalf("%q wakes the gate and reaches nothing: %+v", tool, reply)
+				}
+			})
+		})
+	}
+}
+
+// @scenario "An edit to an instructions file is flagged with its uncertainty attached"
+func TestGateWarnsOnAnInstructionsEdit(t *testing.T) {
+	store := &fakeStore{}
+	sys := &fakeSystem{memStat: domain.MemStat{TotalBytes: 4 << 30}, now: time.Now()}
+
+	t.Run("given a large session editing an instructions file", func(t *testing.T) {
+		reply := ask(t, gateOrch(store, sys), editPayload(t, "Edit"))
+
+		t.Run("the developer is told the price", func(t *testing.T) {
+			if !strings.Contains(reply.SystemMessage, "$") {
+				t.Fatalf("a warning with no price is a warning nobody can weigh: %q", reply.SystemMessage)
+			}
+		})
+
+		t.Run("and told the invalidation is not certain, because it is not", func(t *testing.T) {
+			if !strings.Contains(reply.SystemMessage, "MAY") {
+				t.Fatalf("where the harness places instructions is unverified, so the copy "+
+					"must hedge: %q", reply.SystemMessage)
+			}
+		})
+
+		t.Run("and the edit still goes through, in a session that still prompts", func(t *testing.T) {
+			// Pricing an action must never block it, and must never need an
+			// approval to ride on: a deliberate cache-busting edit is the normal
+			// case, not the exception.
+			if reply.Specific.PermissionDecision != "defer" {
+				t.Fatalf("the price is information, not a veto: %+v", reply.Specific)
+			}
+		})
+	})
+
+	t.Run("given the same edit in a session too small to be worth pricing", func(t *testing.T) {
+		payload := editPayload(t, "Edit")
+		payload["transcript_path"] = filepath.Join(t.TempDir(), "absent.jsonl")
+
+		t.Run("nothing is said at all", func(t *testing.T) {
+			reply := ask(t, gateOrch(store, sys), payload)
+			if reply.SystemMessage != "" {
+				t.Fatalf("warning on a cheap action trains the reader to dismiss the "+
+					"expensive one: %q", reply.SystemMessage)
 			}
 		})
 	})

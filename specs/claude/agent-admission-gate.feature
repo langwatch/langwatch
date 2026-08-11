@@ -384,3 +384,43 @@ Feature: haven answers an agent's tool call before it runs
     Then it is actually installed rather than reported as already present
     And an existing gate whose path has since moved is replaced rather than duplicated
     Because reporting success while writing nothing leaves the machine ungoverned
+
+  # --- Which tools wake the gate ---
+  #
+  # The set of tools the hook is registered for, and the set the gate has an
+  # answer for, are one decision recorded in two places, and they drifted: the
+  # registration named a tool the gate ignored, while the whole cache-cost half
+  # was written for tools the registration never delivered. It could not fire,
+  # and read as finished. Both directions are failures and both are specified
+  # here, because a review caught this one and the next one deserves a test.
+
+  @unit
+  Scenario: Every tool that wakes the gate reaches something that answers
+    Given the set of tools the gate is registered for
+    When each of them is put to the gate
+    Then none of them reaches an unconditional defer
+    Because waking the gate for a tool nothing handles spends a process launch per
+    And call to decide nothing, and is the same defect pointing the other way
+
+  @unit
+  Scenario: A branch of the gate is never left waiting for a tool nobody sends it
+    Given a tool the gate has an answer for
+    Then it is in the registered set
+    Because code that cannot run reads as shipped, and is discovered in production
+
+  @unit
+  Scenario: Widening the tool set reaches a gate that is already installed
+    Given a gate installed before the tool set widened
+    When setup runs again from the same path
+    Then the registration is brought up to the current set
+    And running setup once more writes nothing
+    Because the path usually has not moved, so comparing only the command reports
+    And no change and leaves half the gate unreachable for everyone who set it up early
+
+  @unit
+  Scenario: A registration haven shares with another hook is left as it is
+    Given an installed gate sitting alongside a hook haven did not write
+    When the tool set widens
+    Then the registration is not touched
+    Because it covers both hooks, and widening it would re-route the developer's
+    And own hook onto tools they never pointed it at

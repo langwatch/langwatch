@@ -355,9 +355,6 @@ const LEGACY_INERT: string[] = [
   "specs/ci/no-docker-integration-tests.feature",
   "specs/ci/pr-impact-map.feature",
   "specs/claude/drive-pr.feature",
-  // ADR-091 phase 2: the cost-safety hook is specified ahead of its build; no
-  // test exists yet, so every scenario is parked @unimplemented.
-  "specs/claude/llm-cost-safety.feature",
   "specs/claude/telemetry-turn-bounding.feature",
   "specs/coding-agent/personal-usage.feature",
   "specs/components/code-block-editor.feature",

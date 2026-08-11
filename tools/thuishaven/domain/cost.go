@@ -9,7 +9,7 @@ import (
 
 // The gate's second duty: pricing an action before it silently invalidates a
 // prompt cache, and refusing the two things that are unambiguous waste. See
-// ADR-088.
+// ADR-091.
 
 // Cache rate multipliers, relative to base input price. Published rates.
 const (
@@ -201,7 +201,7 @@ const MaxConcurrentAgents = 12
 // The cap MUST be able to lose count. PreToolUse fires before the permission
 // check, so a spawn the user then rejects is counted and never runs, and drift
 // is one-directional. A stale-high counter would refuse every spawn on the
-// machine forever, which is the fail-closed outcome ADR-088 calls
+// machine forever, which is the fail-closed outcome ADR-091 calls
 // non-negotiable — so entries expire and an unverifiable count admits.
 const SpawnEntryTTL = 30 * time.Minute
 

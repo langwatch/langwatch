@@ -10,6 +10,29 @@ import (
 // Reading the hook payload and writing the reply live in app; everything that
 // can be got wrong lives here, where a test can reach it. See ADR-091.
 
+// GatedTools are the tool names the gate has a live branch for, and so the only
+// ones worth waking it for.
+//
+// This list and the branches in app.Gate are one thing said twice, and they
+// drifted: the installed matcher named Bash and Agent while the cache-cost
+// warning it was meant to feed only ran for Edit and Write, so that half of the
+// gate could not fire at all. Two rules keep them together. The matcher haven
+// installs is DERIVED from this list rather than written out beside it, and a
+// test drives every tool named here through the gate and fails if one of them
+// produces no answer.
+//
+// Agent is absent deliberately. The spawn cap that would read it is complete in
+// this package but not yet wired into the gate, and naming a tool nothing
+// handles spends a process launch per sub-agent to reach an unconditional
+// defer — the same defect as the one above, pointing the other way. Whoever
+// wires it adds Agent back, and the test makes that mandatory rather than
+// something to remember.
+var GatedTools = []string{"Bash", "Edit", "Write"}
+
+// HookMatcher is the PreToolUse matcher routing exactly GatedTools to the gate.
+// Claude Code matches a tool name against it as an alternation.
+func HookMatcher() string { return strings.Join(GatedTools, "|") }
+
 // heavyCommands are the only commands worth gating. Everything else defers in
 // a few milliseconds, because a gate that thinks about `ls` is its own outage.
 //

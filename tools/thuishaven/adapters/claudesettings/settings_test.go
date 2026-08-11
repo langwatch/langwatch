@@ -238,6 +238,79 @@ func TestEnsureHookMatchesTheGateAndNotMerelyTheWord(t *testing.T) {
 	})
 }
 
+// The upgrade nobody would have received. haven's own path usually has not moved
+// between releases, so a merge comparing only the command finds it equal, writes
+// nothing, and leaves a matcher routing fewer tools than the gate answers for —
+// the dead-branch defect again, this time arriving by way of everyone who set up
+// early.
+//
+// @scenario "Widening the tool set reaches a gate that is already installed"
+func TestEnsureHookWidensAnAlreadyInstalledGate(t *testing.T) {
+	t.Run("given a gate installed before the tool set widened", func(t *testing.T) {
+		root := t.TempDir()
+		writeSettings(t, root, `{"hooks": {"PreToolUse": [
+			{"matcher": "Bash", "hooks": [{"type": "command", "command": "/haven gate"}]}
+		]}}`)
+
+		t.Run("when setup runs again from the same path", func(t *testing.T) {
+			isInstalled, err := New().EnsureHook(root, "/haven gate")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			t.Run("the matcher is brought up to the tools the gate answers for", func(t *testing.T) {
+				if !isInstalled {
+					t.Fatal("a matcher that routes too little is a change worth writing")
+				}
+				written := string(mustRead(t, root))
+				for _, tool := range domain.GatedTools {
+					if !strings.Contains(written, tool) {
+						t.Fatalf("%q wakes no gate, so its branch is unreachable: %s", tool, written)
+					}
+				}
+			})
+
+			t.Run("and running setup once more writes nothing", func(t *testing.T) {
+				isInstalled, err := New().EnsureHook(root, "/haven gate")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if isInstalled {
+					t.Fatal("setup reporting a change on every run makes a real one unreadable")
+				}
+			})
+		})
+	})
+}
+
+// @scenario "A registration haven shares with another hook is left as it is"
+func TestEnsureHookLeavesASharedRegistrationAlone(t *testing.T) {
+	t.Run("given a stale matcher on an entry haven shares with another hook", func(t *testing.T) {
+		root := t.TempDir()
+		writeSettings(t, root, `{"hooks": {"PreToolUse": [
+			{"matcher": "Bash", "hooks": [
+				{"type": "command", "command": "/haven gate"},
+				{"type": "command", "command": "notify-me"}
+			]}
+		]}}`)
+
+		t.Run("when setup runs again", func(t *testing.T) {
+			isInstalled, err := New().EnsureHook(root, "/haven gate")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			t.Run("the matcher is left alone, because it is not only haven's", func(t *testing.T) {
+				// Widening it here would re-route the developer's own hook onto tools
+				// they never pointed it at. Their arrangement, their call.
+				if isInstalled {
+					t.Fatalf("haven rewired a stranger's hook: %s", mustRead(t, root))
+				}
+			})
+		})
+	})
+}
+
 // @scenario "A gate installed from a path with a space is still recognised as haven's own"
 func TestEnsureHookRecognisesItsOwnQuotedPath(t *testing.T) {
 	t.Run("given a gate installed from a worktree whose name has a space in it", func(t *testing.T) {

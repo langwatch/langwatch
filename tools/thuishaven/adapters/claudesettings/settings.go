@@ -104,13 +104,9 @@ func mergeHook(settings map[string]any, command string) (bool, error) {
 		if hook == nil {
 			continue
 		}
-		if hook["command"] == command {
+		if !updateGateHook(entry, hook, command) {
 			return false, nil
 		}
-		// The nested hook's own command, not the entry around it: an entry may
-		// hold several hooks, and replacing the whole block to update one of them
-		// would delete the developer's siblings.
-		hook["command"] = command
 		hooks["PreToolUse"] = entries
 		settings["hooks"] = hooks
 		return true, nil
@@ -119,6 +115,50 @@ func mergeHook(settings map[string]any, command string) (bool, error) {
 	hooks["PreToolUse"] = append(entries, claudeHookEntry(command))
 	settings["hooks"] = hooks
 	return true, nil
+}
+
+// updateGateHook brings an already-installed gate up to date, reporting whether
+// anything changed.
+func updateGateHook(entry any, hook map[string]any, command string) bool {
+	isCommandChanged := hook["command"] != command
+	if isCommandChanged {
+		// The nested hook's own command, not the entry around it: an entry may
+		// hold several hooks, and replacing the whole block to update one of them
+		// would delete the developer's siblings.
+		hook["command"] = command
+	}
+	// Not `||`: the matcher has to be reconciled whether or not the command moved,
+	// and short-circuiting would skip it exactly when it matters most.
+	isMatcherChanged := reconcileMatcher(entry)
+	return isCommandChanged || isMatcherChanged
+}
+
+// reconcileMatcher brings an installed entry's matcher up to the current tool
+// set, reporting whether it changed anything.
+//
+// Without this, widening the tool set reaches nobody who already ran
+// `haven setup`. haven's own path usually has not moved, so the merge above finds
+// the command equal, reports "no change", and leaves the old matcher in place —
+// and a matcher missing a tool is a branch of the gate that never runs, which is
+// the defect this pass exists to fix rather than reproduce one release later.
+//
+// It declines when haven's gate is not alone in the entry. The matcher belongs to
+// the entry rather than to any one hook inside it, so widening one that a
+// developer's own hook also sits in would silently re-route THEIR hook onto tools
+// they never asked it to see.
+func reconcileMatcher(entry any) bool {
+	block, isObject := entry.(map[string]any)
+	if !isObject {
+		return false
+	}
+	if siblings, isArray := block["hooks"].([]any); !isArray || len(siblings) != 1 {
+		return false
+	}
+	if block["matcher"] == domain.HookMatcher() {
+		return false
+	}
+	block["matcher"] = domain.HookMatcher()
+	return true
 }
 
 // findGateHook returns the nested hook inside one PreToolUse entry that runs
@@ -178,7 +218,7 @@ const (
 // claudeHookEntry is the PreToolUse block haven installs.
 func claudeHookEntry(command string) map[string]any {
 	return map[string]any{
-		"matcher": "Bash|Agent",
+		"matcher": domain.HookMatcher(),
 		"hooks": []any{map[string]any{
 			"type":    "command",
 			"command": command,

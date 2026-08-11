@@ -84,14 +84,14 @@ Feature: The gate prices an action before it silently invalidates a prompt cache
 
   # --- The size gate is what keeps the warnings credible ---
 
-  @unit @unimplemented
+  @unit
   Scenario: A small cached prefix produces no warning at all
     Given the session's cached prefix is below the warning threshold
     When a cache-invalidating action is observed
     Then nothing is reported
     Because a warning on a cheap action trains the reader to dismiss the expensive one
 
-  @unit @unimplemented
+  @unit
   Scenario: The warning states the price, not just the fact
     Given the session's cached prefix is above the threshold
     When a cache-invalidating action is priced
@@ -111,13 +111,18 @@ Feature: The gate prices an action before it silently invalidates a prompt cache
 
   # --- Lower certainty: stated as such ---
 
-  @unit @unimplemented
+  @unit
   Scenario: An edit to an instructions file is flagged with its uncertainty attached
     Given a large cached prefix
     When an instructions or rules file is edited mid-session
     Then the developer is told the possible cost
     And is told that whether this invalidates depends on where the harness places that file
+    And the edit is not blocked, in any permission mode
     Until that placement is verified, at which point the hedge is removed
+    # Bound end to end rather than at the pricing function alone. Shipped once
+    # with the arithmetic correct and the tool never routed to it, so a test that
+    # calls the pure function proves nothing about whether a developer ever sees
+    # the line.
 
   # --- The silent one ---
 
