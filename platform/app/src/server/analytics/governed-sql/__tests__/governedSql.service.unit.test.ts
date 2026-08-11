@@ -155,7 +155,9 @@ describe("given the governed SQL service", () => {
       );
       // The raw key is the secret the digest exists to keep out of the
       // database; a capability that merely contained it would be a leak.
-      expect(executor.calls[0]!.tenantCapability).not.toContain(PROJECT.governedSqlKey);
+      expect(executor.calls[0]!.tenantCapability).not.toContain(
+        PROJECT.governedSqlKey,
+      );
     });
 
     it("returns the executor's typed columns, rows and statistics with no diagnostics", async () => {
