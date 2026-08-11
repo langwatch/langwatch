@@ -65,7 +65,9 @@ const decodeCursor = (scrollId: string | null): CursorInfo | null => {
  *   dropped in the ClickHouse migration and a non-zero `pageOffset` is now
  *   rejected at the boundary.
  * - `offset` — real `pageOffset` paging, honoured by the server. The
- *   experiments list and the audit log page this way against Prisma `skip`.
+ *   experiments list pages this way against Prisma `skip`, and is the only
+ *   caller that does. (The audit log renders the footer component but drives
+ *   it from its own offset state and handlers, so the mode never reaches it.)
  */
 export type PaginationMode = "cursor" | "offset";
 

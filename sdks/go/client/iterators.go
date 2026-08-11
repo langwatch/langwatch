@@ -185,6 +185,9 @@ func (s *ProjectsService) All(ctx context.Context, params ListProjectsParams) it
 // loop stops fetching immediately; the supplied context is honoured between
 // pages.
 //
+// A cursor that comes back unchanged is reported as an error rather than
+// followed, since a walk that is not advancing will not start.
+//
 // It walked by pageOffset until trace search started rejecting a non-zero one.
 // That parameter had been unread since trace storage moved to ClickHouse, so
 // the walk was re-served page one for every request and, since a repeated full
@@ -204,6 +207,7 @@ func (s *TracesService) All(ctx context.Context, params TraceSearchParams) iter.
 			return
 		}
 		scrollID := ""
+		pages := 1
 		for {
 			if err := ctx.Err(); err != nil {
 				yield(Trace{}, err)
@@ -225,6 +229,16 @@ func (s *TracesService) All(ctx context.Context, params TraceSearchParams) iter.
 			if nextScrollID == "" || len(traces) == 0 {
 				return
 			}
+			// A cursor that does not move is not pagination, and following it
+			// is an unbounded loop against someone's API quota. #6808 was that
+			// exact failure — the walk had no way to notice it was being served
+			// the same page over and over — so this refuses to repeat it, and
+			// says why rather than stopping silently on a partial result.
+			if nextScrollID == scrollID {
+				yield(Trace{}, fmt.Errorf("langwatch: Traces.All: the API returned the same scroll cursor twice, so pagination is not advancing; stopping after %d page(s) rather than looping", pages))
+				return
+			}
+			pages++
 			scrollID = nextScrollID
 		}
 	}

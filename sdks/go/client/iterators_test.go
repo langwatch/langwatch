@@ -324,6 +324,36 @@ func TestTracesAll(t *testing.T) {
 		})
 	})
 
+	t.Run("given a server that keeps handing back the same cursor", func(t *testing.T) {
+		t.Run("when the pages stay full", func(t *testing.T) {
+			// The failure #6808 was: the walk is served one page forever and
+			// cannot tell. Following an unmoving cursor would reproduce it
+			// exactly, so it stops and says so instead of spinning.
+			var calls int32
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				atomic.AddInt32(&calls, 1)
+				_, _ = w.Write([]byte(`{"traces":[{"trace_id":"t0"},{"trace_id":"t1"}],"pagination":{"totalHits":99,"scrollId":"stuck"}}`))
+			})
+
+			var ids []string
+			var errs []error
+			for tr, err := range c.Traces.All(context.Background(), TraceSearchParams{PageSize: 2}) {
+				if err != nil {
+					errs = append(errs, err)
+					continue
+				}
+				ids = append(ids, *tr.TraceId)
+			}
+
+			require.Len(t, errs, 1, "the caller is told why the walk stopped")
+			assert.Contains(t, errs[0].Error(), "not advancing")
+			assert.Equal(t, int32(2), atomic.LoadInt32(&calls),
+				"it takes two responses to see the cursor repeat, and no more")
+			assert.Equal(t, []string{"t0", "t1", "t0", "t1"}, ids,
+				"rows already yielded are not retracted")
+		})
+	})
+
 	t.Run("given a server that keeps handing back a cursor", func(t *testing.T) {
 		t.Run("when a page arrives empty", func(t *testing.T) {
 			// Following the cursor alone would loop here forever, so an empty

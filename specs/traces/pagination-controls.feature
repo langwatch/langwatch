@@ -119,15 +119,12 @@ Feature: Traces tab pagination controls
     Then the scrollId is removed from the URL
     And the trace list shows the first page at the new size
 
-  # The footer is shared with lists that really do page by offset. A cursor
-  # position and a row count are both stated in units of the old page size, so
-  # neither survives a resize — the reset has to happen in both modes.
-  @integration @unimplemented
-  Scenario: Changing items per page starts an offset list over too
-    Given an offset-paged list showing a page well past the first
-    When I change the "Items per page" dropdown
-    Then the pageOffset is removed from the URL
-    And the list shows the first page at the new size
+  # The same reset has to happen for the offset-paged lists that share this
+  # footer, and it regressed there while trace pagination was being fixed. It
+  # is not written as a scenario here: this feature's Background puts the
+  # reader on the Traces tab, which has no offset mode, so a scenario about an
+  # offset list would contradict the Background it inherits. It is bound by
+  # useNavigationFooter.offset-reset.integration.test.ts, which runs.
 
   @integration @unimplemented
   Scenario: Page size persists across a page reload
