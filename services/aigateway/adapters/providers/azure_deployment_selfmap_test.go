@@ -99,7 +99,7 @@ func TestAzureDispatch_ResolvesDeploymentForControlPlaneCredential(t *testing.T)
 		// request as the gateway builds it
 		reqModel string
 		resolved *domain.ResolvedModel
-		// credential as the control plane materialises it
+		// credential as the control plane materializes it
 		wireDeploymentMap  map[string]string
 		explicitDeployment string // Extra["deployment"], set by the provider row
 		// wantDeployment empty means "the model Bifrost was handed" — the

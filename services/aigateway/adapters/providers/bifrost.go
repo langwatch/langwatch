@@ -179,10 +179,10 @@ func (r *BifrostRouter) validateCredentialEndpoints(ctx context.Context, cred do
 // domain.WithDeploymentSelfMap.
 //
 // Azure / Bedrock / Vertex route on deployment name, and the control-plane/VK
-// path materialises credentials straight off the bundle wire
+// path materializes credentials straight off the bundle wire
 // (adapters/controlplane/config_wire.go), which carries no deployment map at
 // all — so without this the provider is handed a nil map and rejects the
-// dispatch before dialling. Resolving at the two dispatch entry points rather
+// dispatch before dialing. Resolving at the two dispatch entry points rather
 // than per lane is what stops the next lane added from forgetting it, and it
 // lands before Bifrost's key SELECTION stage (GetKeysForProvider reads the
 // credential off the context), which filters out keys whose deployment map
@@ -939,7 +939,7 @@ func rawResponseBytesResp(resp *bfschemas.BifrostResponsesResponse) ([]byte, boo
 	return extractRawResponseBytes(resp.ExtraFields.RawResponse)
 }
 
-// extractRawResponseBytes normalises the various concrete types
+// extractRawResponseBytes normalizes the various concrete types
 // Bifrost may stash into ExtraFields.RawResponse (typed `interface{}`)
 // into a []byte suitable for writing to the HTTP response.
 //
@@ -1607,7 +1607,7 @@ func classifyBifrostError(ctx context.Context, berr *bfschemas.BifrostError) err
 // The discriminator is the vendor's error shape rather than its message,
 // because the messages are open-ended: every status-less shape raised from an
 // attempted call carries the Go error it failed on (transport, DNS, body
-// marshalling, response read), and an unsupported request type carries the
+// marshaling, response read), and an unsupported request type carries the
 // vendor's own error code. A rejection with neither was raised before
 // anything was attempted — the provider row itself is unusable.
 func statuslessBifrostCode(berr *bfschemas.BifrostError) herr.Code {

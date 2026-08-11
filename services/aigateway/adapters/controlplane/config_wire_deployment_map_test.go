@@ -10,7 +10,7 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-// The control-plane/VK path materialises provider slots from the bundle wire.
+// The control-plane/VK path materializes provider slots from the bundle wire.
 // A ModelProvider with no deploymentMapping ships no `deployment_map` key at
 // all, and an empty mapping ships `{}` — so on this path the wire alone can
 // never hand Azure / Bedrock / Vertex the deployment name Bifrost demands.

@@ -18,7 +18,7 @@ import (
 // classifyBifrostError is the only translation point for a Bifrost error that
 // carries no HTTP status, because no HTTP call was ever made. Its switch treats
 // status 0 as a gateway timeout, which mislabels every configuration rejection
-// the vendor raises before dialling — a permanent, operator-fixable fault that
+// the vendor raises before dialing — a permanent, operator-fixable fault that
 // then reads to the client as a transient upstream timeout.
 //
 // Rows build their errors with the vendor's own constructors so the shapes
@@ -30,12 +30,12 @@ import (
 func codeOf(t *testing.T, err error) herr.Code {
 	t.Helper()
 	var e herr.E
-	require.True(t, errors.As(err, &e), "expected a herr.E, got %T: %v", err, err)
+	require.ErrorAs(t, err, &e, "expected a herr.E, got %T: %v", err, err)
 	return e.Code
 }
 
 // AC16 / AC18b: no status-less Bifrost error is a timeout. None of these
-// shapes involves a network round trip, so labelling them provider_timeout is
+// shapes involves a network round trip, so labeling them provider_timeout is
 // wrong on its face — and it is what the switch does today for all three.
 //
 // @scenario "A status-less configuration error is not reported as a timeout"
@@ -65,7 +65,7 @@ func TestClassifyBifrostError_StatuslessShapesAreNotTimeouts(t *testing.T) {
 		{
 			// AC18b: an internal Bifrost failure. Also not a timeout.
 			name: "bifrost operation error",
-			berr: bfproviderutils.NewBifrostOperationError("error marshalling request", errors.New("boom"), bfschemas.Azure),
+			berr: bfproviderutils.NewBifrostOperationError("error marshaling request", errors.New("boom"), bfschemas.Azure),
 		},
 	}
 
@@ -90,7 +90,7 @@ func TestClassifyBifrostError_KeepsTheUnderlyingBifrostMessage(t *testing.T) {
 		bfproviderutils.NewConfigurationError("deployments not set", bfschemas.Azure))
 
 	var e herr.E
-	require.True(t, errors.As(err, &e))
+	require.ErrorAs(t, err, &e)
 	assert.Equal(t, "deployments not set", e.Meta["message"],
 		"the operator's only clue to the misconfiguration is this string")
 }
@@ -112,7 +112,7 @@ func TestClassifyBifrostError_VendorTimeoutStaysATimeout(t *testing.T) {
 
 // AC19: the status-bearing branches of the switch are the baseline this issue
 // does not touch. 408 is deliberately absent from the switch and therefore
-// falls through to provider_error; that is current behaviour, pinned so a fix
+// falls through to provider_error; that is current behavior, pinned so a fix
 // to the status-0 branch cannot quietly reshuffle the rest.
 //
 // Spec: specs/ai-gateway/azure-deployment-map-control-plane-path.feature

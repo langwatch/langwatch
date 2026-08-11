@@ -108,7 +108,7 @@ func TestAzureLane_ConfigurationErrorIsNotSurfacedAsATimeout(t *testing.T) {
 		ProviderID: domain.ProviderAzure,
 		APIKey:     "az-key",
 		// No endpoint: the provider row was never finished. Bifrost rejects
-		// this before dialling, with no HTTP status to report.
+		// this before dialing, with no HTTP status to report.
 		Extra: map[string]string{"api_version": "2024-10-21"},
 	})
 
@@ -127,7 +127,7 @@ func TestAzureLane_ConfigurationErrorIsNotSurfacedAsATimeout(t *testing.T) {
 // in the chain before failing (the production trace showed eight identical
 // attempt pairs).
 //
-// The second credential is fully working, so "it was never dialled" can only be
+// The second credential is fully working, so "it was never dialed" can only be
 // explained by the chain not being walked.
 //
 // @scenario "A configuration failure does not walk the credential fallback chain"

@@ -641,7 +641,7 @@ func modelsHandler(deps RouterDeps) http.HandlerFunc {
 // provider (an allowlist entry on a multi-provider credential chain, for
 // instance) are attributed to the gateway rather than to an empty string:
 // `owned_by` is a required string in the OpenAI Model object, and a
-// blank one renders as an unlabelled row in model pickers.
+// blank one renders as an unlabeled row in model pickers.
 func modelOwnedBy(m domain.Model) string {
 	if m.ProviderID == "" {
 		return "langwatch"
@@ -1217,7 +1217,7 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrProviderError, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrProviderTimeout, http.StatusGatewayTimeout)
 	// 502 like ErrProviderError, and deliberately NOT 504: the provider row
-	// was rejected before it was dialled, so a gateway timeout would tell the
+	// was rejected before it was dialed, so a gateway timeout would tell the
 	// client to wait out a stall that never happened and tell the retry
 	// engine the chain is worth walking.
 	herr.RegisterStatus(domain.ErrProviderMisconfigured, http.StatusBadGateway)

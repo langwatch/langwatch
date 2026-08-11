@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -28,28 +29,35 @@ func TestWithDeploymentSelfMap_HasExactlyOneCallSiteInTheGateway(t *testing.T) {
 	root, err := filepath.Abs("..")
 	require.NoError(t, err)
 
+	// os.Root scopes every read below to the services/aigateway subtree: a
+	// symlink inside it cannot resolve to a path outside root, so the walk
+	// cannot be TOCTOU'd into reading a file the callback never intended.
+	rootDir, err := os.OpenRoot(root)
+	require.NoError(t, err)
+	defer rootDir.Close()
+
 	// The `domain.` qualifier and the `(` are load-bearing: the bare
 	// identifier also matches this helper's own definition and doc comment,
 	// so that grep could never equal one.
 	const needle = "domain.WithDeploymentSelfMap("
 	var callSites []string
 
-	require.NoError(t, filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+	require.NoError(t, fs.WalkDir(rootDir.FS(), ".", func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
-		content, err := os.ReadFile(path)
+		content, err := rootDir.ReadFile(path)
 		if err != nil {
 			return err
 		}
 		for i, line := range strings.Split(string(content), "\n") {
 			if strings.Contains(line, needle) {
-				rel, _ := filepath.Rel(root, path)
+				// path is already root-relative and forward-slash separated.
 				callSites = append(callSites,
-					filepath.Join("services/aigateway", rel)+":"+strconv.Itoa(i+1))
+					filepath.Join("services", "aigateway", path)+":"+strconv.Itoa(i+1))
 			}
 		}
 		return nil

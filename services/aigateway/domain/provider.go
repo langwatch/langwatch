@@ -93,7 +93,7 @@ type Credential struct {
 // credentials from the bundle wire (adapters/controlplane/config_wire.go), and
 // that wire carries no deployment map for a provider whose models have no
 // explicit mapping — so an Azure request on that path would otherwise reach
-// Bifrost with a nil map and be rejected before dialling. nlpgo's
+// Bifrost with a nil map and be rejected before dialing. nlpgo's
 // dispatcheradapter and gatewayproxy call it on their own credentials too;
 // re-applying it is a no-op, since an entry already present wins.
 func WithDeploymentSelfMap(cred Credential, bareModel string) Credential {
