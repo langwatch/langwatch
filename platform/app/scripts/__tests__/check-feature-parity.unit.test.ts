@@ -341,6 +341,19 @@ describe("findScenarioAnnotations", () => {
     });
   });
 
+  describe("given a line of comment punctuation that never reaches the token", () => {
+    it("gives up in linear time instead of backtracking", () => {
+      // The prefix has to accept `//`, `/**` and a bare `*`. Spelling that as
+      // an alternation under a repeat makes `/**` splittable two ways, so this
+      // input has 2^30 parses and the engine walks them all: measured at 7s
+      // for this line alone, against a whole repo of files per run.
+      const src = `/${"**/".repeat(30)}x`;
+      const started = performance.now();
+      expect(titles(src)).toEqual([]);
+      expect(performance.now() - started).toBeLessThan(1000);
+    });
+  });
+
   describe("given the token appears mid-sentence in prose", () => {
     it("binds nothing when a comment explains that it carries no annotation", () => {
       // The regression this guards: the sentence saying there is no binding

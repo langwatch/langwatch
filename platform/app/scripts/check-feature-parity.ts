@@ -843,11 +843,18 @@ export function discoverFeatureFiles(
 // whatever follows it: a comment reading "carries no @scenario annotation:
 // this guards a temporary exclusion" bound a scenario named "annotation: this
 // guards a temporary", and the failure then named a scenario nobody wrote at a
-// line whose comment says the opposite. The leading group allows the comment
-// markers actually used in this repo, including a `*` continuation that opens
-// a nested `/**`.
+// line whose comment says the opposite. The prefix allows the comment markers
+// actually used in this repo, including a `*` continuation that opens a nested
+// `/**`, and a `#` for the Python and Bats forms.
+//
+// That prefix is one flat character class under one quantifier on purpose. The
+// readable spelling of the same rule, alternating `//` with `/*+` under a
+// repeat, is ambiguous: `/**` splits either as one `/*+` or as `/*` then `*`,
+// so a line of `/**/**/...` has exponentially many parses and the engine tries
+// them all before failing. Every source file in the repo is fed to this, so a
+// linear scan is not optional.
 const ANNOTATION_RE =
-  /^[ \t]*(?:(?:\/\/|\/\*+|\*|#)[ \t]*)*@scenario[ \t]+(?:"([^"\n]+)"|'([^'\n]+)'|([^\n*]+?))[ \t]*(?:\*\/|$)/gm;
+  /^[ \t/*#]*@scenario[ \t]+(?:"([^"\n]+)"|'([^'\n]+)'|([^\n*]+?))[ \t]*(?:\*\/|$)/gm;
 
 /**
  * Every `@scenario` annotation in `src`, with the offset just past each match so
