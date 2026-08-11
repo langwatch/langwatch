@@ -47,6 +47,27 @@ Feature: Starting Langy conversations with a project API key
     Then the resolved actor is the key's owner
     And the user named in the payload is ignored
 
+  @unit
+  Scenario: The acting identity is loaded from the owner's record, not invented
+    Given a project API key owned by a user with a name and email on file
+    When the surface builds the acting identity for a turn
+    Then the identity carries that user's own name and email
+    And no placeholder actor is substituted
+
+  @unit
+  Scenario: A key whose owning user no longer exists is refused
+    Given a project API key whose owning user record has been deleted
+    When the surface builds the acting identity for a turn
+    Then the turn is refused
+    And no stand-in actor is used in the owner's place
+
+  @unit
+  Scenario: The key-authed surface is switched off by default
+    Given a deployment that has not opted into key-initiated Langy turns
+    When the rollback switch for the surface is read
+    Then the surface is closed
+    And the switch is independent of the flag that opens Langy itself
+
   # ---------------------------------------------------------------------------
   # Capability — turn start, continue, streaming
   # ---------------------------------------------------------------------------
