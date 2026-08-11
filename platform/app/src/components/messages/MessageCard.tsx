@@ -40,7 +40,7 @@ import { getColorForString } from "../../utils/rotatingColors";
 import { stringifyIfObject } from "../../utils/stringifyIfObject";
 import { getExtractedInput } from "../../utils/traceExtraction";
 import { CheckPassing } from "../CheckPassing";
-import { evaluationPassed } from "../checks/EvaluationStatus";
+import { summarizeEvaluationsTag } from "../checks/evaluationSummaryCounts";
 import { Markdown } from "../Markdown";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import { Popover } from "../ui/popover";
@@ -73,24 +73,14 @@ export function MessageCard({
   const guardrails = checksMap
     ? (checksMap[trace.trace_id]?.filter((x) => x.is_guardrail) ?? [])
     : [];
-  const evaluationsDone = evaluations.every(
-    (check) =>
-      check.status == "processed" ||
-      check.status == "skipped" ||
-      check.status == "error",
-  );
-  const evaluationsPasses = evaluations.filter(
-    (check) =>
-      evaluationPassed(check) !== false &&
-      (check.status === "processed" || check.status === "skipped"),
-  ).length;
+  // Skipped and errored runs never produced a verdict, so they stay out of
+  // both sides of the pass count — a skipped run counted as a pass and an
+  // errored run counted as a fail both invent verdicts (#6835).
+  const evalSummary = summarizeEvaluationsTag(evaluations);
   const guardrailsPasses = guardrails.filter(
     (check) => check.passed !== false,
   ).length;
 
-  const allEvaluationsSkipped = evaluations.every(
-    (check) => check.status === "skipped",
-  );
   const allGuardrailsSkipped = guardrails.every(
     (check) => check.status === "skipped",
   );
@@ -465,11 +455,11 @@ export function MessageCard({
                 borderWidth="1px"
                 borderColor="border"
                 color={
-                  !evaluationsDone || allEvaluationsSkipped
+                  !evalSummary.done || evalSummary.allSkipped
                     ? "yellow.fg"
-                    : evaluationsPasses == totalEvaluations
-                      ? "green.fg"
-                      : "red.fg"
+                    : evalSummary.failed > 0 || evalSummary.errored > 0
+                      ? "red.fg"
+                      : "green.fg"
                 }
                 paddingY={1}
                 paddingX={2}
@@ -481,24 +471,36 @@ export function MessageCard({
               >
                 <Tag.Label>
                   <HStack gap={2}>
-                    {!evaluationsDone ? (
+                    {!evalSummary.done ? (
                       <Clock />
-                    ) : allEvaluationsSkipped ? (
+                    ) : evalSummary.allSkipped ? (
                       <MinusCircle />
-                    ) : evaluationsPasses == totalEvaluations ? (
-                      <CheckCircle />
-                    ) : (
+                    ) : evalSummary.failed > 0 || evalSummary.errored > 0 ? (
                       <XCircle />
+                    ) : (
+                      <CheckCircle />
                     )}
-                    {allEvaluationsSkipped
-                      ? "Evaluations skipped"
-                      : evaluationsDone && evaluationsPasses != totalEvaluations
-                        ? `${totalEvaluations - evaluationsPasses} ${
-                            totalEvaluations - evaluationsPasses == 1
-                              ? "evaluation failed"
-                              : "evaluations failed"
-                          }`
-                        : `${evaluationsPasses}/${totalEvaluations} evaluations`}
+                    {!evalSummary.done ? (
+                      `${evalSummary.passes}/${evalSummary.verdictTotal} evaluations`
+                    ) : evalSummary.allSkipped ? (
+                      "Evaluations skipped"
+                    ) : evalSummary.failed > 0 ? (
+                      `${evalSummary.failed} ${
+                        evalSummary.failed == 1
+                          ? "evaluation failed"
+                          : "evaluations failed"
+                      }`
+                    ) : evalSummary.errored > 0 ? (
+                      // A crashed evaluator is not a fail verdict — label it
+                      // as an error instead of folding it into "failed".
+                      `${evalSummary.errored} ${
+                        evalSummary.errored == 1
+                          ? "evaluation errored"
+                          : "evaluations errored"
+                      }`
+                    ) : (
+                      `${evalSummary.passes}/${evalSummary.verdictTotal} evaluations`
+                    )}
                   </HStack>
                 </Tag.Label>
               </Tag.Root>
