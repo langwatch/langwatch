@@ -120,6 +120,23 @@ export interface GovernedViewDedup {
    * that silently double-counts.
    */
   readonly versionColumn?: string;
+  /**
+   * Set when the source is an `AggregatingMergeTree`, whose rows for one key
+   * are *summed together* rather than one superseding the others.
+   *
+   * The third answer to "which row survives", and it has to be declared because
+   * it cannot be inferred from the other two. An absent `versionColumn` already
+   * means "nothing to collapse" (the PostgreSQL-resident datasets), and reading
+   * this engine that way would expose every unmerged partial row as its own
+   * result row — a caller's `SELECT CostSum` would see a fraction of the
+   * bucket's cost, which looks like a real number rather than like an error.
+   *
+   * The survivor is the merge, so there is no version to pick and
+   * {@link versionColumn} must stay absent; `FINAL` performs the merge and the
+   * key columns must be the source's whole `ORDER BY`, since that is what the
+   * engine merges on.
+   */
+  readonly aggregating?: boolean;
 }
 
 /**

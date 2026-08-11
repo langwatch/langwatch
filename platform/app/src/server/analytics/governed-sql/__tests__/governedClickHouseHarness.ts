@@ -503,6 +503,10 @@ export const REAL_FACT_TABLES = [
   "stored_spans",
   "evaluation_runs",
   "simulation_runs",
+  "trace_analytics",
+  "trace_analytics_rollup",
+  "evaluation_analytics",
+  "evaluation_analytics_rollup",
 ] as const;
 
 /**
@@ -632,6 +636,40 @@ export const MOVED_PARTITION_FIXTURE = {
 export function movedPartitionTraceId(tenantId: string): string {
   return `${tenantId}-${MOVED_PARTITION_FIXTURE.traceIdSuffix}`;
 }
+
+/**
+ * One bucket of a rollup, written as two partial rows in two parts.
+ *
+ * The shape an `AggregatingMergeTree` is for and the one a reader can get
+ * wrong: neither part is the answer, and the answer is not the later of them
+ * either — it is their sum. Written in two inserts with merges stopped, so a
+ * view that forgot to merge returns two rows and a view that picked a winner
+ * returns the wrong total, and neither can pass by accident.
+ *
+ * The bucket sits inside the last seeded week, so it is in the same partition
+ * the "recent" queries read and shares their retention.
+ */
+export const ROLLUP_MERGE_FIXTURE = {
+  bucketStart: "2026-02-23 00:01:00.000",
+  model: "gpt-5-rollup-merge",
+  spanType: "llm",
+  evaluatorType: "rollup_merge_judge",
+  status: "processed",
+  /** The two parts, and what each measure is in each. */
+  parts: [
+    { count: 2, cost: 0.5, duration: 10, tokens: 30, score: 1.5 },
+    { count: 3, cost: 0.25, duration: 5, tokens: 12, score: 0.75 },
+  ],
+} as const;
+
+/** What the merged bucket must add up to, stated separately from the parts. */
+export const ROLLUP_MERGE_TOTALS = {
+  count: 5,
+  cost: 0.75,
+  duration: 15,
+  tokens: 42,
+  score: 2.25,
+} as const;
 
 interface TraceSummarySeed {
   TenantId: string;
@@ -867,6 +905,296 @@ async function seedRealFactRows({
       })),
     ),
   });
+
+  await seedAnalyticsProjections({ admin, database, tenants, weeks });
+}
+
+/**
+ * Seeds the analytics projections and their per-minute rollups.
+ *
+ * Same tenants, same weekly partitions and the same trace ids as the fold's
+ * other projections, so a query that joins `trace_metrics` to `spans` on
+ * `TraceId` finds rows on both sides rather than proving isolation against an
+ * empty result.
+ */
+async function seedAnalyticsProjections({
+  admin,
+  database,
+  tenants,
+  weeks,
+}: {
+  admin: ClickHouseClient;
+  database: string;
+  tenants: readonly { tenantId: string }[];
+  weeks: readonly number[];
+}): Promise<void> {
+  const traceAnalyticsRow = ({
+    tenantId,
+    traceId,
+    occurredAt,
+    updatedAt,
+    durationMs,
+  }: {
+    tenantId: string;
+    traceId: string;
+    occurredAt: string;
+    updatedAt: string;
+    durationMs: number;
+  }) => ({
+    TenantId: tenantId,
+    TraceId: traceId,
+    Version: "1",
+    OccurredAt: occurredAt,
+    CreatedAt: occurredAt,
+    UpdatedAt: updatedAt,
+    TraceName: `trace ${traceId}`,
+    TopicId: "checkout",
+    SubTopicId: null,
+    UserId: `${tenantId}-end-user`,
+    ConversationId: `${tenantId}-thread`,
+    CustomerId: `${tenantId}-customer`,
+    Origin: "sdk",
+    Models: [SEEDED_DIMENSION_ATTRIBUTE.value],
+    Labels: ["checkout"],
+    TotalCost: 0.0042,
+    NonBilledCost: 0.0001,
+    TotalDurationMs: durationMs,
+    TimeToFirstTokenMs: 120,
+    TokensPerSecond: 42,
+    PromptTokens: 100,
+    CompletionTokens: 20,
+    CacheReadTokens: 5,
+    CacheWriteTokens: 3,
+    ReasoningTokens: 7,
+    HasError: false,
+    HasAnnotation: null,
+    // The same content key the other projections carry, so "the map is
+    // filtered" is a claim with something to filter.
+    Attributes: {
+      [SEEDED_DIMENSION_ATTRIBUTE.key]: SEEDED_DIMENSION_ATTRIBUTE.value,
+      "gen_ai.prompt": SEEDED_CONTENT.spanPromptAttribute,
+    },
+  });
+
+  await admin.insert({
+    table: `${database}.trace_analytics`,
+    format: "JSONEachRow",
+    values: tenants.flatMap((tenant) =>
+      weeks.flatMap((week) =>
+        [...Array(SEED_TRACES_PER_WEEK).keys()].map((index) =>
+          traceAnalyticsRow({
+            tenantId: tenant.tenantId,
+            traceId: `${tenant.tenantId}-trace-${week}-${index}`,
+            occurredAt: seedWeekStart(week),
+            updatedAt: seedWeekStart(week),
+            durationMs: 1200,
+          }),
+        ),
+      ),
+    ),
+  });
+
+  // Two versions in two parts, so `FINAL` has something to collapse here too.
+  for (const updatedAt of [
+    DEDUP_FIXTURE.staleUpdatedAt,
+    DEDUP_FIXTURE.latestUpdatedAt,
+  ]) {
+    await admin.insert({
+      table: `${database}.trace_analytics`,
+      format: "JSONEachRow",
+      values: tenants.map((tenant) =>
+        traceAnalyticsRow({
+          tenantId: tenant.tenantId,
+          traceId: dedupTraceId(tenant.tenantId),
+          occurredAt: seedWeekStart(SEED_WEEK_COUNT - 1),
+          updatedAt,
+          durationMs:
+            updatedAt === DEDUP_FIXTURE.latestUpdatedAt
+              ? DEDUP_FIXTURE.latestSpanCount
+              : DEDUP_FIXTURE.staleSpanCount,
+        }),
+      ),
+    });
+  }
+
+  const evaluationAnalyticsRow = ({
+    tenantId,
+    evaluationId,
+    traceId,
+    occurredAt,
+    updatedAt,
+    score,
+  }: {
+    tenantId: string;
+    evaluationId: string;
+    traceId: string;
+    occurredAt: string;
+    updatedAt: string;
+    score: number;
+  }) => ({
+    TenantId: tenantId,
+    EvaluationId: evaluationId,
+    Version: "1",
+    OccurredAt: occurredAt,
+    CreatedAt: occurredAt,
+    UpdatedAt: updatedAt,
+    EvaluatorType: "llm_judge",
+    EvaluatorName: "Quality",
+    Status: "processed",
+    IsGuardrail: false,
+    Passed: true,
+    Score: score,
+    Label: "good",
+    Model: SEEDED_DIMENSION_ATTRIBUTE.value,
+    TraceId: traceId,
+    UserId: `${tenantId}-end-user`,
+    ConversationId: `${tenantId}-thread`,
+    CustomerId: `${tenantId}-customer`,
+    Origin: "sdk",
+    DurationMs: 340,
+    TotalCost: 0.0009,
+    NonBilledCost: 0.0,
+    Attributes: {
+      [SEEDED_DIMENSION_ATTRIBUTE.key]: SEEDED_DIMENSION_ATTRIBUTE.value,
+      "gen_ai.prompt": SEEDED_CONTENT.spanPromptAttribute,
+    },
+  });
+
+  await admin.insert({
+    table: `${database}.evaluation_analytics`,
+    format: "JSONEachRow",
+    values: tenants.flatMap((tenant) =>
+      weeks.flatMap((week) =>
+        [...Array(SEED_EVALUATIONS_PER_WEEK).keys()].map((index) =>
+          evaluationAnalyticsRow({
+            tenantId: tenant.tenantId,
+            evaluationId: `${tenant.tenantId}-eval-${week}-${index}`,
+            traceId: `${tenant.tenantId}-trace-${week}-${index}`,
+            occurredAt: seedWeekStart(week),
+            updatedAt: seedWeekStart(week),
+            score: 0.8,
+          }),
+        ),
+      ),
+    ),
+  });
+
+  for (const updatedAt of [
+    DEDUP_FIXTURE.staleUpdatedAt,
+    DEDUP_FIXTURE.latestUpdatedAt,
+  ]) {
+    await admin.insert({
+      table: `${database}.evaluation_analytics`,
+      format: "JSONEachRow",
+      values: tenants.map((tenant) =>
+        evaluationAnalyticsRow({
+          tenantId: tenant.tenantId,
+          evaluationId: `${tenant.tenantId}-${DEDUP_FIXTURE.traceIdSuffix}-eval`,
+          traceId: dedupTraceId(tenant.tenantId),
+          occurredAt: seedWeekStart(SEED_WEEK_COUNT - 1),
+          updatedAt,
+          score:
+            updatedAt === DEDUP_FIXTURE.latestUpdatedAt
+              ? DEDUP_FIXTURE.latestSpanCount
+              : DEDUP_FIXTURE.staleSpanCount,
+        }),
+      ),
+    });
+  }
+
+  await admin.insert({
+    table: `${database}.trace_analytics_rollup`,
+    format: "JSONEachRow",
+    values: tenants.flatMap((tenant) =>
+      weeks.map((week) => ({
+        TenantId: tenant.tenantId,
+        BucketStart: seedWeekStart(week),
+        Model: SEEDED_DIMENSION_ATTRIBUTE.value,
+        SpanType: "llm",
+        SpanCount: SEED_TRACES_PER_WEEK,
+        TraceCount: SEED_TRACES_PER_WEEK,
+        ErrorCount: 0,
+        CostSum: 1.05,
+        NonBilledCostSum: 0.025,
+        DurationSum: 300_000,
+        PromptTokensSum: 25_000,
+        CompletionTokensSum: 5_000,
+        CacheReadTokensSum: 1_250,
+        CacheWriteTokensSum: 750,
+        ReasoningTokensSum: 1_750,
+      })),
+    ),
+  });
+
+  await admin.insert({
+    table: `${database}.evaluation_analytics_rollup`,
+    format: "JSONEachRow",
+    values: tenants.flatMap((tenant) =>
+      weeks.map((week) => ({
+        TenantId: tenant.tenantId,
+        BucketStart: seedWeekStart(week),
+        EvaluatorType: "llm_judge",
+        Status: "processed",
+        EvalCount: SEED_EVALUATIONS_PER_WEEK,
+        PassCount: SEED_EVALUATIONS_PER_WEEK,
+        FailCount: 0,
+        ErrorCount: 0,
+        SkippedCount: 0,
+        ScoreSum: 20,
+        ScoreCount: SEED_EVALUATIONS_PER_WEEK,
+        DurationSum: 8_500,
+        CostSum: 0.0225,
+        NonBilledCostSum: 0,
+      })),
+    ),
+  });
+
+  // One insert per part, so the bucket really is two rows on disk rather than
+  // one the client summed on the way in.
+  for (const part of ROLLUP_MERGE_FIXTURE.parts) {
+    await admin.insert({
+      table: `${database}.trace_analytics_rollup`,
+      format: "JSONEachRow",
+      values: tenants.map((tenant) => ({
+        TenantId: tenant.tenantId,
+        BucketStart: ROLLUP_MERGE_FIXTURE.bucketStart,
+        Model: ROLLUP_MERGE_FIXTURE.model,
+        SpanType: ROLLUP_MERGE_FIXTURE.spanType,
+        SpanCount: part.count,
+        TraceCount: part.count,
+        ErrorCount: 0,
+        CostSum: part.cost,
+        NonBilledCostSum: 0,
+        DurationSum: part.duration,
+        PromptTokensSum: part.tokens,
+        CompletionTokensSum: 0,
+        CacheReadTokensSum: 0,
+        CacheWriteTokensSum: 0,
+        ReasoningTokensSum: 0,
+      })),
+    });
+
+    await admin.insert({
+      table: `${database}.evaluation_analytics_rollup`,
+      format: "JSONEachRow",
+      values: tenants.map((tenant) => ({
+        TenantId: tenant.tenantId,
+        BucketStart: ROLLUP_MERGE_FIXTURE.bucketStart,
+        EvaluatorType: ROLLUP_MERGE_FIXTURE.evaluatorType,
+        Status: ROLLUP_MERGE_FIXTURE.status,
+        EvalCount: part.count,
+        PassCount: part.count,
+        FailCount: 0,
+        ErrorCount: 0,
+        SkippedCount: 0,
+        ScoreSum: part.score,
+        ScoreCount: part.count,
+        DurationSum: part.duration,
+        CostSum: part.cost,
+        NonBilledCostSum: 0,
+      })),
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------

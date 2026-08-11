@@ -218,6 +218,29 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
     And no ungated column is built over a content-carrying key
     And a caller whose permissions are unresolved has every gated column withheld
 
+  @unit
+  Scenario: A pre-aggregated dataset declares that its rows merge rather than supersede
+    Given the governed analytics schema catalog
+    When a dataset whose source aggregates is inspected
+    Then it declares every key its rows merge on
+    And it declares no version column, because no version supersedes another
+    And a dataset whose source keeps versions still declares the column that picks the survivor
+
+  @unit
+  Scenario: The analytics-optimised datasets expose no captured content
+    Given the governed analytics schema catalog
+    When the datasets built over the analytics projections are inspected
+    Then none of them exposes a content-gated column
+    And every attribute map any dataset exposes has the content keys filtered out
+
+  @integration
+  Scenario: A pre-aggregated dataset returns one merged row per bucket
+    Given a rollup table holding two partial rows for the same bucket
+    And the restricted identity carries tenant-a's valid key-hash context
+    When it reads that bucket through the governed view
+    Then one row is returned
+    And each measure is the sum of the partial rows
+
   @integration
   Scenario: The catalog's declared columns match the tables the views read
     Given the shipped ClickHouse migrations applied to the test server
@@ -746,10 +769,23 @@ Feature: Governed analytics SQL API — read-only native ClickHouse SQL over ana
 #   → Scenario: Every governed view declares its grain, join keys, and time column
 #   → Scenario: The catalog's declared columns match the tables the views read
 #   → Scenario: Every governed view names the column that prunes its partitions
+#   → Scenario: A pre-aggregated dataset declares that its rows merge rather than supersede
+#     (issue #6856: the analytics projections and their per-minute rollups join
+#      the catalog, and a rollup's source is an AggregatingMergeTree — its rows
+#      for one key are SUMMED rather than superseded, which is a third answer to
+#      "which row survives" and cannot be inferred from the other two)
+#   → Scenario: A pre-aggregated dataset returns one merged row per bucket
+#     (the same claim proven against the shipped table: partial rows in
+#      separate parts, one summed row out)
 # AC "Derive content-gated fields from the existing visibility stack — never a second
 #     handwritten gated-field list; keep a parity test"
 #   → Scenario: The gated column set is derived from the data privacy policy, not hand-listed
 #   → Scenario: Captured content is reachable only through the gated columns
+#   → Scenario: The analytics-optimised datasets expose no captured content
+#     (issue #6856: the analytics projections carry no captured input or output
+#      at all, and every attribute map in the catalog is filtered against the
+#      same policy — the map is the one place a view can leak content without
+#      naming a gated column)
 # (supporting invariants of the same proof: the views are bounded by the same row
 #  policies as the tables under them, the grant is the exposed surface, and the
 #  views are usable at scale)

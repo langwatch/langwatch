@@ -125,6 +125,48 @@ never hand-listed.
 - These objects are provisioning statements, not goose migrations. Deployment
   wiring is a later slice of #6480.
 
+## Amendment: aggregating sources, a third answer to "which row survives" (2026-08-11, #6856)
+
+Exposing the modern analytics projections
+([#6856](https://github.com/langwatch/langwatch/issues/6856)) brought the first
+source tables that are **not** `ReplacingMergeTree`s: `trace_analytics_rollup`
+and `evaluation_analytics_rollup` are `AggregatingMergeTree`s, whose rows for one
+sort key are *summed* rather than one superseding the others.
+
+The decision above still holds, unchanged: `FINAL` is what the view uses.
+Measured against 25.10.2.65 with merges stopped and a bucket written as two
+parts, `FINAL` over an `AggregatingMergeTree` returns one row per sort key with
+each `SimpleAggregateFunction(sum, …)` column summed across the parts. What
+changes is what the catalog has to *say*, on two points:
+
+**A catalog entry declares an aggregating source explicitly**
+(`GovernedViewDedup.aggregating`), and such an entry declares no version column.
+Absence of a version column previously meant one thing — a PostgreSQL-resident
+view with nothing to collapse — and the unit guard read it that way, so an
+aggregating entry would otherwise be indistinguishable from a `ReplacingMergeTree`
+entry that forgot to name its version. `dedupPredicate` and the guard now branch
+on the flag rather than on the absence.
+
+**The key columns are the source's whole `ORDER BY`.** This was already true of
+the existing entries and is now stated as the rule, because on an aggregating
+source getting it wrong is not a duplicate row — it is a *wrong number*, one
+model's cost summed into another's under a key that merged too much.
+
+**Rollup measures are cast to their plain types in the view body**
+(`toUInt64`, `toInt64`, `toFloat64`). A view that passes such a column straight
+through reports it to `system.columns`, and therefore to the schema endpoint, as
+`SimpleAggregateFunction(sum, UInt64)` — the name of a storage engine where a
+caller expects the type of a number. `FINAL` has already merged the parts by the
+time the projection runs, so the cast reads the merged total.
+
+Two datasets now answer "how many traces" (`traces` and `trace_metrics`), and two
+answer it for evaluations. That is deliberate and is not two sources of truth:
+both are folded from the same events by the same services, and the catalog
+descriptions say which is shaped for which question. The rollups' `TraceCount`
+is the one number that genuinely differs — it counts a trace through its root
+span, so a trace whose root span never arrived contributes sums and no count,
+which the column description states.
+
 ## Alternatives considered
 
 **`DEFINER` view with a policed definer.** Would let the caller hold no grant on

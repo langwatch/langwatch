@@ -123,10 +123,22 @@ describe("given the governed view catalog", () => {
         // optional, and an entry that forgot it would otherwise fail as
         // "deduplicates on undefined without granting it" — which reads as a
         // broken guard rather than as the missing declaration it is.
-        expect(
-          view.dedup.versionColumn,
-          `${view.name} is ClickHouse-resident and declares no version column, so its view would silently double-count`,
-        ).toBeDefined();
+        //
+        // An aggregating source is the one ClickHouse-resident shape with no
+        // version, because its rows for a key are summed rather than
+        // superseded. It has to say so, or "no version column" is
+        // indistinguishable from a `ReplacingMergeTree` entry that forgot one.
+        if (view.dedup.aggregating) {
+          expect(
+            view.dedup.versionColumn,
+            `${view.name} aggregates, so no version supersedes another and declaring one would be a claim about an engine that is not underneath it`,
+          ).toBeUndefined();
+        } else {
+          expect(
+            view.dedup.versionColumn,
+            `${view.name} is ClickHouse-resident and declares no version column, so its view would silently double-count`,
+          ).toBeDefined();
+        }
 
         // A ClickHouse-resident view builds its own dedup subquery, so the same
         // columns must additionally be granted on the source table — even when
@@ -134,7 +146,7 @@ describe("given the governed view catalog", () => {
         const sourceColumns = governedViewSourceColumns(view);
         for (const column of [
           ...view.dedup.keyColumns,
-          view.dedup.versionColumn!,
+          ...(view.dedup.versionColumn ? [view.dedup.versionColumn] : []),
         ]) {
           expect(
             sourceColumns,
@@ -358,6 +370,127 @@ describe("given the governed view catalog", () => {
       // A dimension the analytics views exist to group by must survive.
       expect(isContentAttributeKey("gen_ai.request.model")).toBe(false);
       expect(isContentAttributeKey("gen_ai.prompt_id")).toBe(false);
+    });
+
+    /**
+     * The map is the one place a view can hand a caller captured content
+     * without naming a gated column, because a ClickHouse grant bounds columns
+     * and not keys inside one. Stated over the whole catalog rather than over
+     * the maps someone remembered, so a dataset added with an unfiltered map
+     * fails here.
+     */
+    /** @scenario "The analytics-optimised datasets expose no captured content" */
+    it("filters the content keys out of every map column any dataset exposes", () => {
+      let checked = 0;
+      for (const view of GOVERNED_VIEW_CATALOG) {
+        for (const column of view.columns.filter((candidate) =>
+          candidate.type.startsWith("Map("),
+        )) {
+          checked += 1;
+          expect(
+            expressionOf(column),
+            `${view.name}.${column.name} is a map the caller reads unfiltered`,
+          ).toContain(contentKeyExclusionSql("k"));
+        }
+      }
+      expect(
+        checked,
+        "no dataset exposes a map — this guard is inspecting nothing",
+      ).toBeGreaterThan(0);
+    });
+  });
+
+  /**
+   * The analytics projections and their rollups (issue #6856). The fold never
+   * writes captured content onto them, so nothing on them is content-gated —
+   * pinned here so that adding a captured-content column to one is a decision
+   * someone made rather than a line that arrived with a copy-pasted entry.
+   */
+  describe("when the analytics projections are inspected", () => {
+    const ANALYTICS_DATASETS = [
+      "trace_metrics",
+      "trace_metrics_by_minute",
+      "evaluation_metrics",
+      "evaluation_metrics_by_minute",
+    ] as const;
+
+    /** @scenario "The analytics-optimised datasets expose no captured content" */
+    it("exposes no content-gated column on any of them", () => {
+      for (const name of ANALYTICS_DATASETS) {
+        const view = governedViewByName(name);
+        expect(view, `${name} is not in the catalog`).toBeDefined();
+        expect(
+          view!.columns.filter(isContentGated).map((column) => column.name),
+          `${name} exposes captured content`,
+        ).toEqual([]);
+      }
+    });
+
+    /**
+     * The control. Without it the case above passes on a catalog in which
+     * nothing anywhere is content-gated, which would be the same words
+     * describing a very different schema.
+     */
+    it("is a claim about those datasets, because the complete records do gate content", () => {
+      for (const name of ["traces", "evaluations", "simulations"] as const) {
+        const view = governedViewByName(name);
+        expect(view, `${name} is not in the catalog`).toBeDefined();
+        expect(
+          view!.columns.filter(isContentGated).length,
+          `${name} gates no content, so the analytics case above distinguishes nothing`,
+        ).toBeGreaterThan(0);
+      }
+    });
+  });
+
+  /**
+   * An `AggregatingMergeTree` source: its rows for one key are summed rather
+   * than one superseding the others, which is a third answer to "which row
+   * survives" and the one that cannot be inferred from the other two.
+   */
+  describe("when a dataset's source aggregates rather than supersedes", () => {
+    const aggregating = GOVERNED_VIEW_CATALOG.filter(
+      (view) => view.dedup.aggregating,
+    );
+
+    /** @scenario "A pre-aggregated dataset declares that its rows merge rather than supersede" */
+    it("declares every column that is not a measure as a key its rows merge on", () => {
+      expect(
+        aggregating.length,
+        "no dataset aggregates — this case is inspecting nothing",
+      ).toBeGreaterThan(0);
+
+      for (const view of aggregating) {
+        // Every column is one of two things: a dimension the engine merges
+        // *on*, or a measure it merges. A dimension missing from the key set
+        // is the silent failure — the view would merge across it and add two
+        // models' costs together under one row.
+        const measures = view.columns
+          .filter((column) => column.expression !== undefined)
+          .map((column) => column.name);
+        expect(
+          [...view.dedup.keyColumns, ...measures].sort(),
+          `${view.name} has a column that is neither a key its rows merge on nor a measure that merges`,
+        ).toEqual(view.columns.map((column) => column.name).sort());
+        expect(
+          view.dedup.keyColumns.filter((key) => measures.includes(key)),
+          `${view.name} merges on a column that is itself a measure`,
+        ).toEqual([]);
+      }
+    });
+
+    /** @scenario "A pre-aggregated dataset declares that its rows merge rather than supersede" */
+    it("leaves a versioned dataset's version column required, so this is not a blanket exemption", () => {
+      const versioned = GOVERNED_VIEW_CATALOG.filter(
+        (view) => !view.dedup.aggregating && !isPostgresResident(view),
+      );
+      expect(
+        versioned.length,
+        "no dataset keeps versions — this case is inspecting nothing",
+      ).toBeGreaterThan(0);
+      for (const view of versioned) {
+        expect(view.dedup.versionColumn, `${view.name}`).toBeDefined();
+      }
     });
   });
 

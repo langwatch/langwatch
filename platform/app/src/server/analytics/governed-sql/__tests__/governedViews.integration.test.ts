@@ -61,6 +61,8 @@ import {
   mapPostgresIntoClickHouse,
   measureQuery,
   movedPartitionTraceId,
+  ROLLUP_MERGE_FIXTURE,
+  ROLLUP_MERGE_TOTALS,
   recordSeedControl,
   SEED_RECENT_WEEK,
   SEEDED_CONTENT,
@@ -479,6 +481,98 @@ describe("given the governed views provisioned over the shipped fact tables", ()
           `${view.name} returns more than one row for some key`,
         ).toBe(0);
       }
+    });
+  });
+
+  /**
+   * The rollups (issue #6856). An `AggregatingMergeTree` holds a bucket as
+   * however many partial rows the writers produced, and no one of them is the
+   * answer — which makes it the one shape where "returned a single row" and
+   * "returned the right number" can come apart.
+   */
+  describe("when a rollup table holds two partial rows for one bucket", () => {
+    /** @scenario "A pre-aggregated dataset returns one merged row per bucket" */
+    it("returns one merged row, each measure the sum of the parts", async () => {
+      // The control, on the physical table: without it a view that merges
+      // nothing passes, because the bucket would have been one row all along.
+      const parts = await selectScalar<string>(
+        harness.admin,
+        `SELECT count() AS value FROM ${facts}.trace_analytics_rollup ` +
+          `WHERE TenantId = '${harness.tenantA.tenantId}' ` +
+          `AND Model = '${ROLLUP_MERGE_FIXTURE.model}'`,
+      );
+      expect(
+        Number(parts),
+        "the bucket is stored as one row — a view that does not merge would pass this",
+      ).toBe(ROLLUP_MERGE_FIXTURE.parts.length);
+
+      const merged = await selectRows<{
+        SpanCount: string;
+        TraceCount: string;
+        CostSum: number;
+        DurationSum: string;
+        PromptTokensSum: string;
+      }>(
+        tenantA,
+        `SELECT SpanCount, TraceCount, CostSum, DurationSum, PromptTokensSum ` +
+          `FROM ${database}.trace_metrics_by_minute ` +
+          `WHERE Model = '${ROLLUP_MERGE_FIXTURE.model}'`,
+      );
+      expect(merged).toHaveLength(1);
+      expect(Number(merged[0]!.SpanCount)).toBe(ROLLUP_MERGE_TOTALS.count);
+      expect(Number(merged[0]!.TraceCount)).toBe(ROLLUP_MERGE_TOTALS.count);
+      expect(Number(merged[0]!.CostSum)).toBeCloseTo(ROLLUP_MERGE_TOTALS.cost);
+      expect(Number(merged[0]!.DurationSum)).toBe(ROLLUP_MERGE_TOTALS.duration);
+      expect(Number(merged[0]!.PromptTokensSum)).toBe(
+        ROLLUP_MERGE_TOTALS.tokens,
+      );
+
+      const evaluations = await selectRows<{
+        EvalCount: string;
+        ScoreSum: number;
+        CostSum: number;
+      }>(
+        tenantA,
+        `SELECT EvalCount, ScoreSum, CostSum ` +
+          `FROM ${database}.evaluation_metrics_by_minute ` +
+          `WHERE EvaluatorType = '${ROLLUP_MERGE_FIXTURE.evaluatorType}'`,
+      );
+      expect(evaluations).toHaveLength(1);
+      expect(Number(evaluations[0]!.EvalCount)).toBe(ROLLUP_MERGE_TOTALS.count);
+      expect(Number(evaluations[0]!.ScoreSum)).toBeCloseTo(
+        ROLLUP_MERGE_TOTALS.score,
+      );
+      expect(Number(evaluations[0]!.CostSum)).toBeCloseTo(
+        ROLLUP_MERGE_TOTALS.cost,
+      );
+    });
+
+    /**
+     * The published type, not the storage engine's. A rollup measure is stored
+     * as `SimpleAggregateFunction(sum, …)`, which a view passes straight
+     * through to `system.columns` and therefore to the schema endpoint — a
+     * caller would be told the name of an engine instead of a number's type.
+     */
+    /** @scenario "A pre-aggregated dataset returns one merged row per bucket" */
+    it("publishes the measures as plain numeric types", async () => {
+      const stored = await selectScalar<string>(
+        harness.admin,
+        `SELECT type AS value FROM system.columns ` +
+          `WHERE database = '${facts}' AND table = 'trace_analytics_rollup' ` +
+          `AND name = 'SpanCount'`,
+      );
+      expect(
+        stored,
+        "the source no longer stores an aggregate function — this case is inspecting nothing",
+      ).toContain("SimpleAggregateFunction");
+
+      const published = await selectScalar<string>(
+        harness.admin,
+        `SELECT type AS value FROM system.columns ` +
+          `WHERE database = '${database}' AND table = 'trace_metrics_by_minute' ` +
+          `AND name = 'SpanCount'`,
+      );
+      expect(published).toBe("UInt64");
     });
   });
 

@@ -343,7 +343,10 @@ function dedupPredicate(
     // dataset is given this strategy without declaring the column — the
     // PostgreSQL-resident ones take the tenant-predicate branch instead.
     throw new Error(
-      `governed view ${view.name} deduplicates on a version column it does not declare`,
+      view.dedup.aggregating
+        ? `governed view ${view.name} reads an aggregating source, whose rows for one key are summed ` +
+            `rather than superseded, so there is no version for this strategy to pick`
+        : `governed view ${view.name} deduplicates on a version column it does not declare`,
     );
   }
   const outerKeys = view.dedup.keyColumns.map(sourceColumn);
