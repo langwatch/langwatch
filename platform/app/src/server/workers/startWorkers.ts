@@ -82,7 +82,7 @@ async function bootScenarioProcessor(
     concurrency: SCENARIO_WORKER.CONCURRENCY,
   });
   getScenarioExecutionHandle()?.setPool(scenarioPool);
-  const scenarioProcessor = await startScenarioProcessor(scenarioPool);
+  const scenarioProcessor = await startScenarioProcessor({ pool: scenarioPool });
   if (scenarioProcessor) {
     shutdownHandles.push(() => scenarioProcessor.close());
   }

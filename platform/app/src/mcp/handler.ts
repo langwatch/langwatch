@@ -219,8 +219,11 @@ export interface McpHandler {
 export function createMcpHandler(): McpHandler {
   // Resolved once, here: the handler is built after the App is initialized
   // (start.ts), and the App's connection does not change for the life of the
-  // process. Null means no Redis is configured — every use below branches on
-  // it, degrading OAuth tokens and sessions to in-memory (ADR-090).
+  // process. Null means no Redis is configured, and every use below branches on
+  // it — but not all the same way (ADR-090). Session storage degrades to the
+  // in-memory map, so a single process keeps working; the OAuth
+  // authorization-code exchange cannot, because the code is written by whichever
+  // process served the authorize request, so it answers 500 instead.
   const redis = tryGetApp()?.redis ?? null;
 
   // Ensure the MCP config is initialized with the app's endpoint

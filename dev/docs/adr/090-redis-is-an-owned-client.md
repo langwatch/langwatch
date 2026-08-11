@@ -167,7 +167,10 @@ null object would hide which of those paths a deployment is actually on.
 ## Consequences
 
 The browser bundle can no longer reach a Redis client through an accidental
-import chain, and no build, test, or jsdom run connects to anything. The
+import chain, and no build, test, or jsdom run connects to anything as an
+import side effect. A test that means to talk to Redis still does, by asking
+for a connection — the point is that importing a module is no longer how it
+happens. The
 `BUILD_TIME` / `SKIP_REDIS` / `typeof window` guards are deleted rather than
 relocated — with no work at import time there is nothing left to guard. Tests
 that mocked `~/server/redis` to keep it quiet no longer need to mock anything;

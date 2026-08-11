@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { tryGetApp } from "~/server/app-layer/app";
+import { resolveRedis } from "./resolveRedis";
 
 const logger = createLogger("langwatch:outbox:emailHourlyCap");
 
@@ -106,18 +106,6 @@ async function expireIfUnset(
   seconds: number,
 ): Promise<void> {
   await redis.eval(EXPIRE_IF_UNSET_SCRIPT, 1, key, String(seconds));
-}
-
-/**
- * Resolves the connection a cap check should use.
- *
- * Omitting `redis` takes the App's; passing `null` explicitly forces the
- * in-memory path. A default parameter can't tell "not passed" from "passed
- * undefined", so the sentinel is how a caller opts out (same idiom as the
- * ingest rate limiter).
- */
-function resolveRedis(redis: RedisConnection | null | undefined) {
-  return redis === void 0 ? (tryGetApp()?.redis ?? null) : redis;
 }
 
 const MEMORY_GC_THRESHOLD = 1000;

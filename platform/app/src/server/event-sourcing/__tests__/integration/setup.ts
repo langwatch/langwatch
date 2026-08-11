@@ -51,6 +51,7 @@ try {
 
 // Now safe to import application code
 import { afterAll, beforeAll } from "vitest";
+import { tryGetApp } from "../../../app-layer/app";
 import { startTestContainers, stopTestContainers } from "./testContainers";
 
 /**
@@ -87,7 +88,6 @@ export async function setup(): Promise<void> {
 async function unrefAppRedisSingleton(): Promise<void> {
   unrefRedisSockets();
   try {
-    const { tryGetApp } = await import("../../../app-layer/app");
     const conn = tryGetApp()?.redis as
       | {
           on?: (event: string, cb: () => void) => void;
@@ -164,7 +164,6 @@ async function closeAppRuntimeSingletons(): Promise<void> {
     // No prisma client ever constructed, or already disconnected.
   }
   try {
-    const { tryGetApp } = await import("../../../app-layer/app");
     const conn = tryGetApp()?.redis;
     if (conn) {
       await Promise.race([

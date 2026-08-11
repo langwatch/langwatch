@@ -37,23 +37,27 @@ export interface PingRedisOptions {
  *
  * The path survives, since it is the database index and is not a secret.
  *
+ * Nothing is split on commas. A caller passes `REDIS_CLUSTER_ENDPOINTS` — a
+ * `host:port` list that carries no credentials — or `REDIS_URL`, one URL that
+ * may; never a mix. Splitting first looked harmless and was the bug: a
+ * password may contain a comma, and `rediss://admin:p,a@host` split into two
+ * fragments that each failed to match the userinfo pattern, so both halves of
+ * the credential survived into the log.
+ *
  * The query is cut with `indexOf` rather than a second regex. `/\?.*$/` reads
  * as the obvious way to write it and is quadratic: `.` does not cross a
  * newline while an unanchored `$` only matches end of input, so every `?` in a
  * newline-bearing value re-scans the tail before failing.
  */
 function withoutCredentials(target: string): string {
-  return target
-    .split(",")
-    .map((entry) => {
-      const withoutUserinfo = entry.replace(
-        /^([a-z][a-z0-9+.-]*:\/\/)[^/]*@/i,
-        "$1",
-      );
-      const query = withoutUserinfo.indexOf("?");
-      return query === -1 ? withoutUserinfo : withoutUserinfo.slice(0, query);
-    })
-    .join(",");
+  if (!target.includes("://")) return target;
+
+  const withoutUserinfo = target.replace(
+    /^([a-z][a-z0-9+.-]*:\/\/)[^/]*@/i,
+    "$1",
+  );
+  const query = withoutUserinfo.indexOf("?");
+  return query === -1 ? withoutUserinfo : withoutUserinfo.slice(0, query);
 }
 
 /**

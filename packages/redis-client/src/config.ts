@@ -110,9 +110,11 @@ function resolveTls(url: string): RedisTlsSetting {
 /**
  * Decides how — and whether — to connect, from the supplied environment.
  *
- * Cluster endpoints win over a plain URL when both are set, matching the
- * deployment shape: a clustered environment sets both, and the cluster is the
- * real target.
+ * Cluster endpoints win over a plain URL when both are set. A clustered
+ * deployment normally sets only `REDIS_CLUSTER_ENDPOINTS`, so "both" is the
+ * ambiguous case rather than the usual one — and there the endpoint list is the
+ * more specific statement of intent, while the leftover URL may well name a
+ * different server.
  */
 export function resolveRedisConfig(
   env: RedisEnvironment,

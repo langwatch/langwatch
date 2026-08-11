@@ -28,6 +28,17 @@ const APP_ROOT = path.resolve(HERE, "../../../..");
 const REPO_ROOT = path.resolve(APP_ROOT, "../..");
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);
+
+/**
+ * Every way an ioredis client gets constructed.
+ *
+ * The trailing member access is what catches `new IORedis.Cluster(nodes)`,
+ * which a default import reaches without ever naming `Cluster` — the one
+ * spelling a bare `new (IORedis|Redis|Cluster)(` misses. Kept as a named
+ * constant so the test below can check the pattern itself: a gap here does not
+ * fail loudly, it just scans and finds nothing.
+ */
+const IOREDIS_CONSTRUCTION = /\bnew\s+(?:IORedis|Redis|Cluster)(?:\s*\.\s*\w+)*\s*\(/;
 const SKIP_DIRECTORIES = new Set([
   "node_modules",
   "dist",
@@ -232,12 +243,35 @@ describe("Redis ownership", () => {
         .filter((file) => !file.startsWith(clientPackage))
         .filter((file) => !isTestFile(file))
         .filter((file) =>
-          /\bnew\s+(?:IORedis|Redis|Cluster)\s*\(/.test(
-            fs.readFileSync(file, "utf8"),
-          ),
+          IOREDIS_CONSTRUCTION.test(fs.readFileSync(file, "utf8")),
         );
 
       expect(offenders.map(relative)).toEqual([]);
+    });
+
+    it("recognises every spelling of an ioredis construction", () => {
+      // The guard above can only be as good as this pattern, and a miss here is
+      // silent: the scan finds nothing and reports success. `new IORedis.Cluster()`
+      // is the spelling that slipped — reachable from a default import alone,
+      // with no `Cluster` in the import list to notice.
+      for (const spelling of [
+        "new IORedis(url)",
+        "new Redis(url)",
+        "new Cluster(nodes)",
+        "new IORedis.Cluster(nodes)",
+        "new Redis.Cluster(nodes)",
+        "new  IORedis\n  .Cluster(nodes)",
+      ]) {
+        expect(IOREDIS_CONSTRUCTION.test(spelling)).toBe(true);
+      }
+
+      for (const innocent of [
+        "new RedisLikeThing(url)",
+        "renew Redis(url)",
+        "createRedisConnection({ env })",
+      ]) {
+        expect(IOREDIS_CONSTRUCTION.test(innocent)).toBe(false);
+      }
     });
   });
 });

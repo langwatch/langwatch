@@ -641,10 +641,13 @@ async function spawnScenarioChildProcess(
  *
  * @returns A shutdown handle, or undefined if Redis is not available.
  */
-export async function startScenarioProcessor(
-  pool: ScenarioExecutionPool,
-  injectedDeps?: ProcessorDependencies,
-): Promise<{ close: () => Promise<void> } | undefined> {
+export async function startScenarioProcessor({
+  pool,
+  injectedDeps,
+}: {
+  pool: ScenarioExecutionPool;
+  injectedDeps?: ProcessorDependencies | undefined;
+}): Promise<{ close: () => Promise<void> } | undefined> {
   // Skipping the processor is this function's documented outcome when there
   // is no Redis, so absence must not raise (ADR-090).
   const connection = tryGetApp()?.redis ?? null;

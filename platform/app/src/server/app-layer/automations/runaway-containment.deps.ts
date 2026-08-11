@@ -50,11 +50,15 @@ function sweepExpiredClaims(now: number): void {
  * The value is a fresh token rather than a constant, so a later release can
  * prove it owns the claim it is dropping. See `ClaimLease`.
  */
-async function claimOnce(
-  connection: RedisConnection | null,
-  key: string,
-  ttlSeconds: number = CLAIM_EXPIRE_SECONDS,
-): Promise<ClaimLease | null> {
+async function claimOnce({
+  connection,
+  key,
+  ttlSeconds = CLAIM_EXPIRE_SECONDS,
+}: {
+  connection: RedisConnection | null;
+  key: string;
+  ttlSeconds?: number | undefined;
+}): Promise<ClaimLease | null> {
   const token = nanoid();
   if (connection) {
     try {
@@ -99,10 +103,13 @@ return 0
  * would then look. Each store drops the claim only while this lease still owns
  * it, which is what keeps a release from crossing into another worker's claim.
  */
-async function releaseClaim(
-  connection: RedisConnection | null,
-  lease: ClaimLease,
-): Promise<void> {
+async function releaseClaim({
+  connection,
+  lease,
+}: {
+  connection: RedisConnection | null;
+  lease: ClaimLease;
+}): Promise<void> {
   if (connection) {
     try {
       await connection.eval(RELEASE_IF_OWNED_SCRIPT, 1, lease.key, lease.token);
@@ -210,8 +217,9 @@ export function defaultRunawayContainmentDeps({
 
     sendLimitEmail: (params) => sendAutomationLimitEmail(params),
 
-    claimOnce: (key, ttlSeconds) => claimOnce(redis, key, ttlSeconds),
-    releaseClaim: (lease) => releaseClaim(redis, lease),
+    claimOnce: (key, ttlSeconds) =>
+      claimOnce({ connection: redis, key, ttlSeconds }),
+    releaseClaim: (lease) => releaseClaim({ connection: redis, lease }),
 
     projectName: async (projectId) =>
       (await projects.getById(projectId))?.name ?? "your project",

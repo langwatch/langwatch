@@ -1,8 +1,8 @@
 /**
  * Public surface of the observability module — singletons that lazily
- * initialise from the App's Redis connection so callers in hot paths
- * (GroupQueue producer) don't pay an import cost per invocation and
- * don't need to thread Redis through DI.
+ * initialise from the App's Redis connection, so callers in hot paths
+ * (GroupQueue producer) reach the connection when they run rather than when
+ * they are imported, and don't need to thread Redis through DI.
  */
 import { tryGetApp } from "../app-layer/app";
 import { TenantRateTracker } from "./tenantRateTracker";

@@ -403,7 +403,10 @@ describe("Event-sourcing cancellation (real Redis)", () => {
         });
       } else {
         // Real path: startScenarioProcessor wires everything
-        const handle = await startScenarioProcessor(pool, mockDeps);
+        const handle = await startScenarioProcessor({
+          pool,
+          injectedDeps: mockDeps,
+        });
         if (handle) cleanupFns.push(handle.close);
       }
 

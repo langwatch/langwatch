@@ -2,7 +2,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
-import { tryGetApp } from "~/server/app-layer/app";
+import { getApp } from "~/server/app-layer/app";
 
 const logger = createLogger("langwatch:cli-token-revocation");
 
@@ -47,9 +47,22 @@ export class CliTokenRevocationService {
     return new CliTokenRevocationService(redis);
   }
 
-  /** The injected connection, else the App's, resolved at the point of use. */
+  /**
+   * The injected connection, else the App's, resolved at the point of use.
+   *
+   * `getApp`, not `tryGetApp`: revocation is one of the few places where doing
+   * less is a wrong answer rather than a degraded success. The `null` branch
+   * below is safe only because "this deployment configured no Redis" also means
+   * "there are no CLI tokens to revoke" — which is not what "the App is not
+   * initialized" means. Collapsing the two would report a successful revocation
+   * of nothing and leave live CLI credentials working, the same reasoning that
+   * keeps `revokeSessions` on `getApp` (ADR-090).
+   *
+   * Construction stays App-free regardless, because this getter runs during a
+   * revocation rather than at build time.
+   */
   private get redis(): RedisLike | undefined {
-    return this.injectedRedis ?? tryGetApp()?.redis ?? void 0;
+    return this.injectedRedis ?? getApp().redis ?? void 0;
   }
 
   static userTokensIndexKey(userId: string): string {

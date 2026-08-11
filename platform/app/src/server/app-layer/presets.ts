@@ -373,8 +373,13 @@ export function initializeDefaultApp(options?: {
     params,
   ) => clusterTopicsForProject({ ...params, resolveClickHouseClient });
 
-  // ADR-090: the composition root owns the process's only Redis connection.
-  // Nothing else constructs one, and nothing holds one at module scope.
+  // ADR-090: the composition root owns the App's Redis connection, and nothing
+  // holds one at module scope. Two entry points outside a serving process build
+  // their own and close it themselves — `replayPreset` (which needs a
+  // standalone client, since its multi-key work CROSSSLOT-rejects on a cluster)
+  // and the `migrateObjectStorage` task, which boots no App at all. Both go
+  // through the client package; neither is a second live connection in a
+  // process this one is serving.
   const redis = createRedisConnection({
     env: {
       url: config.redisUrl,

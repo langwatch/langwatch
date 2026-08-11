@@ -57,6 +57,24 @@ describe("pingRedis", () => {
       expect(everythingLogged).toContain("rediss://redis.internal:6379");
     });
 
+    it("drops a password containing a comma", async () => {
+      const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+
+      await pingRedis({
+        connection: connectionThat(() => Promise.resolve("PONG")),
+        target: "rediss://admin:p,a@redis.internal:6379",
+        logger,
+      });
+
+      // Splitting the target on commas first sent `rediss://admin:p` and
+      // `a@redis.internal:6379` through the userinfo pattern separately, and
+      // neither matched, so the whole credential reached the log.
+      expect(logger.info).toHaveBeenCalledWith(
+        { target: "rediss://redis.internal:6379" },
+        "redis ready",
+      );
+    });
+
     it("drops a password passed as a query parameter, keeping the database index", async () => {
       const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
 

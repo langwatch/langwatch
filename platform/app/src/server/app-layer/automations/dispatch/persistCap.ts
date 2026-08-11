@@ -3,22 +3,13 @@ import type { PlanInfo } from "@ee/licensing/planInfo";
 import { createLogger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { env } from "~/env.mjs";
-import { getApp, tryGetApp } from "~/server/app-layer/app";
+import { getApp } from "~/server/app-layer/app";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { TtlCache } from "~/server/utils/ttlCache";
+import { resolveRedis } from "./resolveRedis";
 
 const logger = createLogger("langwatch:automations:persist-cap");
 
-/**
- * Resolves the connection a cap operation should use.
- *
- * Omitting `redis` takes the App's; passing `null` explicitly forces the
- * in-memory path. A default parameter can't tell "not passed" from "passed
- * undefined", so the sentinel is how a caller opts out (ADR-090).
- */
-function resolveRedis(redis: RedisConnection | null | undefined) {
-  return redis === void 0 ? (tryGetApp()?.redis ?? null) : redis;
-}
 
 const DAY_MS = 86_400_000;
 
