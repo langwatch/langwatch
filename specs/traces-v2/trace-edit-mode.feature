@@ -684,14 +684,15 @@ Feature: Editing a trace in the drawer
       Then the header counts one span fewer than was captured
       And the captured trace still counts them all
 
-    # The captured trace is the trace as it arrived. Nothing the correction did
-    # belongs on it, so a span the correction removes reads there exactly like
-    # every span the correction never touched. The changed colour is not a
-    # milder way to say it: it promises a replaced value the reader can go and
-    # compare, and a removal replaces nothing.
+    # The captured trace is the trace as it arrived, so a span the correction
+    # does nothing to but remove reads there exactly like every span it never
+    # touched. The changed colour is not a milder way to say removed: it promises
+    # a replaced value the reader can go and compare, and a removal replaces
+    # nothing. A correction that renamed the span before removing it did replace
+    # one, which is the scenario after this.
     @integration
     Scenario: A deleted span reads plainly in the captured trace
-      Given the trace has a correction that deletes a span
+      Given the trace has a correction whose only change is deleting a span
       When I switch to the captured trace
       Then that span is listed with no deleted marker
       And its name is not struck through
@@ -703,11 +704,11 @@ Feature: Editing a trace in the drawer
       When I switch to the captured trace
       Then that span carries the changed colour
 
-    # Removal is the whole of the change, and the deleted marker says it. The
-    # changed colour on the same row argues with it.
+    # When removal is the whole of the change the deleted marker says it, and
+    # the changed colour on the same row argues with it.
     @integration
     Scenario: A deleted span is not also coloured as changed
-      Given the trace has a correction that deletes a span
+      Given the trace has a correction whose only change is deleting a span
       When I read the corrected trace
       Then that row does not carry the changed colour
 
