@@ -1,4 +1,7 @@
-import { TRANSIENT_NETWORK_CODES } from "@langwatch/clickhouse-client";
+import {
+  isTransientClickHouseError as isTransientForSharedClient,
+  TRANSIENT_NETWORK_CODES,
+} from "@langwatch/clickhouse-client";
 import { describe, expect, it, vi } from "vitest";
 import {
   ClickHouseOverloadedError,
@@ -6,6 +9,7 @@ import {
   QueryMemoryExceededError,
 } from "~/server/app-layer/traces/errors";
 import {
+  CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS,
   ConfigurationError,
   categorizeError,
   classifyClickHouseError,
@@ -569,6 +573,47 @@ describe("classifyClickHouseError", () => {
             ),
           ).toBe(ErrorCategory.RECOVERABLE);
         }
+      });
+
+      // The driver's socket pool raises `new Error("Timeout error.")` — no
+      // ClickHouse code, no errno, nothing but that message. The shared client
+      // retries it via its own timeout arm; this classifier had no such arm, so
+      // the same wire timeout was retried on a read and dead-lettered on a
+      // queued job. Prod, 2026-08-11: 354 of these in ten hours.
+      /** @scenario a statement that times out on the wire is retried, not dead-lettered */
+      it("returns RECOVERABLE for the driver's bare request timeout", () => {
+        expect(classifyClickHouseError(new Error("Timeout error."))).toBe(
+          ErrorCategory.RECOVERABLE,
+        );
+      });
+
+      // The previous version of this guard walked TRANSIENT_NETWORK_CODES only,
+      // so it proved agreement on errnos while the timeout arm drifted
+      // unnoticed. Assert against the shared classifier itself: anything it
+      // retries, this one must not dead-letter, whatever arm decided it.
+      /** @scenario a statement that times out on the wire is retried, not dead-lettered */
+      it.each([
+        [
+          "a socket errno",
+          Object.assign(new Error("request failed"), { code: "ECONNRESET" }),
+        ],
+        ["the driver's request timeout", new Error("Timeout error.")],
+        [
+          "a busy status",
+          Object.assign(new Error("busy"), { statusCode: 503 }),
+        ],
+        [
+          "a ClickHouse overload message",
+          new Error("Too many simultaneous queries"),
+        ],
+      ])("agrees with the shared ClickHouse client on %s", (_label, error) => {
+        expect(
+          isTransientForSharedClient({
+            error,
+            transientMessageFragments: CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS,
+          }),
+        ).toBe(true);
+        expect(classifyClickHouseError(error)).toBe(ErrorCategory.RECOVERABLE);
       });
 
       /** @scenario A genuine data error is still critical */

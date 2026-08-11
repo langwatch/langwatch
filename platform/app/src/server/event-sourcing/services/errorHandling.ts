@@ -1,4 +1,7 @@
-import { TRANSIENT_NETWORK_CODES } from "@langwatch/clickhouse-client";
+import {
+  isTransientClickHouseError as isTransientForSharedClient,
+  TRANSIENT_NETWORK_CODES,
+} from "@langwatch/clickhouse-client";
 import { HandledError } from "@langwatch/handled-error";
 import type { createLogger } from "@langwatch/observability";
 
@@ -529,6 +532,21 @@ export function classifyClickHouseError(error: unknown): ErrorCategory {
 }
 
 function isTransientClickHouseError(error: unknown): boolean {
+  // The shared client owns the retry policy for reads, and this classifier owns
+  // it for queued jobs. Ask the shared one rather than restating it: restating
+  // covered the errnos but not the driver's own request timeout, which arrives
+  // as a bare `Error("Timeout error.")` with no ClickHouse code and no errno,
+  // so the same failure was retried on a read and dead-lettered on a job. Its
+  // fragment list is passed in, so the two cannot disagree about that either.
+  if (
+    isTransientForSharedClient({
+      error,
+      transientMessageFragments: CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS,
+    })
+  ) {
+    return true;
+  }
+
   if (error != null && typeof error === "object" && "code" in error) {
     const code = String((error as { code: unknown }).code);
     // Two disjoint namespaces share the one `code` field. ClickHouse's own

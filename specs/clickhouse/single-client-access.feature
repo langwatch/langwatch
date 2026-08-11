@@ -68,6 +68,21 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
     And the statement already running is left alone
     And the wait bound is shorter than the time one statement may spend on the wire
 
+  # The shared client already retries the driver's own request timeout on the
+  # read path. The queue's classifier restated that policy instead of sharing
+  # it, and the restatement had no timeout arm: the driver raises a bare
+  # `Error("Timeout error.")` carrying no ClickHouse code and no errno, so it
+  # matched nothing. The identical failure was therefore retried on a read and
+  # dead-lettered on a queued job. Restating a policy is how two layers come to
+  # disagree; the fix is to apply the one policy twice.
+  @unit
+  Scenario: a statement that times out on the wire is retried, not dead-lettered
+    Given a statement fails with the driver's own request timeout
+    And that failure carries neither a ClickHouse code nor a socket errno
+    When the queue classifies the failure
+    Then it is classified as recoverable, so the job is re-staged rather than dropped
+    And the queue's classifier agrees with the shared client on every failure the client retries
+
   @unit
   Scenario: ClickHouse is reached through a repository, from the application object
     Given a service needs data that lives in ClickHouse
