@@ -75,7 +75,10 @@ export function EvalCard({
   // for them and fetch on open.
   const canLazyLoadInputs =
     !!eval_.evaluationId &&
-    (status === "pass" || status === "fail" || status === "error");
+    (status === "pass" ||
+      status === "fail" ||
+      status === "processed" ||
+      status === "error");
   const mightHaveInputs = hasListInputs || canLazyLoadInputs;
   const hasRetries = (eval_.retries ?? 0) > 0;
   // The labeled categorical/boolean verdict is sometimes more informative
@@ -203,7 +206,10 @@ export function EvalCard({
       </HStack>
 
       {/* Score bar (numeric, only when the eval actually produced a score) */}
-      {!noVerdict && !categoryOnly && scoreType === "numeric" && (
+      {!noVerdict &&
+        !categoryOnly &&
+        scoreType === "numeric" &&
+        typeof score === "number" && (
         <Box
           height="3px"
           bg="bg.subtle"

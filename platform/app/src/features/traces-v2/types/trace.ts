@@ -9,16 +9,20 @@ export type TraceStatus = "ok" | "error" | "warning";
  */
 export interface EvalSummary {
   name: string;
-  score: number | boolean;
+  /** `null` when the evaluator produced neither a score nor a verdict —
+   *  never substitute a fabricated 0, it renders as a real "0.00". */
+  score: number | boolean | null;
   scoreType: "numeric" | "boolean" | "categorical";
   /**
    * - `pass` / `fail` / `warning` — the evaluator ran and produced a verdict.
+   * - `processed` — the evaluator ran to completion but produced no pass/fail
+   *   verdict (score-only or verdict-less runs). Neutral: not a pass.
    * - `skipped` — the evaluator wasn't run (e.g. provider not configured,
    *   preconditions not met). The score is meaningless; don't show it.
    * - `error` — the evaluator crashed / errored out. Distinct from a "fail"
    *   verdict — the evaluator never produced a real score.
    */
-  status: "pass" | "warning" | "fail" | "skipped" | "error";
+  status: "pass" | "warning" | "fail" | "processed" | "skipped" | "error";
 }
 
 /**
