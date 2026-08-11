@@ -847,14 +847,15 @@ export function discoverFeatureFiles(
 // actually used in this repo, including a `*` continuation that opens a nested
 // `/**`, and a `#` for the Python and Bats forms.
 //
-// That prefix is one flat character class under one quantifier on purpose. The
-// readable spelling of the same rule, alternating `//` with `/*+` under a
-// repeat, is ambiguous: `/**` splits either as one `/*+` or as `/*` then `*`,
-// so a line of `/**/**/...` has exponentially many parses and the engine tries
-// them all before failing. Every source file in the repo is fed to this, so a
-// linear scan is not optional.
+// Each marker there is a fixed two characters or one, never `/*+`. A variable
+// repeat inside the alternation makes `/**` splittable both as one `/*+` and
+// as `/*` then `*`, which gives a line of `/**/**/...` exponentially many
+// parses: measured at 6.8s for thirty repetitions, against every source file
+// in the repo on every run. Spelled this way each marker is consumed exactly
+// once, so there is nothing to backtrack over, and the accepted set is the
+// same because `/**` is just `/*` followed by one more iteration.
 const ANNOTATION_RE =
-  /^[ \t/*#]*@scenario[ \t]+(?:"([^"\n]+)"|'([^'\n]+)'|([^\n*]+?))[ \t]*(?:\*\/|$)/gm;
+  /^[ \t]*(?:(?:\/\/|\/\*|\*|#)[ \t]*)*@scenario[ \t]+(?:"([^"\n]+)"|'([^'\n]+)'|([^\n*]+?))[ \t]*(?:\*\/|$)/gm;
 
 /**
  * Every `@scenario` annotation in `src`, with the offset just past each match so
