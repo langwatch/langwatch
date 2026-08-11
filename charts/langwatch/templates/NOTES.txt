@@ -106,7 +106,10 @@ dev's Personal Workspace at https://<your-host>/me .
        the render every lookup returns empty. ./tests/restricted-rbac.sh does. */}}
     To see whether this cluster already offers one:
       kubectl get runtimeclass
-    A class whose HANDLER is runsc or kata is sandboxed. To pin Langy to it:
+    gVisor reports a handler of runsc; Kata ships under several, such as
+    kata-qemu or kata-mshv-vm-isolation. Handler names are runtime- and
+    platform-specific, so confirm against your platform's documentation
+    rather than the name alone. To pin Langy to a class:
       langyagent.runtimeClassName=<class>  langyagent.acceptUnsandboxedRuntime=false
 {{- end }}
 {{- if (index .Values "langyagent").enableForAllUsers }}

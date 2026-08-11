@@ -40,25 +40,29 @@ fail() {
 }
 
 # Every template across every chart, so a chart added later is covered without
-# anyone remembering to extend this list.
+# anyone remembering to extend this list. Helm renders every file under
+# templates/ regardless of extension, so .yml belongs here next to .yaml — a
+# lookup in a .yml template renders exactly the same and must not slip past.
 templates() {
   find "$CHARTS_DIR" -type d -name templates -not -path "*/charts/*/charts/*" \
-    -exec find {} -type f \( -name "*.yaml" -o -name "*.tpl" -o -name "*.txt" \) \;
+    -exec find {} -type f \
+      \( -name "*.yaml" -o -name "*.yml" -o -name "*.tpl" -o -name "*.txt" \) \;
 }
 
-TEMPLATES=$(templates)
-readonly TEMPLATES
+TEMPLATE_FILES=()
+while IFS= read -r template_file; do
+  [[ -n "$template_file" ]] && TEMPLATE_FILES+=("$template_file")
+done <<< "$(templates)"
 
 # A guard that scans nothing passes silently, and every way this breaks — the
 # script moving, a templates/ directory being renamed, the wrong cwd — produces
-# exactly that. GNU xargs makes it worse than it looks: given empty input it
-# still runs grep, with no file operands, so grep reads the already-drained
-# stdin, finds nothing and reports success. Anchor on the file the whole rule
-# exists for, so an empty corpus is a failure rather than a green tick.
-readonly CORPUS_ANCHOR="charts/langwatch/templates/NOTES.txt"
+# exactly that. Anchor on the file the whole rule exists for, matched as a
+# literal full path (grep -xF, so the dot in NOTES.txt cannot act as a
+# wildcard), and fail loudly rather than reporting a green tick over nothing.
+readonly CORPUS_ANCHOR="$CHARTS_DIR/langwatch/templates/NOTES.txt"
 
-if ! printf '%s\n' "$TEMPLATES" | grep -q "/${CORPUS_ANCHOR}\$"; then
-  echo "FAIL [no-corpus]: did not find ${CORPUS_ANCHOR} under ${CHARTS_DIR}."
+if ! printf '%s\n' "${TEMPLATE_FILES[@]:-}" | grep -qxF "$CORPUS_ANCHOR"; then
+  echo "FAIL [no-corpus]: did not find ${CORPUS_ANCHOR}."
   echo "This guard scans by path, so an empty or wrong corpus makes it pass"
   echo "without checking anything. Has the script moved out of charts/*/tests/?"
   exit 1
@@ -80,10 +84,51 @@ readonly CLUSTER_SCOPED='lookup[[:space:]]+"[^"]*"[[:space:]]+"[^"]*"[[:space:]]
 # and must not trip it.
 readonly ANY_LOOKUP_CALL='lookup[[:space:]]+"'
 
+# Scan the corpus for a pattern, failing CLOSED.
+#
+# Two things a plain `grep ... || true` gets wrong, both of which turn a broken
+# scan into a silent pass:
+#
+#   1. It launders every non-zero status into success. grep exits 1 for "no
+#      match" but >=1 for real errors — an unreadable file, a bad pattern — and
+#      those must abort, not read as "nothing found". Only status 1 is a miss.
+#   2. It is line-oriented, so a call split across lines is invisible:
+#        {{- $x := lookup "v1"
+#             "Secret" "" "" }}
+#      Rare, but valid Go template and renders identically. Files that do not
+#      match line-wise get a second look with newlines flattened; those report
+#      the file rather than a line, since after flattening there is no line
+#      number left to report. Enough to send someone to the right file.
+scan() {
+  local pattern=$1
+  shift
+  local file matched status flattened
+
+  for file in "$@"; do
+    matched=$(grep -nEH "$pattern" "$file") && status=0 || status=$?
+    if [[ $status -gt 1 ]]; then
+      echo "SCANNER ERROR: grep exited $status reading $file" >&2
+      exit 2
+    fi
+    if [[ $status -eq 0 ]]; then
+      printf '%s\n' "$matched"
+      continue
+    fi
+
+    flattened=$(tr '\n' ' ' <"$file") || {
+      echo "SCANNER ERROR: cannot read $file" >&2
+      exit 2
+    }
+    if printf '%s\n' "$flattened" | grep -qE "$pattern"; then
+      printf '%s: lookup call split across lines\n' "$file"
+    fi
+  done
+}
+
 # @scenario "A restricted installer can render the chart without cluster-scoped read access"
 test_no_cluster_scoped_lookup() {
   local hits
-  hits=$(printf '%s\n' "$TEMPLATES" | xargs grep -nEH "$CLUSTER_SCOPED" || true)
+  hits=$(scan "$CLUSTER_SCOPED" "${TEMPLATE_FILES[@]}")
 
   if [[ -n "$hits" ]]; then
     fail "cluster-scoped-lookup" \
@@ -95,10 +140,14 @@ Use a namespaced lookup, or tell the operator the command to run themselves."
 
 # @scenario "The install notes never depend on reading the cluster"
 test_notes_make_no_lookup() {
+  local notes=()
+  local template_file
+  for template_file in "${TEMPLATE_FILES[@]}"; do
+    [[ "$template_file" == *"/NOTES.txt" ]] && notes+=("$template_file")
+  done
+
   local hits
-  # The anchor check above guarantees at least one NOTES.txt, so xargs always
-  # gets a file operand and can never fall through to reading stdin.
-  hits=$(printf '%s\n' "$TEMPLATES" | grep 'NOTES\.txt$' | xargs grep -nEH "$ANY_LOOKUP_CALL" || true)
+  hits=$(scan "$ANY_LOOKUP_CALL" "${notes[@]}")
 
   if [[ -n "$hits" ]]; then
     fail "notes-lookup" \
@@ -118,4 +167,4 @@ if [[ $failures -gt 0 ]]; then
   exit 1
 fi
 
-echo "PASS: no template requires cluster-scoped read access to render"
+echo "PASS: no template requires cluster-scoped read access to render (${#TEMPLATE_FILES[@]} templates)"

@@ -535,36 +535,27 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- if not $chartWritesIt }}
     {{- $found := lookup "v1" "Secret" .Release.Namespace $langySecretName }}
     {{- $hint := printf "Either add the key to that Secret (kubectl -n %s create secret generic %s --from-literal=%s=$(openssl rand -hex 32), or patch it if it already exists), point langyagent.secrets.existingSecretName at the Secret that does hold it, or let the chart generate it by leaving autogen.enabled=true with no secrets.existingSecret override." .Release.Namespace $langySecretName $langyKey }}
-    {{- if not $found }}
-      {{/* Every lookup comes back empty during `helm template` and dry runs, so
-           "Secret not found" there means "we cannot see the cluster", not "it is
-           missing". Probe with an object that exists in every namespace and
-           stay quiet when it is invisible too, rather than failing a plain
-           render.
+    {{/* Only the "Secret is readable but the key is missing" case is reported,
+         and reporting it needs no permission beyond the read on the line above.
 
-           The probe is namespaced on purpose. A cluster-scoped one (kube-system
-           was the obvious candidate) adds an RBAC requirement this chart has no
-           business having: `lookup` turns a denial into a template error, so an
-           installer scoped to their own namespace would get a hard render
-           failure out of a check whose only job is to stay quiet. Reading the
-           release namespace's own default ServiceAccount keeps the requirement
-           inside the namespace they are already installing into, next to the
-           Secret read on the line above. Not literally the same grant — a role
-           could allow `get secrets` and refuse `get serviceaccounts` — but the
-           standard admin/edit roles carry both, and namespaced is the whole
-           point: no reachable RBAC makes a cluster-scoped read succeed for an
-           installer who only holds their own namespace.
+         A Secret that is absent is deliberately NOT reported. `lookup` returns
+         the same empty result for "not there" and "no cluster behind this
+         render", so telling them apart takes a SECOND read whose only job is to
+         prove the cluster is visible — and every candidate for that read costs
+         a permission the chart otherwise does not need. kube-system was
+         cluster-scoped, which is the bug this whole change exists to remove.
+         The namespace's own default ServiceAccount is at least namespaced, but
+         `get serviceaccounts` is still a distinct grant a role can withhold,
+         so it reintroduces the same class of failure in a smaller blast radius.
+         Neither is worth a hard render failure for an operator whose setup is
+         correct, in service of a message.
 
-           Trade-off, accepted: with `--create-namespace` on a first install the
-           namespace does not exist yet at render time, so the probe finds
-           nothing and this guard stays silent. That degrades to the behaviour
-           from before the guard existed — the pods report
-           CreateContainerConfigError — which is the right direction to fail
-           when the alternative is blocking installs that are correctly set up. */}}
-      {{- if lookup "v1" "ServiceAccount" .Release.Namespace "default" }}
-        {{- $errors = append $errors (printf "Langy is enabled (langyagent.chartManaged=true) but Secret %q was not found in namespace %q, and this chart is not generating it. The app, the workers, and the agent pod all read %q from it to authenticate to each other, so all three would start into CreateContainerConfigError. %s" $langySecretName .Release.Namespace $langyKey $hint) }}
-      {{- end }}
-    {{- else if not (index ($found.data | default dict) $langyKey) }}
+         What that costs: a completely absent Secret is no longer named at
+         render time. It surfaces as CreateContainerConfigError on the pods,
+         which is exactly where it surfaced before this guard existed. What it
+         keeps is the case operators actually hit — the Secret is there and the
+         one key was never added — reported precisely, for free. */}}
+    {{- if and $found (not (index ($found.data | default dict) $langyKey)) }}
       {{- $errors = append $errors (printf "Langy is enabled (langyagent.chartManaged=true) but Secret %q in namespace %q has no %q key. The app, the workers, and the agent pod all read that one key to authenticate to each other. %s" $langySecretName .Release.Namespace $langyKey $hint) }}
     {{- end }}
   {{- end }}

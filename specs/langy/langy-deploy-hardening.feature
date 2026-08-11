@@ -117,16 +117,22 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
   @unit
   Scenario: A restricted installer can render the chart without cluster-scoped read access
     Given an operator whose permissions stop at the namespace they install into
-    When they render the chart
-    Then no part of the render asks to read a cluster-scoped resource
-    And the render never fails for a permission the operator was not granted
+    When they install or upgrade the release
+    Then it completes
+    And it never fails for a permission they were never granted
+    # Enforced by charts/langwatch/tests/restricted-rbac.sh, which reads the
+    # templates instead of rendering them. That is not a shortcut: with no
+    # cluster behind a render every lookup returns empty, so the forbidden
+    # case cannot be reproduced by `helm template` at all. Keeping no
+    # cluster-scoped read in any template is the mechanism; the outcome above
+    # is what it buys.
 
   @unit
   Scenario: The install notes never depend on reading the cluster
-    Given the install notes
-    Then nothing in them reads the cluster to decide what to print
-    # The notes are advice printed after the install has already succeeded.
-    # Nothing in them is worth failing an install over.
+    Given an operator whose permissions stop at the namespace they install into
+    When the install finishes and prints its notes
+    Then the notes print
+    And nothing in them can fail the install that has already succeeded
     #
     # Deliberately only the one claim. Guidance that would have needed such a
     # read is printed as a command for the operator to run instead, but that
