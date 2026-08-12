@@ -71,7 +71,9 @@ const makeQueueRepo = () => ({
 });
 
 const makeSnapshotRepo = (isHeld: boolean): SnapshotRepository => ({
-  acquireOrRenewLease: vi.fn().mockResolvedValue({ isHeld, epoch: 1 }),
+  acquireOrRenewLease: vi
+    .fn()
+    .mockResolvedValue({ isHeld, epoch: 1, token: isHeld ? "token-1" : null }),
   releaseLease: vi.fn().mockResolvedValue(undefined),
   writeLive: vi.fn().mockResolvedValue(true),
   writeDetail: vi.fn().mockResolvedValue(true),
@@ -135,9 +137,7 @@ describe("snapshot writer lease gate", () => {
 
       await collector.stop();
 
-      expect(snapshotRepo.releaseLease).toHaveBeenCalledWith({
-        writerId: "holder",
-      });
+      expect(snapshotRepo.releaseLease).toHaveBeenCalled();
     });
   });
 
@@ -197,6 +197,34 @@ describe("snapshot writer lease gate", () => {
       );
       expect(written).toBeDefined();
       expect(JSON.parse(written![1] as string).peakCompletedPerSec).toBe(999);
+    });
+  });
+
+  describe("given a detail write the fence rejects", () => {
+    /** @scenario "A rejected detail write is not adopted as this pod's state" */
+    it("keeps no detail artifact that no reader can see", async () => {
+      // The lease turned over mid-scan, so this payload was never published.
+      // Adopting it would have the collector report a detail artifact that
+      // exists nowhere but in its own memory.
+      const snapshotRepo = makeSnapshotRepo(true);
+      (snapshotRepo.writeDetail as ReturnType<typeof vi.fn>).mockResolvedValue(
+        false,
+      );
+      const collector = new OpsMetricsCollector({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        redis: redisStub as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        queueRepo: makeQueueRepo() as any,
+        snapshotRepo,
+        writerId: "fenced-out",
+      });
+
+      await collector.discoverQueues();
+      await collector.collect();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(snapshotRepo.writeDetail).toHaveBeenCalled();
+      expect(collector.getLatestDetail()).toBeNull();
     });
   });
 

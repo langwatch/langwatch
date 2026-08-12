@@ -1,6 +1,6 @@
 import { Field, IconButton, Input, Menu, Portal, Text } from "@chakra-ui/react";
 import { MoreVertical } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
@@ -249,6 +249,15 @@ function RunNowConfirmation({
   project: string;
 }) {
   const [typed, setTyped] = useState("");
+
+  // Clear on every close, not just on Cancel. A CONFIRMED run closes through
+  // the parent's success handler rather than through `onClose`, so resetting
+  // there only would leave the typed name sitting in the box: reopening the
+  // same row would find Confirm already enabled, and one click would send a
+  // second real report. Keying off `open` covers both exits.
+  useEffect(() => {
+    if (!open) setTyped("");
+  }, [open]);
 
   const close = () => {
     setTyped("");

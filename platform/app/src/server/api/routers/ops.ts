@@ -124,16 +124,23 @@ export const opsRouter = createTRPCRouter({
    * always-on polling; reach for `getDashboardSnapshot` only on the
    * ops route itself.
    */
-  getBadgeCounts: protectedProcedure.use(opsViewPermission).query(() => {
-    const ops = getApp().ops;
-    if (!ops?.snapshotReader) {
-      // Same shape as the served path, `computedAt` included: a caller that has
-      // to branch on whether the field is there will eventually forget to, and
-      // read a degraded zero as a fresh all-clear.
-      return { blockedCount: 0, dlqCount: 0, computedAt: new Date() };
-    }
-    return ops.snapshotReader.getBadgeCounts();
-  }),
+  getBadgeCounts: protectedProcedure.use(opsViewPermission).query(
+    (): {
+      blockedCount: number;
+      dlqCount: number;
+      computedAt: Date | null;
+    } => {
+      const ops = getApp().ops;
+      if (!ops?.snapshotReader) {
+        // Same shape as the served path so no caller has to branch on whether
+        // the field exists — but `computedAt: null`, because these zeroes are
+        // "we cannot say" rather than "nothing is wrong". Stamping the current
+        // time would present unavailable data as a fresh all-clear.
+        return { blockedCount: 0, dlqCount: 0, computedAt: null };
+      }
+      return ops.snapshotReader.getBadgeCounts();
+    },
+  ),
 
   dashboardStream: protectedProcedure
     .use(opsViewPermission)

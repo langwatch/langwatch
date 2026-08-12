@@ -69,6 +69,20 @@ Feature: Shared ops snapshot with a single elected writer
     And the new holder's snapshot is what readers see
 
   @unit
+  Scenario: A scan cannot publish under a lease that turned over beneath it
+    Given a writer lost the lease and reacquired it while a scan was running
+    When that scan finishes and tries to publish
+    Then the write is refused
+    And it makes no difference that the same pod holds the lease again
+
+  @unit
+  Scenario: A rejected detail write is not adopted as this pod's state
+    Given a writer's detail write is refused because the lease turned over
+    When the cycle finishes
+    Then the writer keeps no detail artifact from that scan
+    And it does not report one that no reader can see
+
+  @unit
   Scenario: An older snapshot never replaces a newer one
     Given a writer published a snapshot
     When a slower scan from the same writer finishes with an earlier computed time

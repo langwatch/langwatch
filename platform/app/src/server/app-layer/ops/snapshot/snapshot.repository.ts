@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import {
@@ -56,8 +57,8 @@ return 0
 `;
 
 /**
- * Publish only if we still own the lease AND we are not moving `computedAt`
- * backwards.
+ * Publish only if the lease still carries the token this scan started under
+ * AND we are not moving `computedAt` backwards.
  *
  * A scan is not instantaneous, so a writer can lose the lease part-way through
  * one and finish holding a payload it is no longer entitled to publish. An
@@ -71,7 +72,7 @@ return 0
  * a faster later one. Both artifacts are snapshots of the same underlying
  * state, so the newest observation always wins.
  *
- * KEYS: artifact, lease. ARGV: payload, writerId, ttlSeconds, computedAt.
+ * KEYS: artifact, lease. ARGV: payload, leaseToken, ttlSeconds, computedAt.
  */
 const WRITE_FENCED_LUA = `
 if redis.call('GET', KEYS[2]) ~= ARGV[2] then
@@ -102,20 +103,33 @@ export interface LeaseState {
    * ordering of writers, and a pod that has never held the lease reports 0.
    */
   epoch: number;
+  /**
+   * Opaque, and unique to THIS acquisition rather than to the pod.
+   *
+   * Writes are fenced on it, and that is why it cannot be the writer id: a pod
+   * can lose the lease and take it back while a slow detail scan is still
+   * running, and a scan carrying only the pod's identity would then pass a
+   * fence it should fail. Capture it when a scan STARTS and pass that value to
+   * the write; a lease that turned over in between no longer matches.
+   *
+   * Null when the lease is not held.
+   */
+  token: string | null;
 }
 
 export interface SnapshotRepository {
   acquireOrRenewLease(params: { writerId: string }): Promise<LeaseState>;
-  releaseLease(params: { writerId: string }): Promise<void>;
+  /** No-op when this instance does not hold the lease. */
+  releaseLease(): Promise<void>;
   /** Resolves true when the artifact was published, false when fenced out. */
   writeLive(params: {
     snapshot: LiveSnapshot;
-    writerId: string;
+    leaseToken: string;
   }): Promise<boolean>;
   /** Resolves true when the artifact was published, false when fenced out. */
   writeDetail(params: {
     snapshot: DetailSnapshot;
-    writerId: string;
+    leaseToken: string;
   }): Promise<boolean>;
   readLive(): Promise<LiveSnapshot | null>;
   readDetail(): Promise<DetailSnapshot | null>;
@@ -123,74 +137,98 @@ export interface SnapshotRepository {
 
 export class SnapshotRedisRepository implements SnapshotRepository {
   private currentEpoch = 0;
+  /** The value this instance last wrote into the lease key, or null. */
+  private currentToken: string | null = null;
 
   constructor(private readonly redis: IORedis | Cluster) {}
 
   /**
    * One round trip in the common case (renewal), two on a fresh acquisition.
    *
-   * A writer that renews keeps its epoch; any acquisition takes a fresh one
-   * from the shared counter.
+   * A writer that renews keeps its token and epoch; any acquisition mints a
+   * fresh token and takes a fresh epoch from the shared counter. The token,
+   * not the writer id, is what lands in the lease key — see `LeaseState.token`
+   * for why a stable per-pod value cannot fence a write.
    */
   async acquireOrRenewLease({
     writerId,
   }: {
     writerId: string;
   }): Promise<LeaseState> {
-    const renewed = await this.redis.eval(
-      RENEW_LUA,
-      1,
-      SNAPSHOT_LEASE_KEY,
-      writerId,
-      String(LEASE_TTL_SECONDS),
-    );
-    if (Number(renewed) === 1) {
-      return { isHeld: true, epoch: this.currentEpoch };
+    if (this.currentToken) {
+      const renewed = await this.redis.eval(
+        RENEW_LUA,
+        1,
+        SNAPSHOT_LEASE_KEY,
+        this.currentToken,
+        String(LEASE_TTL_SECONDS),
+      );
+      if (Number(renewed) === 1) {
+        return {
+          isHeld: true,
+          epoch: this.currentEpoch,
+          token: this.currentToken,
+        };
+      }
+      // Lost it. Drop the token before trying to acquire, so a failed
+      // acquisition cannot leave us claiming to hold a lease we do not.
+      this.currentToken = null;
     }
 
+    const token = `${writerId}:${randomUUID()}`;
     const acquired = await this.redis.set(
       SNAPSHOT_LEASE_KEY,
-      writerId,
+      token,
       "EX",
       LEASE_TTL_SECONDS,
       "NX",
     );
-    if (acquired !== "OK") return { isHeld: false, epoch: this.currentEpoch };
+    if (acquired !== "OK") {
+      return { isHeld: false, epoch: this.currentEpoch, token: null };
+    }
 
+    this.currentToken = token;
     this.currentEpoch = Number(await this.redis.incr(SNAPSHOT_EPOCH_KEY)) || 0;
-    return { isHeld: true, epoch: this.currentEpoch };
+    return { isHeld: true, epoch: this.currentEpoch, token };
   }
 
-  async releaseLease({ writerId }: { writerId: string }): Promise<void> {
-    await this.redis.eval(RELEASE_LUA, 1, SNAPSHOT_LEASE_KEY, writerId);
+  async releaseLease(): Promise<void> {
+    if (!this.currentToken) return;
+    await this.redis.eval(
+      RELEASE_LUA,
+      1,
+      SNAPSHOT_LEASE_KEY,
+      this.currentToken,
+    );
+    this.currentToken = null;
   }
 
   async writeLive({
     snapshot,
-    writerId,
+    leaseToken,
   }: {
     snapshot: LiveSnapshot;
-    writerId: string;
+    leaseToken: string;
   }): Promise<boolean> {
     return this.writeFenced({
       key: SNAPSHOT_LIVE_KEY,
       snapshot,
-      writerId,
+      leaseToken,
       ttlSeconds: LIVE_TTL_SECONDS,
     });
   }
 
   async writeDetail({
     snapshot,
-    writerId,
+    leaseToken,
   }: {
     snapshot: DetailSnapshot;
-    writerId: string;
+    leaseToken: string;
   }): Promise<boolean> {
     return this.writeFenced({
       key: SNAPSHOT_DETAIL_KEY,
       snapshot,
-      writerId,
+      leaseToken,
       ttlSeconds: DETAIL_TTL_SECONDS,
     });
   }
@@ -198,12 +236,12 @@ export class SnapshotRedisRepository implements SnapshotRepository {
   private async writeFenced({
     key,
     snapshot,
-    writerId,
+    leaseToken,
     ttlSeconds,
   }: {
     key: string;
     snapshot: LiveSnapshot | DetailSnapshot;
-    writerId: string;
+    leaseToken: string;
     ttlSeconds: number;
   }): Promise<boolean> {
     const written = await this.redis.eval(
@@ -212,7 +250,7 @@ export class SnapshotRedisRepository implements SnapshotRepository {
       key,
       SNAPSHOT_LEASE_KEY,
       JSON.stringify(snapshot),
-      writerId,
+      leaseToken,
       String(ttlSeconds),
       String(snapshot.computedAt),
     );

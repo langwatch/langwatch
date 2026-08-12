@@ -168,7 +168,7 @@ function ScheduleRow({
       </Table.Cell>
       <Table.Cell>
         <Text textStyle="xs" title={new Date(job.nextRunAt).toLocaleString()}>
-          {formatTimeAgo(new Date(job.nextRunAt).getTime())}
+          {formatTimeAgo(new Date(job.nextRunAt).getTime(), now)}
         </Text>
       </Table.Cell>
       <Table.Cell color="fg.muted">
@@ -179,7 +179,7 @@ function ScheduleRow({
           }
         >
           {job.lastSlot
-            ? formatTimeAgo(new Date(job.lastSlot).getTime())
+            ? formatTimeAgo(new Date(job.lastSlot).getTime(), now)
             : "never"}
         </Text>
       </Table.Cell>

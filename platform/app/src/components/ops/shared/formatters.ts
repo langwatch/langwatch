@@ -55,9 +55,9 @@ export function formatDurationMs(ms: number): string {
   return `${hours}h ${remainMins}m ${secs}s`;
 }
 
-export function formatTimeAgo(ms: number | null): string {
+export function formatTimeAgo(ms: number | null, now = Date.now()): string {
   if (ms === null) return "—";
-  const diff = Date.now() - ms;
+  const diff = now - ms;
   const absDiff = Math.abs(diff);
   const seconds = Math.floor(absDiff / 1000);
   const isFuture = diff < 0;

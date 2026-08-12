@@ -372,6 +372,8 @@ export class OpsMetricsCollector {
   private readonly writerId: string;
   private leaseEpoch = 0;
   private holdsLease = false;
+  /** Token of the CURRENT acquisition; writes are fenced on it, not on the id. */
+  private leaseToken: string | null = null;
   private lastDetailAt = 0;
   private detailInFlight = false;
   /** Latest scan, held so the detail cycle can derive structure without rescanning. */
@@ -444,8 +446,9 @@ export class OpsMetricsCollector {
     // lease window, which is exactly the rolling-deploy case.
     if (this.snapshotRepo && this.holdsLease) {
       this.holdsLease = false;
+      this.leaseToken = null;
       try {
-        await this.snapshotRepo.releaseLease({ writerId: this.writerId });
+        await this.snapshotRepo.releaseLease();
       } catch (err) {
         logger.warn({ error: err }, "Failed to release ops snapshot lease");
       }
@@ -622,11 +625,13 @@ export class OpsMetricsCollector {
   /** Cheap artifact: exact counts, rates, peaks and the rolling history. */
   private async publishLive(): Promise<void> {
     if (!this.snapshotRepo) return;
+    const leaseToken = this.leaseToken;
+    if (!leaseToken) return;
     const data = this.getDashboardData();
     const mem = process.memoryUsage();
     try {
       await this.snapshotRepo.writeLive({
-        writerId: this.writerId,
+        leaseToken,
         snapshot: {
           version: SNAPSHOT_VERSION,
           computedAt: Date.now(),
@@ -678,6 +683,12 @@ export class OpsMetricsCollector {
     if (this.detailInFlight) return;
     if (Date.now() - this.lastDetailAt < DETAIL_CYCLE_INTERVAL_MS) return;
 
+    // Captured BEFORE the scan: a slow detail scan can outlive the lease it
+    // started under, and the write must be fenced on that lease rather than on
+    // whatever the pod holds by the time the scan finishes.
+    const tokenAtScanStart = this.leaseToken;
+    if (!tokenAtScanStart) return;
+
     this.detailInFlight = true;
     void (async () => {
       try {
@@ -715,11 +726,18 @@ export class OpsMetricsCollector {
           jobNameMetrics: this.currentJobNameMetrics,
         };
 
-        this.latestDetail = detail;
-        await this.snapshotRepo!.writeDetail({
+        // Only adopt the artifact the fence ACCEPTED. A rejected write means
+        // the lease turned over mid-scan, so this payload was never published;
+        // keeping it would have `getLatestDetail()` report a detail artifact no
+        // reader can see. Leaving `lastDetailAt` alone is deliberate too — a
+        // pod that regains the lease should rescan rather than sit out a
+        // cadence it never completed.
+        const published = await this.snapshotRepo!.writeDetail({
           snapshot: detail,
-          writerId: this.writerId,
+          leaseToken: tokenAtScanStart,
         });
+        if (!published) return;
+        this.latestDetail = detail;
         this.lastDetailAt = Date.now();
       } catch (err) {
         logger.warn({ error: err }, "Failed to publish detail ops snapshot");
@@ -1126,6 +1144,7 @@ export class OpsMetricsCollector {
         });
         if (!lease.isHeld) {
           this.holdsLease = false;
+          this.leaseToken = null;
           return;
         }
         // Taking over: reload the fleet's accumulators BEFORE scanning, and so
@@ -1141,6 +1160,7 @@ export class OpsMetricsCollector {
         if (!this.holdsLease) await this.restoreState();
         this.holdsLease = true;
         this.leaseEpoch = lease.epoch;
+        this.leaseToken = lease.token;
       }
       const [queues, redisInfo] = await Promise.all([
         this.queueRepo.scanQueues({ queueNames: this.groupQueueNames }),

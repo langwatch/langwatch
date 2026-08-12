@@ -93,6 +93,10 @@ function ParkedTenantRow({
   oldestParkedMs: number | null;
 }) {
   const [open, setOpen] = useState(false);
+  // The disclosed content is a SIBLING row, not a descendant of the button, so
+  // there is no implicit relationship for a screen reader to follow — without
+  // this pairing it hears "expanded" and has no way to reach what expanded.
+  const panelId = `parked-groups-${queueName}-${tenantId}`;
 
   return (
     <>
@@ -108,6 +112,7 @@ function ParkedTenantRow({
                 : `Show parked groups for ${tenantId}`
             }
             aria-expanded={open}
+            aria-controls={panelId}
             variant="ghost"
             size="2xs"
             color="fg.muted"
@@ -133,7 +138,7 @@ function ParkedTenantRow({
         <Table.Row>
           <Table.Cell colSpan={5} padding={0}>
             <Collapsible.Root open>
-              <Collapsible.Content>
+              <Collapsible.Content id={panelId}>
                 <ParkedGroupList queueName={queueName} tenantId={tenantId} />
               </Collapsible.Content>
             </Collapsible.Root>

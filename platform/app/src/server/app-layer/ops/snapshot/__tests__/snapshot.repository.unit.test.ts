@@ -229,7 +229,7 @@ describe("SnapshotRedisRepository", () => {
         const arriving = new SnapshotRedisRepository(redis as any);
 
         await leaving.acquireOrRenewLease({ writerId: "leaving" });
-        await leaving.releaseLease({ writerId: "leaving" });
+        await leaving.releaseLease();
         const taken = await arriving.acquireOrRenewLease({
           writerId: "arriving",
         });
@@ -251,15 +251,15 @@ describe("SnapshotRedisRepository", () => {
 
         await lapsed.acquireOrRenewLease({ writerId: "lapsed" });
         redis.expireLease();
-        await holder.acquireOrRenewLease({ writerId: "holder" });
+        const held = await holder.acquireOrRenewLease({ writerId: "holder" });
 
         const renewAttempt = await lapsed.acquireOrRenewLease({
           writerId: "lapsed",
         });
-        await lapsed.releaseLease({ writerId: "lapsed" });
+        await lapsed.releaseLease();
 
         expect(renewAttempt.isHeld).toBe(false);
-        expect(await redis.get(SNAPSHOT_LEASE_KEY)).toBe("holder");
+        expect(await redis.get(SNAPSHOT_LEASE_KEY)).toBe(held.token);
       });
     });
   });
@@ -285,16 +285,46 @@ describe("SnapshotRedisRepository", () => {
       it("leaves the new writer's artifact in place", async () => {
         const { redis, repo } = makeRepo();
 
-        await repo.acquireOrRenewLease({ writerId: "lapsed" });
+        const lease = await repo.acquireOrRenewLease({ writerId: "lapsed" });
         await repo.writeLive({
-          writerId: "lapsed",
+          leaseToken: lease.token!,
           snapshot: liveSnapshot({ computedAt: 1_000 }),
         });
         redis.giveLeaseTo("successor");
 
         const published = await repo.writeLive({
-          writerId: "lapsed",
+          leaseToken: lease.token!,
           snapshot: liveSnapshot({ computedAt: 2_000 }),
+        });
+
+        expect(published).toBe(false);
+        expect((await repo.readLive())?.computedAt).toBe(1_000);
+      });
+    });
+  });
+
+  describe("given one pod that lost the lease and took it straight back", () => {
+    describe("when a scan started under the OLD lease finishes", () => {
+      /** @scenario "A scan cannot publish under a lease that turned over beneath it" */
+      it("refuses the write even though the pod is the writer again", async () => {
+        // The pod's identity is unchanged across the handover, so fencing on
+        // the writer id would wave this through. Only a token minted per
+        // acquisition can tell the two leases apart — and the stale scan's
+        // computedAt is LATER, so the monotonic check cannot catch it either.
+        const { redis, repo } = makeRepo();
+
+        const oldLease = await repo.acquireOrRenewLease({ writerId: "pod-a" });
+        redis.expireLease();
+        const newLease = await repo.acquireOrRenewLease({ writerId: "pod-a" });
+        expect(newLease.token).not.toBe(oldLease.token);
+
+        await repo.writeLive({
+          leaseToken: newLease.token!,
+          snapshot: liveSnapshot({ computedAt: 1_000 }),
+        });
+        const published = await repo.writeLive({
+          leaseToken: oldLease.token!,
+          snapshot: liveSnapshot({ computedAt: 9_000 }),
         });
 
         expect(published).toBe(false);
@@ -309,14 +339,14 @@ describe("SnapshotRedisRepository", () => {
       it("keeps the newer artifact", async () => {
         const { repo } = makeRepo();
 
-        await repo.acquireOrRenewLease({ writerId: "writer-a" });
+        const lease = await repo.acquireOrRenewLease({ writerId: "writer-a" });
         await repo.writeLive({
-          writerId: "writer-a",
+          leaseToken: lease.token!,
           snapshot: liveSnapshot({ computedAt: 5_000 }),
         });
 
         const published = await repo.writeLive({
-          writerId: "writer-a",
+          leaseToken: lease.token!,
           snapshot: liveSnapshot({ computedAt: 4_000 }),
         });
 

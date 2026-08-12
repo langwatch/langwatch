@@ -8,7 +8,7 @@
  * state of its own, sorts to the top, and is counted in the header.
  */
 
-import { SLOT_STALE_AFTER_MS } from "../../../shared/ops/schedulerControl";
+import { SLOT_STALE_AFTER_MS } from "~/shared/ops/schedulerControl";
 
 export interface SchedulerJobLike {
   nextRunAt: string;
