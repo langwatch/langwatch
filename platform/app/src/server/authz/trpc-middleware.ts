@@ -1,7 +1,8 @@
 /**
  * ADR-092 §5 — the tRPC adapter. `protectedProcedure.permission("…")` sugar
  * compiles down to this middleware: input-driven scope extraction, one
- * engine decision, legacy-compatible error shapes.
+ * engine decision through the composed AuthzService, legacy-compatible
+ * error shapes.
  *
  * New procedures opt in via `.permission()`; existing `.use(checkXxx…)`
  * sites keep the legacy path (now shadow-compared) until the stage-D
@@ -10,16 +11,13 @@
 import {
   type AuthzDecision,
   type AuthzPermission,
-  decide,
+  type AuthzScopeRef,
   PermissionDeniedError,
-  scopeOrganizationId,
 } from "@langwatch/authz";
-import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { LiteMemberRestrictedError } from "../app-layer/permissions/errors";
 import type { Session } from "../auth";
-import { collectGrantsCached } from "./cache";
-import { resolveScopeRef } from "./collector";
+import { authz, authzCollector } from "./runtime";
 
 type ScopeInput = {
   projectId?: string;
@@ -29,7 +27,6 @@ type ScopeInput = {
 
 type MiddlewareParams = {
   ctx: {
-    prisma: PrismaClient;
     session: Session;
     permissionChecked: boolean;
     organizationRole?: "ADMIN" | "MEMBER" | "EXTERNAL" | null;
@@ -46,18 +43,12 @@ type MiddlewareParams = {
 export const checkPermissionV2 =
   (permission: AuthzPermission) =>
   async ({ ctx, input, next }: MiddlewareParams) => {
-    const scope = await requireScopeFromInput({ prisma: ctx.prisma, input });
+    const scope = await requireScopeFromInput({ input });
 
-    const grants = await collectGrantsCached({
-      prisma: ctx.prisma,
+    const { decision, grants } = await authz.checkDetailed({
       principal: { type: "user", id: ctx.session.user.id },
-      organizationId: scopeOrganizationId(scope),
-    });
-    const decision = decide({
-      grants,
       permission,
       scope,
-      demoProjectId: process.env.DEMO_PROJECT_ID ?? undefined,
     });
 
     if (!decision.allowed) {
@@ -79,14 +70,11 @@ export const checkPermissionV2 =
  * denies without leaking (legacy posture).
  */
 async function requireScopeFromInput({
-  prisma,
   input,
 }: {
-  prisma: PrismaClient;
   input: ScopeInput;
-}): Promise<NonNullable<Awaited<ReturnType<typeof resolveScopeRef>>>> {
-  const scope = await resolveScopeRef({
-    prisma,
+}): Promise<AuthzScopeRef> {
+  const scope = await authzCollector.resolveScopeRef({
     projectId: input.projectId,
     teamId: input.projectId ? undefined : input.teamId,
     organizationId:
@@ -112,7 +100,7 @@ function deniedError({
   denialReason,
 }: {
   permission: AuthzPermission;
-  scope: NonNullable<Awaited<ReturnType<typeof resolveScopeRef>>>;
+  scope: AuthzScopeRef;
   denialReason: NonNullable<AuthzDecision["denialReason"]>;
 }): TRPCError {
   const denied = new PermissionDeniedError({ permission, scope, denialReason });

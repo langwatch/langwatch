@@ -5,7 +5,7 @@ import {
   bitsetToBase64Url,
   encodePermissionBitset,
 } from "../bitset";
-import { mintPassport, verifyPassport } from "../passport";
+import { PassportService } from "../passport";
 
 describe("permission bitsets", () => {
   it("round-trips a permission set through encode/decode", () => {
@@ -38,29 +38,26 @@ describe("permission bitsets", () => {
 describe("authz passports", () => {
   const now = () => 1_700_000_000_000;
   const secret = "test-passport-secret";
+  const passports = new PassportService({ secret, now });
 
   function mint(epoch = 7) {
-    return mintPassport({
+    return passports.mint({
       principal: { type: "user", id: "alice" },
       organizationId: "org-1",
       scopedPermissions: [
         { scopeKey: "project:proj-1", permissions: ["traces:view"] },
       ],
       epoch,
-      secret,
       ttlSeconds: 60,
-      now,
     });
   }
 
   describe("given a freshly minted passport", () => {
     it("verifies with the matching epoch and carries the bitmap", () => {
       const token = mint();
-      const verification = verifyPassport({
+      const verification = passports.verify({
         token: token!,
         currentEpoch: 7,
-        secret,
-        now,
       });
       expect(verification.ok).toBe(true);
       if (!verification.ok) return;
@@ -87,30 +84,31 @@ describe("authz passports", () => {
         }),
       ).toString("base64url")}.${signature}`;
 
-      expect(
-        verifyPassport({ token: tampered, currentEpoch: 7, secret, now }),
-      ).toEqual({ ok: false, reason: "bad-signature" });
+      expect(passports.verify({ token: tampered, currentEpoch: 7 })).toEqual({
+        ok: false,
+        reason: "bad-signature",
+      });
     });
   });
 
   describe("when the passport has expired", () => {
     it("fails with expired", () => {
       const token = mint()!;
-      expect(
-        verifyPassport({
-          token,
-          currentEpoch: 7,
-          secret,
-          now: () => now() + 61_000,
-        }),
-      ).toEqual({ ok: false, reason: "expired" });
+      const later = new PassportService({
+        secret,
+        now: () => now() + 61_000,
+      });
+      expect(later.verify({ token, currentEpoch: 7 })).toEqual({
+        ok: false,
+        reason: "expired",
+      });
     });
   });
 
   describe("when a grant write bumped the epoch after minting", () => {
     it("fails with stale-epoch — revocation outruns the TTL", () => {
       const token = mint(7)!;
-      expect(verifyPassport({ token, currentEpoch: 8, secret, now })).toEqual({
+      expect(passports.verify({ token, currentEpoch: 8 })).toEqual({
         ok: false,
         reason: "stale-epoch",
       });
@@ -120,9 +118,7 @@ describe("authz passports", () => {
   describe("when the epoch store is unavailable", () => {
     it("fails closed", () => {
       const token = mint()!;
-      expect(
-        verifyPassport({ token, currentEpoch: null, secret, now }),
-      ).toEqual({
+      expect(passports.verify({ token, currentEpoch: null })).toEqual({
         ok: false,
         reason: "stale-epoch",
       });
@@ -131,24 +127,16 @@ describe("authz passports", () => {
 
   describe("when no secret is provided", () => {
     it("mints nothing and verifies nothing", () => {
+      const secretless = new PassportService({ secret: undefined, now });
       expect(
-        mintPassport({
+        secretless.mint({
           principal: { type: "user", id: "alice" },
           organizationId: "org-1",
           scopedPermissions: [],
           epoch: 1,
-          secret: undefined,
-          now,
         }),
       ).toBeNull();
-      expect(
-        verifyPassport({
-          token: "a.b",
-          currentEpoch: 1,
-          secret: undefined,
-          now,
-        }),
-      ).toEqual({
+      expect(secretless.verify({ token: "a.b", currentEpoch: 1 })).toEqual({
         ok: false,
         reason: "no-secret",
       });

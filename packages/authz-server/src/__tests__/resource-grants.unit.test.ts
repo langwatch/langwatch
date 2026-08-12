@@ -1,19 +1,18 @@
 import {
+  AuthzEngine,
   type AuthzScopeRef,
   type CollectedBinding,
   type CollectedGrants,
-  decide,
   type ResourceGrant,
 } from "@langwatch/authz";
-import type { PrismaClient } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
-import {
-  collectGrants,
-  collectResourceGrants,
-  resolveResourceScopeRef,
-} from "../collector";
-import { GrantsService, GrantValidationError } from "../grants";
-import { check, effectivePermissions } from "../service";
+import { AuthzCollectorService } from "../authz-collector.service";
+import type { AuthzGrantsRepository } from "../authz-grants.repository";
+import type { AuthzReadRepository } from "../authz-read.repository";
+import { AuthzService } from "../authz.service";
+import { GrantsService, GrantValidationError } from "../grants.service";
+
+const engine = new AuthzEngine();
 
 const ORG = "org-1";
 const TEAM = "team-1";
@@ -69,12 +68,31 @@ const binding = (
   ...partial,
 });
 
+/** A reader whose every method resolves empty; tests override the reads
+ *  their scenario turns on. */
+function makeReader(
+  overrides: Partial<AuthzReadRepository> = {},
+): AuthzReadRepository {
+  return {
+    findOrganizationRole: vi.fn().mockResolvedValue(null),
+    findUserBindings: vi.fn().mockResolvedValue([]),
+    findGroupBindings: vi.fn().mockResolvedValue([]),
+    findApiKeyBindings: vi.fn().mockResolvedValue([]),
+    findLegacyTeamMemberships: vi.fn().mockResolvedValue([]),
+    findCustomRolePermissions: vi.fn().mockResolvedValue([]),
+    findShareLinks: vi.fn().mockResolvedValue([]),
+    findProjectLineage: vi.fn().mockResolvedValue(null),
+    findTeamOrganization: vi.fn().mockResolvedValue(null),
+    ...overrides,
+  };
+}
+
 describe("resource-tier grants (ADR-092 §8)", () => {
   describe("given trace t1 is shared with anyone", () => {
     const resourceGrants = [grantOn()];
 
     it("grants an anonymous caller traces:view on t1, marked public", () => {
-      const decision = decide({
+      const decision = engine.decide({
         grants: makeGrants(),
         permission: "traces:view",
         scope: traceScope(),
@@ -87,7 +105,7 @@ describe("resource-tier grants (ADR-092 §8)", () => {
 
     /** @scenario "A share token grants exactly one permission on exactly one resource" */
     it("denies the same caller on a different trace in the same project", () => {
-      const decision = decide({
+      const decision = engine.decide({
         grants: makeGrants(),
         permission: "traces:view",
         scope: traceScope({ id: "trace-2" }),
@@ -99,7 +117,7 @@ describe("resource-tier grants (ADR-092 §8)", () => {
 
     /** @scenario "A share token grants exactly one permission on exactly one resource" */
     it("denies a permission the grant does not carry", () => {
-      const decision = decide({
+      const decision = engine.decide({
         grants: makeGrants(),
         permission: "traces:update",
         scope: traceScope(),
@@ -110,7 +128,7 @@ describe("resource-tier grants (ADR-092 §8)", () => {
 
     /** @scenario "Resource grants are anchored to their project" */
     it("denies a same-id trace anchored to a different project", () => {
-      const decision = decide({
+      const decision = engine.decide({
         grants: makeGrants(),
         permission: "traces:view",
         scope: traceScope({
@@ -123,7 +141,7 @@ describe("resource-tier grants (ADR-092 §8)", () => {
     });
 
     it("keeps a project member on the binding path, audience member", () => {
-      const decision = decide({
+      const decision = engine.decide({
         grants: makeGrants({
           principal: { type: "user", id: "user-1" },
           organizationRole: "MEMBER",
@@ -144,7 +162,7 @@ describe("resource-tier grants (ADR-092 §8)", () => {
 
     /** @scenario "A shared thread covers its traces and their children" */
     it("covers the trace through its parent link — one grant, no child rows", () => {
-      const decision = decide({
+      const decision = engine.decide({
         grants: makeGrants(),
         permission: "traces:view",
         scope: traceScope({
@@ -157,7 +175,7 @@ describe("resource-tier grants (ADR-092 §8)", () => {
     });
 
     it("does not cover a trace outside the thread", () => {
-      const decision = decide({
+      const decision = engine.decide({
         grants: makeGrants(),
         permission: "traces:view",
         scope: traceScope(),
@@ -175,7 +193,7 @@ describe("resource-tier grants (ADR-092 §8)", () => {
       audience: ResourceGrant["audience"];
       grants: CollectedGrants;
     }) =>
-      decide({
+      engine.decide({
         grants,
         permission: "traces:view",
         scope: traceScope(),
@@ -270,7 +288,7 @@ describe("resource-tier grants (ADR-092 §8)", () => {
 
   describe("when the scope is not a resource", () => {
     it("ignores resource grants entirely", () => {
-      const decision = decide({
+      const decision = engine.decide({
         grants: makeGrants(),
         permission: "traces:view",
         scope: {
@@ -287,7 +305,7 @@ describe("resource-tier grants (ADR-092 §8)", () => {
 
   describe("when the grant and the scope disagree on kind", () => {
     it("a trace grant never covers a thread of the same id", () => {
-      const decision = decide({
+      const decision = engine.decide({
         grants: makeGrants(),
         permission: "traces:view",
         scope: traceScope({ kind: "thread", id: "x" }),
@@ -300,32 +318,36 @@ describe("resource-tier grants (ADR-092 §8)", () => {
 
 describe("collector at the resource tier", () => {
   describe("collectGrants for an anonymous principal", () => {
-    it("returns the empty snapshot without touching the database", async () => {
-      const grants = await collectGrants({
-        prisma: {} as PrismaClient,
+    it("returns the empty snapshot without touching storage", async () => {
+      const reader = makeReader();
+      const grants = await new AuthzCollectorService(reader).collectGrants({
         principal: { type: "anonymous" },
         organizationId: ORG,
       });
       expect(grants.bindings).toEqual([]);
       expect(grants.isOrgMember).toBe(false);
       expect(grants.legacyTeamMemberships).toEqual([]);
+      expect(reader.findOrganizationRole).not.toHaveBeenCalled();
+      expect(reader.findUserBindings).not.toHaveBeenCalled();
     });
   });
 
   describe("collectResourceGrants (ShareLink shim, ADR-057)", () => {
     const liveRow = {
-      resourceType: "TRACE",
+      resourceType: "TRACE" as const,
       resourceId: "trace-1",
       projectId: PROJECT,
-      visibility: "PUBLIC",
+      visibility: "PUBLIC" as const,
       expiresAt: null,
       maxViews: null,
       viewCount: 0,
     };
 
     it("returns nothing for non-resource scopes without querying", async () => {
-      const grants = await collectResourceGrants({
-        prisma: {} as PrismaClient,
+      const reader = makeReader();
+      const grants = await new AuthzCollectorService(
+        reader,
+      ).collectResourceGrants({
         scope: {
           type: "project",
           id: PROJECT,
@@ -334,54 +356,46 @@ describe("collector at the resource tier", () => {
         },
       });
       expect(grants).toEqual([]);
+      expect(reader.findShareLinks).not.toHaveBeenCalled();
     });
 
     /** @scenario "A share link that is not presented grants nothing" */
     it("returns nothing when no token was presented — possession is the gate", async () => {
-      const findMany = vi.fn();
-      const prisma = { shareLink: { findMany } } as unknown as PrismaClient;
-      const grants = await collectResourceGrants({
-        prisma,
+      const reader = makeReader();
+      const grants = await new AuthzCollectorService(
+        reader,
+      ).collectResourceGrants({
         scope: traceScope(),
       });
       expect(grants).toEqual([]);
-      expect(findMany).not.toHaveBeenCalled();
+      expect(reader.findShareLinks).not.toHaveBeenCalled();
     });
 
-    it("reads presented links for the resource and its parents", async () => {
-      const findMany = vi
-        .fn()
-        .mockResolvedValue([
-          { ...liveRow, resourceType: "THREAD", resourceId: "thread-1" },
-        ]);
-      const prisma = { shareLink: { findMany } } as unknown as PrismaClient;
+    it("asks the repository for exactly the presented links, self plus parents", async () => {
+      const reader = makeReader({
+        findShareLinks: vi
+          .fn()
+          .mockResolvedValue([
+            { ...liveRow, resourceType: "THREAD", resourceId: "thread-1" },
+          ]),
+      });
 
-      const grants = await collectResourceGrants({
-        prisma,
+      const grants = await new AuthzCollectorService(
+        reader,
+      ).collectResourceGrants({
         scope: traceScope({
           parents: [{ kind: "thread", id: "thread-1" }],
           shareTokens: ["tok-1"],
         }),
       });
 
-      expect(findMany).toHaveBeenCalledWith({
-        where: {
-          projectId: PROJECT,
-          token: { in: ["tok-1"] },
-          OR: [
-            { resourceType: "TRACE", resourceId: "trace-1" },
-            { resourceType: "THREAD", resourceId: "thread-1" },
-          ],
-        },
-        select: {
-          resourceType: true,
-          resourceId: true,
-          projectId: true,
-          visibility: true,
-          expiresAt: true,
-          maxViews: true,
-          viewCount: true,
-        },
+      expect(reader.findShareLinks).toHaveBeenCalledWith({
+        projectId: PROJECT,
+        tokens: ["tok-1"],
+        links: [
+          { kind: "trace", id: "trace-1" },
+          { kind: "thread", id: "thread-1" },
+        ],
       });
       expect(grants).toEqual([
         {
@@ -395,13 +409,15 @@ describe("collector at the resource tier", () => {
     });
 
     it("maps link visibility onto the matching audience", async () => {
-      const findMany = vi.fn().mockResolvedValue([
-        { ...liveRow, visibility: "ORGANIZATION" },
-        { ...liveRow, visibility: "PROJECT" },
-      ]);
-      const prisma = { shareLink: { findMany } } as unknown as PrismaClient;
-      const grants = await collectResourceGrants({
-        prisma,
+      const reader = makeReader({
+        findShareLinks: vi.fn().mockResolvedValue([
+          { ...liveRow, visibility: "ORGANIZATION" },
+          { ...liveRow, visibility: "PROJECT" },
+        ]),
+      });
+      const grants = await new AuthzCollectorService(
+        reader,
+      ).collectResourceGrants({
         scope: traceScope({ shareTokens: ["tok-1"] }),
       });
       expect(grants.map((grant) => grant.audience)).toEqual([
@@ -412,16 +428,18 @@ describe("collector at the resource tier", () => {
 
     /** @scenario "Expired and view-exhausted share links grant nothing" */
     it("drops expired and view-exhausted links before the engine sees them", async () => {
-      const findMany = vi
-        .fn()
-        .mockResolvedValue([
-          { ...liveRow, expiresAt: new Date(Date.now() - 1000) },
-          { ...liveRow, maxViews: 1, viewCount: 1 },
-          liveRow,
-        ]);
-      const prisma = { shareLink: { findMany } } as unknown as PrismaClient;
-      const grants = await collectResourceGrants({
-        prisma,
+      const reader = makeReader({
+        findShareLinks: vi
+          .fn()
+          .mockResolvedValue([
+            { ...liveRow, expiresAt: new Date(Date.now() - 1000) },
+            { ...liveRow, maxViews: 1, viewCount: 1 },
+            liveRow,
+          ]),
+      });
+      const grants = await new AuthzCollectorService(
+        reader,
+      ).collectResourceGrants({
         scope: traceScope({ shareTokens: ["tok-1"] }),
       });
       expect(grants).toHaveLength(1);
@@ -431,13 +449,15 @@ describe("collector at the resource tier", () => {
 });
 
 describe("resolveResourceScopeRef", () => {
-  it("derives the project lineage from the database, never the caller", async () => {
-    const findUnique = vi.fn().mockResolvedValue({
-      team: { id: TEAM, organizationId: ORG },
+  it("derives the project lineage from storage, never the caller", async () => {
+    const reader = makeReader({
+      findProjectLineage: vi
+        .fn()
+        .mockResolvedValue({ teamId: TEAM, organizationId: ORG }),
     });
-    const prisma = { project: { findUnique } } as unknown as PrismaClient;
-    const scope = await resolveResourceScopeRef({
-      prisma,
+    const scope = await new AuthzCollectorService(
+      reader,
+    ).resolveResourceScopeRef({
       projectId: PROJECT,
       kind: "trace",
       id: "trace-1",
@@ -454,19 +474,15 @@ describe("resolveResourceScopeRef", () => {
       teamId: TEAM,
       organizationId: ORG,
     });
-    expect(findUnique).toHaveBeenCalledWith({
-      where: { id: PROJECT },
-      select: { team: { select: { id: true, organizationId: true } } },
+    expect(reader.findProjectLineage).toHaveBeenCalledWith({
+      projectId: PROJECT,
     });
   });
 
   it("returns null for an unknown project", async () => {
-    const prisma = {
-      project: { findUnique: vi.fn().mockResolvedValue(null) },
-    } as unknown as PrismaClient;
+    const reader = makeReader();
     expect(
-      await resolveResourceScopeRef({
-        prisma,
+      await new AuthzCollectorService(reader).resolveResourceScopeRef({
         projectId: "proj-ghost",
         kind: "trace",
         id: "trace-1",
@@ -475,15 +491,14 @@ describe("resolveResourceScopeRef", () => {
   });
 
   it("gives a thread no parents — threads are the top of the shareable tree", async () => {
-    const prisma = {
-      project: {
-        findUnique: vi
-          .fn()
-          .mockResolvedValue({ team: { id: TEAM, organizationId: ORG } }),
-      },
-    } as unknown as PrismaClient;
-    const scope = await resolveResourceScopeRef({
-      prisma,
+    const reader = makeReader({
+      findProjectLineage: vi
+        .fn()
+        .mockResolvedValue({ teamId: TEAM, organizationId: ORG }),
+    });
+    const scope = await new AuthzCollectorService(
+      reader,
+    ).resolveResourceScopeRef({
       projectId: PROJECT,
       kind: "thread",
       id: "thread-1",
@@ -493,27 +508,25 @@ describe("resolveResourceScopeRef", () => {
   });
 });
 
-describe("authz service on a resource scope", () => {
+describe("AuthzService on a resource scope", () => {
   describe("given a live public share link for trace t1 and no session", () => {
-    const prisma = {
-      shareLink: {
-        findMany: vi.fn().mockResolvedValue([
-          {
-            resourceType: "TRACE",
-            resourceId: "trace-1",
-            projectId: PROJECT,
-            visibility: "PUBLIC",
-            expiresAt: null,
-            maxViews: null,
-            viewCount: 0,
-          },
-        ]),
-      },
-    } as unknown as PrismaClient;
+    const reader = makeReader({
+      findShareLinks: vi.fn().mockResolvedValue([
+        {
+          resourceType: "TRACE",
+          resourceId: "trace-1",
+          projectId: PROJECT,
+          visibility: "PUBLIC",
+          expiresAt: null,
+          maxViews: null,
+          viewCount: 0,
+        },
+      ]),
+    });
+    const authz = new AuthzService(new AuthzCollectorService(reader));
 
     it("check() walks token collection through to a public grant", async () => {
-      const decision = await check({
-        prisma,
+      const decision = await authz.check({
         principal: { type: "anonymous" },
         permission: "traces:view",
         scope: traceScope({ shareTokens: ["tok-1"] }),
@@ -524,8 +537,7 @@ describe("authz service on a resource scope", () => {
     });
 
     it("effectivePermissions() is exactly the shared permission", async () => {
-      const permissions = await effectivePermissions({
-        prisma,
+      const permissions = await authz.effectivePermissions({
         principal: { type: "anonymous" },
         scope: traceScope({ shareTokens: ["tok-1"] }),
       });
@@ -535,12 +547,18 @@ describe("authz service on a resource scope", () => {
 });
 
 describe("GrantsService and resource scopes", () => {
+  const makeService = () =>
+    new GrantsService({} as AuthzGrantsRepository, {
+      audit: vi.fn().mockResolvedValue(undefined),
+      newBindingId: () => "rb_test",
+      bumpEpoch: vi.fn().mockResolvedValue(undefined),
+    });
+
   describe("when a role binding is attached at a resource scope", () => {
     /** @scenario "Resource-tier access is granted by sharing, never by a role binding" */
     it("rejects before touching storage — shares are not bindings", async () => {
-      const service = new GrantsService({} as PrismaClient);
       await expect(
-        service.attach({
+        makeService().attach({
           actor: { userId: "admin-1" },
           who: { type: "user", id: "user-1" },
           role: { builtin: "MEMBER" },
@@ -551,9 +569,8 @@ describe("GrantsService and resource scopes", () => {
 
     /** @scenario "Resource-tier access is granted by sharing, never by a role binding" */
     it("rejects replace() toward a resource scope the same way", async () => {
-      const service = new GrantsService({} as PrismaClient);
       await expect(
-        service.replace({
+        makeService().replace({
           actor: { userId: "admin-1" },
           who: { type: "user", id: "user-1" },
           from: { type: "organization", id: ORG },

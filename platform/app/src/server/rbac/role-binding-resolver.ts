@@ -13,10 +13,7 @@ import {
   type Permission,
   teamRoleHasPermission,
 } from "../api/rbac";
-import {
-  shadowApiKeyPermissionCheck,
-  shadowUserPermissionCheck,
-} from "../authz/shadow";
+import { authzShadow } from "../authz/runtime";
 import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 import {
   MalformedCustomRolePermissionsError,
@@ -303,8 +300,7 @@ export async function checkRoleBindingPermission({
   // cap here), auto-tagged knownDivergence by shadow.ts.
   const scopeIds = scopeRefToIds(scope, organizationId);
   if (resolvedPrincipal.type === "user") {
-    shadowUserPermissionCheck({
-      prisma,
+    authzShadow.userPermissionCheck({
       userId: resolvedPrincipal.id,
       permission,
       legacyAllowed: permitted,
@@ -312,8 +308,7 @@ export async function checkRoleBindingPermission({
       ...scopeIds,
     });
   } else {
-    shadowApiKeyPermissionCheck({
-      prisma,
+    authzShadow.apiKeyPermissionCheck({
       apiKeyId: resolvedPrincipal.id,
       ownerUserId: null,
       organizationId,
@@ -647,8 +642,7 @@ export async function resolveApiKeyPermission({
 
   // ADR-092 stage A4: engine ceiling-algebra shadow comparison.
   const scopeIds = scopeRefToIds(scope, organizationId);
-  shadowApiKeyPermissionCheck({
-    prisma,
+  authzShadow.apiKeyPermissionCheck({
     apiKeyId,
     ownerUserId: userId,
     organizationId,

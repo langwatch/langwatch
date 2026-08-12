@@ -1,17 +1,25 @@
 # @langwatch/authz
 
 The unified authorization engine ([ADR-092](../../dev/docs/adr/092-unified-authorization-engine.md)).
-This package is the **pure half** of the design: the permission registry, the
-built-in roles, the `decide()` walk, and the witness/passport primitives. It
-reads nothing and writes nothing - no Prisma, no env, no server imports - so
-the client (`useCan`), the app's server adapters, and any future service can
-all depend on it and get the same answer.
+This package is the **pure core** of the design: the permission registry, the
+built-in roles, the `AuthzEngine` (the `decide()` walk), and the
+witness/passport primitives. It reads nothing and writes nothing - no Prisma,
+no env, no server imports - so the client (`useCan`), the server runtime, and
+any future service can all depend on it and get the same answer.
 
-The **storage half** lives in the app at `platform/app/src/server/authz/`:
-the collector (the one place authz data is read from Postgres), the epoch
-cache, `GrantsService` (the one write surface), shadow mode, and the tRPC
-middleware. They feed `CollectedGrants` snapshots in; everything here is a
-deterministic function of that snapshot.
+The design is three layers, app-layer service/repository idiom throughout:
+
+- **`@langwatch/authz`** (this package) - the vocabulary and the pure
+  `AuthzEngine`. Browser-safe.
+- **`@langwatch/authz-server`** - the server runtime: `AuthzCollectorService`,
+  `AuthzService` (with the epoch cache inside), `GrantsService`,
+  `AuthzShadowService` - all written against two repository INTERFACES
+  (`AuthzReadRepository`, `AuthzGrantsRepository`). No storage engine.
+- **the app** (`platform/app/src/server/authz/`) - the Prisma repository
+  implementations (`repositories/*.prisma.repository.ts`), the redis epoch
+  store, the tRPC middleware, and `runtime.ts`: the composition root that
+  builds ONE of each service and exports them (`authz`, `authzCollector`,
+  `authzShadow`, `grantsService()`).
 
 ```
  PERMISSION   "traces:view"             a verb on a resource, from ONE registry
@@ -26,14 +34,14 @@ deterministic function of that snapshot.
 ```
 
 ```
- app / client                      @langwatch/authz (this package)
- ──────────────                    ─────────────────────────────────
- collector.ts  ── CollectedGrants ──►  decide() ──► AuthzDecision
- cache.ts      ── ResourceGrant[] ──►  explain()      │ allowed · via
- grants.ts (writes, epoch bump)        registry       │ denialReason
- shadow.ts (legacy comparison)         roles          │ audience
- trpc-middleware (.permission())       witness ◄──────┘
- useCan / RequireCan (client)          passport + bitset (stage F)
+ app (platform/app)              @langwatch/authz-server        @langwatch/authz
+ ─────────────────────           ───────────────────────        ─────────────────
+ Prisma*Repository ─ implements ─► AuthzReadRepository          AuthzEngine
+ (repositories/)                   AuthzGrantsRepository        │ decide()
+ epoch.ts (redis) ─ epochReader ─► AuthzService ── decides via ►│ explain()
+ runtime.ts       ─ composes ────► AuthzCollectorService        registry · roles
+ trpc-middleware (.permission())   GrantsService                witness · bitset
+ useCan / RequireCan (client) ◄─── AuthzShadowService           PassportService
 ```
 
 ## Using it
@@ -43,11 +51,15 @@ Which door you walk through depends on what you are writing:
 | You are writing... | Use |
 |---|---|
 | a tRPC procedure | `protectedProcedure.permission("...")` |
-| a service, worker, or anything server-side | `require_()` (throws, returns a witness) or `can()` (boolean) |
-| a Hono route | nothing inline - the service it calls does `require_()` |
+| a service, worker, or anything server-side | `authz.authorize()` (throws, returns a witness) or `authz.can()` |
+| a Hono route | nothing inline - the service it calls does `authz.authorize()` |
 | React UI | `useCan()` / `<RequireCan>` |
-| an admin surface that changes who can do what | `GrantsService` verbs |
-| a share page (anonymous viewer with a link) | `resolveResourceScopeRef` + `check()` with the presented tokens |
+| an admin surface that changes who can do what | `grantsService()` verbs |
+| a share page (anonymous viewer with a link) | `authzCollector.resolveResourceScopeRef` + `authz.check()` |
+
+The composed instances live in the app's composition root,
+`~/server/authz/runtime.ts` - import them from there; nothing else
+constructs a service or a repository.
 
 ### Protecting a tRPC procedure
 
@@ -73,20 +85,18 @@ lineage facts (a project's team and organization) come from storage; a
 hand-built literal is the one way to lie to the engine.
 
 ```ts
-import { can, require_ } from "~/server/authz/service";
-import { resolveScopeRef } from "~/server/authz/collector";
+import { authz, authzCollector } from "~/server/authz/runtime";
 
-const scope = await resolveScopeRef({ prisma, projectId });
+const scope = await authzCollector.resolveScopeRef({ projectId });
 if (!scope) throw new NotFoundError(...);          // unknown id: deny, don't leak
 
 // Boolean - for branching:
-if (await can({ prisma, principal: { type: "user", id: userId }, permission: "datasets:manage", scope })) { ... }
+if (await authz.can({ principal: { type: "user", id: userId }, permission: "datasets:manage", scope })) { ... }
 
 // Throw-on-denial - for guarding. The returned witness is the proof object
 // repositories following the witness convention accept instead of a raw id,
 // which makes "forgot the permission check" fail to compile:
-const authorized = await require_({
-  prisma,
+const authorized = await authz.authorize({
   principal: { type: "user", id: userId },
   permission: "datasets:manage",
   scope,
@@ -94,9 +104,10 @@ const authorized = await require_({
 await datasetsRepository.deleteAll(authorized);
 ```
 
-`check()` is `can()` with the full decision (via, denialReason, audience) when
-you need to explain or log; `effectivePermissions()` is the whole set at a
-scope, and is what the `authz.effectivePermissions` router serves the client.
+`authz.check()` is `can()` with the full decision (via, denialReason,
+audience) when you need to explain or log; `authz.effectivePermissions()` is
+the whole set at a scope, and is what the `authz.effectivePermissions` router
+serves the client.
 
 ### Checking in the browser
 
@@ -121,15 +132,14 @@ presented links, and `decide()` answers through the resource tier - the ONLY
 path an anonymous principal can take.
 
 ```ts
-const scope = await resolveResourceScopeRef({
-  prisma,
+const scope = await authzCollector.resolveResourceScopeRef({
   projectId: trace.projectId,      // off the FETCHED trace row, never the URL
   kind: "trace",
   id: trace.id,
   parentThreadId: trace.threadId,  // same: the stored row's own thread
   shareTokens: [presentedToken],
 });
-const decision = await check({ prisma, principal: { type: "anonymous" }, permission: "traces:view", scope });
+const decision = await authz.check({ principal: { type: "anonymous" }, permission: "traces:view", scope });
 // decision.audience === "public" → serializers apply the public redactions
 ```
 
@@ -141,8 +151,9 @@ writes an audit event, and bumps the org's epoch so caches die on the next
 request.
 
 ```ts
-const grants = new GrantsService(prisma);
+import { grantsService } from "~/server/authz/runtime";
 
+const grants = grantsService();
 await grants.attach({ actor, who: { type: "user", id }, role: { builtin: "MEMBER" }, where: teamScope });
 await grants.update({ actor, bindingId, role: { customRoleId } });
 await grants.revoke({ actor, bindingId });
@@ -182,12 +193,13 @@ otherwise, and an unregistered code reaches customers as "unknown error".
 
 | Mistake | Instead |
 |---|---|
-| Hand-building an `AuthzScopeRef` literal in a route or service | Resolve it (`resolveScopeRef`, `resolveResourceScopeRef`) - lineage comes from storage, resource anchors from the fetched row |
+| Hand-building an `AuthzScopeRef` literal in a route or service | Resolve it (`authzCollector.resolveScopeRef` / `resolveResourceScopeRef`) - lineage comes from storage, resource anchors from the fetched row |
 | Comparing role names (`role === "ADMIN"`) to gate behaviour | Ask for a permission - roles are grant bundles, not checks |
 | Inserting a permission mid-registry because it "belongs with" its siblings | Append only; the order test exists to stop exactly this |
-| Re-exporting `passport.ts` from the barrel, or importing it client-side | The barrel stays browser-safe (`useCan` imports it); passports are server-only, `@langwatch/authz/passport` |
+| Re-exporting `PassportService` from the barrel, or importing it client-side | The barrel stays browser-safe (`useCan` imports it); passports are server-only, `@langwatch/authz/passport` |
 | Toasting `error.message` from a denied mutation | The code-keyed presentation registry renders the copy (`permission_denied`) |
-| Calling `decide()` with a hand-assembled `CollectedGrants` in production code | `collectGrantsCached` is the one reader; hand-assembly is for tests |
+| Constructing your own `AuthzService` / repository instead of importing from `runtime.ts` | The composition root builds one of each; a second instance means a second cache and a second config |
+| Calling `engine.decide()` with a hand-assembled `CollectedGrants` in production code | `AuthzService` collects through the repository; hand-assembly is for tests |
 | A new error code without `codes.ts` + `presentation.ts` entries | Both, in the same change - the guard test enforces it |
 
 ## Bible of terms
@@ -220,7 +232,9 @@ them, and the migration deletes the synonyms.
 | **Lite member** | Today: the `EXTERNAL` organization role, which caps team/project bindings at the lite-member bag. Stage C makes it a plain role with its own grants instead of a cross-cutting cap. |
 | **Org-role floor** | Every organization member holds the org-member bag on organization-scope checks, bindings or not. A tagged legacy quirk. |
 | **LEGACY-QUIRK(stage)** | A deliberately reproduced legacy behaviour, tagged with the migration stage that deletes it. Stage-A parity means matching legacy warts and all. |
-| **Witness** | `Authorized<Scope>` - a branded, unforgeable proof that `require_()` allowed a permission at a scope. Repositories that accept a witness instead of a raw id make "forgot the check" fail to compile. |
+| **Witness** | `Authorized<Scope>` - a branded, unforgeable proof that `authz.authorize()` allowed a permission at a scope. Repositories that accept a witness instead of a raw id make "forgot the check" fail to compile. |
+| **Repository port** | The storage interfaces the runtime services are written against: `AuthzReadRepository` (everything COLLECT reads) and `AuthzGrantsRepository` (everything the write surface touches, transactions included). The app implements them as `Prisma*Repository` classes. |
+| **Composition root** | `platform/app/src/server/authz/runtime.ts` - the one place repositories, redis, the audit writer and the KSUID minter meet the services. Everything else imports the composed instances. |
 | **Passport** | A signed, short-TTL (≤60s), epoch-bound token carrying per-scope permission bitsets. Lets stateless surfaces (Go gateway, collectors) verify with an HMAC check and an epoch compare - zero database. |
 | **Bitset** | An effective permission set as bits indexed by registry order. The reason the registry is append-only: an index, once shipped inside a passport, must never change meaning. |
 | **Epoch** | A per-organization counter. Every grant write bumps it; caches and passports are valid only for the epoch they were built under, so revocation lands on the next request. |

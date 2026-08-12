@@ -2,23 +2,37 @@
  * ADR-092 §11 (setting) + §10 (offboarding) — the one write surface for
  * grants. Every mutation validates against the registry/tenancy, emits an
  * audit event, and bumps the org's authz epoch so caches and passports die
- * on the caller's next request.
+ * on the caller's next request. Storage is behind AuthzGrantsRepository -
+ * the Prisma implementation (and its transactions) lives in the app; this
+ * service owns validation, naming failures, and the offboarding proof.
  *
  * Migration note (stage D0): the eight legacy RoleBinding write paths
  * (member add, invites, SCIM, groups, API keys, project creation, role
  * editor, better-auth hooks) route through this service as they migrate;
  * new code starts here.
  */
-
-import { auditLog } from "@ee/audit-log/auditLog";
 import { type AuthzScopeRef, scopeOrganizationId } from "@langwatch/authz";
 import { HandledError } from "@langwatch/handled-error";
-import { generate } from "@langwatch/ksuid";
-import type { PrismaClient, TeamUserRole } from "@prisma/client";
-import { Prisma } from "@prisma/client";
-import { KSUID_RESOURCES } from "~/utils/constants";
-import { collectGrants } from "./collector";
-import { bumpAuthzEpoch } from "./epoch";
+import { AuthzCollectorService } from "./authz-collector.service";
+import {
+  type AuthzGrantsRepository,
+  type BindingPrincipalWhere,
+  DuplicateBindingError,
+  type RoleBindingWrite,
+} from "./authz-grants.repository";
+
+/** The app's audit writer (EE) - every grant mutation records one event. */
+export type AuthzAuditWriter = (entry: {
+  userId: string;
+  organizationId: string;
+  action: string;
+  metadata: Record<string, unknown>;
+}) => Promise<unknown>;
+
+/** The app's redis-backed epoch bump (src/server/authz/epoch.ts). */
+export type AuthzEpochBumper = (args: {
+  organizationId: string;
+}) => Promise<void>;
 
 export class GrantValidationError extends HandledError {
   constructor(message: string, meta: Record<string, unknown> = {}) {
@@ -46,7 +60,7 @@ export type GrantPrincipal =
   | { type: "apiKey"; id: string };
 
 export type GrantRole =
-  | { builtin: Exclude<TeamUserRole, "CUSTOM"> }
+  | { builtin: "ADMIN" | "MEMBER" | "VIEWER" }
   | { customRoleId: string };
 
 type Actor = { userId: string };
@@ -57,8 +71,24 @@ const SCOPE_TYPE_FOR_REF = {
   organization: "ORGANIZATION",
 } as const;
 
+type GrantableScope = Exclude<AuthzScopeRef, { type: "resource" }>;
+
+/**
+ * The app-owned effect seams, composed once in the app's runtime
+ * (platform/app/src/server/authz/runtime.ts): the EE audit writer, the
+ * KSUID minter for binding ids, and the redis-backed epoch bump.
+ */
+export type GrantsServiceDeps = {
+  audit: AuthzAuditWriter;
+  newBindingId: () => string;
+  bumpEpoch: AuthzEpochBumper;
+};
+
 export class GrantsService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly repository: AuthzGrantsRepository,
+    private readonly deps: GrantsServiceDeps,
+  ) {}
 
   /** INSERT (who, role, where) — visible on the next check. */
   async attach({
@@ -87,21 +117,24 @@ export class GrantsService {
       });
     }
 
-    const bindingId = await this.createBinding({
-      db: this.prisma,
-      who,
-      role,
-      where,
-      organizationId,
-    });
+    const row = this.bindingRow({ who, role, where, organizationId });
+    try {
+      await this.repository.createBinding(row);
+    } catch (error) {
+      this.throwIfDuplicateBinding(error, {
+        scopeType: where.type,
+        scopeId: where.id,
+      });
+      throw error;
+    }
 
     await this.recordAndBump({
       actor,
       organizationId,
       action: "authz.grants.attach",
-      metadata: { bindingId, who, role, scope: where },
+      metadata: { bindingId: row.bindingId, who, role, scope: where },
     });
-    return { bindingId };
+    return { bindingId: row.bindingId };
   }
 
   /** UPDATE the row's role — visible on the next check. */
@@ -122,12 +155,10 @@ export class GrantsService {
       });
     }
     try {
-      await this.prisma.roleBinding.update({
-        where: { id: bindingId },
-        data: {
-          role: "customRoleId" in role ? "CUSTOM" : role.builtin,
-          customRoleId: "customRoleId" in role ? role.customRoleId : null,
-        },
+      await this.repository.updateBindingRole({
+        bindingId,
+        role: "customRoleId" in role ? "CUSTOM" : role.builtin,
+        customRoleId: "customRoleId" in role ? role.customRoleId : null,
       });
     } catch (error) {
       // A role change can collide with a sibling binding the principal
@@ -152,7 +183,7 @@ export class GrantsService {
     bindingId: string;
   }): Promise<void> {
     const binding = await this.requireBinding(bindingId);
-    await this.prisma.roleBinding.delete({ where: { id: bindingId } });
+    await this.repository.deleteBinding({ bindingId });
     await this.recordAndBump({
       actor,
       organizationId: binding.organizationId,
@@ -163,7 +194,8 @@ export class GrantsService {
 
   /**
    * The REDUCE verb (ADR-092 §3): atomically replace a broad grant with a
-   * narrower one — never a second binding fighting the first.
+   * narrower one — never a second binding fighting the first. The
+   * repository runs the delete and the create as one transaction.
    */
   async replace({
     actor,
@@ -199,38 +231,40 @@ export class GrantsService {
         organizationId,
       });
     }
-    const bindingId = await this.prisma.$transaction(async (tx) => {
-      await tx.roleBinding.deleteMany({
-        where: {
+    const row = this.bindingRow({ who, role, where: to, organizationId });
+    try {
+      await this.repository.replaceBinding({
+        deleteWhere: {
           organizationId,
           scopeType: SCOPE_TYPE_FOR_REF[from.type],
           scopeId: from.id,
-          ...principalWhere(who),
+          principal: principalWhere(who),
         },
+        create: row,
       });
-      return this.createBinding({
-        db: tx,
-        who,
-        role,
-        where: to,
-        organizationId,
+    } catch (error) {
+      this.throwIfDuplicateBinding(error, {
+        scopeType: to.type,
+        scopeId: to.id,
       });
-    });
+      throw error;
+    }
     await this.recordAndBump({
       actor,
       organizationId,
       action: "authz.grants.replace",
-      metadata: { who, from, to, role, bindingId },
+      metadata: { who, from, to, role, bindingId: row.bindingId },
     });
-    return { bindingId };
+    return { bindingId: row.bindingId };
   }
 
   /**
-   * ADR-092 §10 — offboarding, one transaction with a postcondition. Deletes
-   * every grant source for the user in the organization, proves the
+   * ADR-092 §10 — offboarding, one transaction with a postcondition. The
+   * repository deletes every grant source for the user and calls back with
+   * a transaction-bound reader; re-collecting through it proves the
    * effective set resolves to nothing INSIDE the transaction (anything left
-   * rolls the whole thing back), and returns the manifest of what needs a
-   * human decision.
+   * rolls the whole thing back). Returns the manifest of what still needs
+   * a human decision.
    */
   async offboard({
     actor,
@@ -253,72 +287,41 @@ export class GrantsService {
       personalTeams: Array<{ id: string; name: string }>;
     };
   }> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true },
-    });
+    const email = await this.repository.findUserEmail({ userId });
 
-    const removed = await this.prisma.$transaction(async (tx) => {
-      const bindings = await tx.roleBinding.deleteMany({
-        where: { organizationId, userId },
-      });
-      const groupMemberships = await tx.groupMembership.deleteMany({
-        where: { userId, group: { organizationId } },
-      });
-      const legacyTeamMemberships = await tx.teamUser.deleteMany({
-        where: { userId, team: { organizationId } },
-      });
-      const organizationMembership = await tx.organizationUser.deleteMany({
-        where: { userId, organizationId },
-      });
-      const pendingInvites = user?.email
-        ? await tx.organizationInvite.deleteMany({
-            where: { organizationId, email: user.email, status: "PENDING" },
-          })
-        : { count: 0 };
-
-      // The proof (§10 step 7): re-collect inside the transaction — the
-      // deletes are visible here — and fail loudly if anything still
+    const removed = await this.repository.offboardUser({
+      userId,
+      organizationId,
+      email,
+      // The proof (§10 step 7): re-collect against the transaction — the
+      // deletes are visible there — and fail loudly if anything still
       // resolves. Group- or key-held grants cannot survive for this user:
       // memberships are gone and personal keys are ceilinged by an owner
       // who now resolves to nothing.
-      const grants = await collectGrants({
-        prisma: tx as PrismaClient,
-        principal: { type: "user", id: userId },
-        organizationId,
-      });
-      if (
-        grants.isOrgMember ||
-        grants.bindings.length > 0 ||
-        grants.legacyTeamMemberships.length > 0
-      ) {
-        throw new OffboardIncompleteError({
-          userId,
+      prove: async (txReader) => {
+        const grants = await new AuthzCollectorService(txReader).collectGrants({
+          principal: { type: "user", id: userId },
           organizationId,
-          remainingBindings: grants.bindings.length,
-          remainingLegacyRows: grants.legacyTeamMemberships.length,
-          stillOrgMember: grants.isOrgMember,
         });
-      }
-
-      return {
-        bindings: bindings.count,
-        groupMemberships: groupMemberships.count,
-        legacyTeamMemberships: legacyTeamMemberships.count,
-        pendingInvites: pendingInvites.count,
-        organizationMembership: organizationMembership.count > 0,
-      };
+        if (
+          grants.isOrgMember ||
+          grants.bindings.length > 0 ||
+          grants.legacyTeamMemberships.length > 0
+        ) {
+          throw new OffboardIncompleteError({
+            userId,
+            organizationId,
+            remainingBindings: grants.bindings.length,
+            remainingLegacyRows: grants.legacyTeamMemberships.length,
+            stillOrgMember: grants.isOrgMember,
+          });
+        }
+      },
     });
 
     const [ownedApiKeys, personalTeams] = await Promise.all([
-      this.prisma.apiKey.findMany({
-        where: { userId, organizationId, revokedAt: null },
-        select: { id: true, name: true },
-      }),
-      this.prisma.team.findMany({
-        where: { organizationId, isPersonal: true, ownerUserId: userId },
-        select: { id: true, name: true },
-      }),
+      this.repository.findOwnedApiKeys({ userId, organizationId }),
+      this.repository.findPersonalTeams({ userId, organizationId }),
     ]);
 
     await this.recordAndBump({
@@ -336,61 +339,43 @@ export class GrantsService {
     return { removed, needsHumanDecision: { ownedApiKeys, personalTeams } };
   }
 
-  /** The one INSERT. `db` accepts the client or a transaction handle so
-   *  attach() and replace() share the row shape and the duplicate mapping. */
-  private async createBinding({
-    db,
+  private bindingRow({
     who,
     role,
     where,
     organizationId,
   }: {
-    db: Prisma.TransactionClient;
     who: GrantPrincipal;
     role: GrantRole;
-    where: Exclude<AuthzScopeRef, { type: "resource" }>;
+    where: GrantableScope;
     organizationId: string;
-  }): Promise<string> {
-    const bindingId = generate(KSUID_RESOURCES.ROLE_BINDING).toString();
-    try {
-      await db.roleBinding.create({
-        data: {
-          id: bindingId,
-          organizationId,
-          scopeType: SCOPE_TYPE_FOR_REF[where.type],
-          scopeId: where.id,
-          role: "customRoleId" in role ? "CUSTOM" : role.builtin,
-          customRoleId: "customRoleId" in role ? role.customRoleId : null,
-          userId: who.type === "user" ? who.id : null,
-          groupId: who.type === "group" ? who.id : null,
-          apiKeyId: who.type === "apiKey" ? who.id : null,
-        },
-      });
-    } catch (error) {
-      this.throwIfDuplicateBinding(error, {
-        scopeType: where.type,
-        scopeId: where.id,
-      });
-      throw error;
-    }
-    return bindingId;
+  }): RoleBindingWrite {
+    return {
+      bindingId: this.deps.newBindingId(),
+      organizationId,
+      scopeType: SCOPE_TYPE_FOR_REF[where.type],
+      scopeId: where.id,
+      role: "customRoleId" in role ? "CUSTOM" : role.builtin,
+      customRoleId: "customRoleId" in role ? role.customRoleId : null,
+      userId: who.type === "user" ? who.id : null,
+      groupId: who.type === "group" ? who.id : null,
+      apiKeyId: who.type === "apiKey" ? who.id : null,
+    };
   }
 
   /**
-   * The six partial unique indexes on RoleBinding make a duplicate a
-   * knowable failure the caller can act on - name it instead of letting a
-   * raw P2002 degrade to "unknown error". The indexes key on the role too,
-   * so this only fires when the principal already holds this SAME role (or
-   * custom role) at the scope.
+   * The partial unique indexes on RoleBinding make a duplicate a knowable
+   * failure the caller can act on - the repository surfaces it as
+   * DuplicateBindingError, and it is named here instead of degrading to
+   * "unknown error". The indexes key on the role too, so this only fires
+   * when the principal already holds this SAME role (or custom role) at
+   * the scope.
    */
   private throwIfDuplicateBinding(
     error: unknown,
     meta: Record<string, unknown>,
   ): void {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
+    if (error instanceof DuplicateBindingError) {
       throw new GrantValidationError(
         "This principal already holds this role at this scope - update or revoke the existing binding",
         meta,
@@ -398,30 +383,8 @@ export class GrantsService {
     }
   }
 
-  private async assertCustomRoleInOrganization({
-    customRoleId,
-    organizationId,
-  }: {
-    customRoleId: string;
-    organizationId: string;
-  }): Promise<void> {
-    const customRole = await this.prisma.customRole.findUnique({
-      where: { id: customRoleId },
-      select: { organizationId: true },
-    });
-    if (!customRole || customRole.organizationId !== organizationId) {
-      throw new GrantValidationError(
-        "Custom role does not belong to this organization",
-        { customRoleId },
-      );
-    }
-  }
-
   private async requireBinding(bindingId: string) {
-    const binding = await this.prisma.roleBinding.findUnique({
-      where: { id: bindingId },
-      select: { id: true, organizationId: true },
-    });
+    const binding = await this.repository.findBinding({ bindingId });
     if (!binding) {
       throw new GrantValidationError("Role binding not found", { bindingId });
     }
@@ -432,14 +395,13 @@ export class GrantsService {
     where,
     organizationId,
   }: {
-    where: AuthzScopeRef;
+    where: GrantableScope;
     organizationId: string;
   }): Promise<void> {
     if (where.type === "organization") return;
     if (where.type === "team") {
-      const team = await this.prisma.team.findUnique({
-        where: { id: where.id },
-        select: { organizationId: true },
+      const team = await this.repository.findTeamOrganization({
+        teamId: where.id,
       });
       if (team?.organizationId !== organizationId) {
         throw new GrantValidationError("Team is not in this organization", {
@@ -448,17 +410,34 @@ export class GrantsService {
       }
       return;
     }
-    const project = await this.prisma.project.findUnique({
-      where: { id: where.id },
-      select: { team: { select: { id: true, organizationId: true } } },
+    const lineage = await this.repository.findProjectLineage({
+      projectId: where.id,
     });
     if (
-      project?.team?.organizationId !== organizationId ||
-      project.team.id !== where.teamId
+      lineage?.organizationId !== organizationId ||
+      lineage.teamId !== where.teamId
     ) {
       throw new GrantValidationError("Project is not in this scope", {
         projectId: where.id,
       });
+    }
+  }
+
+  private async assertCustomRoleInOrganization({
+    customRoleId,
+    organizationId,
+  }: {
+    customRoleId: string;
+    organizationId: string;
+  }): Promise<void> {
+    const customRole = await this.repository.findCustomRoleOrganization({
+      customRoleId,
+    });
+    if (!customRole || customRole.organizationId !== organizationId) {
+      throw new GrantValidationError(
+        "Custom role does not belong to this organization",
+        { customRoleId },
+      );
     }
   }
 
@@ -473,17 +452,17 @@ export class GrantsService {
     action: string;
     metadata: Record<string, unknown>;
   }): Promise<void> {
-    await auditLog({
+    await this.deps.audit({
       userId: actor.userId,
       organizationId,
       action,
-      metadata: metadata as Prisma.JsonObject,
+      metadata,
     });
-    await bumpAuthzEpoch({ organizationId });
+    await this.deps.bumpEpoch({ organizationId });
   }
 }
 
-function principalWhere(who: GrantPrincipal) {
+function principalWhere(who: GrantPrincipal): BindingPrincipalWhere {
   switch (who.type) {
     case "user":
       return { userId: who.id };

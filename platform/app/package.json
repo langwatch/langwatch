@@ -97,6 +97,7 @@
     "@langwatch/automations": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/authz": "workspace:*",
+    "@langwatch/authz-server": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/langy": "workspace:*",

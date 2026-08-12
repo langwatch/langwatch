@@ -1131,7 +1131,7 @@ const presentations = {
     },
   },
   permission_denied: {
-    // The ADR-092 engine's one denial code (require_ / .permission()). Names
+    // The ADR-092 engine's one denial code (authorize() / .permission()). Names
     // the permission when the server sent one, same reasoning as
     // `project_permission_denied`: the exact grant can be forwarded as-is.
     // Lite-member denials carry their own client modal via the middleware's

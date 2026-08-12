@@ -378,253 +378,265 @@ function matchResourceGrant({
 }
 
 // ============================================================================
-// decide — the walk
+// AuthzEngine — the walk
 // ============================================================================
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: this IS the walk — ADR-092's ordered decision steps (demo → org gate → org floor → bindings → legacy fallback → resource tier → deny) as one top-to-bottom sequence. The score counts the steps; each is already a named helper or a two-line guard, and moving any of them out of here would hide the order, which is the contract.
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: same reason — the step comments narrating the legacy quirks are most of the length, and they belong at the point of decision.
-export function decide({
-  grants,
-  permission,
-  scope,
-  demoProjectId,
-  resourceGrants,
-}: {
-  grants: CollectedGrants;
-  permission: string;
-  scope: AuthzScopeRef;
-  /** Pass process.env.DEMO_PROJECT_ID; parameterised for purity. */
-  demoProjectId?: string | null;
-  /** ADR-092 §8 — grants at the resource tier, collected for `scope`'s
-   *  resource links (collectResourceGrants). Ignored for non-resource
-   *  scopes. */
-  resourceGrants?: readonly ResourceGrant[];
-}): AuthzDecision {
-  const base = {
+/**
+ * The one resolver, as a service class (app-layer idiom). Stateless and
+ * pure by construction: every method is a function of its arguments alone,
+ * so one instance serves any number of callers and tests construct it
+ * freely.
+ */
+export class AuthzEngine {
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: this IS the walk — ADR-092's ordered decision steps (demo → org gate → org floor → bindings → legacy fallback → resource tier → deny) as one top-to-bottom sequence. The score counts the steps; each is already a named helper or a two-line guard, and moving any of them out of here would hide the order, which is the contract.
+  // biome-ignore lint/complexity/noExcessiveLinesPerFunction: same reason — the step comments narrating the legacy quirks are most of the length, and they belong at the point of decision.
+  decide({
+    grants,
     permission,
     scope,
-    principal: grants.principal,
-    audience: "member" as const,
-  };
+    demoProjectId,
+    resourceGrants,
+  }: {
+    grants: CollectedGrants;
+    permission: string;
+    scope: AuthzScopeRef;
+    /** Pass process.env.DEMO_PROJECT_ID; parameterised for purity. */
+    demoProjectId?: string | null;
+    /** ADR-092 §8 — grants at the resource tier, collected for `scope`'s
+     *  resource links (collectResourceGrants). Ignored for non-resource
+     *  scopes. */
+    resourceGrants?: readonly ResourceGrant[];
+  }): AuthzDecision {
+    const base = {
+      permission,
+      scope,
+      principal: grants.principal,
+      audience: "member" as const,
+    };
 
-  // Demo project: any authenticated caller gets the demo-viewer bag on the
-  // one configured project. Mirrors isDemoProject(), which legacy only ever
-  // reaches behind a session - so anonymous principals are excluded here
-  // too, and their only path stays the resource tier.
-  if (
-    scope.type === "project" &&
-    grants.principal.type !== "anonymous" &&
-    demoProjectId &&
-    scope.id === demoProjectId &&
-    builtinRolePermissions("demo-viewer").has(permission)
-  ) {
-    return { ...base, allowed: true, via: "demo-project" };
+    // Demo project: any authenticated caller gets the demo-viewer bag on the
+    // one configured project. Mirrors isDemoProject(), which legacy only ever
+    // reaches behind a session - so anonymous principals are excluded here
+    // too, and their only path stays the resource tier.
+    if (
+      scope.type === "project" &&
+      grants.principal.type !== "anonymous" &&
+      demoProjectId &&
+      scope.id === demoProjectId &&
+      builtinRolePermissions("demo-viewer").has(permission)
+    ) {
+      return { ...base, allowed: true, via: "demo-project" };
+    }
+
+    // LEGACY-QUIRK(C): organization-scope checks require an OrganizationUser
+    // row for user principals (rbac.ts:1016) — bindings alone never satisfy an
+    // org-scope check for a non-member. Api-key principals have no org
+    // membership and are exempt (their org path is bindings-only).
+    if (
+      scope.type === "organization" &&
+      grants.principal.type === "user" &&
+      !grants.isOrgMember
+    ) {
+      return { ...base, allowed: false, denialReason: "no-membership" };
+    }
+
+    // LEGACY-QUIRK(C): every org member holds the org-member bag on
+    // ORGANIZATION-scope checks regardless of bindings (the personal-context
+    // floor, rbac.ts:1058). Applies to org checks only — project/team checks
+    // have no floor.
+    if (
+      scope.type === "organization" &&
+      grants.isOrgMember &&
+      builtinRoleGrants({ role: "org-member", permission })
+    ) {
+      return { ...base, allowed: true, via: "org-role-floor" };
+    }
+
+    // Bindings walk: union across every binding on the scope chain.
+    const chain = scopeChain(scope);
+    const relevant = grants.bindings.filter((binding) =>
+      chain.some(
+        (link) =>
+          link.scopeType === binding.scopeType &&
+          link.scopeId === binding.scopeId,
+      ),
+    );
+    for (const binding of relevant) {
+      if (bindingGrants({ binding, grants, permission })) {
+        return {
+          ...base,
+          allowed: true,
+          via: "binding",
+          matchedBinding: binding,
+        };
+      }
+    }
+
+    if (
+      legacyTeamFallbackGrants({
+        grants,
+        scope,
+        chain,
+        chainBindingCount: relevant.length,
+        permission,
+      })
+    ) {
+      return { ...base, allowed: true, via: "legacy-team-fallback" };
+    }
+
+    if (scope.type === "resource" && resourceGrants) {
+      const matched = matchResourceGrant({
+        scope,
+        resourceGrants,
+        grants,
+        permission,
+      });
+      if (matched) {
+        return {
+          ...base,
+          allowed: true,
+          via: "resource-grant",
+          audience: matched.audience.kind === "anyone" ? "public" : "member",
+        };
+      }
+    }
+
+    const hadAnyPath =
+      grants.isOrgMember ||
+      relevant.length > 0 ||
+      grants.legacyTeamMemberships.length > 0;
+
+    return {
+      ...base,
+      allowed: false,
+      denialReason:
+        grants.organizationRole === "EXTERNAL"
+          ? "lite-member-restricted"
+          : hadAnyPath
+            ? "no-binding"
+            : "no-membership",
+    };
   }
 
-  // LEGACY-QUIRK(C): organization-scope checks require an OrganizationUser
-  // row for user principals (rbac.ts:1016) — bindings alone never satisfy an
-  // org-scope check for a non-member. Api-key principals have no org
-  // membership and are exempt (their org path is bindings-only).
-  if (
-    scope.type === "organization" &&
-    grants.principal.type === "user" &&
-    !grants.isOrgMember
-  ) {
-    return { ...base, allowed: false, denialReason: "no-membership" };
+  /**
+   * ADR-092 §9 — the API-key owner ceiling as engine algebra:
+   * effective(key) = grants(key) ∩ grants(owner). Service keys (no owner)
+   * have no ceiling.
+   */
+  decideWithCeiling({
+    keyGrants,
+    ownerGrants,
+    permission,
+    scope,
+    demoProjectId,
+    resourceGrants,
+  }: {
+    keyGrants: CollectedGrants;
+    ownerGrants: CollectedGrants | null;
+    permission: string;
+    scope: AuthzScopeRef;
+    demoProjectId?: string | null;
+    resourceGrants?: readonly ResourceGrant[];
+  }): AuthzDecision {
+    const keyDecision = this.decide({
+      grants: keyGrants,
+      permission,
+      scope,
+      demoProjectId,
+      resourceGrants,
+    });
+    if (!keyDecision.allowed || !ownerGrants) return keyDecision;
+
+    const ownerDecision = this.decide({
+      grants: ownerGrants,
+      permission,
+      scope,
+      demoProjectId,
+      resourceGrants,
+    });
+    if (ownerDecision.allowed) return keyDecision;
+
+    return {
+      ...keyDecision,
+      allowed: false,
+      via: undefined,
+      matchedBinding: undefined,
+      denialReason: "owner-ceiling",
+    };
   }
 
-  // LEGACY-QUIRK(C): every org member holds the org-member bag on
-  // ORGANIZATION-scope checks regardless of bindings (the personal-context
-  // floor, rbac.ts:1058). Applies to org checks only — project/team checks
-  // have no floor.
-  if (
-    scope.type === "organization" &&
-    grants.isOrgMember &&
-    builtinRoleGrants({ role: "org-member", permission })
-  ) {
-    return { ...base, allowed: true, via: "org-role-floor" };
-  }
+  // ============================================================================
+  // explain — ADR-092 §6, the decision object rendered as a walk
+  // ============================================================================
 
-  // Bindings walk: union across every binding on the scope chain.
-  const chain = scopeChain(scope);
-  const relevant = grants.bindings.filter((binding) =>
-    chain.some(
+  private explainBindingLine({
+    binding,
+    chain,
+    decision,
+  }: {
+    binding: CollectedBinding;
+    chain: ReturnType<typeof scopeChain>;
+    decision: AuthzDecision;
+  }): string {
+    const who = binding.viaGroupId ? ` (via group ${binding.viaGroupId})` : "";
+    const label = `${binding.customRoleId ? `custom:${binding.customRoleId}` : binding.role.toLowerCase()} @ ${binding.scopeType.toLowerCase()} ${binding.scopeId}${who}`;
+    const onChain = chain.some(
       (link) =>
         link.scopeType === binding.scopeType &&
         link.scopeId === binding.scopeId,
-    ),
-  );
-  for (const binding of relevant) {
-    if (bindingGrants({ binding, grants, permission })) {
-      return {
-        ...base,
-        allowed: true,
-        via: "binding",
-        matchedBinding: binding,
-      };
-    }
-  }
-
-  if (
-    legacyTeamFallbackGrants({
-      grants,
-      scope,
-      chain,
-      chainBindingCount: relevant.length,
-      permission,
-    })
-  ) {
-    return { ...base, allowed: true, via: "legacy-team-fallback" };
-  }
-
-  if (scope.type === "resource" && resourceGrants) {
-    const matched = matchResourceGrant({
-      scope,
-      resourceGrants,
-      grants,
-      permission,
-    });
-    if (matched) {
-      return {
-        ...base,
-        allowed: true,
-        via: "resource-grant",
-        audience: matched.audience.kind === "anyone" ? "public" : "member",
-      };
-    }
-  }
-
-  const hadAnyPath =
-    grants.isOrgMember ||
-    relevant.length > 0 ||
-    grants.legacyTeamMemberships.length > 0;
-
-  return {
-    ...base,
-    allowed: false,
-    denialReason:
-      grants.organizationRole === "EXTERNAL"
-        ? "lite-member-restricted"
-        : hadAnyPath
-          ? "no-binding"
-          : "no-membership",
-  };
-}
-
-/**
- * ADR-092 §9 — the API-key owner ceiling as engine algebra:
- * effective(key) = grants(key) ∩ grants(owner). Service keys (no owner)
- * have no ceiling.
- */
-export function decideWithCeiling({
-  keyGrants,
-  ownerGrants,
-  permission,
-  scope,
-  demoProjectId,
-  resourceGrants,
-}: {
-  keyGrants: CollectedGrants;
-  ownerGrants: CollectedGrants | null;
-  permission: string;
-  scope: AuthzScopeRef;
-  demoProjectId?: string | null;
-  resourceGrants?: readonly ResourceGrant[];
-}): AuthzDecision {
-  const keyDecision = decide({
-    grants: keyGrants,
-    permission,
-    scope,
-    demoProjectId,
-    resourceGrants,
-  });
-  if (!keyDecision.allowed || !ownerGrants) return keyDecision;
-
-  const ownerDecision = decide({
-    grants: ownerGrants,
-    permission,
-    scope,
-    demoProjectId,
-    resourceGrants,
-  });
-  if (ownerDecision.allowed) return keyDecision;
-
-  return {
-    ...keyDecision,
-    allowed: false,
-    via: undefined,
-    matchedBinding: undefined,
-    denialReason: "owner-ceiling",
-  };
-}
-
-// ============================================================================
-// explain — ADR-092 §6, the decision object rendered as a walk
-// ============================================================================
-
-function explainBindingLine({
-  binding,
-  chain,
-  decision,
-}: {
-  binding: CollectedBinding;
-  chain: ReturnType<typeof scopeChain>;
-  decision: AuthzDecision;
-}): string {
-  const who = binding.viaGroupId ? ` (via group ${binding.viaGroupId})` : "";
-  const label = `${binding.customRoleId ? `custom:${binding.customRoleId}` : binding.role.toLowerCase()} @ ${binding.scopeType.toLowerCase()} ${binding.scopeId}${who}`;
-  const onChain = chain.some(
-    (link) =>
-      link.scopeType === binding.scopeType && link.scopeId === binding.scopeId,
-  );
-  if (!onChain) return `  - ${label} — filtered out: not on this scope chain`;
-  const matched =
-    decision.matchedBinding === binding
-      ? "GRANTS the permission"
-      : `does not grant ${decision.permission}`;
-  return `  - ${label} — ${matched}`;
-}
-
-export function explain({
-  decision,
-  grants,
-}: {
-  decision: AuthzDecision;
-  grants: CollectedGrants;
-}): string[] {
-  const lines: string[] = [];
-  const scopeLabel = `${decision.scope.type} ${decision.scope.id}`;
-  lines.push(
-    `${decision.allowed ? "GRANTED" : "DENIED"} ${decision.permission} @ ${scopeLabel}`,
-  );
-
-  if (decision.via === "demo-project") {
-    lines.push("granted: demo project (read-only demo-viewer set)");
-    return lines;
-  }
-  if (decision.via === "org-role-floor") {
-    lines.push("granted: every organization member holds this permission");
-    return lines;
-  }
-  if (decision.via === "resource-grant") {
-    lines.push(
-      "granted: a resource-tier grant on this resource (or a shareable ancestor) covers it",
     );
-    return lines;
+    if (!onChain) return `  - ${label} — filtered out: not on this scope chain`;
+    const matched =
+      decision.matchedBinding === binding
+        ? "GRANTS the permission"
+        : `does not grant ${decision.permission}`;
+    return `  - ${label} — ${matched}`;
   }
 
-  const chain = scopeChain(decision.scope);
-  lines.push(`collected ${grants.bindings.length} binding(s):`);
-  for (const binding of grants.bindings) {
-    lines.push(explainBindingLine({ binding, chain, decision }));
-  }
-  if (grants.bindings.length === 0 && grants.legacyTeamMemberships.length > 0) {
+  explain({
+    decision,
+    grants,
+  }: {
+    decision: AuthzDecision;
+    grants: CollectedGrants;
+  }): string[] {
+    const lines: string[] = [];
+    const scopeLabel = `${decision.scope.type} ${decision.scope.id}`;
     lines.push(
-      `  - legacy team membership fallback consulted (${grants.legacyTeamMemberships.length} team(s))`,
+      `${decision.allowed ? "GRANTED" : "DENIED"} ${decision.permission} @ ${scopeLabel}`,
     );
+
+    if (decision.via === "demo-project") {
+      lines.push("granted: demo project (read-only demo-viewer set)");
+      return lines;
+    }
+    if (decision.via === "org-role-floor") {
+      lines.push("granted: every organization member holds this permission");
+      return lines;
+    }
+    if (decision.via === "resource-grant") {
+      lines.push(
+        "granted: a resource-tier grant on this resource (or a shareable ancestor) covers it",
+      );
+      return lines;
+    }
+
+    const chain = scopeChain(decision.scope);
+    lines.push(`collected ${grants.bindings.length} binding(s):`);
+    for (const binding of grants.bindings) {
+      lines.push(this.explainBindingLine({ binding, chain, decision }));
+    }
+    if (
+      grants.bindings.length === 0 &&
+      grants.legacyTeamMemberships.length > 0
+    ) {
+      lines.push(
+        `  - legacy team membership fallback consulted (${grants.legacyTeamMemberships.length} team(s))`,
+      );
+    }
+    if (!decision.allowed) {
+      lines.push(`denial reason: ${decision.denialReason ?? "unknown"}`);
+    }
+    return lines;
   }
-  if (!decision.allowed) {
-    lines.push(`denial reason: ${decision.denialReason ?? "unknown"}`);
-  }
-  return lines;
 }

@@ -9,13 +9,7 @@
  * epoch, grants, shadow, tRPC middleware) lives in the app at
  * `src/server/authz/` and feeds CollectedGrants snapshots in.
  */
-export {
-  decide,
-  decideWithCeiling,
-  explain,
-  scopeChain,
-  scopeOrganizationId,
-} from "./engine";
+export { AuthzEngine, scopeChain, scopeOrganizationId } from "./engine";
 export type {
   AuthzDecision,
   AuthzDenialReason,
@@ -61,6 +55,7 @@ export {
   bitsetToBase64Url,
   encodePermissionBitset,
 } from "./bitset";
-// passport.ts is deliberately NOT re-exported here: it uses node:crypto, and
-// this barrel must stay browser-safe (useCan imports it). Server code that
-// wires passports (stage F) imports "@langwatch/authz/passport".
+// PassportService is deliberately NOT re-exported here: it uses
+// node:crypto, and this barrel must stay browser-safe (useCan imports it).
+// Server code that wires passports (stage F) imports
+// "@langwatch/authz/passport".

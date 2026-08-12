@@ -333,13 +333,19 @@ revocation-lag SLO green for a week.
 Shipped on this branch (`feat/adr-092-unified-authz`, rebased onto main after
 the platform/app move):
 
-- **The pure core is a workspace package, `@langwatch/authz`**
-  (`packages/authz`): registry, roles, engine, witness, passport/bitset,
-  `PermissionDeniedError` - Prisma-free (the Prisma enums are mirrored as
-  string unions at the seam), env-free, client-safe, with its own test suite
-  wired into app CI. The storage adapters stay in the app's
-  `src/server/authz/`: collector, epoch + cache, `GrantsService`, shadow,
-  the tRPC middleware.
+- **The engine is two workspace packages plus app adapters, in the
+  app-layer service/repository idiom.** `@langwatch/authz`
+  (`packages/authz`): the vocabulary and the pure `AuthzEngine`, plus
+  witness/bitset/`PassportService` - Prisma-free, env-free, browser-safe
+  barrel. `@langwatch/authz-server` (`packages/authz-server`): the service
+  classes (`AuthzCollectorService`, `AuthzService` with the epoch cache
+  inside, `GrantsService`, `AuthzShadowService`) written against two
+  repository INTERFACES - no storage engine in the package. The app keeps
+  the Prisma repository implementations
+  (`src/server/authz/repositories/*.prisma.repository.ts`), the redis epoch
+  store, the tRPC middleware, and the composition root
+  (`src/server/authz/runtime.ts`). Both package suites are wired into app
+  CI. `require_()` is renamed `authorize()`.
 - **Stage A engine-side, complete.** Registry (126 permissions, append-only
   bitset order), roles as differences with the cell-for-cell parity suite,
   collector, the pure `decide()` walk with every legacy quirk tagged

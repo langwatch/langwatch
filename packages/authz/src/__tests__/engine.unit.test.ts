@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  AuthzEngine,
   type AuthzScopeRef,
   type CollectedBinding,
   type CollectedGrants,
-  decide,
-  decideWithCeiling,
-  explain,
   type LegacyTeamMembership,
 } from "../engine";
+
+const engine = new AuthzEngine();
 
 const ORG = "org-1";
 const TEAM = "team-1";
@@ -67,7 +67,7 @@ describe("authz engine decide()", () => {
 
     /** @scenario "Grants are an additive union across scopes" */
     it("grants via the union — the narrower binding is inert", () => {
-      const decision = decide({
+      const decision = engine.decide({
         grants,
         permission: "traces:update",
         scope: projectScope,
@@ -86,14 +86,17 @@ describe("authz engine decide()", () => {
 
     it("grants view on that project", () => {
       expect(
-        decide({ grants, permission: "traces:view", scope: projectScope })
-          .allowed,
+        engine.decide({
+          grants,
+          permission: "traces:view",
+          scope: projectScope,
+        }).allowed,
       ).toBe(true);
     });
 
     /** @scenario "Narrow access is expressed by granting less, not by overriding" */
     it("denies update on that project", () => {
-      const decision = decide({
+      const decision = engine.decide({
         grants,
         permission: "traces:update",
         scope: projectScope,
@@ -105,8 +108,11 @@ describe("authz engine decide()", () => {
     /** @scenario "Narrow access is expressed by granting less, not by overriding" */
     it("denies everything on a different project (scope chain filter)", () => {
       expect(
-        decide({ grants, permission: "traces:view", scope: otherProjectScope })
-          .allowed,
+        engine.decide({
+          grants,
+          permission: "traces:view",
+          scope: otherProjectScope,
+        }).allowed,
       ).toBe(false);
     });
   });
@@ -128,8 +134,11 @@ describe("authz engine decide()", () => {
         customRolePermissions,
       });
       expect(
-        decide({ grants, permission: "governance:manage", scope: projectScope })
-          .allowed,
+        engine.decide({
+          grants,
+          permission: "governance:manage",
+          scope: projectScope,
+        }).allowed,
       ).toBe(false);
     });
 
@@ -146,8 +155,11 @@ describe("authz engine decide()", () => {
         customRolePermissions,
       });
       expect(
-        decide({ grants, permission: "governance:manage", scope: orgScope })
-          .allowed,
+        engine.decide({
+          grants,
+          permission: "governance:manage",
+          scope: orgScope,
+        }).allowed,
       ).toBe(true);
     });
   });
@@ -160,8 +172,11 @@ describe("authz engine decide()", () => {
         ],
       });
       expect(
-        decide({ grants, permission: "governance:manage", scope: orgScope })
-          .allowed,
+        engine.decide({
+          grants,
+          permission: "governance:manage",
+          scope: orgScope,
+        }).allowed,
       ).toBe(true);
     });
 
@@ -172,12 +187,18 @@ describe("authz engine decide()", () => {
         ],
       });
       expect(
-        decide({ grants, permission: "organization:view", scope: orgScope })
-          .allowed,
+        engine.decide({
+          grants,
+          permission: "organization:view",
+          scope: orgScope,
+        }).allowed,
       ).toBe(true);
       expect(
-        decide({ grants, permission: "organization:manage", scope: orgScope })
-          .allowed,
+        engine.decide({
+          grants,
+          permission: "organization:manage",
+          scope: orgScope,
+        }).allowed,
       ).toBe(false);
     });
   });
@@ -192,13 +213,13 @@ describe("authz engine decide()", () => {
         ],
       });
       expect(
-        decide({
+        engine.decide({
           grants,
           permission: "annotations:create",
           scope: projectScope,
         }).allowed,
       ).toBe(true);
-      const denied = decide({
+      const denied = engine.decide({
         grants,
         permission: "datasets:manage",
         scope: projectScope,
@@ -221,8 +242,11 @@ describe("authz engine decide()", () => {
         customRolePermissions: new Map([["cr-2", ["datasets:manage"]]]),
       });
       expect(
-        decide({ grants, permission: "datasets:manage", scope: projectScope })
-          .allowed,
+        engine.decide({
+          grants,
+          permission: "datasets:manage",
+          scope: projectScope,
+        }).allowed,
       ).toBe(true);
     });
 
@@ -234,8 +258,11 @@ describe("authz engine decide()", () => {
         ],
       });
       expect(
-        decide({ grants, permission: "datasets:manage", scope: projectScope })
-          .allowed,
+        engine.decide({
+          grants,
+          permission: "datasets:manage",
+          scope: projectScope,
+        }).allowed,
       ).toBe(false);
     });
   });
@@ -254,12 +281,18 @@ describe("authz engine decide()", () => {
         customRolePermissions: new Map([["cr-empty", []]]),
       });
       expect(
-        decide({ grants, permission: "datasets:view", scope: projectScope })
-          .allowed,
+        engine.decide({
+          grants,
+          permission: "datasets:view",
+          scope: projectScope,
+        }).allowed,
       ).toBe(true);
       expect(
-        decide({ grants, permission: "datasets:manage", scope: projectScope })
-          .allowed,
+        engine.decide({
+          grants,
+          permission: "datasets:manage",
+          scope: projectScope,
+        }).allowed,
       ).toBe(false);
     });
   });
@@ -276,7 +309,7 @@ describe("authz engine decide()", () => {
           },
         ],
       });
-      const decision = decide({
+      const decision = engine.decide({
         grants,
         permission: "project:delete",
         scope: projectScope,
@@ -300,8 +333,11 @@ describe("authz engine decide()", () => {
         ],
       });
       expect(
-        decide({ grants, permission: "project:delete", scope: projectScope })
-          .allowed,
+        engine.decide({
+          grants,
+          permission: "project:delete",
+          scope: projectScope,
+        }).allowed,
       ).toBe(false);
     });
 
@@ -324,8 +360,11 @@ describe("authz engine decide()", () => {
         ],
       });
       expect(
-        decide({ grants, permission: "project:delete", scope: projectScope })
-          .allowed,
+        engine.decide({
+          grants,
+          permission: "project:delete",
+          scope: projectScope,
+        }).allowed,
       ).toBe(true);
     });
   });
@@ -339,7 +378,7 @@ describe("authz engine decide()", () => {
           binding({ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG }),
         ],
       });
-      const decision = decide({
+      const decision = engine.decide({
         grants,
         permission: "organization:view",
         scope: orgScope,
@@ -350,7 +389,7 @@ describe("authz engine decide()", () => {
 
     it("grants the org-member floor to any member with zero bindings", () => {
       const grants = makeGrants({ organizationRole: "MEMBER" });
-      const decision = decide({
+      const decision = engine.decide({
         grants,
         permission: "organization:view",
         scope: orgScope,
@@ -358,8 +397,11 @@ describe("authz engine decide()", () => {
       expect(decision.allowed).toBe(true);
       expect(decision.via).toBe("org-role-floor");
       expect(
-        decide({ grants, permission: "organization:manage", scope: orgScope })
-          .allowed,
+        engine.decide({
+          grants,
+          permission: "organization:manage",
+          scope: orgScope,
+        }).allowed,
       ).toBe(false);
     });
 
@@ -378,8 +420,11 @@ describe("authz engine decide()", () => {
         ],
       });
       expect(
-        decide({ grants, permission: "gatewayBudgets:manage", scope: orgScope })
-          .allowed,
+        engine.decide({
+          grants,
+          permission: "gatewayBudgets:manage",
+          scope: orgScope,
+        }).allowed,
       ).toBe(true);
     });
 
@@ -395,8 +440,11 @@ describe("authz engine decide()", () => {
         ],
       });
       expect(
-        decide({ grants, permission: "gatewayBudgets:manage", scope: orgScope })
-          .allowed,
+        engine.decide({
+          grants,
+          permission: "gatewayBudgets:manage",
+          scope: orgScope,
+        }).allowed,
       ).toBe(false);
     });
 
@@ -412,8 +460,11 @@ describe("authz engine decide()", () => {
         ],
       });
       expect(
-        decide({ grants, permission: "organization:manage", scope: orgScope })
-          .allowed,
+        engine.decide({
+          grants,
+          permission: "organization:manage",
+          scope: orgScope,
+        }).allowed,
       ).toBe(false);
     });
   });
@@ -425,7 +476,7 @@ describe("authz engine decide()", () => {
         organizationRole: null,
         isOrgMember: false,
       });
-      const view = decide({
+      const view = engine.decide({
         grants,
         permission: "traces:view",
         scope: projectScope,
@@ -434,7 +485,7 @@ describe("authz engine decide()", () => {
       expect(view.allowed).toBe(true);
       expect(view.via).toBe("demo-project");
       expect(
-        decide({
+        engine.decide({
           grants,
           permission: "traces:update",
           scope: projectScope,
@@ -445,7 +496,7 @@ describe("authz engine decide()", () => {
 
     /** @scenario "The demo project opens for signed-in callers only" */
     it("denies the demo bag to an anonymous caller — legacy only reaches it behind a session", () => {
-      const decision = decide({
+      const decision = engine.decide({
         grants: makeGrants({
           principal: { type: "anonymous" },
           organizationRole: null,
@@ -479,7 +530,7 @@ describe("authz engine decideWithCeiling()", () => {
 
     /** @scenario "An API key is capped by its owner's current grants" */
     it("denies what the key alone would grant (owner ceiling)", () => {
-      const decision = decideWithCeiling({
+      const decision = engine.decideWithCeiling({
         keyGrants,
         ownerGrants,
         permission: "datasets:manage",
@@ -491,7 +542,7 @@ describe("authz engine decideWithCeiling()", () => {
 
     it("still grants what both hold", () => {
       expect(
-        decideWithCeiling({
+        engine.decideWithCeiling({
           keyGrants,
           ownerGrants,
           permission: "traces:view",
@@ -509,7 +560,7 @@ describe("authz engine decideWithCeiling()", () => {
           binding({ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG }),
         ],
       });
-      const decision = decideWithCeiling({
+      const decision = engine.decideWithCeiling({
         keyGrants,
         ownerGrants,
         permission: "project:delete",
@@ -529,7 +580,7 @@ describe("authz engine decideWithCeiling()", () => {
           binding({ role: "MEMBER", scopeType: "TEAM", scopeId: TEAM }),
         ],
       });
-      const decision = decideWithCeiling({
+      const decision = engine.decideWithCeiling({
         keyGrants,
         ownerGrants,
         permission: "datasets:manage",
@@ -543,7 +594,7 @@ describe("authz engine decideWithCeiling()", () => {
   describe("given a service key (no owner)", () => {
     it("applies no ceiling", () => {
       expect(
-        decideWithCeiling({
+        engine.decideWithCeiling({
           keyGrants,
           ownerGrants: null,
           permission: "datasets:manage",
@@ -566,12 +617,12 @@ describe("authz engine explain()", () => {
         }),
       ],
     });
-    const decision = decide({
+    const decision = engine.decide({
       grants,
       permission: "datasets:delete",
       scope: projectScope,
     });
-    const lines = explain({ decision, grants });
+    const lines = engine.explain({ decision, grants });
     expect(lines[0]).toContain("DENIED datasets:delete");
     expect(lines.join("\n")).toContain("via group group-9");
     expect(lines.join("\n")).toContain("denial reason: no-binding");

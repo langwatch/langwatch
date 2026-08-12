@@ -1,5 +1,6 @@
-import type { PrismaClient } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AuthzCollectorService } from "../authz-collector.service";
+import type { AuthzReadRepository } from "../authz-read.repository";
 
 const { warn, debug } = vi.hoisted(() => ({
   warn: vi.fn(),
@@ -9,21 +10,23 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ warn, debug, info: vi.fn(), error: vi.fn() }),
 }));
 
-import { shadowUserPermissionCheck } from "../shadow";
+import { AuthzShadowService } from "../authz-shadow.service";
 
-function makePrisma({ throwOnProject = false } = {}) {
+function makeReader({ throwOnLineage = false } = {}): AuthzReadRepository {
   return {
-    project: {
-      findUnique: throwOnProject
-        ? vi.fn().mockRejectedValue(new Error("db down"))
-        : vi.fn().mockResolvedValue({
-            team: { id: "team-1", organizationId: "org-1" },
-          }),
-    },
-    organizationUser: { findFirst: vi.fn().mockResolvedValue(null) },
-    roleBinding: { findMany: vi.fn().mockResolvedValue([]) },
-    teamUser: { findMany: vi.fn().mockResolvedValue([]) },
-    customRole: { findMany: vi.fn().mockResolvedValue([]) },
+    findOrganizationRole: vi.fn().mockResolvedValue(null),
+    findUserBindings: vi.fn().mockResolvedValue([]),
+    findGroupBindings: vi.fn().mockResolvedValue([]),
+    findApiKeyBindings: vi.fn().mockResolvedValue([]),
+    findLegacyTeamMemberships: vi.fn().mockResolvedValue([]),
+    findCustomRolePermissions: vi.fn().mockResolvedValue([]),
+    findShareLinks: vi.fn().mockResolvedValue([]),
+    findProjectLineage: throwOnLineage
+      ? vi.fn().mockRejectedValue(new Error("db down"))
+      : vi
+          .fn()
+          .mockResolvedValue({ teamId: "team-1", organizationId: "org-1" }),
+    findTeamOrganization: vi.fn().mockResolvedValue(null),
   };
 }
 
@@ -42,10 +45,10 @@ describe("authz shadow mode", () => {
   describe("given the flag is off", () => {
     it("does nothing at all", async () => {
       delete process.env.AUTHZ_V2_SHADOW;
-      const prisma = makePrisma();
+      const reader = makeReader();
+      const shadow = new AuthzShadowService(new AuthzCollectorService(reader));
 
-      shadowUserPermissionCheck({
-        prisma: prisma as unknown as PrismaClient,
+      shadow.userPermissionCheck({
         userId: "alice",
         permission: "traces:view",
         legacyAllowed: true,
@@ -54,18 +57,19 @@ describe("authz shadow mode", () => {
       });
       await new Promise((resolve) => setImmediate(resolve));
 
-      expect(prisma.project.findUnique).not.toHaveBeenCalled();
+      expect(reader.findProjectLineage).not.toHaveBeenCalled();
       expect(warn).not.toHaveBeenCalled();
     });
   });
 
   describe("when legacy and engine disagree", () => {
     it("logs one structured mismatch and never throws", async () => {
-      const prisma = makePrisma();
+      const shadow = new AuthzShadowService(
+        new AuthzCollectorService(makeReader()),
+      );
 
       // Engine will deny (no membership, no bindings); legacy said yes.
-      shadowUserPermissionCheck({
-        prisma: prisma as unknown as PrismaClient,
+      shadow.userPermissionCheck({
         userId: "alice",
         permission: "traces:view",
         legacyAllowed: true,
@@ -80,6 +84,7 @@ describe("authz shadow mode", () => {
           legacyAllowed: true,
           engineAllowed: false,
           permission: "traces:view",
+          principalType: "user",
         }),
         "authz shadow mismatch",
       );
@@ -88,10 +93,11 @@ describe("authz shadow mode", () => {
 
   describe("when legacy and engine agree", () => {
     it("stays silent", async () => {
-      const prisma = makePrisma();
+      const shadow = new AuthzShadowService(
+        new AuthzCollectorService(makeReader()),
+      );
 
-      shadowUserPermissionCheck({
-        prisma: prisma as unknown as PrismaClient,
+      shadow.userPermissionCheck({
         userId: "alice",
         permission: "traces:view",
         legacyAllowed: false,
@@ -104,12 +110,13 @@ describe("authz shadow mode", () => {
     });
   });
 
-  describe("when the comparison itself blows up", () => {
-    it("swallows the error at debug level", async () => {
-      const prisma = makePrisma({ throwOnProject: true });
+  describe("when the comparison itself fails", () => {
+    it("logs debug and swallows — never affects the response", async () => {
+      const shadow = new AuthzShadowService(
+        new AuthzCollectorService(makeReader({ throwOnLineage: true })),
+      );
 
-      shadowUserPermissionCheck({
-        prisma: prisma as unknown as PrismaClient,
+      shadow.userPermissionCheck({
         userId: "alice",
         permission: "traces:view",
         legacyAllowed: true,
@@ -117,7 +124,7 @@ describe("authz shadow mode", () => {
         caller: "trpc.project",
       });
 
-      await vi.waitFor(() => expect(debug).toHaveBeenCalled());
+      await vi.waitFor(() => expect(debug).toHaveBeenCalledTimes(1));
       expect(warn).not.toHaveBeenCalled();
     });
   });
