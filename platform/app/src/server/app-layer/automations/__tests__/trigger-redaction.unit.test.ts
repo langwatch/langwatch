@@ -278,6 +278,61 @@ describe("persistPublicApiActionParams", () => {
     });
   });
 
+  describe("given an automation that fires on a rule the channel does not own", () => {
+    it("carries the rule across while the channel states its own fields", async () => {
+      const rule = {
+        threshold: 5,
+        operator: "gt",
+        timePeriod: 60,
+        seriesName: "Errors",
+      };
+
+      expect(
+        await persistPublicApiActionParams({
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+          incoming: {
+            slackDelivery: "webhook",
+            slackWebhook: SLACK_WEBHOOK,
+            ...rule,
+          },
+        }),
+      ).toEqual({
+        ...rule,
+        slackDelivery: "webhook",
+        slackWebhook: SLACK_WEBHOOK,
+      });
+    });
+
+    it("still lets the channel drop a credential from another delivery method", async () => {
+      const saved = (await persistPublicApiActionParams({
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+        incoming: {
+          slackDelivery: "webhook",
+          slackWebhook: SLACK_WEBHOOK,
+          slackChannelId: "C123",
+          threshold: 5,
+        },
+      })) as Record<string, unknown>;
+
+      expect(saved.slackChannelId).toBeUndefined();
+      expect(saved.threshold).toBe(5);
+    });
+  });
+
+  describe("given a delivery channel this server does not offer", () => {
+    /** @scenario "A delivery channel the server no longer offers is written as it was sent" */
+    it("stores what the caller sent", async () => {
+      const actionParams = { pigeonWebhook: "https://example.com/pigeon" };
+
+      expect(
+        await persistPublicApiActionParams({
+          action: "SEND_CARRIER_PIGEON" as TriggerAction,
+          incoming: actionParams,
+        }),
+      ).toEqual(actionParams);
+    });
+  });
+
   describe("given a delivery that carries no credential", () => {
     it("stores what the caller sent", async () => {
       const actionParams = { members: ["someone@example.com"] };

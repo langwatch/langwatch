@@ -13,10 +13,12 @@ import {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { graphAlertActionParamsSchema } from "~/server/app-layer/automations/graph-alert.builder";
 import {
   decryptWebhookHeaders,
   type WebhookStoredActionParams,
 } from "~/server/app-layer/automations/providers/webhook/server";
+import { reportActionParamsSchema } from "~/server/app-layer/automations/report.builder";
 import { REDACTED_CREDENTIAL } from "~/server/app-layer/automations/trigger-redaction";
 import { prisma } from "~/server/db";
 import { decrypt, encrypt } from "~/utils/encryption";
@@ -386,6 +388,100 @@ describe("Feature: delivery credentials are redacted at the REST boundary", () =
       ).actionParams as { slackBotToken: string; slackChannelId: string };
       expect(decrypt(saved.slackBotToken)).toBe(SLACK_BOT_TOKEN);
       expect(saved.slackChannelId).toBe("C123");
+    });
+
+    /** @scenario "Writing back a graph alert keeps the rule it fires by" */
+    it("keeps the rule a graph alert fires by", async () => {
+      const rule = {
+        threshold: 5,
+        operator: "gt",
+        timePeriod: 60,
+        seriesName: "Errors",
+      };
+      const stored = await storeTrigger({
+        name: `Graph alert ${ns}`,
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+        actionParams: {
+          slackDelivery: "webhook",
+          slackWebhook: SLACK_WEBHOOK,
+          ...rule,
+        },
+      });
+
+      const response = await writeBack(stored.id);
+
+      expect(response.status).toBe(200);
+      const saved = (
+        await prisma.trigger.findUniqueOrThrow({
+          where: { id: stored.id, projectId: projectId() },
+        })
+      ).actionParams;
+      expect(saved).toMatchObject({ ...rule, slackWebhook: SLACK_WEBHOOK });
+      // The evaluator reads the rule straight off the row, so what matters is
+      // that it still parses as a complete one.
+      expect(graphAlertActionParamsSchema.safeParse(saved).success).toBe(true);
+    });
+
+    /** @scenario "Writing back a scheduled report keeps its schedule" */
+    it("keeps the schedule a report sends on", async () => {
+      const report = {
+        source: { kind: "dashboard", dashboardId: "dashboard_1" },
+        schedule: { cron: "0 9 * * 1", timezone: "Europe/Amsterdam" },
+        compareToPrevious: true,
+      };
+      const stored = await storeTrigger({
+        name: `Report ${ns}`,
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+        actionParams: {
+          slackDelivery: "webhook",
+          slackWebhook: SLACK_WEBHOOK,
+          ...report,
+        },
+      });
+
+      const response = await writeBack(stored.id);
+
+      expect(response.status).toBe(200);
+      const saved = (
+        await prisma.trigger.findUniqueOrThrow({
+          where: { id: stored.id, projectId: projectId() },
+        })
+      ).actionParams;
+      expect(saved).toMatchObject(report);
+      // The dispatcher skips a report it cannot read a source and schedule
+      // from, so what matters is that both still parse.
+      expect(reportActionParamsSchema.safeParse(saved).success).toBe(true);
+    });
+
+    /** @scenario "Leaving a header out of an update removes it" */
+    it("removes the headers an update leaves out", async () => {
+      const stored = await storeTrigger({
+        name: `Header cleared ${ns}`,
+        action: TriggerAction.SEND_WEBHOOK,
+        actionParams: {
+          url: ENDPOINT_URL,
+          method: "POST",
+          headersEncrypted: encrypt(
+            JSON.stringify({ Authorization: WEBHOOK_HEADER_VALUE }),
+          ),
+        },
+      });
+
+      const response = await app.request(`/api/triggers/${stored.id}`, {
+        method: "PATCH",
+        headers: headers(),
+        body: JSON.stringify({
+          actionParams: { url: ENDPOINT_URL, method: "POST" },
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      const saved = (
+        await prisma.trigger.findUniqueOrThrow({
+          where: { id: stored.id, projectId: projectId() },
+        })
+      ).actionParams as unknown as WebhookStoredActionParams;
+      expect(decryptWebhookHeaders(saved)).toEqual({});
     });
   });
 
