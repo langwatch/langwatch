@@ -352,11 +352,6 @@ const LEGACY_INERT: string[] = [
   "specs/auth/sso-orphan-user-linking.feature",
   "specs/auth/sso-wrong-provider-recovery.feature",
   "specs/automations/dispatch-timing.feature",
-  "specs/automations/notification-templates.feature",
-  // ADR-093's design contract, every scenario @unimplemented on purpose: the
-  // ADR ships ahead of the implementation, and the reference PR (R0) binds
-  // these as it lands. Remove this entry with the first binding.
-  "specs/automations/source-merge.feature",
   "specs/automations/spam-prevention.feature",
   "specs/automations/webhook-http-action.feature",
   "specs/batch-evaluation-results/experiment-cost-folding.feature",
