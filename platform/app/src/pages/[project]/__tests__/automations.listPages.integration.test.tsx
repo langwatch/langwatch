@@ -2,11 +2,13 @@
  * @vitest-environment jsdom
  *
  * specs/automations/list-pages.feature
+ * specs/automations/source-merge.feature
  *
- * Covers the WS-6 defects that live on the Automations/Alerts/Schedules
- * list pages: no delete confirmation, delete copy naming the wrong kind,
- * row actions with no accessible name, and the Overview tab having no way
- * to create anything (#6716, G5).
+ * Covers the WS-6 defects that live on the Automations/Schedules list pages
+ * (no delete confirmation, delete copy naming the wrong kind, row actions with
+ * no accessible name, the Overview tab having no way to create anything —
+ * #6716, G5) and the merged list those defects now live on: one table for
+ * everything that watches something, whatever it watches (ADR-093 §1).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
@@ -71,7 +73,7 @@ vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: mockToastCreate },
 }));
 
-const alertTrigger = {
+const graphTrigger = {
   id: "alert-1",
   name: "Cost spike",
   active: true,
@@ -111,7 +113,7 @@ const scheduleTrigger = {
   filters: "{}",
 };
 
-const automationTrigger = {
+const filterTrigger = {
   id: "automation-1",
   name: "Flag failures",
   active: true,
@@ -142,9 +144,9 @@ const botSlackTrigger = {
 };
 
 const allTriggers = [
-  alertTrigger,
+  graphTrigger,
   scheduleTrigger,
-  automationTrigger,
+  filterTrigger,
   botSlackTrigger,
 ];
 
@@ -192,9 +194,9 @@ const renderPage = async () => {
   return render(<AutomationsPage />, { wrapper: Wrapper });
 };
 
-describe("given the Alerts table", () => {
+describe("given the unified automations table", () => {
   beforeEach(() => {
-    mockPathnameRef.current = "/test-project/automations/alerts";
+    mockPathnameRef.current = "/test-project/automations/automations";
     mockDeleteMutate.mockReset();
     mockInvalidateTriggerById.mockReset();
     mockToastCreate.mockReset();
@@ -204,34 +206,41 @@ describe("given the Alerts table", () => {
     cleanup();
   });
 
-  describe("when the user chooses Delete on an alert row", () => {
-    /** @scenario Deleting an alert asks for confirmation and names it as an alert */
-    it("asks for confirmation and names the row an alert, not an automation", async () => {
-      const user = userEvent.setup();
+  describe("when the project has automations watching a filter and a graph", () => {
+    /** @scenario "The unified table lists automations watching filters and graphs together" */
+    it("lists both in one table, each saying what it watches and where it delivers", async () => {
       await renderPage();
 
-      await user.click(screen.getByLabelText("Actions for Cost spike"));
-      await user.click(
-        screen.getByRole("menuitem", { name: /Delete alert Cost spike/ }),
-      );
-
-      // Scoped to the dialog itself: the menu's own "Delete alert" item can
-      // still be mid-exit-animation in the DOM when the dialog mounts, and
-      // an unscoped `getByText("Delete alert")` intermittently matches both
-      // — the closing menu item and the dialog title — and throws.
-      const dialog = within(screen.getByRole("dialog"));
-      expect(dialog.getByText("Delete alert")).toBeInTheDocument();
+      const table = within(screen.getByRole("table"));
+      // Both former kinds, one table.
+      expect(table.getByText("Cost spike")).toBeInTheDocument();
+      expect(table.getByText("Flag failures")).toBeInTheDocument();
+      // What each row watches.
+      expect(table.getByText("Graph · Cost graph")).toBeInTheDocument();
+      expect(table.getAllByText("Trace filter").length).toBeGreaterThan(0);
+      expect(table.getAllByText("status:error").length).toBeGreaterThan(0);
+      // Where each row delivers.
+      expect(table.getByText("a@b.com")).toBeInTheDocument();
       expect(
-        dialog.getByText(/This permanently deletes "Cost spike"/),
+        table.getByText("Slack app · channel C0999999"),
       ).toBeInTheDocument();
-      // Nothing is deleted merely by opening the dialog.
-      expect(mockDeleteMutate).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Schedules stay on their own tab" */
+    it("keeps schedules out of it and lists them on their own tab", async () => {
+      const automationsTab = await renderPage();
+      expect(screen.queryByText("Weekly digest")).not.toBeInTheDocument();
+      automationsTab.unmount();
+
+      mockPathnameRef.current = "/test-project/automations/schedules";
+      await renderPage();
+      expect(screen.getByText("Weekly digest")).toBeInTheDocument();
     });
   });
 
-  describe("when the user confirms the deletion", () => {
-    /** @scenario Confirming the dialog deletes the row and the drawer cache */
-    it("deletes the row, invalidates the drawer cache, and names it as an alert", async () => {
+  describe("when the user chooses Delete on a graph-watching row", () => {
+    /** @scenario "Deleting names the row an automation, whatever it watches" */
+    it("names it an automation in the dialog and in the toast", async () => {
       mockDeleteMutate.mockImplementation((_input, opts) => {
         opts.onSuccess();
       });
@@ -240,7 +249,44 @@ describe("given the Alerts table", () => {
 
       await user.click(screen.getByLabelText("Actions for Cost spike"));
       await user.click(
-        screen.getByRole("menuitem", { name: /Delete alert Cost spike/ }),
+        screen.getByRole("menuitem", { name: /Delete automation Cost spike/ }),
+      );
+
+      // Scoped to the dialog itself: the menu's own item can still be
+      // mid-exit-animation in the DOM when the dialog mounts, and an unscoped
+      // query intermittently matches both and throws.
+      const dialog = within(screen.getByRole("dialog"));
+      expect(dialog.getByText("Delete automation")).toBeInTheDocument();
+      expect(
+        dialog.getByText(/This permanently deletes "Cost spike"/),
+      ).toBeInTheDocument();
+      // Nothing is deleted merely by opening the dialog.
+      expect(mockDeleteMutate).not.toHaveBeenCalled();
+
+      await user.click(screen.getByRole("button", { name: "Delete" }));
+
+      expect(mockToastCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Delete automation",
+          description: "Automation deleted",
+          type: "success",
+        }),
+      );
+    });
+  });
+
+  describe("when the user confirms the deletion", () => {
+    /** @scenario Confirming the dialog deletes the row and the drawer cache */
+    it("deletes the row and invalidates the drawer cache", async () => {
+      mockDeleteMutate.mockImplementation((_input, opts) => {
+        opts.onSuccess();
+      });
+      const user = userEvent.setup();
+      await renderPage();
+
+      await user.click(screen.getByLabelText("Actions for Cost spike"));
+      await user.click(
+        screen.getByRole("menuitem", { name: /Delete automation Cost spike/ }),
       );
       await user.click(screen.getByRole("button", { name: "Delete" }));
 
@@ -252,13 +298,6 @@ describe("given the Alerts table", () => {
         }),
       );
       expect(mockInvalidateTriggerById).toHaveBeenCalled();
-      expect(mockToastCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: "Delete alert",
-          description: "Alert deleted",
-          type: "success",
-        }),
-      );
     });
   });
 
@@ -270,7 +309,7 @@ describe("given the Alerts table", () => {
 
       await user.click(screen.getByLabelText("Actions for Cost spike"));
       await user.click(
-        screen.getByRole("menuitem", { name: /Delete alert Cost spike/ }),
+        screen.getByRole("menuitem", { name: /Delete automation Cost spike/ }),
       );
       await user.click(screen.getByRole("button", { name: "Cancel" }));
 
@@ -293,7 +332,7 @@ describe("given the Alerts table", () => {
         screen.getByRole("menuitem", { name: /Edit Cost spike/ }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole("menuitem", { name: /Delete alert Cost spike/ }),
+        screen.getByRole("menuitem", { name: /Delete automation Cost spike/ }),
       ).toBeInTheDocument();
     });
   });
@@ -333,7 +372,7 @@ describe("given the Schedules table", () => {
   });
 });
 
-describe("given the Automations table", () => {
+describe("given a Slack automation on the unified table", () => {
   beforeEach(() => {
     mockPathnameRef.current = "/test-project/automations/automations";
   });
@@ -377,8 +416,8 @@ describe("given the Overview tab", () => {
   });
 
   describe("when the user opens the create menu", () => {
-    /** @scenario The Overview offers creating an automation, alert, or schedule */
-    it("offers the three kinds and opens the composer pre-set to each", async () => {
+    /** @scenario "The Overview offers creating an automation or a schedule" */
+    it("offers an automation and a schedule, and no longer an alert", async () => {
       const user = userEvent.setup();
       await renderPage();
 
@@ -388,16 +427,18 @@ describe("given the Overview tab", () => {
         screen.getByRole("menuitem", { name: "New automation" }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole("menuitem", { name: "New alert" }),
-      ).toBeInTheDocument();
-      expect(
         screen.getByRole("menuitem", { name: "New schedule" }),
       ).toBeInTheDocument();
+      // What an automation watches is chosen in its own first step now, so
+      // there is nothing left for a third menu item to pre-set (ADR-093 §1).
+      expect(
+        screen.queryByRole("menuitem", { name: "New alert" }),
+      ).not.toBeInTheDocument();
 
-      await user.click(screen.getByRole("menuitem", { name: "New alert" }));
-      expect(mockOpenDrawer).toHaveBeenCalledWith("automation", {
-        initialSource: "customGraph",
-      });
+      await user.click(
+        screen.getByRole("menuitem", { name: "New automation" }),
+      );
+      expect(mockOpenDrawer).toHaveBeenCalledWith("automation", {});
     });
   });
 });
