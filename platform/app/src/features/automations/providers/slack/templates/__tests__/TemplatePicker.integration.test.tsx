@@ -3,6 +3,8 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { templateOptionsFor } from "../registry";
 import { SlackBlockKitTemplatePicker } from "../TemplatePicker";
@@ -27,6 +29,40 @@ const renderPicker = (
     />,
     { wrapper: Wrapper },
   );
+
+/** Stands in for the composer's draft: `cadence` flows back down as a live
+ *  prop once `onSelectOtherCadence` fires, exactly like the real form owner
+ *  reacting to `ctx.setNotificationCadence`. */
+function StatefulPicker({
+  onPick,
+}: {
+  onPick: (
+    option: Parameters<
+      Parameters<typeof SlackBlockKitTemplatePicker>[0]["onSelect"]
+    >[0],
+  ) => void;
+}) {
+  const [cadence, setCadence] = useState<"immediate" | "digest">("immediate");
+  const [currentSource, setCurrentSource] = useState("");
+  return (
+    <SlackBlockKitTemplatePicker
+      cadence={cadence}
+      kind="trace"
+      deliveryMethod="webhook"
+      hasEvaluationFilter={false}
+      currentSource={currentSource}
+      onSelect={(option) => {
+        setCurrentSource(option.source);
+        onPick(option);
+      }}
+      onSelectOtherCadence={(option) => {
+        setCadence(option.cadenceFit === "digest" ? "digest" : "immediate");
+        setCurrentSource(option.source);
+        onPick(option);
+      }}
+    />
+  );
+}
 
 describe("SlackBlockKitTemplatePicker", () => {
   afterEach(() => {
@@ -153,6 +189,42 @@ describe("SlackBlockKitTemplatePicker", () => {
       renderPicker({ kind: "graphAlert" });
 
       expect(screen.queryByText(/more layouts for/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when a cross-cadence layout is picked from the expanded disclosure", () => {
+    /** @scenario "Cross-cadence layout picking keeps list order" */
+    it("keeps the primary grid's list order instead of regrouping around the new cadence", async () => {
+      const user = userEvent.setup();
+      render(<StatefulPicker onPick={vi.fn()} />, { wrapper: Wrapper });
+
+      const namesBefore = screen
+        .getAllByRole("button", { name: /^use .+ template$/i })
+        .slice(0, 5)
+        .map((el) => el.getAttribute("aria-label"));
+      // The immediate-cadence layouts render first, in this order, per the
+      // registry — captured before any pick to compare against after.
+      expect(namesBefore).toEqual([
+        "Use Compact alert template",
+        "Use One-liner template",
+        "Use Eval failure detail template",
+        "Use Rich trace card template",
+        "Use Eval failure banner template",
+      ]);
+
+      await user.click(screen.getByText(/more layouts for digest cadences/i));
+      await user.click(
+        screen.getByRole("button", { name: /use digest — compact template/i }),
+      );
+
+      // The cadence switched (the picker now renders against "digest"), but
+      // the grid the author is looking at must not have reshuffled: the same
+      // five immediate cards, in the same order, still lead.
+      const namesAfter = screen
+        .getAllByRole("button", { name: /^use .+ template$/i })
+        .slice(0, 5)
+        .map((el) => el.getAttribute("aria-label"));
+      expect(namesAfter).toEqual(namesBefore);
     });
   });
 });
