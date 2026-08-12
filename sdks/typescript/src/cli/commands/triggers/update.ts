@@ -20,6 +20,9 @@ export const updateTriggerCommand = async (
     active?: string;
     message?: string;
     alertType?: string;
+    filters?: string;
+    filterQuery?: string;
+    actionParams?: string;
   },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
@@ -35,12 +38,24 @@ export const updateTriggerCommand = async (
     if (options.active !== undefined) body.active = options.active === "true";
     if (options.message !== undefined) body.message = options.message || null;
     if (options.alertType) body.alertType = options.alertType;
+    if (options.filters) {
+      body.filters = JSON.parse(options.filters) as Record<string, unknown>;
+    }
+    if (options.filterQuery !== undefined) {
+      body.filterQuery = options.filterQuery || null;
+    }
+    // The delivery configuration this automation should have from now on: it
+    // replaces the stored one rather than merging into it. A credential the
+    // read hid comes back as `[redacted]`; send that to keep the stored value.
+    if (options.actionParams) {
+      body.actionParams = JSON.parse(options.actionParams) as Record<string, unknown>;
+    }
 
     if (Object.keys(body).length === 0) {
       failSpinner({
         spinner,
         error: commandValidationError(
-          "No fields to update. Use --name, --active, --message, or --alert-type.",
+          "No fields to update. Use --name, --active, --message, --alert-type, --filters, --filter-query or --action-params.",
         ),
         action: "update trigger",
       });
@@ -73,7 +88,14 @@ export const updateTriggerCommand = async (
       },
     };
   } catch (error) {
-    failSpinner({ spinner, error, action: "update trigger" });
+    failSpinner({
+      spinner,
+      error:
+        error instanceof SyntaxError
+          ? commandValidationError("--filters and --action-params must be valid JSON")
+          : error,
+      action: "update trigger",
+    });
     process.exit(1);
   }
 };

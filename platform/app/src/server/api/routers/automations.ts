@@ -3,7 +3,6 @@ import {
   MAX_TRACE_DEBOUNCE_MS,
   MIN_TRACE_DEBOUNCE_MS,
   NOTIFICATION_CADENCES,
-  type NotificationCadence,
 } from "@langwatch/automations/cadences";
 import { EMAIL_RX } from "@langwatch/automations/providers/email";
 import type { SlackActionParams } from "@langwatch/automations/providers/slack";
@@ -39,9 +38,12 @@ import {
   graphAlertActionParamsSchema,
 } from "~/server/app-layer/automations/graph-alert.builder";
 import {
+  resolveNotificationCadenceForCreate,
+  resolveNotificationCadenceForUpdate,
+} from "~/server/app-layer/automations/notification-cadence";
+import {
   actionParamsSchemaFor,
   persistActionParamsFor,
-  redactActionParamsFor,
 } from "~/server/app-layer/automations/providers/registry";
 import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
 import {
@@ -55,6 +57,7 @@ import {
   reportActionParamsSchema,
 } from "~/server/app-layer/automations/report.builder";
 import { TriggerFireHistoryService } from "~/server/app-layer/automations/trigger-fire-history.service";
+import { redactTriggerForRead } from "~/server/app-layer/automations/trigger-redaction";
 import {
   type DraftProject,
   type TestFireWebhookDestination,
@@ -78,22 +81,6 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { extractCheckKeys } from "../utils";
 import { buildRetryAfterMessage } from "./rateLimitMessage";
 
-/** Strip secrets from a trigger row before it leaves the server via the
- *  provider registry's redact hook: the encrypted Slack bot token (ADR-041)
- *  and webhook header values (ADR-040 §3 — names echo with the kept
- *  sentinel, values never return). Identity for every other action. */
-function redactTriggerForRead<
-  T extends { action: TriggerAction; actionParams: unknown },
->(trigger: T): T {
-  return {
-    ...trigger,
-    actionParams: redactActionParamsFor(
-      trigger.action,
-      trigger.actionParams ?? {},
-    ),
-  };
-}
-
 const templateDraftSchema = z.object({
   slackTemplateType: z.string().nullable().optional(),
   slackTemplate: z.string().nullable().optional(),
@@ -110,39 +97,6 @@ const traceDebounceMsSchema = z
   .int()
   .min(MIN_TRACE_DEBOUNCE_MS)
   .max(MAX_TRACE_DEBOUNCE_MS);
-
-// ADR-026: cadence applies to notify actions only. New notify triggers default
-// to a 5-minute digest (operator-friendly storm protection); persist actions
-// are pinned to immediate at the storage boundary so a stale value can't leak
-// into the dispatch path.
-function resolveCadenceForCreate(
-  action: TriggerAction,
-  requested: NotificationCadence | undefined,
-  isGraphAlert = false,
-): NotificationCadence {
-  if (!NOTIFY_TRIGGER_ACTIONS.has(action)) return "immediate";
-  // Graph alerts are incident-based (fire on breach, silent while open,
-  // resolve on recovery) — there is nothing to digest, so cadence pins to
-  // immediate at the storage boundary just like persist actions.
-  if (isGraphAlert) return "immediate";
-  return requested ?? "5min_digest";
-}
-
-function resolveCadenceForUpdate(
-  action: TriggerAction,
-  requested: NotificationCadence | undefined,
-  isGraphAlert = false,
-): NotificationCadence | undefined {
-  // Persist actions always pin to `immediate`. Returning `undefined`
-  // here when the client omits the field would skip the column update
-  // and leak a stale notify-class cadence onto a row that's been
-  // edited from notify → persist (since the digest cadence stays on
-  // the row but the dispatch path no longer reads it). Force the
-  // boundary invariant on every update.
-  if (!NOTIFY_TRIGGER_ACTIONS.has(action)) return "immediate";
-  if (isGraphAlert) return "immediate";
-  return requested;
-}
 
 const triggerIdentitySchema = z.object({
   name: z.string(),
@@ -366,10 +320,10 @@ export const automationRouter = createTRPCRouter({
           filters: JSON.stringify(input.filters),
           projectId: input.projectId,
           lastRunAt: new Date().getTime(),
-          notificationCadence: resolveCadenceForCreate(
-            input.action,
-            input.notificationCadence,
-          ),
+          notificationCadence: resolveNotificationCadenceForCreate({
+            action: input.action,
+            requested: input.notificationCadence,
+          }),
         },
       });
 
@@ -836,11 +790,14 @@ export const automationRouter = createTRPCRouter({
       try {
         // The webhook channel ships dark (ADR-040 §7): the type picker is
         // flag-gated client-side, and the server refuses the channel too so
-        // the flag can't be bypassed by calling the API directly.
+        // the flag can't be bypassed by calling the API directly. The flag is
+        // resolved per PROJECT — whether a project has this channel cannot
+        // depend on which teammate is asking, and the public API, which has no
+        // user at all, has to reach the same answer.
         if (input.channel === "webhook") {
           const allowed = await featureFlagService.isEnabled(
             "release_webhook_automations",
-            { distinctId: ctx.session.user.id, projectId: input.projectId },
+            { distinctId: input.projectId, projectId: input.projectId },
           );
           if (!allowed) {
             throw new TRPCError({
@@ -1023,10 +980,12 @@ export const automationRouter = createTRPCRouter({
         validateTemplateDraft(input.templates);
         // The webhook channel ships dark (ADR-040 §7): gate the save route as
         // well as the picker, so the flag can't be bypassed via the API.
+        // Resolved per PROJECT, like every other gate on this channel, so the
+        // dashboard and the public API agree during a partial rollout.
         if (input.action === TriggerAction.SEND_WEBHOOK) {
           const allowed = await featureFlagService.isEnabled(
             "release_webhook_automations",
-            { distinctId: ctx.session.user.id, projectId: input.projectId },
+            { distinctId: input.projectId, projectId: input.projectId },
           );
           if (!allowed) {
             throw new TRPCError({
@@ -1292,11 +1251,11 @@ export const automationRouter = createTRPCRouter({
 
       let trigger;
       if (input.triggerId) {
-        const cadenceUpdate = resolveCadenceForUpdate(
-          input.action,
-          input.notificationCadence,
+        const cadenceUpdate = resolveNotificationCadenceForUpdate({
+          action: input.action,
+          requested: input.notificationCadence,
           isGraphAlert,
-        );
+        });
         trigger = await getApp().triggers.update({
           triggerId: input.triggerId,
           projectId: input.projectId,
@@ -1334,11 +1293,11 @@ export const automationRouter = createTRPCRouter({
               deleted: false,
               active: true,
               lastRunAt: new Date().getTime(),
-              notificationCadence: resolveCadenceForCreate(
-                input.action,
-                input.notificationCadence,
+              notificationCadence: resolveNotificationCadenceForCreate({
+                action: input.action,
+                requested: input.notificationCadence,
                 isGraphAlert,
-              ),
+              }),
               traceDebounceMs:
                 input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
             },
@@ -1349,11 +1308,11 @@ export const automationRouter = createTRPCRouter({
               id: ksuid(KSUID_RESOURCES.TRIGGER).toString(),
               projectId: input.projectId,
               lastRunAt: new Date().getTime(),
-              notificationCadence: resolveCadenceForCreate(
-                input.action,
-                input.notificationCadence,
+              notificationCadence: resolveNotificationCadenceForCreate({
+                action: input.action,
+                requested: input.notificationCadence,
                 isGraphAlert,
-              ),
+              }),
               traceDebounceMs:
                 input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
               ...data,

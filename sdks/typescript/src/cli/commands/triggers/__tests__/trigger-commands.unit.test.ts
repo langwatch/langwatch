@@ -17,6 +17,9 @@ import { getTriggerCommand } from "../get";
 import { createTriggerCommand } from "../create";
 import { updateTriggerCommand } from "../update";
 import { deleteTriggerCommand } from "../delete";
+import { setTriggerActiveCommand } from "../setActive";
+import { testFireTriggerCommand } from "../testFire";
+import { triggerFiresCommand } from "../fires";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -131,6 +134,25 @@ describe("getTriggerCommand()", () => {
     });
   });
 
+  describe("when a machine format is requested", () => {
+    // Machine output is the more exposed surface — it gets logged, piped and
+    // pasted into agent context. It carries what the API answered, and the API
+    // answers with delivery credentials replaced by the `[redacted]`
+    // placeholder, so the command hands the response through untouched.
+    /** @scenario "The command line prints what the API returned" */
+    it("returns the response payload as the API sent it", async () => {
+      const trigger = makeTrigger({
+        action: "SEND_SLACK_MESSAGE",
+        actionParams: { slackWebhook: "[redacted]" },
+      });
+      mockFetch.mockResolvedValue({ ok: true, json: async () => trigger });
+
+      const result = await getTriggerCommand("trigger_abc");
+
+      expect(result?.data).toEqual(trigger);
+    });
+  });
+
   describe("when trigger is not found", () => {
     it("exits with code 1", async () => {
       mockFetch.mockResolvedValue({ ok: false, status: 404 });
@@ -211,6 +233,117 @@ describe("updateTriggerCommand()", () => {
           method: "PATCH",
           body: expect.stringContaining("false"),
         }),
+      );
+    });
+  });
+});
+
+describe("setTriggerActiveCommand()", () => {
+  let mockFetch: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch = vi.fn();
+    global.fetch = mockFetch as unknown as typeof fetch;
+    vi.spyOn(console, "log").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
+    mockProcessExit();
+    process.env.LANGWATCH_API_KEY = "test-key";
+    process.env.LANGWATCH_ENDPOINT = "http://localhost:5560";
+  });
+
+  describe("when the trigger is paused", () => {
+    it("calls the verb that says so", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => makeTrigger({ active: false }),
+      });
+
+      await setTriggerActiveCommand("trigger_abc", { active: false });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "http://localhost:5560/api/triggers/trigger_abc/disable",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+  });
+
+  describe("when the trigger is resumed", () => {
+    it("calls the verb that says so", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => makeTrigger({ active: true }),
+      });
+
+      await setTriggerActiveCommand("trigger_abc", { active: true });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "http://localhost:5560/api/triggers/trigger_abc/enable",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+  });
+});
+
+describe("testFireTriggerCommand()", () => {
+  let mockFetch: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch = vi.fn();
+    global.fetch = mockFetch as unknown as typeof fetch;
+    vi.spyOn(console, "log").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
+    mockProcessExit();
+    process.env.LANGWATCH_API_KEY = "test-key";
+    process.env.LANGWATCH_ENDPOINT = "http://localhost:5560";
+  });
+
+  describe("when the automation has a destination", () => {
+    it("asks the API to send to it and returns what came back", async () => {
+      const result = {
+        channel: "email",
+        recipientCount: 2,
+        usedDefault: true,
+        missingVariables: [],
+        errors: [],
+      };
+      mockFetch.mockResolvedValue({ ok: true, json: async () => result });
+
+      const command = await testFireTriggerCommand("trigger_abc");
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "http://localhost:5560/api/triggers/trigger_abc/test-fire",
+        expect.objectContaining({ method: "POST" }),
+      );
+      expect(command?.data).toEqual(result);
+    });
+  });
+});
+
+describe("triggerFiresCommand()", () => {
+  let mockFetch: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch = vi.fn();
+    global.fetch = mockFetch as unknown as typeof fetch;
+    vi.spyOn(console, "log").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
+    mockProcessExit();
+    process.env.LANGWATCH_API_KEY = "test-key";
+    process.env.LANGWATCH_ENDPOINT = "http://localhost:5560";
+  });
+
+  describe("when a limit is given", () => {
+    it("asks for that many fires", async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: async () => [] });
+
+      await triggerFiresCommand("trigger_abc", { limit: "5" });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "http://localhost:5560/api/triggers/trigger_abc/fires?limit=5",
+        expect.anything(),
       );
     });
   });

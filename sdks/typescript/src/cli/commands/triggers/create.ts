@@ -9,7 +9,6 @@ import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
-import { redactTriggerSecrets } from "./redact";
 
 /**
  * Returns the created trigger rather than printing it: the output port renders
@@ -20,14 +19,16 @@ export const createTriggerCommand = async (
   options: {
     action: string;
     filters?: string;
+    filterQuery?: string;
     message?: string;
     alertType?: string;
     slackWebhook?: string;
+    actionParams?: string;
   },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const validActions = ["SEND_EMAIL", "ADD_TO_DATASET", "ADD_TO_ANNOTATION_QUEUE", "SEND_SLACK_MESSAGE"];
+  const validActions = ["SEND_EMAIL", "ADD_TO_DATASET", "ADD_TO_ANNOTATION_QUEUE", "SEND_SLACK_MESSAGE", "SEND_WEBHOOK"];
   if (!validActions.includes(options.action)) {
     reportCommandError({
       error: commandValidationError(
@@ -43,12 +44,17 @@ export const createTriggerCommand = async (
   const spinner = createSpinner(`Creating trigger "${name}"...`).start();
 
   try {
-    let filters: Record<string, unknown> = {};
+    let filters: Record<string, unknown> | undefined;
     if (options.filters) {
       filters = JSON.parse(options.filters) as Record<string, unknown>;
     }
 
-    const actionParams: Record<string, unknown> = {};
+    // The delivery configuration the chosen channel reads. `--slack-webhook`
+    // is the shorthand for the one field a Slack automation most often needs;
+    // everything else is stated with `--action-params`.
+    const actionParams: Record<string, unknown> = options.actionParams
+      ? (JSON.parse(options.actionParams) as Record<string, unknown>)
+      : {};
     if (options.slackWebhook) actionParams.slackWebhook = options.slackWebhook;
 
     const response = await fetch(`${endpoint}/api/triggers`, {
@@ -61,6 +67,7 @@ export const createTriggerCommand = async (
         name,
         action: options.action,
         filters,
+        filterQuery: options.filterQuery,
         actionParams,
         message: options.message,
         alertType: options.alertType,
@@ -77,8 +84,9 @@ export const createTriggerCommand = async (
     spinner.succeed(`Trigger "${trigger.name}" created (${trigger.id})`);
 
     return {
-      // See ./redact.ts — actionParams is plaintext and never shown to humans.
-      data: redactTriggerSecrets(trigger),
+      // The API redacts delivery credentials before it answers, so machine
+      // output is the response exactly as it arrived.
+      data: trigger,
       table: () => {
         console.log();
         console.log(`  ${chalk.gray("ID:")}     ${chalk.green(trigger.id)}`);
@@ -96,7 +104,7 @@ export const createTriggerCommand = async (
       spinner,
       error:
         error instanceof SyntaxError
-          ? commandValidationError("--filters must be valid JSON")
+          ? commandValidationError("--filters and --action-params must be valid JSON")
           : error,
       action: "create trigger",
     });

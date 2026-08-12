@@ -60,6 +60,14 @@ const str = (
   return typeof value === "string" && value.length > 0 ? value : fallback;
 };
 
+/** Reads a list of strings out of `meta` without trusting it. */
+const list = (error: HandledErrorShape, key: string): string[] => {
+  const value = error.meta[key];
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
+};
+
 type MissingModelRequestType =
   | "chat"
   | "messages"
@@ -1360,11 +1368,135 @@ const presentations = {
         : "Configure the destination first.";
     },
   },
+  trigger_action_immutable: {
+    title: "The delivery channel is fixed",
+    describe: () =>
+      "An automation keeps the channel it was created with, because the " +
+      "credentials it holds belong to that channel. Create a new automation " +
+      "on the channel you want.",
+  },
+
+  trigger_action_params_unknown_fields: {
+    title: "Some of those fields are not part of this channel",
+    // Both lists are the caller's own vocabulary: what it sent, and what this
+    // channel has. Naming them is the whole remediation — a misspelt field is
+    // invisible otherwise.
+    describe: (error) => {
+      const fields = list(error, "fields");
+      const accepted = list(error, "accepted");
+      const named = fields.length > 0 ? `${fields.join(", ")}. ` : "";
+      return accepted.length > 0
+        ? `${named}This channel reads: ${accepted.join(", ")}.`
+        : `${named}Check the fields against the channel you are configuring.`;
+    },
+  },
+
+  trigger_rule_fields_misplaced: {
+    title: "The rule belongs in its own field",
+    describe: (error) => {
+      const where = str(error, "expectedField", "");
+      return where
+        ? `State it in "${where}" rather than inside the delivery ` +
+            "configuration, which is only about where the message goes."
+        : "State it in its own field rather than inside the delivery " +
+            "configuration, which is only about where the message goes.";
+    },
+  },
+
+  trigger_test_fire_rate_limited: {
+    title: "That is a lot of test fires",
+    // `meta.resetAt` is the instant the window ends, which is the one thing
+    // the caller wants: how long to wait. A window that has already passed by
+    // the time this renders reads as "try again", not as a negative wait.
+    describe: (error) => {
+      const resetAt = error.meta.resetAt;
+      const seconds =
+        typeof resetAt === "number"
+          ? Math.ceil((resetAt - Date.now()) / 1000)
+          : 0;
+      return seconds > 0
+        ? `This project has sent as many as a minute allows. Try again in ${seconds} seconds.`
+        : "This project has sent as many as a minute allows. Try again now.";
+    },
+  },
+
+  trigger_kind_immutable: {
+    title: "This cannot become a different kind of automation",
+    describe: () =>
+      "A trace automation, a graph alert and a scheduled report are set up " +
+      "differently. Create the one you want and delete this one.",
+  },
+
+  trigger_filter_query_invalid: {
+    title: "This trace query could not be read",
+    describe: () =>
+      "Check it against the query syntax the traces view uses. It was not " +
+      "saved, so nothing has changed.",
+  },
+
+  graph_alert_incomplete: {
+    title: "This alert is missing something it needs",
+    // `meta.field` names which piece — the rule, the severity, the channel —
+    // and the service wrote the sentence for that exact case, which the
+    // generic line cannot do.
+    describe: (error) =>
+      safeProse(str(error, "reason", "")) ||
+      "Add the rule it fires by, the severity it fires at and a channel that " +
+        "can notify.",
+  },
+
+  graph_not_found: {
+    title: "That graph is not in this project",
+    describe: () =>
+      "Alerts fire on a graph in the same project. Check the graph id.",
+  },
+
+  report_channel_unsupported: {
+    title: "A report cannot be delivered that way",
+    describe: () =>
+      "Reports are delivered by email or to Slack. Pick one of those channels.",
+  },
+
+  report_incomplete: {
+    title: "This report is missing something it needs",
+    describe: () =>
+      "Say what it sends — a dashboard, a graph or a trace query — and the " +
+      "schedule it sends on.",
+  },
+
+  webhook_header_values_required: {
+    title: "Send the header values with the new destination",
+    describe: () =>
+      "Header values belong to the endpoint they authenticate against, so " +
+      "they are not carried over to a new one. Include each header's value " +
+      "in the same request as the new URL.",
+  },
+
+  trigger_channel_not_enabled: {
+    title: "This project does not have that channel yet",
+    describe: () =>
+      "The automation was not saved. Pick a channel this project already " +
+      "delivers on, or ask us to turn this one on for you.",
+  },
+
   trigger_filters_required: {
     title: "This automation needs a condition",
     describe: () =>
       "Add a filter or a query that says which traces it is about. " +
       "Without one it would fire on every single trace.",
+  },
+
+  trigger_filters_unsupported: {
+    title: "None of these conditions can be used",
+    describe: () =>
+      "Every condition on this automation names something this platform no " +
+      "longer filters on. Add at least one condition it can act on.",
+  },
+
+  trigger_not_found: {
+    title: "This automation no longer exists",
+    describe: () =>
+      "It may have been deleted. Reload the list to see what is there now.",
   },
 
   // ==========================================================================
