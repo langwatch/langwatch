@@ -48,15 +48,15 @@ const CADENCE_HELP = {
   trace:
     "How often notifications go out — one per matching trace, or batched into a digest — plus how long to wait for late spans before evaluating.",
   customGraph:
-    "What makes the alert fire: the watched metric crosses this threshold over the chosen window.",
+    "What makes it fire: the watched metric crosses this threshold over the chosen window.",
   report: "When it's sent, as a recurring schedule in the timezone you pick.",
 } as const;
 
 /**
  * The Cadence facet (ADR-043 facet 4) — "what makes it run, and how often?".
- * Owns all timing: an automation's digest cadence + settle window, an
- * alert's threshold rule, a report's schedule. Reads and writes the draft
- * through the store.
+ * Owns all timing: a trace automation's digest cadence + settle window, a
+ * graph automation's threshold rule, a schedule's cron. Reads and writes the
+ * draft through the store.
  */
 export function CadenceSection({
   isEdit = false,
@@ -98,7 +98,7 @@ export function CadenceSection({
   );
 }
 
-/** Alert cadence: the threshold rule that fires it. */
+/** Graph-watching cadence: the threshold rule that fires it. */
 function GraphCadence() {
   const draft = useDraft();
   const dispatch = useAutomationStore((s) => s.dispatch);

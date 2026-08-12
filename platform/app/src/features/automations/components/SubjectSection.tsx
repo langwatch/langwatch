@@ -70,17 +70,17 @@ const SUBJECT_HELP = {
   trace:
     "Which incoming traces this automation acts on. It fires when a trace matches every condition you set.",
   customGraph:
-    "The metric this alert watches — one series on one of your analytics graphs.",
+    "The metric this automation watches — one series on one of your analytics graphs.",
   report:
     "What this schedule sends: a table of matching traces, a single graph, or a whole dashboard.",
 } as const;
 
 /**
  * The Subject facet (ADR-043 facet 3) — "what is it about?". Switches on
- * the preset: trace filters for an automation, a graph + series for an
- * alert, a content source for a report. Reads and writes the draft through
- * the store, so the awkward required-`report` prop the old secondary drawer
- * needed is gone.
+ * what the draft watches: trace filters, a graph plus the series to watch, or
+ * a schedule's content source. Reads and writes the draft through the store,
+ * so the awkward required-`report` prop the old secondary drawer needed is
+ * gone.
  */
 export function SubjectSection({
   prefilledGraphId,
@@ -117,7 +117,7 @@ export function SubjectSection({
   );
 }
 
-/** Alert subject: the custom graph + the series to watch. */
+/** Graph-watching subject: the custom graph + the series to watch. */
 function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
@@ -246,7 +246,7 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
  * fix is a way to create one, not a picker that can only ever be wrong. Also
  * covers the #6716 case where a template opens this same drawer with no
  * graph attached: either way, the author lands here with the same way out.
- * The link opens in a new tab so this alert draft is still exactly as left
+ * The link opens in a new tab so this draft is still exactly as left
  * when the author comes back to finish it.
  */
 function NoGraphsYet({ projectSlug }: { projectSlug?: string }) {
@@ -261,8 +261,9 @@ function NoGraphsYet({ projectSlug }: { projectSlug?: string }) {
       bg="bg.subtle"
     >
       <Text textStyle="sm">
-        This project doesn{"'"}t have a custom graph yet. An alert watches a
-        metric on one, so create a graph first, then come back here to pick it.
+        This project doesn{"'"}t have a custom graph yet. An automation watches
+        a metric on one, so create a graph first, then come back here to pick
+        it.
       </Text>
       {projectSlug ? (
         <>
@@ -277,7 +278,7 @@ function NoGraphsYet({ projectSlug }: { projectSlug?: string }) {
             </Button>
           </Link>
           <Text textStyle="2xs" color="fg.muted">
-            Opens in a new tab, so this alert stays exactly as you left it.
+            Opens in a new tab, so this automation stays exactly as you left it.
           </Text>
         </>
       ) : null}

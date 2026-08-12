@@ -392,14 +392,16 @@ describe("presetLabels", () => {
     expect(presetLabels("trace", true).saveButton).toBe("Save changes");
   });
 
-  it("gives an alert its own copy", () => {
-    expect(presetLabels("customGraph", false)).toMatchObject({
-      title: "New alert",
-      saveButton: "Create alert",
-      createdToast: "Alert created",
-      noun: "alert",
-    });
-    expect(presetLabels("customGraph", true).title).toBe("Edit alert");
+  it("names a graph-watching automation an automation, like any other", () => {
+    // ADR-093 §1: the alert/automation split was a distinction customers did
+    // not draw, so both subjects share one noun — which is what makes the
+    // delete dialog and its toast say "automation" for a graph row too.
+    expect(presetLabels("customGraph", false)).toEqual(
+      presetLabels("trace", false),
+    );
+    expect(presetLabels("customGraph", false).noun).toBe("automation");
+    expect(presetLabels("customGraph", true).title).toBe("Edit automation");
+    expect(presetLabels("customGraph", false).saveButton).not.toMatch(/alert/i);
   });
 
   it("gives a report schedule copy — never automation copy (field-5015)", () => {

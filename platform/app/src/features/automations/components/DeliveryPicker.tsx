@@ -229,7 +229,7 @@ function DeliveryCard({
   const description =
     !webhookEnabled && entry.shared.action === TriggerAction.SEND_SLACK_MESSAGE
       ? isAlertKind
-        ? "Post a message to Slack when the alert fires."
+        ? "Post a message to Slack when it fires."
         : "Post a message to Slack when a trace matches."
       : isAlertKind
         ? (entry.shared.alertDescription ?? entry.shared.description)

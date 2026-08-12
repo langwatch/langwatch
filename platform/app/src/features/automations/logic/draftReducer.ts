@@ -268,7 +268,7 @@ export function reducer(
   }
 }
 
-/** The Automation / Alert / Schedule noun set for one preset. */
+/** The Automation / Schedule noun set for one preset. */
 export interface PresetLabels {
   /** Drawer heading. */
   title: string;
@@ -283,26 +283,22 @@ export interface PresetLabels {
 }
 
 /**
- * The single source of truth for the Automation / Alert / Schedule nouns,
- * keyed on the preset (`draft.source`) so every heading, button, and toast
- * stays in step with the chosen type. Replaces the scattered
- * `source === "customGraph" ? … : …` two-way branches that classified a
- * REPORT as trace data — the visible bug where the drawer said "New report"
- * yet the save button read "Create automation" (field-5015).
+ * The single source of truth for the customer-facing nouns, keyed on the
+ * preset (`draft.source`) so every heading, button, and toast stays in step
+ * with what the row actually is.
+ *
+ * There are two nouns, not three (ADR-093 §1): an automation is defined by
+ * what it watches, and watching a graph is not a different kind of thing from
+ * watching a trace filter — that split was a distinction the product drew and
+ * customers did not. A schedule stays separate, because the clock is not
+ * something to watch and a report has no rule. The storage enum and the wire
+ * discriminator are untouched; this is vocabulary.
  */
 export function presetLabels(
   source: ConditionSource,
   isEdit: boolean,
 ): PresetLabels {
   switch (source) {
-    case "customGraph":
-      return {
-        title: isEdit ? "Edit alert" : "New alert",
-        saveButton: isEdit ? "Save alert" : "Create alert",
-        createdToast: "Alert created",
-        updatedToast: "Alert updated",
-        noun: "alert",
-      };
     case "report":
       return {
         title: isEdit ? "Edit schedule" : "New schedule",
@@ -311,6 +307,10 @@ export function presetLabels(
         updatedToast: "Schedule updated",
         noun: "schedule",
       };
+    // One noun for both subjects: a graph-watching automation is an
+    // automation, and the delete dialog, the toast, and the drawer heading all
+    // say so.
+    case "customGraph":
     case "trace":
       return {
         title: isEdit ? "Edit automation" : "Add automation",
