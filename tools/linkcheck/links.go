@@ -47,7 +47,10 @@ const (
 
 var (
 	markdownLink = regexp.MustCompile(`\[[^\]]*\]\(\s*<?([^)\s>]+)`)
-	htmlAttr     = regexp.MustCompile(`(?:href|src)\s*=\s*"([^"]+)"`)
+	// Case-insensitive and either quote style: HREF= and href='...' are valid
+	// HTML, and a badge written that way would otherwise go unchecked while
+	// the run still printed a tick.
+	htmlAttr = regexp.MustCompile(`(?i)(?:href|src)\s*=\s*(?:"([^"]+)"|'([^']+)')`)
 )
 
 // Extract returns every link in the document, line by line. The README's
@@ -81,13 +84,23 @@ func linksInLine(line string, number int) []Link {
 	var links []Link
 	for _, pattern := range []*regexp.Regexp{markdownLink, htmlAttr} {
 		for _, match := range pattern.FindAllStringSubmatch(line, -1) {
-			target := strings.TrimSpace(match[1])
-			if target != "" {
+			if target := firstCapture(match); target != "" {
 				links = append(links, Link{Target: target, Line: number})
 			}
 		}
 	}
 	return links
+}
+
+// firstCapture returns the first non-empty capture group, since the HTML
+// pattern has one group per quote style and only one of them can match.
+func firstCapture(match []string) string {
+	for _, group := range match[1:] {
+		if trimmed := strings.TrimSpace(group); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }
 
 func isFenceDelimiter(line string) bool {

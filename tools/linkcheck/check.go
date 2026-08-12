@@ -92,11 +92,15 @@ func (c Checker) checkPath(docPath, target string) (Verdict, string) {
 		resolved = filepath.Join(filepath.Dir(docPath), filepath.FromSlash(clean))
 	}
 
+	// filepath.Join collapses "..", so a target can name a path outside the
+	// checkout. GitHub 404s those, and answering OK because the host happens
+	// to have the file would be the wrong answer to the question asked.
+	relative, err := filepath.Rel(c.RepoRoot, resolved)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return Dead, fmt.Sprintf("path resolves outside the repository: %s", clean)
+	}
+
 	if _, err := os.Stat(resolved); err != nil {
-		relative, relErr := filepath.Rel(c.RepoRoot, resolved)
-		if relErr != nil {
-			relative = resolved
-		}
 		return Dead, fmt.Sprintf("no such path in the repository: %s", relative)
 	}
 	return OK, ""

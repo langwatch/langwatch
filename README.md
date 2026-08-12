@@ -82,8 +82,8 @@ Once running, LangWatch will be available at `http://localhost:5560`, where you 
 
 Run LangWatch on your own infrastructure:
 
-- [Docker Compose](https://docs.langwatch.ai/self-hosting/open-source#docker-compose) - Run LangWatch on your own machine.
-- [Kubernetes (Helm)](https://docs.langwatch.ai/self-hosting/open-source#helm-chart-for-langwatch) - Run LangWatch on a Kubernetes cluster using Helm.
+- [Docker Compose](https://docs.langwatch.ai/self-hosting/deployment/docker-compose) - Run LangWatch on your own machine.
+- [Kubernetes (Helm)](https://docs.langwatch.ai/self-hosting/deployment/kubernetes-helm) - Run LangWatch on a Kubernetes cluster using Helm.
 - [OnPrem](https://docs.langwatch.ai/self-hosting/onprem) - Cloud-specific setups for AWS, Google Cloud, and Azure.
 
 <details>

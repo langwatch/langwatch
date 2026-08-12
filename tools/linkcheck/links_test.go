@@ -121,6 +121,64 @@ func TestRunResolvesARelativeLinkAgainstTheRepository(t *testing.T) {
 	}
 }
 
+func TestRunFailsOnARelativeLinkThatEscapesTheRepository(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "repo")
+	if err := os.MkdirAll(root, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	// Exists on disk, but outside the repository — GitHub 404s it, so
+	// answering OK would be the wrong answer to the question asked.
+	if err := os.WriteFile(filepath.Join(root, "..", "outside.md"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	checker := linkcheck.Checker{RepoRoot: root}
+	results := checker.Run(t.Context(), filepath.Join(root, "README.md"), "[escape](/../outside.md)")
+
+	escaped := verdictOf(t, results, "/../outside.md")
+	if escaped.Verdict != linkcheck.Dead {
+		t.Errorf("got %v, want Dead", escaped.Verdict)
+	}
+	if !strings.Contains(escaped.Detail, "outside the repository") {
+		t.Errorf("want the reason reported, got %q", escaped.Detail)
+	}
+}
+
+func TestExtractReadsBothQuoteStylesAndAnyCase(t *testing.T) {
+	document := `<a HREF="https://langwatch.ai/upper">a</a> <img src='https://langwatch.ai/single'/>`
+
+	links := linkcheck.Extract(document)
+
+	if len(links) != 2 {
+		t.Fatalf("got %d links, want 2: %+v", len(links), links)
+	}
+	for index, want := range []string{"https://langwatch.ai/upper", "https://langwatch.ai/single"} {
+		if links[index].Target != want {
+			t.Errorf("link %d: got %q, want %q", index, links[index].Target, want)
+		}
+	}
+}
+
+func TestExtractSkipsLinksInsideFencedCodeBlocks(t *testing.T) {
+	document := "" +
+		"[real](https://langwatch.ai/real)\n" +
+		"```bash\n" +
+		"# [sample](https://langwatch.ai/not-a-real-link)\n" +
+		"```\n" +
+		"[also-real](https://langwatch.ai/also-real)\n"
+
+	links := linkcheck.Extract(document)
+
+	if len(links) != 2 {
+		t.Fatalf("got %d links, want 2 (the fenced one must be skipped): %+v", len(links), links)
+	}
+	for _, link := range links {
+		if strings.Contains(link.Target, "not-a-real-link") {
+			t.Errorf("a link inside a code fence was extracted: %q", link.Target)
+		}
+	}
+}
+
 // @scenario "A relative link to a path that no longer exists fails the check"
 func TestRunFailsOnARelativeLinkToAnAbsentPath(t *testing.T) {
 	checker := linkcheck.Checker{RepoRoot: t.TempDir()}
