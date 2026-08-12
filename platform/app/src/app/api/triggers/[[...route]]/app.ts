@@ -24,7 +24,10 @@ import { graphAlertActionParamsSchema } from "~/server/app-layer/automations/gra
 import { PublicApiTriggerService } from "~/server/app-layer/automations/public-api-trigger.service";
 import { reportActionParamsSchema } from "~/server/app-layer/automations/report.builder";
 import { TriggerFireHistoryService } from "~/server/app-layer/automations/trigger-fire-history.service";
-import { redactTriggerForPublicApi } from "~/server/app-layer/automations/trigger-redaction";
+import {
+  redactTriggerForPublicApi,
+  splitStoredRuleFromDelivery,
+} from "~/server/app-layer/automations/trigger-redaction";
 import { prisma } from "~/server/db";
 import { triggerFiltersPermissiveSchema } from "~/server/filters/types";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
@@ -68,6 +71,7 @@ const emailActionParamsSchema = z
       .min(1)
       .describe("Who receives the email. Any address, not only teammates."),
   })
+  .passthrough()
   .describe("Email delivery.");
 
 const slackActionParamsSchema = z
@@ -107,6 +111,7 @@ const slackActionParamsSchema = z
           "stored one.",
       ),
   })
+  .passthrough()
   .describe("Slack delivery, by incoming webhook or by bot connection.");
 
 const webhookActionParamsWireSchema = z
@@ -145,6 +150,7 @@ const webhookActionParamsWireSchema = z
           "sending the placeholder back keeps the stored one.",
       ),
   })
+  .passthrough()
   .describe("Delivery to a customer endpoint over HTTP.");
 
 const datasetActionParamsWireSchema = z
@@ -159,6 +165,7 @@ const datasetActionParamsWireSchema = z
       })
       .describe("How a trace becomes a row in that dataset."),
   })
+  .passthrough()
   .describe("Append matched traces to a dataset.");
 
 const annotationQueueActionParamsWireSchema = z
@@ -168,6 +175,7 @@ const annotationQueueActionParamsWireSchema = z
       .min(1)
       .describe("Who the queued items go to."),
   })
+  .passthrough()
   .describe("Queue matched traces for a person to label.");
 
 /**
@@ -178,16 +186,17 @@ const annotationQueueActionParamsWireSchema = z
  * does not declare. Several of these shapes are satisfiable by another
  * channel's payload — every Slack field is optional, so a webhook destination
  * reads as an empty Slack one — and a member that dropped what it did not
- * recognise would answer such a save by silently saving nothing. The channel's
- * own schema is the authority on the shape either way; this one says what the
- * fields are called.
+ * recognise would answer such a save by silently saving nothing. What the
+ * fields are is settled where the channel is known: the service reads the
+ * payload against the channel on the stored row and refuses a field that
+ * channel does not have, rather than inferring the shape from the payload.
  */
 const anyActionParamsSchema = z.union([
-  emailActionParamsSchema.passthrough(),
-  slackActionParamsSchema.passthrough(),
-  webhookActionParamsWireSchema.passthrough(),
-  datasetActionParamsWireSchema.passthrough(),
-  annotationQueueActionParamsWireSchema.passthrough(),
+  emailActionParamsSchema,
+  slackActionParamsSchema,
+  webhookActionParamsWireSchema,
+  datasetActionParamsWireSchema,
+  annotationQueueActionParamsWireSchema,
 ]);
 
 const templatesSchema = z
@@ -231,11 +240,19 @@ const triggerResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
   action: triggerActionEnum,
-  /** The delivery configuration, with every credential value replaced by the
-   *  `[redacted]` placeholder. Which channel is configured, which destination
-   *  is set and which header names are in play all survive; the values never
-   *  leave. Sending the placeholder back on an update keeps the stored value. */
+  /** Where this automation delivers, with every credential value replaced by
+   *  the `[redacted]` placeholder. Which channel is configured, which
+   *  destination is set and which header names are in play all survive; the
+   *  values never leave. Sending the placeholder back on an update keeps the
+   *  stored value. The rule the automation fires by is stated separately, in
+   *  `graphAlert` or `report`. */
   actionParams: z.record(z.unknown()),
+  graphAlert: graphAlertActionParamsSchema
+    .nullable()
+    .describe("The rule an alert fires by. Null for anything that is not one."),
+  report: reportActionParamsSchema
+    .nullable()
+    .describe("What a report renders and when. Null for anything else."),
   filters: z.record(z.unknown()),
   filterQuery: z.string().nullable(),
   kind: z
@@ -392,6 +409,24 @@ const testFireSchema = z.object({
     .describe("Webhook only: what the endpoint answered with."),
 });
 
+/**
+ * The rule an automation fires by, stated where a caller states it.
+ *
+ * At rest the rule shares a column with the delivery configuration; on the
+ * wire the two are separate fields, and a save refuses a rule sent inside
+ * `actionParams` rather than quietly overwriting it. So the read hands them
+ * over the same way round, and writing the response back means what it says.
+ */
+function toRuleResponse(trigger: Trigger) {
+  const { rule } = splitStoredRuleFromDelivery(trigger.actionParams);
+  const graphAlert = graphAlertActionParamsSchema.safeParse(rule);
+  const report = reportActionParamsSchema.safeParse(rule);
+  return {
+    graphAlert: graphAlert.success ? graphAlert.data : null,
+    report: report.success ? report.data : null,
+  };
+}
+
 function toTriggerResponse(trigger: Trigger) {
   let filters: Record<string, unknown> = {};
   if (typeof trigger.filters === "string") {
@@ -407,12 +442,14 @@ function toTriggerResponse(trigger: Trigger) {
   // Every verb answers through here, so the redaction is applied once for the
   // whole surface: list, read, create, update.
   const { actionParams } = redactTriggerForPublicApi(trigger);
+  const { delivery } = splitStoredRuleFromDelivery(actionParams);
 
   return {
     id: trigger.id,
     name: trigger.name,
     action: trigger.action,
-    actionParams: (actionParams ?? {}) as Record<string, unknown>,
+    actionParams: delivery,
+    ...toRuleResponse(trigger),
     filters,
     filterQuery: trigger.filterQuery,
     kind: trigger.triggerKind,

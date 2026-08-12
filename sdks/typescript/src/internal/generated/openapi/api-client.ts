@@ -24405,6 +24405,42 @@ export interface operations {
                         actionParams: {
                             [key: string]: unknown;
                         };
+                        /** @description The rule an alert fires by. Null for anything that is not one. */
+                        graphAlert: {
+                            threshold: number;
+                            /** @enum {string} */
+                            operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                            timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                            seriesName: string;
+                        } | null;
+                        /** @description What a report renders and when. Null for anything else. */
+                        report: {
+                            source: {
+                                /** @constant */
+                                kind: "dashboard";
+                                dashboardId: string;
+                            } | {
+                                /** @constant */
+                                kind: "customGraph";
+                                customGraphId: string;
+                            } | {
+                                /** @constant */
+                                kind: "traceQuery";
+                                /** @default {} */
+                                filters: {
+                                    [key: string]: unknown;
+                                };
+                                metric?: string;
+                                /** @default 5 */
+                                topN: number;
+                            };
+                            schedule: {
+                                cron: string;
+                                timezone: string;
+                            };
+                            /** @default false */
+                            compareToPrevious: boolean;
+                        } | null;
                         filters: {
                             [key: string]: unknown;
                         };
@@ -24502,6 +24538,8 @@ export interface operations {
                     actionParams: {
                         /** @description Who receives the email. Any address, not only teammates. */
                         members: string[];
+                    } & {
+                        [key: string]: unknown;
                     };
                     name: string;
                     filters?: {
@@ -24589,6 +24627,8 @@ export interface operations {
                         slackBotToken?: string;
                         /** @description Read: whether a bot token is stored. Write: `true` keeps the stored one. */
                         slackBotTokenSet?: boolean;
+                    } & {
+                        [key: string]: unknown;
                     };
                     name: string;
                     filters?: {
@@ -24678,6 +24718,8 @@ export interface operations {
                         bodyTemplate?: string | null;
                         /** @description Signs every delivery so the receiver can verify it came from LangWatch. A credential: it reads back as the placeholder, and sending the placeholder back keeps the stored one. */
                         signingSecret?: string | null;
+                    } & {
+                        [key: string]: unknown;
                     };
                     name: string;
                     filters?: {
@@ -24761,6 +24803,8 @@ export interface operations {
                             };
                             expansions?: string[];
                         };
+                    } & {
+                        [key: string]: unknown;
                     };
                     name: string;
                     filters?: {
@@ -24840,6 +24884,8 @@ export interface operations {
                             id: string;
                             name: string;
                         }[];
+                    } & {
+                        [key: string]: unknown;
                     };
                     name: string;
                     filters?: {
@@ -24927,6 +24973,42 @@ export interface operations {
                         actionParams: {
                             [key: string]: unknown;
                         };
+                        /** @description The rule an alert fires by. Null for anything that is not one. */
+                        graphAlert: {
+                            threshold: number;
+                            /** @enum {string} */
+                            operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                            timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                            seriesName: string;
+                        } | null;
+                        /** @description What a report renders and when. Null for anything else. */
+                        report: {
+                            source: {
+                                /** @constant */
+                                kind: "dashboard";
+                                dashboardId: string;
+                            } | {
+                                /** @constant */
+                                kind: "customGraph";
+                                customGraphId: string;
+                            } | {
+                                /** @constant */
+                                kind: "traceQuery";
+                                /** @default {} */
+                                filters: {
+                                    [key: string]: unknown;
+                                };
+                                metric?: string;
+                                /** @default 5 */
+                                topN: number;
+                            };
+                            schedule: {
+                                cron: string;
+                                timezone: string;
+                            };
+                            /** @default false */
+                            compareToPrevious: boolean;
+                        } | null;
                         filters: {
                             [key: string]: unknown;
                         };
@@ -25033,6 +25115,42 @@ export interface operations {
                         actionParams: {
                             [key: string]: unknown;
                         };
+                        /** @description The rule an alert fires by. Null for anything that is not one. */
+                        graphAlert: {
+                            threshold: number;
+                            /** @enum {string} */
+                            operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                            timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                            seriesName: string;
+                        } | null;
+                        /** @description What a report renders and when. Null for anything else. */
+                        report: {
+                            source: {
+                                /** @constant */
+                                kind: "dashboard";
+                                dashboardId: string;
+                            } | {
+                                /** @constant */
+                                kind: "customGraph";
+                                customGraphId: string;
+                            } | {
+                                /** @constant */
+                                kind: "traceQuery";
+                                /** @default {} */
+                                filters: {
+                                    [key: string]: unknown;
+                                };
+                                metric?: string;
+                                /** @default 5 */
+                                topN: number;
+                            };
+                            schedule: {
+                                cron: string;
+                                timezone: string;
+                            };
+                            /** @default false */
+                            compareToPrevious: boolean;
+                        } | null;
                         filters: {
                             [key: string]: unknown;
                         };
@@ -25370,6 +25488,42 @@ export interface operations {
                         actionParams: {
                             [key: string]: unknown;
                         };
+                        /** @description The rule an alert fires by. Null for anything that is not one. */
+                        graphAlert: {
+                            threshold: number;
+                            /** @enum {string} */
+                            operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                            timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                            seriesName: string;
+                        } | null;
+                        /** @description What a report renders and when. Null for anything else. */
+                        report: {
+                            source: {
+                                /** @constant */
+                                kind: "dashboard";
+                                dashboardId: string;
+                            } | {
+                                /** @constant */
+                                kind: "customGraph";
+                                customGraphId: string;
+                            } | {
+                                /** @constant */
+                                kind: "traceQuery";
+                                /** @default {} */
+                                filters: {
+                                    [key: string]: unknown;
+                                };
+                                metric?: string;
+                                /** @default 5 */
+                                topN: number;
+                            };
+                            schedule: {
+                                cron: string;
+                                timezone: string;
+                            };
+                            /** @default false */
+                            compareToPrevious: boolean;
+                        } | null;
                         filters: {
                             [key: string]: unknown;
                         };
@@ -25578,6 +25732,42 @@ export interface operations {
                         actionParams: {
                             [key: string]: unknown;
                         };
+                        /** @description The rule an alert fires by. Null for anything that is not one. */
+                        graphAlert: {
+                            threshold: number;
+                            /** @enum {string} */
+                            operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                            timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                            seriesName: string;
+                        } | null;
+                        /** @description What a report renders and when. Null for anything else. */
+                        report: {
+                            source: {
+                                /** @constant */
+                                kind: "dashboard";
+                                dashboardId: string;
+                            } | {
+                                /** @constant */
+                                kind: "customGraph";
+                                customGraphId: string;
+                            } | {
+                                /** @constant */
+                                kind: "traceQuery";
+                                /** @default {} */
+                                filters: {
+                                    [key: string]: unknown;
+                                };
+                                metric?: string;
+                                /** @default 5 */
+                                topN: number;
+                            };
+                            schedule: {
+                                cron: string;
+                                timezone: string;
+                            };
+                            /** @default false */
+                            compareToPrevious: boolean;
+                        } | null;
                         filters: {
                             [key: string]: unknown;
                         };
@@ -25696,6 +25886,42 @@ export interface operations {
                         actionParams: {
                             [key: string]: unknown;
                         };
+                        /** @description The rule an alert fires by. Null for anything that is not one. */
+                        graphAlert: {
+                            threshold: number;
+                            /** @enum {string} */
+                            operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                            timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                            seriesName: string;
+                        } | null;
+                        /** @description What a report renders and when. Null for anything else. */
+                        report: {
+                            source: {
+                                /** @constant */
+                                kind: "dashboard";
+                                dashboardId: string;
+                            } | {
+                                /** @constant */
+                                kind: "customGraph";
+                                customGraphId: string;
+                            } | {
+                                /** @constant */
+                                kind: "traceQuery";
+                                /** @default {} */
+                                filters: {
+                                    [key: string]: unknown;
+                                };
+                                metric?: string;
+                                /** @default 5 */
+                                topN: number;
+                            };
+                            schedule: {
+                                cron: string;
+                                timezone: string;
+                            };
+                            /** @default false */
+                            compareToPrevious: boolean;
+                        } | null;
                         filters: {
                             [key: string]: unknown;
                         };

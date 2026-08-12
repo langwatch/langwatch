@@ -12,6 +12,7 @@ import {
   sanitizeTriggerFilters,
   type TriggerFilterValue,
 } from "~/server/filters/types";
+import { rateLimit } from "~/server/rateLimit";
 import { translateFilterToClickHouse } from "../traces/filter-to-clickhouse";
 import type { AutomationCustomGraphService } from "./custom-graph.service";
 import { NOTIFY_TRIGGER_ACTIONS } from "./dispatch/triggerActionDispatch";
@@ -21,12 +22,15 @@ import {
   ReportChannelUnsupportedError,
   TestFireUnavailableError,
   TriggerActionImmutableError,
+  TriggerActionParamsUnknownFieldsError,
   TriggerChannelNotEnabledError,
   TriggerFilterQueryInvalidError,
   TriggerFiltersRequiredError,
   TriggerFiltersUnsupportedError,
   TriggerKindImmutableError,
   TriggerNotFoundError,
+  TriggerRuleFieldsMisplacedError,
+  TriggerTestFireRateLimitedError,
 } from "./errors";
 import {
   buildGraphAlertTriggerData,
@@ -38,6 +42,7 @@ import {
   resolveNotificationCadenceForCreate,
   resolveNotificationCadenceForUpdate,
 } from "./notification-cadence";
+import { actionParamsSchemaFor } from "./providers/registry";
 import { decryptSlackBotToken } from "./providers/slack/server";
 import {
   decryptWebhookHeaders,
@@ -48,10 +53,14 @@ import {
   buildReportTriggerData,
   extractReportFromTriggerRow,
   type ReportActionParams,
+  reportActionParamsSchema,
 } from "./report.builder";
 import type { TriggerService } from "./trigger.service";
 import type { TriggerFireHistoryService } from "./trigger-fire-history.service";
-import { persistPublicApiActionParams } from "./trigger-redaction";
+import {
+  deliveryFieldNames,
+  persistPublicApiActionParams,
+} from "./trigger-redaction";
 import type {
   DraftProject,
   TemplateDraft,
@@ -59,6 +68,18 @@ import type {
   TestFireWebhookDestination,
 } from "./trigger-template.service";
 import { validateTemplateDraft } from "./trigger-template.service";
+
+/** The same window the dashboard's test fire runs on, so a project cannot make
+ *  LangWatch send more often through the API than through the drawer. */
+const TEST_FIRE_WINDOW_SECONDS = 60;
+const TEST_FIRE_MAX_PER_WINDOW = 10;
+
+/** Where each kind of automation states the rule it fires by, read off the
+ *  schema that validates it so the two cannot drift. */
+const RULE_FIELD_NAMES: Record<"graphAlert" | "report", Set<string>> = {
+  graphAlert: new Set(Object.keys(graphAlertActionParamsSchema.shape)),
+  report: new Set(Object.keys(reportActionParamsSchema.shape)),
+};
 
 /**
  * What the public API is allowed to write, and on what terms.
@@ -171,6 +192,15 @@ export class PublicApiTriggerService {
       projectId,
     });
     const filters = this.sanitizeFilters(input.filters ?? {});
+    this.assertActionParamsFieldsAreThisChannels({
+      action: input.action,
+      actionParams: input.actionParams,
+      kind: input.customGraphId
+        ? TriggerKind.ALERT
+        : input.report
+          ? TriggerKind.REPORT
+          : TriggerKind.AUTOMATION,
+    });
     const delivery = (await persistPublicApiActionParams({
       action: input.action,
       incoming: input.actionParams,
@@ -404,6 +434,16 @@ export class PublicApiTriggerService {
    * The delivery configuration and the rule an automation fires by share one
    * column, so a save that touches either states both halves and the stored
    * row supplies the one this call did not.
+   *
+   * The stored rule is the base. A save that only replaces the delivery
+   * configuration says nothing about the rule, and a row whose rule then went
+   * missing would stop firing on a save that never mentioned it — including a
+   * row whose rule the automation's kind does not advertise.
+   *
+   * Only a rule that parses as one is carried across. Anything else left in
+   * that half of the stored column is the channel's own at-rest business —
+   * ciphertext under names no wire schema publishes — and the provider's hook
+   * has just decided what becomes of it.
    */
   private async actionParamsUpdate({
     projectId,
@@ -414,12 +454,31 @@ export class PublicApiTriggerService {
     stored: Trigger;
     input: PublicApiUpdateInput;
   }): Promise<Prisma.TriggerUncheckedUpdateInput> {
-    const rule = await this.resolveStoredRule({ stored, input });
+    const statedRule = await this.resolveStoredRule({ stored, input });
+    const rule =
+      statedRule === undefined && input.actionParams === undefined
+        ? undefined
+        : {
+            ...(this.storedGraphAlertRule(stored) ??
+              this.storedReport(stored) ??
+              {}),
+            ...(statedRule ?? {}),
+          };
 
     if (input.actionParams !== undefined) {
       // The channel is the stored row's: an update states a delivery
-      // configuration for the channel this automation already delivers on.
+      // configuration for the channel this automation already delivers on, and
+      // is held to that channel's fields rather than to whichever shape the
+      // payload resembles.
       await this.assertChannelEnabled({ action: stored.action, projectId });
+      this.assertActionParamsFieldsAreThisChannels({
+        action: stored.action,
+        actionParams: input.actionParams,
+        kind:
+          stored.customGraphId !== null
+            ? TriggerKind.ALERT
+            : stored.triggerKind,
+      });
       return {
         actionParams: (await persistPublicApiActionParams({
           action: stored.action,
@@ -515,11 +574,14 @@ export class PublicApiTriggerService {
   /**
    * Send this automation's message to the destination it is configured with.
    *
-   * The destination is the saved one, never one supplied by the caller: a test
-   * fire is proof that a configured automation delivers, not a way to send a
-   * message anywhere. That also keeps this off the open-relay shape ADR-031
-   * closed on the dashboard path, where the recipient is the signed-in user
-   * rather than anything the request carried.
+   * The destination is the saved one, never one supplied by the request. That
+   * is not by itself what keeps this off the open-relay shape ADR-031 closed
+   * on the dashboard path: there the recipient is the signed-in user and so is
+   * not the caller's to choose, while here the same caller can set an
+   * automation's recipients and then fire it. What bounds it is the cap below,
+   * which is the volume limit on how often a project can make LangWatch send —
+   * an email through the shared provider, or a request from our workers at an
+   * arbitrary destination (ADR-040 §4).
    */
   async testFire({
     projectId,
@@ -530,6 +592,7 @@ export class PublicApiTriggerService {
   }): Promise<TestFireResult> {
     const trigger = await this.getById({ projectId, triggerId });
     await this.assertChannelEnabled({ action: trigger.action, projectId });
+    await this.assertTestFireAllowed({ action: trigger.action, projectId });
     const project = await this.deps.resolveProject(projectId);
     const graphAlert = extractGraphAlertFromTriggerRow(trigger.actionParams);
     const report = extractReportFromTriggerRow(trigger.actionParams);
@@ -863,6 +926,58 @@ export class PublicApiTriggerService {
     return query;
   }
 
+  /**
+   * Hold a delivery configuration to the field names its channel publishes.
+   *
+   * The channel is known before the payload is read — named on a create, taken
+   * from the stored row on an update — so the shape is never inferred from
+   * what the payload happens to look like. That matters twice over: several
+   * channels are satisfiable by another one's payload, and a field the channel
+   * does not have has no safe reading. Dropping it saves an automation that
+   * delivers nowhere; keeping it parks another channel's key in the row, where
+   * a later conversion could adopt it as live configuration.
+   *
+   * The rule an automation fires by is refused here too rather than merged: it
+   * is stated in `graphAlert` or `report`, and inside `actionParams` it was
+   * overwritten by the stored rule on the way to storage — a save that
+   * answered 200 and changed nothing.
+   */
+  private assertActionParamsFieldsAreThisChannels({
+    action,
+    actionParams,
+    kind,
+  }: {
+    action: TriggerAction;
+    actionParams: Record<string, unknown>;
+    /** What the automation is, which decides where its rule is stated. */
+    kind: TriggerKind;
+  }): void {
+    const accepted = deliveryFieldNames(actionParamsSchemaFor(action));
+    const unknown = Object.keys(actionParams).filter(
+      (field) => !accepted.has(field),
+    );
+    if (unknown.length === 0) return;
+
+    const ruleField =
+      kind === TriggerKind.ALERT
+        ? "graphAlert"
+        : kind === TriggerKind.REPORT
+          ? "report"
+          : null;
+    if (ruleField) {
+      const misplaced = unknown.filter((field) =>
+        RULE_FIELD_NAMES[ruleField].has(field),
+      );
+      if (misplaced.length > 0) {
+        throw new TriggerRuleFieldsMisplacedError(misplaced, ruleField);
+      }
+    }
+    throw new TriggerActionParamsUnknownFieldsError(
+      unknown,
+      [...accepted].sort(),
+    );
+  }
+
   /** Conditions naming fields this platform no longer filters on are dropped.
    *  An automation left with nothing but those has no usable condition at all,
    *  which is a different answer from having written none. */
@@ -874,6 +989,38 @@ export class PublicApiTriggerService {
       throw new TriggerFiltersUnsupportedError(unknownFields);
     }
     return sanitized;
+  }
+
+  /**
+   * How often a project may make LangWatch send on its say-so.
+   *
+   * The same window the dashboard's test fire uses, keyed on the project
+   * rather than on a person, because a project API key is the identity behind
+   * the call. Email shares the mail provider with every customer and a webhook
+   * fires at an arbitrary destination from our workers, so both are capped;
+   * Slack is exempt, as it did on the dashboard, because its destination is
+   * pinned to Slack's own hosts.
+   */
+  private async assertTestFireAllowed({
+    action,
+    projectId,
+  }: {
+    action: TriggerAction;
+    projectId: string;
+  }): Promise<void> {
+    if (
+      action !== TriggerAction.SEND_EMAIL &&
+      action !== TriggerAction.SEND_WEBHOOK
+    ) {
+      return;
+    }
+    const limit = await rateLimit({
+      key: `testfire:project:${projectId}`,
+      windowSeconds: TEST_FIRE_WINDOW_SECONDS,
+      max: TEST_FIRE_MAX_PER_WINDOW,
+    });
+    if (!limit.allowed)
+      throw new TriggerTestFireRateLimitedError(limit.resetAt);
   }
 
   /** The webhook channel ships behind a release flag (ADR-040 §7). Gating the

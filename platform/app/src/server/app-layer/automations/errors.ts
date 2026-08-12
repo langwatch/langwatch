@@ -213,6 +213,90 @@ export class TriggerKindImmutableError extends HandledError {
   }
 }
 
+/**
+ * The delivery configuration named fields the channel does not have.
+ *
+ * They are refused rather than dropped. A dropped field is the failure this
+ * surface exists to remove: `slackChannelID` for `slackChannelId` saved
+ * cleanly, answered 200, and delivered nowhere — and on an update it was worse
+ * than useless, because the payload replaces the stored configuration whole.
+ */
+export class TriggerActionParamsUnknownFieldsError extends HandledError {
+  declare readonly code: "trigger_action_params_unknown_fields";
+
+  constructor(
+    /** The fields this channel does not have, in the order they were sent. */
+    public readonly fields: string[],
+    /** Every field it does have, so the caller can see the one it meant. */
+    public readonly accepted: string[],
+  ) {
+    super(
+      "trigger_action_params_unknown_fields",
+      "This delivery configuration names fields the channel does not have.",
+      { meta: { field: "actionParams", fields, accepted }, httpStatus: 422 },
+    );
+    this.name = "TriggerActionParamsUnknownFieldsError";
+  }
+}
+
+/**
+ * The rule an automation fires by was sent inside its delivery configuration.
+ *
+ * The two live in one column at rest, but they are stated separately on the
+ * wire: `graphAlert` and `report` are top-level fields. Sent inside
+ * `actionParams` they used to be overwritten by the stored rule on the way to
+ * storage, so the save answered 200 and changed nothing — the silent ignore
+ * this surface exists to remove.
+ */
+export class TriggerRuleFieldsMisplacedError extends HandledError {
+  declare readonly code: "trigger_rule_fields_misplaced";
+
+  constructor(
+    /** The rule fields that arrived in the wrong place. */
+    public readonly fields: string[],
+    /** Where they belong: `graphAlert` or `report`. */
+    public readonly expectedField: "graphAlert" | "report",
+  ) {
+    super(
+      "trigger_rule_fields_misplaced",
+      `The rule this automation fires by is stated in "${expectedField}", not ` +
+        "in its delivery configuration.",
+      {
+        meta: { field: "actionParams", fields, expectedField },
+        httpStatus: 422,
+      },
+    );
+    this.name = "TriggerRuleFieldsMisplacedError";
+  }
+}
+
+/**
+ * Too many test fires in too short a window.
+ *
+ * A test fire is the one verb here that makes LangWatch send something on the
+ * caller's say-so, to an address the same caller chose: an email automation
+ * states its own recipients, and a webhook one an arbitrary destination our
+ * workers then request (ADR-040 §4). Uncapped, either is a flood primitive
+ * driven from an API key. The cap is per project, because a project's API key
+ * is the identity behind the call.
+ */
+export class TriggerTestFireRateLimitedError extends HandledError {
+  declare readonly code: "trigger_test_fire_rate_limited";
+
+  constructor(
+    /** Epoch ms the current window ends at. */
+    public readonly resetAt: number,
+  ) {
+    super(
+      "trigger_test_fire_rate_limited",
+      "Too many test fires for this project. Wait for the current minute to " +
+        "pass and try again.",
+      { meta: { resetAt }, httpStatus: 429 },
+    );
+    this.name = "TriggerTestFireRateLimitedError";
+  }
+}
+
 /** A graph alert was saved without something it needs to fire: the rule it
  *  fires by, the severity it fires at, or a channel that can notify. */
 export class GraphAlertIncompleteError extends HandledError {

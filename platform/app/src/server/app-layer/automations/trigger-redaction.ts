@@ -153,16 +153,20 @@ export function redactTriggerForPublicApi<
  * also carries the rule an automation fires by — a graph alert's threshold, a
  * report's source and schedule — and a provider states its own fields
  * exhaustively, dropping anything it does not recognise so a channel can never
- * keep another channel's stale credential. So the two are separated by the
- * channel's own schema, the hook decides the delivery half, and the rule half
- * is carried across untouched (the same split the dashboard save makes).
+ * keep another channel's stale credential. So the two are separated by name,
+ * the hook decides the delivery half, and the rule half is carried across
+ * untouched (the same split the dashboard save makes).
  *
- * Slicing by the current channel alone holds because an update cannot change a
- * trigger's `action`: the channel that owns the stored delivery fields is the
- * same one that owns the incoming ones. Make the channel switchable and the
- * split has to widen to the union of every provider's field names, or the
- * outgoing channel's credentials would be carried across as if they were the
- * rule the automation fires by.
+ * The split reads **every** provider's field names as delivery, not only the
+ * current channel's. Slicing by the current channel alone would hold as long
+ * as nothing ever changes a trigger's `action` — this API refuses to — but the
+ * dashboard can convert one, and a payload naming another channel's field
+ * would until then have been carried across as if it were part of the rule,
+ * sitting in the row until a conversion made it live configuration. Reading
+ * the union means such a field reaches the channel's own schema instead, which
+ * states its fields exhaustively and drops it. The public API refuses it
+ * outright one layer up (`assertActionParamsFieldsAreThisChannels`); this is
+ * the same answer arrived at without depending on that.
  */
 export async function persistPublicApiActionParams({
   action,
@@ -184,7 +188,7 @@ export async function persistPublicApiActionParams({
 
   const { delivery, rule } = splitDeliveryFromRule(
     resolved,
-    deliveryFieldNames(entry.shared.actionParamsSchema),
+    everyChannelsDeliveryFieldNames(),
   );
   const persisted = await persistActionParamsFor(action, {
     incoming: readDeliveryConfiguration(
@@ -266,6 +270,38 @@ export function deliveryFieldNames(schema: ZodTypeAny): Set<string> {
     return new Set(Object.keys(current.shape as Record<string, unknown>));
   }
   return new Set();
+}
+
+/**
+ * Separate a stored `actionParams` into the two halves it carries: where the
+ * automation delivers, and the rule it fires by.
+ *
+ * The public API states those separately on the wire, so a read has to hand
+ * them over separately too — a caller writing back what it read would
+ * otherwise be sending the rule inside the delivery configuration, which is
+ * the one place the save refuses to read it.
+ */
+export function splitStoredRuleFromDelivery(actionParams: unknown): {
+  delivery: Record<string, unknown>;
+  rule: Record<string, unknown>;
+} {
+  if (!isRecord(actionParams)) return { delivery: {}, rule: {} };
+  return splitDeliveryFromRule(actionParams, everyChannelsDeliveryFieldNames());
+}
+
+/** Every field name any channel delivers by. A field one channel owns is
+ *  delivery wherever it turns up, so it can never be carried across as part of
+ *  the rule an automation fires by. Computed once — the registry is static. */
+let deliveryFieldNamesAcrossChannels: Set<string> | undefined;
+function everyChannelsDeliveryFieldNames(): Set<string> {
+  if (!deliveryFieldNamesAcrossChannels) {
+    deliveryFieldNamesAcrossChannels = new Set(
+      Object.values(SERVER_PROVIDERS).flatMap((entry) => [
+        ...deliveryFieldNames(entry.shared.actionParamsSchema),
+      ]),
+    );
+  }
+  return deliveryFieldNamesAcrossChannels;
 }
 
 function splitDeliveryFromRule(

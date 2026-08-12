@@ -363,6 +363,51 @@ describe("persistPublicApiActionParams", () => {
     });
   });
 
+  describe("given a payload naming a field another channel delivers by", () => {
+    /** @scenario "Another channel's field never survives as part of the rule" */
+    it("keeps it out of the rule the automation fires by", async () => {
+      const saved = (await persistPublicApiActionParams({
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+        incoming: {
+          slackDelivery: "webhook",
+          slackWebhook: SLACK_WEBHOOK,
+          // The webhook channel's, not Slack's. Read as delivery wherever it
+          // turns up, it reaches Slack's own schema and is dropped there; read
+          // as rule, it would sit in the row waiting for a channel that knows
+          // what to do with it.
+          headers: { Authorization: HEADER_VALUE },
+          url: "https://example.com/hooks/langwatch",
+        },
+      })) as Record<string, unknown>;
+
+      expect(saved.headers).toBeUndefined();
+      expect(saved.url).toBeUndefined();
+      expect(JSON.stringify(saved)).not.toContain(HEADER_VALUE);
+    });
+
+    /** @scenario "The rule an automation fires by still survives a save" */
+    it("still carries the rule across", async () => {
+      const saved = (await persistPublicApiActionParams({
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+        incoming: {
+          slackDelivery: "webhook",
+          slackWebhook: SLACK_WEBHOOK,
+          threshold: 5,
+          operator: "gt",
+          timePeriod: 60,
+          seriesName: "Errors",
+        },
+      })) as Record<string, unknown>;
+
+      expect(saved).toMatchObject({
+        threshold: 5,
+        operator: "gt",
+        timePeriod: 60,
+        seriesName: "Errors",
+      });
+    });
+  });
+
   describe("given a customer endpoint saved without any header", () => {
     it("stores the destination without inventing one", async () => {
       const saved = (await persistPublicApiActionParams({
