@@ -748,10 +748,12 @@ Feature: AI Gateway — Budgets
   @integration
   Scenario: Budget list Scope column renders the shared scope chip on one line
     Given budgets exist scoped to "organization acme-demo", "team platform",
-      "project gateway-demo", "virtual_key prod-openai", and "principal user@acme.com"
+      "project gateway-demo", "virtual_key prod-openai", "principal user@acme.com",
+      and a per-person allowance anchored on "virtual_key prod-openai"
     When I open the Budgets list
     Then each row's Scope cell is one line: the scope kind's icon and the target's name
     And the identifier that used to follow the name in parentheses is only in the chip's tooltip
+    And every kind names itself in its tooltip rather than borrowing the project chip
 
   @integration
   Scenario: Budget list links a virtual-key scope to that key

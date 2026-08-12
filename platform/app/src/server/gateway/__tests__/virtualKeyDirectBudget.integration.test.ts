@@ -160,7 +160,11 @@ describe("direct budget per virtual key (real PG + real CH)", () => {
       // A prefix match, or a read at the project's scope rather than the
       // key's bucket, would give the unused one this money too.
       expect(Number(used?.periodSpentUsd)).toBeCloseTo(1.25, 6);
-      expect(unused?.periodSpentUsd).toBe("0.000000");
+      // A confident zero, not the null an unreadable rollup reports. The
+      // digits it is written with belong to the money layer, so what is
+      // pinned here is the value and the fact that it was read at all.
+      expect(unused?.periodSpentUsd).not.toBeNull();
+      expect(Number(unused?.periodSpentUsd)).toBe(0);
     });
   });
 

@@ -6,6 +6,7 @@ import {
   KeyRound,
   Server,
   User,
+  UserRound,
   Users,
   UsersRound,
 } from "lucide-react";
@@ -17,10 +18,11 @@ import { Tooltip } from "~/components/ui/tooltip";
  * Scope kinds a chip can render. ORGANIZATION/TEAM/PROJECT mirror the
  * Prisma `ModelProviderScopeType` enum; DEPARTMENT is a picker/badge-only
  * capability (no enum row - see scope-selector-and-badges.md). GROUP,
- * PRINCIPAL and VIRTUAL_KEY are render-only kinds that gateway budgets
- * target; they are not offered by `ScopeChipPicker`. Surfaces that key on
- * the Prisma enum (model providers) never pass anything but the triad;
- * the tile catalog opts into ORGANIZATION + DEPARTMENT only.
+ * PRINCIPAL, VIRTUAL_KEY and ATTRIBUTED_USER are render-only kinds that
+ * gateway budgets target; they are not offered by `ScopeChipPicker`.
+ * Surfaces that key on the Prisma enum (model providers) never pass
+ * anything but the triad; the tile catalog opts into ORGANIZATION +
+ * DEPARTMENT only.
  */
 export type ProviderScopeType =
   | "ORGANIZATION"
@@ -29,7 +31,8 @@ export type ProviderScopeType =
   | "DEPARTMENT"
   | "GROUP"
   | "PRINCIPAL"
-  | "VIRTUAL_KEY";
+  | "VIRTUAL_KEY"
+  | "ATTRIBUTED_USER";
 
 type ScopeEntry = {
   scopeType: ProviderScopeType;
@@ -102,6 +105,15 @@ const CHIP_STYLES: Record<
     colorPalette: "orange",
     kind: "Virtual key",
     fallbackLabel: "Virtual key",
+  },
+  // The name a chip carries here is the anchor the allowance hangs off, a
+  // key or a project, not a person: the limit is handed to each end user
+  // the anchor's traffic is attributed to.
+  ATTRIBUTED_USER: {
+    icon: UserRound,
+    colorPalette: "green",
+    kind: "Attributed user",
+    fallbackLabel: "Attributed user",
   },
 };
 

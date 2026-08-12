@@ -121,6 +121,19 @@ const BUDGETS = [
       secondary: "ada@acme.test",
     },
   }),
+  // A per-person template names the anchor its allowance hangs off, so the
+  // chip carries a key's name under a kind of its own.
+  budget({
+    id: "bdg-attributed",
+    name: "per person cap",
+    scopeType: "ATTRIBUTED_USER",
+    scopeTarget: {
+      kind: "ATTRIBUTED_USER",
+      id: "vk-lw-01KYC7H",
+      name: "prod-openai",
+      secondary: "vk-lw-01KYC7H…",
+    },
+  }),
 ];
 
 vi.mock("~/utils/api", () => ({
@@ -187,6 +200,11 @@ describe("budgets list scope column", () => {
     expect(within(principal).getByText("Ada Lovelace")).toBeInTheDocument();
     expect(
       within(principal).queryByText(/ada@acme\.test/),
+    ).not.toBeInTheDocument();
+    const attributed = rowFor("per person cap");
+    expect(within(attributed).getByText("prod-openai")).toBeInTheDocument();
+    expect(
+      within(attributed).queryByText("attributed user"),
     ).not.toBeInTheDocument();
   });
 

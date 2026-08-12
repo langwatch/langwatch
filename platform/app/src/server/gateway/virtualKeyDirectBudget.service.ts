@@ -169,7 +169,7 @@ async function loadPeriodSpend(args: {
   try {
     const spends = await chRepo.getSpendForTargetsAcrossTenants(
       projects.map((p) => p.id),
-      spendTargetsForBudgets(budgets),
+      spendTargetsForBudgets({ budgets, now }),
       now,
     );
     return new Map(spends.map((s) => [s.budgetId, s.spentUsd]));

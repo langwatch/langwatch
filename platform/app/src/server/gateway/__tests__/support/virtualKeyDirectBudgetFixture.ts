@@ -10,6 +10,7 @@ import { nanoid } from "nanoid";
 
 import { prisma } from "~/server/db";
 import type { GatewayBudgetClickHouseRepository } from "../../budget.clickhouse.repository";
+import { usdToNanoUsd } from "../../wireMoney";
 
 const suffix = nanoid(8);
 
@@ -132,7 +133,10 @@ async function debit(
       window: args.window,
       virtualKeyId: args.virtualKeyId,
       gatewayRequestId: `req-${nanoid(10)}`,
-      amountUsd: args.amountUsd,
+      // The cases read in dollars; the ledger is priced in integer
+      // nano-USD, and the same boundary conversion the writer uses keeps
+      // the seeded money and the asserted money the same money.
+      amountNanoUsd: Number(usdToNanoUsd(args.amountUsd)),
       tokensInput: 10,
       tokensOutput: 5,
       tokensCacheRead: 0,

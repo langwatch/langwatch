@@ -182,7 +182,7 @@ export const virtualKeysRouter = createTRPCRouter({
           prisma: ctx.prisma,
           organizationId: input.organizationId,
           virtualKeyIds: keys.map((k) => k.id),
-          chRepo: chRepoOrUndefined(),
+          chRepo: getApp().gateway.budgets,
           now,
         }),
       ]);
