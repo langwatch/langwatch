@@ -9,7 +9,7 @@ import {
 } from "@chakra-ui/react";
 import type { SlackDeliveryMethod } from "@langwatch/automations/providers/slack";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   type DraftCadence,
   pickDefaultSlackBlockKitTemplateId,
@@ -75,9 +75,25 @@ export function SlackBlockKitTemplatePicker({
   onSelect,
   onSelectOtherCadence,
 }: Props) {
-  const options = templateOptionsFor({ cadence, kind, reportSource });
+  // The grouping (which layouts sit in the primary grid vs. behind the
+  // "N more layouts" disclosure) is latched to the cadence the picker
+  // MOUNTED with. Picking a cross-cadence layout changes the draft's
+  // cadence — see `onSelectOtherCadence` below — and that change flows back
+  // down as a new `cadence` prop. Deriving the grouping from the live prop
+  // would then swap the two groups on every cross-cadence pick: the
+  // disclosure the author just expanded becomes the primary grid and jumps
+  // to the top, and the layout they were looking at moves out from under
+  // them. Selecting still updates the highlight and the draft's cadence —
+  // it just never reshuffles the list.
+  const groupingCadenceRef = useRef(cadence);
+  const groupingCadence = groupingCadenceRef.current;
+  const options = templateOptionsFor({
+    cadence: groupingCadence,
+    kind,
+    reportSource,
+  });
   const otherCadence: DraftCadence =
-    cadence === "digest" ? "immediate" : "digest";
+    groupingCadence === "digest" ? "immediate" : "digest";
   const otherOptions = templateOptionsFor({
     cadence: otherCadence,
     kind,
