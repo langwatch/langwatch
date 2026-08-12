@@ -24,6 +24,10 @@ import { useAutomationStore } from "./automationStore";
 export const useDraft = () => useAutomationStore((s) => s.draft);
 export const useSection = () => useAutomationStore((s) => s.section);
 export const useTestHistory = () => useAutomationStore((s) => s.testHistory);
+/** The wizard step on screen, and the furthest one reached (ADR-093 §4). */
+export const useWizardStep = () => useAutomationStore((s) => s.step);
+export const useFurthestWizardStep = () =>
+  useAutomationStore((s) => s.furthestStep);
 
 export const useConditionsSet = () =>
   useAutomationStore((s) => conditionsAreSet(s.draft));

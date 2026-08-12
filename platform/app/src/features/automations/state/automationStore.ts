@@ -5,6 +5,7 @@ import {
   INITIAL_DRAFT,
   reducer,
 } from "../logic/draftReducer";
+import { stepIndex, type WizardStep } from "../logic/wizardSteps";
 
 export const MAX_TEST_HISTORY = 5;
 
@@ -33,12 +34,20 @@ export interface AutomationStore {
   /** Pure-state portion. The whole drawer is a view onto this. */
   draft: AutomationDraft;
   section: Section;
+  /** The wizard step on screen (ADR-093 §4). */
+  step: WizardStep;
+  /** The furthest step the author has reached, so the rail knows which
+   *  earlier steps stay one click away. */
+  furthestStep: WizardStep;
   testHistory: TestFireAttempt[];
 
   /** Drives the pure reducer. */
   dispatch: (action: DraftAction) => void;
   /** Open or close a secondary drawer. */
   setSection: (section: Section) => void;
+  /** Show a wizard step. Reaching a later step never un-reaches an earlier
+   *  one, so stepping back leaves every step clickable. */
+  setStep: (step: WizardStep) => void;
   /** Prepend a test-fire attempt; cap at `MAX_TEST_HISTORY`. */
   pushTestAttempt: (attempt: TestFireAttempt) => void;
   /** Replace the whole draft (edit hydration path). */
@@ -58,15 +67,32 @@ export interface AutomationStore {
 export const useAutomationStore = create<AutomationStore>((set) => ({
   draft: INITIAL_DRAFT,
   section: null,
+  step: "watch",
+  furthestStep: "watch",
   testHistory: [],
 
   dispatch: (action) =>
     set((state) => ({ draft: reducer(state.draft, action) })),
   setSection: (section) => set({ section }),
+  setStep: (step) =>
+    set((state) => ({
+      step,
+      furthestStep:
+        stepIndex(step) > stepIndex(state.furthestStep)
+          ? step
+          : state.furthestStep,
+    })),
   pushTestAttempt: (attempt) =>
     set((state) => ({
       testHistory: [attempt, ...state.testHistory].slice(0, MAX_TEST_HISTORY),
     })),
   hydrate: (draft) => set({ draft }),
-  reset: () => set({ draft: INITIAL_DRAFT, section: null, testHistory: [] }),
+  reset: () =>
+    set({
+      draft: INITIAL_DRAFT,
+      section: null,
+      step: "watch",
+      furthestStep: "watch",
+      testHistory: [],
+    }),
 }));
