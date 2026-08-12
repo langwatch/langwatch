@@ -76,6 +76,7 @@ self-hosting. The values you most often override:
 | `autoscaling.minReplicas` / `maxReplicas` | HPA bounds                                              |
 | `resources`                   | Pod CPU/memory requests + limits                                     |
 | `otel.endpoint`               | Optional OTLP HTTP exporter URL (gateway emits its own spans)        |
+| `spend.enabled`               | Kill switch for spend emission (default `true`). Off means no budget debits are ever written |
 
 The pod ships hardened (`podSecurityContext` / `containerSecurityContext` in
 `values.yaml`): non-root at both pod and container level, read-only root,
@@ -89,7 +90,7 @@ it is a public-facing, tenant-controlled egress workload, so there is no
 configuration under which projecting a cluster credential into it is correct.
 
 Many `values.yaml` knobs are exposed as forward-compat for v1.1 and
-have no effect in v1 (e.g. `cache.lruSize`, `redis.url`,
+have no effect in v1 (e.g. `cache.lruSize`,
 `bifrost.poolSize`, `admin.addr`, `guardrails.*`). They are
 intentionally kept in the values surface so operator runbooks built
 today survive v1.1 without re-pinning. See

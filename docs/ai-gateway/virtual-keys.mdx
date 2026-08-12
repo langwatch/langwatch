@@ -117,11 +117,22 @@ Rotate a VK when you believe the secret may have leaked or as part of routine hy
 4. The old secret remains valid for a 24-hour **grace window** to let in-flight deploys update.
 5. After the grace window ends, only the new secret works.
 
-Rotation keeps the same `vk_id`, same ownership, same configuration, only the secret changes. Observability traces remain continuous across rotation.
+Rotation keeps the same `vk_id`, same ownership, same configuration, only the secret changes. Observability traces remain continuous across rotation. Rotation emits `gateway.virtual_key.rotated` to your [webhook endpoints](/features/webhooks#family-gateway), so a provisioning backend can mirror the new secret while the previous one is still inside its grace window.
+
+## Disable and enable: the reversible stop
+
+Disabling a VK stops it without destroying anything: requests on the key are rejected with the **distinct** `virtual_key_disabled` error (`403`) until it is enabled again, so tenant tooling can tell a paused key from a revoked one. Use it as the kill switch for non-payment, abuse, or incident containment, anywhere you may want the key back.
+
+- Budgets, scopes, configuration, key material, and **any rotation grace that was running** stay intact. Enable restores the key exactly as it was.
+- Both calls are idempotent, take an optional `reason` (recorded in the audit log and on the lifecycle event), and propagate to the gateway in seconds through the change feed.
+- `POST /api/gateway/v1/virtual-keys/:id/disable` and `.../enable`, permission `virtualKeys:update`.
+- Each transition emits a webhook event (`gateway.virtual_key.disabled`, `gateway.virtual_key.enabled`) alongside `created` and `revoked`, so a provisioning backend can mirror key state without polling. See [Webhooks](/features/webhooks#family-gateway).
+
+Disable is the pause; revoke is the goodbye. If you find yourself scheduling a revoke "in case the customer comes back", you want disable.
 
 ## Revocation
 
-Revocation immediately invalidates the secret. There is **no grace period** on revoke.
+Revocation immediately invalidates the secret. There is **no grace period** on revoke, and it is one-way: re-activating means minting a new key. Revoking also archives the key's own budgets and discards any rotation grace.
 
 Gateway caches are invalidated within 60 seconds via the `/internal/gateway/changes` long-poll. If you need instant invalidation everywhere (e.g. incident response), restart the gateway pods, the next request that hits them will pull fresh state before serving.
 
@@ -164,6 +175,7 @@ Acting on VKs requires the following permissions (2-segment `resource:action`):
 | View another user's personal VK | `virtualKeys:viewOtherPersonal` |
 | Create | `virtualKeys:create` (must hold `:manage` at every named scope when creating multi-scope) |
 | Update config | `virtualKeys:update` |
+| Disable, enable | `virtualKeys:update` |
 | Rotate | `virtualKeys:rotate` |
 | Delete, revoke | `virtualKeys:delete` |
 | All of the above | `virtualKeys:manage` |
@@ -176,7 +188,7 @@ The first time the gateway sees a presented VK:
 
 1. Calls `/internal/gateway/resolve-key` on the LangWatch control-plane → receives a signed JWT (15-minute TTL) with identity claims (`vk_id`, `project_id`, `principal_id`, etc.) plus a `revision` number.
 2. Calls `/internal/gateway/config/:vk_id` (with `If-None-Match: <revision>` on subsequent fetches) → receives the fat config (providers, fallback, guardrails, budgets).
-3. Caches both in-memory (L1 LRU) and optionally in Redis (L2, shared across gateway pods).
+3. Caches both in an in-memory LRU, private to that gateway pod.
 4. Subscribes to `/internal/gateway/changes?since=<revision>` long-poll, on any mutation to any VK, the gateway invalidates and re-fetches.
 
 Subsequent requests with the same VK are served entirely from cache. JWT verification is local (HS256 shared secret); no control-plane round-trip on the hot path.

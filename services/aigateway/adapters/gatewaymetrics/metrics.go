@@ -36,11 +36,11 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-// Auth cache tiers reported on the auth-cache metrics.
-const (
-	TierL1      = "l1"
-	TierL2Redis = "l2_redis"
-)
+// TierL1 is the auth cache tier reported on the auth-cache metrics. The
+// gateway caches virtual keys in each pod's own memory and nowhere else, so
+// the label carries one value; it stays a label because these metric names
+// are published and an operator's dashboard should not break to save a string.
+const TierL1 = "l1"
 
 // Guardrail verdict label values. Allow/block/modify mirror the control
 // plane's decision; FailOpen is recorded when the guardrail service could
@@ -57,6 +57,16 @@ const (
 const (
 	CacheOutcomeHit  = "hit"
 	CacheOutcomeMiss = "miss"
+)
+
+// Drop reasons on gateway_spend_spool_dropped_total. Intake is a record the
+// spool's writer could not accept (queue full, or the spool already closed);
+// overflow is a sealed segment deleted to keep the spool inside its size
+// bound. They separate a pod producing faster than it can write from a pod
+// producing faster than it can ship.
+const (
+	SpoolDropIntake   = "intake"
+	SpoolDropOverflow = "overflow"
 )
 
 // unknownLabel is the placeholder for a dimension that is genuinely not
@@ -104,9 +114,11 @@ type Recorder struct {
 	internalRTT    *prometheus.HistogramVec
 	controlPlane   *prometheus.CounterVec
 	rateLimits     *prometheus.CounterVec
+	clientRejects  *prometheus.CounterVec
 
 	draining      gaugeSource
 	authCacheSize gaugeSource
+	spendSpool    spoolStatsSource
 
 	// models bounds how many distinct caller-supplied model names may
 	// become labels. See modelLabel.
@@ -175,7 +187,7 @@ func New() *Recorder {
 
 	r.authHits = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "gateway_auth_cache_hits_total",
-		Help: "Virtual-key resolutions served from cache, by tier (l1, l2_redis).",
+		Help: "Virtual-key resolutions served from cache, by tier (l1).",
 	}, []string{"tier"})
 
 	r.authMisses = prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -224,6 +236,11 @@ func New() *Recorder {
 		Help: "Requests denied by a gateway rate limit, by the dimension that tripped (rpm, rpd) and the virtual key.",
 	}, []string{"dimension", "vk_id"})
 
+	r.clientRejects = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "gateway_client_rejects_total",
+		Help: "Requests the gateway itself rejected as the caller's fault, by gateway error code and virtual key.",
+	}, []string{"code", "vk_id"})
+
 	r.register(
 		prometheus.NewGaugeFunc(prometheus.GaugeOpts{
 			Name: "gateway_draining",
@@ -234,12 +251,27 @@ func New() *Recorder {
 			Help:        "Virtual keys currently held in the in-memory key cache.",
 			ConstLabels: prometheus.Labels{"tier": TierL1},
 		}, r.authCacheSize.value),
+		prometheus.NewCounterFunc(prometheus.CounterOpts{
+			Name: "gateway_spend_spool_appended_total",
+			Help: "Spend records written to the on-disk spool. The denominator for the drop counters.",
+		}, func() float64 { return float64(r.spendSpool.stats().Appended) }),
+		prometheus.NewCounterFunc(prometheus.CounterOpts{
+			Name:        "gateway_spend_spool_dropped_total",
+			Help:        "Spend records lost before they could ship, by reason (intake, overflow). Gateway budget debits come from these records, so every drop is spend that is never billed and never enforced against.",
+			ConstLabels: prometheus.Labels{"reason": SpoolDropIntake},
+		}, func() float64 { return float64(r.spendSpool.stats().DroppedIntake) }),
+		prometheus.NewCounterFunc(prometheus.CounterOpts{
+			Name:        "gateway_spend_spool_dropped_total",
+			Help:        "Spend records lost before they could ship, by reason (intake, overflow). Gateway budget debits come from these records, so every drop is spend that is never billed and never enforced against.",
+			ConstLabels: prometheus.Labels{"reason": SpoolDropOverflow},
+		}, func() float64 { return float64(r.spendSpool.stats().DroppedOverflow) }),
 		r.httpRequests, r.httpDuration, r.inFlight,
 		r.streamingOpen, r.streamNoUsage,
 		r.providerTime, r.providerTries, r.fallbackEvents, r.circuitState,
 		r.authHits, r.authMisses, r.authLookups,
 		r.budgetBlocks, r.cacheHits, r.cacheRuleHits,
 		r.guardrails, r.internalRTT, r.controlPlane, r.rateLimits,
+		r.clientRejects,
 	)
 	return r
 }
@@ -350,6 +382,49 @@ func (r *Recorder) TrackAuthCacheSize(size func() int) {
 		return
 	}
 	r.authCacheSize.set(func() float64 { return float64(size()) })
+}
+
+// SpoolStats is the spend spool's counter snapshot. Declared here rather
+// than imported from the emitter so the collector set stays independent of
+// how the spool is built.
+type SpoolStats struct {
+	Appended        uint64
+	DroppedIntake   uint64
+	DroppedOverflow uint64
+}
+
+// TrackSpendSpool points the spend-spool counters at the live spool.
+// Registered up front for the same reason as TrackDraining, and left
+// unattached when the spool failed to open: that pod serves without spend
+// emission, and a flat zero series says so where a missing series would
+// just look like a scrape problem.
+func (r *Recorder) TrackSpendSpool(stats func() SpoolStats) {
+	if r == nil || stats == nil {
+		return
+	}
+	r.spendSpool.set(stats)
+}
+
+// spoolStatsSource is gaugeSource's counter equivalent: the spool is built
+// after the registry, and may never be built at all.
+type spoolStatsSource struct {
+	mu sync.RWMutex
+	fn func() SpoolStats
+}
+
+func (s *spoolStatsSource) set(fn func() SpoolStats) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.fn = fn
+}
+
+func (s *spoolStatsSource) stats() SpoolStats {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.fn == nil {
+		return SpoolStats{}
+	}
+	return s.fn()
 }
 
 // gaugeSource lets a gauge be registered before the thing it measures
@@ -496,6 +571,24 @@ func (r *Recorder) RecordRateLimitDenied(dimension, vkID string) {
 		return
 	}
 	r.rateLimits.WithLabelValues(orUnknown(dimension), orUnknown(vkID)).Inc()
+}
+
+// RecordClientReject counts a request the gateway rejected as the caller's
+// fault, keyed by the error code and the virtual key that sent it.
+//
+// The label set is the whole point, so it is worth being explicit about what
+// is NOT here. Project and model are both omitted: project is redundant with
+// the key (a virtual key belongs to exactly one project, and the log line
+// already carries both), and model is caller-controlled on a key that permits
+// arbitrary names, which is the same unbounded-label trap modelLabel exists to
+// cap. Code is a closed enum of the gateway's own codes, and vk_id is minted
+// by the control plane and bounded by the keys a deployment has issued, which
+// is the pairing gateway_rate_limit_denied_total already uses.
+func (r *Recorder) RecordClientReject(code, vkID string) {
+	if r == nil {
+		return
+	}
+	r.clientRejects.WithLabelValues(orUnknown(code), orUnknown(vkID)).Inc()
 }
 
 // StreamOpened marks a streaming response as open.

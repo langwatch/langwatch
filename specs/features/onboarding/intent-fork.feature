@@ -98,6 +98,41 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
       When onboarding completes
       Then an organization, a team, and a default project exist for the user
 
+  # ============================================================================
+  # Onboarding is only ever offered to someone who belongs to nothing
+  # ============================================================================
+
+  Rule: a member of an organization is never asked to create one
+
+    # Onboarding is the page that creates an organization, so offering it to
+    # somebody who already belongs to one can only produce a second organization
+    # nobody wanted. Whether they are onboarded used to be read off the
+    # organization's primary intent, which is null for every organization created
+    # before this fork and every one created outside onboarding. So a member who
+    # had just accepted an invitation into such an organization was shown "let's
+    # kick off by creating your organization", and the screen offered nothing else
+    # to do. Reported by a customer whose invited colleague could not escape it.
+
+    @unit
+    Scenario: An invited member of an organization with no shared project goes home
+      Given the user belongs to an organization with no primary intent
+      And that organization has no project in a shared team
+      When the welcome screen decides where they go
+      Then they are sent home rather than into organization creation
+
+    @unit
+    Scenario: A member whose only team is their own workspace goes home
+      Given the user belongs to an organization with no primary intent
+      And their only team there is their personal workspace
+      When the welcome screen decides where they go
+      Then they are sent home rather than into organization creation
+
+    @unit
+    Scenario: Someone who belongs to no organization is still onboarded
+      Given the user belongs to no organization
+      When the welcome screen decides where they go
+      Then they are sent to organization creation
+
   Rule: the governance track provisions the signer's personal workspace
 
     # Coding-agent usage lands in a personal workspace, so /me is empty until
@@ -109,11 +144,6 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
     # onboarding path. CLI login still provisions on its own, unchanged and
     # still idempotent, so a user who signs up on one machine and logs in on
     # another gets the same single workspace either way.
-    #
-    # Held until personal workspaces stopped consuming plan limits (#6189):
-    # before that, provisioning one at signup spent a project and a team out
-    # of the free plan's allowance of two and one, so a free customer landed
-    # on their first real project already at the ceiling.
 
     @unit
     Scenario: Governance signup provisions the personal workspace
@@ -122,12 +152,11 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
       Then the user has a personal workspace in the new organization
 
     @unit
-    Scenario: The personal workspace does not spend the plan's allowance
+    Scenario: The personal workspace stays separate from the shared workspace
       Given the user selected the coding-agent tracking intent
-      And the organization is on the free plan
       When onboarding completes
-      Then the organization can still create its full allowance of projects
-      And the organization can still create its full allowance of teams
+      Then the personal project is marked personal and owned by the signer
+      And the organization's shared team is not the personal one
 
     @unit
     Scenario: Failing to provision the workspace does not cost the user their organization

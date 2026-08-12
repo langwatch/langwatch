@@ -14,8 +14,38 @@ Feature: Structured Logging for ClickHouse Queries
   @unit @regression
   Scenario: Query failures are logged with structured metadata
     When a ClickHouse query fails
-    Then a structured error log is emitted with source, operation, durationMs, and error
+    Then a structured log is emitted with source, operation, durationMs, and the cause
     And the log is tagged with source "clickhouse" to distinguish from general application errors
+
+  # ---------------------------------------------------------------------------
+  # Who owns the verdict
+  #
+  # A failed attempt is raised to a caller, and the caller is what knows how the
+  # story ends: a read has its translated error surfaced at the request
+  # boundary, and an insert is issued from a job the queue retries and, if it
+  # finally gives up, drops loudly with its own error record and counter.
+  #
+  # This wrapper sees none of that. Reporting each attempt as an error made
+  # recovered work indistinguishable from lost work — 17k records a day on one
+  # service against zero jobs actually dropped. So the attempt is reported, and
+  # the verdict is left to whoever has it.
+  # ---------------------------------------------------------------------------
+
+  @unit @regression
+  Scenario: A failed attempt raised to the caller is not itself an error
+    When a ClickHouse query fails and the error is raised to the caller
+    Then the attempt is logged at warning level
+    And the failure is still counted for alerting
+
+  # The field name is a contract, not just "anything but error" — log queries
+  # read it by name, so a rename to some other wrong key breaks them just as
+  # thoroughly as leaving it on "error" would.
+  @unit @regression
+  Scenario: The cause rides on the named query-cause field
+    When a ClickHouse attempt fails
+    Then the cause is attached under the field "queryError"
+    And no field named "error" is emitted
+    And the record does not claim a failure that the level did not establish
 
   @unit @regression
   Scenario: Query successes are logged at debug level
@@ -36,17 +66,25 @@ Feature: Structured Logging for ClickHouse Queries
   # ---------------------------------------------------------------------------
   # Retry behavior
   #
-  # Both reads and inserts retry transient ClickHouse failures (overload,
-  # connection, cluster-recovery). Read-side retry behavior lives in
-  # clickhouse-concurrency-resilience.feature; the insert scenarios stay here
-  # next to the logging they emit.
+  # Reads retry transient ClickHouse failures (overload, connection,
+  # cluster-recovery); that behaviour lives in
+  # clickhouse-concurrency-resilience.feature. Inserts do not retry here, and
+  # the scenarios for that stay in this file next to the logging they emit.
+  #
+  # Inserts are only ever issued from a queued job, which retries the whole job
+  # on its own backoff, so retrying again at the client multiplies attempts
+  # rather than adding resilience. It is also the unsafe half: these are async
+  # inserts with deduplication left at ClickHouse's default of off, so a failure
+  # raised after the server has buffered the batch can still flush, and a retry
+  # writes the rows twice.
   # ---------------------------------------------------------------------------
 
   @unit @regression
-  Scenario: Transient insert errors are retried with exponential backoff
+  Scenario: Insert failures are not retried by the client
+    Given every insert is issued from a job the queue will retry
     When an insert fails with a transient error
-    Then the insert is retried up to the configured maximum
-    And each retry uses jittered exponential backoff
+    Then the insert is attempted exactly once
+    And the failure is raised to the caller for the queue to retry
 
   @unit @regression
   Scenario: Non-transient insert errors fail immediately

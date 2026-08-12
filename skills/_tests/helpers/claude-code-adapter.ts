@@ -92,7 +92,7 @@ export function installSkillToWorkDir({
 
 const cliDistPath = path.resolve(
 	__dirname,
-	"../../../typescript-sdk/dist/cli/index.js",
+	"../../../sdks/typescript/dist/cli/index.js",
 );
 
 /**
@@ -106,7 +106,7 @@ export function setupLocalCli(workingDirectory: string): void {
 	if (!fs.existsSync(cliDistPath)) {
 		throw new Error(
 			`Local langwatch CLI not built at ${cliDistPath}. ` +
-				`Run \`pnpm build\` inside typescript-sdk/ before running scenario tests.`,
+				`Run \`pnpm build\` inside sdks/typescript/ before running scenario tests.`,
 		);
 	}
 

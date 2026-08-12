@@ -1,0 +1,607 @@
+/**
+ * Unit tests for the runtime path-selection UX of `langwatch <tool>`.
+ *
+ * Covers the decision tree (override flag / env, remembered pref,
+ * single-allowed-path, both-allowed prompt, non-TTY default) and the
+ * `--tool-mode` arg-strip that keeps the wrapper flag out of the child's
+ * argv. The prompt + config-save are injected seams, so no module mock
+ * or filesystem touch is needed.
+ */
+import { describe, it, expect, vi } from "vitest";
+
+import type { GovernanceConfig } from "../config";
+import {
+  parseToolModeFlag,
+  resolveWrapperPath,
+  pathChoiceMessage,
+  gatewayChoiceTitle,
+  gatewayChoiceDescription,
+  otlpChoiceTitle,
+  otlpChoiceDescription,
+} from "../wrapper-path-choice";
+
+function baseCfg(overrides: Partial<GovernanceConfig> = {}): GovernanceConfig {
+  return {
+    gateway_url: "http://gw.example.com",
+    control_plane_url: "http://app.example.com",
+    access_token: "tok",
+    organization: { id: "o1", slug: "acme" },
+    ...overrides,
+  };
+}
+
+/** A prompts() stub that returns a fixed selection and records the call. */
+function selectingPrompt(value: "gateway" | "ingestion") {
+  return vi.fn(async () => ({ path: value })) as unknown as Parameters<
+    typeof resolveWrapperPath
+  >[0]["promptImpl"];
+}
+
+const neverPrompt = vi.fn(async () => {
+  throw new Error("prompt should not have been called");
+}) as unknown as Parameters<typeof resolveWrapperPath>[0]["promptImpl"];
+
+describe("parseToolModeFlag", () => {
+  describe("given no wrapper flag is present", () => {
+    it("forwards every arg verbatim in order with no override", () => {
+      const input = ["--dangerously-skip-permissions", "-p", "say hi"];
+      const out = parseToolModeFlag(input, {});
+      expect(out.args).toEqual([
+        "--dangerously-skip-permissions",
+        "-p",
+        "say hi",
+      ]);
+      expect(out.override).toBeUndefined();
+    });
+  });
+
+  describe("given --tool-mode=otlp in the args", () => {
+    /** @scenario "--tool-mode=otlp forces ingestion and is not forwarded to the tool" */
+    it("strips the flag and resolves the ingestion override, order preserved", () => {
+      const input = ["--tool-mode=otlp", "-p", "hi"];
+      const out = parseToolModeFlag(input, {});
+      expect(out.args).toEqual(["-p", "hi"]);
+      expect(out.override).toBe("ingestion");
+    });
+
+    /** @scenario "--tool-mode=gateway forces the gateway path" */
+    it("strips the flag from the MIDDLE without disturbing surrounding args", () => {
+      const input = [
+        "--dangerously-skip-permissions",
+        "--tool-mode=gateway",
+        "-p",
+        "hi there",
+      ];
+      const out = parseToolModeFlag(input, {});
+      expect(out.args).toEqual([
+        "--dangerously-skip-permissions",
+        "-p",
+        "hi there",
+      ]);
+      expect(out.override).toBe("gateway");
+    });
+  });
+
+  describe("given the space-separated --tool-mode otlp form", () => {
+    it("consumes both the flag and its value token", () => {
+      const input = ["--tool-mode", "otlp", "--print", "x"];
+      const out = parseToolModeFlag(input, {});
+      expect(out.args).toEqual(["--print", "x"]);
+      expect(out.override).toBe("ingestion");
+    });
+  });
+
+  describe("given LANGWATCH_TOOL_MODE env and no flag", () => {
+    /** @scenario "LANGWATCH_TOOL_MODE=otlp forces ingestion without a flag" */
+    it("reads the override from the env", () => {
+      const out = parseToolModeFlag(["-p", "hi"], { LANGWATCH_TOOL_MODE: "otlp" });
+      expect(out.args).toEqual(["-p", "hi"]);
+      expect(out.override).toBe("ingestion");
+    });
+
+    it("lets the flag win over the env", () => {
+      const out = parseToolModeFlag(["--tool-mode=otlp"], {
+        LANGWATCH_TOOL_MODE: "gateway",
+      });
+      expect(out.override).toBe("ingestion");
+    });
+  });
+});
+
+describe("resolveWrapperPath", () => {
+  describe("when an explicit override is set", () => {
+    it("uses otlp without prompting", async () => {
+      const out = await resolveWrapperPath({
+        cfg: baseCfg(),
+        tool: "claude",
+        args: ["-p", "hi"],
+        override: "ingestion",
+        isTTY: true,
+        promptImpl: neverPrompt,
+        env: {},
+      });
+      expect(out.mode).toBe("ingestion");
+      expect(out.prompted).toBe(false);
+    });
+  });
+
+  describe("when a preference is already remembered", () => {
+    /** @scenario "A pinned tool_mode is honored with no prompt" */
+    it("honors the pinned tool_mode without prompting", async () => {
+      const out = await resolveWrapperPath({
+        cfg: baseCfg({ tool_mode: { claude: "ingestion" } }),
+        tool: "claude",
+        args: [],
+        isTTY: true,
+        promptImpl: neverPrompt,
+        env: {},
+      });
+      expect(out.mode).toBe("ingestion");
+      expect(out.prompted).toBe(false);
+    });
+  });
+
+  describe("when exactly one path is allowed by policy", () => {
+    /** @scenario "Only the gateway path is allowed" */
+    it("uses the gateway silently when direct OTLP is disabled", async () => {
+      const out = await resolveWrapperPath({
+        cfg: baseCfg({
+          tool_policies: { claude: { allowVk: true, allowOtelDirect: false } },
+        }),
+        tool: "claude",
+        args: [],
+        isTTY: true,
+        promptImpl: neverPrompt,
+        env: {},
+      });
+      expect(out.mode).toBe("gateway");
+      expect(out.prompted).toBe(false);
+    });
+
+    /** @scenario "Only the direct OTLP path is allowed" */
+    it("uses ingestion silently when the gateway path is disabled", async () => {
+      const out = await resolveWrapperPath({
+        cfg: baseCfg({
+          tool_policies: { claude: { allowVk: false, allowOtelDirect: true } },
+        }),
+        tool: "claude",
+        args: [],
+        isTTY: true,
+        promptImpl: neverPrompt,
+        env: {},
+      });
+      expect(out.mode).toBe("ingestion");
+      expect(out.prompted).toBe(false);
+    });
+  });
+
+  describe("when both paths are allowed", () => {
+    describe("when stdin/stdout is a TTY and nothing is remembered", () => {
+      /** @scenario "First interactive run with both paths allowed prompts for the path" */
+      it("prompts and remembers the gateway choice", async () => {
+        const save = vi.fn();
+        const write = vi.fn();
+        // Capturing prompt so we can assert the select offered both paths.
+        const prompt = vi.fn(async () => ({
+          path: "gateway",
+        })) as unknown as Parameters<typeof resolveWrapperPath>[0]["promptImpl"];
+        const cfg = baseCfg();
+        const out = await resolveWrapperPath({
+          cfg,
+          tool: "claude",
+          args: [],
+          isTTY: true,
+          promptImpl: prompt,
+          saveImpl: save,
+          writeImpl: write,
+          env: {},
+        });
+        expect(out.mode).toBe("gateway");
+        expect(out.prompted).toBe(true);
+        // The select asked how the tool should run and offered both paths,
+        // subscription (OTLP) first and pre-selected as the default.
+        const promptArg = (prompt as unknown as ReturnType<typeof vi.fn>).mock
+          .calls[0]![0] as {
+          message: string;
+          choices: Array<{ title: string; value: string; description?: string }>;
+          initial: number;
+        };
+        expect(promptArg.message).toBe("How should `langwatch claude` run?");
+        const values = promptArg.choices.map((c) => c.value);
+        expect(values).toEqual(["ingestion", "gateway"]);
+        expect(promptArg.initial).toBe(0);
+        expect(promptArg.choices[promptArg.initial]!.value).toBe("ingestion");
+        const titles = promptArg.choices.map((c) => c.title).join(" | ");
+        expect(titles).toContain("Using a Claude subscription");
+        expect(titles).toContain("Using an API key");
+        // The secondary line carries the explanation, at the prompt boundary.
+        expect(promptArg.choices[0]!.description).toBe(
+          "keep your own plan, send only telemetry to LangWatch",
+        );
+        expect(promptArg.choices[1]!.description).toBe(
+          "route calls through LangWatch with a virtual key",
+        );
+        // Remembered for next time.
+        expect(save).toHaveBeenCalledTimes(1);
+        const persisted = save.mock.calls[0]![0] as GovernanceConfig;
+        expect(persisted.tool_mode?.claude).toBe("gateway");
+        // tip mentions how to override + where it's stored.
+        const tip = write.mock.calls.map((c) => c[0]).join("");
+        expect(tip).toContain("--tool-mode=otlp");
+        expect(tip).toContain("config.json");
+      });
+
+      /** @scenario "Choosing direct OTLP remembers it as ingestion" */
+      it("prompts and remembers the otlp choice as ingestion", async () => {
+        const save = vi.fn();
+        const out = await resolveWrapperPath({
+          cfg: baseCfg(),
+          tool: "claude",
+          args: [],
+          isTTY: true,
+          promptImpl: selectingPrompt("ingestion"),
+          saveImpl: save,
+          writeImpl: vi.fn(),
+          env: {},
+        });
+        expect(out.mode).toBe("ingestion");
+        expect(out.prompted).toBe(true);
+        const persisted = save.mock.calls[0]![0] as GovernanceConfig;
+        expect(persisted.tool_mode?.claude).toBe("ingestion");
+      });
+
+      /** @scenario "Choosing the gateway remembers it and does not prompt again" */
+      it("does not prompt on the next run after the gateway choice is remembered", async () => {
+        // First run: pick gateway. The choice is written back onto the
+        // same cfg object (cfg.tool_mode is mutated in place).
+        const cfg = baseCfg();
+        const first = await resolveWrapperPath({
+          cfg,
+          tool: "claude",
+          args: [],
+          isTTY: true,
+          promptImpl: selectingPrompt("gateway"),
+          saveImpl: vi.fn(),
+          writeImpl: vi.fn(),
+          env: {},
+        });
+        expect(first.mode).toBe("gateway");
+        expect(first.prompted).toBe(true);
+        expect(cfg.tool_mode?.claude).toBe("gateway");
+
+        // Second run on the same (now-pinned) cfg: no prompt.
+        const second = await resolveWrapperPath({
+          cfg,
+          tool: "claude",
+          args: [],
+          isTTY: true,
+          promptImpl: neverPrompt,
+          env: {},
+        });
+        expect(second.mode).toBe("gateway");
+        expect(second.prompted).toBe(false);
+      });
+    });
+
+    describe("when stdin is not a TTY", () => {
+      /** @scenario "Non-TTY takes the path that spends nothing" */
+      it("takes the OTLP path without prompting or persisting", async () => {
+        const save = vi.fn();
+        const out = await resolveWrapperPath({
+          cfg: baseCfg(),
+          tool: "claude",
+          args: [],
+          isTTY: false,
+          promptImpl: neverPrompt,
+          saveImpl: save,
+          env: {},
+        });
+        // Nobody is there to answer, and the gateway bills the org.
+        expect(out.mode).toBe("ingestion");
+        expect(out.prompted).toBe(false);
+        expect(save).not.toHaveBeenCalled();
+      });
+
+      it("still honors an explicit gateway request", async () => {
+        const out = await resolveWrapperPath({
+          cfg: baseCfg(),
+          tool: "claude",
+          args: [],
+          override: "gateway",
+          isTTY: false,
+          promptImpl: neverPrompt,
+          env: {},
+        });
+        expect(out.mode).toBe("gateway");
+      });
+    });
+
+    describe("when LANGWATCH_AUTO_LOGIN is forced on", () => {
+      /** @scenario "LANGWATCH_AUTO_LOGIN skips the prompt" */
+      it("takes the OTLP path even on a TTY", async () => {
+        const out = await resolveWrapperPath({
+          cfg: baseCfg(),
+          tool: "claude",
+          args: [],
+          isTTY: true,
+          promptImpl: neverPrompt,
+          env: { LANGWATCH_AUTO_LOGIN: "1" },
+        });
+        expect(out.mode).toBe("ingestion");
+        expect(out.prompted).toBe(false);
+      });
+    });
+
+    describe("when the user aborts the prompt", () => {
+      /** @scenario "Cancelling the path prompt cancels the run" */
+      it("cancels the run instead of picking a path", async () => {
+        const save = vi.fn();
+        const abortPrompt = vi.fn(async () => ({})) as unknown as Parameters<
+          typeof resolveWrapperPath
+        >[0]["promptImpl"];
+        const out = await resolveWrapperPath({
+          cfg: baseCfg(),
+          tool: "claude",
+          args: [],
+          isTTY: true,
+          promptImpl: abortPrompt,
+          saveImpl: save,
+          env: {},
+        });
+        expect(out.isAborted).toBe(true);
+        expect(out.mode).not.toBe("gateway");
+        expect(out.prompted).toBe(false);
+        expect(save).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("when the tool is copilot (ingestion-first defaults, ADR-039)", () => {
+    // Copilot's gateway path switches it into BYOK mode, moving spend off
+    // the user's paid Copilot seat onto the org's provider keys — not
+    // billing-neutral like the claude/codex base-URL swap. The resolver is
+    // ingestion-first for every tool, which keeps copilot safe by default;
+    // these tests pin that copilot rides those defaults and that every
+    // gateway route names the seat bypass. Explicit choices are honored.
+
+    /** @scenario Non-interactive copilot run with no pinned mode resolves to direct OTLP */
+    it("defaults copilot to ingestion on non-TTY runs (billing neutrality)", async () => {
+      const save = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg(),
+        tool: "copilot",
+        args: [],
+        isTTY: false,
+        promptImpl: neverPrompt,
+        saveImpl: save,
+        env: {},
+      });
+      expect(out.mode).toBe("ingestion");
+      expect(out.prompted).toBe(false);
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    /** @scenario The copilot path prompt pre-selects direct OTLP */
+    it("pre-selects the direct OTLP choice on the copilot prompt", async () => {
+      const prompt = vi.fn(async () => ({
+        path: "ingestion",
+      })) as unknown as Parameters<typeof resolveWrapperPath>[0]["promptImpl"];
+      await resolveWrapperPath({
+        cfg: baseCfg(),
+        tool: "copilot",
+        args: [],
+        isTTY: true,
+        promptImpl: prompt,
+        saveImpl: vi.fn(),
+        writeImpl: vi.fn(),
+        env: {},
+      });
+      const promptArg = (prompt as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0]![0] as {
+        choices: Array<{ value: string; description: string }>;
+        initial: number;
+      };
+      const values = promptArg.choices.map((c) => c.value);
+      expect(values[promptArg.initial]).toBe("ingestion");
+      expect(promptArg.choices[values.indexOf("gateway")]!.description).toBe(
+        "route calls through LangWatch with a virtual key",
+      );
+    });
+
+    /** @scenario An explicit --tool-mode=gateway flag routes copilot through the gateway */
+    it("honors an explicit gateway override for copilot and names the seat bypass", async () => {
+      const write = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg(),
+        tool: "copilot",
+        args: [],
+        override: "gateway",
+        isTTY: false,
+        promptImpl: neverPrompt,
+        writeImpl: write,
+        env: {},
+      });
+      expect(out.mode).toBe("gateway");
+      expect(write).toHaveBeenCalledWith(
+        expect.stringContaining("Copilot seat"),
+      );
+    });
+
+    it("names the seat bypass when copilot's gateway path is chosen at the prompt", async () => {
+      // The prompt answer is the route that actually moves spend off the
+      // user's Copilot seat — the saved-choice line must name the shift.
+      const write = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg(),
+        tool: "copilot",
+        args: [],
+        isTTY: true,
+        promptImpl: (async () => ({
+          path: "gateway",
+        })) as unknown as Parameters<
+          typeof resolveWrapperPath
+        >[0]["promptImpl"],
+        saveImpl: vi.fn(),
+        writeImpl: write,
+        env: {},
+      });
+      expect(out.mode).toBe("gateway");
+      expect(write).toHaveBeenCalledWith(
+        expect.stringContaining("Copilot seat"),
+      );
+    });
+
+    it("suppresses the seat-bypass notice when policy will downgrade the pinned gateway anyway", async () => {
+      // Warning about a billing shift the downgrade then cancels would be
+      // false; resolveWrapperMode's downgrade branch prints its own notice.
+      const write = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg({
+          tool_mode: { copilot: "gateway" },
+          tool_policies: { copilot: { allowVk: false, allowOtelDirect: true } },
+        }),
+        tool: "copilot",
+        args: [],
+        isTTY: true,
+        promptImpl: neverPrompt,
+        env: {},
+        writeImpl: write,
+      });
+      expect(out.mode).toBe("gateway");
+      expect(write).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A pinned gateway mode for copilot is honored without prompting */
+    it("honors a pinned gateway mode for copilot without prompting and names the seat bypass", async () => {
+      const write = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg({ tool_mode: { copilot: "gateway" } }),
+        tool: "copilot",
+        args: [],
+        isTTY: true,
+        promptImpl: neverPrompt,
+        writeImpl: write,
+        env: {},
+      });
+      expect(out.mode).toBe("gateway");
+      expect(out.prompted).toBe(false);
+      expect(write).toHaveBeenCalledWith(
+        expect.stringContaining("Copilot seat"),
+      );
+    });
+
+    /** @scenario Policy-forced gateway routing for copilot names the seat bypass */
+    it("names the Copilot seat bypass when policy forces the gateway path", async () => {
+      const write = vi.fn();
+      const out = await resolveWrapperPath({
+        cfg: baseCfg({
+          tool_policies: { copilot: { allowVk: true, allowOtelDirect: false } },
+        }),
+        tool: "copilot",
+        args: [],
+        isTTY: false,
+        promptImpl: neverPrompt,
+        writeImpl: write,
+        env: {},
+      });
+      expect(out.mode).toBe("gateway");
+      const written = write.mock.calls.map((c) => c[0]).join("");
+      expect(written).toContain("Copilot seat");
+    });
+  });
+
+  describe("when there is no remembered answer (run-time policy refresh)", () => {
+    it("re-checks the policy at run time and honors a freshly-disabled gateway", async () => {
+      // Login cached BOTH paths; the admin has since turned the gateway off.
+      // A stale read would prompt; the refresh must collapse to ingestion.
+      const cfg = baseCfg({
+        tool_policies: { claude: { allowVk: true, allowOtelDirect: true } },
+      });
+      const save = vi.fn();
+      const refreshPolicies = vi.fn(async () => ({
+        claude: { allowVk: false, allowOtelDirect: true },
+      }));
+      const out = await resolveWrapperPath({
+        cfg,
+        tool: "claude",
+        args: [],
+        isTTY: true,
+        promptImpl: neverPrompt,
+        saveImpl: save,
+        refreshPolicies,
+        env: {},
+      });
+      expect(refreshPolicies).toHaveBeenCalledTimes(1);
+      expect(out.mode).toBe("ingestion");
+      expect(out.prompted).toBe(false);
+      // The fresh map is re-cached for next time.
+      const persisted = save.mock.calls[0]![0] as GovernanceConfig;
+      expect(persisted.tool_policies?.claude?.allowVk).toBe(false);
+    });
+
+    it("does not refresh when a path is already remembered", async () => {
+      const refreshPolicies = vi.fn(async () => null);
+      const out = await resolveWrapperPath({
+        cfg: baseCfg({ tool_mode: { claude: "gateway" } }),
+        tool: "claude",
+        args: [],
+        isTTY: true,
+        promptImpl: neverPrompt,
+        refreshPolicies,
+        env: {},
+      });
+      expect(refreshPolicies).not.toHaveBeenCalled();
+      expect(out.mode).toBe("gateway");
+    });
+
+    it("falls back to the cached policy when the refresh fails", async () => {
+      const cfg = baseCfg({
+        tool_policies: { claude: { allowVk: true, allowOtelDirect: true } },
+      });
+      const refreshPolicies = vi.fn(async () => {
+        throw new Error("offline");
+      });
+      const out = await resolveWrapperPath({
+        cfg,
+        tool: "claude",
+        args: [],
+        isTTY: true,
+        promptImpl: selectingPrompt("gateway"),
+        saveImpl: vi.fn(),
+        writeImpl: vi.fn(),
+        refreshPolicies,
+        env: {},
+      });
+      // Cached map still allows both, so it prompts (we picked gateway).
+      expect(refreshPolicies).toHaveBeenCalledTimes(1);
+      expect(out.mode).toBe("gateway");
+      expect(out.prompted).toBe(true);
+    });
+  });
+
+  describe("prompt copy", () => {
+    it("asks how the tool should run and names both paths in human terms", () => {
+      expect(pathChoiceMessage("claude")).toBe(
+        "How should `langwatch claude` run?",
+      );
+      expect(otlpChoiceTitle("claude")).toBe("Using a Claude subscription");
+      expect(otlpChoiceDescription()).toBe(
+        "keep your own plan, send only telemetry to LangWatch",
+      );
+      expect(gatewayChoiceTitle()).toBe("Using an API key");
+      expect(gatewayChoiceDescription()).toBe(
+        "route calls through LangWatch with a virtual key",
+      );
+    });
+
+    it("names the right subscription per tool, with a neutral fallback", () => {
+      expect(otlpChoiceTitle("codex")).toBe("Using a ChatGPT subscription");
+      expect(otlpChoiceTitle("gemini")).toBe("Using a Gemini subscription");
+      expect(otlpChoiceTitle("cursor")).toBe("Using a Cursor subscription");
+      // Inherited object keys must take the fallback, not the prototype.
+      expect(otlpChoiceTitle("toString")).toBe("Using your own toString plan");
+      // opencode is a bring-your-own client with no single subscription.
+      expect(otlpChoiceTitle("opencode")).toBe("Using your own opencode plan");
+    });
+  });
+});

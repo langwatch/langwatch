@@ -1,0 +1,235 @@
+import type { JsonValue } from "../json";
+import type { ProcessRef } from "../processManager.types";
+
+/**
+ * Persistence port for process-manager state, inbox, and outbox
+ * (ADR-049 §5: ProcessManagerInbox / ProcessManagerInstance /
+ * ProcessManagerOutbox). The port owns the atomic-commit semantics: one
+ * `commit` call must apply the inbox marker, the state transition, the
+ * wake-up, and the outbox inserts together, or not at all. Durable adapters
+ * also own exclusive leasing; the in-memory test adapter is atomic per call.
+ *
+ * No infrastructure types (Prisma or otherwise) may appear in these
+ * contracts.
+ */
+export interface PersistedProcessInstance<State = unknown> {
+  ref: ProcessRef;
+  tenantId: string;
+  userId?: string;
+  state: State;
+  /** Monotonic optimistic-concurrency counter; 1 after the first commit. */
+  revision: number;
+  /** Epoch ms of the next due wake-up, or null when none is scheduled. */
+  nextWakeAt: number | null;
+  updatedAt: number;
+}
+
+export type OutboxMessageStatus = "pending" | "dispatched" | "dead";
+
+export interface NewOutboxMessage {
+  messageKey: string;
+  intentType: string;
+  payload: JsonValue;
+  /**
+   * Full W3C propagation carrier (traceparent/tracestate/baggage as
+   * configured) captured with propagation.inject at commit time.
+   */
+  traceCarrier: Record<string, string>;
+  userId?: string;
+}
+
+export interface OutboxMessageRecord extends NewOutboxMessage {
+  processName: string;
+  projectId: string;
+  processKey: string;
+  tenantId: string;
+  /** The inbox identity that produced this intent; null for wake commits. */
+  sourceEventId: string | null;
+  status: OutboxMessageStatus;
+  /** Completed delivery attempts so far. */
+  attempts: number;
+  /** Epoch ms before which the message must not be leased. */
+  nextAttemptAt: number;
+  /** Current exclusive lease capability, or null while unleased. */
+  leaseToken: string | null;
+  createdAt: number;
+}
+
+/** A message returned from leaseDueMessages always has a fencing token. */
+export interface LeasedOutboxMessageRecord extends OutboxMessageRecord {
+  leaseToken: string;
+}
+
+export interface ProcessCommit<State = unknown> {
+  ref: ProcessRef;
+  tenantId: string;
+  userId?: string;
+  /**
+   * Inbox identity: (processName, projectId, sourceEventId) is consumed at
+   * most once. Null for wake-driven commits, which are guarded by
+   * `expectedRevision` instead.
+   *
+   * Any length is accepted. A store that enforces the uniqueness in an index
+   * derives a fixed-width key from this value rather than indexing it
+   * (`stores/inboxKey.ts`), so a caller's idempotency key can be as long as its
+   * own domain needs.
+   */
+  sourceEventId: string | null;
+  /** 0 when the process has never been committed. */
+  expectedRevision: number;
+  state: State;
+  nextWakeAt: number | null;
+  messages: NewOutboxMessage[];
+  now: number;
+}
+
+export type CommitResult =
+  | {
+      outcome: "committed";
+      revision: number;
+      insertedMessageKeys: string[];
+      /** Message keys skipped because (processName, projectId, messageKey) already exists. */
+      duplicateMessageKeys: string[];
+    }
+  | { outcome: "duplicateEvent" }
+  | { outcome: "revisionConflict"; actualRevision: number };
+
+/** Identity of one outbox message within its uniqueness contract. */
+export interface OutboxMessageIdentity {
+  processName: string;
+  projectId: string;
+  messageKey: string;
+}
+
+export interface DueWake {
+  ref: ProcessRef;
+  /** Process revision the wake-up was scheduled at; stale if it moved on. */
+  revision: number;
+  wakeAt: number;
+}
+
+export interface ProcessStore {
+  findByRef<State = unknown>(params: {
+    ref: ProcessRef;
+  }): Promise<PersistedProcessInstance<State> | null>;
+
+  /** Atomically: consume inbox row, bump revision, persist state + wake, insert deduped messages. */
+  commit<State = unknown>(commit: ProcessCommit<State>): Promise<CommitResult>;
+
+  /** All messages for one process, primarily for diagnostics and tests. */
+  findMessagesByRef(params: {
+    ref: ProcessRef;
+  }): Promise<OutboxMessageRecord[]>;
+
+  /**
+   * Lease pending, due messages for exclusive dispatch until
+   * `now + leaseDurationMs`.
+   */
+  leaseDueMessages(params: {
+    now: number;
+    limit: number;
+    leaseDurationMs: number;
+    /**
+     * Restrict leasing to these processNames. The outbox table is shared
+     * across every process manager, so each domain's dispatcher MUST scope
+     * its leases — an unfiltered dispatcher would lease another domain's
+     * intents, fail to find a handler, and retry-churn them (ADR-051 §4).
+     * Omitted means unfiltered (single-domain deployments and tests).
+     */
+    processNames?: readonly string[];
+  }): Promise<LeasedOutboxMessageRecord[]>;
+
+  markDispatched(params: {
+    identity: OutboxMessageIdentity;
+    leaseToken: string;
+    now: number;
+  }): Promise<void>;
+
+  /** Record a failed attempt; `dead: true` retires the message permanently. */
+  markFailed(params: {
+    identity: OutboxMessageIdentity;
+    leaseToken: string;
+    now: number;
+    nextAttemptAt: number;
+    dead: boolean;
+  }): Promise<void>;
+
+  /** Processes whose nextWakeAt is due, with the revision to guard against staleness. */
+  findDueWakes(params: {
+    now: number;
+    limit: number;
+    /** Restrict the global wake scan to process managers mounted here. */
+    processNames?: readonly string[];
+  }): Promise<DueWake[]>;
+
+  /**
+   * Retention for high-frequency recurring intents (ADR-052): deletes
+   * DISPATCHED outbox rows of one processName whose dispatch finished
+   * before `before`. Pending/dead rows are never touched — dead rows are
+   * the operator's failure record, pending rows are work. Returns the
+   * deleted count.
+   */
+  deleteDispatchedBefore(params: {
+    processName: string;
+    before: number;
+  }): Promise<number>;
+
+  /**
+   * Retention sweep, dispatched family: delete at most `limit` DISPATCHED
+   * outbox rows whose dispatch finished before `before`, ACROSS EVERY
+   * processName and project. Returns the deleted count.
+   *
+   * The absent processName predicate is the point. `deleteDispatchedBefore`
+   * above reaps one named process, so a process manager is only covered if
+   * somebody remembered to register a prune for it, and half of them never
+   * were. Reaping by predicate covers every process manager that exists and
+   * every one added later, with no registration step to forget.
+   *
+   * A returned count below `limit` means the family is drained, which is how
+   * a caller's drain loop knows to stop.
+   */
+  deleteDispatchedOutboxBatch(params: {
+    before: number;
+    limit: number;
+  }): Promise<number>;
+
+  /**
+   * Retention sweep, dead family: delete at most `limit` DEAD outbox rows
+   * last touched before `before`, across every processName and project.
+   * Dead rows are the operator's failure record, so callers give this a far
+   * longer window than the dispatched family.
+   */
+  deleteDeadOutboxBatch(params: {
+    before: number;
+    limit: number;
+  }): Promise<number>;
+
+  /**
+   * Retention sweep, inbox family: delete at most `limit` inbox rows consumed
+   * before `before`, across every processName and project.
+   *
+   * An inbox row is an idempotency marker, so the window only has to outlive
+   * the horizon in which the same source event can be redelivered. See
+   * specs/event-sourcing/process-manager-retention.feature for why that
+   * horizon is about 25 hours.
+   */
+  deleteConsumedInboxBatch(params: {
+    before: number;
+    limit: number;
+  }): Promise<number>;
+
+  /**
+   * Dead-letter recovery: flip DEAD rows of one process back to pending
+   * with a fresh attempt budget, due immediately. Scoped by processKey
+   * (one process instance's rows) and optionally narrowed by messageKey
+   * prefix so an operator can requeue one endpoint's batches without
+   * resurrecting every failure in the domain. Returns the requeued count.
+   */
+  requeueDeadMessages(params: {
+    processName: string;
+    projectId: string;
+    processKey: string;
+    messageKeyPrefix?: string;
+    now: number;
+  }): Promise<number>;
+}

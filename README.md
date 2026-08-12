@@ -58,14 +58,13 @@ npx @langwatch/server
 
 The CLI installs `uv`, `postgres`, `redis`, `clickhouse`, the AI gateway binary, and the Langy assistant's runtime into `~/.langwatch/`, scaffolds a `.env` with locally-generated secrets, then starts every service in parallel and opens `http://localhost:5560`. Everything lives under `~/.langwatch/`; `rm -rf ~/.langwatch` is a clean reset.
 
-Two pieces are yours to decide on, in `~/.langwatch/.env`:
+Three pieces are yours to decide on, in `~/.langwatch/.env`:
 
 | Variable | Default | What it changes |
 |---|---|---|
 | `LANGWATCH_ENABLE_LANGY` | `true` | The Langy assistant. Adds ~45MB for its runtime; the workers run unsandboxed as you, on your own machine. |
 | `LANGWATCH_ENABLE_PRESIDIO` | `false` | The PII detection evaluator. Adds ~670MB of language model, larger than the rest of the evaluator environment put together. LangWatch's own secret and PII redaction of your traces does not depend on it. |
 | `LANGWATCH_ENABLE_LINGUA` | `false` | The language detection evaluator. Adds ~95MB of language models. |
-| `LANGWATCH_ENABLE_LEGACY_EVALUATORS` | `false` | The deprecated legacy evaluators, kept only for evaluations saved long ago. Hidden from the product entirely while off. |
 
 Every other evaluator is installed either way. Change any of these in `~/.langwatch/.env` and restart the server.
 
@@ -73,8 +72,8 @@ Prefer Docker? You can still use docker compose:
 
 ```bash
 git clone https://github.com/langwatch/langwatch.git
-cd langwatch
-cp langwatch/.env.example langwatch/.env
+cd platform/app
+cp platform/app/.env.example platform/app/.env
 docker compose up -d --wait --build
 ```
 Once running, LangWatch will be available at `http://localhost:5560`, where you can create your first project and API key.
@@ -171,11 +170,11 @@ Contributions are what make the open-source community such an amazing place to l
 
 Please read our [Contribution Guidelines](https://github.com/langwatch/langwatch/blob/main/CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests.
 
-## ✍️ License — open-core split
+## ✍️ License: open-core split
 
-LangWatch is Apache 2.0, except for the enterprise modules (SCIM, audit logs, license and billing management, etc.) which live under `langwatch/ee/` and need a commercial license for production use. The SDKs (`typescript-sdk`, `python-sdk`, `mcp-server`) are MIT.
+LangWatch is Apache 2.0 and free to use, for individuals and for companies, self-hosted or not. The enterprise modules (SSO, SCIM provisioning, audit logs, gateway webhooks, billing, back-office) live under [`platform/app/ee/`](/platform/app/ee/) and are the one part that needs a commercial license in production. The SDKs (`typescript-sdk`, `python-sdk`, `mcp-server`) are MIT.
 
-See [`LICENSE.md`](/LICENSE.md), [`NOTICE`](/NOTICE), and [`langwatch/ee/LICENSE.md`](/langwatch/ee/LICENSE.md) for the full text and the per-folder breakdown.
+See [Editions and licensing](https://docs.langwatch.ai/self-hosting/licensing) for what a license adds, and [`LICENSE.md`](/LICENSE.md), [`NOTICE`](/NOTICE), [`platform/app/ee/LICENSE.md`](/platform/app/ee/LICENSE.md) for the full text and the per-folder breakdown.
 
 ## 👮‍♀️ Security + Compliance
 

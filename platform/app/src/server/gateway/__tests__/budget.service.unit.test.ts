@@ -1,0 +1,457 @@
+import { type GatewayBudget, Prisma, type PrismaClient } from "@prisma/client";
+import { describe, expect, it, vi } from "vitest";
+
+import type {
+  GatewayBudgetClickHouseRepository,
+  LedgerEventRow,
+} from "../budget.clickhouse.repository";
+import { GatewayBudgetService } from "../budget.service";
+
+function mockChRepoWithEvents(
+  events: Array<Partial<LedgerEventRow> & Pick<LedgerEventRow, "id">>,
+): GatewayBudgetClickHouseRepository {
+  const fullEvents: LedgerEventRow[] = events.map((e) => ({
+    id: e.id,
+    budgetId: e.budgetId ?? "b_01",
+    virtualKeyId: e.virtualKeyId ?? "vk_test",
+    amountUsd: e.amountUsd ?? "0",
+    model: e.model ?? "gpt-5-mini",
+    providerSlot: e.providerSlot ?? null,
+    tokensInput: e.tokensInput ?? 0,
+    tokensOutput: e.tokensOutput ?? 0,
+    durationMs: e.durationMs ?? null,
+    status: e.status ?? "SUCCESS",
+    occurredAt: e.occurredAt ?? new Date(),
+  }));
+  return {
+    recentEventsForBudget: async () => fullEvents,
+    getSpendForBudgetsAcrossTenants: async () => [],
+  } as unknown as GatewayBudgetClickHouseRepository;
+}
+
+function stubBudget(overrides: Partial<GatewayBudget> = {}): GatewayBudget {
+  return {
+    id: "b_01",
+    organizationId: "org_01",
+    scopeType: "PROJECT",
+    scopeId: "project_01",
+    name: "monthly",
+    description: null,
+    window: "MONTH",
+    onBreach: "BLOCK",
+    limitUsd: new Prisma.Decimal("100.00"),
+    spentUsd: new Prisma.Decimal("0.00"),
+    timezone: null,
+    resetsAt: new Date("2099-01-01T00:00:00Z"),
+    currentPeriodStartedAt: new Date(),
+    lastResetAt: null,
+    archivedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    createdById: "user_01",
+    ...overrides,
+  } as GatewayBudget;
+}
+
+function mockPrismaWithBudgets(budgets: GatewayBudget[]): PrismaClient {
+  return {
+    gatewayBudget: {
+      findMany: async () => budgets,
+    },
+    project: {
+      findMany: async () => [{ id: "project_01" }],
+    },
+    // The resolver reads the key's own team scopes so a team-scoped key
+    // reaches its team's budget. These checks pass the team directly, so
+    // the key contributes nothing extra.
+    virtualKeyScope: {
+      findMany: async () => [],
+    },
+  } as unknown as PrismaClient;
+}
+
+const baseCheck = {
+  organizationId: "org_01",
+  teamId: "team_01",
+  projectId: "project_01",
+  virtualKeyId: "vk_01",
+  principalUserId: null,
+};
+
+describe("GatewayBudgetService.check", () => {
+  describe("when no budgets are applicable", () => {
+    it("returns allow with empty warnings / blockedBy", async () => {
+      const sut = GatewayBudgetService.create(mockPrismaWithBudgets([]));
+
+      const result = await sut.check({ ...baseCheck, projectedCostUsd: 5 });
+
+      expect(result.decision).toBe("allow");
+      expect(result.warnings).toEqual([]);
+      expect(result.blockedBy).toEqual([]);
+      expect(result.blockReason).toBeNull();
+    });
+  });
+
+  describe("when projected spend stays well under limit", () => {
+    it("returns allow without warnings", async () => {
+      const sut = GatewayBudgetService.create(
+        mockPrismaWithBudgets([
+          stubBudget({ spentUsd: new Prisma.Decimal("10.00") }),
+        ]),
+      );
+
+      const result = await sut.check({ ...baseCheck, projectedCostUsd: 5 });
+
+      expect(result.decision).toBe("allow");
+    });
+  });
+
+  describe("when projected spend crosses the 80% threshold on a BLOCK budget", () => {
+    it("returns soft_warn — warning but not blocked", async () => {
+      const sut = GatewayBudgetService.create(
+        mockPrismaWithBudgets([
+          stubBudget({ spentUsd: new Prisma.Decimal("75.00") }),
+        ]),
+      );
+
+      const result = await sut.check({ ...baseCheck, projectedCostUsd: 10 });
+
+      expect(result.decision).toBe("soft_warn");
+      expect(result.warnings).toHaveLength(1);
+    });
+  });
+
+  describe("when projected spend reaches the hard limit on a BLOCK budget", () => {
+    /** @scenario Hard-block budget returns 402 when spent >= limit */
+    it("returns hard_block with a descriptive reason", async () => {
+      const sut = GatewayBudgetService.create(
+        mockPrismaWithBudgets([
+          stubBudget({ spentUsd: new Prisma.Decimal("95.00") }),
+        ]),
+      );
+
+      const result = await sut.check({ ...baseCheck, projectedCostUsd: 10 });
+
+      expect(result.decision).toBe("hard_block");
+      expect(result.blockedBy).toHaveLength(1);
+      expect(result.blockReason).toMatch(/Budget exceeded/);
+    });
+  });
+
+  // Regression for iter-111 finding: after the outbox/debit
+  // replacement by the ClickHouse ledger, `GatewayBudget.spentUsd` is
+  // a dormant PG column. `check()` correctly reads live spend
+  // from CH into `scopes[]`, but `blockedBy[]` used to also read from
+  // the stale PG column — so the block decision was right, but the
+  // reported spent_usd was wrong by any amount accumulated since
+  // cutover. The UI + error messages surface that number directly.
+  describe("when CH rollup > 0 and legacy PG spentUsd is stale", () => {
+    it("reports blockedBy[].spentUsd from CH, not from the dormant PG column", async () => {
+      const budget = stubBudget({
+        id: "b_ch_sourced",
+        limitUsd: new Prisma.Decimal("100.00"),
+        spentUsd: new Prisma.Decimal("0.00"), // dormant post-cutover
+      });
+      const chRepoStub = {
+        getSpendForBudgetsAcrossTenants: async () => [
+          // Both units, as a real read returns them. The cast below means the
+          // compiler would not notice this drifting from the shape.
+          {
+            budgetId: "b_ch_sourced",
+            spentNanoUsd: 95_000_000_000,
+            spentUsd: "95",
+          },
+        ],
+      } as unknown as Parameters<typeof GatewayBudgetService.create>[1];
+
+      const sut = GatewayBudgetService.create(
+        mockPrismaWithBudgets([budget]),
+        chRepoStub,
+      );
+
+      const result = await sut.check({ ...baseCheck, projectedCostUsd: 10 });
+
+      expect(result.decision).toBe("hard_block");
+      expect(result.blockedBy).toHaveLength(1);
+      // CH figure wins, not the zero from the dormant PG column.
+      expect(result.blockedBy[0]!.spentUsd).toBe("95.000000");
+      // And scopes[] must agree — same source of truth across both lists.
+      const scopeLine = result.scopes.find(
+        (s) => s.scope === "project" && s.scopeId === "project_01",
+      );
+      expect(scopeLine?.spentUsd).toBe("95.000000");
+    });
+  });
+
+  describe("when a WARN budget crosses its limit", () => {
+    /** @scenario Soft budget emits warning header but allows the call */
+    it("warns but does not block", async () => {
+      const sut = GatewayBudgetService.create(
+        mockPrismaWithBudgets([
+          stubBudget({
+            onBreach: "WARN",
+            spentUsd: new Prisma.Decimal("95.00"),
+          }),
+        ]),
+      );
+
+      const result = await sut.check({ ...baseCheck, projectedCostUsd: 10 });
+
+      expect(result.decision).toBe("soft_warn");
+      expect(result.blockedBy).toEqual([]);
+    });
+  });
+
+  describe("when one BLOCK budget is at limit and another WARN budget is fine", () => {
+    /** @scenario Sum-of-breaches rule — any block-breach blocks */
+    /** @scenario Most restrictive budget wins when multiple apply */
+    it("still hard_blocks (sum-of-breaches semantics)", async () => {
+      const sut = GatewayBudgetService.create(
+        mockPrismaWithBudgets([
+          stubBudget({
+            id: "b_org",
+            scopeType: "ORGANIZATION",
+            scopeId: "org_01",
+            onBreach: "WARN",
+            spentUsd: new Prisma.Decimal("10.00"),
+          }),
+          stubBudget({
+            id: "b_project",
+            onBreach: "BLOCK",
+            spentUsd: new Prisma.Decimal("95.00"),
+          }),
+        ]),
+      );
+
+      const result = await sut.check({ ...baseCheck, projectedCostUsd: 10 });
+
+      expect(result.decision).toBe("hard_block");
+      expect(result.blockedBy.map((b) => b.budgetId)).toContain("b_project");
+    });
+  });
+
+  describe("scopes payload (contract §4.4 for Checker.ApplyLive)", () => {
+    it("echoes every applicable budget, not just warn/block ones", async () => {
+      const sut = GatewayBudgetService.create(
+        mockPrismaWithBudgets([
+          stubBudget({
+            id: "b_org",
+            scopeType: "ORGANIZATION",
+            scopeId: "org_01",
+            spentUsd: new Prisma.Decimal("10.00"),
+          }),
+          stubBudget({
+            id: "b_team",
+            scopeType: "TEAM",
+            scopeId: "team_01",
+            spentUsd: new Prisma.Decimal("50.00"),
+          }),
+        ]),
+      );
+
+      const result = await sut.check({ ...baseCheck, projectedCostUsd: 1 });
+
+      expect(result.decision).toBe("allow");
+      expect(result.scopes).toHaveLength(2);
+      expect(result.scopes.map((s) => s.scope).sort()).toEqual([
+        "organization",
+        "team",
+      ]);
+      expect(result.scopes[0]).toHaveProperty("spentUsd");
+      expect(result.scopes[0]).toHaveProperty("limitUsd");
+    });
+
+    it("reports spent_usd as 0 for budgets whose window has rolled over", async () => {
+      const sut = GatewayBudgetService.create(
+        mockPrismaWithBudgets([
+          stubBudget({
+            spentUsd: new Prisma.Decimal("99.00"),
+            resetsAt: new Date("2020-01-01T00:00:00Z"),
+          }),
+        ]),
+      );
+
+      const result = await sut.check({ ...baseCheck, projectedCostUsd: 1 });
+
+      expect(result.scopes[0]?.spentUsd).toBe("0.000000");
+    });
+  });
+
+  describe("when the stale spent_usd indicates the window has reset", () => {
+    it("treats effective spent as 0 and allows the request", async () => {
+      const sut = GatewayBudgetService.create(
+        mockPrismaWithBudgets([
+          stubBudget({
+            spentUsd: new Prisma.Decimal("99.00"),
+            // resetsAt in the past → window has rolled over, stale spent is ignored.
+            resetsAt: new Date("2020-01-01T00:00:00Z"),
+          }),
+        ]),
+      );
+
+      const result = await sut.check({ ...baseCheck, projectedCostUsd: 10 });
+
+      expect(result.decision).toBe("allow");
+    });
+  });
+});
+
+/**
+ * Scope-target resolution prism test. Each scope kind hits a different
+ * table (organization / team / project / virtualKey / user) and the
+ * resolver must return the right shape with the right human-friendly
+ * name. Covered under one describe so the full prism is visible.
+ */
+describe("GatewayBudgetService.getDetail", () => {
+  type Findable = {
+    findFirst: unknown;
+    findUnique: unknown;
+    findMany: unknown;
+  };
+  function mockPrismaWithDetail(
+    budget: GatewayBudget | null,
+    scopeRow: unknown,
+    ledger: unknown[] = [],
+  ): PrismaClient {
+    return {
+      gatewayBudget: {
+        findFirst: vi.fn(async () => budget),
+      },
+      gatewayBudgetLedger: {
+        findMany: vi.fn(async () => ledger),
+      },
+      organization: {
+        findUnique: vi.fn(async () => scopeRow),
+      },
+      team: {
+        findUnique: vi.fn(async () => scopeRow),
+      },
+      project: {
+        findUnique: vi.fn(async () => scopeRow),
+        findMany: vi.fn(async () => [{ id: "project_01" }]),
+      },
+      virtualKey: {
+        findUnique: vi.fn(async () => scopeRow),
+        findMany: vi.fn(async () => []),
+      },
+      virtualKeyScope: {
+        findFirst: vi.fn(async () => ({ scopeId: "project_01" })),
+        findMany: vi.fn(async () => []),
+      },
+      user: {
+        findUnique: vi.fn(async () => scopeRow),
+      },
+    } as unknown as PrismaClient & Record<string, Findable>;
+  }
+
+  describe("when the budget does not exist", () => {
+    it("returns null", async () => {
+      const sut = GatewayBudgetService.create(mockPrismaWithDetail(null, null));
+      const detail = await sut.getDetail("b_missing", "org_01");
+      expect(detail).toBeNull();
+    });
+  });
+
+  describe("when scope is ORGANIZATION", () => {
+    it("resolves the scope target to the org name/slug", async () => {
+      const sut = GatewayBudgetService.create(
+        mockPrismaWithDetail(
+          stubBudget({ scopeType: "ORGANIZATION", scopeId: "org_01" }),
+          { name: "Acme Inc.", slug: "acme" },
+        ),
+      );
+      const detail = await sut.getDetail("b_01", "org_01");
+      expect(detail?.scopeTarget).toEqual({
+        kind: "ORGANIZATION",
+        id: "org_01",
+        name: "Acme Inc.",
+        secondary: "acme",
+      });
+    });
+  });
+
+  describe("when scope is VIRTUAL_KEY", () => {
+    it("includes the display prefix + project slug for linkback", async () => {
+      const baseMock = mockPrismaWithDetail(
+        stubBudget({ scopeType: "VIRTUAL_KEY", scopeId: "vk_01" }),
+        { name: "prod-openai", displayPrefix: "lw_live_abc" },
+      );
+      // VIRTUAL_KEY resolveScopeTarget chains vk → virtualKeyScope → project.
+      // Override project.findUnique to return the linkback slug.
+      (
+        baseMock as unknown as { project: { findUnique: unknown } }
+      ).project.findUnique = vi.fn(async () => ({ slug: "proj" }));
+      const sut = GatewayBudgetService.create(baseMock);
+      const detail = await sut.getDetail("b_01", "org_01");
+      expect(detail?.scopeTarget).toEqual({
+        kind: "VIRTUAL_KEY",
+        id: "vk_01",
+        name: "prod-openai",
+        secondary: "lw_live_abc…",
+        projectSlug: "proj",
+      });
+    });
+  });
+
+  describe("when scope is PRINCIPAL", () => {
+    it("prefers user.name but falls back to email then id", async () => {
+      const sut1 = GatewayBudgetService.create(
+        mockPrismaWithDetail(
+          stubBudget({ scopeType: "PRINCIPAL", scopeId: "user_42" }),
+          { name: "Alex Chen", email: "alex@example.com" },
+        ),
+      );
+      expect((await sut1.getDetail("b_01", "org_01"))?.scopeTarget.name).toBe(
+        "Alex Chen",
+      );
+
+      const sut2 = GatewayBudgetService.create(
+        mockPrismaWithDetail(
+          stubBudget({ scopeType: "PRINCIPAL", scopeId: "user_42" }),
+          { name: null, email: "alex@example.com" },
+        ),
+      );
+      expect((await sut2.getDetail("b_01", "org_01"))?.scopeTarget.name).toBe(
+        "alex@example.com",
+      );
+
+      const sut3 = GatewayBudgetService.create(
+        mockPrismaWithDetail(
+          stubBudget({ scopeType: "PRINCIPAL", scopeId: "user_42" }),
+          null,
+        ),
+      );
+      expect((await sut3.getDetail("b_01", "org_01"))?.scopeTarget.name).toBe(
+        "user_42",
+      );
+    });
+  });
+
+  describe("when the target row has been deleted", () => {
+    it("falls back to the raw scopeId instead of throwing", async () => {
+      // Scope FKs are ON DELETE CASCADE, but if the row is stale (null on
+      // lookup) the resolver must not null-pointer-crash. Detail page
+      // should still render.
+      const sut = GatewayBudgetService.create(
+        mockPrismaWithDetail(
+          stubBudget({ scopeType: "TEAM", scopeId: "team_01" }),
+          null,
+        ),
+      );
+      const detail = await sut.getDetail("b_01", "org_01");
+      expect(detail?.scopeTarget.name).toBe("team_01");
+      expect(detail?.scopeTarget.secondary).toBeNull();
+    });
+  });
+
+  describe("ledger join", () => {
+    it("returns the ledger rows limited to the last 20, ordered by occurredAt desc", async () => {
+      const sut = GatewayBudgetService.create(
+        mockPrismaWithDetail(stubBudget(), { name: "Proj", slug: "proj" }),
+        mockChRepoWithEvents([{ id: "l_01" }]),
+      );
+      const detail = await sut.getDetail("b_01", "org_01");
+      expect(detail?.recentLedger).toHaveLength(1);
+    });
+  });
+});

@@ -15,8 +15,9 @@ Feature: AI Gateway Governance — Personal budget exceeded surfaces (CLI + dash
   Background:
     Given user "jane@acme.com" has a USD 500/month personal budget
     And jane has spent USD 500.00 in the current month
-    And the gateway budget-fold from ClickHouse confirms the spend total
-    And the gateway's `/budget/check` endpoint will return `blocked_by: "personal"`
+    And the ClickHouse spend ledger totals that spend for the current month
+    And the CLI budget pre-check `GET /api/auth/cli/budget/status` answers 402
+      with `error.scope: "principal"`, jane's own allowance being the blocker
 
   # ---------------------------------------------------------------------------
   # Gateway response shape

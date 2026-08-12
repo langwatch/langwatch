@@ -164,7 +164,7 @@ curl -sS http://localhost:5563/health | jq .
 
 # /v1/models — 401 without auth, 200 with a valid VK
 curl -si http://localhost:5563/v1/models
-# → HTTP/1.1 401 + X-LangWatch-Request-Id + X-LangWatch-Gateway-Version
+# → HTTP/1.1 401 + X-Request-Id + X-LangWatch-Gateway-Version
 
 # /metrics — Prometheus scrape
 curl -sSf http://localhost:5563/metrics | head -30
@@ -197,7 +197,7 @@ curl -sSf http://localhost:5563/v1/chat/completions \
   -d '{"model":"openai/gpt-5-mini","messages":[{"role":"user","content":"ping — reply ok"}]}' | jq .
 ```
 
-A successful response completes the end-to-end smoke. Once the trace lands and the control plane's trace-fold reactor folds it, the spend shows up in the control-plane budget view.
+A successful response completes the end-to-end smoke. The gateway spools a spend record for the request and ships it to the control plane within a second or so; once that lands, the spend shows up in the control-plane budget view.
 
 ## 6 — Cleanup
 

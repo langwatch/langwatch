@@ -24,4 +24,119 @@ useDefault = true
 [[allowlists]]
 description = "Stripe catalog lookupKeys are public price handles, not credentials"
 targetRules = ["generic-api-key"]
-paths = ['''langwatch/ee/billing/stripe/stripeCatalog\.json''']
+paths = ['''platform/app/ee/billing/stripe/stripeCatalog\.json''']
+
+# Gateway test fixtures that pattern-match `generic-api-key` but are provably
+# not credentials: a sequential-hex HMAC fixture (`0123456789abcdef...`) signing
+# the vk-lifecycle and spend-ingest route tests, and the literal process key
+# `"conversation-1"` in the process-store suite.
+# Scoped to those test files and the generic rule only, so a real token
+# landing in either is still caught by every provider-specific rule.
+[[allowlists]]
+description = "Sequential-hex HMAC fixture in the signed-route tests, not a credential"
+targetRules = ["generic-api-key"]
+paths = [
+  '''platform/app/src/server/routes/__tests__/gateway-internal\.vk-lifecycle\.integration\.test\.ts''',
+  '''platform/app/src/server/routes/__tests__/gateway-internal\.spend-ingest\.integration\.test\.ts''',
+]
+
+[[allowlists]]
+description = "Literal fixture ids (conversation-1) in the process-store suite, not credentials"
+targetRules = ["generic-api-key"]
+paths = ['''platform/app/src/server/event-sourcing/process-manager/stores/__tests__/prismaProcessStore\.integration\.test\.ts''']
+
+# The self-hosted license fixtures are base64 payloads signed with the TEST
+# keypair that sits beside them in `fixtures/testKeys.ts`, checked in on
+# purpose: license validation is signature verification, so a test that does not
+# carry a real signature verifies nothing. The keypair signs nothing outside
+# this suite, and the production verifier reads its key from
+# `LANGWATCH_LICENSE_PUBLIC_KEY`, so a fixture key is refused by every real
+# deployment.
+#
+# Scoped to `generic-api-key` only, so a real credential pasted into this file
+# is still caught by every provider-specific rule. Scoped by path rather than by
+# value so a new fixture does not need a config change; the first line of the
+# file already carries the same claim for readers.
+[[allowlists]]
+description = "Signed license test fixtures, verifiable only against the checked-in test keypair"
+targetRules = ["generic-api-key"]
+paths = ['''platform/app/ee/licensing/__tests__/fixtures/testLicenses\.ts''']
+
+# gitleaks scans the branch's whole commit range, not just its tip, so a value
+# removed in a later commit is still found in the commit that added it. This one
+# is the sequential-hex placeholder `0123456789abcdef...` that briefly stood in
+# for CREDENTIALS_SECRET in the CI workflow. It never protected anything: it
+# encrypted and decrypted throwaway rows inside a single CI job, and the workflow
+# generates a random key per run now instead.
+#
+# Scoped by VALUE as well as path, and matched with AND, so any other
+# high-entropy string in a workflow file is still caught. A real credential
+# cannot be this string.
+[[allowlists]]
+description = "Sequential-hex CREDENTIALS_SECRET placeholder once inlined in the CI workflow"
+targetRules = ["generic-api-key"]
+matchCondition = "AND"
+paths = ['''\.github/workflows/langwatch-app-ci\.yml''']
+regexes = ['''(0123456789abcdef){4}''']
+
+# The two AWS-shaped literals the secrets-gate tests plant into throwaway
+# repositories. The tests exist to prove the gate fails on a credential a pull
+# request adds and passes on one it did not (#6681), and a fixture that no
+# scanner recognises would prove neither half. No such AWS account exists, and
+# the tests run the scanners in offline mode precisely because these values
+# cannot verify against a provider.
+#
+# Scoped by VALUE and by nothing else, so any OTHER credential — in this file
+# or any other — is still caught by every rule. Deliberately NOT scoped by path
+# with `matchCondition = "AND"`, the shape the CREDENTIALS_SECRET entry above
+# uses: gitleaks 8.30 does not narrow that way. A `paths` entry allowlists the
+# whole file, AND or no AND, and the accompanying `regexes` change nothing —
+# verified by planting a second, unrelated AWS key in this file and watching it
+# go unreported. Fixing that entry (and its comment, which claims a narrowing it
+# does not get) is tracked in #6684.
+[[allowlists]]
+description = "AWS-shaped fixture credentials planted by the secrets-gate scoping tests"
+regexes = [
+  '''AKIAQYLPMN5HHHFPZAM2''',
+  '''A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0''',
+]
+
+# `Idempotency-Key: signup-acme-4171` and its SDK equivalents in the billing
+# docs. An idempotency key is a value the CALLER invents to make a retry safe,
+# and it is meaningless to anyone who is not already authenticated: it names a
+# request, never grants access to one. gitleaks' `generic-api-key` rule fires on
+# the `Key: "<value>"` shape and cannot tell a caller-chosen request tag from a
+# credential. `llms-full.txt` is the generated concatenation of the same pages.
+#
+# Scoped to `generic-api-key` and to docs paths only, so a real token pasted
+# into the documentation is still caught by every provider-specific rule.
+[[allowlists]]
+description = "Idempotency-Key examples in the docs are caller-chosen request tags, not credentials"
+targetRules = ["generic-api-key"]
+paths = [
+  '''docs/ai-gateway/api/management\.mdx''',
+  '''docs/ai-gateway/cookbooks/metering-and-rebilling\.mdx''',
+  '''docs/llms-full\.txt''',
+]
+
+# `azure-secret-hygiene.unit.test.ts` proves the opposite of a leak: that
+# `redactAuthorizationMaterial` strips bearer tokens out of Azure error text
+# before it reaches a log. To prove that, the fixture has to be shaped exactly
+# like the thing a real leak would be — so gitleaks flags it, correctly, on
+# shape alone.
+#
+# Naming the value, as this file requires. `LEAKED_TOKEN` is three base64
+# segments that decode to:
+#   header    {"alg":"RS256","typ":"JWT"}
+#   payload   {"aud":"https://storage"}
+#   signature the literal ASCII word `signature`
+# No key signed it, it names no tenant, no account and no subject, and it
+# authenticates against nothing. Decode it and there is nothing to revoke.
+#
+# Scoped to this one file and to the two rules its shape trips, so every other
+# rule still applies here: a real Azure account key or SAS token landing in this
+# file is still caught.
+[[allowlists]]
+description = "Synthetic JWT-shaped fixture proving bearer-token redaction; signs nothing, grants nothing"
+targetRules = ["jwt", "generic-api-key"]
+paths = ['''platform/app/src/server/stored-objects/__tests__/azure-secret-hygiene\.unit\.test\.ts''']

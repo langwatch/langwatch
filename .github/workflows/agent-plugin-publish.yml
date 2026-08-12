@@ -1,0 +1,169 @@
+# Publishes plugins/langwatch to the public langwatch/agent-plugin repository,
+# which is what `claude plugin marketplace add langwatch/agent-plugin` resolves.
+#
+# Tag-driven rather than path-driven, unlike skills-publish: the plugin carries
+# a version in three manifests and a marketplace entry users pin against, so a
+# publish must correspond to a release rather than to a merge. release-please
+# cuts `agent-plugin@vX.Y.Z`; this reacts to it.
+#
+# The public repo is a MIRROR of the built directory. It gets the manifests, the
+# hooks, the skills and the built hook script, and none of the monorepo scaffolding
+# (package.json, build script, tests, release shim).
+name: agent-plugin-publish
+
+on:
+  push:
+    tags:
+      - "agent-plugin@v*"
+  workflow_dispatch:
+
+# A publish run drains — see publish-docker-app. Tag pushes are unique, so the
+# collision this actually guards is a re-dispatch of a tag already publishing.
+concurrency:
+  group: agent-plugin-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Resolve version
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          declared="$(node -p "require('./plugins/langwatch/plugin.json').version")"
+          claude_declared="$(node -p "require('./plugins/langwatch/.claude-plugin/plugin.json').version")"
+          # Both manifests ship, and a client reads whichever one its ecosystem
+          # knows about, so two versions in one publish means the same plugin
+          # answers a version query differently depending on who asks.
+          if [ "$claude_declared" != "$declared" ]; then
+            echo "::error::plugins/langwatch/plugin.json says $declared but plugins/langwatch/.claude-plugin/plugin.json says $claude_declared."
+            exit 1
+          fi
+          if [ "$EVENT_NAME" = "push" ]; then
+            tagged="${REF_NAME#agent-plugin@v}"
+            if [ "$tagged" = "$REF_NAME" ]; then
+              echo "::error::Tag $REF_NAME is not an agent-plugin@vX.Y.Z tag."
+              exit 1
+            fi
+            # release-please bumps plugin.json through the same release PR that
+            # creates the tag, so a mismatch means the tag was cut by hand
+            # against a tree that was never bumped.
+            if [ "$tagged" != "$declared" ]; then
+              echo "::error::Tag $REF_NAME says $tagged but plugins/langwatch/plugin.json says $declared."
+              exit 1
+            fi
+          fi
+          echo "version=$declared" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout agent-plugin repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: langwatch/agent-plugin
+          path: _agent-plugin-publish
+          token: ${{ secrets.AGENT_PLUGIN_PUBLISH_TOKEN }}
+
+      # `langwatch...` is the SDK the hook is bundled from, plus its workspace
+      # dependencies. The plugin package's own devDependencies are test tooling
+      # and this job runs no tests, so they are deliberately not installed.
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "langwatch..."
+
+      - name: Build the plugin
+        run: pnpm --filter @langwatch/agent-plugin run build
+
+      - name: Verify the hook bundle is present
+        run: |
+          set -euo pipefail
+          script=plugins/langwatch/scripts/session-context.mjs
+          if [ ! -s "$script" ]; then
+            echo "::error::$script is missing or empty. Publishing would ship a plugin whose hooks do nothing."
+            exit 1
+          fi
+
+      # What crosses over: the two manifests, the marketplace, hooks/, skills/,
+      # the built scripts/session-context.mjs, the README, the LICENSE and the
+      # changelog. What stays behind is the monorepo scaffolding that would only
+      # confuse somebody reading the published package.
+      #
+      # `.git/` is excluded explicitly because `--delete` would otherwise remove
+      # the destination checkout's own history, which is what the guard in the
+      # next step exists to catch.
+      - name: Mirror the plugin directory
+        run: |
+          set -euo pipefail
+          rsync -a --delete \
+            --exclude '.git/' \
+            --exclude 'node_modules/' \
+            --exclude '__tests__/' \
+            --exclude 'package.json' \
+            --exclude 'tsconfig.json' \
+            --exclude 'build.mjs' \
+            --exclude 'vitest.config.ts' \
+            --exclude '.gitignore' \
+            --exclude '.release-please-shim' \
+            plugins/langwatch/ _agent-plugin-publish/
+
+      - name: Commit and push
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ ! -d _agent-plugin-publish/.git ]; then
+            echo "::error::_agent-plugin-publish/.git missing: the mirror likely wiped the checkout. Refusing to commit into the wrong repo."
+            exit 1
+          fi
+          cd _agent-plugin-publish
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          tag="v${VERSION}"
+          # What the remote's own tag resolves to, peeled to a commit, or empty
+          # when there is no such tag. ls-remote prints the peeled `^{}` line
+          # last for an annotated tag, so the last field is the commit either
+          # way.
+          published_tag_commit="$(
+            git ls-remote --tags origin "refs/tags/${tag}" "refs/tags/${tag}^{}" \
+              | awk 'END { print $1 }'
+          )"
+
+          # Nothing to commit is not automatically success. The branch push and
+          # the tag push are two operations, so a previous run can have landed
+          # the content and then failed on the tag, leaving a release nobody can
+          # pin. Reconcile the tag before reporting success.
+          if git diff --cached --quiet; then
+            if [ -z "$published_tag_commit" ]; then
+              echo "Mirror is already current but ${tag} is missing. Creating it."
+              git tag "$tag"
+              git push origin "refs/tags/${tag}"
+              exit 0
+            fi
+            if [ "$published_tag_commit" != "$(git rev-parse HEAD)" ]; then
+              echo "::error::${tag} exists in langwatch/agent-plugin but resolves to ${published_tag_commit}, not to the published commit $(git rev-parse HEAD)."
+              exit 1
+            fi
+            echo "No changes to publish, and ${tag} already resolves to them."
+            exit 0
+          fi
+
+          # With changes in hand, a tag that already exists would ship new
+          # content while `${tag}` still resolves the old, which is worse than a
+          # failed publish: users pin against that tag.
+          if [ -n "$published_tag_commit" ]; then
+            echo "::error::langwatch/agent-plugin already has tag ${tag}. Bump the plugin version and release again."
+            exit 1
+          fi
+          git commit -m "chore: sync agent plugin ${tag} from langwatch/langwatch"
+          git tag "$tag"
+          git push
+          git push origin "refs/tags/${tag}"

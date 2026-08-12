@@ -119,7 +119,12 @@ type budgetWire struct {
 	PrincipalID string `json:"principal_id"`
 	// ProviderKey is the ModelProvider row id the budget is filtered to.
 	// null on the wire (= counts every dispatch) decodes to "".
-	ProviderKey   string `json:"provider_key"`
+	ProviderKey string `json:"provider_key"`
+	// PerUser marks an attributed-user TEMPLATE: ScopeID is the anchor and
+	// the limit applies to each distinct external end user separately. The
+	// gateway resolves the request's own bucket through the cached
+	// bucket-spend read; SpentMicroUSD is 0 on templates.
+	PerUser       bool   `json:"per_user"`
 	Window        string `json:"window"`
 	LimitMicroUSD int64  `json:"limit_micro_usd"`
 	SpentMicroUSD int64  `json:"spent_micro_usd"`
@@ -135,7 +140,7 @@ type cacheRuleWire struct {
 }
 
 // cacheMatchersWire mirrors the matchers shape emitted by the control-plane
-// materialiser (langwatch/src/server/gateway/config.materialiser.ts:121-128).
+// materialiser (platform/app/src/server/gateway/config.materialiser.ts:121-128).
 // Every recognized matcher must have an explicit field — silently dropping a
 // matcher at unmarshal collapses the rule's effective scope to "match all",
 // which has caused stripped `cache_control` on system blocks in matrix tests.
@@ -206,6 +211,7 @@ func (w *configWire) toDomain() domain.BundleConfig {
 			Scope:         b.Scope,
 			ScopeID:       b.ScopeID,
 			PrincipalID:   b.PrincipalID,
+			PerUser:       b.PerUser,
 			ProviderKey:   b.ProviderKey,
 			Window:        b.Window,
 			LimitMicroUSD: b.LimitMicroUSD,
@@ -428,6 +434,20 @@ func providerSlotToCredential(p providerSlotWire) domain.Credential {
 		cred.Extra = map[string]string{
 			"account_id":      getString("account_id"),
 			"provider_row_id": getString("provider_row_id"),
+		}
+	case domain.ProviderGemini:
+		// Gemini's second door: a credential carrying project_id + region
+		// is an Agent Platform key, and mapProvider routes it to
+		// aiplatform.googleapis.com off exactly these two Extra fields
+		// (credentialIsAgentPlatform). Dropping them here silently sends
+		// the key to the Gemini API host, where it is refused. Emitted by
+		// config.materialiser.ts's gemini branch together or not at all.
+		cred.APIKey = getString("api_key")
+		if project, region := getString("project_id"), getString("region"); project != "" && region != "" {
+			cred.Extra = map[string]string{
+				"project_id": project,
+				"region":     region,
+			}
 		}
 	default:
 		cred.APIKey = getString("api_key")

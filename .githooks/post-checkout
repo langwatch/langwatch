@@ -18,7 +18,7 @@ main_checkout="$(cd "$git_common_dir/.." && pwd)"
 worktree_root="$(git rev-parse --show-toplevel)"
 
 # Directories that may contain .env files
-env_dirs=("langwatch" "langwatch_nlp" "langevals" "python-sdk" "typescript-sdk" "mcp-server")
+env_dirs=("platform/app" "services/langevals" "sdks/python" "sdks/typescript" "mcp/typescript")
 
 copied=0
 for dir in "${env_dirs[@]}"; do

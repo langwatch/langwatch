@@ -220,7 +220,7 @@ jobs:
       # secrets. Reading the policy doc from the base prevents a PR from
       # changing the policy that evaluates itself.
       - name: Checkout repo (policy doc)
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.base.sha }}
 
@@ -257,18 +257,22 @@ jobs:
             "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" \
             --jq '.[].filename' > /tmp/pr_files.txt
 
-          # GitHub's PR diff endpoint returns HTTP 406 above 300 changed files.
-          # Such a PR cannot be fully inspected here, so fail closed before
-          # calling that endpoint. The paginated files endpoint supports the
-          # larger listing and remains useful for the audit trail.
+          # GitHub's PR diff endpoint returns HTTP 406 on a PR it will not
+          # serve: above 300 changed files, and independently above 20000 diff
+          # lines. Only the file count is knowable before the call, so it is
+          # checked first and the 406 from the call itself lands on the same
+          # oversized verdict rather than killing the step. The paginated files
+          # endpoint has no such ceiling and remains useful for the audit trail.
           FILE_LIMIT=300
           FILE_COUNT=$(wc -l < /tmp/pr_files.txt)
           DIFF_LIMIT=100000
           if [ "$FILE_COUNT" -gt "$FILE_LIMIT" ]; then
             echo "PR changes ${FILE_COUNT} files (> ${FILE_LIMIT}); too large for automated evaluation."
             echo "oversized=true" >> "$GITHUB_OUTPUT"
+          elif ! gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" > /tmp/pr_diff.txt; then
+            echo "PR diff exceeds what the API will serve; too large for automated evaluation."
+            echo "oversized=true" >> "$GITHUB_OUTPUT"
           else
-            gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" > /tmp/pr_diff.txt
             DIFF_SIZE=$(wc -c < /tmp/pr_diff.txt)
             if [ "$DIFF_SIZE" -gt "$DIFF_LIMIT" ]; then
               echo "PR diff is ${DIFF_SIZE} chars (> ${DIFF_LIMIT}); too large for automated evaluation."

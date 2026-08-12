@@ -26,18 +26,24 @@ jobs:
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # The gate reads no working-tree content: on pull_request events
+          # dorny/paths-filter takes the changed-file list from the API, and
+          # every file this job needs on disk lives under .github/. Checking
+          # out the rest of the tree is pure runner time.
+          sparse-checkout: .github
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
           # push-strategy diff + no release-please-manifest entry: the test
           # job spends real LLM money, so it must not run on pushes or
-          # release PRs that touched nothing under sdk-go/. An SDK release
-          # PR still matches via sdk-go/CHANGELOG.md.
+          # release PRs that touched nothing under sdks/go/. An SDK release
+          # PR still matches via sdks/go/CHANGELOG.md.
           push-strategy: diff
           filters: |
             relevant:
-              - 'sdk-go/**'
+              - 'sdks/go/**'
               - '.github/workflows/sdk-go-ci.yml'
 
   test:
@@ -47,35 +53,54 @@ jobs:
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
+    # The repo-root go.work targets a newer Go than the SDK's floor (see
+    # sdk-go-cd.yml); the SDK must build standalone at its declared go
+    # directive, so ignore the workspace for every step in this job.
+    env:
+      GOWORK: "off"
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.25'
+          # Read the floor from the module instead of restating it. The SDK
+          # deliberately targets an older Go than the rest of the repo — it
+          # must build standalone at its declared directive, which is why
+          # these jobs run with GOWORK=off — and a literal here is a second
+          # copy of that decision, free to drift from the first. It already
+          # had: go.mod said 1.25.0 while three other workflows said "1.25",
+          # "1.26" and go.mod's 1.26.5.
+          go-version-file: sdks/go/go.mod
           cache: true
+          # Every module, because test-all.sh walks every go.mod under sdks/go
+          # and a key built from the core module alone goes stale silently.
+          cache-dependency-path: sdks/go/**/go.sum
 
-      - name: Install dependencies
-        working-directory: ./sdk-go
-        run: go mod download
-
-      - name: Run tests
-        working-directory: ./sdk-go
-        run: go test -v ./...
+      # The SDK is a set of separate modules on purpose: importing one
+      # provider's instrumentation must never pull in another's SDK. A single
+      # `go test ./...` in the core therefore covers none of them, so walk
+      # every go.mod instead — test-all.sh vets, tests and gofmt-checks each
+      # module independently. It forwards its arguments to `go test`, so -race
+      # runs the detector: the SDK's span processing, streaming accumulators and
+      # exporters all run on the caller's goroutines, where a data race is a
+      # customer-visible corruption rather than a test-only artefact.
+      - name: Run tests for every module
+        working-directory: ./sdks/go
+        run: ./test-all.sh -race
 
       - name: Install examples dependencies
-        working-directory: ./sdk-go/examples
+        working-directory: ./sdks/go/examples
         run: go mod download
 
       - name: Run filtering example
-        working-directory: ./sdk-go/examples
+        working-directory: ./sdks/go/examples
         run: go run ./filtering
 
       - name: Install e2e dependencies
-        working-directory: ./sdk-go/e2e
+        working-directory: ./sdks/go/e2e
         run: go mod download
 
       - name: Run e2e examples
@@ -87,7 +112,7 @@ jobs:
            || github.event.pull_request.head.repo.full_name == github.repository)
           && (github.event_name != 'pull_request'
            || github.actor != 'dependabot[bot]')
-        working-directory: ./sdk-go/e2e
+        working-directory: ./sdks/go/e2e
         run: go run cmd/main.go --ci run-examples
         env:
           LANGWATCH_API_KEY: ${{ secrets.GO_SDK_LANGWATCH_API_KEY }}
@@ -110,23 +135,31 @@ jobs:
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
+    # See the `test` job above: ignore the repo-root go.work so the SDK
+    # builds standalone at its own declared go directive.
+    env:
+      GOWORK: "off"
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.25'
+          # The module's own floor, as in `test` above.
+          go-version-file: sdks/go/go.mod
           cache: true
+          # The core module only: this job builds it alone, never the
+          # per-provider modules that `test` walks.
+          cache-dependency-path: sdks/go/go.sum
 
       - name: Install dependencies
-        working-directory: ./sdk-go
+        working-directory: ./sdks/go
         run: go mod download
 
       - name: Build
-        working-directory: ./sdk-go
+        working-directory: ./sdks/go
         run: go build -v ./...
 
   sdk-go-complete:

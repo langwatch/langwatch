@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/oklog/ulid/v2"
@@ -32,6 +33,7 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/adapters/policy"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/providers"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/ratelimit"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/spendemitter"
 )
 
 // Deps holds validated infrastructure adapters needed by the gateway.
@@ -52,6 +54,10 @@ type Deps struct {
 	Health        *health.Registry
 	Metrics       *gatewaymetrics.Recorder
 	Breaker       *breaker.Registry
+	// Spend emission (nil when LW_GATEWAY_SPEND_ENABLED is off).
+	SpendEmitter *spendemitter.Emitter
+	SpendSpool   *spendemitter.Spool
+	SpendDrainer *spendemitter.Drainer
 }
 
 // NewDeps builds all infrastructure adapters from the given config.
@@ -146,9 +152,9 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		ChangePoller:  changePollerAdapter{client: cpClient},
 		Logger:        logger,
 		Metrics:       metrics,
-		SoftBump:      cfg.AuthCache.SoftBump,
-		HardGrace:     cfg.AuthCache.HardGrace,
-		ConfigTTL:     cfg.AuthCache.ConfigTTL,
+		SoftBump:      time.Duration(cfg.AuthCache.SoftBumpSeconds) * time.Second,
+		HardGrace:     time.Duration(cfg.AuthCache.HardGraceSeconds) * time.Second,
+		ConfigTTL:     time.Duration(cfg.AuthCache.ConfigTTLSeconds) * time.Second,
 	})
 	if err != nil {
 		return ctx, nil, fmt.Errorf("auth service init: %w", err)
@@ -175,6 +181,9 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	budgetChecker := budget.NewChecker(budget.CheckerOptions{
 		Logger:  logger,
 		Metrics: metrics,
+		// Attributed-user templates enforce per end user through a cached
+		// control-plane bucket read; everything else stays bundle-local.
+		Buckets: budget.NewCachedBucketSpend(cpClient),
 	})
 
 	// Per-credential circuit breaker. A provider that keeps failing is
@@ -209,6 +218,59 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	metrics.TrackDraining(probes.Draining)
 	metrics.TrackAuthCacheSize(authSvc.CacheLen)
 
+	var spendSpool *spendemitter.Spool
+	var spendEmitterAdapter *spendemitter.Emitter
+	var spendDrainer *spendemitter.Drainer
+	if cfg.SpendEmitter.Enabled {
+		spoolDir := cfg.SpendEmitter.SpoolDir
+		if spoolDir == "" {
+			spoolDir = filepath.Join(os.TempDir(), "langwatch-gateway-spend-spool")
+		}
+		flushEvery := time.Duration(cfg.SpendEmitter.FlushIntervalSeconds) * time.Second
+		spendSpool, err = spendemitter.Open(spendemitter.SpoolOptions{
+			Dir:           spoolDir,
+			MaxTotalBytes: cfg.SpendEmitter.SpoolMaxBytes,
+			FlushEvery:    flushEvery,
+			PodID:         nodeID,
+			Logf:          func(format string, args ...any) { logger.Sugar().Warnf(format, args...) },
+		})
+		if err != nil {
+			// Spend emission is best-effort billing telemetry: a bad spool
+			// directory must not take the LLM proxy down with it. Serve
+			// without emission and scream; settlement reconciliation surfaces
+			// the gap.
+			logger.Sugar().Errorf("spend spool unavailable, serving WITHOUT spend emission: %v", err)
+		} else {
+			ingestBase := cfg.SpendEmitter.IngestBaseURL
+			if ingestBase == "" {
+				ingestBase = cfg.ControlPlane.BaseURL
+			}
+			ingestClient, err := spendemitter.NewIngestClient(ingestBase, signer)
+			if err != nil {
+				logger.Sugar().Errorf("spend ingest client unavailable, serving WITHOUT spend emission: %v", err)
+				_ = spendSpool.Close()
+				spendSpool = nil
+			} else {
+				spendEmitterAdapter = spendemitter.NewEmitter(spendSpool)
+				spendDrainer = spendemitter.NewDrainer(spendemitter.DrainerOptions{
+					Spool:   spendSpool,
+					Shipper: ingestClient,
+					Logf:    func(format string, args ...any) { logger.Sugar().Warnf(format, args...) },
+				})
+			}
+		}
+	}
+	if spendSpool != nil {
+		metrics.TrackSpendSpool(func() gatewaymetrics.SpoolStats {
+			stats := spendSpool.Stats()
+			return gatewaymetrics.SpoolStats{
+				Appended:        stats.Appended,
+				DroppedIntake:   stats.DroppedIntake,
+				DroppedOverflow: stats.DroppedOverflow,
+			}
+		})
+	}
+
 	return ctx, &Deps{
 		Logger:        logger,
 		NodeID:        nodeID,
@@ -226,6 +288,9 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		Health:        probes,
 		Metrics:       metrics,
 		Breaker:       circuits,
+		SpendEmitter:  spendEmitterAdapter,
+		SpendSpool:    spendSpool,
+		SpendDrainer:  spendDrainer,
 	}, nil
 }
 

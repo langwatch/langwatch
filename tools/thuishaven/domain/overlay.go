@@ -40,7 +40,7 @@ func (s Stack) svc(name string) Service {
 }
 
 // OverlayEnv returns the KEY=VALUE lines that carry the resolved hostname URLs +
-// ports. These are (a) written to langwatch/.env.portless — the overlay every TS
+// ports. These are (a) written to platform/app/.env.portless — the overlay every TS
 // entry point loads last with override:true so it beats anything pinned in .env —
 // and (b) injected directly into each supervised child. Deriving them from the
 // Stack (which already holds every URL/port) keeps this the single source of
@@ -97,6 +97,13 @@ func (s Stack) OverlayEnv() []string {
 	if s.LocalAPIKey != "" {
 		env = append(env, "HAVEN_SEED_LANGWATCH_API_KEY="+s.LocalAPIKey)
 	}
+	// Google DLP off by default locally: no local workflow wants trace text leaving
+	// for Google, and the app skips loading @google-cloud/dlp (grpc + generated
+	// protos) entirely when this is set. False emits nothing, leaving .env to decide
+	// — which is how you opt back in to running the DLP check locally.
+	if s.DisableGoogleDLP {
+		env = append(env, "LANGWATCH_DISABLE_GOOGLE_DLP=true")
+	}
 	// The rest of the static seeded identity (see prisma/seed.ts's header comment
 	// for the full rationale) — same story: fixed values so any worktree or agent
 	// can log in / authenticate without rediscovering them.
@@ -143,6 +150,12 @@ func (s Stack) OverlayEnv() []string {
 	if s.ClickHouseHTTPPort != 0 && s.ClickHouseDatabase != "" {
 		env = append(env, fmt.Sprintf("CLICKHOUSE_URL=http://%s:%s@127.0.0.1:%d/%s",
 			ClickHouseUser, ClickHousePassword, s.ClickHouseHTTPPort, s.ClickHouseDatabase))
+		// Backup-status gauges query system.backup_log, which only exists once
+		// backups are configured, a production concern. The app collects them by
+		// default (unset must not disarm the production alerts that read them), so
+		// haven's container, which has no backups, opts out explicitly. Otherwise
+		// every 15s stats tick would fail on a missing table for nothing.
+		env = append(env, "CLICKHOUSE_BACKUP_METRICS_ENABLED=false")
 	}
 	// Same story for Postgres: one shared brew-managed server, a database per
 	// slug, connected straight to loopback.

@@ -107,7 +107,7 @@ Feature: Large trace payloads — event_log as single source of truth · transie
 
   @e2e @track2 @unimplemented
   # Python SDK default raised to 32 KB (constructor + public factory:
-  # python-sdk/src/langwatch/telemetry/tracing.py:96, 786). TS SDK has no
+  # sdks/python/src/langwatch/telemetry/tracing.py:96, 786). TS SDK has no
   # transport-layer cap (grep confirms only CLI display helpers). Go gateway
   # has no sdktrace.WithSpanLimits and no manual truncation in
   # customertracebridge/emitter.go (OTel Go SDK v1.43.0 defaults to unlimited).
@@ -148,8 +148,23 @@ Feature: Large trace payloads — event_log as single source of truth · transie
     And the event is written to event_log with the full content as EventPayload
     And after event_log INSERT succeeds the S3 spool object is best-effort DELETEd
 
-  @integration @track2 @unimplemented
-  # Bound by edge-offload.unit.test.ts written in Step 4.
+  @unit @track2
+  # Preservation is the default, so nobody has to discover a setting to get
+  # it. Turning it off is the deliberate act, and it reaches only what the
+  # operator aimed at. Bound by featureFlagStore.postgres.unit.test.ts.
+  Scenario: Oversized span content survives ingestion wherever storage is available
+    Given a deployment whose object storage is reachable
+    And nobody has configured anything about oversized content
+    When a trace arrives carrying far more content than a span field holds
+    Then the whole value is preserved on the trace
+    When an operator turns preservation off for one project
+    Then that project's oversized content is no longer preserved
+    And every other project keeps its content preserved
+
+  @unit @track2
+  # Bound by edge-offload.unit.test.ts for the edge decision, and by
+  # recordSpanCommand.oversized.unit.test.ts for what the worker then does
+  # with the command the edge handed back.
   Scenario: When edge S3 spool PUT fails, ingestion falls back to inline (fail-open)
     Given a span whose serialized command payload exceeds 256 KB
     And the S3 spool PUT fails at the edge

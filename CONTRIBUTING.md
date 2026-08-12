@@ -29,7 +29,7 @@ Please note, all contributions should start with an issue first.
 ## System Requirements
 
 - **RAM**: At least **8 GB** of RAM is recommended to run the full development environment
-- **Docker**: Only needed for the compose-based `make quickstart` presets (e.g. `all-local`, `full-local`) and for `agentic-e2e-tests`. UI/frontend work can skip Docker entirely with `make quickstart frontend-only`
+- **Docker**: Only needed for the compose-based `make quickstart` presets (e.g. `all-local`, `full-local`) and for `tests/agentic-e2e`. UI/frontend work can skip Docker entirely with `make quickstart frontend-only`
 - **Performance tips**:
   - Close unnecessary applications to free up memory when running the full dev environment
   - If builds or hot-reload feel slow and you're on a compose-based preset, ensure Docker has enough memory allocated (Docker Desktop → Settings → Resources)
@@ -72,16 +72,22 @@ Here's how to propose a change:
 If your changes affect the UI, please ensure e2e tests pass:
 
 ```bash
-cd agentic-e2e-tests
+cd tests/agentic-e2e
 docker compose up -d --wait
 pnpm install && pnpm test
 ```
 
-See `agentic-e2e-tests/README.md` for details on writing new tests.
+See `tests/agentic-e2e/README.md` for details on writing new tests.
 
 ## Commit Messages and PR Titles
 
 We follow the [Conventional Commits](https://www.conventionalcommits.org) specification for our commit messages and PR titles. This helps us automate versioning and generate changelogs.
+
+### Breaking Changes
+
+The repo publishes eight independently versioned components: the product itself, the four SDKs, the MCP server, langevals and the skills package. release-please decides which of them a commit affects by path, then applies the whole commit message to every one of them. A `!` marker or a `BREAKING CHANGE:` footer on a commit that touches three components therefore releases three majors, whether or not the break means anything to all three.
+
+So keep a breaking change inside one component. If the work has to touch another one, land the incidental part as a separate non-breaking PR. The `release-scope-guard` check fails a PR that breaks this rule, and tells you what to do about it. See [dev/docs/RELEASES.md](./dev/docs/RELEASES.md) for the full procedure, including how to pin a version release-please got wrong.
 
 ## Additional Notes
 

@@ -1,0 +1,366 @@
+import pino, {
+  type DestinationStream,
+  type LoggerOptions,
+  type Logger as PinoLogger,
+} from "pino";
+import type SuperJSON from "superjson";
+import { DEFAULT_SERVICE_NAME, REQUEST_CAUSE_FIELD } from "./constants";
+
+type LogContextProvider = () => Record<string, string | null>;
+
+const isNodeRuntime =
+  typeof process !== "undefined" && typeof process.versions?.node === "string";
+
+let logContextProvider: LogContextProvider | undefined;
+let sharedSuperjson: typeof SuperJSON | undefined;
+
+function getSuperjson(): typeof SuperJSON {
+  if (!sharedSuperjson) {
+    const { createRequire } = process.getBuiltinModule("node:module");
+    const loadModule = createRequire(import.meta.url);
+    sharedSuperjson = loadModule("superjson") as typeof SuperJSON;
+  }
+
+  return sharedSuperjson;
+}
+
+/**
+ * Registers the server context provider used by every logger mixin.
+ *
+ * The provider is injected rather than imported so this module stays safe to
+ * load in a browser: no OpenTelemetry or Node-only context module is part of
+ * the root package's module graph.
+ */
+export function registerLogContextProvider(provider: LogContextProvider): void {
+  logContextProvider = provider;
+}
+
+/**
+ * Custom Error serializer using superjson.
+ * Avoids expensive manual stack trace formatting while preserving metadata.
+ */
+const superjsonErrorSerializer = (error: unknown) => {
+  if (!(error instanceof Error)) {
+    return pino.stdSerializers.err(error as Error);
+  }
+
+  const serialized = getSuperjson().serialize(error);
+
+  return {
+    ...pino.stdSerializers.err(error),
+    _superjson: serialized.meta,
+  };
+};
+
+/**
+ * Every key a cause may be logged under, mapped to the same serializer.
+ *
+ * pino matches serializers by exact property name and nothing warns when a key
+ * has none: the value is passed to `JSON.stringify`, and an `Error` has no
+ * enumerable own properties, so it lands as `{}` with the message and stack -
+ * the only reasons it was logged - gone. Keeping the map in one exported
+ * constant is what lets a test drive the real thing rather than a copy of it.
+ *
+ * `error` for records that ARE failures; {@link REQUEST_CAUSE_FIELD} for the
+ * cause on records deliberately logged below error level.
+ */
+export const NODE_LOG_SERIALIZERS = {
+  error: superjsonErrorSerializer,
+  [REQUEST_CAUSE_FIELD]: superjsonErrorSerializer,
+} as const;
+
+export interface CreateLoggerOptions {
+  /**
+   * Disable automatic context injection (traceId, spanId, organizationId,
+   * projectId, and userId). This option has no effect in the browser.
+   */
+  disableContext?: boolean;
+}
+
+// Each pino.transport() call adds exit listeners and starts a worker thread.
+// Reusing one transport prevents listener pollution and keeps in-process
+// workers on the same output pipeline.
+let sharedTransport: DestinationStream | null = null;
+let isTransportInitialized = false;
+
+function getSharedTransport(): DestinationStream | null {
+  if (!isNodeRuntime || isTransportInitialized) {
+    return sharedTransport;
+  }
+  isTransportInitialized = true;
+
+  const isDevelopment = process.env.NODE_ENV !== "production";
+  const isTest = process.env.NODE_ENV === "test";
+
+  if (isTest) {
+    return null;
+  }
+
+  // Console format follows LOG_FORMAT (the same var the Go services' clog reads),
+  // so one signal makes every dev lane — TS and Go — read as pretty prose. An
+  // explicit LOG_FORMAT wins in both directions ("pretty"/"json"); unset falls back
+  // to the NODE_ENV default (pretty in dev, JSON in prod), so nothing changes for
+  // anyone who never sets it.
+  const logFormat = process.env.LOG_FORMAT;
+  const usePretty =
+    logFormat === "pretty" || (logFormat !== "json" && isDevelopment);
+
+  const isOtelExportEnabled = process.env.PINO_OTEL_ENABLED === "true";
+  const consoleLevel =
+    process.env.LOG_CONSOLE_LEVEL ?? process.env.PINO_CONSOLE_LEVEL ?? "info";
+  const otelLevel =
+    process.env.LOG_OTEL_LEVEL ?? process.env.PINO_OTEL_LEVEL ?? "debug";
+
+  try {
+    sharedTransport = buildTransport({
+      usePretty,
+      isOtelExportEnabled,
+      consoleLevel,
+      otelLevel,
+    });
+  } catch (error) {
+    console.error(
+      "Failed to create pino transport, falling back to stdout:",
+      error,
+    );
+    sharedTransport = null;
+  }
+
+  return sharedTransport;
+}
+
+/**
+ * Creates a Pino logger with one API for Node.js and browser consumers.
+ *
+ * Node.js loggers use the shared console/OTel transport and inject registered
+ * async request context. Browser loggers use Pino's browser mode and never load
+ * the package's OpenTelemetry or Node-only context modules.
+ */
+export function createLogger(
+  name: string,
+  options?: CreateLoggerOptions,
+): PinoLogger {
+  return isNodeRuntime
+    ? createNodeLogger(name, options)
+    : createBrowserLogger(name);
+}
+
+function createBrowserLogger(name: string): PinoLogger {
+  const isTest =
+    typeof process !== "undefined" && process.env.NODE_ENV === "test";
+  const level = isTest
+    ? "error"
+    : typeof process !== "undefined"
+      ? (process.env.PINO_LOG_LEVEL ?? "info")
+      : "info";
+
+  return pino({
+    name,
+    level,
+    timestamp: pino.stdTimeFunctions.isoTime,
+    // Both keys, same serializer. pino matches serializers by exact property
+    // name, so a cause moved to REQUEST_CAUSE_FIELD and not registered here is
+    // emitted as a bare Error - which serialises to `{}`, losing the message
+    // and stack that are the whole reason it was logged.
+    serializers: {
+      error: pino.stdSerializers.err,
+      [REQUEST_CAUSE_FIELD]: pino.stdSerializers.err,
+    },
+    formatters: {
+      bindings: (bindings) => bindings,
+      level: (label) => ({ level: label.toUpperCase() }),
+    },
+    browser: { asObject: true },
+  });
+}
+
+/**
+ * `service.version` for a log record, read from the same place the OTel
+ * resource reads it.
+ *
+ * `OTEL_RESOURCE_ATTRIBUTES` is the `k=v,k=v` form the deployment already sets.
+ * Parsing it keeps one source of truth — two ways to state the version is how
+ * they drift — and `SERVICE_VERSION` is accepted as an explicit override for
+ * anything that sets only that.
+ *
+ * Returns nothing when unset, so a local run adds no field rather than an empty
+ * one.
+ */
+/**
+ * `OTEL_RESOURCE_ATTRIBUTES` values are percent-encoded (the spec's W3C Baggage
+ * octet string), which is how a value containing `,` or `=` survives a format
+ * that separates on both. The OTel SDK's own envDetector decodes them, so this
+ * has to as well: the whole point of reading this variable rather than adding a
+ * second one is that a log and a span cannot disagree about the version, and
+ * emitting `git%2Dabc` where the trace says `git-abc` would be exactly that
+ * disagreement.
+ *
+ * A malformed escape falls back to the raw text. `decodeURIComponent` throws on
+ * a stray `%`, and a version we can print imperfectly beats no version at all.
+ */
+function decodeAttributeValue(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+export function serviceVersionField(): Record<string, string> {
+  const explicit = process.env.SERVICE_VERSION?.trim();
+  if (explicit) return { "service.version": explicit };
+
+  const attrs = process.env.OTEL_RESOURCE_ATTRIBUTES;
+  if (!attrs) return {};
+
+  for (const pair of attrs.split(",")) {
+    const separator = pair.indexOf("=");
+    if (separator === -1) continue;
+    if (pair.slice(0, separator).trim() !== "service.version") continue;
+
+    const value = decodeAttributeValue(pair.slice(separator + 1).trim());
+    if (value) return { "service.version": value };
+  }
+
+  return {};
+}
+
+function createNodeLogger(
+  name: string,
+  options?: CreateLoggerOptions,
+): PinoLogger {
+  const isTest = process.env.NODE_ENV === "test";
+  const defaultLevel = isTest ? "error" : "debug";
+  const level =
+    process.env.PINO_LOG_LEVEL ?? process.env._LOG_LEVEL ?? defaultLevel;
+
+  const pinoOptions: LoggerOptions = {
+    name,
+    level,
+    timestamp: pino.stdTimeFunctions.isoTime,
+    serializers: NODE_LOG_SERIALIZERS,
+    formatters: {
+      // Adds process identity alongside pino's own pid/hostname bindings,
+      // distinct from `name` (the per-module label like "langwatch:api:hono").
+      // Prod ships stdout through fluent-bit, which promotes this field to the
+      // Loki `service_name` label — it is how the Go services land under
+      // `langwatch-service-aigateway` / `-nlp` (pkg/clog stamps the same
+      // field). Without it every line from this app arrives as
+      // `service_name="fluent-bit"`, unfilterable by service. Done here rather
+      // than via `base` so pino keeps supplying pid/hostname and this module
+      // stays free of a node:os import (it must remain browser-safe).
+      bindings: (bindings) => ({
+        ...bindings,
+        service: process.env.OTEL_SERVICE_NAME ?? DEFAULT_SERVICE_NAME,
+        // Which build produced the line.
+        //
+        // The deployment already states this — OTEL_RESOURCE_ATTRIBUTES carries
+        // `service.version=<tag>` and `envDetector` merges it into the OTel
+        // resource — but that resource only reaches telemetry we EXPORT.
+        // These logs go to stdout and are picked up from the pod's log file, a
+        // path the resource never touches, so no log line has ever carried a
+        // version: measured 2026-08-07, `service_version` appeared on no record
+        // in the fleet. Reading the same env var keeps one source of truth
+        // rather than introducing a second way to say it.
+        ...serviceVersionField(),
+      }),
+      level: (label) => ({ level: label.toUpperCase() }),
+    },
+    mixin: options?.disableContext
+      ? undefined
+      : () => logContextProvider?.() ?? {},
+  };
+
+  const transport = getSharedTransport();
+  return transport
+    ? pino(pinoOptions, transport)
+    : pino(pinoOptions, process.stdout);
+}
+
+function buildTransport({
+  usePretty,
+  isOtelExportEnabled,
+  consoleLevel,
+  otelLevel,
+}: {
+  usePretty: boolean;
+  isOtelExportEnabled: boolean;
+  consoleLevel: string;
+  otelLevel: string;
+}): DestinationStream {
+  const targets: pino.TransportTargetOptions[] = [
+    buildConsoleTransport({
+      usePretty,
+      level: consoleLevel,
+      isOtelExportEnabled,
+    }),
+  ];
+
+  if (isOtelExportEnabled) {
+    targets.push(buildOtelTransport(otelLevel));
+  }
+
+  return pino.transport({ targets });
+}
+
+// `service` is constant for the process and only exists so fluent-bit can
+// promote it to a Loki label — it is pure noise on a local console line.
+const BASE_CONSOLE_IGNORE = "pid,hostname,service";
+const HEAVY_CONTEXT_FIELDS = ["organizationId", "projectId", "userId"];
+
+/**
+ * Selects fields hidden from the pretty console. When OTel export is enabled,
+ * business context remains available in Grafana while trace/span IDs stay on
+ * the compact console line for correlation.
+ */
+export function consoleIgnoreFields(isOtelExportEnabled: boolean): string {
+  return isOtelExportEnabled
+    ? [BASE_CONSOLE_IGNORE, ...HEAVY_CONTEXT_FIELDS].join(",")
+    : BASE_CONSOLE_IGNORE;
+}
+
+function buildConsoleTransport({
+  usePretty,
+  level,
+  isOtelExportEnabled,
+}: {
+  usePretty: boolean;
+  level: string;
+  isOtelExportEnabled: boolean;
+}): pino.TransportTargetOptions {
+  if (usePretty) {
+    return {
+      target: "pino-pretty",
+      options: {
+        colorize: true,
+        singleLine: true,
+        ignore: consoleIgnoreFields(isOtelExportEnabled),
+        minimumLevel: level,
+      },
+      level,
+    };
+  }
+
+  return {
+    target: "pino/file",
+    options: { destination: 1 },
+    level,
+  };
+}
+
+function buildOtelTransport(level: string): pino.TransportTargetOptions {
+  return {
+    target: "pino-opentelemetry-transport",
+    options: {
+      loggerName: DEFAULT_SERVICE_NAME,
+      serviceVersion: process.env.npm_package_version ?? "1.0.0",
+      resourceAttributes: {
+        "service.name": process.env.OTEL_SERVICE_NAME ?? DEFAULT_SERVICE_NAME,
+        "deployment.environment.name": process.env.ENVIRONMENT ?? "development",
+      },
+    },
+    level,
+  };
+}
+
+export type Logger = PinoLogger;
