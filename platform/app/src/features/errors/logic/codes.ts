@@ -24,6 +24,7 @@ export const APP_ERROR_CODES = [
   "ai_call_failed",
   "ai_query_provider_error",
   "already_organization_member",
+  "analytics_series_percentage_unsupported",
   "anomaly_rule_not_found",
   "api_key_already_revoked",
   "api_key_not_found",

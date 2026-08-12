@@ -1388,6 +1388,17 @@ const presentations = {
       "This is a self-hosted deployment, so plans are managed outside the app.",
   },
 
+  // ---- analytics ----
+  analytics_series_percentage_unsupported: {
+    // A percentage is the series divided by the same measurement without the
+    // series' own filters. A per-entity measurement (average per user, sum per
+    // thread) also changes which entities exist once filtered, so the two
+    // halves stop being comparable — the author has to drop one of the two.
+    title: "This series can't be shown as a percentage",
+    describe: () =>
+      "Turn the percentage toggle off for this series, or remove its per user, per thread or per customer breakdown.",
+  },
+
   // ---- governance ----
   anomaly_rule_not_found: {
     title: "Anomaly rule not found",
