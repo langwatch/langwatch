@@ -566,16 +566,6 @@ export interface ReportChart {
   total: number;
   /** True when the graph returned no data points for the window. */
   isEmpty: boolean;
-  /**
-   * True when this panel's own query failed and it renders as empty in its
-   * place, rather than sinking the whole report. Always paired with
-   * `isEmpty: true` — a failed panel has nothing to plot either way, but this
-   * distinguishes "errored" from "genuinely had no data" for anything that
-   * inspects the context (logs, future template copy). Absent (not `false`)
-   * for every panel that queried fine, so existing templates and fixtures
-   * that predate this field need no changes.
-   */
-  failed?: boolean;
 }
 
 /**
