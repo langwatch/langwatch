@@ -941,15 +941,6 @@ export function applySpanToAnalytics({
   );
   const resolvedView = conditionalUsage.state;
   const accumulationSpan = conditionalUsage.span;
-  const resolvedState: TraceAnalyticsData = {
-    ...state,
-    attributes: resolvedView.attributes,
-    totalCost: resolvedView.totalCost,
-    nonBilledCost: resolvedView.nonBilledCost,
-    totalPromptTokenCount: resolvedView.totalPromptTokenCount,
-    totalCompletionTokenCount: resolvedView.totalCompletionTokenCount,
-  };
-
   const timing = spanTimingService.accumulateTiming({
     state: resolvedView,
     span,
@@ -997,7 +988,7 @@ export function applySpanToAnalytics({
   } = traceNameResolutionService.resolveFromSpan({ state: view, span });
 
   return {
-    ...resolvedState,
+    ...state,
     traceId: state.traceId || span.traceId,
     spanCount: state.spanCount + 1,
     occurredAt: timing.occurredAt,

@@ -696,6 +696,22 @@ describe("aggregation-builder", () => {
       );
     });
 
+    it("excludes hard-skipped spans from conditional authority and candidate flags", () => {
+      const result = buildTimeseriesQuery({
+        ...baseInput,
+        groupBy: "metadata.model",
+      });
+
+      // A hard-skipped authority must not suppress an otherwise countable
+      // candidate on the same trace.
+      expect(result.sql).toContain(
+        "skip_token_accumulation'] != 'true' AND SpanAttributes['langwatch.reserved.token_accumulation_authority'] = 'true'",
+      );
+      expect(result.sql).toContain(
+        "skip_token_accumulation'] != 'true' AND SpanAttributes['langwatch.reserved.token_accumulation_candidate'] = 'true'",
+      );
+    });
+
     it("includes all date parameters", () => {
       const result = buildTimeseriesQuery(baseInput);
 

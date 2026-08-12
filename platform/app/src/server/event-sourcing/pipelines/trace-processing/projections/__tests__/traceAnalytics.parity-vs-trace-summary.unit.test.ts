@@ -360,30 +360,32 @@ describe("traceAnalytics fold projection — parity vs trace-summary fold", () =
       "gen_ai.usage.output_tokens": 51,
       "gen_ai.usage.cache_read.input_tokens": 12000,
     };
-    const authority = createTestSpan({
-      name: "session_task.turn",
-      spanId: "turn",
-      spanAttributes: {
-        ...usage,
-        "langwatch.reserved.token_accumulation_authority": "true",
-      },
-    });
-    const candidate = createTestSpan({
-      name: "handle_responses",
-      spanId: "response",
-      spanAttributes: {
-        ...usage,
-        "langwatch.reserved.token_accumulation_candidate": "true",
-      },
-    });
+    const authoritySpan = () =>
+      createTestSpan({
+        name: "session_task.turn",
+        spanId: "turn",
+        spanAttributes: {
+          ...usage,
+          "langwatch.reserved.token_accumulation_authority": "true",
+        },
+      });
+    const candidateSpan = () =>
+      createTestSpan({
+        name: "handle_responses",
+        spanId: "response",
+        spanAttributes: {
+          ...usage,
+          "langwatch.reserved.token_accumulation_candidate": "true",
+        },
+      });
 
     it.each([
-      ["authority first", [authority, candidate]],
-      ["candidate first", [candidate, authority]],
-    ])("keeps slim and summary at one usage for %s", (_name, spans) => {
+      ["authority first", () => [authoritySpan(), candidateSpan()]],
+      ["candidate first", () => [candidateSpan(), authoritySpan()]],
+    ])("keeps slim and summary at one usage for %s", (_name, createSpans) => {
       let summary = createInitState();
       let slim = createInitSlimState();
-      for (const span of spans) {
+      for (const span of createSpans()) {
         ({ summary, slim } = applyToBoth(span, summary, slim));
       }
 
@@ -397,7 +399,7 @@ describe("traceAnalytics fold projection — parity vs trace-summary fold", () =
 
     it("keeps a rollup-less candidate in both folds", () => {
       const { summary, slim } = applyToBoth(
-        candidate,
+        candidateSpan(),
         createInitState(),
         createInitSlimState(),
       );

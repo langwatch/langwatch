@@ -446,6 +446,22 @@ describe("CodexExtractor.apply on the codex_exec scope", () => {
     ).toBe("true");
   });
 
+  it("does not mark a turn without token usage as an authority", () => {
+    const ctx = createExtractorContext(
+      { "codex.turn.id": "turn-1" },
+      {
+        name: "session_task.turn",
+        instrumentationScope: { name: "codex_exec", version: "0.146.0" },
+      },
+    );
+
+    new CodexExtractor().apply(ctx);
+
+    expect(
+      ctx.out["langwatch.reserved.token_accumulation_authority"],
+    ).toBeUndefined();
+  });
+
   it("marks response usage as a conditional duplicate without hard-skipping it", () => {
     const ctx = createExtractorContext(
       {

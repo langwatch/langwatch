@@ -3,7 +3,14 @@ import type {
   FacetQuery,
   FacetQueryContext,
 } from "../facet-registry";
+import { TOKEN_ACCUMULATION_CONTROL_ATTRIBUTE_KEYS } from "../canonicalisation/extractors/_constants";
 import { baseParams, buildTimeWhere, KEY_DISCOVERY_SETTINGS } from "./helpers";
+
+const TOKEN_ACCUMULATION_CONTROL_KEYS_SQL = [
+  ...TOKEN_ACCUMULATION_CONTROL_ATTRIBUTE_KEYS,
+]
+  .map((key) => `'${key}'`)
+  .join(", ");
 
 /**
  * Discover query for trace metadata attribute keys: every distinct
@@ -41,6 +48,7 @@ export function buildMetadataKeysFacetQuery(
           AND length(Attributes.keys) > 0
       )
       WHERE key != ''
+        AND key NOT IN (${TOKEN_ACCUMULATION_CONTROL_KEYS_SQL})
         ${prefixFilter}
       GROUP BY key
       ORDER BY cnt DESC

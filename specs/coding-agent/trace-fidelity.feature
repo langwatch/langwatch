@@ -11,15 +11,15 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
   # --- Codex token accuracy -------------------------------------------------
 
   @unit
-  Scenario: Codex exec 0.146 tokens are counted once when two spans report the same usage
-    Given a codex exec 0.146 turn where the turn rollup span and its response span both report the same token usage
+  Scenario: Repeated token usage is counted once
+    Given a coding-agent turn reports the same token usage more than once
     When the trace summary is computed
     Then the trace's input and output token totals count that usage once, not twice
     And the per-span detail still shows the usage on each span
 
   @unit
-  Scenario: Older rollup-less Codex exec traces retain response usage
-    Given a rollup-less codex exec trace whose response span is the only usage record
+  Scenario: A single token usage report remains countable
+    Given a coding-agent turn has one token usage report
     When the trace summary is computed
     Then the trace's input and output token totals include the response usage
 

@@ -41,7 +41,7 @@ const RESERVED_CACHE_CREATION_TOKENS =
 const RESERVED_REASONING_TOKENS = "langwatch.reserved.reasoning_tokens";
 
 interface ConditionalUsageTotals {
-  observed: boolean;
+  isObserved: boolean;
   promptTokens: number;
   completionTokens: number;
   cost: number;
@@ -52,7 +52,7 @@ interface ConditionalUsageTotals {
 }
 
 const EMPTY_CONDITIONAL_USAGE_TOTALS: ConditionalUsageTotals = {
-  observed: false,
+  isObserved: false,
   promptTokens: 0,
   completionTokens: 0,
   cost: 0,
@@ -66,7 +66,25 @@ function markerIsTrue(value: unknown): boolean {
   return value === true || value === "true";
 }
 
-function parseConditionalCandidateTotals(
+function conditionalUsageRole(span: NormalizedSpan): {
+  isCandidate: boolean;
+  isAuthority: boolean;
+} {
+  return {
+    isCandidate: markerIsTrue(
+      span.spanAttributes[
+        ATTR_KEYS.LANGWATCH_RESERVED_TOKEN_ACCUMULATION_CANDIDATE
+      ],
+    ),
+    isAuthority: markerIsTrue(
+      span.spanAttributes[
+        ATTR_KEYS.LANGWATCH_RESERVED_TOKEN_ACCUMULATION_AUTHORITY
+      ],
+    ),
+  };
+}
+
+function parseConditionalUsageTotals(
   value: string | undefined,
 ): ConditionalUsageTotals {
   if (!value) return { ...EMPTY_CONDITIONAL_USAGE_TOTALS };
@@ -79,7 +97,7 @@ function parseConditionalCandidateTotals(
         : 0;
     };
     return {
-      observed: parsed.observed === true,
+      isObserved: parsed.isObserved === true,
       promptTokens: number("promptTokens"),
       completionTokens: number("completionTokens"),
       cost: number("cost"),
@@ -108,7 +126,9 @@ function applyReservedTotalDelta(
   key: string,
   delta: number,
 ): void {
-  const resolved = Number(attributes[key] ?? "0") + delta;
+  const parsedPrior = Number(attributes[key] ?? "0");
+  const prior = Number.isFinite(parsedPrior) ? parsedPrior : 0;
+  const resolved = prior + delta;
   if (resolved <= Number.EPSILON) {
     delete attributes[key];
     return;
@@ -116,12 +136,12 @@ function applyReservedTotalDelta(
   attributes[key] = String(resolved);
 }
 
-function addCandidateTotals(
+function addConditionalUsageTotals(
   totals: ConditionalUsageTotals,
   contribution: ConditionalUsageTotals,
 ): ConditionalUsageTotals {
   return {
-    observed: true,
+    isObserved: true,
     promptTokens: totals.promptTokens + contribution.promptTokens,
     completionTokens: totals.completionTokens + contribution.completionTokens,
     cost: totals.cost + contribution.cost,
@@ -137,15 +157,15 @@ function selectConditionalUsageTotals(
   candidate: ConditionalUsageTotals,
   authority: ConditionalUsageTotals,
 ): ConditionalUsageTotals {
-  return authority.observed ? authority : candidate;
+  return authority.isObserved ? authority : candidate;
 }
 
-function subtractCandidateTotals(
+function subtractConditionalUsageTotals(
   minuend: ConditionalUsageTotals,
   subtrahend: ConditionalUsageTotals,
 ): ConditionalUsageTotals {
   return {
-    observed: minuend.observed,
+    isObserved: minuend.isObserved,
     promptTokens: minuend.promptTokens - subtrahend.promptTokens,
     completionTokens: minuend.completionTokens - subtrahend.completionTokens,
     cost: minuend.cost - subtrahend.cost,
@@ -154,6 +174,62 @@ function subtractCandidateTotals(
     cacheCreationTokens:
       minuend.cacheCreationTokens - subtrahend.cacheCreationTokens,
     reasoningTokens: minuend.reasoningTokens - subtrahend.reasoningTokens,
+  };
+}
+
+function applyConditionalUsageAttributeDeltas(
+  attributes: Record<string, string>,
+  delta: ConditionalUsageTotals,
+): void {
+  applyReservedTotalDelta(
+    attributes,
+    RESERVED_CACHE_READ_TOKENS,
+    delta.cacheReadTokens,
+  );
+  applyReservedTotalDelta(
+    attributes,
+    RESERVED_CACHE_CREATION_TOKENS,
+    delta.cacheCreationTokens,
+  );
+  applyReservedTotalDelta(
+    attributes,
+    RESERVED_REASONING_TOKENS,
+    delta.reasoningTokens,
+  );
+}
+
+function projectConditionalUsageState(
+  state: TraceSummaryData,
+  attributes: Record<string, string>,
+  delta: ConditionalUsageTotals,
+): TraceSummaryData {
+  return {
+    ...state,
+    attributes,
+    totalPromptTokenCount: addNullableTotal(
+      state.totalPromptTokenCount,
+      delta.promptTokens,
+    ),
+    totalCompletionTokenCount: addNullableTotal(
+      state.totalCompletionTokenCount,
+      delta.completionTokens,
+    ),
+    totalCost: addNullableTotal(state.totalCost, delta.cost, 6),
+    nonBilledCost: addNullableTotal(
+      state.nonBilledCost,
+      delta.nonBilledCost,
+      6,
+    ),
+  };
+}
+
+function markTokenAccumulationSkipped(span: NormalizedSpan): NormalizedSpan {
+  return {
+    ...span,
+    spanAttributes: {
+      ...span.spanAttributes,
+      [ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION]: "true",
+    },
   };
 }
 
@@ -289,6 +365,12 @@ export class SpanCostService {
     );
   }
 
+  isConditionalTokenAccumulation(span: NormalizedSpan): boolean {
+    if (this.isTokenAccumulationSkipped(span)) return false;
+    const role = conditionalUsageRole(span);
+    return role.isCandidate || role.isAuthority;
+  }
+
   /**
    * Resolve usage that is only conditionally redundant across sibling spans.
    * Candidate and authority totals are tracked independently. The fold uses
@@ -305,23 +387,14 @@ export class SpanCostService {
   }): { state: TraceSummaryData; span: NormalizedSpan } {
     if (this.isTokenAccumulationSkipped(span)) return { state, span };
 
-    const isCandidate = markerIsTrue(
-      span.spanAttributes[
-        ATTR_KEYS.LANGWATCH_RESERVED_TOKEN_ACCUMULATION_CANDIDATE
-      ],
-    );
-    const isAuthority = markerIsTrue(
-      span.spanAttributes[
-        ATTR_KEYS.LANGWATCH_RESERVED_TOKEN_ACCUMULATION_AUTHORITY
-      ],
-    );
+    const { isCandidate, isAuthority } = conditionalUsageRole(span);
     if (!isCandidate && !isAuthority) return { state, span };
 
     const attributes = { ...state.attributes };
-    const candidateTotals = parseConditionalCandidateTotals(
+    const candidateTotals = parseConditionalUsageTotals(
       attributes[CONDITIONAL_CANDIDATE_TOTALS_ATTR],
     );
-    const authorityTotals = parseConditionalCandidateTotals(
+    const authorityTotals = parseConditionalUsageTotals(
       attributes[CONDITIONAL_AUTHORITY_TOTALS_ATTR],
     );
     const previousApplied = selectConditionalUsageTotals(
@@ -331,7 +404,7 @@ export class SpanCostService {
     const metrics = this.extractTokenMetrics(span);
     const cache = this.extractCacheTokens(span);
     const contribution: ConditionalUsageTotals = {
-      observed: true,
+      isObserved: true,
       promptTokens: metrics.promptTokens,
       completionTokens: metrics.completionTokens,
       cost: metrics.cost,
@@ -341,61 +414,24 @@ export class SpanCostService {
       reasoningTokens: cache.reasoningTokens,
     };
     const nextCandidateTotals = isCandidate
-      ? addCandidateTotals(candidateTotals, contribution)
+      ? addConditionalUsageTotals(candidateTotals, contribution)
       : candidateTotals;
     const nextAuthorityTotals = isAuthority
-      ? addCandidateTotals(authorityTotals, contribution)
+      ? addConditionalUsageTotals(authorityTotals, contribution)
       : authorityTotals;
     attributes[CONDITIONAL_CANDIDATE_TOTALS_ATTR] =
       JSON.stringify(nextCandidateTotals);
     attributes[CONDITIONAL_AUTHORITY_TOTALS_ATTR] =
       JSON.stringify(nextAuthorityTotals);
-    const delta = subtractCandidateTotals(
+    const delta = subtractConditionalUsageTotals(
       selectConditionalUsageTotals(nextCandidateTotals, nextAuthorityTotals),
       previousApplied,
     );
-    applyReservedTotalDelta(
-      attributes,
-      RESERVED_CACHE_READ_TOKENS,
-      delta.cacheReadTokens,
-    );
-    applyReservedTotalDelta(
-      attributes,
-      RESERVED_CACHE_CREATION_TOKENS,
-      delta.cacheCreationTokens,
-    );
-    applyReservedTotalDelta(
-      attributes,
-      RESERVED_REASONING_TOKENS,
-      delta.reasoningTokens,
-    );
+    applyConditionalUsageAttributeDeltas(attributes, delta);
 
     return {
-      state: {
-        ...state,
-        attributes,
-        totalPromptTokenCount: addNullableTotal(
-          state.totalPromptTokenCount,
-          delta.promptTokens,
-        ),
-        totalCompletionTokenCount: addNullableTotal(
-          state.totalCompletionTokenCount,
-          delta.completionTokens,
-        ),
-        totalCost: addNullableTotal(state.totalCost, delta.cost, 6),
-        nonBilledCost: addNullableTotal(
-          state.nonBilledCost,
-          delta.nonBilledCost,
-          6,
-        ),
-      },
-      span: {
-        ...span,
-        spanAttributes: {
-          ...span.spanAttributes,
-          [ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION]: "true",
-        },
-      },
+      state: projectConditionalUsageState(state, attributes, delta),
+      span: markTokenAccumulationSkipped(span),
     };
   }
 

@@ -51,8 +51,8 @@ describe("applySpanToSummary codex conditional redundant-usage handling", () => 
       },
     });
 
-  describe("given a turn whose rollup and response spans report the same usage", () => {
-    /** @scenario "Codex exec 0.146 tokens are counted once when two spans report the same usage" */
+  describe("given candidate and authority spans report the same usage", () => {
+    /** @scenario "Repeated token usage is counted once" */
     it.each([
       ["rollup then response", [turnSpan(), responseSpan()]],
       ["response then rollup", [responseSpan(), turnSpan()]],
@@ -75,8 +75,10 @@ describe("applySpanToSummary codex conditional redundant-usage handling", () => 
         expect(span.spanAttributes["gen_ai.usage.output_tokens"]).toBe(23);
       }
     });
+  });
 
-    /** @scenario "Older rollup-less Codex exec traces retain response usage" */
+  describe("given a response candidate without an authority", () => {
+    /** @scenario "A single token usage report remains countable" */
     it("counts a candidate when no turn rollup exists", () => {
       const state = applySpanToSummary({
         state: createInitState(),
@@ -94,6 +96,22 @@ describe("applySpanToSummary codex conditional redundant-usage handling", () => 
       );
     });
 
+    it("recovers from a malformed reserved running total", () => {
+      const initial = createInitState();
+      initial.attributes["langwatch.reserved.cache_read_tokens"] = "invalid";
+
+      const state = applySpanToSummary({
+        state: initial,
+        span: responseSpan(),
+      });
+
+      expect(state.attributes["langwatch.reserved.cache_read_tokens"]).toBe(
+        "4480",
+      );
+    });
+  });
+
+  describe("given multiple candidates and one authority", () => {
     it("uses the authoritative rollup when multiple candidate spans are present", () => {
       const secondResponse = createTestSpan({
         name: "handle_responses",
@@ -113,7 +131,9 @@ describe("applySpanToSummary codex conditional redundant-usage handling", () => 
       expect(state.totalPromptTokenCount).toBe(13297);
       expect(state.totalCompletionTokenCount).toBe(23);
     });
+  });
 
+  describe("given candidate and authority usage differs", () => {
     it.each([
       ["candidate then authority", false],
       ["authority then candidate", true],
@@ -145,7 +165,9 @@ describe("applySpanToSummary codex conditional redundant-usage handling", () => 
       expect(state.totalPromptTokenCount).toBe(90);
       expect(state.totalCompletionTokenCount).toBe(20);
     });
+  });
 
+  describe("given a zero-token authority", () => {
     it("treats an observed zero-token authority as authoritative", () => {
       const candidate = createTestSpan({
         name: "handle_responses",
@@ -177,29 +199,45 @@ describe("applySpanToSummary codex conditional redundant-usage handling", () => 
         state.attributes["langwatch.reserved.cache_read_tokens"],
       ).toBeUndefined();
     });
+  });
 
-    describe("when the redundant copy is not flagged (control)", () => {
-      it("double-counts the usage", () => {
-        const turnSpan = createTestSpan({
-          spanAttributes: {
-            "gen_ai.request.model": "gpt-5-mini",
-            "gen_ai.usage.input_tokens": 13297,
-            "gen_ai.usage.output_tokens": 23,
-          },
-        });
-        const unflaggedDuplicate = createTestSpan({
-          spanAttributes: {
-            "gen_ai.usage.input_tokens": 13297,
-            "gen_ai.usage.output_tokens": 23,
-          },
-        });
+  describe("given an authority is already hard-skipped", () => {
+    it("keeps the unskipped candidate usage", () => {
+      const skippedAuthority = turnSpan();
+      skippedAuthority.spanAttributes[
+        "langwatch.reserved.skip_token_accumulation"
+      ] = "true";
+      let state = createInitState();
+      for (const span of [responseSpan(), skippedAuthority]) {
+        state = applySpanToSummary({ state, span });
+      }
 
-        let state = createInitState();
-        state = applySpanToSummary({ state, span: turnSpan });
-        state = applySpanToSummary({ state, span: unflaggedDuplicate });
+      expect(state.totalPromptTokenCount).toBe(13297);
+      expect(state.totalCompletionTokenCount).toBe(23);
+    });
+  });
 
-        expect(state.totalPromptTokenCount).toBe(26594);
+  describe("when the redundant copy is not flagged (control)", () => {
+    it("double-counts the usage", () => {
+      const turnSpan = createTestSpan({
+        spanAttributes: {
+          "gen_ai.request.model": "gpt-5-mini",
+          "gen_ai.usage.input_tokens": 13297,
+          "gen_ai.usage.output_tokens": 23,
+        },
       });
+      const unflaggedDuplicate = createTestSpan({
+        spanAttributes: {
+          "gen_ai.usage.input_tokens": 13297,
+          "gen_ai.usage.output_tokens": 23,
+        },
+      });
+
+      let state = createInitState();
+      state = applySpanToSummary({ state, span: turnSpan });
+      state = applySpanToSummary({ state, span: unflaggedDuplicate });
+
+      expect(state.totalPromptTokenCount).toBe(26594);
     });
   });
 

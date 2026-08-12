@@ -215,6 +215,8 @@ export function applySpanToSummary({
     return state;
   }
 
+  const isConditionalUsageSpan =
+    spanCostService.isConditionalTokenAccumulation(span);
   const conditionalUsage = spanCostService.resolveConditionalTokenAccumulation(
     { state, span },
   );
@@ -272,13 +274,6 @@ export function applySpanToSummary({
     RESERVED_REASONING_TOKENS,
     cacheTokens.reasoningTokens,
   );
-  const isConditionalUsageSpan =
-    span.spanAttributes[
-      ATTR_KEYS.LANGWATCH_RESERVED_TOKEN_ACCUMULATION_CANDIDATE
-    ] !== undefined ||
-    span.spanAttributes[
-      ATTR_KEYS.LANGWATCH_RESERVED_TOKEN_ACCUMULATION_AUTHORITY
-    ] !== undefined;
   // Context size is not additive. Preserve the original observation for a
   // conditional span, while established hard-skipped aggregate spans remain
   // excluded from context selection.
