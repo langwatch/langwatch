@@ -3,6 +3,9 @@ package controlplane
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -175,8 +178,16 @@ func TestContentForPacksEachDirectionUnderItsOwnKey(t *testing.T) {
 // <root>/langwatch to <root>/platform/app.
 var (
 	monorepoRoot     = filepath.Join("..", "..", "..", "..")
-	controlPlaneRoot = filepath.Join(monorepoRoot, "platform", "app")
+	controlPlaneRoot = controlPlaneRootFor(monorepoRoot)
 )
+
+// controlPlaneRootFor derives the control plane's location from a repo root.
+// Both the package-level controlPlaneRoot and controlPlaneVerdict resolve the
+// layout through here, so a future move cannot repoint one and leave the other
+// stale -- which is the drift ADR-076 already caused once.
+func controlPlaneRootFor(root string) string {
+	return filepath.Join(root, "platform", "app")
+}
 
 // The two witnesses that decide skip-versus-fail. Neither is a bare directory:
 // a directory is re-created by any stray file that lands under it, and one was.
@@ -203,43 +214,346 @@ func readControlPlaneSource(t *testing.T, parts ...string) string {
 	return string(source)
 }
 
-// requireControlPlane decides whether there is a control plane to compare
-// against. Skipping is reserved for a checkout that carries no TypeScript side
-// at all -- a vendored or split Go build -- and requires BOTH witnesses to be
-// absent: the pnpm workspace manifest at the repo root, and the control plane's
-// own package manifest at controlPlaneRoot. Either one alone is enough to run.
+// controlPlaneStatus is what controlPlaneVerdict decided. The zero value is
+// deliberately none of the three: an unset status is not a skip.
+type controlPlaneStatus string
+
+const (
+	controlPlaneOK    controlPlaneStatus = "ok"
+	controlPlaneSkip  controlPlaneStatus = "skip"
+	controlPlaneFatal controlPlaneStatus = "fatal"
+)
+
+// controlPlaneVerdict decides whether there is a control plane to compare
+// against under root. It is a pure decision -- it reads the filesystem and
+// returns, touching no *testing.T -- so every branch is driven by t.TempDir()
+// fixtures in TestControlPlaneVerdictDecidesEachWitnessCombination instead of by
+// whatever checkout CI happens to run in. Keep it that way: a guard whose
+// branches are only ever exercised by the ambient checkout is the trap this file
+// exists to close.
+//
+// Skipping is reserved for a checkout that carries no TypeScript side at all --
+// a vendored or split Go build -- and requires BOTH witnesses to be absent: the
+// pnpm workspace manifest at the repo root, and the control plane's own package
+// manifest under controlPlaneRootFor(root). Either one alone is enough to run.
 //
 // THE AMBIGUOUS CASE FAILS, IT DOES NOT SKIP. A workspace present without the
 // control plane under it -- exactly the shape of the ADR-076 rename -- is a hard
-// failure naming the stale constant. That direction is deliberate: a false red
-// costs one path edit, while a false green costs an unenforced cross-language
-// contract that nobody is watching, which is the failure this file exists to
-// make loud. Do not relax this into a skip.
+// failure naming the stale constant. So is a manifest that is present but
+// unreadable, malformed, or naming another package: something is there, so the
+// "no TypeScript side at all" premise for skipping is false, and the only honest
+// verdicts left are run or fail. That direction is deliberate: a false red costs
+// one path edit, while a false green costs an unenforced cross-language contract
+// that nobody is watching, which is the failure this file exists to make loud.
+// Do not relax any of this into a skip.
+func controlPlaneVerdict(root string) (controlPlaneStatus, string) {
+	cpRoot := controlPlaneRootFor(root)
+	manifestPath := filepath.Join(cpRoot, "package.json")
+
+	data, readErr := os.ReadFile(manifestPath)
+	switch {
+	case readErr == nil:
+		// Parsed rather than pattern-matched so that reformatting the
+		// manifest cannot read as a missing control plane.
+		var manifest struct {
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal(data, &manifest); err != nil {
+			return controlPlaneFatal, fmt.Sprintf(
+				"%s is present but is not valid JSON, so the control plane cannot be identified: %v. "+
+					"An unparseable manifest is drift, not a checkout without a TypeScript side.",
+				manifestPath, err)
+		}
+		if manifest.Name != controlPlanePackage {
+			return controlPlaneFatal, fmt.Sprintf(
+				"%s names package %q, want %q: controlPlaneRoot points at some other workspace package. Repoint controlPlaneRoot.",
+				manifestPath, manifest.Name, controlPlanePackage)
+		}
+		return controlPlaneOK, ""
+
+	case !errors.Is(readErr, fs.ErrNotExist):
+		// Something occupies the path but will not open. An unreadable
+		// witness is not an absent one.
+		return controlPlaneFatal, fmt.Sprintf(
+			"%s exists but could not be read, so the control plane cannot be identified: %v",
+			manifestPath, readErr)
+	}
+
+	if _, err := os.Stat(filepath.Join(root, workspaceManifest)); err == nil {
+		return controlPlaneFatal, fmt.Sprintf(
+			"this checkout carries the monorepo (%s is at the repo root) but %s holds no %s package manifest: "+
+				"the control plane moved and controlPlaneRoot did not move with it. Repoint controlPlaneRoot.",
+			workspaceManifest, cpRoot, controlPlanePackage)
+	}
+
+	return controlPlaneSkip, fmt.Sprintf(
+		"no TypeScript control plane in this checkout: no %s at the repo root and no %s package manifest at %s",
+		workspaceManifest, controlPlanePackage, cpRoot)
+}
+
+// controlPlaneReporter is the slice of *testing.T the dispatch needs, so the
+// verdict-to-action mapping can be driven by a recorder. Mapping fatal onto Skip
+// would resurrect exactly the silent non-enforcement this file exists to
+// prevent, and nothing in a green CI run would show it.
+type controlPlaneReporter interface {
+	Helper()
+	Skip(args ...any)
+	Fatal(args ...any)
+}
+
+// requireControlPlane ends the calling test unless there is a control plane to
+// compare against.
 func requireControlPlane(t *testing.T) {
 	t.Helper()
+	dispatchControlPlaneVerdict(t, monorepoRoot)
+}
 
-	_, workspaceErr := os.Stat(filepath.Join(monorepoRoot, workspaceManifest))
-
-	// Parsed rather than pattern-matched so that reformatting the manifest
-	// cannot read as a missing control plane.
-	var manifest struct {
-		Name string `json:"name"`
-	}
-	data, readErr := os.ReadFile(filepath.Join(controlPlaneRoot, "package.json"))
-	controlPlanePresent := readErr == nil &&
-		json.Unmarshal(data, &manifest) == nil &&
-		manifest.Name == controlPlanePackage
-
-	switch {
-	case controlPlanePresent:
+// dispatchControlPlaneVerdict turns a verdict into an action. The one thing it
+// must never do is let an unrecognised verdict fall through to a skip, so the
+// default fails; it is unreachable while controlPlaneStatus has three values and
+// is here for the edit that adds a fourth.
+func dispatchControlPlaneVerdict(r controlPlaneReporter, root string) {
+	r.Helper()
+	switch status, reason := controlPlaneVerdict(root); status {
+	case controlPlaneOK:
 		return
-	case workspaceErr == nil:
-		t.Fatalf("this checkout carries the monorepo (%s is at the repo root) but %s holds no %s package manifest: "+
-			"the control plane moved and controlPlaneRoot did not move with it. Repoint controlPlaneRoot.",
-			workspaceManifest, controlPlaneRoot, controlPlanePackage)
+	case controlPlaneSkip:
+		r.Skip(reason)
+	case controlPlaneFatal:
+		r.Fatal(reason)
 	default:
-		t.Skipf("no TypeScript control plane in this checkout: no %s at the repo root and no %s package manifest at %s",
-			workspaceManifest, controlPlanePackage, controlPlaneRoot)
+		r.Fatal(fmt.Sprintf("unrecognised control plane verdict %q", status))
+	}
+}
+
+// The guard above is the same trap class as the bug this file documents: a
+// branch that skips where it should fail costs nothing visible in a green CI
+// run, and the last one survived eight days. Each case below builds a repo root
+// under t.TempDir() and pins one verdict, so a later edit that widens the skip
+// -- or that "simplifies" the switch, or repoints controlPlanePackage -- turns a
+// test red instead of turning enforcement off.
+func TestControlPlaneVerdictDecidesEachWitnessCombination(t *testing.T) {
+	const (
+		validManifest   = `{"name":"` + controlPlanePackage + `","version":"0.0.0"}`
+		foreignManifest = `{"name":"@langwatch/some-other-package"}`
+		malformed       = `{"name": `
+	)
+
+	cases := []struct {
+		name               string
+		fixture            controlPlaneFixture
+		want               controlPlaneStatus
+		wantReasonContains string
+	}{
+		{
+			name:    "both witnesses present and valid",
+			fixture: controlPlaneFixture{workspace: true, controlPlaneDir: true, manifest: validManifest},
+			want:    controlPlaneOK,
+		},
+		{
+			// Either witness alone is enough to run: a split checkout that
+			// carries the app but not the workspace file still has a control
+			// plane to compare against.
+			name:    "the control plane is present without the workspace manifest",
+			fixture: controlPlaneFixture{controlPlaneDir: true, manifest: validManifest},
+			want:    controlPlaneOK,
+		},
+		{
+			// The literal shape of the ADR-076 rename.
+			name:               "the workspace is present and the control plane directory is gone",
+			fixture:            controlPlaneFixture{workspace: true},
+			want:               controlPlaneFatal,
+			wantReasonContains: "Repoint controlPlaneRoot",
+		},
+		{
+			// The old sentinel's exact defect: a bare directory, re-created by
+			// any stray file, used to read as a live control plane.
+			name:               "the workspace is present and the control plane path is an empty directory",
+			fixture:            controlPlaneFixture{workspace: true, controlPlaneDir: true},
+			want:               controlPlaneFatal,
+			wantReasonContains: "Repoint controlPlaneRoot",
+		},
+		{
+			// Same empty directory, no workspace: still must not be ok.
+			name:               "the control plane path is an empty directory and nothing else",
+			fixture:            controlPlaneFixture{controlPlaneDir: true},
+			want:               controlPlaneSkip,
+			wantReasonContains: "no TypeScript control plane",
+		},
+		{
+			name:               "the manifest names another package",
+			fixture:            controlPlaneFixture{workspace: true, controlPlaneDir: true, manifest: foreignManifest},
+			want:               controlPlaneFatal,
+			wantReasonContains: "@langwatch/some-other-package",
+		},
+		{
+			// A wrong-named manifest is a present witness, so the absent-both
+			// premise for skipping is false even without the workspace file.
+			name:               "the manifest names another package and there is no workspace",
+			fixture:            controlPlaneFixture{controlPlaneDir: true, manifest: foreignManifest},
+			want:               controlPlaneFatal,
+			wantReasonContains: "@langwatch/some-other-package",
+		},
+		{
+			name:               "the manifest is malformed JSON",
+			fixture:            controlPlaneFixture{workspace: true, controlPlaneDir: true, manifest: malformed},
+			want:               controlPlaneFatal,
+			wantReasonContains: "not valid JSON",
+		},
+		{
+			name:               "the manifest is malformed JSON and there is no workspace",
+			fixture:            controlPlaneFixture{controlPlaneDir: true, manifest: malformed},
+			want:               controlPlaneFatal,
+			wantReasonContains: "not valid JSON",
+		},
+		{
+			name:               "the manifest is present but will not open",
+			fixture:            controlPlaneFixture{controlPlaneDir: true, manifestIsDir: true},
+			want:               controlPlaneFatal,
+			wantReasonContains: "could not be read",
+		},
+		{
+			name:               "neither witness is present",
+			fixture:            controlPlaneFixture{},
+			want:               controlPlaneSkip,
+			wantReasonContains: "no TypeScript control plane",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := tc.fixture.build(t)
+
+			got, reason := controlPlaneVerdict(root)
+			if got != tc.want {
+				t.Fatalf("controlPlaneVerdict = %q (%s), want %q", got, reason, tc.want)
+			}
+			if tc.want == controlPlaneOK {
+				return
+			}
+			// A skip or a failure nobody can act on is how the stale
+			// constant went unnoticed, so the reason is part of the contract.
+			if reason == "" {
+				t.Fatalf("verdict %q carries no reason", got)
+			}
+			if !strings.Contains(reason, tc.wantReasonContains) {
+				t.Fatalf("reason %q does not mention %q", reason, tc.wantReasonContains)
+			}
+		})
+	}
+}
+
+// controlPlaneFixture describes which witnesses a temp repo root carries. The
+// zero value is a checkout with no TypeScript side at all.
+type controlPlaneFixture struct {
+	workspace       bool   // pnpm-workspace.yaml at the repo root
+	controlPlaneDir bool   // platform/app exists, possibly empty
+	manifest        string // written to platform/app/package.json when set
+	manifestIsDir   bool   // platform/app/package.json exists but will not open
+}
+
+// build materialises the fixture under t.TempDir() and returns the repo root.
+func (f controlPlaneFixture) build(t *testing.T) string {
+	t.Helper()
+
+	root := t.TempDir()
+	if f.workspace {
+		writeControlPlaneFile(t, filepath.Join(root, workspaceManifest), "packages:\n  - platform/app\n")
+	}
+
+	cpRoot := controlPlaneRootFor(root)
+	if f.controlPlaneDir || f.manifest != "" || f.manifestIsDir {
+		if err := os.MkdirAll(cpRoot, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", cpRoot, err)
+		}
+	}
+
+	manifestPath := filepath.Join(cpRoot, "package.json")
+	switch {
+	case f.manifestIsDir:
+		// A directory opens but will not read, which is the cheapest
+		// deterministic stand-in for an unreadable manifest -- unlike a
+		// permission bit, it also holds when the suite runs as root.
+		if err := os.MkdirAll(manifestPath, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", manifestPath, err)
+		}
+	case f.manifest != "":
+		writeControlPlaneFile(t, manifestPath, f.manifest)
+	}
+	return root
+}
+
+func writeControlPlaneFile(t *testing.T, path, contents string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
+// controlPlaneRecorder captures what the dispatch did without ending a real
+// test. It does not reproduce t.Fatal's runtime.Goexit, which is harmless here:
+// every branch of the dispatch returns immediately after reporting.
+type controlPlaneRecorder struct {
+	skipped bool
+	failed  bool
+	message string
+}
+
+func (r *controlPlaneRecorder) Helper() {}
+
+func (r *controlPlaneRecorder) Skip(args ...any) {
+	r.skipped = true
+	r.message = fmt.Sprint(args...)
+}
+
+func (r *controlPlaneRecorder) Fatal(args ...any) {
+	r.failed = true
+	r.message = fmt.Sprint(args...)
+}
+
+// The verdict is only half the guard; the mapping from verdict to action is the
+// half that can silently turn a hard failure into a skip. A recorder pins it.
+func TestRequireControlPlaneDispatchesTheVerdictItWasGiven(t *testing.T) {
+	cases := []struct {
+		name        string
+		fixture     controlPlaneFixture
+		wantSkipped bool
+		wantFailed  bool
+	}{
+		{
+			name: "a present control plane lets the test run",
+			fixture: controlPlaneFixture{
+				workspace:       true,
+				controlPlaneDir: true,
+				manifest:        `{"name":"` + controlPlanePackage + `"}`,
+			},
+		},
+		{
+			name:       "an ambiguous checkout fails rather than skipping",
+			fixture:    controlPlaneFixture{workspace: true},
+			wantFailed: true,
+		},
+		{
+			name:        "a checkout with no TypeScript side skips",
+			fixture:     controlPlaneFixture{},
+			wantSkipped: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := tc.fixture.build(t)
+
+			var recorder controlPlaneRecorder
+			dispatchControlPlaneVerdict(&recorder, root)
+
+			if recorder.skipped != tc.wantSkipped {
+				t.Errorf("skipped = %v, want %v (message: %s)", recorder.skipped, tc.wantSkipped, recorder.message)
+			}
+			if recorder.failed != tc.wantFailed {
+				t.Errorf("failed = %v, want %v (message: %s)", recorder.failed, tc.wantFailed, recorder.message)
+			}
+		})
 	}
 }
 
