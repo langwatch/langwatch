@@ -72,6 +72,17 @@ const updateTriggerSchema = z.object({
   message: z.string().nullable().optional(),
   alertType: alertTypeEnum.nullable().optional(),
   filters: z.record(z.unknown()).optional(),
+  /**
+   * Replaces the delivery configuration as a whole rather than merging into
+   * it: send the fields this automation should have from now on, and anything
+   * left out is removed — omit `headers` and the automation delivers with
+   * none, omit `signingSecret` and its deliveries are no longer signed.
+   *
+   * The one exception is a credential the read hid. Send back the `[redacted]`
+   * placeholder (or, for a Slack bot connection, the `slackBotTokenSet` flag
+   * the read echoes) and the stored credential is kept, so reading an
+   * automation, changing one field and writing the whole object back is safe.
+   */
   actionParams: z.record(z.unknown()).optional(),
 });
 

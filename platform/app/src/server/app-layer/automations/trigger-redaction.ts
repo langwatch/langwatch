@@ -2,10 +2,13 @@ import { SLACK_BOT_TOKEN_KEPT } from "@langwatch/automations/providers/slack";
 import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automations/providers/webhook";
 import { createLogger } from "@langwatch/observability";
 import { TriggerAction } from "@prisma/client";
+import { ZodEffects, ZodObject, type ZodTypeAny } from "zod";
 import {
   persistActionParamsFor,
   redactActionParamsFor,
+  SERVER_PROVIDERS,
 } from "./providers/registry";
+import type { ServerEntry } from "./providers/types";
 
 /**
  * The public API's delivery-credential contract, both directions.
@@ -134,12 +137,21 @@ export function redactTriggerForPublicApi<
 /**
  * Prepare `actionParams` from a public API write for storage.
  *
- * Every save goes through the provider's persist hook, so the at-rest form is
- * whatever that provider says it is. Before the hook runs, each credential the
- * caller sent back as the placeholder is turned into something the hook reads
- * as "keep what is stored": the channel's own kept sentinel where the hook
- * resolves it, the stored value itself where the field is kept in plain form.
- * A placeholder with nothing stored behind it is dropped rather than saved.
+ * The delivery configuration goes through the provider's persist hook, so the
+ * at-rest form is whatever that provider says it is. Before the hook runs,
+ * each credential the caller sent back as the placeholder is turned into
+ * something the hook reads as "keep what is stored": the channel's own kept
+ * sentinel where the hook resolves it, the stored value itself where the field
+ * is kept in plain form. A placeholder with nothing stored behind it is
+ * dropped rather than saved.
+ *
+ * Only the delivery configuration is the provider's to rule on. `actionParams`
+ * also carries the rule an automation fires by — a graph alert's threshold, a
+ * report's source and schedule — and a provider states its own fields
+ * exhaustively, dropping anything it does not recognise so a channel can never
+ * keep another channel's stale credential. So the two are separated by the
+ * channel's own schema, the hook decides the delivery half, and the rule half
+ * is carried across untouched (the same split the dashboard save makes).
  */
 export async function persistPublicApiActionParams({
   action,
@@ -150,10 +162,50 @@ export async function persistPublicApiActionParams({
   incoming: unknown;
   stored?: unknown;
 }): Promise<unknown> {
-  return persistActionParamsFor(action, {
-    incoming: resolveCredentialPlaceholders({ action, incoming, stored }),
+  const resolved = resolveCredentialPlaceholders({ action, incoming, stored });
+
+  const entry = SERVER_PROVIDERS[action] as ServerEntry | undefined;
+  // No provider claims this action — a row naming a channel this server no
+  // longer offers. There is no at-rest form to prepare, so the payload is
+  // stored as it was sent; the read still declines to return it.
+  if (!entry || !isRecord(resolved)) return resolved;
+
+  const { delivery, rule } = splitDeliveryFromRule(
+    resolved,
+    deliveryFieldNames(entry.shared.actionParamsSchema),
+  );
+  const persisted = await persistActionParamsFor(action, {
+    incoming: delivery,
     loadExisting: async () => stored,
   });
+  return { ...rule, ...(isRecord(persisted) ? persisted : {}) };
+}
+
+/** The fields a channel declares as its own, read off the schema it publishes
+ *  for them. A schema that is not an object shape claims nothing by name, and
+ *  the whole payload goes to the hook as it did before. */
+function deliveryFieldNames(schema: ZodTypeAny): Set<string> {
+  let current: ZodTypeAny = schema;
+  while (current instanceof ZodEffects) current = current.innerType();
+  if (current instanceof ZodObject) {
+    return new Set(Object.keys(current.shape as Record<string, unknown>));
+  }
+  return new Set();
+}
+
+function splitDeliveryFromRule(
+  params: Record<string, unknown>,
+  deliveryFields: Set<string>,
+): { delivery: Record<string, unknown>; rule: Record<string, unknown> } {
+  if (deliveryFields.size === 0) return { delivery: params, rule: {} };
+
+  const delivery: Record<string, unknown> = {};
+  const rule: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (deliveryFields.has(key)) delivery[key] = value;
+    else rule[key] = value;
+  }
+  return { delivery, rule };
 }
 
 function resolveCredentialPlaceholders({

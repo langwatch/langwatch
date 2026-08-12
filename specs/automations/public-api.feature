@@ -73,6 +73,12 @@ Feature: Automations over the public API
       When the automation is redacted for the public API
       Then its delivery configuration is returned empty
 
+    @unit
+    Scenario: A delivery channel the server no longer offers is written as it was sent
+      Given a stored automation whose delivery channel is not one this server offers
+      When a delivery configuration is saved for it over the API
+      Then it is stored as the caller sent it
+
   Rule: Writing the read response back keeps the stored credential
 
     An integrator reads an automation, changes one thing and writes the whole
@@ -99,6 +105,31 @@ Feature: Automations over the public API
       Given an automation that delivers to a Slack incoming webhook
       When the integrator writes back a different webhook URL
       Then the automation delivers to the URL the integrator typed
+
+    @integration
+    Scenario: Writing back a graph alert keeps the rule it fires by
+      Given a graph alert that notifies Slack when a series crosses a threshold
+      When the integrator reads it over the API and writes the response back unchanged
+      Then the alert still fires on the same series, threshold and time window
+
+    @integration
+    Scenario: Writing back a scheduled report keeps its schedule
+      Given a report that sends to Slack on a schedule
+      When the integrator reads it over the API and writes the response back unchanged
+      Then the report still sends the same content on the same schedule
+
+  Rule: An update states the delivery configuration in full
+
+    An update replaces the delivery configuration rather than merging into it,
+    so an integrator sends the fields the automation should have from now on.
+    A credential the read hid is the exception: sent back as the placeholder,
+    it means the one already stored.
+
+    @integration
+    Scenario: Leaving a header out of an update removes it
+      Given an automation that delivers to a customer endpoint with an authorization header
+      When the integrator updates it and states no headers at all
+      Then the automation delivers without any header
 
   Rule: Clients read the redacted response as it arrives
 
