@@ -240,13 +240,20 @@ const triggerResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
   action: triggerActionEnum,
-  /** Where this automation delivers, with every credential value replaced by
-   *  the `[redacted]` placeholder. Which channel is configured, which
-   *  destination is set and which header names are in play all survive; the
-   *  values never leave. Sending the placeholder back on an update keeps the
-   *  stored value. The rule the automation fires by is stated separately, in
-   *  `graphAlert` or `report`. */
-  actionParams: z.record(z.unknown()),
+  // Said in `.describe()` rather than in a comment: the reader who needs it is
+  // the one holding the published document, the generated client or the API
+  // reference, and a comment reaches none of them.
+  actionParams: z
+    .record(z.unknown())
+    .describe(
+      "Where this automation delivers, with every credential value replaced " +
+        "by the `[redacted]` placeholder. Which channel is configured, which " +
+        "destination is set and which header names are in play all survive; " +
+        "the values never leave. Sending the placeholder back on an update " +
+        "keeps the stored value. The rule this automation fires by is not " +
+        "here — it is stated in `graphAlert` or `report`, and sending it in " +
+        "this field is refused.",
+    ),
   graphAlert: graphAlertActionParamsSchema
     .nullable()
     .describe("The rule an alert fires by. Null for anything that is not one."),
@@ -357,18 +364,21 @@ const updateTriggerSchema = z.object({
    * same channel. Create a new automation to deliver somewhere else.
    */
   action: triggerActionEnum.optional(),
-  /**
-   * Replaces the delivery configuration as a whole rather than merging into
-   * it: send the fields this automation should have from now on, and anything
-   * left out is removed — omit `headers` and the automation delivers with
-   * none, omit `signingSecret` and its deliveries are no longer signed.
-   *
-   * The one exception is a credential the read hid. Send back the `[redacted]`
-   * placeholder (or, for a Slack bot connection, the `slackBotTokenSet` flag
-   * the read echoes) and the stored credential is kept, so reading an
-   * automation, changing one field and writing the whole object back is safe.
-   */
-  actionParams: anyActionParamsSchema.optional(),
+  actionParams: anyActionParamsSchema
+    .optional()
+    .describe(
+      "Replaces the delivery configuration as a whole rather than merging " +
+        "into it: send the fields this automation should have from now on, " +
+        "and anything left out is removed — omit `headers` and it delivers " +
+        "with none, omit `signingSecret` and its deliveries are no longer " +
+        "signed. The one exception is a credential the read hid: send back " +
+        "the `[redacted]` placeholder (or, for a Slack bot connection, the " +
+        "`slackBotTokenSet` flag the read echoes) and the stored credential " +
+        "is kept, so reading an automation, changing one field and writing " +
+        "the whole object back is safe. Only this channel's fields are " +
+        "accepted; anything else is refused rather than dropped, and the " +
+        "rule this automation fires by belongs in `graphAlert` or `report`.",
+    ),
   graphAlert: graphAlertActionParamsSchema
     .optional()
     .describe(

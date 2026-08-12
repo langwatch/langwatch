@@ -4,6 +4,7 @@ import {
   deletedTriggerSchema,
   type GraphAlertRule,
   type NotificationCadence,
+  type ReportRule,
   type TestFireResult,
   type Trigger,
   type TriggerAction,
@@ -33,6 +34,7 @@ export interface CreateTriggerInput {
   alertType?: TriggerAlertType;
   customGraphId?: string;
   graphAlert?: GraphAlertRule;
+  report?: ReportRule;
   templates?: TriggerTemplates;
   notificationCadence?: NotificationCadence;
 }
@@ -49,6 +51,7 @@ export interface UpdateTriggerInput {
    *  `[redacted]` keeps the stored one. The channel itself cannot change. */
   actionParams?: TriggerActionParams;
   graphAlert?: GraphAlertRule;
+  report?: ReportRule;
   templates?: TriggerTemplates;
   notificationCadence?: NotificationCadence;
 }

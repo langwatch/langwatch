@@ -289,6 +289,15 @@ Feature: Automations over the public API
       Then the rule comes back in its own field
       And the delivery configuration carries only where the message goes
 
+  Rule: A refusal says what to do about the thing that is wrong
+
+    @integration
+    Scenario: A report with nothing readable to send says what to state
+      Given a report whose stored configuration can no longer be read
+      When the integrator saves a change to it
+      Then the save is refused, asking for what it sends and when
+      And it does not ask for a different channel
+
   Rule: A project can only make LangWatch send so often
 
     A test fire is the one verb here that sends on the caller's say-so, to an
