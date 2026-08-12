@@ -54,6 +54,7 @@ import {
   presetLabels,
 } from "~/features/automations/logic/draftReducer";
 import { RUNAWAY_PAUSE_REASON } from "~/features/automations/logic/pauseReasons";
+import { slackDestinationPresentation } from "~/features/automations/logic/slackDestinationPresentation";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { showErrorToast } from "~/features/errors";
@@ -325,15 +326,7 @@ function AutomationsPage() {
   ) => {
     switch (action) {
       case "SEND_SLACK_MESSAGE":
-        return (
-          <Tooltip
-            content={(actionParams as { slackWebhook: string }).slackWebhook}
-          >
-            <Text lineClamp={1} display="block">
-              Webhook
-            </Text>
-          </Tooltip>
-        );
+        return <SlackNotifyCell actionParams={actionParams} />;
       case "SEND_EMAIL":
         return (actionParams as { members: string[] }).members?.join(", ");
       case "ADD_TO_DATASET":
@@ -1125,6 +1118,46 @@ function AutomationsPage() {
         }}
       />
     </SectionNavigationLayout>
+  );
+}
+
+/**
+ * The "Notifies" cell for a Slack automation row. #6244: this used to show
+ * "Webhook" (with an empty tooltip) for every Slack row, including
+ * bot-token deliveries that never carry a webhook at all. Shared decision
+ * with `ViewAutomationDrawer.tsx`'s destination cell via
+ * `slackDestinationPresentation`, so the two surfaces can't drift apart
+ * again. Extracted out of `actionItems`'s switch (rather than inlined as a
+ * branch there) purely to keep that switch's own complexity down — each
+ * case stays a single expression.
+ */
+function SlackNotifyCell({
+  actionParams,
+}: {
+  actionParams: TriggerActionParams;
+}) {
+  const destination = slackDestinationPresentation(actionParams);
+  if (destination.kind === "bot") {
+    return destination.channelId ? (
+      <Text lineClamp={1} display="block">
+        Slack app · channel {destination.channelId}
+      </Text>
+    ) : (
+      <Text lineClamp={1} display="block" color="fg.muted">
+        Slack app
+      </Text>
+    );
+  }
+  return destination.tooltipUrl ? (
+    <Tooltip content={destination.tooltipUrl}>
+      <Text lineClamp={1} display="block">
+        Slack webhook
+      </Text>
+    </Tooltip>
+  ) : (
+    <Text lineClamp={1} display="block">
+      Slack webhook
+    </Text>
   );
 }
 

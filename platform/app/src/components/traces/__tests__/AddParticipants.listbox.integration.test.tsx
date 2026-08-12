@@ -35,7 +35,13 @@
  *    the regression guard.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -170,6 +176,16 @@ describe("given the annotation-queue 'Send to' selector", () => {
         .getAllByText("Review queue")
         .find((el) => el.closest('[data-scope="select"][data-part="item"]'))!;
       expect(option).toBeTruthy();
+
+      // Modal `Dialog.Root` queueMicrotasks `document.body.style.pointerEvents
+      // = "none"`; the Select listbox's dismissable-layer registration (which
+      // restores `pointer-events: auto` on its own node) is deferred via
+      // `raf`. Under CPU contention a click can land in the window between
+      // the two and hit a pointer-events:none ancestor — wait for exactly
+      // the property that race resolves before clicking.
+      await waitFor(() => {
+        expect(getComputedStyle(option).pointerEvents).not.toBe("none");
+      });
 
       await user.click(option);
 

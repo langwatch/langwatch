@@ -22,6 +22,7 @@ import {
   TIME_PERIOD_LABELS,
 } from "~/features/automations/logic/draftReducer";
 import { resolveSeriesLabel } from "~/features/automations/logic/seriesOptions";
+import { slackDestinationPresentation } from "~/features/automations/logic/slackDestinationPresentation";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -110,20 +111,13 @@ export function ViewAutomationDrawer({
     if (!trigger) return null;
     switch (trigger.action) {
       case "SEND_SLACK_MESSAGE": {
-        // #6244: every Slack automation read as "Slack webhook", including
-        // bot-token deliveries — which never carry a webhook at all, so the
-        // drawer couldn't answer "where does this post?". Branch on the
-        // stored delivery method instead (absent = legacy `webhook` row).
-        if ((actionParams.slackDelivery ?? "webhook") === "bot") {
-          // No channel NAME is ever persisted (`triggerActionParams.ts`) —
-          // only the raw id, which the composer resolves to a name via a
-          // live, bot-token-authenticated Slack API call this read-only
-          // surface doesn't make. The id on its own is still a real,
-          // customer-recognisable identifier (it's the exact channel they
-          // picked), so it's shown plainly rather than hidden.
-          return actionParams.slackChannelId ? (
+        // #6244: see `slackDestinationPresentation` — shared with the list
+        // page's "Notifies" cell so the decision can't drift between them.
+        const destination = slackDestinationPresentation(actionParams);
+        if (destination.kind === "bot") {
+          return destination.channelId ? (
             <Text textStyle="sm">
-              Slack app · channel {actionParams.slackChannelId}
+              Slack app · channel {destination.channelId}
             </Text>
           ) : (
             <Text textStyle="sm" color="fg.muted">
@@ -131,18 +125,8 @@ export function ViewAutomationDrawer({
             </Text>
           );
         }
-        // Webhook delivery. The URL carries a secret token — mask it and
-        // surface the full URL only on hover, mirroring the list page's
-        // Slack cell. A real Slack incoming webhook always starts
-        // `https://hooks.slack.com/…`; anything else (absent, or a
-        // redaction placeholder if the row was read through a redacting
-        // boundary) has nothing meaningful to show on hover, so the label
-        // renders without a tooltip rather than risk rendering a
-        // placeholder string as though it were the URL.
-        const webhook = actionParams.slackWebhook;
-        const isRealWebhookUrl = !!webhook?.startsWith("https://");
-        return isRealWebhookUrl ? (
-          <Tooltip content={webhook}>
+        return destination.tooltipUrl ? (
+          <Tooltip content={destination.tooltipUrl}>
             <Text
               textStyle="sm"
               lineClamp={1}

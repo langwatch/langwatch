@@ -126,7 +126,27 @@ const automationTrigger = {
   filters: "{}",
 };
 
-const allTriggers = [alertTrigger, scheduleTrigger, automationTrigger];
+const botSlackTrigger = {
+  id: "automation-2",
+  name: "Errors to #ops",
+  active: true,
+  pausedReason: null,
+  customGraphId: null,
+  customGraph: null,
+  triggerKind: "TRIGGER",
+  action: "SEND_SLACK_MESSAGE",
+  actionParams: { slackDelivery: "bot", slackChannelId: "C0999999" },
+  checks: [],
+  filterQuery: "status:error",
+  filters: "{}",
+};
+
+const allTriggers = [
+  alertTrigger,
+  scheduleTrigger,
+  automationTrigger,
+  botSlackTrigger,
+];
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -309,6 +329,39 @@ describe("given the Schedules table", () => {
           description: "Schedule deleted",
         }),
       );
+    });
+  });
+});
+
+describe("given the Automations table", () => {
+  beforeEach(() => {
+    mockPathnameRef.current = "/test-project/automations/automations";
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  describe("when a row is a bot-delivery Slack automation", () => {
+    /** @scenario The Notifies cell names a bot-delivery Slack automation */
+    it("names the Slack app and its destination channel, not 'Webhook'", async () => {
+      await renderPage();
+
+      // #6244: this cell used to show "Webhook" with an empty tooltip for
+      // every Slack row, including bot deliveries that never carry a
+      // webhook at all.
+      expect(
+        screen.getByText("Slack app · channel C0999999"),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Webhook")).toBeNull();
+    });
+  });
+
+  describe("when a row is a legacy webhook-delivery Slack automation", () => {
+    it("keeps the existing webhook presentation", async () => {
+      await renderPage();
+
+      expect(screen.getByText("Slack webhook")).toBeInTheDocument();
     });
   });
 });
