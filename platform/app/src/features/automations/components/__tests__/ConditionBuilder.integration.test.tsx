@@ -68,14 +68,66 @@ describe("ConditionBuilder", () => {
     });
   });
 
-  describe("when a condition is added to an empty builder", () => {
-    it("shows a fresh field picker", async () => {
-      const user = userEvent.setup();
+  describe("given an empty query", () => {
+    /** @scenario "A fresh trace automation starts with one editable condition" */
+    it("starts with one empty, editable condition row already there", () => {
       render(<Harness initial="" />, { wrapper: Wrapper });
 
-      await user.click(screen.getByText("Add a condition"));
-
+      // No "Add a condition" click needed — the row is already on screen.
       expect(screen.getByText("Field…")).toBeTruthy();
+    });
+
+    it("does not emit a query for the seeded, untouched row", () => {
+      const onChangeSpy = vi.fn();
+      render(<Harness initial="" onChangeSpy={onChangeSpy} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(onChangeSpy).not.toHaveBeenCalled();
+    });
+
+    describe("when a second condition is added", () => {
+      it("shows a second field picker joined by AND", async () => {
+        const user = userEvent.setup();
+        render(<Harness initial="" />, { wrapper: Wrapper });
+
+        await user.click(screen.getByText("Add AND condition"));
+
+        expect(screen.getAllByText("Field…")).toHaveLength(2);
+        expect(screen.getByText("AND")).toBeTruthy();
+      });
+    });
+  });
+
+  describe("given a custom-attribute condition from the code editor", () => {
+    it("renders a key sub-input alongside the attribute field", () => {
+      render(<Harness initial="trace.attribute.user_id:premium" />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByDisplayValue("user_id")).toBeTruthy();
+      expect(screen.getByDisplayValue("premium")).toBeTruthy();
+    });
+  });
+
+  describe("when the user edits an existing attribute condition's key", () => {
+    it("emits the composed field without touching the value", () => {
+      const onChangeSpy = vi.fn();
+      render(
+        <Harness
+          initial="trace.attribute.user_id:premium"
+          onChangeSpy={onChangeSpy}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      fireEvent.change(screen.getByDisplayValue("user_id"), {
+        target: { value: "plan" },
+      });
+
+      expect(onChangeSpy).toHaveBeenLastCalledWith(
+        "trace.attribute.plan:premium",
+      );
     });
   });
 });

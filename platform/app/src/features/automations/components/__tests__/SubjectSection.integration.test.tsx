@@ -24,6 +24,9 @@ const server = vi.hoisted(() => ({
     error: null as unknown,
   },
   cap: { data: null as { cap: number } | null },
+  graphs: [
+    { id: "graph-1", name: "Latency", trigger: null as unknown },
+  ] as Array<{ id: string; name: string; trigger: unknown }>,
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -31,7 +34,7 @@ vi.mock("~/utils/api", () => ({
     graphs: {
       getAll: {
         useQuery: () => ({
-          data: [{ id: "graph-1", name: "Latency", trigger: null }],
+          data: server.graphs,
           isLoading: false,
         }),
       },
@@ -95,6 +98,15 @@ const seedGraphDraft = () =>
     customGraphId: "graph-1",
   });
 
+/** A brand-new alert draft — no graph chosen yet (matches `INITIAL_DRAFT`'s
+ *  `customGraphId: null`), distinct from `seedGraphDraft`'s already-picked
+ *  graph. */
+const seedFreshAlertDraft = () =>
+  useAutomationStore.getState().hydrate({
+    ...INITIAL_DRAFT,
+    source: "customGraph",
+  });
+
 const seedTraceDraft = (action: TriggerAction) =>
   useAutomationStore.getState().hydrate({
     ...INITIAL_DRAFT,
@@ -121,6 +133,7 @@ describe("SubjectSection", () => {
     useAutomationStore.getState().reset();
     previewReturns(0);
     server.cap = { data: { cap: PLAN_CAP } };
+    server.graphs = [{ id: "graph-1", name: "Latency", trigger: null }];
   });
   afterEach(() => {
     cleanup();
@@ -169,6 +182,45 @@ describe("SubjectSection", () => {
         expect(
           useAutomationStore.getState().draft.graphAlert.seriesName.length,
         ).toBeGreaterThan(0);
+      });
+    });
+
+    describe("when the project has no custom graphs yet", () => {
+      /** @scenario "A project with no custom graphs offers to create one" */
+      it("explains there is nothing to watch yet and offers to create one", () => {
+        server.graphs = [];
+        seedFreshAlertDraft();
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(
+          screen.getByText(/doesn.t have a custom graph yet/i),
+        ).toBeInTheDocument();
+        const link = screen.getByRole("link", {
+          name: /create a custom graph/i,
+        });
+        expect(link).toHaveAttribute("href", "/proj/analytics/custom");
+        // Opens in a new tab so the in-progress alert draft is not lost.
+        expect(link).toHaveAttribute("target", "_blank");
+      });
+
+      it("does not show a graph or series picker", () => {
+        server.graphs = [];
+        seedFreshAlertDraft();
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.queryAllByRole("combobox")).toHaveLength(0);
+      });
+    });
+
+    describe("when opened prefilled even though the project has no other graphs", () => {
+      it("still shows the locked graph picker, not the empty state", () => {
+        server.graphs = [];
+        seedGraphDraft();
+        render(<SubjectSection prefilledGraphId="graph-1" />, {
+          wrapper: Wrapper,
+        });
+
+        expect(selectContainingOption(/select a graph/i)).toBeInTheDocument();
       });
     });
   });

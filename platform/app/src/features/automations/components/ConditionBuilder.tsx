@@ -35,13 +35,65 @@ const OPERATOR_LABEL: Record<ConditionOperator, string> = {
   between: "between",
 };
 
-/** The non-prefix fields, in the same order and labelling the traces
- *  autocomplete uses, so the builder's field list reads identically. */
-const FIELD_OPTIONS = getFieldSuggestions("")
-  .filter((s) => !s.isPrefix)
-  .map((s) => ({ value: s.field, label: s.label }));
+/** One selectable field: a plain field (`status`, `cost`) or a custom-
+ *  attribute prefix (`trace.attribute.<key>`, `span.attribute.<key>`,
+ *  `event.attribute.<key>`). Picking a prefix opens a key sub-input
+ *  (`ConditionRow`) so the row can target one specific attribute. */
+interface FieldOption {
+  value: string;
+  label: string;
+  isPrefix: boolean;
+}
+
+/** Every field the traces autocomplete offers, in the same order and
+ *  labelling it uses, so the builder's field list reads identically —
+ *  including the custom-attribute prefixes, so a condition on a custom
+ *  attribute is expressible here too, not just in Code mode. */
+const FIELD_OPTIONS: FieldOption[] = getFieldSuggestions("").map((s) => ({
+  value: s.field,
+  label: s.label,
+  isPrefix: s.isPrefix ?? false,
+}));
 
 const FIELD_COLLECTION = createListCollection({ items: FIELD_OPTIONS });
+
+/** The prefix option a row's field belongs to, or `null` for a plain field
+ *  (or no field yet). Matches both a bare prefix (just picked, no key typed
+ *  yet) and a prefix with a key already appended — the two states
+ *  `ConditionRow` needs to tell apart to render the key sub-input. */
+export function matchAttributePrefix(field: string): FieldOption | null {
+  return (
+    FIELD_OPTIONS.find((opt) => opt.isPrefix && field.startsWith(opt.value)) ??
+    null
+  );
+}
+
+/** A prefix with no key typed yet (`"trace.attribute."`) can't serialise to
+ *  a valid query clause — there's nothing to compare against — so it's
+ *  excluded from the query the builder emits until a key is entered. */
+export function isPrefixOnly(field: string): boolean {
+  return FIELD_OPTIONS.some((opt) => opt.isPrefix && opt.value === field);
+}
+
+let blankRowCounter = 0;
+function blankCondition(): Condition {
+  return {
+    id: `blank${blankRowCounter++}`,
+    field: "",
+    operator: "is",
+    value: "",
+  };
+}
+
+/** A brand-new builder with zero rows reads as broken — nothing to fill in
+ *  but a small "Add a condition" button, right where an "Add at least one
+ *  condition." warning sits below it. Seeding one blank, editable row makes
+ *  the surface read as ready-to-fill instead. It still doesn't serialise to
+ *  anything (an empty field skips `isConditionComplete`), so save-gating on
+ *  an untouched draft is unaffected. */
+function withMinimumRow(conditions: Condition[]): Condition[] {
+  return conditions.length > 0 ? conditions : [blankCondition()];
+}
 
 /**
  * The structured, no-code front-end over the trace query language. Rows are
@@ -61,8 +113,8 @@ export function ConditionBuilder({
   query: string;
   onChange: (query: string) => void;
 }) {
-  const [conditions, setConditions] = useState<Condition[]>(
-    () => queryToConditions(query) ?? [],
+  const [conditions, setConditions] = useState<Condition[]>(() =>
+    withMinimumRow(queryToConditions(query) ?? []),
   );
   // The last string we emitted, so the parent echoing it straight back doesn't
   // re-parse (and clobber the ids / in-progress blank rows) on every keystroke.
@@ -75,12 +127,16 @@ export function ConditionBuilder({
     const parsed = queryToConditions(query);
     // A non-structurable value shouldn't reach us; if it does, don't wipe the
     // user's rows — leave them be and let Code mode own that query.
-    if (parsed) setConditions(parsed);
+    if (parsed) setConditions(withMinimumRow(parsed));
   }, [query]);
 
   const commit = (next: Condition[]) => {
     setConditions(next);
-    const q = serializeConditions(next);
+    // A prefix the author picked but hasn't typed a key into yet has nothing
+    // to compare against — exclude it until then, same as any other
+    // half-filled row.
+    const usable = next.filter((c) => !isPrefixOnly(c.field));
+    const q = serializeConditions(usable);
     lastEmitted.current = q;
     onChange(q);
   };
@@ -134,6 +190,7 @@ export function ConditionBuilder({
           <ConditionRow
             condition={condition}
             onField={(field) => setField(condition.id, field)}
+            onFieldKey={(field) => update(condition.id, { field })}
             onOperator={(operator) => update(condition.id, { operator })}
             onValue={(value) => update(condition.id, { value })}
             onValueTo={(valueTo) => update(condition.id, { valueTo })}
@@ -157,6 +214,7 @@ export function ConditionBuilder({
 function ConditionRow({
   condition,
   onField,
+  onFieldKey,
   onOperator,
   onValue,
   onValueTo,
@@ -164,6 +222,10 @@ function ConditionRow({
 }: {
   condition: Condition;
   onField: (field: string) => void;
+  /** Updates just the key portion of a custom-attribute field
+   *  (`trace.attribute.<key>`), leaving the operator and value alone —
+   *  unlike `onField`, this isn't a field switch. */
+  onFieldKey: (field: string) => void;
   onOperator: (operator: ConditionOperator) => void;
   onValue: (value: string) => void;
   onValueTo: (valueTo: string) => void;
@@ -182,13 +244,24 @@ function ConditionRow({
     [operators],
   );
 
+  const attributePrefix = matchAttributePrefix(condition.field);
+  const attributeKey = attributePrefix
+    ? condition.field.slice(attributePrefix.value.length)
+    : "";
+
   return (
-    <HStack gap={2} align="center">
+    <HStack gap={2} align="center" flexWrap="wrap" rowGap={2}>
       <Box width="190px" flexShrink={0}>
         <Select.Root
           size="sm"
           collection={FIELD_COLLECTION}
-          value={condition.field ? [condition.field] : []}
+          value={
+            attributePrefix
+              ? [attributePrefix.value]
+              : condition.field
+                ? [condition.field]
+                : []
+          }
           onValueChange={({ value }) => value[0] && onField(value[0])}
         >
           <Select.Trigger>
@@ -203,6 +276,18 @@ function ConditionRow({
           </Select.Content>
         </Select.Root>
       </Box>
+
+      {attributePrefix ? (
+        <Box width="130px" flexShrink={0}>
+          <Input
+            size="sm"
+            placeholder="attribute key"
+            aria-label={`${attributePrefix.label} key`}
+            value={attributeKey}
+            onChange={(e) => onFieldKey(attributePrefix.value + e.target.value)}
+          />
+        </Box>
+      ) : null}
 
       {condition.field ? (
         <Box width="100px" flexShrink={0}>

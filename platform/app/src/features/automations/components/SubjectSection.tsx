@@ -14,8 +14,10 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { NotificationCadence } from "@langwatch/automations/cadences";
+import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
+import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
 import { describeError } from "~/features/errors";
 import type { FilterParam } from "~/hooks/useFilterParams";
@@ -134,6 +136,14 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
   const customGraphMissing = draft.customGraphId === null;
   const seriesMissing =
     !!draft.customGraphId && draft.graphAlert.seriesName.length === 0;
+  // A prefilled draft already carries its graph (opened from a dashboard chart
+  // card), so an otherwise-empty project-wide list is beside the point there.
+  const hasNoGraphs =
+    !isPrefilled && !graphs.isLoading && (graphs.data ?? []).length === 0;
+
+  if (hasNoGraphs) {
+    return <NoGraphsYet projectSlug={project?.slug} />;
+  }
 
   return (
     <VStack align="stretch" gap={4}>
@@ -202,6 +212,51 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
         </NativeSelect.Root>
         <Field.ErrorText>Pick a series to monitor.</Field.ErrorText>
       </Field.Root>
+    </VStack>
+  );
+}
+
+/**
+ * Shown instead of an empty, error-flagged graph picker when the project has
+ * no custom graphs yet — there is nothing to watch until one exists, so the
+ * fix is a way to create one, not a picker that can only ever be wrong. Also
+ * covers the #6716 case where a template opens this same drawer with no
+ * graph attached: either way, the author lands here with the same way out.
+ * The link opens in a new tab so this alert draft is still exactly as left
+ * when the author comes back to finish it.
+ */
+function NoGraphsYet({ projectSlug }: { projectSlug?: string }) {
+  return (
+    <VStack
+      align="start"
+      gap={2}
+      padding={3}
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="md"
+      bg="bg.subtle"
+    >
+      <Text textStyle="sm">
+        This project doesn{"'"}t have a custom graph yet. An alert watches a
+        metric on one, so create a graph first, then come back here to pick it.
+      </Text>
+      {projectSlug ? (
+        <>
+          <Link
+            href={`/${projectSlug}/analytics/custom`}
+            target="_blank"
+            rel="noopener noreferrer"
+            asChild
+          >
+            <Button size="xs" variant="outline">
+              <Plus size={13} /> Create a custom graph
+            </Button>
+          </Link>
+          <Text textStyle="2xs" color="fg.muted">
+            Opens in a new tab, so this alert stays exactly as you left it.
+          </Text>
+        </>
+      ) : null}
     </VStack>
   );
 }
