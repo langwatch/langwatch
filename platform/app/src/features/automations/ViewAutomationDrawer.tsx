@@ -22,7 +22,10 @@ import {
   OPERATOR_LABELS,
   TIME_PERIOD_LABELS,
 } from "~/features/automations/logic/draftReducer";
-import { isAutomationPauseReason } from "~/features/automations/logic/pauseReasons";
+import {
+  isAutomationPauseReason,
+  RUNAWAY_PAUSE_EXPLANATION,
+} from "~/features/automations/logic/pauseReasons";
 import { resolveSeriesLabel } from "~/features/automations/logic/seriesOptions";
 import { slackDestinationPresentation } from "~/features/automations/logic/slackDestinationPresentation";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
@@ -255,7 +258,7 @@ export function ViewAutomationDrawer({
                   stop can be hovered but never focused. */}
               {trigger && !trigger.active ? (
                 isAutomationPauseReason(trigger.pausedReason) ? (
-                  <Tooltip content="This automation matched almost every trace in the project, so we paused it. Narrow its condition, then switch it back on.">
+                  <Tooltip content={RUNAWAY_PAUSE_EXPLANATION}>
                     <Badge colorPalette="red" tabIndex={0}>
                       Paused
                     </Badge>
