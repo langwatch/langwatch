@@ -724,6 +724,10 @@ function CustomGraphForm({
       {
         onSuccess: () => {
           void trpc.graphs.getById.invalidate();
+          // Every picker that offers "which graph?" — the alert drawer's graph
+          // select among them — reads the full list. Without this the graph
+          // just created is absent from it until a page reload.
+          void trpc.graphs.getAll.invalidate();
           // Navigate back to the same page we came from
           const dashboardUrl = dashboardId
             ? `/${project?.slug}/analytics/reports?dashboard=${dashboardId}`
@@ -753,6 +757,9 @@ function CustomGraphForm({
       {
         onSuccess: () => {
           void trpc.graphs.getById.invalidate();
+          // A rename changes how the graph reads in every list that offers it,
+          // so the full list is as stale as the single graph is.
+          void trpc.graphs.getAll.invalidate();
           // Navigate back to the same dashboard we came from
           const dashboardUrl = dashboardId
             ? `/${project?.slug}/analytics/reports?dashboard=${dashboardId}`
