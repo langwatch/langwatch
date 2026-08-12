@@ -1591,6 +1591,59 @@ const presentations = {
         : "Configure the destination first.";
     },
   },
+  trigger_action_immutable: {
+    title: "The delivery channel is fixed",
+    describe: () =>
+      "An automation keeps the channel it was created with, because the " +
+      "credentials it holds belong to that channel. Create a new automation " +
+      "on the channel you want.",
+  },
+
+  trigger_kind_immutable: {
+    title: "This cannot become a different kind of automation",
+    describe: () =>
+      "A trace automation, a graph alert and a scheduled report are set up " +
+      "differently. Create the one you want and delete this one.",
+  },
+
+  trigger_filter_query_invalid: {
+    title: "This trace query could not be read",
+    describe: () =>
+      "Check it against the query syntax the traces view uses. It was not " +
+      "saved, so nothing has changed.",
+  },
+
+  graph_alert_incomplete: {
+    title: "This alert is missing something it needs",
+    // `meta.field` names which piece — the rule, the severity, the channel —
+    // and the service wrote the sentence for that exact case, which the
+    // generic line cannot do.
+    describe: (error) =>
+      safeProse(str(error, "reason", "")) ||
+      "Add the rule it fires by, the severity it fires at and a channel that " +
+        "can notify.",
+  },
+
+  graph_not_found: {
+    title: "That graph is not in this project",
+    describe: () =>
+      "Alerts fire on a graph in the same project. Check the graph id.",
+  },
+
+  report_channel_unsupported: {
+    title: "A report cannot be delivered that way",
+    describe: () =>
+      "Reports are delivered by email or to Slack. Pick one of those channels.",
+  },
+
+  webhook_header_values_required: {
+    title: "Send the header values with the new destination",
+    describe: () =>
+      "Header values belong to the endpoint they authenticate against, so " +
+      "they are not carried over to a new one. Include each header's value " +
+      "in the same request as the new URL.",
+  },
+
   trigger_channel_not_enabled: {
     title: "This project does not have that channel yet",
     describe: () =>

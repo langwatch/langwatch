@@ -164,6 +164,147 @@ export class TriggerChannelNotEnabledError extends HandledError {
   }
 }
 
+/**
+ * The channel an automation delivers on is fixed when it is created.
+ *
+ * This is not a limitation waiting to be lifted: the credential rules that let
+ * a caller write back what it read depend on the incoming and the stored
+ * delivery configuration belonging to the same channel (see the module doc in
+ * `trigger-redaction.ts`). Refusing the change is how a caller finds out,
+ * rather than having the field quietly ignored.
+ */
+export class TriggerActionImmutableError extends HandledError {
+  declare readonly code: "trigger_action_immutable";
+
+  constructor(
+    /** The channel this automation delivers on and keeps delivering on. */
+    public readonly action: string,
+  ) {
+    super(
+      "trigger_action_immutable",
+      "An automation keeps the delivery channel it was created with. " +
+        "Create a new automation on the channel you want.",
+      { meta: { field: "action", action }, httpStatus: 422 },
+    );
+    this.name = "TriggerActionImmutableError";
+  }
+}
+
+/**
+ * A trace automation, a graph alert and a scheduled report are three different
+ * kinds of row, and an edit cannot turn one into another over the public API:
+ * a graph alert owns its graph's alert slot and a report owns a calendar entry,
+ * so converting one is a create and a delete rather than an edit.
+ */
+export class TriggerKindImmutableError extends HandledError {
+  declare readonly code: "trigger_kind_immutable";
+
+  constructor(
+    /** What this automation is: `automation`, `alert` or `report`. */
+    public readonly kind: string,
+  ) {
+    super(
+      "trigger_kind_immutable",
+      "This automation cannot be turned into a different kind of automation. " +
+        "Create the one you want and delete this one.",
+      { meta: { field: "kind", kind }, httpStatus: 422 },
+    );
+    this.name = "TriggerKindImmutableError";
+  }
+}
+
+/** A graph alert was saved without something it needs to fire: the rule it
+ *  fires by, the severity it fires at, or a channel that can notify. */
+export class GraphAlertIncompleteError extends HandledError {
+  declare readonly code: "graph_alert_incomplete";
+
+  constructor(
+    /** What is missing or wrong — `graphAlert`, `alertType`, `action`. */
+    public readonly field: string,
+    /** Which piece is missing, written for whoever has to add it. Travels in
+     *  `meta` because an error's own message no longer crosses the tRPC wire
+     *  (#5984), and the generic line cannot name the missing piece. */
+    public readonly reason: string,
+  ) {
+    super("graph_alert_incomplete", reason, {
+      meta: { field, reason },
+      httpStatus: 422,
+    });
+    this.name = "GraphAlertIncompleteError";
+  }
+}
+
+/** The alert names a graph this project does not have. Also what a caller sees
+ *  for a graph in another project. */
+export class GraphNotFoundError extends HandledError {
+  declare readonly code: "graph_not_found";
+
+  constructor() {
+    super("graph_not_found", "This project has no graph with that id.", {
+      meta: { field: "customGraphId" },
+      httpStatus: 404,
+    });
+    this.name = "GraphNotFoundError";
+  }
+}
+
+/** A scheduled report was saved on a channel that cannot deliver one. */
+export class ReportChannelUnsupportedError extends HandledError {
+  declare readonly code: "report_channel_unsupported";
+
+  constructor() {
+    super(
+      "report_channel_unsupported",
+      "A report is delivered by email or to Slack. Pick one of those channels.",
+      { meta: { field: "action" }, httpStatus: 422 },
+    );
+    this.name = "ReportChannelUnsupportedError";
+  }
+}
+
+/** The trace query the automation is about could not be read. Rejected at the
+ *  save rather than at dispatch, where it would silently match nothing. */
+export class TriggerFilterQueryInvalidError extends HandledError {
+  declare readonly code: "trigger_filter_query_invalid";
+
+  constructor(
+    /** The parser's own account of what it could not read. */
+    public readonly reason: string,
+  ) {
+    super(
+      "trigger_filter_query_invalid",
+      "This trace query could not be read. Check it against the query syntax " +
+        "the traces view uses.",
+      { meta: { field: "filterQuery", reason }, httpStatus: 422 },
+    );
+    this.name = "TriggerFilterQueryInvalidError";
+  }
+}
+
+/**
+ * A webhook automation's destination changed in the same save that asked to
+ * keep the stored header values.
+ *
+ * Header values are scoped to the endpoint they authenticate against, so they
+ * do not travel to a new one. Over the public API a caller never held those
+ * values — the read hands it the placeholder — so the remediation is not "type
+ * them again" but "send them with the new destination": one call carrying the
+ * new URL and each header's value saves both.
+ */
+export class WebhookHeaderValuesRequiredError extends HandledError {
+  declare readonly code: "webhook_header_values_required";
+
+  constructor() {
+    super(
+      "webhook_header_values_required",
+      "Changing the destination means sending the header values with it. " +
+        "Include each header's value in the same request as the new URL.",
+      { meta: { field: "headers" }, httpStatus: 422 },
+    );
+    this.name = "WebhookHeaderValuesRequiredError";
+  }
+}
+
 /** No automation with that id in this project. Also what a caller sees for an
  *  automation belonging to another project: an id it may not read is an id
  *  that does not exist. */

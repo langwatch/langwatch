@@ -52967,7 +52967,8 @@
                           "SEND_EMAIL",
                           "ADD_TO_DATASET",
                           "ADD_TO_ANNOTATION_QUEUE",
-                          "SEND_SLACK_MESSAGE"
+                          "SEND_SLACK_MESSAGE",
+                          "SEND_WEBHOOK"
                         ]
                       },
                       "actionParams": {
@@ -52977,6 +52978,74 @@
                       "filters": {
                         "type": "object",
                         "additionalProperties": {}
+                      },
+                      "filterQuery": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "AUTOMATION",
+                          "ALERT",
+                          "REPORT"
+                        ],
+                        "description": "What this automation is about: matching traces, a metric crossing a threshold, or a schedule."
+                      },
+                      "customGraphId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "notificationCadence": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "traceDebounceMs": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "templates": {
+                        "type": "object",
+                        "properties": {
+                          "slackTemplateType": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "enum": [
+                              "string",
+                              "block_kit",
+                              null
+                            ]
+                          },
+                          "slackTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "emailSubjectTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "emailBodyTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "description": "The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel."
                       },
                       "active": {
                         "type": "boolean"
@@ -53016,6 +53085,12 @@
                       "action",
                       "actionParams",
                       "filters",
+                      "filterQuery",
+                      "kind",
+                      "customGraphId",
+                      "notificationCadence",
+                      "traceDebounceMs",
+                      "templates",
                       "active",
                       "message",
                       "alertType",
@@ -53115,7 +53190,7 @@
         },
         "operationId": "getApiTriggers",
         "parameters": [],
-        "description": "List all active triggers (automations) for the project",
+        "description": "List the project's automations, newest first. Paused automations are included.",
         "security": [
           {
             "project_api_key": []
@@ -53143,7 +53218,8 @@
                         "SEND_EMAIL",
                         "ADD_TO_DATASET",
                         "ADD_TO_ANNOTATION_QUEUE",
-                        "SEND_SLACK_MESSAGE"
+                        "SEND_SLACK_MESSAGE",
+                        "SEND_WEBHOOK"
                       ]
                     },
                     "actionParams": {
@@ -53153,6 +53229,74 @@
                     "filters": {
                       "type": "object",
                       "additionalProperties": {}
+                    },
+                    "filterQuery": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "AUTOMATION",
+                        "ALERT",
+                        "REPORT"
+                      ],
+                      "description": "What this automation is about: matching traces, a metric crossing a threshold, or a schedule."
+                    },
+                    "customGraphId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "notificationCadence": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "traceDebounceMs": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "templates": {
+                      "type": "object",
+                      "properties": {
+                        "slackTemplateType": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "enum": [
+                            "string",
+                            "block_kit",
+                            null
+                          ]
+                        },
+                        "slackTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "emailSubjectTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "emailBodyTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "description": "The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel."
                     },
                     "active": {
                       "type": "boolean"
@@ -53192,6 +53336,12 @@
                     "action",
                     "actionParams",
                     "filters",
+                    "filterQuery",
+                    "kind",
+                    "customGraphId",
+                    "notificationCadence",
+                    "traceDebounceMs",
+                    "templates",
                     "active",
                     "message",
                     "alertType",
@@ -53290,50 +53440,1559 @@
         },
         "operationId": "postApiTriggers",
         "parameters": [],
-        "description": "Create a new trigger (automation)",
+        "description": "Create an automation. Send `customGraphId` + `graphAlert` for an alert on a metric, `report` for a scheduled report, or conditions for a trace automation. The delivery channel is fixed at creation.",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "action": {
-                    "type": "string",
-                    "enum": [
-                      "SEND_EMAIL",
-                      "ADD_TO_DATASET",
-                      "ADD_TO_ANNOTATION_QUEUE",
-                      "SEND_SLACK_MESSAGE"
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "SEND_EMAIL"
+                      },
+                      "actionParams": {
+                        "type": "object",
+                        "properties": {
+                          "members": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "minItems": 1,
+                            "description": "Who receives the email. Any address, not only teammates."
+                          }
+                        },
+                        "required": [
+                          "members"
+                        ],
+                        "description": "Email delivery."
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "filters": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "filterQuery": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`."
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "alertType": {
+                        "type": "string",
+                        "enum": [
+                          "CRITICAL",
+                          "WARNING",
+                          "INFO"
+                        ]
+                      },
+                      "customGraphId": {
+                        "type": "string",
+                        "description": "Set to make this an alert on that graph. `graphAlert` and `alertType` are then required."
+                      },
+                      "graphAlert": {
+                        "type": "object",
+                        "properties": {
+                          "threshold": {
+                            "type": "number"
+                          },
+                          "operator": {
+                            "type": "string",
+                            "enum": [
+                              "gt",
+                              "lt",
+                              "gte",
+                              "lte",
+                              "eq"
+                            ]
+                          },
+                          "timePeriod": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "const": 1
+                              },
+                              {
+                                "type": "number",
+                                "const": 5
+                              },
+                              {
+                                "type": "number",
+                                "const": 15
+                              },
+                              {
+                                "type": "number",
+                                "const": 30
+                              },
+                              {
+                                "type": "number",
+                                "const": 60
+                              },
+                              {
+                                "type": "number",
+                                "const": 1440
+                              }
+                            ]
+                          },
+                          "seriesName": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "threshold",
+                          "operator",
+                          "timePeriod",
+                          "seriesName"
+                        ],
+                        "description": "The rule an alert fires by: series, operator, threshold, window."
+                      },
+                      "report": {
+                        "type": "object",
+                        "properties": {
+                          "source": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "dashboard"
+                                  },
+                                  "dashboardId": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "dashboardId"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "customGraph"
+                                  },
+                                  "customGraphId": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "customGraphId"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "traceQuery"
+                                  },
+                                  "filters": {
+                                    "type": "object",
+                                    "additionalProperties": {},
+                                    "default": {}
+                                  },
+                                  "metric": {
+                                    "type": "string"
+                                  },
+                                  "topN": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 100,
+                                    "default": 5
+                                  }
+                                },
+                                "required": [
+                                  "kind"
+                                ]
+                              }
+                            ]
+                          },
+                          "schedule": {
+                            "type": "object",
+                            "properties": {
+                              "cron": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "timezone": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              }
+                            },
+                            "required": [
+                              "cron",
+                              "timezone"
+                            ]
+                          },
+                          "compareToPrevious": {
+                            "type": "boolean",
+                            "default": false
+                          }
+                        },
+                        "required": [
+                          "source",
+                          "schedule"
+                        ],
+                        "description": "What a scheduled report renders and when it sends."
+                      },
+                      "templates": {
+                        "type": "object",
+                        "properties": {
+                          "slackTemplateType": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "enum": [
+                              "string",
+                              "block_kit",
+                              null
+                            ]
+                          },
+                          "slackTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "emailSubjectTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "emailBodyTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "description": "The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel."
+                      },
+                      "notificationCadence": {
+                        "type": "string",
+                        "enum": [
+                          "immediate",
+                          "5min_digest",
+                          "15min_digest",
+                          "hourly_digest"
+                        ],
+                        "description": "How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace."
+                      },
+                      "traceDebounceMs": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 600000,
+                        "description": "How long to wait for a trace to settle before the conditions are read."
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "actionParams",
+                      "name"
                     ]
                   },
-                  "actionParams": {
+                  {
                     "type": "object",
-                    "additionalProperties": {},
-                    "default": {}
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "SEND_SLACK_MESSAGE"
+                      },
+                      "actionParams": {
+                        "type": "object",
+                        "properties": {
+                          "slackDelivery": {
+                            "type": "string",
+                            "enum": [
+                              "webhook",
+                              "bot"
+                            ],
+                            "description": "How the message reaches Slack. `webhook` posts to an incoming webhook URL, `bot` posts as the LangWatch Slack app. Absent means `webhook`."
+                          },
+                          "slackWebhook": {
+                            "type": "string",
+                            "description": "The incoming webhook URL, for `webhook` delivery. A credential: it reads back as the placeholder, and sending the placeholder back keeps the stored one."
+                          },
+                          "slackChannelId": {
+                            "type": "string",
+                            "description": "The channel the bot posts in, for `bot` delivery."
+                          },
+                          "slackBotToken": {
+                            "type": "string",
+                            "description": "The bot token, for `bot` delivery. A credential: it never reads back. Send `slackBotTokenSet: true` to keep the stored one."
+                          },
+                          "slackBotTokenSet": {
+                            "type": "boolean",
+                            "description": "Read: whether a bot token is stored. Write: `true` keeps the stored one."
+                          }
+                        },
+                        "description": "Slack delivery, by incoming webhook or by bot connection."
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "filters": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "filterQuery": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`."
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "alertType": {
+                        "type": "string",
+                        "enum": [
+                          "CRITICAL",
+                          "WARNING",
+                          "INFO"
+                        ]
+                      },
+                      "customGraphId": {
+                        "type": "string",
+                        "description": "Set to make this an alert on that graph. `graphAlert` and `alertType` are then required."
+                      },
+                      "graphAlert": {
+                        "type": "object",
+                        "properties": {
+                          "threshold": {
+                            "type": "number"
+                          },
+                          "operator": {
+                            "type": "string",
+                            "enum": [
+                              "gt",
+                              "lt",
+                              "gte",
+                              "lte",
+                              "eq"
+                            ]
+                          },
+                          "timePeriod": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "const": 1
+                              },
+                              {
+                                "type": "number",
+                                "const": 5
+                              },
+                              {
+                                "type": "number",
+                                "const": 15
+                              },
+                              {
+                                "type": "number",
+                                "const": 30
+                              },
+                              {
+                                "type": "number",
+                                "const": 60
+                              },
+                              {
+                                "type": "number",
+                                "const": 1440
+                              }
+                            ]
+                          },
+                          "seriesName": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "threshold",
+                          "operator",
+                          "timePeriod",
+                          "seriesName"
+                        ],
+                        "description": "The rule an alert fires by: series, operator, threshold, window."
+                      },
+                      "report": {
+                        "type": "object",
+                        "properties": {
+                          "source": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "dashboard"
+                                  },
+                                  "dashboardId": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "dashboardId"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "customGraph"
+                                  },
+                                  "customGraphId": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "customGraphId"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "traceQuery"
+                                  },
+                                  "filters": {
+                                    "type": "object",
+                                    "additionalProperties": {},
+                                    "default": {}
+                                  },
+                                  "metric": {
+                                    "type": "string"
+                                  },
+                                  "topN": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 100,
+                                    "default": 5
+                                  }
+                                },
+                                "required": [
+                                  "kind"
+                                ]
+                              }
+                            ]
+                          },
+                          "schedule": {
+                            "type": "object",
+                            "properties": {
+                              "cron": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "timezone": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              }
+                            },
+                            "required": [
+                              "cron",
+                              "timezone"
+                            ]
+                          },
+                          "compareToPrevious": {
+                            "type": "boolean",
+                            "default": false
+                          }
+                        },
+                        "required": [
+                          "source",
+                          "schedule"
+                        ],
+                        "description": "What a scheduled report renders and when it sends."
+                      },
+                      "templates": {
+                        "type": "object",
+                        "properties": {
+                          "slackTemplateType": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "enum": [
+                              "string",
+                              "block_kit",
+                              null
+                            ]
+                          },
+                          "slackTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "emailSubjectTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "emailBodyTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "description": "The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel."
+                      },
+                      "notificationCadence": {
+                        "type": "string",
+                        "enum": [
+                          "immediate",
+                          "5min_digest",
+                          "15min_digest",
+                          "hourly_digest"
+                        ],
+                        "description": "How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace."
+                      },
+                      "traceDebounceMs": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 600000,
+                        "description": "How long to wait for a trace to settle before the conditions are read."
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "actionParams",
+                      "name"
+                    ]
                   },
-                  "filters": {
+                  {
                     "type": "object",
-                    "additionalProperties": {}
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "SEND_WEBHOOK"
+                      },
+                      "actionParams": {
+                        "type": "object",
+                        "properties": {
+                          "url": {
+                            "type": "string",
+                            "description": "Where the request goes. https only, and not a private host."
+                          },
+                          "method": {
+                            "type": "string",
+                            "enum": [
+                              "POST",
+                              "PUT",
+                              "PATCH"
+                            ],
+                            "description": "The HTTP method. Absent means POST."
+                          },
+                          "headers": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "Static headers sent with every delivery. The values are credentials: they read back as the placeholder, and sending the placeholder back keeps the stored ones. Changing `url` means sending the values again in the same request."
+                          },
+                          "bodyTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "A Liquid template for the JSON body. Absent sends the standard LangWatch envelope."
+                          },
+                          "signingSecret": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "Signs every delivery so the receiver can verify it came from LangWatch. A credential: it reads back as the placeholder, and sending the placeholder back keeps the stored one."
+                          }
+                        },
+                        "required": [
+                          "url"
+                        ],
+                        "description": "Delivery to a customer endpoint over HTTP."
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "filters": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "filterQuery": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`."
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "alertType": {
+                        "type": "string",
+                        "enum": [
+                          "CRITICAL",
+                          "WARNING",
+                          "INFO"
+                        ]
+                      },
+                      "customGraphId": {
+                        "type": "string",
+                        "description": "Set to make this an alert on that graph. `graphAlert` and `alertType` are then required."
+                      },
+                      "graphAlert": {
+                        "type": "object",
+                        "properties": {
+                          "threshold": {
+                            "type": "number"
+                          },
+                          "operator": {
+                            "type": "string",
+                            "enum": [
+                              "gt",
+                              "lt",
+                              "gte",
+                              "lte",
+                              "eq"
+                            ]
+                          },
+                          "timePeriod": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "const": 1
+                              },
+                              {
+                                "type": "number",
+                                "const": 5
+                              },
+                              {
+                                "type": "number",
+                                "const": 15
+                              },
+                              {
+                                "type": "number",
+                                "const": 30
+                              },
+                              {
+                                "type": "number",
+                                "const": 60
+                              },
+                              {
+                                "type": "number",
+                                "const": 1440
+                              }
+                            ]
+                          },
+                          "seriesName": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "threshold",
+                          "operator",
+                          "timePeriod",
+                          "seriesName"
+                        ],
+                        "description": "The rule an alert fires by: series, operator, threshold, window."
+                      },
+                      "report": {
+                        "type": "object",
+                        "properties": {
+                          "source": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "dashboard"
+                                  },
+                                  "dashboardId": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "dashboardId"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "customGraph"
+                                  },
+                                  "customGraphId": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "customGraphId"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "traceQuery"
+                                  },
+                                  "filters": {
+                                    "type": "object",
+                                    "additionalProperties": {},
+                                    "default": {}
+                                  },
+                                  "metric": {
+                                    "type": "string"
+                                  },
+                                  "topN": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 100,
+                                    "default": 5
+                                  }
+                                },
+                                "required": [
+                                  "kind"
+                                ]
+                              }
+                            ]
+                          },
+                          "schedule": {
+                            "type": "object",
+                            "properties": {
+                              "cron": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "timezone": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              }
+                            },
+                            "required": [
+                              "cron",
+                              "timezone"
+                            ]
+                          },
+                          "compareToPrevious": {
+                            "type": "boolean",
+                            "default": false
+                          }
+                        },
+                        "required": [
+                          "source",
+                          "schedule"
+                        ],
+                        "description": "What a scheduled report renders and when it sends."
+                      },
+                      "templates": {
+                        "type": "object",
+                        "properties": {
+                          "slackTemplateType": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "enum": [
+                              "string",
+                              "block_kit",
+                              null
+                            ]
+                          },
+                          "slackTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "emailSubjectTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "emailBodyTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "description": "The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel."
+                      },
+                      "notificationCadence": {
+                        "type": "string",
+                        "enum": [
+                          "immediate",
+                          "5min_digest",
+                          "15min_digest",
+                          "hourly_digest"
+                        ],
+                        "description": "How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace."
+                      },
+                      "traceDebounceMs": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 600000,
+                        "description": "How long to wait for a trace to settle before the conditions are read."
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "actionParams",
+                      "name"
+                    ]
                   },
-                  "message": {
-                    "type": "string"
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "ADD_TO_DATASET"
+                      },
+                      "actionParams": {
+                        "type": "object",
+                        "properties": {
+                          "datasetId": {
+                            "type": "string",
+                            "description": "The dataset matched traces are appended to."
+                          },
+                          "datasetMapping": {
+                            "type": "object",
+                            "properties": {
+                              "mapping": {
+                                "type": "object",
+                                "additionalProperties": {}
+                              },
+                              "expansions": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "mapping"
+                            ],
+                            "description": "How a trace becomes a row in that dataset."
+                          }
+                        },
+                        "required": [
+                          "datasetId",
+                          "datasetMapping"
+                        ],
+                        "description": "Append matched traces to a dataset."
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "filters": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "filterQuery": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`."
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "alertType": {
+                        "type": "string",
+                        "enum": [
+                          "CRITICAL",
+                          "WARNING",
+                          "INFO"
+                        ]
+                      },
+                      "customGraphId": {
+                        "type": "string",
+                        "description": "Set to make this an alert on that graph. `graphAlert` and `alertType` are then required."
+                      },
+                      "graphAlert": {
+                        "type": "object",
+                        "properties": {
+                          "threshold": {
+                            "type": "number"
+                          },
+                          "operator": {
+                            "type": "string",
+                            "enum": [
+                              "gt",
+                              "lt",
+                              "gte",
+                              "lte",
+                              "eq"
+                            ]
+                          },
+                          "timePeriod": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "const": 1
+                              },
+                              {
+                                "type": "number",
+                                "const": 5
+                              },
+                              {
+                                "type": "number",
+                                "const": 15
+                              },
+                              {
+                                "type": "number",
+                                "const": 30
+                              },
+                              {
+                                "type": "number",
+                                "const": 60
+                              },
+                              {
+                                "type": "number",
+                                "const": 1440
+                              }
+                            ]
+                          },
+                          "seriesName": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "threshold",
+                          "operator",
+                          "timePeriod",
+                          "seriesName"
+                        ],
+                        "description": "The rule an alert fires by: series, operator, threshold, window."
+                      },
+                      "report": {
+                        "type": "object",
+                        "properties": {
+                          "source": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "dashboard"
+                                  },
+                                  "dashboardId": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "dashboardId"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "customGraph"
+                                  },
+                                  "customGraphId": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "customGraphId"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "traceQuery"
+                                  },
+                                  "filters": {
+                                    "type": "object",
+                                    "additionalProperties": {},
+                                    "default": {}
+                                  },
+                                  "metric": {
+                                    "type": "string"
+                                  },
+                                  "topN": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 100,
+                                    "default": 5
+                                  }
+                                },
+                                "required": [
+                                  "kind"
+                                ]
+                              }
+                            ]
+                          },
+                          "schedule": {
+                            "type": "object",
+                            "properties": {
+                              "cron": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "timezone": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              }
+                            },
+                            "required": [
+                              "cron",
+                              "timezone"
+                            ]
+                          },
+                          "compareToPrevious": {
+                            "type": "boolean",
+                            "default": false
+                          }
+                        },
+                        "required": [
+                          "source",
+                          "schedule"
+                        ],
+                        "description": "What a scheduled report renders and when it sends."
+                      },
+                      "templates": {
+                        "type": "object",
+                        "properties": {
+                          "slackTemplateType": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "enum": [
+                              "string",
+                              "block_kit",
+                              null
+                            ]
+                          },
+                          "slackTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "emailSubjectTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "emailBodyTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "description": "The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel."
+                      },
+                      "notificationCadence": {
+                        "type": "string",
+                        "enum": [
+                          "immediate",
+                          "5min_digest",
+                          "15min_digest",
+                          "hourly_digest"
+                        ],
+                        "description": "How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace."
+                      },
+                      "traceDebounceMs": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 600000,
+                        "description": "How long to wait for a trace to settle before the conditions are read."
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "actionParams",
+                      "name"
+                    ]
                   },
-                  "alertType": {
-                    "type": "string",
-                    "enum": [
-                      "CRITICAL",
-                      "WARNING",
-                      "INFO"
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "ADD_TO_ANNOTATION_QUEUE"
+                      },
+                      "actionParams": {
+                        "type": "object",
+                        "properties": {
+                          "annotators": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name"
+                              ]
+                            },
+                            "minItems": 1,
+                            "description": "Who the queued items go to."
+                          }
+                        },
+                        "required": [
+                          "annotators"
+                        ],
+                        "description": "Queue matched traces for a person to label."
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "filters": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "filterQuery": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`."
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "alertType": {
+                        "type": "string",
+                        "enum": [
+                          "CRITICAL",
+                          "WARNING",
+                          "INFO"
+                        ]
+                      },
+                      "customGraphId": {
+                        "type": "string",
+                        "description": "Set to make this an alert on that graph. `graphAlert` and `alertType` are then required."
+                      },
+                      "graphAlert": {
+                        "type": "object",
+                        "properties": {
+                          "threshold": {
+                            "type": "number"
+                          },
+                          "operator": {
+                            "type": "string",
+                            "enum": [
+                              "gt",
+                              "lt",
+                              "gte",
+                              "lte",
+                              "eq"
+                            ]
+                          },
+                          "timePeriod": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "const": 1
+                              },
+                              {
+                                "type": "number",
+                                "const": 5
+                              },
+                              {
+                                "type": "number",
+                                "const": 15
+                              },
+                              {
+                                "type": "number",
+                                "const": 30
+                              },
+                              {
+                                "type": "number",
+                                "const": 60
+                              },
+                              {
+                                "type": "number",
+                                "const": 1440
+                              }
+                            ]
+                          },
+                          "seriesName": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "threshold",
+                          "operator",
+                          "timePeriod",
+                          "seriesName"
+                        ],
+                        "description": "The rule an alert fires by: series, operator, threshold, window."
+                      },
+                      "report": {
+                        "type": "object",
+                        "properties": {
+                          "source": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "dashboard"
+                                  },
+                                  "dashboardId": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "dashboardId"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "customGraph"
+                                  },
+                                  "customGraphId": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "customGraphId"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "traceQuery"
+                                  },
+                                  "filters": {
+                                    "type": "object",
+                                    "additionalProperties": {},
+                                    "default": {}
+                                  },
+                                  "metric": {
+                                    "type": "string"
+                                  },
+                                  "topN": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 100,
+                                    "default": 5
+                                  }
+                                },
+                                "required": [
+                                  "kind"
+                                ]
+                              }
+                            ]
+                          },
+                          "schedule": {
+                            "type": "object",
+                            "properties": {
+                              "cron": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 120
+                              },
+                              "timezone": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              }
+                            },
+                            "required": [
+                              "cron",
+                              "timezone"
+                            ]
+                          },
+                          "compareToPrevious": {
+                            "type": "boolean",
+                            "default": false
+                          }
+                        },
+                        "required": [
+                          "source",
+                          "schedule"
+                        ],
+                        "description": "What a scheduled report renders and when it sends."
+                      },
+                      "templates": {
+                        "type": "object",
+                        "properties": {
+                          "slackTemplateType": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "enum": [
+                              "string",
+                              "block_kit",
+                              null
+                            ]
+                          },
+                          "slackTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "emailSubjectTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "emailBodyTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "description": "The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel."
+                      },
+                      "notificationCadence": {
+                        "type": "string",
+                        "enum": [
+                          "immediate",
+                          "5min_digest",
+                          "15min_digest",
+                          "hourly_digest"
+                        ],
+                        "description": "How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace."
+                      },
+                      "traceDebounceMs": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 600000,
+                        "description": "How long to wait for a trace to settle before the conditions are read."
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "actionParams",
+                      "name"
                     ]
                   }
-                },
-                "required": [
-                  "name",
-                  "action"
                 ]
               }
             }
@@ -53368,7 +55027,8 @@
                         "SEND_EMAIL",
                         "ADD_TO_DATASET",
                         "ADD_TO_ANNOTATION_QUEUE",
-                        "SEND_SLACK_MESSAGE"
+                        "SEND_SLACK_MESSAGE",
+                        "SEND_WEBHOOK"
                       ]
                     },
                     "actionParams": {
@@ -53378,6 +55038,74 @@
                     "filters": {
                       "type": "object",
                       "additionalProperties": {}
+                    },
+                    "filterQuery": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "AUTOMATION",
+                        "ALERT",
+                        "REPORT"
+                      ],
+                      "description": "What this automation is about: matching traces, a metric crossing a threshold, or a schedule."
+                    },
+                    "customGraphId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "notificationCadence": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "traceDebounceMs": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "templates": {
+                      "type": "object",
+                      "properties": {
+                        "slackTemplateType": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "enum": [
+                            "string",
+                            "block_kit",
+                            null
+                          ]
+                        },
+                        "slackTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "emailSubjectTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "emailBodyTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "description": "The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel."
                     },
                     "active": {
                       "type": "boolean"
@@ -53417,6 +55145,12 @@
                     "action",
                     "actionParams",
                     "filters",
+                    "filterQuery",
+                    "kind",
+                    "customGraphId",
+                    "notificationCadence",
+                    "traceDebounceMs",
+                    "templates",
                     "active",
                     "message",
                     "alertType",
@@ -53573,7 +55307,8 @@
                         "SEND_EMAIL",
                         "ADD_TO_DATASET",
                         "ADD_TO_ANNOTATION_QUEUE",
-                        "SEND_SLACK_MESSAGE"
+                        "SEND_SLACK_MESSAGE",
+                        "SEND_WEBHOOK"
                       ]
                     },
                     "actionParams": {
@@ -53583,6 +55318,74 @@
                     "filters": {
                       "type": "object",
                       "additionalProperties": {}
+                    },
+                    "filterQuery": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "AUTOMATION",
+                        "ALERT",
+                        "REPORT"
+                      ],
+                      "description": "What this automation is about: matching traces, a metric crossing a threshold, or a schedule."
+                    },
+                    "customGraphId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "notificationCadence": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "traceDebounceMs": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "templates": {
+                      "type": "object",
+                      "properties": {
+                        "slackTemplateType": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "enum": [
+                            "string",
+                            "block_kit",
+                            null
+                          ]
+                        },
+                        "slackTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "emailSubjectTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "emailBodyTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "description": "The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel."
                     },
                     "active": {
                       "type": "boolean"
@@ -53622,6 +55425,12 @@
                     "action",
                     "actionParams",
                     "filters",
+                    "filterQuery",
+                    "kind",
+                    "customGraphId",
+                    "notificationCadence",
+                    "traceDebounceMs",
+                    "templates",
                     "active",
                     "message",
                     "alertType",
@@ -53750,7 +55559,7 @@
             "required": true
           }
         ],
-        "description": "Update a trigger (name, active state, message, filters)",
+        "description": "Update an automation. Every field is optional and what is left out is left alone, except `actionParams`, which replaces the delivery configuration as a whole. The delivery channel cannot be changed.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -53784,11 +55593,420 @@
                   },
                   "filters": {
                     "type": "object",
-                    "additionalProperties": {}
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "filterQuery": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`."
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "SEND_EMAIL",
+                      "ADD_TO_DATASET",
+                      "ADD_TO_ANNOTATION_QUEUE",
+                      "SEND_SLACK_MESSAGE",
+                      "SEND_WEBHOOK"
+                    ]
                   },
                   "actionParams": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "members": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "minItems": 1,
+                            "description": "Who receives the email. Any address, not only teammates."
+                          }
+                        },
+                        "required": [
+                          "members"
+                        ],
+                        "additionalProperties": true,
+                        "description": "Email delivery."
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "slackDelivery": {
+                            "type": "string",
+                            "enum": [
+                              "webhook",
+                              "bot"
+                            ],
+                            "description": "How the message reaches Slack. `webhook` posts to an incoming webhook URL, `bot` posts as the LangWatch Slack app. Absent means `webhook`."
+                          },
+                          "slackWebhook": {
+                            "type": "string",
+                            "description": "The incoming webhook URL, for `webhook` delivery. A credential: it reads back as the placeholder, and sending the placeholder back keeps the stored one."
+                          },
+                          "slackChannelId": {
+                            "type": "string",
+                            "description": "The channel the bot posts in, for `bot` delivery."
+                          },
+                          "slackBotToken": {
+                            "type": "string",
+                            "description": "The bot token, for `bot` delivery. A credential: it never reads back. Send `slackBotTokenSet: true` to keep the stored one."
+                          },
+                          "slackBotTokenSet": {
+                            "type": "boolean",
+                            "description": "Read: whether a bot token is stored. Write: `true` keeps the stored one."
+                          }
+                        },
+                        "additionalProperties": true,
+                        "description": "Slack delivery, by incoming webhook or by bot connection."
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "url": {
+                            "type": "string",
+                            "description": "Where the request goes. https only, and not a private host."
+                          },
+                          "method": {
+                            "type": "string",
+                            "enum": [
+                              "POST",
+                              "PUT",
+                              "PATCH"
+                            ],
+                            "description": "The HTTP method. Absent means POST."
+                          },
+                          "headers": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "Static headers sent with every delivery. The values are credentials: they read back as the placeholder, and sending the placeholder back keeps the stored ones. Changing `url` means sending the values again in the same request."
+                          },
+                          "bodyTemplate": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "A Liquid template for the JSON body. Absent sends the standard LangWatch envelope."
+                          },
+                          "signingSecret": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "Signs every delivery so the receiver can verify it came from LangWatch. A credential: it reads back as the placeholder, and sending the placeholder back keeps the stored one."
+                          }
+                        },
+                        "required": [
+                          "url"
+                        ],
+                        "additionalProperties": true,
+                        "description": "Delivery to a customer endpoint over HTTP."
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "datasetId": {
+                            "type": "string",
+                            "description": "The dataset matched traces are appended to."
+                          },
+                          "datasetMapping": {
+                            "type": "object",
+                            "properties": {
+                              "mapping": {
+                                "type": "object",
+                                "additionalProperties": {}
+                              },
+                              "expansions": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "mapping"
+                            ],
+                            "description": "How a trace becomes a row in that dataset."
+                          }
+                        },
+                        "required": [
+                          "datasetId",
+                          "datasetMapping"
+                        ],
+                        "additionalProperties": true,
+                        "description": "Append matched traces to a dataset."
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "annotators": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name"
+                              ]
+                            },
+                            "minItems": 1,
+                            "description": "Who the queued items go to."
+                          }
+                        },
+                        "required": [
+                          "annotators"
+                        ],
+                        "additionalProperties": true,
+                        "description": "Queue matched traces for a person to label."
+                      }
+                    ]
+                  },
+                  "graphAlert": {
                     "type": "object",
-                    "additionalProperties": {}
+                    "properties": {
+                      "threshold": {
+                        "type": "number"
+                      },
+                      "operator": {
+                        "type": "string",
+                        "enum": [
+                          "gt",
+                          "lt",
+                          "gte",
+                          "lte",
+                          "eq"
+                        ]
+                      },
+                      "timePeriod": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "const": 1
+                          },
+                          {
+                            "type": "number",
+                            "const": 5
+                          },
+                          {
+                            "type": "number",
+                            "const": 15
+                          },
+                          {
+                            "type": "number",
+                            "const": 30
+                          },
+                          {
+                            "type": "number",
+                            "const": 60
+                          },
+                          {
+                            "type": "number",
+                            "const": 1440
+                          }
+                        ]
+                      },
+                      "seriesName": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "threshold",
+                      "operator",
+                      "timePeriod",
+                      "seriesName"
+                    ],
+                    "description": "The rule this alert fires by. Only for an automation that is one."
+                  },
+                  "report": {
+                    "type": "object",
+                    "properties": {
+                      "source": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "dashboard"
+                              },
+                              "dashboardId": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "dashboardId"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "customGraph"
+                              },
+                              "customGraphId": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "customGraphId"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "traceQuery"
+                              },
+                              "filters": {
+                                "type": "object",
+                                "additionalProperties": {},
+                                "default": {}
+                              },
+                              "metric": {
+                                "type": "string"
+                              },
+                              "topN": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 100,
+                                "default": 5
+                              }
+                            },
+                            "required": [
+                              "kind"
+                            ]
+                          }
+                        ]
+                      },
+                      "schedule": {
+                        "type": "object",
+                        "properties": {
+                          "cron": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "timezone": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          }
+                        },
+                        "required": [
+                          "cron",
+                          "timezone"
+                        ]
+                      },
+                      "compareToPrevious": {
+                        "type": "boolean",
+                        "default": false
+                      }
+                    },
+                    "required": [
+                      "source",
+                      "schedule"
+                    ],
+                    "description": "What this report renders and when. Only for one that is a report."
+                  },
+                  "templates": {
+                    "type": "object",
+                    "properties": {
+                      "slackTemplateType": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "enum": [
+                          "string",
+                          "block_kit",
+                          null
+                        ]
+                      },
+                      "slackTemplate": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "emailSubjectTemplate": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "emailBodyTemplate": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "description": "The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel."
+                  },
+                  "notificationCadence": {
+                    "type": "string",
+                    "enum": [
+                      "immediate",
+                      "5min_digest",
+                      "15min_digest",
+                      "hourly_digest"
+                    ],
+                    "description": "How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace."
+                  },
+                  "traceDebounceMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 600000,
+                    "description": "How long to wait for a trace to settle before the conditions are read."
                   }
                 }
               }
@@ -53943,6 +56161,929 @@
           }
         ],
         "description": "Delete (soft-delete) a trigger",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/triggers/{id}/fires": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "triggerId": {
+                        "type": "string"
+                      },
+                      "customGraphId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "firedAt": {
+                        "type": "string"
+                      },
+                      "resolvedAt": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "triggerId",
+                      "customGraphId",
+                      "firedAt",
+                      "resolvedAt"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Trigger not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiTriggersByIdFires",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "What this automation has done: its fires, newest first. Metadata only — no trace ids and no trace content.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/triggers/{id}/enable": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Trigger resumed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "action": {
+                      "type": "string",
+                      "enum": [
+                        "SEND_EMAIL",
+                        "ADD_TO_DATASET",
+                        "ADD_TO_ANNOTATION_QUEUE",
+                        "SEND_SLACK_MESSAGE",
+                        "SEND_WEBHOOK"
+                      ]
+                    },
+                    "actionParams": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    },
+                    "filters": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    },
+                    "filterQuery": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "AUTOMATION",
+                        "ALERT",
+                        "REPORT"
+                      ],
+                      "description": "What this automation is about: matching traces, a metric crossing a threshold, or a schedule."
+                    },
+                    "customGraphId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "notificationCadence": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "traceDebounceMs": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "templates": {
+                      "type": "object",
+                      "properties": {
+                        "slackTemplateType": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "enum": [
+                            "string",
+                            "block_kit",
+                            null
+                          ]
+                        },
+                        "slackTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "emailSubjectTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "emailBodyTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "description": "The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel."
+                    },
+                    "active": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "alertType": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "enum": [
+                        "CRITICAL",
+                        "WARNING",
+                        "INFO",
+                        null
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "platformUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "action",
+                    "actionParams",
+                    "filters",
+                    "filterQuery",
+                    "kind",
+                    "customGraphId",
+                    "notificationCadence",
+                    "traceDebounceMs",
+                    "templates",
+                    "active",
+                    "message",
+                    "alertType",
+                    "createdAt",
+                    "updatedAt",
+                    "platformUrl"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Trigger not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiTriggersByIdEnable",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Resume an automation. A report's schedule is put back on the calendar.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/triggers/{id}/disable": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Trigger paused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "action": {
+                      "type": "string",
+                      "enum": [
+                        "SEND_EMAIL",
+                        "ADD_TO_DATASET",
+                        "ADD_TO_ANNOTATION_QUEUE",
+                        "SEND_SLACK_MESSAGE",
+                        "SEND_WEBHOOK"
+                      ]
+                    },
+                    "actionParams": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    },
+                    "filters": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    },
+                    "filterQuery": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "AUTOMATION",
+                        "ALERT",
+                        "REPORT"
+                      ],
+                      "description": "What this automation is about: matching traces, a metric crossing a threshold, or a schedule."
+                    },
+                    "customGraphId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "notificationCadence": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "traceDebounceMs": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "templates": {
+                      "type": "object",
+                      "properties": {
+                        "slackTemplateType": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "enum": [
+                            "string",
+                            "block_kit",
+                            null
+                          ]
+                        },
+                        "slackTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "emailSubjectTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "emailBodyTemplate": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "description": "The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel."
+                    },
+                    "active": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "alertType": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "enum": [
+                        "CRITICAL",
+                        "WARNING",
+                        "INFO",
+                        null
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "platformUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "action",
+                    "actionParams",
+                    "filters",
+                    "filterQuery",
+                    "kind",
+                    "customGraphId",
+                    "notificationCadence",
+                    "traceDebounceMs",
+                    "templates",
+                    "active",
+                    "message",
+                    "alertType",
+                    "createdAt",
+                    "updatedAt",
+                    "platformUrl"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Trigger not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiTriggersByIdDisable",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Pause an automation. A report stops claiming its schedule.",
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/triggers/{id}/test-fire": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Test fire sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "channel": {
+                      "type": "string",
+                      "enum": [
+                        "email",
+                        "slack",
+                        "webhook"
+                      ]
+                    },
+                    "recipientCount": {
+                      "type": "number"
+                    },
+                    "usedDefault": {
+                      "type": "boolean",
+                      "description": "Whether the LangWatch default message was rendered because this automation states no template of its own."
+                    },
+                    "missingVariables": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "httpStatus": {
+                      "type": "number",
+                      "description": "Webhook only: what the endpoint answered with."
+                    }
+                  },
+                  "required": [
+                    "channel",
+                    "recipientCount",
+                    "usedDefault",
+                    "missingVariables",
+                    "errors"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Trigger not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiTriggersByIdTest-fire",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Send this automation's message to the destination it is configured with, so you can confirm it arrives. Nothing is recorded as a fire.",
         "security": [
           {
             "project_api_key": []
