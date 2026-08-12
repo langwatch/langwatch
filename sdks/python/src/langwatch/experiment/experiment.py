@@ -290,8 +290,17 @@ def _predicted_as_text(predicted: Optional[Dict[str, Any]]) -> str:
 
 
 def _current_trace_id() -> str:
-    """The active trace id, hex-encoded."""
-    return format(trace.get_current_span().get_span_context().trace_id, "x")
+    """The active trace id, hex-encoded to the full 32 characters.
+
+    The padding is what makes the id joinable. Roughly one trace in 256 starts
+    with a zero byte, and an unpadded id for one of those is a different string
+    from the one the same trace is written under everywhere else, so the
+    evaluation stops matching the dataset entry it belongs to.
+
+    With no span active this is OTel's all-zero invalid trace id, which reads
+    as "no trace" wherever a trace id is expected.
+    """
+    return format(trace.get_current_span().get_span_context().trace_id, "032x")
 
 
 class Experiment:

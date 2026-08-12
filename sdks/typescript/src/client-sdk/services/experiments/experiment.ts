@@ -55,7 +55,6 @@ import {
   buildComparisonSettings,
   comparisonEntryLabel,
   comparisonEntryStatus,
-  comparisonRowKey,
   describeSkippedComparison,
   renderTargetOutput,
   toComparisonVerdict,
@@ -75,6 +74,20 @@ const DEBOUNCE_INTERVAL_MS = 1000;
  * of any size.
  */
 const MAX_COMPARISON_ROWS_RETAINED = 1000;
+
+/**
+ * How long an evaluator call may take before the socket is given up on.
+ *
+ * The ceiling has to clear the slowest legitimate judge: a comparison with
+ * swap-and-reconcile on makes two sequential LLM calls over every candidate
+ * the row produced, and a large reasoning model can spend minutes on each. It
+ * exists because the alternative is worse: a judge that accepts the socket and
+ * never answers would hold its slot in the concurrency window for the life of
+ * the process, so a single dead connection stalls the whole run rather than
+ * costing it one row. This is the ceiling the Python SDK already applies to
+ * the same endpoint.
+ */
+export const EVALUATOR_TIMEOUT_MS = 900_000;
 
 // Slim projections retained across the lifetime of an Experiment for
 // printSummary() — deliberately excludes large fields (inputs, tracebacks,
@@ -143,7 +156,7 @@ export class Experiment {
   // the batch, which is flushed on a timer and may be long gone by the time
   // the row is compared. Insertion-ordered, and reaped oldest-first past
   // MAX_COMPARISON_ROWS_RETAINED.
-  private capturedOutputs = new Map<string, Map<string, CapturedTargetOutput>>();
+  private capturedOutputs = new Map<number, Map<string, CapturedTargetOutput>>();
 
   // Current iteration context (for log/evaluate calls)
   private currentTraceId: string | null = null;
@@ -672,6 +685,7 @@ export class Experiment {
           settings,
           as_guardrail: asGuardrail,
         }),
+        signal: AbortSignal.timeout(EVALUATOR_TIMEOUT_MS),
       }
     );
 
@@ -733,14 +747,13 @@ export class Experiment {
     const index = this.resolveComparisonRow(options.index);
 
     const captured =
-      this.capturedOutputs.get(comparisonRowKey(index)) ??
-      new Map<string, CapturedTargetOutput>();
+      this.capturedOutputs.get(index) ?? new Map<string, CapturedTargetOutput>();
 
     if (targets) {
       const missing = targets.filter((target) => !captured.has(target));
       if (missing.length > 0) {
         throw new ComparisonError(
-          `Cannot compare row ${String(index)}: no output was recorded for ${missing
+          `Cannot compare row ${index}: no output was recorded for ${missing
             .map((target) => `'${target}'`)
             .join(", ")}. Compare a row once every withTarget() call for it has settled.`,
           missing
@@ -828,7 +841,7 @@ export class Experiment {
    * back to a row: judging row 0 because no row was named would hand back a
    * confident verdict about candidates the caller never asked about.
    */
-  private resolveComparisonRow(index?: number | string): number | string {
+  private resolveComparisonRow(index?: number): number {
     const resolved =
       index ?? iterationContextStorage.getStore()?.index ?? this.currentIndex;
 
@@ -861,7 +874,7 @@ export class Experiment {
     duration = null,
   }: {
     name: string;
-    index: number | string;
+    index: number;
     verdict: ComparisonVerdict;
     score?: number | null;
     cost?: number | null;
@@ -1089,7 +1102,7 @@ export class Experiment {
     output,
     durationMs,
   }: {
-    index: number | string;
+    index: number;
     targetName: string;
     output: string;
     durationMs?: number;
@@ -1098,11 +1111,10 @@ export class Experiment {
       return;
     }
 
-    const key = comparisonRowKey(index);
-    let row = this.capturedOutputs.get(key);
+    let row = this.capturedOutputs.get(index);
     if (!row) {
       row = new Map<string, CapturedTargetOutput>();
-      this.capturedOutputs.set(key, row);
+      this.capturedOutputs.set(index, row);
     }
     row.set(targetName, { output, durationMs });
 

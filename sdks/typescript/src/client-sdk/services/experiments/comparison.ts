@@ -48,12 +48,6 @@ export type ComparisonCandidatePayload = {
 };
 
 /**
- * Rows are keyed by their string form so a dataset iterated by label and one
- * iterated by position agree on what "row 3" means.
- */
-export const comparisonRowKey = (index: number | string): string => String(index);
-
-/**
  * Render a target's callback result as the text a judge can read.
  *
  * A lone `output` field is unwrapped to its own value, because that is the
@@ -168,9 +162,7 @@ export const buildComparisonCandidates = (
  *
  * `row_index` seeds the judge's deterministic candidate shuffle, so it comes
  * from the row the caller is already naming rather than from a second argument
- * they would have to remember to keep in step. A row identified by label
- * carries no position to seed with, so it is left out and the judge falls back
- * to its own stable seed.
+ * they would have to remember to keep in step.
  */
 export const buildComparisonData = ({
   input,
@@ -181,12 +173,12 @@ export const buildComparisonData = ({
   input?: string;
   golden?: string;
   candidates: ComparisonCandidatePayload[];
-  index: number | string;
+  index: number;
 }): Record<string, unknown> => ({
   ...(input !== undefined ? { input } : {}),
   ...(golden !== undefined ? { golden } : {}),
   candidates,
-  ...(typeof index === "number" ? { row_index: index } : {}),
+  row_index: index,
 });
 
 /**

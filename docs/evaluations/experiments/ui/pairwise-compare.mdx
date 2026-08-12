@@ -58,13 +58,13 @@ You can compare variants even when they have the same display name. LangWatch nu
 
 ## How the verdict works
 
-Comparison shuffles candidate order deterministically (seeded per row) and asks the judge to pick the best candidate in a single call:
+Comparison shuffles candidate order deterministically (seeded per row) and asks the judge to pick the best candidate, weighing every variant in one comparison:
 
 1. Candidates are presented to the judge in a shuffled order that's stable for that row — re-evaluating the same row produces the same order and a comparable verdict.
 2. The judge picks the single best candidate, or a tie if none is clearly better and ties are allowed.
 3. The verdict is mapped back to the winning candidate's real identifier before it's shown to you — never the shuffled slot position.
 
-This uses exactly one judge call per row, regardless of how many variants are being compared — half the token cost of the old two-call swap-and-confirm approach, with the same protection against position bias.
+One comparison covers every variant at once, however many there are, instead of a round of one-against-one matchups. The judge is asked twice per row, the second time with the candidate order reversed, and a row whose two answers disagree is recorded with no winner rather than as a tie: an answer that flips when the order flips has not separated the candidates.
 
 The verdict names the winning candidate's own identifier (for a prompt variant, its prompt handle) rather than a generic slot label. The details include the judge's reasoning so you can inspect why a row went the way it did.
 
@@ -107,7 +107,7 @@ Review the aggregate result and the row-level explanations together:
 
 ## Using it from the SDK
 
-Comparison is available from the Python and TypeScript SDKs for code-first experiments. Register one target per candidate in your loop, then compare the row once: `evaluation.compare(index)` in Python, `await evaluation.compare({ index })` in TypeScript. The candidates are the targets that recorded an output for that row, so you never name them twice, and the verdict appears on the results page with the same winner column and win-rate chart as a comparison configured here.
+Comparison is available from the Python and TypeScript SDKs for code-first experiments. Register one target per candidate in your loop, then compare the row once: `evaluation.compare(index)` in Python, `await evaluation.compare()` in TypeScript, which infers the row from the iteration it runs in. The candidates are the targets that recorded an output for that row, so you never name them twice, and the verdict appears on the results page with the same winner column and win-rate chart as a comparison configured here.
 
 See [Experiments via SDK](/evaluations/experiments/sdk) for the full set of judge options, including judging against a reference answer and replacing the judge prompt.
 

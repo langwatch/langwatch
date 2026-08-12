@@ -855,7 +855,7 @@ describe("csvExport", () => {
    * an n-way comparison, reads the Winner column on the results page and then
    * exports gets a file with no trace of the comparison at all.
    */
-  describe("comparison verdicts", () => {
+  describe("given a run that recorded comparison verdicts", () => {
     const VARIANTS = [
       { id: "gpt-5-mini", name: "gpt-5-mini" },
       { id: "claude-sonnet-5", name: "claude-sonnet-5" },

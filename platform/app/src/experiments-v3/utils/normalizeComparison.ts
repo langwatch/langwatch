@@ -61,9 +61,10 @@ type ComparisonCarrier = {
  * fails resolveVariants' "variant target not found" check instead of
  * silently misresolving to the wrong candidate.
  *
- * Legacy pairwise had no `randomizeOrder` (it mitigated position bias with
- * swap-and-confirm, which the comparison judge does not have). Defaulting it on
- * gives a re-run of an old column the strongest mitigation still available.
+ * Legacy pairwise had no `randomizeOrder`, leaning on swap-and-confirm alone
+ * for position bias. Defaulting it on gives a re-run of an old column both
+ * mitigations the comparison judge offers rather than just the one it came in
+ * with.
  */
 const fromPairwise = (
   pairwise: PairwiseEvaluatorConfig,

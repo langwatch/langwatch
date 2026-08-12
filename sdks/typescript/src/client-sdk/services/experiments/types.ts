@@ -56,8 +56,7 @@ export const evaluationResultSchema = z.object({
   score: z.number().nullable().optional(),
   passed: z.boolean().nullable().optional(),
   details: z.string().nullable().optional(),
-  /** Row key: the dataset position, or the row's label when it has one. */
-  index: z.union([z.number(), z.string()]).nullable().optional(),
+  index: z.number().nullable().optional(),
   label: z.string().nullable().optional(),
   cost: z.number().nullable().optional(),
   duration: z.number().nullable().optional(),
@@ -144,7 +143,7 @@ export type LogResultsRequest = {
     score?: number | null;
     passed?: boolean | null;
     details?: string | null;
-    index?: number | string | null;
+    index?: number | null;
     label?: string | null;
     cost?: number | null;
     duration?: number | null;
@@ -322,13 +321,13 @@ export type ComparisonVerdict = {
  */
 export type ComparisonOptions = {
   /**
-   * Row key in the dataset. Also seeds the judge's deterministic candidate
-   * shuffle when it is a number.
+   * Row index in the dataset. Also seeds the judge's deterministic candidate
+   * shuffle.
    *
    * compare() takes the row the way log() does: inside a run() callback it is
    * inferred from the row being processed, and outside one it is required.
    */
-  index?: number | string;
+  index?: number;
   /** Name the verdict is recorded under (default: "comparison") */
   name?: string;
   /**

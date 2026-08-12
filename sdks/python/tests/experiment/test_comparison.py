@@ -292,10 +292,16 @@ class TestGivenEveryTargetRecordedAnOutput:
         assert verdict.status == "decided"
 
     def test_forgets_rows_the_run_has_moved_far_past(self, experiment, judge):
+        """The bound lives entirely in _record_row_output, so the rows are fed
+        to it directly. Driving them through target() would open two real
+        spans per row, four thousand of them, to prove one eviction rule."""
         from langwatch.experiment.experiment import _MAX_TRACKED_OUTPUT_ROWS
 
         for index in range(_MAX_TRACKED_OUTPUT_ROWS + 5):
-            record(experiment, index, {"gpt-5-mini": "a", "claude-sonnet-5": "b"})
+            for name, output in (("gpt-5-mini", "a"), ("claude-sonnet-5", "b")):
+                experiment._record_row_output(
+                    index=index, target=name, predicted={"output": output}
+                )
 
         assert len(experiment._row_outputs) == _MAX_TRACKED_OUTPUT_ROWS
         assert 0 not in experiment._row_outputs

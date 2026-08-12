@@ -1,90 +1,86 @@
 Feature: Evaluator judge reasoning and tool compatibility
   As someone running an LLM-as-judge evaluator
-  I want the judge request to use a provider-compatible reasoning mode
+  I want the judge to work on the model I picked for it
   So that the evaluation returns a verdict instead of failing before it starts
 
-  # Confirmed against the live provider: a Comparison run whose evaluator model
-  # resolved to openai/gpt-5.6-sol failed every single time with "Function
-  # tools with reasoning_effort are not supported for gpt-5.6-sol in
-  # /v1/chat/completions. To use function tools, use /v1/responses or set
-  # reasoning_effort to 'none'." The same model answers normally once reasoning
-  # is declared off, and openai/gpt-5-mini rejects that very value, so the
-  # compatibility cannot be applied to everything.
+  # Most evaluators here are LLM-as-judge, and a judge does not ask the model
+  # for prose: it asks for a structured verdict it can read back. Some models
+  # refuse to answer that way while their reasoning is on, and an evaluator
+  # pointed at one of them returns no verdict at all, on any entry, until
+  # someone changes the model. Nine evaluators are exposed to this rather than
+  # one, since asking for a structured verdict is what makes a judge a judge.
   #
-  # Nine evaluators are exposed to this rather than one. Comparison, Pairwise
-  # Compare, LLM-as-a-Judge Boolean, LLM-as-a-Judge Score, LLM Category, Off
-  # Topic, Query Resolution, both Competitor checks and topic naming all ask
-  # for their answer through a function tool. They reach the provider through
-  # the one litellm entry point langevals already patches, which is where the
-  # compatibility belongs.
+  # Which models refuse cannot be read off their names: near neighbours in the
+  # same family accept the request, and other models refuse to run with their
+  # reasoning off at all. So a model is treated this way only once it has been
+  # seen to need it, and the treatment is a default, never an override.
   #
   # Bindings:
   #   services/langevals/langevals_core/langevals_core/litellm_patch.py
   #   services/langevals/langevals_core/tests/test_tool_reasoning_compatibility.py
 
   @unit
-  Scenario Outline: An affected evaluator model disables reasoning by default
-    Given the evaluator model is "openai/gpt-5.6-<variant>"
-    And the evaluator asks for its verdict through a function tool
-    And the call does not select a reasoning effort of its own
-    When the request is sent to the provider
-    Then the request declares its reasoning effort as "none"
+  Scenario: A judge reaches a verdict on a model that would otherwise refuse it
+    Given an evaluator model known to refuse a structured verdict while its reasoning is on
+    And nobody has chosen a reasoning effort for the evaluator
+    When the evaluator asks that model to judge
+    Then the model answers
+    And the evaluation reaches a verdict
 
-    Examples:
-      | variant |
-      | luna    |
-      | sol     |
-      | terra   |
-
+  # Someone who chose a reasoning effort chose it for a reason, and gets the
+  # model's own answer rather than a request quietly rewritten underneath them.
   @unit
-  Scenario: The compatibility value is a default that an explicit effort beats
-    Given an affected evaluator model
-    And the call selects a reasoning effort of its own
-    When the request is sent to the provider
-    Then the request carries the effort the caller chose, unchanged
+  Scenario: A reasoning effort the caller chose is the one that is used
+    Given an evaluator model known to refuse a structured verdict while its reasoning is on
+    And the caller has chosen a reasoning effort for the evaluator
+    When the evaluator asks that model to judge
+    Then the model is asked with the effort the caller chose
 
+  # Every other model keeps working the way it does today, which matters most
+  # for the ones that only work with their reasoning on: switching it off on a
+  # guess would break evaluators that have no problem.
   @unit
-  Scenario Outline: An unverified evaluator model keeps its reasoning untouched
-    Given the evaluator model is "<model>"
-    And the evaluator asks for its verdict through a function tool
-    When the request is sent to the provider
-    Then the request declares no reasoning effort at all
+  Scenario: A model nobody has seen refuse keeps the behaviour it has today
+    Given an evaluator model that has not been seen to refuse a structured verdict
+    When the evaluator asks that model to judge
+    Then nothing about the model's reasoning is decided on the caller's behalf
 
-    Examples:
-      | model                  |
-      | openai/gpt-5.6-sol-pro |
-      | azure/gpt-5.6-sol      |
-      | openai/gpt-5.5-sol     |
-      | openai/gpt-5.5         |
-      | openai/gpt-5-mini      |
-
-  # The refusal is about tools specifically, and reasoning is worth having on
-  # the calls that can use it, so a request carrying no tools is not rewritten
-  # even on an affected model.
+  # The refusal is about the structured verdict specifically, and reasoning is
+  # worth having on the calls that can use it.
   @unit
-  Scenario: A request that carries no tools keeps its reasoning untouched
-    Given an affected evaluator model
-    And a call that asks for no tools
-    When the request is sent to the provider
-    Then the request declares no reasoning effort at all
+  Scenario: An evaluator that asks for no verdict keeps its reasoning
+    Given an evaluator model known to refuse a structured verdict while its reasoning is on
+    And an evaluator that asks that model for prose rather than a verdict
+    When the evaluator runs
+    Then nothing about the model's reasoning is decided on the caller's behalf
 
+  # A default added to the request, not a rewrite of it: the question the
+  # evaluator wrote is still the question the model is asked.
   @unit
-  Scenario: The function tool the judge asked for reaches the provider unchanged
-    Given an affected evaluator model
-    And the evaluator forces a named function call for its verdict
-    When the request is sent to the provider
-    Then the tool definition and the forced choice arrive as the evaluator wrote them
+  Scenario: The evaluator's own question reaches the model unchanged
+    Given an evaluator model known to refuse a structured verdict while its reasoning is on
+    When the evaluator asks that model to judge
+    Then the model is asked exactly what the evaluator wrote
 
+  # A model can start refusing before anyone has seen it do so. The provider's
+  # own words for it name endpoints nobody chose and give the reader nothing to
+  # act on, so the failure names the model and the setting instead.
   @unit
-  Scenario: A remaining conflict is reported as a configuration problem the user can fix
-    Given an evaluator model outside the verified list
-    And the provider refuses its tool-carrying request over the reasoning setting
+  Scenario: A refusal over the reasoning setting says what to change
+    Given an evaluator model that has not been seen to refuse a structured verdict
+    And the model refuses the judge's request over its reasoning setting
     When the evaluator runs
     Then the failure names the model and the setting to change
-    And the provider's own wording is not used as the message
+    And it does not repeat the provider's own wording
 
+  # Every other refusal belongs to whoever has to read it, and arrives intact.
   @unit
-  Scenario: An unrelated provider rejection reaches the caller unchanged
-    Given the provider refuses a request for a reason unrelated to reasoning
+  Scenario Outline: A refusal that is not this conflict reaches the caller untouched
+    Given the model refuses the request <reason>
     When the evaluator runs
-    Then the caller receives the provider's own rejection as it stands
+    Then the caller receives the refusal exactly as the model gave it
+
+    Examples:
+      | reason                                                |
+      | for a reason unrelated to its reasoning setting       |
+      | over its reasoning setting, with no verdict asked for |

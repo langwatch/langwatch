@@ -5,9 +5,13 @@ litellm patch.
 The stub stands in for the provider, so every assertion is about the request
 that actually leaves langevals. No API keys and no network.
 
+Async tests are marked with anyio, whose pytest plugin ships with the anyio
+langevals-core already depends on and defaults to the asyncio backend.
+
 Spec: specs/evaluators/langevals-judge-reasoning-tool-compatibility.feature
 """
 
+import inspect
 import os
 from typing import Optional
 
@@ -25,6 +29,10 @@ PROVIDER_TOOL_REASONING_REFUSAL = (
     "/v1/chat/completions. To use function tools, use /v1/responses or set "
     "reasoning_effort to 'none'."
 )
+
+# What the stub answers with when it is not refusing, standing in for the
+# verdict the judge came for.
+PROVIDER_ANSWER = "verdict response"
 
 AFFECTED_MODELS = [
     "openai/gpt-5.6-luna",
@@ -64,17 +72,27 @@ FORCED_TOOL_CHOICE = {
 
 class _Provider:
     """Records the request langevals sends, and answers with what the test
-    lined up for it."""
+    lined up for it.
+
+    The blocking and the awaitable entry points share one record, so a test
+    reads the request the same way whichever one the evaluator drove.
+    """
 
     def __init__(self):
         self.requests: list[dict] = []
         self.refusal: Optional[BaseException] = None
 
     def __call__(self, *args, **kwargs):
+        return self._respond(kwargs)
+
+    async def acall(self, *args, **kwargs):
+        return self._respond(kwargs)
+
+    def _respond(self, kwargs: dict):
         self.requests.append(kwargs)
         if self.refusal is not None:
             raise self.refusal
-        return "verdict response"
+        return PROVIDER_ANSWER
 
     @property
     def last_request(self) -> dict:
@@ -86,6 +104,8 @@ def provider(monkeypatch):
     """langevals' litellm patch rebuilt over a stub, so a judge request can be
     read exactly as the provider would receive it.
 
+    Both entry points langevals patches are stubbed, so an evaluator that
+    awaits its judge is covered by the same fixture as one that blocks on it.
     litellm's module attributes are restored afterwards, so the rest of the
     suite keeps the real client. X_LITELLM_ variables are cleared because the
     patch merges them into every request, and an ambient reasoning effort would
@@ -103,6 +123,7 @@ def provider(monkeypatch):
     )
     stub = _Provider()
     litellm.completion = stub
+    litellm.acompletion = stub.acall
     patch_litellm()
     try:
         yield stub
@@ -128,7 +149,7 @@ def judge_request(model: str, **overrides) -> dict:
     return request
 
 
-# @scenario "An affected evaluator model disables reasoning by default"
+# @scenario "A judge reaches a verdict on a model that would otherwise refuse it"
 @pytest.mark.parametrize("model", AFFECTED_MODELS)
 def test_affected_model_disables_reasoning_by_default(provider, model):
     litellm.completion(**judge_request(model))
@@ -136,7 +157,7 @@ def test_affected_model_disables_reasoning_by_default(provider, model):
     assert provider.last_request["reasoning_effort"] == "none"
 
 
-# @scenario "The compatibility value is a default that an explicit effort beats"
+# @scenario "A reasoning effort the caller chose is the one that is used"
 def test_explicit_reasoning_effort_beats_the_compatibility_default(provider):
     litellm.completion(
         **judge_request("openai/gpt-5.6-sol", reasoning_effort="high")
@@ -145,7 +166,7 @@ def test_explicit_reasoning_effort_beats_the_compatibility_default(provider):
     assert provider.last_request["reasoning_effort"] == "high"
 
 
-# @scenario "An unverified evaluator model keeps its reasoning untouched"
+# @scenario "A model nobody has seen refuse keeps the behaviour it has today"
 @pytest.mark.parametrize("model", UNVERIFIED_MODELS)
 def test_unverified_model_keeps_its_reasoning_untouched(provider, model):
     litellm.completion(**judge_request(model))
@@ -153,7 +174,7 @@ def test_unverified_model_keeps_its_reasoning_untouched(provider, model):
     assert "reasoning_effort" not in provider.last_request
 
 
-# @scenario "A request that carries no tools keeps its reasoning untouched"
+# @scenario "An evaluator that asks for no verdict keeps its reasoning"
 def test_request_without_tools_keeps_its_reasoning_untouched(provider):
     litellm.completion(
         model="openai/gpt-5.6-sol",
@@ -163,7 +184,7 @@ def test_request_without_tools_keeps_its_reasoning_untouched(provider):
     assert "reasoning_effort" not in provider.last_request
 
 
-# @scenario "The function tool the judge asked for reaches the provider unchanged"
+# @scenario "The evaluator's own question reaches the model unchanged"
 def test_forced_function_call_reaches_the_provider_unchanged(provider):
     litellm.completion(**judge_request("openai/gpt-5.6-sol"))
 
@@ -171,7 +192,7 @@ def test_forced_function_call_reaches_the_provider_unchanged(provider):
     assert provider.last_request["tool_choice"] == FORCED_TOOL_CHOICE
 
 
-# @scenario "A remaining conflict is reported as a configuration problem the user can fix"
+# @scenario "A refusal over the reasoning setting says what to change"
 def test_remaining_conflict_is_reported_as_a_fixable_configuration_problem(
     provider,
 ):
@@ -188,7 +209,7 @@ def test_remaining_conflict_is_reported_as_a_fixable_configuration_problem(
     assert "OpenAIException" not in message
 
 
-# @scenario "An unrelated provider rejection reaches the caller unchanged"
+# @scenario "A refusal that is not this conflict reaches the caller untouched"
 def test_unrelated_provider_rejection_reaches_the_caller_unchanged(provider):
     refusal = Exception("OpenAIException - context_length_exceeded")
     provider.refusal = refusal
@@ -199,6 +220,7 @@ def test_unrelated_provider_rejection_reaches_the_caller_unchanged(provider):
     assert raised.value is refusal
 
 
+# @scenario "A refusal that is not this conflict reaches the caller untouched"
 def test_reasoning_rejection_without_tools_reaches_the_caller_unchanged(provider):
     """The conflict is only a conflict when a tool was actually asked for. A
     request that carries none gets the provider's own answer, whatever the
@@ -211,5 +233,66 @@ def test_reasoning_rejection_without_tools_reaches_the_caller_unchanged(provider
             model="openai/gpt-5.6-sol",
             messages=[{"role": "user", "content": "Summarize this."}],
         )
+
+    assert raised.value is refusal
+
+
+# Evaluators that judge several entries at once reach the model through the
+# awaitable entry point instead of the blocking one. It is patched too, and a
+# verdict has to come back there on the same terms.
+
+
+# @scenario "A judge reaches a verdict on a model that would otherwise refuse it"
+@pytest.mark.anyio
+@pytest.mark.parametrize("model", AFFECTED_MODELS)
+async def test_awaited_affected_model_disables_reasoning_by_default(provider, model):
+    answer = await litellm.acompletion(**judge_request(model))
+
+    assert provider.last_request["reasoning_effort"] == "none"
+    assert answer == PROVIDER_ANSWER
+
+
+# @scenario "A judge reaches a verdict on a model that would otherwise refuse it"
+@pytest.mark.anyio
+async def test_awaited_and_blocking_judges_send_the_same_request(provider):
+    """Awaiting the judge has to be the same conversation as blocking on it,
+    down to the request, or the compatibility only holds for half the
+    evaluators.
+    """
+    assert inspect.iscoroutinefunction(litellm.acompletion)
+
+    litellm.completion(**judge_request("openai/gpt-5.6-sol"))
+    await litellm.acompletion(**judge_request("openai/gpt-5.6-sol"))
+
+    blocking, awaited = provider.requests
+    assert blocking == awaited
+
+
+# @scenario "A refusal over the reasoning setting says what to change"
+@pytest.mark.anyio
+async def test_awaited_conflict_is_reported_as_a_fixable_configuration_problem(
+    provider,
+):
+    provider.refusal = Exception(PROVIDER_TOOL_REASONING_REFUSAL)
+
+    with pytest.raises(ToolReasoningConflictError) as raised:
+        await litellm.acompletion(**judge_request("openai/gpt-5.6-sol-pro"))
+
+    message = str(raised.value)
+    assert "openai/gpt-5.6-sol-pro" in message
+    assert "reasoning effort" in message
+    assert "none" in message
+    assert "/v1/responses" not in message
+    assert "OpenAIException" not in message
+
+
+# @scenario "A refusal that is not this conflict reaches the caller untouched"
+@pytest.mark.anyio
+async def test_awaited_unrelated_rejection_reaches_the_caller_unchanged(provider):
+    refusal = Exception("OpenAIException - context_length_exceeded")
+    provider.refusal = refusal
+
+    with pytest.raises(Exception) as raised:
+        await litellm.acompletion(**judge_request("openai/gpt-5.6-sol"))
 
     assert raised.value is refusal
