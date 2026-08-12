@@ -219,13 +219,39 @@ describe("Feature: the API saves what the dashboard would accept", () => {
   });
 
   describe("when the automation is not this project's", () => {
+    /** @scenario "An automation in another project reads as one that does not exist" */
     it("reads as an automation that does not exist", async () => {
-      const response = await app.request(`/api/triggers/${nanoid()}`, {
+      const elsewhere = await prisma.project.create({
+        data: {
+          name: "Someone Else's Rules Project",
+          slug: `--test-other-project-${ns}`,
+          teamId: team!.id,
+          language: "other",
+          framework: "other",
+          apiKey: `test-other-api-key-${ns}`,
+        },
+      });
+      const theirs = await prisma.trigger.create({
+        data: {
+          id: nanoid(),
+          projectId: elsewhere.id,
+          name: `Theirs ${ns}`,
+          action: TriggerAction.SEND_EMAIL,
+          actionParams: { members: ["them@example.com"] },
+          filters: JSON.stringify(CONDITION),
+          lastRunAt: new Date().getTime(),
+        },
+      });
+
+      const response = await app.request(`/api/triggers/${theirs.id}`, {
         headers: headers(),
       });
 
       expect(response.status).toBe(404);
       expect((await response.json()).error).toBe("trigger_not_found");
+
+      await prisma.trigger.deleteMany({ where: { projectId: elsewhere.id } });
+      await prisma.project.delete({ where: { id: elsewhere.id } });
     });
   });
 });

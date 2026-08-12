@@ -175,6 +175,142 @@ Feature: Automations over the public API
       When the automations are listed over the API
       Then the paused automation is in the listing
 
+  Rule: The API expresses the automations the dashboard expresses
+
+    An integrator can write, over the API, every kind of automation the
+    composer writes: one about matching traces, one about a metric crossing a
+    threshold, one that sends on a schedule. The row it writes is the row the
+    dashboard reads back, so an automation authored either way looks the same
+    from the other side.
+
+    @integration
+    Scenario: A graph alert created via the API renders in the UI
+      Given a graph in the project
+      When an alert on that graph is created over the API
+      Then the dashboard reads back the same series, threshold and time window
+      And it reads back as an alert rather than as a trace automation
+
+    @integration
+    Scenario: An alert on a graph from another project is refused
+      Given a graph in another project
+      When an alert on that graph is created over the API
+      Then the save is refused as a graph this project does not have
+
+    @integration
+    Scenario: The upsert shape is expressible over the API
+      When an automation is created over the API with templates, a cadence, a
+      settle time and a trace query
+      Then each of them is saved on the automation
+
+    @integration
+    Scenario: A trace query the platform cannot read is refused
+      When an automation is created over the API with a trace query that
+      cannot be read
+      Then the save is refused as a query it cannot read
+
+    @unit
+    Scenario: Each channel's delivery configuration is published by name
+      When the API's delivery schemas are read
+      Then each one names the fields its channel actually reads
+
+  Rule: What an automation delivers on, and what it is about, are fixed
+
+    The channel is fixed because the credential rules depend on it: keeping a
+    stored secret across a save is only sound while the incoming and the stored
+    delivery configuration belong to the same channel. The kind is fixed
+    because an alert owns its graph's alert slot and a report owns a calendar
+    entry. Both are refused rather than ignored, so an integrator writing the
+    whole read response back is told what happened.
+
+    @integration
+    Scenario: The delivery channel cannot be changed over the API
+      Given an automation that emails on matching traces
+      When the integrator writes it back naming a different channel
+      Then the save is refused as a channel that cannot be changed
+      And the automation still delivers on the channel it was created with
+
+    @integration
+    Scenario: An automation cannot become an alert over the API
+      Given an automation that emails on matching traces
+      When the integrator writes it back with a threshold rule
+      Then the save is refused as a kind that cannot be changed
+
+  Rule: Header values travel with the destination they authenticate against
+
+    A header value is issued for one endpoint, so it does not follow that
+    endpoint's replacement. The dashboard tells an author to re-enter the
+    values; an API caller never held them, so it is told to send them — one
+    call carrying the new destination and each header's value saves both.
+
+    @integration
+    Scenario: Retargeting and re-stating the header values succeeds in one call
+      Given an automation that delivers to a customer endpoint with an authorization header
+      When the integrator sends a new destination and the header value together
+      Then the automation delivers to the new destination with the value it sent
+
+    @integration
+    Scenario: Retargeting while keeping the stored header values is refused
+      Given an automation that delivers to a customer endpoint with an authorization header
+      When the integrator sends a new destination and asks to keep the stored header value
+      Then the save is refused, saying the values have to travel with the destination
+      And the automation still delivers to the destination it had
+
+  Rule: An automation can be exercised and inspected over the API
+
+    @integration
+    Scenario: API test-fire delivers to the automation's own destination
+      Given an automation that emails on matching traces
+      When it is test-fired over the API
+      Then the message goes to the recipients the automation is saved with
+
+    @integration
+    Scenario: A test fire with nothing to deliver to says so
+      Given an automation that appends matched traces to a dataset
+      When it is test-fired over the API
+      Then the API says there is nothing to test-fire
+      And nothing is delivered
+
+    @integration
+    Scenario: Fire history is readable over the API
+      Given an automation that has fired more than once
+      When its fires are read over the API
+      Then they come back newest first
+
+    @integration
+    Scenario: Pausing and resuming round-trips over the API
+      Given an automation that emails on matching traces
+      When it is paused and then resumed over the API
+      Then each call answers with the state it is now in
+      And the automation no longer claims it was paused
+
+  Rule: A channel a project no longer has stays readable
+
+    Turning a delivery channel off for a project stops new configuration on it.
+    The automations already saved on that channel stay listed, readable and
+    manageable, because taking them away would leave an operator unable to
+    pause or delete something that is still delivering.
+
+    @integration
+    Scenario: An existing webhook automation stays readable and manageable
+      Given an automation that delivers to a customer endpoint
+      And the project no longer has the webhook channel
+      Then it is still listed, readable, renameable, pausable and deletable
+
+    @integration
+    Scenario: Changing an existing webhook automation's delivery is refused
+      Given an automation that delivers to a customer endpoint
+      And the project no longer has the webhook channel
+      When the integrator states a new delivery configuration for it
+      Then the save is refused as a channel this project does not have
+
+  Rule: The automation an id names is the caller's own
+
+    @integration
+    Scenario: An automation in another project reads as one that does not exist
+      Given an automation in another project
+      When it is read by its id over the API
+      Then the API answers that no such automation exists
+
   Rule: Clients read the redacted response as it arrives
 
     @unit

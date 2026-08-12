@@ -15,7 +15,8 @@ import { NOTIFY_TRIGGER_ACTIONS } from "./dispatch/triggerActionDispatch";
  * immediate as well.
  *
  * Lives in the app layer because every write path owes the same answer: the
- * dashboard save, and any automation written over the public API.
+ * dashboard save, and any automation written over the public API. Both call
+ * these two functions — there is no second copy of the rule.
  */
 export function resolveNotificationCadenceForCreate({
   action,
@@ -29,4 +30,28 @@ export function resolveNotificationCadenceForCreate({
   if (!NOTIFY_TRIGGER_ACTIONS.has(action)) return "immediate";
   if (isGraphAlert) return "immediate";
   return requested ?? "5min_digest";
+}
+
+/**
+ * The cadence an edited automation runs on, or `undefined` to leave the stored
+ * one alone.
+ *
+ * The pinned classes answer with a value rather than with `undefined` on
+ * purpose. An automation edited from a notify channel to one that writes keeps
+ * its digest cadence on the row unless the edit overwrites it, and the row
+ * would then claim a cadence the dispatch path no longer reads. Stating
+ * `immediate` on every such save keeps the stored value true.
+ */
+export function resolveNotificationCadenceForUpdate({
+  action,
+  requested,
+  isGraphAlert = false,
+}: {
+  action: TriggerAction;
+  requested?: NotificationCadence;
+  isGraphAlert?: boolean;
+}): NotificationCadence | undefined {
+  if (!NOTIFY_TRIGGER_ACTIONS.has(action)) return "immediate";
+  if (isGraphAlert) return "immediate";
+  return requested;
 }

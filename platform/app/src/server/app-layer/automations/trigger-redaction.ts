@@ -3,7 +3,10 @@ import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automations/providers/webh
 import { createLogger } from "@langwatch/observability";
 import { TriggerAction } from "@prisma/client";
 import { ZodEffects, ZodObject, type ZodTypeAny } from "zod";
-import { InvalidActionParamsError } from "./errors";
+import {
+  InvalidActionParamsError,
+  WebhookHeaderValuesRequiredError,
+} from "./errors";
 import {
   persistActionParamsFor,
   redactActionParamsFor,
@@ -170,6 +173,7 @@ export async function persistPublicApiActionParams({
   incoming: unknown;
   stored?: unknown;
 }): Promise<unknown> {
+  assertHeaderValuesTravelWithTheirDestination({ action, incoming, stored });
   const resolved = resolveCredentialPlaceholders({ action, incoming, stored });
 
   const entry = SERVER_PROVIDERS[action] as ServerEntry | undefined;
@@ -190,6 +194,39 @@ export async function persistPublicApiActionParams({
     loadExisting: async () => stored,
   });
   return { ...rule, ...(isRecord(persisted) ? persisted : {}) };
+}
+
+/**
+ * A header value authenticates against the endpoint it was issued for, so it
+ * does not follow that endpoint's replacement: a save that points the
+ * automation somewhere new states the header values for the new destination.
+ *
+ * The dashboard says "re-enter them", which is what an author does — they can
+ * see the names and type the values again. An API caller never held those
+ * values; the read hands it the placeholder. So the answer here is not to
+ * re-enter anything but to send them: one call carrying the new URL and each
+ * header's value saves both. Checked before the placeholders are resolved, so
+ * the caller is told what to do rather than shown the provider's account of a
+ * sentinel it never sent.
+ */
+function assertHeaderValuesTravelWithTheirDestination({
+  action,
+  incoming,
+  stored,
+}: {
+  action: TriggerAction;
+  incoming: unknown;
+  stored: unknown;
+}): void {
+  if (action !== TriggerAction.SEND_WEBHOOK) return;
+  if (!isRecord(incoming) || !isRecord(stored)) return;
+  if (incoming.url === stored.url) return;
+
+  const headers = incoming.headers;
+  const keepsAStoredValue =
+    isRecord(headers) &&
+    Object.values(headers).some((value) => value === REDACTED_CREDENTIAL);
+  if (keepsAStoredValue) throw new WebhookHeaderValuesRequiredError();
 }
 
 /**
