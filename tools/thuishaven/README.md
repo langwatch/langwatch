@@ -89,6 +89,8 @@ haven play [pr]  run a PR in a throwaway sandbox: own checkout, own
                  Postgres/ClickHouse/Redis containers, own play-<n> hostname.
                  Quitting the view DESTROYS everything it created, every time.
                  No argument opens a picker of open PRs (terminal only).
+                 --seed <preset> opens it on data instead of the onboarding
+                 screen (the same presets `db seed` takes).
                  Trust-gated: every commit author must have write access, or a
                  two-step confirmation — y/N, then the PR number typed back
                  after it discloses that the code runs as you, from this
@@ -164,6 +166,16 @@ access; anyone without it (including commits with no GitHub account) stops
 play for an explicit default-no confirmation, and in agent mode only
 `--allow-untrusted` proceeds. If a play dies hard, `haven clean` finds its
 record and finishes the teardown.
+
+A sandbox's databases start empty, so the PR opens on the onboarding screen —
+the wrong place to be standing if the change is about anything afterwards.
+`haven play 4913 --seed demo` takes the same presets as `haven db seed` (one
+registry, no play-only variants) and applies them where each belongs: the
+preset's switches go to the sandbox's own seed, and any data that has to travel
+through the collector is ingested once the sandbox's app answers, in a lane
+beside the services. A failed ingest never takes the sandbox down — it names
+the step and the command that retries it, since a PR that broke the collector
+is exactly the PR you want to keep watching.
 
 **Git across worktrees.** `haven git` opens [moron](https://github.com/0xdeafcafe/moron)
 in-process (a Go module dependency — nothing extra to install) for the current
