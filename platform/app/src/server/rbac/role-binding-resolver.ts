@@ -13,6 +13,10 @@ import {
   type Permission,
   teamRoleHasPermission,
 } from "../api/rbac";
+import {
+  shadowApiKeyPermissionCheck,
+  shadowUserPermissionCheck,
+} from "../authz/shadow";
 import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 import {
   MalformedCustomRolePermissionsError,
@@ -286,6 +290,72 @@ export async function checkRoleBindingPermission({
     type: "user",
     id: userId!,
   };
+  const permitted = await checkRoleBindingPermissionInner({
+    prisma,
+    principal: resolvedPrincipal,
+    organizationId,
+    scope,
+    permission,
+  });
+
+  // ADR-092 stage A4: engine shadow comparison. Mismatches on this path for
+  // EXTERNAL owners are the documented resolver divergence (no lite-member
+  // cap here), auto-tagged knownDivergence by shadow.ts.
+  const scopeIds = scopeRefToIds(scope, organizationId);
+  if (resolvedPrincipal.type === "user") {
+    shadowUserPermissionCheck({
+      prisma,
+      userId: resolvedPrincipal.id,
+      permission,
+      legacyAllowed: permitted,
+      caller: "apiKeyPath.userBindings",
+      ...scopeIds,
+    });
+  } else {
+    shadowApiKeyPermissionCheck({
+      prisma,
+      apiKeyId: resolvedPrincipal.id,
+      ownerUserId: null,
+      organizationId,
+      permission,
+      legacyAllowed: permitted,
+      caller: "apiKeyPath.keyBindings",
+      projectId: scopeIds.projectId,
+      teamId: scopeIds.teamId,
+    });
+  }
+
+  return permitted;
+}
+
+function scopeRefToIds(
+  scope: ScopeRef,
+  organizationId: string,
+): { projectId?: string; teamId?: string; organizationId?: string } {
+  switch (scope.type) {
+    case "project":
+      return { projectId: scope.id };
+    case "team":
+      return { teamId: scope.id };
+    case "org":
+      return { organizationId };
+  }
+}
+
+async function checkRoleBindingPermissionInner({
+  prisma,
+  principal,
+  organizationId,
+  scope,
+  permission,
+}: {
+  prisma: PrismaClient;
+  principal: Principal;
+  organizationId: string;
+  scope: ScopeRef;
+  permission: Permission;
+}): Promise<boolean> {
+  const resolvedPrincipal: Principal = principal;
 
   const bindings = await collectBindingsForScope({
     prisma,
@@ -522,48 +592,72 @@ export async function resolveApiKeyPermission({
   scope: ScopeRef;
   permission: Permission;
 }): Promise<boolean> {
-  // 1. Check API key's own bindings
-  const apiKeyAllowed = await checkRoleBindingPermission({
+  // 1. Check API key's own bindings (inner variant: the composite shadow
+  // below covers this path, so the per-leg wrapper shadow is skipped)
+  const apiKeyAllowed = await checkRoleBindingPermissionInner({
     prisma,
     principal: { type: "apiKey", id: apiKeyId },
     organizationId,
     scope,
     permission,
   });
-  if (!apiKeyAllowed) return false;
 
-  // 2. Service keys (no userId) have no user ceiling — binding check is sufficient
-  if (!userId) return true;
+  let permitted: boolean;
+  if (!apiKeyAllowed) {
+    permitted = false;
+  } else if (!userId) {
+    // 2. Service keys (no userId) have no user ceiling — binding check is
+    //    sufficient
+    permitted = true;
+  } else {
+    // 3. Check owning user's current bindings (ceiling)
+    const userAllowed = await checkRoleBindingPermissionInner({
+      prisma,
+      principal: { type: "user", id: userId },
+      organizationId,
+      scope,
+      permission,
+    });
+    if (userAllowed) {
+      permitted = true;
+    } else {
+      // 4. Fall back to legacy membership, the same way the mint-side ceiling
+      //    and the tRPC path do.
+      //
+      //    Without this the mint-side fix was no fix at all: the population it
+      //    targets is DEFINED by holding zero RoleBindings, so step 3 returns
+      //    false for every permission and the key it just allowed to be minted
+      //    is a dead credential. Every REST route funnels through
+      //    `enforceApiKeyCeiling`, so the failure only moved — from a refusal
+      //    at mint time to every tool call 403ing after the turn had already
+      //    started streaming, which is the worse of the two.
+      //
+      //    Safe by construction: this can only restore access the same legacy
+      //    role already grants through tRPC, which is what the key's
+      //    permission set was measured from in the first place.
+      const legacy = await resolveLegacyCeiling({
+        prisma,
+        userId,
+        organizationId,
+        scope,
+      });
+      permitted = legacy.grants(permission);
+    }
+  }
 
-  // 3. Check owning user's current bindings (ceiling)
-  const userAllowed = await checkRoleBindingPermission({
+  // ADR-092 stage A4: engine ceiling-algebra shadow comparison.
+  const scopeIds = scopeRefToIds(scope, organizationId);
+  shadowApiKeyPermissionCheck({
     prisma,
-    principal: { type: "user", id: userId },
+    apiKeyId,
+    ownerUserId: userId,
     organizationId,
-    scope,
     permission,
+    legacyAllowed: permitted,
+    caller: "apiKeyPath.ceiling",
+    projectId: scopeIds.projectId,
+    teamId: scopeIds.teamId,
   });
-  if (userAllowed) return true;
 
-  // 4. Fall back to legacy membership, the same way the mint-side ceiling and
-  //    the tRPC path do.
-  //
-  //    Without this the mint-side fix was no fix at all: the population it
-  //    targets is DEFINED by holding zero RoleBindings, so step 3 returns
-  //    false for every permission and the key it just allowed to be minted is
-  //    a dead credential. Every REST route funnels through
-  //    `enforceApiKeyCeiling`, so the failure only moved — from a refusal at
-  //    mint time to every tool call 403ing after the turn had already started
-  //    streaming, which is the worse of the two.
-  //
-  //    Safe by construction: this can only restore access the same legacy role
-  //    already grants through tRPC, which is what the key's permission set was
-  //    measured from in the first place.
-  const legacy = await resolveLegacyCeiling({
-    prisma,
-    userId,
-    organizationId,
-    scope,
-  });
-  return legacy.grants(permission);
+  return permitted;
 }

@@ -52,6 +52,8 @@ import { ModelProviderDisabledError } from "~/server/modelProviders/modelProvide
 import { createWarnThrottle } from "~/server/observability/warnThrottle";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { captureException, toError } from "../../utils/posthogErrorCapture";
+import type { AuthzPermission } from "../authz/registry";
+import { checkPermissionV2 } from "../authz/trpc-middleware";
 import type { OpsScope, PermissionMiddleware } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");
@@ -1203,6 +1205,23 @@ interface PendingPermissionProcedureBuilder<
     TOutputOut,
     TCaller
   >;
+  /**
+   * ADR-092 §5 sugar: declare the required permission and let the engine
+   * extract the scope (projectId / teamId / organizationId) from the
+   * validated input. New procedures prefer this over `.use(checkXxx…)`.
+   */
+  permission: (
+    permission: AuthzPermission,
+  ) => ProcedureBuilder<
+    TContext,
+    TMeta,
+    TContextOverrides,
+    TInputIn,
+    TInputOut,
+    TOutputIn,
+    TOutputOut,
+    TCaller
+  >;
 }
 
 const permissionProcedureBuilder = <
@@ -1254,6 +1273,15 @@ const permissionProcedureBuilder = <
         .use(loggerMiddleware as any)
         .use(handledErrorMiddleware as any)
         .use(middleware as any)
+        .use(enforcePermissionCheck as any)
+        .use(auditLogMutations as any) as any;
+    },
+    permission: (permission) => {
+      return procedure
+        .use(tracerMiddleware as any)
+        .use(loggerMiddleware as any)
+        .use(handledErrorMiddleware as any)
+        .use(checkPermissionV2(permission) as any)
         .use(enforcePermissionCheck as any)
         .use(auditLogMutations as any) as any;
     },

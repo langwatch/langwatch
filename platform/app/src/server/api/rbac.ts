@@ -11,6 +11,7 @@ import {
   ProjectPermissionDeniedError,
 } from "~/server/app-layer/permissions/errors";
 import type { Session } from "~/server/auth";
+import { shadowUserPermissionCheck } from "~/server/authz/shadow";
 import { isAdmin } from "../../../ee/admin/isAdmin";
 import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 
@@ -1134,6 +1135,17 @@ export async function resolveProjectPermission(
     permission,
   });
 
+  // ADR-092 stage A4: engine shadow comparison — async, never affects the
+  // legacy answer.
+  shadowUserPermissionCheck({
+    prisma: ctx.prisma,
+    userId: context.userId,
+    permission,
+    legacyAllowed: permitted,
+    projectId,
+    caller: "trpc.project",
+  });
+
   return { permitted, organizationRole: context.organizationRole };
 }
 
@@ -1245,6 +1257,16 @@ export async function resolveTeamPermission(
     permission,
   });
 
+  // ADR-092 stage A4: engine shadow comparison.
+  shadowUserPermissionCheck({
+    prisma: ctx.prisma,
+    userId: ctx.session.user.id,
+    permission,
+    legacyAllowed: permitted,
+    teamId,
+    caller: "trpc.team",
+  });
+
   return { permitted, organizationRole };
 }
 
@@ -1264,6 +1286,30 @@ export async function hasTeamPermission(
  * Check if user has a specific permission for an organization
  */
 export async function hasOrganizationPermission(
+  ctx: { prisma: PrismaClient; session: Session },
+  organizationId: string,
+  permission: Permission,
+): Promise<boolean> {
+  const permitted = await hasOrganizationPermissionLegacy(
+    ctx,
+    organizationId,
+    permission,
+  );
+  // ADR-092 stage A4: engine shadow comparison.
+  if (ctx.session?.user) {
+    shadowUserPermissionCheck({
+      prisma: ctx.prisma,
+      userId: ctx.session.user.id,
+      permission,
+      legacyAllowed: permitted,
+      organizationId,
+      caller: "trpc.organization",
+    });
+  }
+  return permitted;
+}
+
+async function hasOrganizationPermissionLegacy(
   ctx: { prisma: PrismaClient; session: Session },
   organizationId: string,
   permission: Permission,
