@@ -147,12 +147,20 @@ Feature: Shared ops snapshot with a single elected writer
     Then the snapshot is ignored as if missing
     And the reader serves the loading state until a known version appears
 
-  @unimplemented
+  @unit
   Scenario: Peaks and chart history survive a writer failover
     Given a holder has accumulated peaks and thirty minutes of history
     When a different writer takes over the lease
     Then the new holder continues from the persisted peaks and history
     And viewers observe no reset in the chart
+
+  @unit
+  Scenario: A new writer does not overwrite the fleet's record with its own stale copy
+    Given a pod has spent hours losing the lease election
+    And its own peaks and history are frozen at its boot
+    When it acquires the lease
+    Then it reloads the fleet's accumulators before it scans
+    And the peak it publishes is the higher of the two, never its own stale one
 
   # The pending-counter reconcile is NOT governed here. It already has its own
   # cross-instance single-flight marker, specified end to end in

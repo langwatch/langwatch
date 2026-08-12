@@ -24,6 +24,42 @@ const redisStub = {
   set: vi.fn().mockResolvedValue("OK"),
 };
 
+/**
+ * A Redis whose `ops:metrics:state` holds a fleet record, so a pod acquiring
+ * the lease has something to take over FROM. Peaks and the rolling history are
+ * accumulated rather than derived, so this is the only place they exist.
+ */
+const makeRedisHoldingState = (state: Record<string, unknown>) => ({
+  ...redisStub,
+  get: vi.fn().mockResolvedValue(JSON.stringify(state)),
+  set: vi.fn().mockResolvedValue("OK"),
+});
+
+const FLEET_STATE = {
+  version: 3,
+  savedAt: 1,
+  peakCompletedPerSec: 999,
+  peakFailedPerSec: 7,
+  peakIngestedPerSec: 42,
+  peakLatencyP50Ms: 120,
+  peakLatencyP99Ms: 900,
+  peakPhases: {},
+  peakJobNames: [],
+  throughputBuffer: [
+    {
+      timestamp: Date.now() - 1_000,
+      ingestedPerSec: 1,
+      completedPerSec: 1,
+      failedPerSec: 0,
+      pendingCount: 1,
+      blockedCount: 0,
+      parkedCount: 0,
+    },
+  ],
+  latestTotalCompleted: 5_000,
+  latestTotalFailed: 12,
+};
+
 const makeQueueRepo = () => ({
   discoverQueueNames: vi.fn().mockResolvedValue(["trace_processing"]),
   scanQueues: vi.fn().mockResolvedValue([]),
@@ -102,6 +138,65 @@ describe("snapshot writer lease gate", () => {
       expect(snapshotRepo.releaseLease).toHaveBeenCalledWith({
         writerId: "holder",
       });
+    });
+  });
+
+  describe("given a pod taking over the lease with stale accumulators", () => {
+    /** @scenario "Peaks and chart history survive a writer failover" */
+    it("publishes the fleet's peaks and history, not its own boot values", async () => {
+      // The pod deliberately never calls start(), which models the real case:
+      // it booted long ago, has lost every election since, and its in-memory
+      // peaks and chart buffer are frozen at zero.
+      const redis = makeRedisHoldingState(FLEET_STATE);
+      const snapshotRepo = makeSnapshotRepo(true);
+      const collector = new OpsMetricsCollector({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        redis: redis as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        queueRepo: makeQueueRepo() as any,
+        snapshotRepo,
+        writerId: "taking-over",
+      });
+
+      await collector.discoverQueues();
+      await collector.collect();
+
+      const published = (snapshotRepo.writeLive as ReturnType<typeof vi.fn>)
+        .mock.calls[0]?.[0].snapshot;
+      expect(published.peakCompletedPerSec).toBe(999);
+      expect(published.peakLatencyP99Ms).toBe(900);
+      // The restored point is still there, with this cycle's appended after it
+      // — the chart continues rather than restarting.
+      expect(
+        published.throughputHistory.map(
+          (point: { timestamp: number }) => point.timestamp,
+        ),
+      ).toContain(FLEET_STATE.throughputBuffer[0]!.timestamp);
+    });
+
+    /** @scenario "A new writer does not overwrite the fleet's record with its own stale copy" */
+    it("persists the merged record rather than its own zeroes", async () => {
+      // Publishing stale numbers blanks the chart for one cycle; persisting
+      // them destroys the fleet's only copy.
+      const redis = makeRedisHoldingState(FLEET_STATE);
+      const collector = new OpsMetricsCollector({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        redis: redis as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        queueRepo: makeQueueRepo() as any,
+        snapshotRepo: makeSnapshotRepo(true),
+        writerId: "taking-over",
+      });
+
+      await collector.discoverQueues();
+      await collector.collect();
+      await new Promise((resolve) => setImmediate(resolve));
+
+      const written = redis.set.mock.calls.find(
+        (call) => call[0] === "ops:metrics:state",
+      );
+      expect(written).toBeDefined();
+      expect(JSON.parse(written![1] as string).peakCompletedPerSec).toBe(999);
     });
   });
 

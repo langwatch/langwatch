@@ -120,6 +120,52 @@ function normalizeJobType(jobType: string): string {
   return jobType;
 }
 
+interface PeakBucket {
+  completedPerSec: number;
+  failedPerSec: number;
+  latencyP50Ms: number;
+  latencyP99Ms: number;
+}
+
+/** Field-wise max, so neither side of a handover loses a peak it observed. */
+function mergePeakBucket(
+  mine: PeakBucket | undefined,
+  theirs: PeakBucket,
+): PeakBucket {
+  if (!mine) return { ...theirs };
+  return {
+    completedPerSec: Math.max(mine.completedPerSec, theirs.completedPerSec),
+    failedPerSec: Math.max(mine.failedPerSec, theirs.failedPerSec),
+    latencyP50Ms: Math.max(mine.latencyP50Ms, theirs.latencyP50Ms),
+    latencyP99Ms: Math.max(mine.latencyP99Ms, theirs.latencyP99Ms),
+  };
+}
+
+/**
+ * Union two rolling histories by timestamp, newest window kept.
+ *
+ * The persisted series wins a collision: it is the fleet's record, whereas a
+ * point only this instance holds was sampled while it was not the writer.
+ */
+function mergeThroughput({
+  mine,
+  theirs,
+}: {
+  mine: ThroughputPoint[];
+  theirs: ThroughputPoint[];
+}): ThroughputPoint[] {
+  const byTimestamp = new Map<number, ThroughputPoint>();
+  for (const point of mine) byTimestamp.set(point.timestamp, point);
+  for (const point of theirs) byTimestamp.set(point.timestamp, point);
+
+  const cutoff =
+    Date.now() - THROUGHPUT_BUFFER_SIZE * METRICS_COLLECT_INTERVAL_MS;
+  return Array.from(byTimestamp.values())
+    .filter((point) => point.timestamp > cutoff)
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .slice(-THROUGHPUT_BUFFER_SIZE);
+}
+
 export function buildPipelineTree({
   queues,
   seedKeys = [],
@@ -930,6 +976,19 @@ export class OpsMetricsCollector {
     return metrics;
   }
 
+  /**
+   * Fold the fleet's persisted accumulators into this instance's.
+   *
+   * MERGES rather than assigns, because this runs at two very different
+   * moments. At boot the local state is empty and a merge is a plain load. On
+   * lease acquisition it is not: peaks and the rolling history are ACCUMULATED
+   * rather than derived from Redis, so a pod that has spent hours losing the
+   * election holds accumulators frozen at its own boot. Assigning either
+   * direction would lose real observations — the incoming writer would either
+   * publish its stale numbers over the fleet's, or discard a peak it genuinely
+   * saw before the handover. Taking the max of each peak and the union of the
+   * two histories keeps whichever is true.
+   */
   private async restoreState(): Promise<void> {
     try {
       const raw = await this.redis.get(REDIS_STATE_KEY);
@@ -938,36 +997,60 @@ export class OpsMetricsCollector {
       const state: PersistedMetricsState = JSON.parse(raw);
       if (state.version !== 3) return;
 
-      this.peakCompletedPerSec = state.peakCompletedPerSec;
-      this.peakFailedPerSec = state.peakFailedPerSec;
-      this.peakIngestedPerSec = state.peakIngestedPerSec;
-      this.peakLatencyP50Ms = state.peakLatencyP50Ms;
-      this.peakLatencyP99Ms = state.peakLatencyP99Ms;
+      this.peakCompletedPerSec = Math.max(
+        this.peakCompletedPerSec,
+        state.peakCompletedPerSec,
+      );
+      this.peakFailedPerSec = Math.max(
+        this.peakFailedPerSec,
+        state.peakFailedPerSec,
+      );
+      this.peakIngestedPerSec = Math.max(
+        this.peakIngestedPerSec,
+        state.peakIngestedPerSec,
+      );
+      this.peakLatencyP50Ms = Math.max(
+        this.peakLatencyP50Ms,
+        state.peakLatencyP50Ms,
+      );
+      this.peakLatencyP99Ms = Math.max(
+        this.peakLatencyP99Ms,
+        state.peakLatencyP99Ms,
+      );
 
       for (const [key, value] of Object.entries(state.peakPhases)) {
-        this.peakPhases[key] = { ...value };
+        this.peakPhases[key] = mergePeakBucket(this.peakPhases[key], value);
       }
 
       for (const [key, value] of state.peakJobNames) {
-        this.peakJobNames.set(key, { ...value });
+        this.peakJobNames.set(
+          key,
+          mergePeakBucket(this.peakJobNames.get(key), value),
+        );
       }
 
-      const cutoff =
-        Date.now() - THROUGHPUT_BUFFER_SIZE * METRICS_COLLECT_INTERVAL_MS;
       // Backfill parkedCount on points persisted before the Parked series
       // existed, so the chart never reads undefined/NaN for old history. The
       // state version is intentionally not bumped: this keeps the rolling
       // history AND the accumulated peaks across the deploy (a bump would zero
       // them, including the freshly-added Completed/s peak tile).
-      this.throughputBuffer = state.throughputBuffer
-        .filter((p) => p.timestamp > cutoff)
-        .map((p) => ({
+      this.throughputBuffer = mergeThroughput({
+        mine: this.throughputBuffer,
+        theirs: state.throughputBuffer.map((p) => ({
           ...p,
           parkedCount: (p as { parkedCount?: number }).parkedCount ?? 0,
-        }));
+        })),
+      });
 
-      this.latestTotalCompleted = state.latestTotalCompleted;
-      this.latestTotalFailed = state.latestTotalFailed;
+      // Monotonic lifetime totals: the larger is the later reading.
+      this.latestTotalCompleted = Math.max(
+        this.latestTotalCompleted,
+        state.latestTotalCompleted,
+      );
+      this.latestTotalFailed = Math.max(
+        this.latestTotalFailed,
+        state.latestTotalFailed,
+      );
     } catch (err) {
       logger.warn(
         { error: err },
@@ -1045,6 +1128,17 @@ export class OpsMetricsCollector {
           this.holdsLease = false;
           return;
         }
+        // Taking over: reload the fleet's accumulators BEFORE scanning, and so
+        // before the publish and persist at the end of this cycle.
+        //
+        // Peaks and the rolling history are accumulated, not derived, and a pod
+        // that has been losing the election holds them frozen at its own boot.
+        // Publishing those would blank the chart and reset the peak tiles for
+        // every viewer; persisting them would then overwrite the fleet's record
+        // with the stale copy, losing it for good rather than for one cycle.
+        // Every rolling deploy moves this lease, so this is the ordinary path,
+        // not the exceptional one.
+        if (!this.holdsLease) await this.restoreState();
         this.holdsLease = true;
         this.leaseEpoch = lease.epoch;
       }
