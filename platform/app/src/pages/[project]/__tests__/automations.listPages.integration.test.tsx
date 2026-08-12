@@ -9,7 +9,7 @@
  * to create anything (#6716, G5).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -195,9 +195,14 @@ describe("given the Alerts table", () => {
         screen.getByRole("menuitem", { name: /Delete alert Cost spike/ }),
       );
 
-      expect(screen.getByText("Delete alert")).toBeInTheDocument();
+      // Scoped to the dialog itself: the menu's own "Delete alert" item can
+      // still be mid-exit-animation in the DOM when the dialog mounts, and
+      // an unscoped `getByText("Delete alert")` intermittently matches both
+      // — the closing menu item and the dialog title — and throws.
+      const dialog = within(screen.getByRole("dialog"));
+      expect(dialog.getByText("Delete alert")).toBeInTheDocument();
       expect(
-        screen.getByText(/This permanently deletes "Cost spike"/),
+        dialog.getByText(/This permanently deletes "Cost spike"/),
       ).toBeInTheDocument();
       // Nothing is deleted merely by opening the dialog.
       expect(mockDeleteMutate).not.toHaveBeenCalled();

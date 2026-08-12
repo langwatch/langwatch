@@ -66,16 +66,17 @@ const statusOf = (type: string | undefined): ToastStatus =>
 export const SYMMETRIC_PADDING_END = "4";
 
 /**
- * Chakra's `lg` shadow token is tuned for a light background losing very
- * little contrast against it (10% opacity in light mode vs 64% in dark), which
- * is right for a panel that is expected to sit there, wrong for a toast that
- * has to read as "new, floating, temporary" in the half-second before anyone
- * looks at it. Dark mode's shadow already has enough presence; light mode
- * gets an explicit, stronger elevation so the card actually separates from a
+ * Chakra's `lg` shadow token in light mode is `0px 8px 16px
+ * {colors.gray.900/10}, 0px 0px 1px {colors.gray.900/30}` (vs `{black/64}`
+ * for the blur in dark mode) — tuned for a panel that's expected to sit
+ * there, wrong for a toast that has to read as "new, floating, temporary" in
+ * the half-second before anyone looks at it. Dark mode's shadow already has
+ * enough presence; light mode gets an explicit, stronger elevation on BOTH
+ * layers (the blur *and* the 1px ring) so the card actually separates from a
  * near-white page instead of blending into it.
  */
 export const LIGHT_MODE_ELEVATION =
-  "0 16px 32px -12px color-mix(in srgb, var(--chakra-colors-gray-900) 30%, transparent), 0 0 0 1px color-mix(in srgb, var(--chakra-colors-gray-900) 7%, transparent)";
+  "0 16px 32px -12px color-mix(in srgb, var(--chakra-colors-gray-900) 32%, transparent), 0 0 0 1px color-mix(in srgb, var(--chakra-colors-gray-900) 45%, transparent)";
 
 /**
  * The colour a toast's action reads in. Exported because it is the whole of the

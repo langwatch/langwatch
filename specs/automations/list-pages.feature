@@ -87,6 +87,22 @@ Feature: Automations list pages, providers, and shared copy
       When it renders
       Then its content padding is symmetric, not reserved for an absent close button
 
+  Rule: The automation view names its actual Slack destination
+
+    An extra grant onto WS-6 (WS-3, the view drawer's own workstream, had
+    not started): `ViewAutomationDrawer.tsx` labelled every Slack automation
+    "Slack webhook", including bot-token deliveries that never carry a
+    webhook at all, so the drawer could not answer "where does this post?"
+    (#6244; stale PR #6245 tried and could not land, superseded here).
+
+    @integration
+    Scenario: The automation view names its Slack destination
+      Given a Slack automation delivered by a connected Slack app bot
+      And the automation has a destination channel chosen
+      When the user views the automation
+      Then the drawer names the delivery as the Slack app
+      And shows the destination channel
+
   Rule: Estimated tokens is a qualifier on tokens, not a second field
 
     @unit

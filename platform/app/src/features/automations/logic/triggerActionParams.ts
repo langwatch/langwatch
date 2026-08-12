@@ -14,6 +14,16 @@ import type {
  */
 export interface TriggerActionParams {
   slackWebhook?: string;
+  /** How a Slack automation reaches Slack — a legacy incoming webhook, or a
+   *  Slack app bot token posting via the Web API. Absent means `"webhook"`
+   *  (back-compat for rows saved before this existed). Mirrors
+   *  `SlackDeliveryMethod` in `@langwatch/automations/providers/slack`. */
+  slackDelivery?: "webhook" | "bot";
+  /** The bot-delivery destination channel's raw Slack id (e.g. `C0123456`).
+   *  Only the id is ever persisted — the channel NAME shown while authoring
+   *  comes from a live, bot-token-authenticated Slack API call the display
+   *  surfaces don't have. */
+  slackChannelId?: string;
   members?: string[];
   datasetId?: string;
   annotators?: { id: string; name: string }[];
