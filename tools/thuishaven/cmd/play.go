@@ -260,6 +260,12 @@ func playLaunchArgs(number int, preset string) []string {
 // to the play checkout. Internal - it is dispatchable but absent from help,
 // like `daemon`.
 func runPlayLaunchCmd(ctx context.Context, d deps, inv invocation) error {
+	// The parser enforces a maximum number of positionals, never a minimum, and
+	// this command is dispatchable by hand — so a bare `haven play-launch` would
+	// index into an empty slice.
+	if len(inv.args) == 0 {
+		return fmt.Errorf("haven play-launch: a PR number is required")
+	}
 	number, err := strconv.Atoi(inv.args[0])
 	if err != nil || number <= 0 {
 		return fmt.Errorf("haven play-launch: %q is not a PR number", inv.args[0])

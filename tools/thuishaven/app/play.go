@@ -1139,7 +1139,7 @@ func (o *Orchestrator) preparePlaySandbox(ctx context.Context, pl PlaySandbox, s
 	}
 	env := append(st.OverlayEnv(), "DOTENV_CONFIG_QUIET=true")
 	if err := o.sup.RunOnce(ctx, "codegen", pl.LwDir, "pnpm -s run start:prepare:files", env); err != nil {
-		o.log.Warn("play codegen failed (continuing)")
+		o.log.Warn("play codegen failed (continuing)", zap.Error(err))
 	}
 	if err := o.sup.RunOnce(ctx, "prepare", pl.LwDir, "pnpm -s run start:prepare:db", env); err != nil {
 		return fmt.Errorf("play migrations failed: %w", err)
@@ -1148,7 +1148,7 @@ func (o *Orchestrator) preparePlaySandbox(ctx context.Context, pl PlaySandbox, s
 	// are the same run whatever data was asked for.
 	seedEnv := append(append([]string{}, env...), pl.pre.env...)
 	if err := o.sup.RunOnce(ctx, "seed", pl.LwDir, seedShell("pnpm -s run prisma:seed", seedEnv), seedEnv); err != nil {
-		o.log.Warn("play seed failed (continuing)")
+		o.log.Warn("play seed failed (continuing)", zap.Error(err))
 	}
 	return nil
 }

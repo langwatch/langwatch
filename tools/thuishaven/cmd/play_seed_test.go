@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"slices"
 	"strings"
 	"testing"
@@ -44,6 +45,23 @@ func TestPlaySeedFlagTakesTheSharedPresets(t *testing.T) {
 			}
 		})
 	})
+}
+
+// The parser caps positionals but never requires them, and play-launch is
+// dispatchable by hand, so the launcher has to reject an empty argument list
+// itself. Calling it with no orchestrator proves the guard returns before
+// anything downstream is touched; without the guard this indexes an empty
+// slice and panics.
+// @scenario "The preset reaches the backgrounded launcher"
+func TestPlayLaunchWithoutANumberFailsInsteadOfPanicking(t *testing.T) {
+	inv, err := parse(specByName(t, "play-launch"), nil)
+	if err != nil {
+		t.Fatalf("parse accepted no arguments but errored: %v", err)
+	}
+	err = runPlayLaunchCmd(context.Background(), deps{}, inv)
+	if err == nil || !strings.Contains(err.Error(), "PR number") {
+		t.Errorf("err = %v, want a complaint about the missing PR number", err)
+	}
 }
 
 // The launcher is a separate process, so a preset the parent parsed and did not

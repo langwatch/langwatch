@@ -89,8 +89,10 @@ haven play [pr]  run a PR in a throwaway sandbox: own checkout, own
                  Postgres/ClickHouse/Redis containers, own play-<n> hostname.
                  Quitting the view DESTROYS everything it created, every time.
                  No argument opens a picker of open PRs (terminal only).
-                 --seed <preset> opens it on data instead of the onboarding
-                 screen (the same presets `db seed` takes).
+                 --seed <preset> seeds it from the same registry `db seed`
+                 reads, so it can open on data rather than the onboarding
+                 screen (demo/traces/mass load data; onboarding, post-
+                 onboarding and bare only move the flags)
                  Trust-gated: every commit author must have write access, or a
                  two-step confirmation — y/N, then the PR number typed back
                  after it discloses that the code runs as you, from this
