@@ -163,7 +163,7 @@ describe("matchesTriggerFilters", () => {
     it("decodes middle-dot encoded keys from the UI (metadata·env)", () => {
       const data = makeTraceData({ customMetadata: { env: "production" } });
       const filters: TriggerFilters = {
-        "metadata.value": { "metadata·env": ["production"] },
+        "metadata.value": { metadata·env: ["production"] },
       };
       expect(matchesTriggerFilters(data, filters)).toBe(true);
     });
@@ -171,7 +171,7 @@ describe("matchesTriggerFilters", () => {
     it("decodes middle-dot keys with langwatch.metadata prefix", () => {
       const data = makeTraceData({ customMetadata: { env: "production" } });
       const filters: TriggerFilters = {
-        "metadata.value": { "langwatch·metadata·env": ["production"] },
+        "metadata.value": { langwatch·metadata·env: ["production"] },
       };
       expect(matchesTriggerFilters(data, filters)).toBe(true);
     });
@@ -179,7 +179,7 @@ describe("matchesTriggerFilters", () => {
     it("does not match middle-dot encoded key when value differs", () => {
       const data = makeTraceData({ customMetadata: { env: "staging" } });
       const filters: TriggerFilters = {
-        "metadata.value": { "metadata·env": ["production"] },
+        "metadata.value": { metadata·env: ["production"] },
       };
       expect(matchesTriggerFilters(data, filters)).toBe(false);
     });
