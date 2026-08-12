@@ -33,6 +33,7 @@
   "files": [
     "packages/server/dist/",
     "packages/api/",
+    "packages/authz/",
     "packages/automations/",
     "packages/clickhouse-client/",
     "packages/handled-error/",
