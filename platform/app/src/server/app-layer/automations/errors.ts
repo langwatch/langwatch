@@ -332,6 +332,29 @@ export class GraphNotFoundError extends HandledError {
   }
 }
 
+/**
+ * A report was saved without the two things it needs: what it renders and when
+ * it sends.
+ *
+ * Distinct from a report on a channel that cannot carry one — the fix here is
+ * to state the report, not to pick a different channel. The two are reached by
+ * different routes: this one also answers a stored report whose configuration
+ * can no longer be read, where the caller has to state it again.
+ */
+export class ReportIncompleteError extends HandledError {
+  declare readonly code: "report_incomplete";
+
+  constructor() {
+    super(
+      "report_incomplete",
+      "A report needs to say what it sends and when. State its source and " +
+        "its schedule.",
+      { meta: { field: "report" }, httpStatus: 422 },
+    );
+    this.name = "ReportIncompleteError";
+  }
+}
+
 /** A scheduled report was saved on a channel that cannot deliver one. */
 export class ReportChannelUnsupportedError extends HandledError {
   declare readonly code: "report_channel_unsupported";

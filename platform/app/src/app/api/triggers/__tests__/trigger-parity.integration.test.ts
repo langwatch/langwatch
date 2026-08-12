@@ -319,6 +319,33 @@ describe("Feature: automations over the public API express what the dashboard ex
     });
   });
 
+  describe("when a report's stored configuration can no longer be read", () => {
+    /** @scenario "A report with nothing readable to send says what to state" */
+    it("asks for the report rather than for a different channel", async () => {
+      const broken = await prisma.trigger.create({
+        data: {
+          id: nanoid(),
+          projectId: projectId(),
+          name: `Unreadable report ${ns}`,
+          action: TriggerAction.SEND_EMAIL,
+          // A report row whose source and schedule are gone: what it sends and
+          // when are exactly what the caller now has to state.
+          actionParams: { members: ["team@example.com"] },
+          filters: "{}",
+          triggerKind: "REPORT",
+          lastRunAt: new Date().getTime(),
+        },
+      });
+
+      const response = await patch(`/api/triggers/${broken.id}`, {
+        actionParams: { members: ["team@example.com"] },
+      });
+
+      expect(response.status).toBe(422);
+      expect((await response.json()).error).toBe("report_incomplete");
+    });
+  });
+
   describe("when a delivery configuration names a field the channel has not", () => {
     /** @scenario "A field the channel does not have is refused, not dropped" */
     it("refuses the create and names both what it sent and what fits", async () => {

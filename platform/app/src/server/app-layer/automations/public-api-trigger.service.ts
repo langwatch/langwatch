@@ -20,6 +20,7 @@ import {
   GraphAlertIncompleteError,
   GraphNotFoundError,
   ReportChannelUnsupportedError,
+  ReportIncompleteError,
   TestFireUnavailableError,
   TriggerActionImmutableError,
   TriggerActionParamsUnknownFieldsError,
@@ -779,8 +780,11 @@ export class PublicApiTriggerService {
     stored: Trigger;
     stated: ReportActionParams | undefined;
   }): Record<string, unknown> {
+    // Nothing stated, and the stored configuration no longer reads as a
+    // report. What the caller has to do is state one — which channel it
+    // delivers on is not the problem here.
     const report = stated ?? this.storedReport(stored);
-    if (!report) throw new ReportChannelUnsupportedError();
+    if (!report) throw new ReportIncompleteError();
     this.readReport({ action: stored.action, report });
     return { ...report };
   }

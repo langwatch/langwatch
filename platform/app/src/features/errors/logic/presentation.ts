@@ -1394,9 +1394,19 @@ const presentations = {
 
   trigger_test_fire_rate_limited: {
     title: "That is a lot of test fires",
-    describe: () =>
-      "This project has sent as many as a minute allows. Wait for the minute " +
-      "to pass and try again.",
+    // `meta.resetAt` is the instant the window ends, which is the one thing
+    // the caller wants: how long to wait. A window that has already passed by
+    // the time this renders reads as "try again", not as a negative wait.
+    describe: (error) => {
+      const resetAt = error.meta.resetAt;
+      const seconds =
+        typeof resetAt === "number"
+          ? Math.ceil((resetAt - Date.now()) / 1000)
+          : 0;
+      return seconds > 0
+        ? `This project has sent as many as a minute allows. Try again in ${seconds} seconds.`
+        : "This project has sent as many as a minute allows. Try again now.";
+    },
   },
 
   trigger_kind_immutable: {
@@ -1434,6 +1444,13 @@ const presentations = {
     title: "A report cannot be delivered that way",
     describe: () =>
       "Reports are delivered by email or to Slack. Pick one of those channels.",
+  },
+
+  report_incomplete: {
+    title: "This report is missing something it needs",
+    describe: () =>
+      "Say what it sends — a dashboard, a graph or a trace query — and the " +
+      "schedule it sends on.",
   },
 
   webhook_header_values_required: {

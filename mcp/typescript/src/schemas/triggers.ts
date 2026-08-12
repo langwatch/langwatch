@@ -153,6 +153,56 @@ export const graphAlertSchema = z
     "The rule an alert fires by. Send it with `customGraphId` and `alertType`.",
   );
 
+/**
+ * What a scheduled report renders and when it sends.
+ *
+ * Structured, like `graphAlert`, rather than a loose record: an agent that
+ * cannot see the field names has to guess them, and a guess here is a 422. The
+ * version tolerance this file keeps for READS does not apply to a write — the
+ * server validates the payload against this same shape either way, so a loose
+ * one would only move the rejection later and describe it worse.
+ */
+export const reportSchema = z
+  .object({
+    source: z
+      .discriminatedUnion("kind", [
+        z.object({
+          kind: z.literal("dashboard"),
+          dashboardId: z.string(),
+        }),
+        z.object({
+          kind: z.literal("customGraph"),
+          customGraphId: z.string(),
+        }),
+        z.object({
+          kind: z.literal("traceQuery"),
+          filters: z.record(z.string(), z.unknown()).optional(),
+          metric: z.string().optional(),
+          topN: z.number().int().min(1).max(100).optional(),
+        }),
+      ])
+      .describe("What the report renders: a dashboard, one graph, or a table of traces."),
+    schedule: z
+      .object({
+        cron: z
+          .string()
+          .describe(
+            'A 5-field cron expression (minute hour day-of-month month day-of-week), for example "0 9 * * 1". It can send at most every 15 minutes.',
+          ),
+        timezone: z
+          .string()
+          .describe('An IANA timezone, for example "Europe/Amsterdam" or "UTC".'),
+      })
+      .describe("When it sends."),
+    compareToPrevious: z
+      .boolean()
+      .optional()
+      .describe("Include a this-period-versus-last comparison."),
+  })
+  .describe(
+    "What a scheduled report renders and when. Send it with a channel that can carry a message: email or Slack.",
+  );
+
 export const templatesSchema = z
   .object({
     slackTemplateType: z.enum(["string", "block_kit"]).nullable().optional(),
@@ -185,6 +235,8 @@ export const triggerSchema = z
      *  the same way a write states it. */
     actionParams: z.record(z.string(), z.unknown()).default({}),
     graphAlert: graphAlertSchema.nullable().optional(),
+    // A read stays tolerant of a deployment that words this differently; a
+    // write is held to `reportSchema`.
     report: z.record(z.string(), z.unknown()).nullable().optional(),
     filters: z.record(z.string(), z.unknown()).default({}),
     filterQuery: z.string().nullable().optional(),
@@ -235,5 +287,6 @@ export type TriggerAction = z.infer<typeof triggerActionSchema>;
 export type TriggerAlertType = z.infer<typeof alertTypeSchema>;
 export type TriggerActionParams = z.infer<typeof actionParamsSchema>;
 export type GraphAlertRule = z.infer<typeof graphAlertSchema>;
+export type ReportRule = z.infer<typeof reportSchema>;
 export type TriggerTemplates = z.infer<typeof templatesSchema>;
 export type NotificationCadence = z.infer<typeof notificationCadenceSchema>;

@@ -23374,6 +23374,7 @@ export interface operations {
                         name: string;
                         /** @enum {string} */
                         action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
+                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
                         actionParams: {
                             [key: string]: unknown;
                         };
@@ -23942,6 +23943,7 @@ export interface operations {
                         name: string;
                         /** @enum {string} */
                         action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
+                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
                         actionParams: {
                             [key: string]: unknown;
                         };
@@ -24084,6 +24086,7 @@ export interface operations {
                         name: string;
                         /** @enum {string} */
                         action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
+                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
                         actionParams: {
                             [key: string]: unknown;
                         };
@@ -24331,6 +24334,7 @@ export interface operations {
                     filterQuery?: string | null;
                     /** @enum {string} */
                     action?: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
+                    /** @description Replaces the delivery configuration as a whole rather than merging into it: send the fields this automation should have from now on, and anything left out is removed — omit `headers` and it delivers with none, omit `signingSecret` and its deliveries are no longer signed. The one exception is a credential the read hid: send back the `[redacted]` placeholder (or, for a Slack bot connection, the `slackBotTokenSet` flag the read echoes) and the stored credential is kept, so reading an automation, changing one field and writing the whole object back is safe. Only this channel's fields are accepted; anything else is refused rather than dropped, and the rule this automation fires by belongs in `graphAlert` or `report`. */
                     actionParams?: ({
                         /** @description Who receives the email. Any address, not only teammates. */
                         members: string[];
@@ -24457,6 +24461,7 @@ export interface operations {
                         name: string;
                         /** @enum {string} */
                         action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
+                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
                         actionParams: {
                             [key: string]: unknown;
                         };
@@ -24701,6 +24706,7 @@ export interface operations {
                         name: string;
                         /** @enum {string} */
                         action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
+                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
                         actionParams: {
                             [key: string]: unknown;
                         };
@@ -24855,6 +24861,7 @@ export interface operations {
                         name: string;
                         /** @enum {string} */
                         action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
+                        /** @description Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which header names are in play all survive; the values never leave. Sending the placeholder back on an update keeps the stored value. The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this field is refused. */
                         actionParams: {
                             [key: string]: unknown;
                         };

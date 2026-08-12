@@ -11,7 +11,7 @@ import {
   testFireTrigger,
   updateTrigger,
 } from "../langwatch-api-triggers.js";
-import { actionParamsSchema } from "../schemas/triggers.js";
+import { actionParamsSchema, reportSchema } from "../schemas/triggers.js";
 
 const request = vi.mocked(makeRequest);
 
@@ -63,6 +63,71 @@ describe("Feature: an agent configures an automation over MCP", () => {
             slackDelivery: "webhook",
             slackWebhook: "https://hooks.slack.com/services/T/B/x",
           },
+        }),
+      );
+    });
+  });
+
+  describe("when a scheduled report is created", () => {
+    it("sends what it renders and when, alongside the channel", async () => {
+      request.mockResolvedValue(TRIGGER);
+
+      await createTrigger({
+        name: "Monday digest",
+        action: "SEND_EMAIL",
+        actionParams: { members: ["team@example.com"] },
+        report: {
+          source: { kind: "dashboard", dashboardId: "dashboard_1" },
+          schedule: { cron: "0 9 * * 1", timezone: "Europe/Amsterdam" },
+          compareToPrevious: true,
+        },
+      });
+
+      expect(request).toHaveBeenCalledWith(
+        "POST",
+        "/api/triggers",
+        expect.objectContaining({
+          report: {
+            source: { kind: "dashboard", dashboardId: "dashboard_1" },
+            schedule: { cron: "0 9 * * 1", timezone: "Europe/Amsterdam" },
+            compareToPrevious: true,
+          },
+        }),
+      );
+    });
+
+    it("reads a schedule against the published shape", () => {
+      const report = {
+        source: { kind: "traceQuery" as const, topN: 10 },
+        schedule: { cron: "0 9 * * 1", timezone: "UTC" },
+      };
+
+      expect(reportSchema.parse(report)).toMatchObject(report);
+      expect(
+        reportSchema.safeParse({ schedule: report.schedule }).success,
+      ).toBe(false);
+    });
+  });
+
+  describe("when an existing report's schedule is changed", () => {
+    it("states the report alongside the fields it is changing", async () => {
+      request.mockResolvedValue(TRIGGER);
+
+      await updateTrigger({
+        id: "trigger-1",
+        report: {
+          source: { kind: "customGraph", customGraphId: "graph_1" },
+          schedule: { cron: "0 8 * * *", timezone: "UTC" },
+        },
+      });
+
+      expect(request).toHaveBeenCalledWith(
+        "PATCH",
+        "/api/triggers/trigger-1",
+        expect.objectContaining({
+          report: expect.objectContaining({
+            schedule: { cron: "0 8 * * *", timezone: "UTC" },
+          }),
         }),
       );
     });

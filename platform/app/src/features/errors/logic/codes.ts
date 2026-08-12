@@ -201,6 +201,7 @@ export const APP_ERROR_CODES = [
   "query_memory_exceeded",
   "query_timeout",
   "report_channel_unsupported",
+  "report_incomplete",
   "resource_limit_exceeded",
   "role_binding_already_exists",
   "role_binding_not_found",
