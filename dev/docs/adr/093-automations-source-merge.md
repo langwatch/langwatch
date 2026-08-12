@@ -4,7 +4,9 @@
 
 **Status:** Proposed
 
-**Builds on:** [ADR-043](./043-automation-facet-model.md) (the facet model — the facets survive unchanged; this ADR collapses the Type facet's presets), [ADR-037](./037-automation-operator-surfaces.md) (operator surfaces), [ADR-041](./041-modern-block-kit-notification-template-suite.md) (templates), [ADR-044](./044-scheduled-reports-automation-kind.md) (schedules, which stay separate).
+**Builds on:** [ADR-043](./043-automation-facet-model.md) (the facet model — this ADR amends it in two named places, see §4), [ADR-037](./037-automation-operator-surfaces.md) (operator surfaces), [ADR-041](./041-modern-block-kit-notification-template-suite.md) (templates), [ADR-044](./044-scheduled-reports-automation-kind.md) (schedules, which stay separate), [ADR-021](./021-multi-scope-targeting-and-tenancy.md) (the scoped-resource storage shape §5 adopts).
+
+**Supersedes in part:** ADR-037's "Why section rows + secondary drawers, not a linear wizard" ruling — it rejected a stepper because "a stepper forces a single path and blocks revisiting earlier choices"; the step rail (every completed step's summary stays visible and clickable) and Review-as-home editing are this ADR's direct answer to that objection, restoring non-linear access inside a stepped create. And ADR-044's naming recommendation to "surface the three kinds as first-class cards in the type picker (Automation · Alert · Report)" — the merged flow deletes that picker (§1).
 
 **Relates to:** [ADR-052](./052-automations-on-process-manager-substrate.md) (dispatch is untouched), [#6717](https://github.com/langwatch/langwatch/issues/6717) (the decisions this records), [#6716](https://github.com/langwatch/langwatch/issues/6716) (the bug bash that motivated them), PR [#6891](https://github.com/langwatch/langwatch/pull/6891) (the public-API contract this must not break).
 
@@ -50,6 +52,8 @@ There is no type card and no source card left to pick — not even a renamed one
                                            entry point, never a third option
 ```
 
+Precision about which picker dies, because the codebase says "type" for two different things. What this ADR retires is the **kind picker** — `platform/app/src/features/automations/components/AutomationTypePicker.tsx`, the three cards Automation / Alert / Schedule. The *other* "type picker" — ADR-037's vocabulary for the **action/channel** choice ("Slack and email under Notification, add-to-dataset and add-to-annotation-queue under Action", `authoring-drawer.feature`'s "Choosing a category offers the matching types") — **survives unchanged** as the Delivery step's channel choice. An implementer working from this ADR must not delete that one.
+
 Internally nothing renames: the draft reducer's `ConditionSource` (`"trace" | "customGraph" | "report"`) does not change. This is UI copy, information architecture, and wire naming — not a semantic change.
 
 **What a saved automation watches cannot change.** This is stated as a rule of the merged flow, not a leftover: the graph slot (`customGraphId @unique` — one automation per graph) and the report calendar make the conversion a create-plus-delete, which is exactly what the public API already enforces as `trigger_kind_immutable` (#6891). The #6716 "type-lock" finding dissolves — there is no type to lock, and the Watch step simply renders locked on edit with the same explanation. Severity (`alertType`) keeps its current behaviour: offered for graph-watching automations, absent for filter-watching ones.
@@ -73,6 +77,16 @@ The public API shipped full parity days ago (#6891): `triggerKind` immutability,
 
 tRPC (the dashboard's own API) needs no new field: the UI derives its labels from `triggerKind` exactly as it does today.
 
+One axis, three layers, and each layer keeps its own word for it — deliberately, so no layer's vocabulary bleeds into another's:
+
+| Layer | Says | Values |
+|---|---|---|
+| UI | "watches" | a trace filter / a graph (no label says "type" or "source") |
+| Wire | `kind` + derived `source` | `AUTOMATION` / `ALERT` / `REPORT` + `trace_search` / `graph_metric` / `schedule` |
+| Storage | `triggerKind` | the unchanged enum (§3) |
+
+Bound spec files that speak in alert nouns about wire and dispatch behaviour (`public-api.feature`, `process-manager-dispatch.feature`, `dispatch-timing.feature`) keep those nouns deliberately: at their layer, "alert" remains the kind's name. Only customer-facing copy scenarios change words (§3's rebinding table).
+
 ### 3. Data model: no migration
 
 ```
@@ -87,7 +101,19 @@ tRPC (the dashboard's own API) needs no new field: the UI derives its labels fro
 
 The merge is presentation and contract, not storage. `triggerKind: ALERT` *means* "watches a graph"; a stored enum that no longer matches the UI vocabulary is a comment problem, not a data problem, and renaming a deployed enum buys churn with no behaviour. The one schema addition this ADR makes is the Slack integration table (§5), which is additive.
 
-`check-feature-parity`-bound specs that speak of "alerts" as a distinct kind (`specs/automations/*.feature`) keep binding — the behaviour they pin (graph evaluation, incident open/resolve, report scheduling) is untouched. The spec accompanying this ADR (`source-merge.feature`) covers the merged surface and ships `@unimplemented` until the reference implementation binds it.
+Most bound scenarios in the automations corpus pin behaviour the merge does not touch — graph evaluation, incident open/resolve, report scheduling, the wire contract — and keep binding as they are. Four files are the exception: they pin **customer-facing copy or surface seating that the merge inverts or reseats**, and each is owned by a named unit of the plan (§ reference plan) that rebinds, rewrites, or retires it in the same change that alters the behaviour:
+
+| File | Bound scenarios affected | What the merge does to them | Unit |
+|---|---|---|---|
+| `specs/automations/list-pages.feature` (in flight via [#6884](https://github.com/langwatch/langwatch/pull/6884)) | "Deleting an alert asks for confirmation and names it as an alert", "…the toast reads 'Alert deleted'", "the Delete item's accessible name includes the row's kind" | **Inverted.** In the merged world the noun is "automation" for both subjects (schedules keep "schedule"). Rebind with the merged-world copy; `source-merge.feature` states that copy now ("Deleting names the row an automation") | F6 |
+| `specs/automations/list-pages.feature` | "The Overview offers creating an automation, alert, or schedule" | **Superseded.** The Overview's create menu offers "New automation" and "New schedule"; `source-merge.feature` carries the superseding scenario | F6 |
+| `specs/automations/authoring-drawer.feature` | "An external cadence change regroups the gallery…" (its trigger is "the separate Cadence section") | **Rebind.** The external trigger becomes the Delivery step's cadence control; the regroup-vs-stable-order behaviour itself is unchanged | F7, with R0 |
+| `specs/automations/automation-authoring-cap-advice.feature` | "An over-ceiling condition on a persist action shows the advice" and its siblings (the advice reads the *drafted action*) | **Reseated.** The advice needs condition estimate *and* action class, which the wizard no longer shows at once; see §4 for where it renders. Rebind to the new seats | F7, with R0 |
+| `platform/app/specs/monitors/slack-bot-delivery.feature` (untagged; note the second specs root) | "A bot automation is incomplete without a token and channel", "The author is guided to create a Slack app" | **Retired/rewritten.** The composer stops asking for a token (§5); the guidance moves to the settings card | F3 |
+
+The spec accompanying this ADR (`source-merge.feature`) covers the merged surface and ships `@unimplemented` until the reference implementation binds it.
+
+One dangling citation gets corrected on the way through: the schema comments at `prisma/schema.prisma:792` and `:815` attribute `TriggerKind` to "ADR-042", which is the local observability stack; the deciding record is ADR-044's discriminator section. R0 fixes the comment — a comment edit, not a change to any deployed migration.
 
 ### 4. The composer becomes a wizard — linear to create, hub-and-spoke to edit
 
@@ -133,7 +159,11 @@ Steps were chosen over accordion-trimming, and with the type card deleted (§1) 
                   └────────────────────────────┘
 ```
 
-The Aug-4 lesson is designed in rather than remembered: **the overview never disappears.** Creating shows a step rail with each completed step's one-line summary, clickable to go back. Editing opens the Review screen directly — never the Watch step — and each section's edit affordance enters *that step alone*, returning to the overview on done. The facet vocabulary (ADR-043) is unchanged; steps are how the facets are *sequenced*, not a new model. In particular, Cadence stays a first-class facet at the data and draft level — only its wizard seating is decided here (it renders inside Delivery).
+The Aug-4 lesson is designed in rather than remembered: **the overview never disappears.** Creating shows a step rail with each completed step's one-line summary, clickable to go back. Editing opens the Review screen directly — never the Watch step — and each section's edit affordance enters *that step alone*, returning to the overview on done. The step rail is also the answer to ADR-037's recorded objection to a stepper ("forces a single path and blocks revisiting earlier choices"): every earlier choice stays one click away, and edit never enters the linear path at all.
+
+The facet model (ADR-043) survives with **two amendments, named rather than hand-waved**: the Type facet loses its authoring surface (it is derived from the subject choice, §1, and spoken only on the wire, §2), and Cadence is reseated into the Delivery step at the UI level while staying a first-class facet in the data model and the draft. Steps are how the remaining facets are *sequenced*, not a new model.
+
+**Where cross-step advice renders — decided.** The action-conditional ceiling advice (`automation-authoring-cap-advice.feature`: a persist action whose condition implies more matches a day than the plan's ceiling) needs the condition estimate *and* the action class, which the single drawer showed at once and the wizard does not. It renders on the **Review step at create** — the first moment every facet is known — and in the **Watch step when re-entered on edit**, where the saved delivery already supplies the action class. The advice's own behaviour (persist-only, names the numbers, offers the plans page) is unchanged; only its seats move.
 
 The staged secondary-drawer machinery (`FacetSection`, secondary drawers for provider configuration) is reused as step content — this is a re-chroming of navigation, not a rebuild of the sections.
 
@@ -143,11 +173,18 @@ The staged secondary-drawer machinery (`FacetSection`, secondary drawers for pro
 
 **Storage.** A dedicated table, not a `ProjectSecret` row: the integration carries customer-facing metadata and its own surface, where `ProjectSecret` is anonymous machinery (its consumer today is the Langy virtual key). Encryption uses the existing `encrypt()`/`decrypt()` helpers (`platform/app/src/utils/encryption.ts`, AES-256-GCM), the same ones the per-automation token uses today.
 
+The table takes ADR-021's **single-scope-per-row shape** — inline `(scopeType, scopeId)` columns plus the `organizationId` tenancy anchor — rather than a bare `projectId` column, with the per-project decision expressed as a unique constraint:
+
 ```prisma
-model ProjectSlackIntegration {
+enum SlackIntegrationScopeType {
+  PROJECT                                   // the only value today (frozen decision);
+}                                           // TEAM/ORGANIZATION are a future enum add
+
+model SlackIntegration {
   id                String   @id            // ksuid
-  projectId         String   @unique        // one integration per project
-  project           Project  @relation(fields: [projectId], references: [id])
+  scopeType         SlackIntegrationScopeType
+  scopeId           String                  // Project.id while scopeType is PROJECT
+  organizationId    String                  // tenancy anchor (ADR-021)
   botTokenEncrypted String                  // encrypt() ciphertext, never returned to clients
   slackTeamId       String                  // from auth.test at save — pins the workspace
   slackTeamName     String                  // display only
@@ -155,13 +192,16 @@ model ProjectSlackIntegration {
   updatedById       String
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
-  @@index([projectId])
+  @@unique([scopeType, scopeId])            // one integration per project
+  @@index([organizationId])
 }
 ```
 
-`projectId @unique` is the frozen per-project decision made structural. It does not paint sharing into a corner: widening to team/org later means adopting the scoped-resources junction shape (`dev/docs/best_practices/scoped-resources.md`), a migration this table's shape converts into cleanly. Saving validates the token against Slack (`auth.test`) and stores the workspace identity next to the ciphertext, so the settings card can say *which* workspace is connected without ever returning the token; reads return presence + workspace metadata only.
+The `@@unique([scopeType, scopeId])` is the frozen per-project decision made structural; the shape means the already-deferred team/org widening is **a data change — a new enum value and new rows — not a schema rework**. Per-table enum, `String` scopeId, and the `organizationId` anchor follow `dev/docs/best_practices/scoped-resources.md` verbatim, and the table must be registered in the tenancy regimes (`dbMultiTenancyProtection` / `dbOrganizationIdProtection` — an org-scoped model outside every regime makes each query throw, and one in `EXEMPT_MODELS` would let a bare read walk tenants).
 
-**Settings surface.** A Slack card on the Integrations settings page, beside the GitHub App card (`platform/app/src/pages/settings/integrations.tsx`). The card's form picks the project with `ScopeChipPicker` (`allowedScopeTypes={["PROJECT"]}`, `singleSelect`) per `scope-selector-and-badges.md` — never a hand-rolled select — and shows per-project connection state with the project scope badge. Rotation is the same form: paste a new token, `auth.test` revalidates, the ciphertext is replaced. Writes require `project:update` at the picked project.
+Saving validates the token against Slack (`auth.test`) and stores the workspace identity next to the ciphertext, so the settings card can say *which* workspace is connected without ever returning the token; reads return presence + workspace metadata only. On workspace identity: ADR-041 explicitly deferred a Slack-app OAuth install flow, and this ADR does not un-defer it — what is decided here is only **save-time identity pinning** (one `auth.test` at save, its `team_id`/`team` stored for display and for the workspace-mismatch nudge). A full OAuth installation, with Slack-issued rotation and scope grants, remains deferred.
+
+**Settings surface.** A Slack card on the Integrations settings page, beside the GitHub App card (`platform/app/src/pages/settings/integrations.tsx`). The card's form picks the project with `ScopeChipPicker` (`allowedScopeTypes={["PROJECT"]}`, `singleSelect`) per `scope-selector-and-badges.md` — never a hand-rolled select — and shows per-project connection state with the project scope badge. Rotation is the same form: paste a new token, `auth.test` revalidates, the ciphertext is replaced. Writes require `project:update` at the picked project. The card sits next to an org-scoped GitHub App card that mints a short-lived installation token per use (`specs/integrations/github-connection.feature`) and deliberately does not copy that model: a Slack bot token cannot be minted per use — Slack issues one long-lived credential at app install — so this card stores ciphertext at project scope where GitHub's stores an app identity at org scope.
 
 **Token resolution at dispatch** (and for the composer's channel discovery, so the picker lists the workspace delivery will actually hit):
 
@@ -172,7 +212,7 @@ model ProjectSlackIntegration {
    1. actionParams.slackBotToken on the automation?   ── yes ──▶ use it (LEGACY)
         │ no                                                     most specific wins;
         ▼                                                        a project token must
-   2. ProjectSlackIntegration for the project?        ── yes ──▶ use it (TARGET)
+   2. SlackIntegration row for the project?           ── yes ──▶ use it (TARGET)
         │ no
         ▼
    3. fail the delivery: HandledError `slack_integration_missing`
@@ -183,8 +223,8 @@ Most-specific-first is deliberate, and it is the safety property: an existing au
 
 **Migration of existing per-automation tokens.**
 
-- New and edited automations **never store a token again**. The composer's Slack step drops the token field entirely: integration present → channel picker; integration absent → "Connect Slack for this project" pointing at settings (or inline for authors with `project:update`).
-- An automation that still carries its own token says so everywhere it appears — a nudge on its list row and in its drawer, "Uses its own Slack token — switch to the project integration" — with one action: **"Use the project integration"**, which clears the stored credential (delivery falls through to step 2 above). The settings card shows "N automations in this project still use their own Slack token" with the same action in bulk. The rotation-coverage gap most-specific-first accepts (§ rationale) is handled by making it loud, never by silence.
+- Creates and **newly-configured Slack deliveries** never store a token. The composer's Slack step drops the token field entirely: integration present → channel picker; integration absent → "Connect Slack for this project" pointing at settings (or inline for authors with `project:update`). An edit that *keeps* an existing token keeps it — that is the kept-sentinel contract, and it is bound: `public-api.feature`'s "Writing back a Slack bot connection keeps its saved token" stays true.
+- An automation that still carries its own token says so everywhere it appears — a nudge on its list row and in its drawer, "Uses its own Slack token — switch to the project integration" — with one action: **"Use the project integration"**, which clears the stored credential (delivery falls through to step 2 above). The settings card shows "N automations in this project still use their own Slack token" with the same action in bulk. The bulk clear requires `project:update`, treats each row independently — one automation's failure does not roll back the others — and reports how many were cleared and how many failed. The rotation-coverage gap most-specific-first accepts (§ rationale) is handled by making it loud, never by silence.
 - Over the API, the existing kept-sentinel contract becomes the migration lever: `SLACK_BOT_TOKEN_KEPT` keeps the stored legacy ciphertext (unchanged), an explicit `null` clears it, absent-on-create stores nothing. No forced backfill: both storage locations are honoured for as long as legacy rows exist, and the count on the settings card is the progress meter.
 
 **What this does to the redaction machinery.** Less than it looks like. The credential split (`persistActionParamsFor` / `redactActionParamsFor`, the Slack provider's persist hook in `server/app-layer/automations/providers/slack/server.ts`) assumes action immutability and encrypts/redacts `actionParams.slackBotToken`; all of that stays, demoted to the legacy path — it must keep working verbatim for existing rows and for the kept-sentinel round-trip. The project token never enters `actionParams`, so it never enters the redaction problem: it lives in its own column, is decrypted only at dispatch and channel discovery, and no read path returns it. The `slackBotTokenSet: true` read flag gains a sibling the composer needs anyway: the tRPC read exposes whether the *project* integration is connected, so the UI can distinguish "legacy own token" / "project integration" / "nothing". The webhook channel's header-value credentials are untouched — webhooks are not part of this integration.
@@ -193,7 +233,7 @@ This also strengthens the deferred multi-channel story: a future delivery row th
 
 ### 6. Use-case templates ship their graph
 
-The #6716 finding: pick "Error spike" and the automation still has no graph behind it — the template saves no work. In the merged flow, graph-watching use-case cards (`AutomationsEducation.tsx`) carry a **graph specification** in their prefill, not just a name and an action. The Watch step shows it as a pre-filled rule over a graph that does not exist yet ("Creates graph: *Error rate*"), editable like any other. Saving creates the graph and the automation in one service call; if the automation write is refused, the just-created graph is deleted — a template must not strand orphan graphs (#6896 already tracks orphan graphs as a defect class).
+The #6716 finding: pick "Error spike" and the automation still has no graph behind it — the template saves no work. In the merged flow, graph-watching use-case cards (`AutomationsEducation.tsx`) carry a **graph specification** in their prefill, not just a name and an action. The Watch step shows it as a pre-filled rule over a graph that does not exist yet ("Creates graph: *Error rate*"), editable like any other. Saving creates the graph and the automation in **one Prisma transaction**: both writes are Postgres rows through Prisma (`CustomGraph`, `Trigger`), so the mechanism is a transaction, not a compensating delete — a refused automation write rolls the graph back with it, and a template can never strand an orphan graph (#6896 tracks orphan graphs as a defect class).
 
 Templates always create a **new** graph rather than binding an existing one: `customGraphId` is `@unique`, so reusing a graph the user already has an automation on would be refused, and guessing which existing graph the user meant is exactly the dead end the finding describes. Trace-filter cards are unchanged (they already seed working filters).
 
@@ -226,6 +266,7 @@ Templates always create a **new** graph rather than binding an existing one: `cu
 - **Team/org-shared Slack integrations** (one workspace serving many projects). The `@unique projectId` table migrates into the scoped-resources junction shape if wanted.
 - **Automatic healing of legacy tokens** (falling through to the project token when a stored token fails `invalid_auth`). Attractive, but it reintroduces silent retargeting through the back door; revisit with delivery-failure surfacing (#6716 G3 territory).
 - **Schedules inside the wizard.** Schedule keeps its current composer path; unifying its authoring shell can ride a later polish pass without design risk.
+- **Slack-app OAuth install flow.** ADR-041's deferral stands; §5 decides only save-time identity pinning via `auth.test`.
 - **Code-editor default flip and Builder retirement** — *decided, not deferred*: Builder stays the default, Code stays the toggle. Recorded so the earlier musings do not resurface as an open question.
 
 ## Reference implementation plan
@@ -234,7 +275,7 @@ Phase-2 structure per the bug-bash plan: **one reference PR first, no fan-out un
 
 ### R0 — the reference PR (one PR, feature-flagged)
 
-Everything behind a `release_automations_source_merge` feature flag; flag off is byte-identical behaviour.
+Everything behind a `release_automations_source_merge` feature flag; flag off is byte-identical behaviour. (The name sits loose against ADR-005's `{type}_{area}_{feature}_{descriptor}` grammar — deliberate, with ADR-044's `release_scheduled_reports` as the precedent for a three-token automations release flag.)
 
 **Scope:** the merged three-step wizard for create and edit (subject-first Watch step, both subjects, Review-as-home), the vocabulary change everywhere the flow speaks (no type card, no source label), and the unified list as a **read-only view** (one table, Watches + Delivery columns; Schedules tab untouched).
 
@@ -251,9 +292,9 @@ Everything behind a `release_automations_source_merge` feature flag; flag off is
 
 | Unit | Scope | Files (owned) | Depends on |
 |---|---|---|---|
-| F1 | Wire `source` on the public API: read alias, write acceptance, `trigger_source_kind_mismatch`; MCP + CLI + OpenAPI regen | `platform/app/src/app/api/triggers/[[...route]]/app.ts`, `mcp/typescript/src/**`, `sdks/typescript/src/cli/commands/triggers/**`, generated OpenAPI | R0 |
-| F2 | `ProjectSlackIntegration`: migration, service + new tRPC router (setup / rotate / remove / legacy-token census), Integrations settings card with `ScopeChipPicker`, `slack_integration_invalid_token` | `platform/app/prisma/` (new migration), new `server/app-layer/automations/slack-integration/**`, new router file, `pages/settings/integrations.tsx`, `features/errors/logic/codes.ts` + `presentation.ts` entries | R0 |
-| F3 | Dispatch + composer consume the integration: resolution order, `slack_integration_missing`, channel discovery via the resolved token, Slack step drops the token field | `server/app-layer/automations/providers/slack/server.ts`, `server/app-layer/automations/delivery/**` (Slack sites), `features/automations/providers/slack/**` | F2 |
+| F1 | Wire `source` on the public API: read alias, write acceptance, `trigger_source_kind_mismatch`; MCP + CLI + OpenAPI regen; the `TriggerKind` schema-comment citation fix (§3); `specs/features/trigger-cli.feature` gains the source field on its surface | `platform/app/src/app/api/triggers/[[...route]]/app.ts`, `mcp/typescript/src/**`, `sdks/typescript/src/cli/commands/triggers/**`, generated OpenAPI, `prisma/schema.prisma` (comments only), `specs/features/trigger-cli.feature` | R0 |
+| F2 | `SlackIntegration`: migration + tenancy-regime registration, service + new tRPC router (setup / rotate / remove / legacy-token census + bulk clear), Integrations settings card with `ScopeChipPicker`, `slack_integration_invalid_token` | `platform/app/prisma/` (new migration), `dbMultiTenancyProtection.ts` regime lists, new `server/app-layer/automations/slack-integration/**`, new router file, `pages/settings/integrations.tsx`, `features/errors/logic/codes.ts` + `presentation.ts` entries | R0 |
+| F3 | Dispatch + composer consume the integration: resolution order, `slack_integration_missing`, channel discovery via the resolved token, Slack step drops the token field; retire/rewrite the token-asking scenarios in `platform/app/specs/monitors/slack-bot-delivery.feature` | `server/app-layer/automations/providers/slack/server.ts`, `server/app-layer/automations/delivery/**` (Slack sites), `features/automations/providers/slack/**`, `platform/app/specs/monitors/slack-bot-delivery.feature` | F2 |
 | F4 | Legacy-token migration affordances: "Use the project integration" per automation + bulk from settings, kept-sentinel `null`-clears path over the API | slack-integration router/service (owned by the F2 seam), settings card components, the composer's legacy-token notice inside `providers/slack/**` (sequence with F3 — same directory, so F4 starts after F3 merges) | F3 |
 | F5 | Templates ship their graph: graph spec in prefill, create-graph-and-bind service seam, orphan cleanup on refusal | `features/automations/components/page/AutomationsEducation.tsx`, `server/api/routers/automations.ts` (upsert seam) + graph service touchpoint | R0 |
 | F6 | Unified list interactivity: filter/graph + delivery filter chips, row-action coherence with the View drawer, the legacy-token row nudge, flag removal at the end | `pages/[project]/automations.tsx`, `features/automations/components/page/**` | R0 (+#6899 landed; the nudge's data needs F2) |
@@ -264,7 +305,9 @@ Sequencing: R0 → F1 ∥ F2 ∥ F5 ∥ F6 → F3 → F4. The flag comes out in 
 ## References
 
 - [#6717](https://github.com/langwatch/langwatch/issues/6717) — the recorded decisions; [#6716](https://github.com/langwatch/langwatch/issues/6716) — defects folded in where Phase-2-shaped (template-ships-graph, type-lock); [#6896](https://github.com/langwatch/langwatch/issues/6896) — deferred follow-ups adjacent to this design
-- PR [#6891](https://github.com/langwatch/langwatch/pull/6891) — public-API parity and the immutability codes this ADR preserves; PR [#6899](https://github.com/langwatch/langwatch/pull/6899) — the View drawer as in-depth history
+- PR [#6891](https://github.com/langwatch/langwatch/pull/6891) — public-API parity and the immutability codes this ADR preserves; PR [#6899](https://github.com/langwatch/langwatch/pull/6899) — the View drawer as in-depth history; PR [#6884](https://github.com/langwatch/langwatch/pull/6884) — the in-flight list-pages spec §3's table rebinds
+- [ADR-021](./021-multi-scope-targeting-and-tenancy.md) — the scoped-resource storage shape and tenancy regimes §5 adopts; [ADR-005](./005-feature-flags.md) — flag naming grammar (deviation noted in R0); [ADR-026](./026-per-trigger-dispatch-timing.md) — owns `notificationCadence` / `traceDebounceMs`, whose semantics the Delivery-step reseating does not touch; [ADR-036](./036-liquid-templates-for-trigger-notifications.md) — the template columns the wizard carries through unchanged
 - `dev/docs/best_practices/scoped-resources.md`, `scope-selector-and-badges.md` — the settings-surface rules §5 follows
 - `dev/docs/best_practices/error-handling.md` / [ADR-045](./045-domain-errors-handled-boundary.md) — the handled-error contract for the new codes
+- Bound spec files this design touches (§3's rebinding table): `specs/automations/authoring-drawer.feature`, `specs/automations/automation-authoring-cap-advice.feature`, `specs/automations/list-pages.feature` (via #6884), `specs/automations/public-api.feature`, `platform/app/specs/monitors/slack-bot-delivery.feature`; adjacent surfaces: `specs/integrations/github-connection.feature`, `specs/features/trigger-cli.feature`
 - `specs/automations/source-merge.feature` — the behavioural contract (all `@unimplemented` until R0)
