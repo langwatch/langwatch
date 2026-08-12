@@ -50,12 +50,36 @@ Feature: Scheduled report content and links
       Then that panel is marked empty
       And a panel with real data is never marked empty by the same check
 
-  Rule: One panel's failure does not sink the whole report
+  Rule: A panel's own configuration can be left out; anything else retries the whole report
+
+    A panel failure is not one thing. A panel whose STORED configuration
+    can never be evaluated (a schema the query layer rejects, an
+    unsupported combination of series options) will fail identically no
+    matter how many times it is retried — leaving it out lets the rest of
+    the report through. Every other failure (a ClickHouse timeout, a
+    connection error, anything unproven to be a config problem) must
+    reach the scheduler's bounded retry (ADR-044) unchanged, or a
+    transient blip delivers a report with content silently missing,
+    once, forever.
 
     @unit
-    Scenario: One panel's query failure does not blank the whole report
-      Given a dashboard with two panels, one of which fails to query
+    Scenario: An unknown panel failure retries the whole report
+      Given a dashboard panel whose query fails with an unrelated, unknown error
       When the report renders its charts
-      Then the panel that succeeded still carries its data
-      And the failed panel is marked failed rather than the whole report failing
+      Then the report is not delivered
+      And the failure reaches the scheduler's retry path
+
+    @unit
+    Scenario: A panel whose configuration cannot be evaluated is left out; the report still delivers
+      Given a dashboard with a healthy panel and a panel with unusable stored configuration
+      When the report renders its charts
+      Then the unusable panel is left out of the report entirely
+      And the healthy panel still carries its data
       And the report is not marked empty
+
+    @unit
+    Scenario: All panels failing retries rather than delivering a false empty report
+      Given a dashboard whose every panel has unusable stored configuration
+      When the report renders its charts
+      Then the report is not delivered
+      And no false "Nothing to show for this period" is ever sent

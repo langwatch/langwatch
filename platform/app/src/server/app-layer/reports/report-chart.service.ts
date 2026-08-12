@@ -32,6 +32,39 @@ const logger = createLogger("langwatch:report-chart");
  * threshold), a report plots every series on the graph.
  */
 
+/**
+ * A panel's own STORED configuration cannot be evaluated — the graph's
+ * stored JSON is the problem (a schema the query layer rejects, an
+ * unsupported combination of series options), not a transient failure.
+ * Retrying the exact same configuration can never produce a different
+ * result, so `buildChartSafely` absorbs ONLY this class: the panel is
+ * omitted from the report and logged, the rest of the report still
+ * delivers.
+ *
+ * Every OTHER panel error — a ClickHouse timeout, a connection failure,
+ * anything not provably a config problem — is NOT this class and is left to
+ * propagate, so it reaches the scheduler's bounded exponential backoff
+ * (ADR-044 — "the slot is retried, never silently lost") the same as before
+ * per-panel isolation existed. This is the repo's error-handling default:
+ * unknown fails toward retry, never toward a false "delivered".
+ *
+ * A future config-shaped failure (e.g. the query builder's own named error
+ * for an unsupported series combination) should throw this class — or a
+ * subclass of it — at the point the failure is detected, rather than adding
+ * another special case to `buildChartSafely`.
+ */
+export class TerminalReportPanelError extends Error {
+  constructor(
+    message: string,
+    /** The graph(s) this failure applies to, comma-joined when it covers
+     *  every panel in the report rather than one. */
+    public readonly graphId: string,
+  ) {
+    super(message);
+    this.name = "TerminalReportPanelError";
+  }
+}
+
 export interface ReportChartDeps {
   loadCustomGraph(params: {
     projectId: string;
@@ -68,32 +101,36 @@ function chartTypeOf(
 }
 
 /**
- * `chartTypeOf`, tolerant of a graph whose stored JSON is missing or
- * malformed — the fallback path for a panel that failed before it could
- * even derive its own type.
+ * The graph's stored JSON, or a thrown `TerminalReportPanelError` when it is
+ * not a usable object — a config problem, not a query one, since retrying
+ * the exact same row can never produce a different shape.
  */
-function safeChartTypeOf(graph: CustomGraph): ReportChart["type"] {
-  const graphType = (graph.graph as unknown as CustomGraphInput | null)
-    ?.graphType;
-  return chartTypeOf(graphType as CustomGraphInput["graphType"]);
+function parseGraphConfig(graph: CustomGraph): CustomGraphInput {
+  const raw = graph.graph;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new TerminalReportPanelError(
+      `Graph "${graph.id}" has no usable stored configuration`,
+      graph.id,
+    );
+  }
+  return raw as unknown as CustomGraphInput;
 }
 
-/** The "nothing to plot" shape for a panel — no data yet, or none ever
- *  because its query failed (`failed: true`, still `isEmpty: true`). */
+/** The "nothing to plot yet" shape for a panel that queried fine but has no
+ *  data points for the window. */
 function emptyChartFor(
   graph: CustomGraph,
-  opts: { type?: ReportChart["type"]; failed?: boolean } = {},
+  type: ReportChart["type"],
 ): ReportChart {
   return {
     id: graph.id,
     title: graph.name,
-    type: opts.type ?? safeChartTypeOf(graph),
+    type,
     categories: [],
     series: [],
     segments: [],
     total: 0,
     isEmpty: true,
-    ...(opts.failed ? { failed: true } : {}),
   };
 }
 
@@ -185,18 +222,40 @@ export async function loadReportCharts({
   // Panels are independent queries, so overlap them rather than paying eight
   // round-trips in series — but under a concurrency cap (ADR-044 §5) so a large
   // dashboard doesn't fire every panel's heavy ClickHouse query at once.
-  return mapWithConcurrency(graphs, REPORT_CHART_QUERY_CONCURRENCY, (graph) =>
-    buildChartSafely({ deps, graph, projectId, from, to }),
+  const charts = await mapWithConcurrency(
+    graphs,
+    REPORT_CHART_QUERY_CONCURRENCY,
+    (graph) => buildChartSafely({ deps, graph, projectId, from, to }),
   );
+  // `null` marks a panel `buildChartSafely` absorbed (TerminalReportPanelError)
+  // — it is left out of the report entirely, not delivered as a fake-empty
+  // chart. Every other panel error already propagated out of
+  // `mapWithConcurrency` and rejected this function before reaching here.
+  const delivered = charts.filter(
+    (chart): chart is ReportChart => chart !== null,
+  );
+
+  // Graphs existed but EVERY one of them had an unrecoverable config
+  // problem: that is a report that could not be built, not a period with
+  // nothing in it. Throwing sends this fire through the scheduler's bounded
+  // retry same as any other failure — a retried-then-failed fire is more
+  // honest than delivering a false "Nothing to show for this period."
+  if (graphs.length > 0 && delivered.length === 0) {
+    throw new TerminalReportPanelError(
+      "Every panel in this report failed to evaluate",
+      graphs.map((graph) => graph.id).join(","),
+    );
+  }
+
+  return delivered;
 }
 
 /**
- * `buildChart`, isolated so one panel's query failure — an unsupported
- * series combination, a ClickHouse timeout, anything — degrades to that one
- * panel rendering empty rather than rejecting the whole report. Without
- * this, `mapWithConcurrency`'s all-or-nothing contract meant a single bad
- * panel put the *entire dashboard* in the same "blank email" class as #6716,
- * for reasons that had nothing to do with the healthy panels next to it.
+ * `buildChart`, catching ONLY `TerminalReportPanelError` — a panel whose own
+ * stored configuration can never succeed no matter how many times it is
+ * retried. That panel is logged and omitted from the report; every other
+ * error (unknown, transient, infra) rethrows so it reaches the scheduler's
+ * retry path unchanged. See `TerminalReportPanelError` for the reasoning.
  */
 async function buildChartSafely(params: {
   deps: ReportChartDeps;
@@ -204,15 +263,17 @@ async function buildChartSafely(params: {
   projectId: string;
   from: number;
   to: number;
-}): Promise<ReportChart> {
+}): Promise<ReportChart | null> {
   try {
     return await buildChart(params);
   } catch (error) {
+    if (!(error instanceof TerminalReportPanelError)) throw error;
+
     logger.error(
       { projectId: params.projectId, graphId: params.graph.id, error },
-      "Report panel failed to load — sending the rest of the report without it",
+      "Report panel's stored configuration could not be evaluated — omitting it from the report",
     );
-    return emptyChartFor(params.graph, { failed: true });
+    return null;
   }
 }
 
@@ -257,9 +318,7 @@ async function buildChart({
   // Same compensation the analytics UI applies before querying — without it,
   // a summary/pie/donut panel that renders fine on screen comes back with
   // empty buckets in a scheduled report (#6716).
-  const graphData = withGroupedPipeline(
-    graph.graph as unknown as CustomGraphInput,
-  );
+  const graphData = withGroupedPipeline(parseGraphConfig(graph));
   const type = chartTypeOf(graphData.graphType);
   const seriesInputs: SeriesInputType[] = (graphData.series ?? [])
     .slice(0, MAX_SERIES)
@@ -273,7 +332,7 @@ async function buildChart({
       asPercent: series.asPercent,
     }));
 
-  const empty = emptyChartFor(graph, { type });
+  const empty = emptyChartFor(graph, type);
   if (seriesInputs.length === 0) return empty;
 
   // Same "full" forcing the analytics UI applies for summary charts — see

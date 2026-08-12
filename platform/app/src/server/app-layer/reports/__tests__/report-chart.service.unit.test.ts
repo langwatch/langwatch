@@ -8,6 +8,7 @@ import {
   loadReportCharts,
   REPORT_CHART_QUERY_CONCURRENCY,
   type ReportChartDeps,
+  TerminalReportPanelError,
 } from "../report-chart.service";
 
 const COUNT_SERIES = {
@@ -442,37 +443,52 @@ describe("loadReportCharts", () => {
     });
   });
 
-  describe("given one panel's query fails", () => {
-    /** @scenario "One panel's query failure does not blank the whole report" */
-    it("still delivers the healthy panel, marking only the failed one", async () => {
-      // Regression: mapWithConcurrency's all-or-nothing contract meant one
-      // bad panel (e.g. an unsupported series combination, a ClickHouse
-      // timeout) rejected loadReportCharts entirely, putting an otherwise
-      // healthy dashboard in the same "blank email" class as #6716 for
-      // reasons unrelated to the panels that queried fine.
+  describe("given one panel's query fails with an unknown, non-config error", () => {
+    /** @scenario "An unknown panel failure retries the whole report" */
+    it("rejects rather than deliver a report with the panel silently missing", async () => {
+      // A transient/unknown failure (ClickHouse timeout, connection reset,
+      // anything not provably a config problem) must NOT be absorbed — it
+      // has to reach `dispatchScheduledReport` as a rejection so the
+      // scheduler's bounded backoff (ADR-044) retries the fire. Absorbing it
+      // here would deliver the report once, permanently, with content
+      // missing for no recoverable reason.
+      const deps: ReportChartDeps = {
+        loadCustomGraph: vi.fn(async () => null),
+        loadDashboardGraphs: vi.fn(async () => [makeGraph()]),
+        getTimeseries: vi.fn(async () => {
+          throw new Error("ClickHouse connection reset");
+        }),
+      };
+
+      await expect(
+        run({ deps, source: { kind: "dashboard", dashboardId: "dash-1" } }),
+      ).rejects.toThrow("ClickHouse connection reset");
+    });
+  });
+
+  describe("given one panel's stored configuration is unusable", () => {
+    /** @scenario "A panel whose configuration cannot be evaluated is left out; the report still delivers" */
+    it("omits that panel and still delivers the healthy one, not marked empty", async () => {
       const healthyGraph = makeGraph({
         id: "healthy-graph",
         name: "Healthy panel",
-        filters: { ok: ["true"] },
       });
+      // A graph whose stored `graph` column is not a usable object — the
+      // real, if rare, shape of "config cannot be evaluated". Retrying this
+      // exact row can never succeed.
       const badGraph = makeGraph({
         id: "bad-graph",
         name: "Bad panel",
-        filters: { boom: ["true"] },
+        graph: null as unknown as CustomGraph["graph"],
       });
 
       const deps: ReportChartDeps = {
         loadCustomGraph: vi.fn(async () => null),
         loadDashboardGraphs: vi.fn(async () => [healthyGraph, badGraph]),
-        getTimeseries: vi.fn(async (input) => {
-          if ((input.filters as Record<string, unknown> | undefined)?.boom) {
-            throw new Error("unsupported series combination");
-          }
-          return {
-            previousPeriod: [],
-            currentPeriod: [{ date: "2026-07-11T09:00:00Z", [COUNT_KEY]: 5 }],
-          };
-        }),
+        getTimeseries: vi.fn(async () => ({
+          previousPeriod: [],
+          currentPeriod: [{ date: "2026-07-11T09:00:00Z", [COUNT_KEY]: 5 }],
+        })),
       };
 
       const charts = await run({
@@ -480,19 +496,15 @@ describe("loadReportCharts", () => {
         source: { kind: "dashboard", dashboardId: "dash-1" },
       });
 
-      expect(charts).toHaveLength(2);
-      const healthy = charts.find((c) => c.id === "healthy-graph")!;
-      const failed = charts.find((c) => c.id === "bad-graph")!;
-
-      expect(healthy.isEmpty).toBe(false);
-      expect(healthy.failed).toBeUndefined();
-      expect(healthy.series[0]!.data.map((p) => p.value)).toEqual([5]);
-
-      expect(failed.isEmpty).toBe(true);
-      expect(failed.failed).toBe(true);
+      // The bad panel is left out entirely, not delivered as a fake-empty
+      // "failed" chart — there is nothing left for a template to render.
+      expect(charts).toHaveLength(1);
+      expect(charts[0]!.id).toBe("healthy-graph");
+      expect(charts[0]!.isEmpty).toBe(false);
+      expect(charts[0]!.series[0]!.data.map((p) => p.value)).toEqual([5]);
 
       // The report as a whole must not read as empty just because one of its
-      // panels failed — only the failed panel's own content is missing.
+      // panels was omitted.
       const context = buildReportTemplateContext({
         trigger: { id: "trig-1", name: "Weekly dashboard" },
         report: {
@@ -509,6 +521,38 @@ describe("loadReportCharts", () => {
       });
 
       expect(context.report.isEmpty).toBe(false);
+    });
+  });
+
+  describe("given every panel's stored configuration is unusable", () => {
+    /** @scenario "All panels failing retries rather than delivering a false empty report" */
+    it("rejects rather than deliver a false 'nothing to show'", async () => {
+      const badGraphs = [
+        makeGraph({
+          id: "bad-1",
+          graph: null as unknown as CustomGraph["graph"],
+        }),
+        makeGraph({
+          id: "bad-2",
+          graph: null as unknown as CustomGraph["graph"],
+        }),
+      ];
+
+      const deps: ReportChartDeps = {
+        loadCustomGraph: vi.fn(async () => null),
+        loadDashboardGraphs: vi.fn(async () => badGraphs),
+        getTimeseries: vi.fn(async () => ({
+          previousPeriod: [],
+          currentPeriod: [],
+        })),
+      };
+
+      await expect(
+        run({ deps, source: { kind: "dashboard", dashboardId: "dash-1" } }),
+      ).rejects.toThrow(TerminalReportPanelError);
+      // Never resolves to an empty array — that would let the caller build
+      // a "Nothing to show for this period" report that is actually a lie.
+      expect(deps.getTimeseries).not.toHaveBeenCalled();
     });
   });
 
