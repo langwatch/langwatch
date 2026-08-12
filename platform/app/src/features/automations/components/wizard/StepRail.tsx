@@ -1,4 +1,4 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import {
   stepIsComplete,
@@ -44,9 +44,8 @@ export function StepRail({ graphName }: { graphName?: string | null }) {
         const complete = stepIsComplete({ step: candidate, draft });
         const summary = stepSummary({ step: candidate, draft, graphName });
         return (
-          <Box
+          <chakra.button
             key={candidate}
-            as="button"
             type="button"
             flex="1"
             minWidth="0"
@@ -90,7 +89,7 @@ export function StepRail({ graphName }: { graphName?: string | null }) {
                 </Text>
               ) : null}
             </VStack>
-          </Box>
+          </chakra.button>
         );
       })}
     </HStack>
