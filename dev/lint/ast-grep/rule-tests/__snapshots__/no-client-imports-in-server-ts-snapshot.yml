@@ -1,0 +1,184 @@
+id: no-client-imports-in-server-ts
+snapshots:
+  export * from "react";:
+    labels:
+    - source: export * from "react";
+      style: primary
+      start: 0
+      end: 22
+    - source: '"react"'
+      style: secondary
+      start: 14
+      end: 21
+  export { CustomGraph } from "~/components/analytics/CustomGraph";:
+    labels:
+    - source: export { CustomGraph } from "~/components/analytics/CustomGraph";
+      style: primary
+      start: 0
+      end: 65
+    - source: '"~/components/analytics/CustomGraph"'
+      style: secondary
+      start: 28
+      end: 64
+  import "@chakra-ui/react";:
+    labels:
+    - source: import "@chakra-ui/react";
+      style: primary
+      start: 0
+      end: 26
+    - source: '"@chakra-ui/react"'
+      style: secondary
+      start: 7
+      end: 25
+  import * as NS from "react";:
+    labels:
+    - source: import * as NS from "react";
+      style: primary
+      start: 0
+      end: 28
+    - source: '"react"'
+      style: secondary
+      start: 20
+      end: 27
+    - source: '* as NS'
+      style: secondary
+      start: 7
+      end: 14
+    - source: '* as NS'
+      style: secondary
+      start: 7
+      end: 14
+  import D from "react";:
+    labels:
+    - source: import D from "react";
+      style: primary
+      start: 0
+      end: 22
+    - source: '"react"'
+      style: secondary
+      start: 14
+      end: 21
+    - source: D
+      style: secondary
+      start: 7
+      end: 8
+    - source: D
+      style: secondary
+      start: 7
+      end: 8
+  import D, { type C } from "react";:
+    labels:
+    - source: import D, { type C } from "react";
+      style: primary
+      start: 0
+      end: 34
+    - source: '"react"'
+      style: secondary
+      start: 26
+      end: 33
+    - source: D
+      style: secondary
+      start: 7
+      end: 8
+    - source: D, { type C }
+      style: secondary
+      start: 7
+      end: 20
+  import { Bar } from "../../components/foo/Bar";:
+    labels:
+    - source: import { Bar } from "../../components/foo/Bar";
+      style: primary
+      start: 0
+      end: 47
+    - source: '"../../components/foo/Bar"'
+      style: secondary
+      start: 20
+      end: 46
+    - source: Bar
+      style: secondary
+      start: 9
+      end: 12
+  import { a, type T, b, c } from "react";:
+    labels:
+    - source: import { a, type T, b, c } from "react";
+      style: primary
+      start: 0
+      end: 40
+    - source: '"react"'
+      style: secondary
+      start: 32
+      end: 39
+    - source: a
+      style: secondary
+      start: 9
+      end: 10
+  import { getSafeColumnName } from "~/components/datasets/utils/reservedColumns";:
+    labels:
+    - source: import { getSafeColumnName } from "~/components/datasets/utils/reservedColumns";
+      style: primary
+      start: 0
+      end: 80
+    - source: '"~/components/datasets/utils/reservedColumns"'
+      style: secondary
+      start: 34
+      end: 79
+    - source: getSafeColumnName
+      style: secondary
+      start: 9
+      end: 26
+  import { resolveCapabilityProgress } from "~/features/langy/components/capabilities/capabilityRegistry";:
+    labels:
+    - source: import { resolveCapabilityProgress } from "~/features/langy/components/capabilities/capabilityRegistry";
+      style: primary
+      start: 0
+      end: 104
+    - source: '"~/features/langy/components/capabilities/capabilityRegistry"'
+      style: secondary
+      start: 42
+      end: 103
+    - source: resolveCapabilityProgress
+      style: secondary
+      start: 9
+      end: 34
+  import { thing } from "~/stores/thing";:
+    labels:
+    - source: import { thing } from "~/stores/thing";
+      style: primary
+      start: 0
+      end: 39
+    - source: '"~/stores/thing"'
+      style: secondary
+      start: 22
+      end: 38
+    - source: thing
+      style: secondary
+      start: 9
+      end: 14
+  import { type FC, useEffect } from "react";:
+    labels:
+    - source: import { type FC, useEffect } from "react";
+      style: primary
+      start: 0
+      end: 43
+    - source: '"react"'
+      style: secondary
+      start: 35
+      end: 42
+    - source: useEffect
+      style: secondary
+      start: 18
+      end: 27
+  import { useState } from "react";:
+    labels:
+    - source: import { useState } from "react";
+      style: primary
+      start: 0
+      end: 33
+    - source: '"react"'
+      style: secondary
+      start: 25
+      end: 32
+    - source: useState
+      style: secondary
+      start: 9
+      end: 17

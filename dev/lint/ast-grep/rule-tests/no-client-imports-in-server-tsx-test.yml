@@ -1,0 +1,16 @@
+id: no-client-imports-in-server-tsx
+valid:
+  - 'import type { ReactNode } from "react";'
+  - 'import { type FC, type ReactNode } from "react";'
+  - 'import ReactFlow from "reactflow";'
+  - 'import { render } from "@react-email/render";'
+  - 'import { trace } from "@opentelemetry/api";'
+  - 'import { fireSignupNurturingCalls } from "~/../ee/billing/nurturing/hooks/signupIdentification";'
+  - 'import { helper } from "~/utils/componentsHelper";'
+invalid:
+  - 'import { useState } from "react";'
+  - 'import "@chakra-ui/react";'
+  - 'import * as NS from "react";'
+  - 'import { type FC, useEffect } from "react";'
+  - 'export { CustomGraph } from "~/components/analytics/CustomGraph";'
+  - 'import { getSafeColumnName } from "~/components/datasets/utils/reservedColumns";'

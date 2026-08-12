@@ -1,0 +1,82 @@
+id: no-client-imports-in-server-tsx
+snapshots:
+  export { CustomGraph } from "~/components/analytics/CustomGraph";:
+    labels:
+    - source: export { CustomGraph } from "~/components/analytics/CustomGraph";
+      style: primary
+      start: 0
+      end: 65
+    - source: '"~/components/analytics/CustomGraph"'
+      style: secondary
+      start: 28
+      end: 64
+  import "@chakra-ui/react";:
+    labels:
+    - source: import "@chakra-ui/react";
+      style: primary
+      start: 0
+      end: 26
+    - source: '"@chakra-ui/react"'
+      style: secondary
+      start: 7
+      end: 25
+  import * as NS from "react";:
+    labels:
+    - source: import * as NS from "react";
+      style: primary
+      start: 0
+      end: 28
+    - source: '"react"'
+      style: secondary
+      start: 20
+      end: 27
+    - source: '* as NS'
+      style: secondary
+      start: 7
+      end: 14
+    - source: '* as NS'
+      style: secondary
+      start: 7
+      end: 14
+  import { getSafeColumnName } from "~/components/datasets/utils/reservedColumns";:
+    labels:
+    - source: import { getSafeColumnName } from "~/components/datasets/utils/reservedColumns";
+      style: primary
+      start: 0
+      end: 80
+    - source: '"~/components/datasets/utils/reservedColumns"'
+      style: secondary
+      start: 34
+      end: 79
+    - source: getSafeColumnName
+      style: secondary
+      start: 9
+      end: 26
+  import { type FC, useEffect } from "react";:
+    labels:
+    - source: import { type FC, useEffect } from "react";
+      style: primary
+      start: 0
+      end: 43
+    - source: '"react"'
+      style: secondary
+      start: 35
+      end: 42
+    - source: useEffect
+      style: secondary
+      start: 18
+      end: 27
+  import { useState } from "react";:
+    labels:
+    - source: import { useState } from "react";
+      style: primary
+      start: 0
+      end: 33
+    - source: '"react"'
+      style: secondary
+      start: 25
+      end: 32
+    - source: useState
+      style: secondary
+      start: 9
+      end: 17

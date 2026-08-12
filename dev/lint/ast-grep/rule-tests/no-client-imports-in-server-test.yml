@@ -1,0 +1,47 @@
+id: no-client-imports-in-server-ts
+valid:
+  # Types are erased and cannot pull a module at runtime. This is the exemption
+  # that makes the rule adoptable, and the one Biome's noRestrictedImports
+  # cannot express.
+  - 'import type { ReactNode } from "react";'
+  - 'import type { TraceWithGuardrail } from "~/components/messages/MessageCard";'
+  - 'export type { CustomGraphInput } from "~/components/analytics/CustomGraph";'
+  # Every specifier is inline-type, so the statement is erased entirely.
+  - 'import { type FC, type ReactNode } from "react";'
+  # Both begin with the banned word `react`. reactflow is the optimization-studio
+  # canvas; react-email renders the mail templates server-side.
+  - 'import ReactFlow from "reactflow";'
+  - 'import { render } from "@react-email/render";'
+  # Most of @opentelemetry is isomorphic and the server depends on it heavily.
+  - 'import { trace } from "@opentelemetry/api";'
+  - 'import { Resource } from "@opentelemetry/resources";'
+  # Server-side LIFECYCLE hooks, not React hooks. Treating a `hooks/` segment as
+  # client code at any depth flags eleven of these.
+  - 'import { fireSignupNurturingCalls } from "~/../ee/billing/nurturing/hooks/signupIdentification";'
+  # The event-sourcing pipeline's own stores, reached relatively.
+  - 'import { eventStore } from "../stores/eventStore";'
+  # A filename that merely starts with the banned word — it has to be a directory.
+  - 'import { helper } from "~/utils/componentsHelper";'
+# @scenario "A client import into server code is refused as it is written"
+invalid:
+  - 'import { useState } from "react";'
+  # Side-effect only: binds nothing, costs exactly as much.
+  - 'import "@chakra-ui/react";'
+  - 'import * as NS from "react";'
+  - 'import D from "react";'
+  # `type FC` is erased but `useEffect` is a real value, so the statement is a
+  # value import and the `import type` exemption must not swallow it.
+  - 'import { type FC, useEffect } from "react";'
+  # A type specifier surrounded on both sides in a longer list.
+  - 'import { a, type T, b, c } from "react";'
+  # A default binding alongside an erased specifier still binds a value.
+  - 'import D, { type C } from "react";'
+  # A re-export pulls the module exactly as hard as an import.
+  - 'export { CustomGraph } from "~/components/analytics/CustomGraph";'
+  - 'export * from "react";'
+  # The alias tree, and the feature-local depth where two of the three real
+  # offenders actually live.
+  - 'import { getSafeColumnName } from "~/components/datasets/utils/reservedColumns";'
+  - 'import { resolveCapabilityProgress } from "~/features/langy/components/capabilities/capabilityRegistry";'
+  - 'import { Bar } from "../../components/foo/Bar";'
+  - 'import { thing } from "~/stores/thing";'

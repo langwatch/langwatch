@@ -36,6 +36,7 @@ rules that apply to both file types are split into `_ts` / `_tsx` siblings.
 | `use-action-based-test-name` + `-tsx` | `it("should …")`, and names carrying no behaviour (`works`, `renders`, `test`) | test files |
 | `no-tautological-assertion` + `-tsx` | `expect(X).toBe(X)` — an assertion that cannot fail | test files |
 | `no-empty-test` + `-tsx` | `it("…", () => {})` — always green, counts as coverage | test files |
+| `no-client-imports-in-server` + `-tsx` | value-importing a browser-only package or a client tree (`components/`, `hooks/`, `stores/`) from backend code. `import type` is allowed. Disable inline with `// ast-grep-ignore: no-client-imports-in-server-{ts,tsx}` | `platform/app/src/{server,mcp,tasks,app/api,pages/api}/**`, plus the `server.mts` / `start.ts` / `workers.ts` entrypoints; `server/mailer/**` exempt |
 
 The BDD/boolean/fetch trio was added because they were the three largest
 mechanically preventable clusters in a 50-PR sample of CodeRabbit comments —
@@ -52,8 +53,18 @@ any function named `fit(...)`, including a production zoom hook. Each rule that 
 from `path_instructions` in `/.coderabbit.yaml`, or every violation gets
 reported twice, once deterministically and once probabilistically.
 
-All rules are `severity: warning` during rollout. Promote per-rule to `error`
+Rules start at `severity: warning` during rollout. Promote per-rule to `error`
 once its baseline is verifiably clean.
+
+`no-client-imports-in-server` ships at `error` because its baseline already is:
+scanning the tree finds exactly the three imports CLAUDE.md already names, and
+each carries an inline `// ast-grep-ignore:` marking it as debt. It is also the
+one rule here with a second, independent enforcer —
+`platform/app/src/server/__tests__/frontend-boundary.unit.test.ts` walks the real
+import graph, because a linter reads one file at a time and can only ever see
+the first hop, while the leak that motivated the guard was transitive. The two
+keep separate package lists, and `clientBoundaryLintParity.unit.test.ts` fails if
+they drift.
 
 ## Every rule is proven by a fixture
 

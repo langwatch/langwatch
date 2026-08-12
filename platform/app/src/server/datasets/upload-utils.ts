@@ -4,7 +4,7 @@ import Papa from "papaparse";
 // costs nothing today — but it sits under `components/`, which is what makes it
 // one Chakra import away from the leak the rule exists to stop. The fix is to
 // move it to a framework-free module both sides import, not to widen the rule.
-// biome-ignore lint/plugin: pre-existing; see CLAUDE.md
+// ast-grep-ignore: no-client-imports-in-server-ts
 import { getSafeColumnName } from "~/components/datasets/utils/reservedColumns";
 import type { DatasetColumns } from "./types";
 

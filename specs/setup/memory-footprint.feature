@@ -78,9 +78,8 @@ Feature: Reduced server memory footprint
 
   # The scenario above is caught by a test, which means it is caught after the
   # import is written, committed and pushed. The lint rule below is the same
-  # boundary moved to the moment of typing: it runs in the editor and in
-  # `pnpm lint`, so the import is refused while the author is still holding the
-  # context to fix it.
+  # boundary moved to the moment of typing, so the import is refused while the
+  # author is still holding the context to fix it.
   #
   # The two are not redundant and neither replaces the other. A linter reads one
   # file, so it can only see the direct hop; the walk above is what catches the
@@ -91,8 +90,9 @@ Feature: Reduced server memory footprint
   Scenario: A client import into server code is refused as it is written
     Given a module under src/server, src/mcp, src/tasks or an API route
     When it value-imports a browser-only package or a components tree
-    Then the lint rule reports it, in the editor and in pnpm lint
+    Then the lint rule reports it
     But a type-only import is allowed, since types are erased at compile time
+    And an import whose every named binding is a type is allowed for the same reason
     And a server-side lifecycle hook is allowed, since only React hooks are UI
 
   @unit

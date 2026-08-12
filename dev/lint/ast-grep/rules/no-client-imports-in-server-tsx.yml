@@ -1,0 +1,70 @@
+# The `.tsx` sibling of no-client-imports-in-server-ts. See that file for the
+# full rationale; `language: TypeScript` does not match `.tsx` in ast-grep's
+# parser dispatch, so both halves have to exist.
+#
+# This is not hypothetical scoping: `server/modelProviders/llmModelCost.tsx` is a
+# real, non-mailer `.tsx` inside the server tree.
+#
+# The `utils` block below is duplicated verbatim from the `-ts` rule rather than
+# hoisted into `sgconfig.yml`'s `utilDirs`, and that is deliberate: CodeRabbit
+# loads these files through `reviews.tools.ast-grep.rule_dirs` and does NOT read
+# `sgconfig.yml`, so a shared util would resolve locally and break for the one
+# consumer that cannot be tested here. The duplication is pinned instead —
+# `clientBoundaryLintParity.unit.test.ts` fails if the two copies drift.
+id: no-client-imports-in-server-tsx
+message: >
+  Backend code must not value-import browser-only packages or the client
+  source trees (`components/`, `hooks/`, `stores/`) — the whole UI stack
+  becomes resident in every backend process. `import type` is fine; types are
+  erased. Move the shared value into a framework-free module both sides import.
+severity: error
+language: Tsx
+utils:
+  banned-source:
+    kind: string
+    regex: '^["''](?:(?:react|react-dom|react-router|react-feather|lucide-react|framer-motion|@chakra-ui|@ark-ui|@emotion|@zag-js|@opentelemetry/sdk-trace-web|@opentelemetry/instrumentation-document-load|@opentelemetry/instrumentation-fetch)(?:/[^"'']*)?|~/(?:[^"'']*/)?components/[^"'']*|(?:\.\./)+(?:[^"'']*/)?components/[^"'']*|~/hooks/[^"'']*|(?:\.\./)+hooks/[^"'']*|~/stores/[^"'']*)["'']$'
+  binds-a-runtime-value:
+    any:
+      - not:
+          has:
+            kind: import_clause
+      - has:
+          kind: import_clause
+          has:
+            any:
+              - kind: identifier
+              - kind: namespace_import
+      - has:
+          kind: import_specifier
+          not:
+            regex: '^type\s'
+          stopBy: end
+rule:
+  any:
+    - kind: import_statement
+      all:
+        - has:
+            field: source
+            matches: banned-source
+        - not:
+            regex: '^import\s+type\b'
+        - matches: binds-a-runtime-value
+    - kind: export_statement
+      all:
+        - has:
+            field: source
+            matches: banned-source
+        - not:
+            regex: '^export\s+type\b'
+files:
+  - "platform/app/src/server/**/*.tsx"
+  - "platform/app/src/mcp/**/*.tsx"
+  - "platform/app/src/tasks/**/*.tsx"
+  - "platform/app/src/app/api/**/*.tsx"
+  - "platform/app/src/pages/api/**/*.tsx"
+ignores:
+  - "platform/app/src/server/mailer/**"
+  - "**/__tests__/**"
+  - "**/__mocks__/**"
+  - "**/*.test.tsx"
+  - "**/*.spec.tsx"

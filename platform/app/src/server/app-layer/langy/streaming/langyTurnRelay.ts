@@ -28,7 +28,7 @@ import { env } from "~/env.mjs";
 // that do. The largest of the three by far — `capabilityRegistry.ts` is ~750
 // lines with 24 importers — so splitting the relay's half out is a change in its
 // own right rather than a rename. Until then this is tracked debt, not licence.
-// biome-ignore lint/plugin: pre-existing; see CLAUDE.md
+// ast-grep-ignore: no-client-imports-in-server-ts
 import { resolveCapabilityProgress } from "~/features/langy/components/capabilities/capabilityRegistry";
 import {
   extractPlatformUrl,

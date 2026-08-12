@@ -1,0 +1,105 @@
+# Backend code must not value-import the frontend.
+#
+# One such import — a route reaching into a component for a single constant —
+# pulled 2,020 modules / 212 MB RSS into every backend process. The transitive
+# guard `platform/app/src/server/__tests__/frontend-boundary.unit.test.ts` walks
+# the real import graph and is the authority on what may ship; this rule is the
+# author-time half, refusing the direct hop as it is typed. Neither subsumes the
+# other: a linter reads one file and sees only the first hop, the walker sees the
+# chain. Keep the package list here in step with that test's `BROWSER_ONLY`.
+#
+# `import type` is deliberately allowed — types are erased, so they cannot pull a
+# module at runtime, and exempting them is what makes the rule adoptable. That
+# exemption is also why this is not Biome's `noRestrictedImports`, which matches
+# the specifier and nothing else: measured on this tree, 3 of its 5 hits were
+# type-only imports the architecture explicitly permits.
+#
+# To share a value across the boundary, move it into a framework-free module both
+# sides import. For the three pre-existing offenders, see CLAUDE.md.
+id: no-client-imports-in-server-ts
+message: >
+  Backend code must not value-import browser-only packages or the client
+  source trees (`components/`, `hooks/`, `stores/`) — the whole UI stack
+  becomes resident in every backend process. `import type` is fine; types are
+  erased. Move the shared value into a framework-free module both sides import.
+severity: error
+language: TypeScript
+utils:
+  # Anchored on the CLOSING quote, which is what keeps `reactflow` (the
+  # optimization-studio canvas) and `@react-email/*` (which renders the mail
+  # templates server-side) out of a rule that bans `react`.
+  #
+  # Only `components/` is unambiguous enough to match at arbitrary depth: two of
+  # the three real offenders live at `~/features/langy/components/...` and
+  # `~/optimization_studio/components/...`. `hooks/` and `stores/` are top-level
+  # trees only — `ee/billing/nurturing/hooks/` holds server-side LIFECYCLE hooks
+  # and matching a `hooks/` segment at any depth flags all eleven of them — and
+  # `stores/` matches via the `~/` alias only, since a relative `../stores/` is
+  # the event-sourcing pipeline's own store.
+  banned-source:
+    kind: string
+    regex: '^["''](?:(?:react|react-dom|react-router|react-feather|lucide-react|framer-motion|@chakra-ui|@ark-ui|@emotion|@zag-js|@opentelemetry/sdk-trace-web|@opentelemetry/instrumentation-document-load|@opentelemetry/instrumentation-fetch)(?:/[^"'']*)?|~/(?:[^"'']*/)?components/[^"'']*|(?:\.\./)+(?:[^"'']*/)?components/[^"'']*|~/hooks/[^"'']*|(?:\.\./)+hooks/[^"'']*|~/stores/[^"'']*)["'']$'
+  # A statement only costs anything at runtime if it binds a value or is a bare
+  # side-effect import. `import { type A, type B } from "react"` is erased
+  # entirely and must not be flagged; `import { type FC, useEffect }` must be.
+  # The `type` keyword is not a named node in the grammar, so both the statement
+  # form and the specifier form are matched on text.
+  binds-a-runtime-value:
+    any:
+      # `import "pkg"` — no clause at all. Binds nothing, costs everything.
+      - not:
+          has:
+            kind: import_clause
+      - has:
+          kind: import_clause
+          has:
+            any:
+              # `import D from` — a default binding is a direct-child identifier.
+              - kind: identifier
+              # `import * as NS from`
+              - kind: namespace_import
+      # At least one named specifier that is not `type X`.
+      - has:
+          kind: import_specifier
+          not:
+            regex: '^type\s'
+          stopBy: end
+rule:
+  any:
+    - kind: import_statement
+      all:
+        - has:
+            field: source
+            matches: banned-source
+        - not:
+            regex: '^import\s+type\b'
+        - matches: binds-a-runtime-value
+    # A re-export pulls the module exactly as hard as an import while reading
+    # as an export, so it needs its own arm.
+    - kind: export_statement
+      all:
+        - has:
+            field: source
+            matches: banned-source
+        - not:
+            regex: '^export\s+type\b'
+files:
+  - "platform/app/src/server/**/*.ts"
+  - "platform/app/src/mcp/**/*.ts"
+  - "platform/app/src/tasks/**/*.ts"
+  - "platform/app/src/app/api/**/*.ts"
+  - "platform/app/src/pages/api/**/*.ts"
+  # The process entrypoints are single files, and they matter more than anything
+  # under them: whatever they reach is by definition resident in a running
+  # backend process. `server.mts` is why this list cannot be `**/*.ts` alone.
+  - "platform/app/src/server.mts"
+  - "platform/app/src/start.ts"
+  - "platform/app/src/workers.ts"
+ignores:
+  # Server-rendered email templates are React by design — react-email renders
+  # them to HTML at send time. This is the one legitimate exception.
+  - "platform/app/src/server/mailer/**"
+  - "**/__tests__/**"
+  - "**/__mocks__/**"
+  - "**/*.test.ts"
+  - "**/*.spec.ts"

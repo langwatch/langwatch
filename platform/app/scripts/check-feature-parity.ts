@@ -123,6 +123,27 @@ const DEFAULT_SHELL_TEST_ROOTS: string[] = [
 ];
 
 /**
+ * Roots scanned for ast-grep rule fixtures (`dev/lint/ast-grep/rule-tests`).
+ *
+ * A lint rule's behaviour is proved by running the linter over snippets that
+ * must and must not match, which is what `ast-grep test` does in the CI
+ * `ast-grep` job — and by nothing else. ast-grep is pip-installed there and is
+ * not present in the vitest job, so a TS binding for these scenarios could only
+ * be a test that skips when the binary is missing (a vacuous green) or one that
+ * asserts the rule's YAML *text* contains a pattern — which passes just as
+ * happily on a rule that no longer compiles.
+ *
+ * Bindings use the same `@scenario` token as bats, expressed as a hash-comment
+ * above the `invalid:` key — the list of snippets the rule MUST flag, which is
+ * the thing that actually runs:
+ *
+ *   # @scenario "A client import into server code is refused as it is written"
+ *   invalid:
+ *     - 'import { useState } from "react";'
+ */
+const DEFAULT_ASTGREP_TEST_ROOTS: string[] = ["dev/lint/ast-grep/rule-tests"];
+
+/**
  * Roots scanned for Go `_test.go` files. Go-side scenarios use the same
  * `@scenario` token as TS, but the proximity check looks for a
  * `func TestXxx(t *testing.T) {` line instead of `it(` / `test(`. Without
@@ -655,6 +676,8 @@ const LEGACY_INERT: string[] = [
 const TEST_FILE_RE = /\.test\.tsx?$/;
 const BATS_FILE_RE = /\.bats$/;
 const SHELL_TEST_FILE_RE = /\.sh$/;
+// ast-grep's own convention: `rule-tests/<rule-id>-test.yml`.
+const ASTGREP_TEST_FILE_RE = /-test\.ya?ml$/;
 const GO_TEST_FILE_RE = /_test\.go$/;
 const PYTHON_TEST_FILE_RE = /^test_.+\.py$/;
 const FEATURE_FILE_RE = /\.feature$/;
@@ -936,6 +959,33 @@ function isNextLineBatsTest(lines: string[], startLineIdx: number): boolean {
  * The `test_` prefix is required: it keeps a stray annotation above a helper
  * from counting as a binding.
  */
+/**
+ * ast-grep binding form. Mirrors the bats rule with the fixture's `invalid:`
+ * key standing in for `@test`:
+ *
+ *   # @scenario "A client import into server code is refused as it is written"
+ *   invalid:
+ *     - 'import { useState } from "react";'
+ *
+ * `invalid:` is required rather than `valid:` because it is the half that
+ * asserts the rule fires at all. A fixture listing only `valid:` snippets
+ * passes on a rule that matches nothing, which is precisely how #3754 shipped a
+ * dead rule.
+ */
+function isNextLineAstGrepInvalidKey(
+  lines: string[],
+  startLineIdx: number,
+): boolean {
+  for (let i = startLineIdx; i < lines.length; i++) {
+    const line = lines[i] ?? "";
+    const trimmed = line.trim();
+    if (trimmed === "") continue;
+    if (trimmed.startsWith("#")) continue;
+    return /^invalid:[ \t]*$/.test(trimmed);
+  }
+  return false;
+}
+
 function isNextLineShellTest(lines: string[], startLineIdx: number): boolean {
   for (let i = startLineIdx; i < lines.length; i++) {
     const line = lines[i] ?? "";
@@ -1318,6 +1368,14 @@ function collectShellBindings(testRoots: string[]): CollectedBinding[] {
   });
 }
 
+function collectAstGrepBindings(testRoots: string[]): CollectedBinding[] {
+  return collectHashCommentBindings({
+    testRoots,
+    fileMatches: (n) => ASTGREP_TEST_FILE_RE.test(n),
+    isTestLine: isNextLineAstGrepInvalidKey,
+  });
+}
+
 function indexByTitle(bindings: CollectedBinding[]): Map<string, BindingRef[]> {
   const byTitle = new Map<string, BindingRef[]>();
   for (const b of bindings) {
@@ -1563,6 +1621,7 @@ function analyzeParity(): ParityAnalysis {
     ...collectAllBindings(DEFAULT_TEST_ROOTS),
     ...collectBatsBindings(DEFAULT_BATS_TEST_ROOTS),
     ...collectShellBindings(DEFAULT_SHELL_TEST_ROOTS),
+    ...collectAstGrepBindings(DEFAULT_ASTGREP_TEST_ROOTS),
     ...collectGoBindings(DEFAULT_GO_TEST_ROOTS),
     ...collectPythonBindings(DEFAULT_PYTHON_TEST_ROOTS),
   ];

@@ -115,9 +115,3 @@ haven.log
 
 # Local agent dev log tee (pnpm dev), never committed.
 .claude-dev.log
-
-# Scratch copy of the boundary-lint fixture, written into a backend tree by
-# noClientImportsInServer.plugin.unit.test.ts and removed again. Dot-prefixed so
-# frontend-boundary.unit.test.ts's walk skips it; ignored here so an interrupted
-# run cannot leave a deliberately-violating file staged.
-src/server/.lint-fixtures/

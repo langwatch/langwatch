@@ -88,10 +88,7 @@
 	// runs whatever is listed here, and CI already gates that. Registration IS
 	// the enforcement. When adding a plugin, verify it appears below and that
 	// its fixtures still produce a non-zero count.
-	"plugins": [
-		"./biome-plugins/no-raw-error-toast.grit",
-		"./biome-plugins/no-client-imports-in-server.grit"
-	],
+	"plugins": ["./biome-plugins/no-raw-error-toast.grit"],
 	"formatter": {
 		"enabled": true,
 		"indentStyle": "tab"
