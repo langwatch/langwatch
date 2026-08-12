@@ -115,20 +115,33 @@ export async function startReplicaPair({
   const handlers: McpHandler[] = [];
   const servers: Server[] = [];
   const urls: string[] = [];
-  for (let i = 0; i < 2; i++) {
-    const handler = createMcpHandler();
-    const server = createServer((req, res) => handler.handleRequest(req, res));
-    await new Promise<void>((resolve) =>
-      server.listen(0, "127.0.0.1", resolve),
-    );
-    const address = server.address();
-    if (typeof address !== "object" || !address) {
-      throw new Error("a replica reported no address after listening");
+  try {
+    for (let i = 0; i < 2; i++) {
+      const handler = createMcpHandler();
+      const server = createServer((req, res) =>
+        handler.handleRequest(req, res),
+      );
+      await new Promise<void>((resolve) =>
+        server.listen(0, "127.0.0.1", resolve),
+      );
+      const address = server.address();
+      if (typeof address !== "object" || !address) {
+        throw new Error("a replica reported no address after listening");
+      }
+      const port = address.port;
+      handlers.push(handler);
+      servers.push(server);
+      urls.push(`http://127.0.0.1:${port}`);
     }
-    const port = address.port;
-    handlers.push(handler);
-    servers.push(server);
-    urls.push(`http://127.0.0.1:${port}`);
+  } catch (err) {
+    // Failing here returns no `stop()`, so nothing would ever put the previous
+    // App back and every later suite in this worker would read the one
+    // installed above. Undo it on the way out.
+    for (const server of servers) {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+    globalForApp.__langwatch_app = previousApp;
+    throw err;
   }
 
   return {
