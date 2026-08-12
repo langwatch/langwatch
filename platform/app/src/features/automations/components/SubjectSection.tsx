@@ -1,5 +1,4 @@
 import {
-  Alert,
   Badge,
   Box,
   Button,
@@ -44,6 +43,7 @@ import { deriveSeriesOptionsFromGraph } from "../logic/seriesOptions";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
 import { ConditionBuilder } from "./ConditionBuilder";
+import { DailyCapAdviceAlert } from "./DailyCapAdviceAlert";
 import { type FacetAccordionProps, FacetSection } from "./FacetSection";
 import { QueryFilterInput } from "./QueryFilterInput";
 
@@ -85,17 +85,22 @@ const SUBJECT_HELP = {
 export function SubjectSection({
   prefilledGraphId,
   accordion,
+  title = "Subject",
 }: {
   /** The graph select is locked to this value when the drawer was opened
    *  from a specific chart card (Phase 5.2). */
   prefilledGraphId?: string;
   accordion?: FacetAccordionProps;
+  /** The wizard's Watch step names this panel after what it is choosing
+   *  ("Which traces" / "The graph and series") — "Subject" is facet
+   *  vocabulary, and no customer-facing label says it (ADR-093 §1). */
+  title?: string;
 }) {
   const draft = useDraft();
 
   return (
     <FacetSection
-      title="Subject"
+      title={title}
       help={SUBJECT_HELP[draft.source]}
       accordion={accordion}
       complete={subjectIsSet(draft)}
@@ -844,59 +849,6 @@ function TracePreview({
           ))}
         </VStack>
       ) : null}
-    </Box>
-  );
-}
-
-/**
- * Advice, sitting right under the firing-rate line so it reads as a comment on
- * that rate: the drafted condition would match more traces a day than the
- * plan's daily action ceiling allows. It never blocks saving, and it is absent
- * whenever the estimate, the ceiling, or the relevance of either is in doubt.
- */
-function DailyCapAdviceAlert({
-  advice,
-  hasDividerBelow,
-}: {
-  advice: DailyCapAdvice | null;
-  hasDividerBelow: boolean;
-}) {
-  if (!advice) return null;
-  return (
-    <Box
-      paddingX={3}
-      paddingY={2}
-      borderBottomWidth={hasDividerBelow ? "1px" : "0"}
-      borderColor="border"
-    >
-      <Alert.Root
-        status="warning"
-        size="sm"
-        variant="subtle"
-        width="full"
-        data-testid="daily-cap-advice"
-      >
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Description textStyle="xs">
-            About {advice.perDay.toLocaleString()} matches a day is over your
-            plan&apos;s daily automation limit of {advice.cap.toLocaleString()}.
-            Matches past the limit are skipped for the rest of the day. Narrow
-            the condition so it selects fewer traces.
-          </Alert.Description>
-        </Alert.Content>
-        <Button
-          asChild
-          size="xs"
-          variant="outline"
-          bg="bg"
-          flexShrink={0}
-          alignSelf="center"
-          data-testid="daily-cap-advice-upgrade"
-        >
-          <a href="/settings/plans">Upgrade Plan</a>
-        </Button>
-      </Alert.Root>
     </Box>
   );
 }

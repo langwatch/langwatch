@@ -200,6 +200,13 @@ const renderDrawer = (
   } = {},
 ) => render(<AutomationDrawer {...props} />, { wrapper: Wrapper });
 
+/** Walk a fresh create from the Watch step to the Review overview, where the
+ *  whole automation — and the Save button — lives (ADR-093 §4). */
+async function continueToReview(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("button", { name: "Continue" }));
+  await user.click(await screen.findByRole("button", { name: "Continue" }));
+}
+
 /** Locates a native select by one of its option labels — the Field labels
  *  aren't programmatically wired to the NativeSelect fields. */
 function selectContainingOption(optionName: RegExp): HTMLSelectElement {
@@ -278,9 +285,31 @@ describe("AutomationDrawer", () => {
   });
 
   describe("given a fresh create flow", () => {
-    describe("when the draft has no trigger or type yet", () => {
-      it("disables the create button", async () => {
+    describe("when the drawer opens", () => {
+      it("asks what the automation should watch, with no type picker", async () => {
         renderDrawer();
+
+        expect(
+          await screen.findByText("What should this automation watch?"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /A trace filter/ }),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /A graph/ }),
+        ).toBeInTheDocument();
+        // The kind picker is gone: choosing what to watch IS the choice that
+        // used to be a type card (ADR-093 §1).
+        expect(screen.queryByText("Type")).not.toBeInTheDocument();
+        expect(screen.queryByText("Source")).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when the draft reaches the review step with nothing configured", () => {
+      it("disables the create button", async () => {
+        const user = userEvent.setup();
+        renderDrawer();
+        await continueToReview(user);
 
         const createButton = await screen.findByRole("button", {
           name: "Create automation",
@@ -291,6 +320,7 @@ describe("AutomationDrawer", () => {
       it("explains why saving is blocked on hover", async () => {
         const user = userEvent.setup();
         renderDrawer();
+        await continueToReview(user);
 
         const createButton = await screen.findByRole("button", {
           name: "Create automation",
@@ -556,9 +586,10 @@ describe("AutomationDrawer", () => {
     });
   });
 
-  describe("given severity is an alert-only facet", () => {
-    describe("when the draft is an alert", () => {
-      it("shows the severity facet", async () => {
+  describe("given severity is offered only to graph-watching automations", () => {
+    describe("when the draft watches a graph", () => {
+      it("shows the severity facet on the review overview", async () => {
+        const user = userEvent.setup();
         renderDrawer({ initialSource: "customGraph" });
 
         await waitFor(() => {
@@ -566,16 +597,19 @@ describe("AutomationDrawer", () => {
             "customGraph",
           );
         });
+        await continueToReview(user);
+
         expect(screen.getByText(/Severity/)).toBeInTheDocument();
       });
     });
 
-    describe("when the draft is a trace automation", () => {
+    describe("when the draft watches a trace filter", () => {
       it("does not show a severity facet", async () => {
+        const user = userEvent.setup();
         renderDrawer();
+        await continueToReview(user);
 
-        // Automations don't carry a severity (ADR-043) — the facet is gone.
-        await screen.findByText("Type");
+        // A trace-watching automation carries no severity (ADR-043).
         expect(screen.queryByText(/Severity/)).not.toBeInTheDocument();
       });
     });
@@ -727,9 +761,9 @@ describe("AutomationDrawer", () => {
     });
   });
 
-  describe("given a trace query is authored before the type is picked", () => {
-    describe("when the type switches to report", () => {
-      it("keeps the query as the report's trace scope", async () => {
+  describe("given the author moves back to an earlier step", () => {
+    describe("when the watch step is reopened from the rail", () => {
+      it("still holds the answers given on the later steps", async () => {
         const user = userEvent.setup();
         renderDrawer();
 
@@ -742,12 +776,18 @@ describe("AutomationDrawer", () => {
             "status:error",
           );
         });
+        await continueToReview(user);
+        const nameInput = screen.getByPlaceholderText("Flag failing traces");
+        fireEvent.change(nameInput, { target: { value: "Flag failures" } });
 
-        await user.click(screen.getByRole("button", { name: /^Schedule/ }));
+        // The rail carries each reached step, so an earlier one is one click
+        // away — and returning to it loses nothing answered after it.
+        await user.click(screen.getByRole("button", { name: /^Watch/ }));
 
-        await waitFor(() => {
-          expect(useAutomationStore.getState().draft.source).toBe("report");
-        });
+        expect(
+          await screen.findByText("What should this automation watch?"),
+        ).toBeInTheDocument();
+        expect(useAutomationStore.getState().draft.name).toBe("Flag failures");
         expect(useAutomationStore.getState().draft.filterQuery).toBe(
           "status:error",
         );
@@ -826,6 +866,7 @@ describe("AutomationDrawer", () => {
           },
         });
         renderDrawer();
+        await continueToReview(user);
 
         const createButton = await screen.findByRole("button", {
           name: "Create automation",
