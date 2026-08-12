@@ -9,7 +9,7 @@ import {
 } from "@chakra-ui/react";
 import type { SlackDeliveryMethod } from "@langwatch/automations/providers/slack";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   type DraftCadence,
   pickDefaultSlackBlockKitTemplateId,
@@ -76,17 +76,35 @@ export function SlackBlockKitTemplatePicker({
   onSelectOtherCadence,
 }: Props) {
   // The grouping (which layouts sit in the primary grid vs. behind the
-  // "N more layouts" disclosure) is latched to the cadence the picker
-  // MOUNTED with. Picking a cross-cadence layout changes the draft's
-  // cadence — see `onSelectOtherCadence` below — and that change flows back
-  // down as a new `cadence` prop. Deriving the grouping from the live prop
-  // would then swap the two groups on every cross-cadence pick: the
+  // "N more layouts" disclosure) is latched to the cadence the picker last
+  // settled on. Picking a cross-cadence layout changes the draft's cadence —
+  // see `onSelectOtherCadence` below — and that change flows back down as a
+  // new `cadence` prop. Deriving the grouping from the live prop on every
+  // render would swap the two groups on every cross-cadence pick: the
   // disclosure the author just expanded becomes the primary grid and jumps
   // to the top, and the layout they were looking at moves out from under
   // them. Selecting still updates the highlight and the draft's cadence —
-  // it just never reshuffles the list.
-  const groupingCadenceRef = useRef(cadence);
-  const groupingCadence = groupingCadenceRef.current;
+  // it just never reshuffles the list AS A RESULT OF THAT PICK.
+  //
+  // The composer's facets are independently open (not a single-open
+  // accordion — see FacetSection), so the author can also change cadence
+  // from the separate Cadence section while this picker stays mounted. That
+  // external change must still regroup the gallery — `groupingCadence`
+  // exists to survive an in-picker pick, not to pin the picker to whatever
+  // cadence happened to be active when it first mounted. `selfInitiatedRef`
+  // marks the cadence value `onSelectOtherCadence` itself is about to cause,
+  // so the effect below can tell "I changed it" apart from "it changed
+  // elsewhere" and only resync for the latter.
+  const [groupingCadence, setGroupingCadence] = useState<DraftCadence>(cadence);
+  const selfInitiatedRef = useRef<DraftCadence | null>(null);
+  useEffect(() => {
+    if (cadence === groupingCadence) return;
+    if (selfInitiatedRef.current === cadence) {
+      selfInitiatedRef.current = null;
+      return;
+    }
+    setGroupingCadence(cadence);
+  }, [cadence, groupingCadence]);
   const options = templateOptionsFor({
     cadence: groupingCadence,
     kind,
@@ -100,6 +118,10 @@ export function SlackBlockKitTemplatePicker({
     reportSource,
   }).filter((opt) => opt.cadenceFit !== "both");
   const [otherOpen, setOtherOpen] = useState(false);
+  const handleSelectOtherCadence = (option: SlackBlockKitTemplateOption) => {
+    selfInitiatedRef.current = otherCadence;
+    onSelectOtherCadence(option);
+  };
   const defaultId = pickDefaultSlackBlockKitTemplateId({
     cadence,
     hasEvaluationFilter,
@@ -180,7 +202,7 @@ export function SlackBlockKitTemplatePicker({
                     isDefault={false}
                     locked={deliveryMethod === "webhook" && !!option.gatedBlock}
                     lockedNote={GATED_NOTE}
-                    onClick={() => onSelectOtherCadence(option)}
+                    onClick={() => handleSelectOtherCadence(option)}
                   />
                 ))}
               </SimpleGrid>

@@ -32,35 +32,53 @@ const renderPicker = (
 
 /** Stands in for the composer's draft: `cadence` flows back down as a live
  *  prop once `onSelectOtherCadence` fires, exactly like the real form owner
- *  reacting to `ctx.setNotificationCadence`. */
+ *  reacting to `ctx.setNotificationCadence`. `exposeExternalCadenceControl`
+ *  adds a second, independent control — standing in for the separate
+ *  Cadence section, which the composer keeps open at the same time as this
+ *  picker (facets are independently open, not a single-open accordion) — so
+ *  a test can change `cadence` WITHOUT going through the picker itself. */
 function StatefulPicker({
   onPick,
+  exposeExternalCadenceControl = false,
 }: {
   onPick: (
     option: Parameters<
       Parameters<typeof SlackBlockKitTemplatePicker>[0]["onSelect"]
     >[0],
   ) => void;
+  exposeExternalCadenceControl?: boolean;
 }) {
   const [cadence, setCadence] = useState<"immediate" | "digest">("immediate");
   const [currentSource, setCurrentSource] = useState("");
   return (
-    <SlackBlockKitTemplatePicker
-      cadence={cadence}
-      kind="trace"
-      deliveryMethod="webhook"
-      hasEvaluationFilter={false}
-      currentSource={currentSource}
-      onSelect={(option) => {
-        setCurrentSource(option.source);
-        onPick(option);
-      }}
-      onSelectOtherCadence={(option) => {
-        setCadence(option.cadenceFit === "digest" ? "digest" : "immediate");
-        setCurrentSource(option.source);
-        onPick(option);
-      }}
-    />
+    <>
+      {exposeExternalCadenceControl ? (
+        <button
+          type="button"
+          onClick={() =>
+            setCadence((c) => (c === "digest" ? "immediate" : "digest"))
+          }
+        >
+          Change cadence in the Cadence section
+        </button>
+      ) : null}
+      <SlackBlockKitTemplatePicker
+        cadence={cadence}
+        kind="trace"
+        deliveryMethod="webhook"
+        hasEvaluationFilter={false}
+        currentSource={currentSource}
+        onSelect={(option) => {
+          setCurrentSource(option.source);
+          onPick(option);
+        }}
+        onSelectOtherCadence={(option) => {
+          setCadence(option.cadenceFit === "digest" ? "digest" : "immediate");
+          setCurrentSource(option.source);
+          onPick(option);
+        }}
+      />
+    </>
   );
 }
 
@@ -225,6 +243,62 @@ describe("SlackBlockKitTemplatePicker", () => {
         .slice(0, 5)
         .map((el) => el.getAttribute("aria-label"));
       expect(namesAfter).toEqual(namesBefore);
+    });
+  });
+
+  describe("when cadence changes for a reason other than a pick made in this picker", () => {
+    /** @scenario "An external cadence change regroups the gallery; an in-picker pick still does not" */
+    it("regroups the gallery to match, then keeps a subsequent in-picker pick stable", async () => {
+      const user = userEvent.setup();
+      render(<StatefulPicker onPick={vi.fn()} exposeExternalCadenceControl />, {
+        wrapper: Wrapper,
+      });
+
+      // Mounted on immediate — the digest layouts start behind the
+      // disclosure, not in the primary grid.
+      expect(
+        screen.queryByRole("button", {
+          name: /use digest — compact template/i,
+        }),
+      ).not.toBeInTheDocument();
+
+      // The author switches cadence from the separate Cadence section, not
+      // from anything in this picker.
+      await user.click(
+        screen.getByRole("button", {
+          name: /change cadence in the cadence section/i,
+        }),
+      );
+
+      // The gallery must track the real cadence — this was never a pick made
+      // here, so the mount-time latch must not have suppressed the regroup.
+      expect(
+        screen.getByRole("button", { name: /use digest — compact template/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /use compact alert template/i }),
+      ).not.toBeInTheDocument();
+
+      const namesAfterExternalChange = screen
+        .getAllByRole("button", { name: /^use .+ template$/i })
+        .slice(0, 4)
+        .map((el) => el.getAttribute("aria-label"));
+
+      // From here, an in-picker cross-cadence pick must still behave exactly
+      // as the sibling test above expects: no reshuffling as a result of the
+      // pick itself.
+      await user.click(
+        screen.getByText(/more layouts for the immediate cadence/i),
+      );
+      await user.click(
+        screen.getByRole("button", { name: /use compact alert template/i }),
+      );
+
+      const namesAfterInPickerPick = screen
+        .getAllByRole("button", { name: /^use .+ template$/i })
+        .slice(0, 4)
+        .map((el) => el.getAttribute("aria-label"));
+      expect(namesAfterInPickerPick).toEqual(namesAfterExternalChange);
     });
   });
 });

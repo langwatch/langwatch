@@ -291,6 +291,14 @@ Feature: Staged automation authoring drawer
       Then the automation's cadence switches to match the picked layout
       And the gallery's list order is unchanged
 
+    @integration
+    Scenario: An external cadence change regroups the gallery; an in-picker pick still does not
+      Given the template gallery is showing layouts for the automation's current cadence
+      When the user changes the cadence from the separate Cadence section
+      Then the gallery regroups its primary layouts to match the new cadence
+      When the user then picks a layout built for the other cadence from the gallery
+      Then the gallery's list order is unchanged by that pick
+
     Scenario: Test fire sends a banner-marked notification before saving
       Given the user has configured a notification with a destination
       When the user test-fires the automation before saving it
