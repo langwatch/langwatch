@@ -19,15 +19,19 @@ import {
   type WebhookStoredActionParams,
 } from "~/server/app-layer/automations/providers/webhook/server";
 import { reportActionParamsSchema } from "~/server/app-layer/automations/report.builder";
+import { PrismaTriggerRepository } from "~/server/app-layer/automations/repositories/trigger.prisma.repository";
+import { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import { REDACTED_CREDENTIAL } from "~/server/app-layer/automations/trigger-redaction";
 import { prisma } from "~/server/db";
 import { decrypt, encrypt } from "~/utils/encryption";
 
-// The route invalidates the active-triggers cache after a successful write.
-// That is the only thing it needs the app layer for, and booting the whole app
-// to no-op one cache drop would buy nothing this suite asserts.
+// The route reads and writes through the app layer's trigger service. Wiring
+// that service over the real repository is what keeps this suite about the
+// route's own rules rather than about booting every other slice of the app.
 vi.mock("~/server/app-layer/app", () => ({
-  getApp: () => ({ triggers: { invalidate: async () => {} } }),
+  getApp: () => ({
+    triggers: new TriggerService(new PrismaTriggerRepository(prisma)),
+  }),
 }));
 
 import { app } from "../[[...route]]/app";
@@ -82,7 +86,12 @@ describe("Feature: delivery credentials are redacted at the REST boundary", () =
     });
   };
 
+  // Several fixtures deliver to a customer endpoint, a channel a project only
+  // has once it is turned on for them.
+  const previousFlagOverride = process.env.FEATURE_FLAG_FORCE_ENABLE;
+
   beforeAll(async () => {
+    process.env.FEATURE_FLAG_FORCE_ENABLE = "release_webhook_automations";
     organization = await prisma.organization.create({
       data: { name: "Triggers Redaction Org", slug: `--test-org-${ns}` },
     });
@@ -106,6 +115,11 @@ describe("Feature: delivery credentials are redacted at the REST boundary", () =
   });
 
   afterAll(async () => {
+    if (previousFlagOverride === undefined) {
+      delete process.env.FEATURE_FLAG_FORCE_ENABLE;
+    } else {
+      process.env.FEATURE_FLAG_FORCE_ENABLE = previousFlagOverride;
+    }
     if (project) {
       await prisma.trigger.deleteMany({ where: { projectId: projectId() } });
       await prisma.project.delete({ where: { id: project.id } });
@@ -235,7 +249,9 @@ describe("Feature: delivery credentials are redacted at the REST boundary", () =
       });
     });
 
-    it("declines to store the placeholder as a destination", async () => {
+    // A listing copied into a create call names no destination — the
+    // placeholder stands for a credential this new automation has never had.
+    it("declines a listing copied into a create call", async () => {
       const response = await app.request("/api/triggers", {
         method: "POST",
         headers: headers(),
@@ -250,12 +266,16 @@ describe("Feature: delivery credentials are redacted at the REST boundary", () =
         }),
       });
 
-      expect(response.status).toBe(201);
-      const created = (await response.json()) as { id: string };
-      const stored = await prisma.trigger.findUniqueOrThrow({
-        where: { id: created.id, projectId: projectId() },
-      });
-      expect(stored.actionParams).toEqual({ slackDelivery: "webhook" });
+      expect(response.status).toBe(422);
+      expect((await response.json()).error).toBe("invalid_action_params");
+      expect(
+        await prisma.trigger.count({
+          where: {
+            projectId: projectId(),
+            name: `Created from a listing ${ns}`,
+          },
+        }),
+      ).toBe(0);
     });
   });
 

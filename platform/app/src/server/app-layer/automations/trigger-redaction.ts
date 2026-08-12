@@ -3,6 +3,7 @@ import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automations/providers/webh
 import { createLogger } from "@langwatch/observability";
 import { TriggerAction } from "@prisma/client";
 import { ZodEffects, ZodObject, type ZodTypeAny } from "zod";
+import { InvalidActionParamsError } from "./errors";
 import {
   persistActionParamsFor,
   redactActionParamsFor,
@@ -182,10 +183,38 @@ export async function persistPublicApiActionParams({
     deliveryFieldNames(entry.shared.actionParamsSchema),
   );
   const persisted = await persistActionParamsFor(action, {
-    incoming: delivery,
+    incoming: readDeliveryConfiguration(
+      entry.shared.actionParamsSchema,
+      delivery,
+    ),
     loadExisting: async () => stored,
   });
   return { ...rule, ...(isRecord(persisted) ? persisted : {}) };
+}
+
+/**
+ * The delivery configuration read by the schema its channel publishes — the
+ * same one the dashboard save is held to, so an https-only destination, a
+ * Slack connection with no channel or a dataset row with no mapping is refused
+ * here exactly as it is there.
+ *
+ * It runs after the placeholders are resolved, never before: a caller writing
+ * back what it read is stating the credential it already has, and a channel
+ * asked to read `[redacted]` as a destination would refuse a round trip the
+ * API promises is safe.
+ */
+function readDeliveryConfiguration(
+  schema: ZodTypeAny,
+  delivery: Record<string, unknown>,
+): unknown {
+  const read = schema.safeParse(delivery);
+  if (read.success) return read.data;
+
+  const issue = read.error.issues[0];
+  throw new InvalidActionParamsError(
+    issue?.message ?? "This delivery configuration cannot be used.",
+    issue?.path.join(".") || undefined,
+  );
 }
 
 /** The fields a channel declares as its own, read off the schema it publishes

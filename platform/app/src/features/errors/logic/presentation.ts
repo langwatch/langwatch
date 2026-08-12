@@ -1349,11 +1349,31 @@ const presentations = {
         : "Configure the destination first.";
     },
   },
+  trigger_channel_not_enabled: {
+    title: "This project does not have that channel yet",
+    describe: () =>
+      "The automation was not saved. Pick a channel this project already " +
+      "delivers on, or ask us to turn this one on for you.",
+  },
+
   trigger_filters_required: {
     title: "This automation needs a condition",
     describe: () =>
       "Add a filter or a query that says which traces it is about. " +
       "Without one it would fire on every single trace.",
+  },
+
+  trigger_filters_unsupported: {
+    title: "None of these conditions can be used",
+    describe: () =>
+      "Every condition on this automation names something this platform no " +
+      "longer filters on. Add at least one condition it can act on.",
+  },
+
+  trigger_not_found: {
+    title: "This automation no longer exists",
+    describe: () =>
+      "It may have been deleted. Reload the list to see what is there now.",
   },
 
   // ==========================================================================
