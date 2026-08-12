@@ -91,8 +91,16 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
   "metadata.labels": (data) => data.labels,
   "metadata.prompt_ids": (data) => data.promptIds,
   "metadata.key": null, // key selector — not matchable
-  "metadata.value": (data, _value, key) =>
-    key ? (data.customMetadata?.[key] ?? null) : null,
+  "metadata.value": (data, _value, key) => {
+    if (!key) return null;
+    const decoded = key.replaceAll("·", ".");
+    const resolved = decoded.startsWith("metadata.")
+      ? decoded.slice("metadata.".length)
+      : decoded.startsWith("langwatch.metadata.")
+        ? decoded.slice("langwatch.metadata.".length)
+        : decoded;
+    return resolved ? (data.customMetadata?.[resolved] ?? null) : null;
+  },
 
   // Span fields
   "spans.type": (data) => data.spanTypes,
