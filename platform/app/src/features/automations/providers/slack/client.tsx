@@ -311,6 +311,9 @@ function SlackChannelField({
       { projectId, botToken: typedToken || null, automationId },
       {
         onError: (error) =>
+          // The hint below already reads `list.isError` / `list.error`, so
+          // this is a dev-diagnostic echo, not the only place the failure
+          // surfaces to the author.
           // eslint-disable-next-line no-console
           console.error("[slack] listSlackChannels failed", error),
       },
@@ -429,6 +432,10 @@ function SlackChannelField({
   const gapHint = gapHints.length
     ? `${gapHints.join(" ")} Type the channel name or paste its ID above to use one that isn't shown.`
     : null;
+  // `no_token` means a load ran with nothing to load against — the "manual
+  // reload with no usable token yet" case a mid-typed token can hit even
+  // though the field isn't empty. Saying nothing here reads as a load that
+  // silently did nothing; name the cause instead.
   const hint = list.isError
     ? `${endWithStop(
         describeError({
@@ -436,11 +443,24 @@ function SlackChannelField({
           fallbackTitle: "Couldn't load channels",
         }),
       )} You can still type the channel above.`
-    : returnedError === "missing_scope"
-      ? "Add the channels:read permission to your Slack app and reinstall it to pick from a list — you can still type the channel above."
-      : returnedError
-        ? "Couldn't load channels from Slack. Check the token, or type the channel above."
-        : gapHint;
+    : list.data?.error === "no_token"
+      ? "Add a bot token above, then reload to see your channels."
+      : returnedError === "missing_scope"
+        ? "Add the channels:read permission to your Slack app and reinstall it to pick from a list — you can still type the channel above."
+        : returnedError
+          ? "Couldn't load channels from Slack. Check the token, or type the channel above."
+          : gapHint;
+
+  // A token that failed to list once (app not yet installed, scopes not yet
+  // granted) can become valid without the field changing — the author fixes
+  // it in Slack and comes back to the same draft. The automatic effect above
+  // won't retry on its own once a key has been attempted (by design — it
+  // isn't a poll), so Reload resets the latch before firing: the same key is
+  // fetched again instead of being treated as already tried.
+  const handleReload = () => {
+    lastFetched.current = null;
+    fetchChannels(fetchKey ?? `manual:${Date.now()}`);
+  };
 
   return (
     <Field.Root>
@@ -455,7 +475,7 @@ function SlackChannelField({
             color="fg.muted"
             _hover={{ color: "fg" }}
             disabled={list.isPending}
-            onClick={() => fetchChannels(fetchKey ?? `manual:${Date.now()}`)}
+            onClick={handleReload}
           >
             {list.isPending ? "Loading…" : "Reload"}
           </Button>
@@ -725,19 +745,6 @@ function SlackConfigForm({
           </Field.Root>
         </VStack>
       )}
-      {/* Try the real message straight from the destination section. */}
-      <TestFireButton
-        onTestFire={ctx.onTestFire}
-        loading={ctx.testFireLoading}
-        disabled={!isComplete(slice)}
-        hint={
-          isComplete(slice)
-            ? undefined
-            : slice.deliveryMethod === "bot"
-              ? "Add a token and channel first"
-              : "Add a webhook URL first"
-        }
-      />
       <FieldHeader
         label="Message"
         usingDefault={slice.template.usingDefault}
@@ -881,6 +888,20 @@ function SlackConfigForm({
           </Button>
         </VStack>
       )}
+      {/* Sits after the layout choice — a test fire renders whatever is
+          configured above, so it belongs after there is something to try. */}
+      <TestFireButton
+        onTestFire={ctx.onTestFire}
+        loading={ctx.testFireLoading}
+        disabled={!isComplete(slice)}
+        hint={
+          isComplete(slice)
+            ? undefined
+            : slice.deliveryMethod === "bot"
+              ? "Add a token and channel first"
+              : "Add a webhook URL first"
+        }
+      />
     </VStack>
   );
 }
@@ -925,8 +946,7 @@ function SlackBotFields({
       >
         <VStack align="stretch" gap={2}>
           <Text textStyle="xs" color="fg">
-            Post to your Slack workspace with a bot token. Create a Slack app,
-            then paste its token below.
+            Paste a Slack app&rsquo;s bot token below to post here.
           </Text>
           <HStack gap={3}>
             <Link
@@ -953,15 +973,16 @@ function SlackBotFields({
             </Button>
           </HStack>
           <TemplateDisclosure
-            triggerLabel="Setup steps"
+            triggerLabel="Where do I get a bot token?"
             open={stepsOpen}
             onToggle={() => setStepsOpen((prev) => !prev)}
           >
             <List.Root as="ol" gap={1} paddingLeft={4}>
               <List.Item>
                 <Text textStyle="xs" color="fg.muted">
-                  Create the app with &ldquo;From a manifest&rdquo; and paste
-                  the copied manifest — it sets the permissions for you.
+                  Create the app with &ldquo;From a manifest,&rdquo; choose the
+                  YAML format, and paste the copied manifest — it sets the
+                  permissions for you.
                 </Text>
               </List.Item>
               <List.Item>

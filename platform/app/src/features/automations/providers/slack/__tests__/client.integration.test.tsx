@@ -34,6 +34,21 @@ const listedChannels: { current: { id: string; name: string }[] | undefined } =
   };
 /** Why the listing is short of the workspace, as the server would report it. */
 const listedGaps: { current: string[] } = { current: [] };
+/** A server-reported listing failure (`missing_scope`, `no_token`, …) on
+ *  `data.error` — distinct from a transport-level mutation failure below. */
+const listedError: { current: string | null } = { current: null };
+/** A transport-level mutation failure (`list.isError` / `list.error`) — the
+ *  request itself never got an answer, as opposed to a valid answer that
+ *  names a problem. */
+const mutationError: { current: unknown } = { current: null };
+/** Every call the form made to `listSlackChannels.mutate`, so a test can
+ *  assert Reload actually re-fires the request rather than silently doing
+ *  nothing. */
+const mutateCalls: { projectId: string; botToken: string | null }[] = [];
+/** Stable empty-array fallback for `listedChannels.current` — a fresh `[]`
+ *  literal on every mocked render would break the component's "sync the
+ *  collection from a stable reference" effect and loop it forever. */
+const NO_CHANNELS: { id: string; name: string }[] = [];
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -43,11 +58,24 @@ vi.mock("~/utils/api", () => ({
       },
       listSlackChannels: {
         useMutation: () => ({
-          mutate: vi.fn(),
-          data: listedChannels.current
-            ? { channels: listedChannels.current, gaps: listedGaps.current }
-            : undefined,
+          mutate: (
+            args: { projectId: string; botToken: string | null },
+            opts?: { onError?: (error: unknown) => void },
+          ) => {
+            mutateCalls.push(args);
+            if (mutationError.current) opts?.onError?.(mutationError.current);
+          },
+          data:
+            listedChannels.current || listedError.current
+              ? {
+                  channels: listedChannels.current ?? NO_CHANNELS,
+                  gaps: listedGaps.current,
+                  error: listedError.current,
+                }
+              : undefined,
           isPending: false,
+          isError: !!mutationError.current,
+          error: mutationError.current,
         }),
       },
     },
@@ -354,6 +382,9 @@ describe("SlackConfigForm channel picker", () => {
     cleanup();
     listedChannels.current = undefined;
     listedGaps.current = [];
+    listedError.current = null;
+    mutationError.current = null;
+    mutateCalls.length = 0;
   });
 
   describe("given a workspace whose channels have loaded", () => {
@@ -678,11 +709,22 @@ describe("SlackConfigForm channel picker", () => {
         const user = userEvent.setup();
         renderForm({ initial: botSlice({ channelId: "" }) });
 
-        await user.click(screen.getByText(/setup steps/i));
+        await user.click(screen.getByText(/where do i get a bot token/i));
 
         expect(
           await screen.findByText(/public channels work straight away/i),
         ).toHaveTextContent(/private channel, add the app to that channel/i);
+      });
+
+      it("says the manifest is pasted in as YAML", async () => {
+        const user = userEvent.setup();
+        renderForm({ initial: botSlice({ channelId: "" }) });
+
+        await user.click(screen.getByText(/where do i get a bot token/i));
+
+        expect(await screen.findByText(/from a manifest/i)).toHaveTextContent(
+          /yaml/i,
+        );
       });
     });
 
@@ -694,6 +736,65 @@ describe("SlackConfigForm channel picker", () => {
           await screen.findByDisplayValue("#release-signoff"),
         ).toBeInTheDocument();
       });
+    });
+  });
+
+  // B2: the Reload button genuinely re-fires the mutation, but a failure used
+  // to be swallowed to a console.error with nothing shown in the form, and a
+  // manual reload with no usable token answered "no_token" with no hint at
+  // all. Both now name their cause in the hint line under the field.
+  describe("given a channel-list request that fails", () => {
+    beforeEach(() => {
+      listedChannels.current = [];
+      mutationError.current = new Error("network down");
+    });
+
+    /** @scenario "A channel-list failure names its cause in the form" */
+    it("names the failure in the hint under the field instead of only logging it", async () => {
+      renderForm({ initial: botSlice({ channelId: "" }) });
+
+      const hint = await screen.findByText(/couldn.t load channels/i);
+      expect(hint).toHaveTextContent(/you can still type the channel above/i);
+    });
+  });
+
+  describe("given a channel-list request answered with no_token", () => {
+    beforeEach(() => {
+      // A stable (if empty) array — `list.data?.channels` feeds a
+      // sync-the-collection effect keyed on this reference, and a fresh `[]`
+      // literal on every render would loop it forever.
+      listedChannels.current = [];
+      listedError.current = "no_token";
+    });
+
+    it("tells the author to add a token instead of showing nothing", async () => {
+      renderForm({ initial: botSlice({ channelId: "" }) });
+
+      expect(
+        await screen.findByText(/add a bot token above, then reload/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("when the author clicks Reload", () => {
+    beforeEach(() => {
+      listedChannels.current = [{ id: "C001", name: "alerts" }];
+    });
+
+    it("re-fires the channel listing request", async () => {
+      const user = userEvent.setup();
+      renderForm({
+        initial: botSlice({ channelId: "", botTokenAlreadySet: true }),
+      });
+
+      // The mount effect already issues one request for the stored token.
+      await screen.findByText("#alerts");
+      const callsBeforeReload = mutateCalls.length;
+      expect(callsBeforeReload).toBeGreaterThan(0);
+
+      await user.click(screen.getByRole("button", { name: /reload/i }));
+
+      expect(mutateCalls.length).toBeGreaterThan(callsBeforeReload);
     });
   });
 });
