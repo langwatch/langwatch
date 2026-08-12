@@ -131,6 +131,50 @@ Feature: Automations over the public API
       When the integrator updates it and states no headers at all
       Then the automation delivers without any header
 
+  Rule: The API saves what the dashboard would accept
+
+    An automation written over the API is the same kind of row the dashboard
+    writes, so it is held to the same rules: a delivery configuration its
+    channel recognises, a destination that is safe to send to, a channel the
+    project actually has, and the cadence a new notification starts on.
+
+    @integration
+    Scenario: A delivery configuration its channel does not recognise is refused
+      When an automation is created over the API with a Slack delivery that names no destination
+      Then the save is refused as an unusable delivery configuration
+      And no automation is created
+
+    @integration
+    Scenario: A destination that is not https is refused
+      Given the project has the webhook channel
+      When an automation is created over the API delivering to an http destination
+      Then the save is refused as an unusable delivery configuration
+      And no automation is created
+
+    @integration
+    Scenario: The webhook channel stays closed until the project has it
+      Given the project does not have the webhook channel
+      When an automation is created over the API delivering to a customer endpoint
+      Then the save is refused as a channel this project does not have
+      And no automation is created
+
+    @integration
+    Scenario: A new notification automation starts on the cadence that protects against storms
+      When an automation that emails on matching traces is created over the API
+      Then it starts on the same digest cadence a dashboard-authored one does
+
+    @integration
+    Scenario: An automation whose only conditions are unsupported is refused
+      When an automation is created over the API with only conditions this platform no longer supports
+      Then the save is refused as a condition it cannot act on
+      And no automation is created
+
+    @integration
+    Scenario: The listing includes paused automations
+      Given an automation that has been paused
+      When the automations are listed over the API
+      Then the paused automation is in the listing
+
   Rule: Clients read the redacted response as it arrives
 
     @unit

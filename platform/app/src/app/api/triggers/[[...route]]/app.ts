@@ -1,24 +1,19 @@
 import { createLogger } from "@langwatch/observability";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
-import { nanoid } from "nanoid";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
-import {
-  type Prisma,
-  type Trigger,
-  TriggerKind,
+import type {
+  AlertType,
+  Trigger,
+  TriggerAction,
 } from "~/generated/prisma/client";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
-import { TriggerFiltersRequiredError } from "~/server/app-layer/automations/errors";
-import {
-  persistPublicApiActionParams,
-  redactTriggerForPublicApi,
-} from "~/server/app-layer/automations/trigger-redaction";
-import { prisma } from "~/server/db";
-import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
+import { PublicApiTriggerService } from "~/server/app-layer/automations/public-api-trigger.service";
+import { redactTriggerForPublicApi } from "~/server/app-layer/automations/trigger-redaction";
+import { triggerFiltersPermissiveSchema } from "~/server/filters/types";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
@@ -32,6 +27,10 @@ const triggerActionEnum = z.enum([
   "ADD_TO_DATASET",
   "ADD_TO_ANNOTATION_QUEUE",
   "SEND_SLACK_MESSAGE",
+  // Available to projects that deliver on the webhook channel; the save is
+  // refused for the rest, so the channel opens here the same day it opens in
+  // the dashboard.
+  "SEND_WEBHOOK",
 ]);
 
 const alertTypeEnum = z.enum(["CRITICAL", "WARNING", "INFO"]);
@@ -60,12 +59,18 @@ const triggerResponseWithPlatformUrlSchema = triggerResponseSchema.extend({
 const createTriggerSchema = z.object({
   name: z.string().min(1, "name is required"),
   action: triggerActionEnum,
+  /**
+   * The delivery configuration, read by the schema its channel publishes: an
+   * email automation states its recipients, a Slack one its destination, a
+   * dataset one the dataset and how a trace maps onto it. A configuration the
+   * channel cannot use is refused, the same way the dashboard refuses it.
+   */
   actionParams: z.record(z.unknown()).default({}),
   // No default. An omitted condition used to become `{}`, which matches every
   // trace forever, so the easiest possible create call produced the most
   // expensive possible automation. Omitting it is now the same as sending an
   // empty one, and both are refused below with a typed 422.
-  filters: z.record(z.unknown()).optional(),
+  filters: triggerFiltersPermissiveSchema.optional(),
   message: z.string().optional(),
   alertType: alertTypeEnum.optional(),
 });
@@ -75,7 +80,7 @@ const updateTriggerSchema = z.object({
   active: z.boolean().optional(),
   message: z.string().nullable().optional(),
   alertType: alertTypeEnum.nullable().optional(),
-  filters: z.record(z.unknown()).optional(),
+  filters: triggerFiltersPermissiveSchema.optional(),
   /**
    * Replaces the delivery configuration as a whole rather than merging into
    * it: send the fields this automation should have from now on, and anything
@@ -122,11 +127,29 @@ function toTriggerResponse(trigger: Trigger) {
 
 const secured = createProjectApp({ basePath: "/api/triggers" });
 
+/** Reads and writes go through the service so this surface is held to the same
+ *  rules the dashboard is, rather than to whatever the wire schema accepts. */
+const triggerService = () => new PublicApiTriggerService(getApp().triggers);
+
+/** Where this automation opens in the dashboard. */
+const triggerPlatformUrl = ({
+  projectSlug,
+  triggerId,
+}: {
+  projectSlug: string;
+  triggerId: string;
+}) =>
+  platformUrl({
+    projectSlug,
+    path: `/automations?drawer.open=automation&drawer.automationId=${triggerId}`,
+  });
+
 // ── List Triggers ──────────────────────────────────────────
 secured.access(requires("triggers:view")).get(
   "/",
   describeRoute({
-    description: "List all active triggers (automations) for the project",
+    description:
+      "List the project's automations, newest first. Paused automations are included.",
     responses: {
       ...baseResponses,
       200: {
@@ -143,17 +166,14 @@ secured.access(requires("triggers:view")).get(
     const project = c.get("project");
     logger.info({ projectId: project.id }, "Listing triggers");
 
-    const triggers = await prisma.trigger.findMany({
-      where: { projectId: project.id, deleted: false },
-      orderBy: { createdAt: "desc" },
-    });
+    const triggers = await triggerService().getAll({ projectId: project.id });
 
     return c.json(
-      triggers.map((t) => ({
-        ...toTriggerResponse(t),
-        platformUrl: platformUrl({
+      triggers.map((trigger) => ({
+        ...toTriggerResponse(trigger),
+        platformUrl: triggerPlatformUrl({
           projectSlug: project.slug,
-          path: `/automations?drawer.open=automation&drawer.automationId=${t.id}`,
+          triggerId: trigger.id,
         }),
       })),
     );
@@ -188,19 +208,16 @@ secured.access(requires("triggers:view")).get(
     const { id } = c.req.param();
     logger.info({ projectId: project.id, triggerId: id }, "Getting trigger");
 
-    const trigger = await prisma.trigger.findFirst({
-      where: { id, projectId: project.id, deleted: false },
+    const trigger = await triggerService().getById({
+      projectId: project.id,
+      triggerId: id,
     });
-
-    if (!trigger) {
-      return c.json({ error: "Trigger not found" }, 404);
-    }
 
     return c.json({
       ...toTriggerResponse(trigger),
-      platformUrl: platformUrl({
+      platformUrl: triggerPlatformUrl({
         projectSlug: project.slug,
-        path: `/automations?drawer.open=automation&drawer.automationId=${trigger.id}`,
+        triggerId: trigger.id,
       }),
     });
   },
@@ -231,43 +248,24 @@ secured.access(requires("triggers:create")).post(
     const body = c.req.valid("json");
     logger.info({ projectId: project.id }, "Creating trigger");
 
-    // This route only ever writes trace automations (it carries no graph or
-    // report shape), so a condition is always required.
-    if (!hasActionableTriggerFilters(body.filters ?? {})) {
-      throw new TriggerFiltersRequiredError();
-    }
-
-    // The channel's own provider owns the at-rest form of its delivery
-    // configuration, so a create hands the payload to it. Nothing is stored
-    // yet, so a field sent as `[redacted]` (a listing copied into a create
-    // call) is dropped rather than saved as that string.
-    const actionParams = await persistPublicApiActionParams({
-      action: body.action,
-      incoming: body.actionParams,
-    });
-
-    const trigger = await prisma.trigger.create({
-      data: {
-        id: nanoid(),
+    const trigger = await triggerService().create({
+      projectId: project.id,
+      input: {
         name: body.name,
-        action: body.action,
-        actionParams: actionParams as Prisma.InputJsonValue,
-        filters: JSON.stringify(body.filters),
-        projectId: project.id,
-        lastRunAt: new Date().getTime(),
-        message: body.message ?? null,
-        alertType: body.alertType ?? null,
+        action: body.action as TriggerAction,
+        actionParams: body.actionParams,
+        filters: body.filters,
+        message: body.message,
+        alertType: body.alertType as AlertType | undefined,
       },
     });
-
-    await getApp().triggers.invalidate(project.id);
 
     return c.json(
       {
         ...toTriggerResponse(trigger),
-        platformUrl: platformUrl({
+        platformUrl: triggerPlatformUrl({
           projectSlug: project.slug,
-          path: `/automations?drawer.open=automation&drawer.automationId=${trigger.id}`,
+          triggerId: trigger.id,
         }),
       },
       201,
@@ -305,58 +303,24 @@ secured.access(requires("triggers:update")).patch(
     const body = c.req.valid("json");
     logger.info({ projectId: project.id, triggerId: id }, "Updating trigger");
 
-    const trigger = await prisma.trigger.findFirst({
-      where: { id, projectId: project.id, deleted: false },
+    const updated = await triggerService().update({
+      projectId: project.id,
+      triggerId: id,
+      input: {
+        name: body.name,
+        active: body.active,
+        message: body.message,
+        alertType: body.alertType as AlertType | null | undefined,
+        filters: body.filters,
+        actionParams: body.actionParams,
+      },
     });
-
-    if (!trigger) {
-      return c.json({ error: "Trigger not found" }, 404);
-    }
-
-    // Editing is the other route to a match-everything automation: create one
-    // with a real condition, then patch the condition away. An automation whose
-    // condition lives in its query keeps a legitimately empty structured set,
-    // and alerts and reports have no trace condition to require at all.
-    if (
-      body.filters !== undefined &&
-      !hasActionableTriggerFilters(body.filters) &&
-      trigger.triggerKind === TriggerKind.AUTOMATION &&
-      (trigger.filterQuery ?? "").trim() === ""
-    ) {
-      throw new TriggerFiltersRequiredError();
-    }
-
-    const data: Record<string, unknown> = {};
-    if (body.name !== undefined) data.name = body.name;
-    if (body.active !== undefined) data.active = body.active;
-    if (body.message !== undefined) data.message = body.message;
-    if (body.alertType !== undefined) data.alertType = body.alertType;
-    if (body.filters !== undefined) data.filters = JSON.stringify(body.filters);
-    // Read-modify-write is the normal integration shape, and a credential the
-    // caller never touched comes back to us as the placeholder — or, for a
-    // stored bot token, as the flag that says one is set. The channel's
-    // provider resolves both against what it stored, so each of those keeps
-    // the credential the automation already delivers with.
-    if (body.actionParams !== undefined) {
-      data.actionParams = await persistPublicApiActionParams({
-        action: trigger.action,
-        incoming: body.actionParams,
-        stored: trigger.actionParams,
-      });
-    }
-
-    const updated = await prisma.trigger.update({
-      where: { id, projectId: project.id },
-      data,
-    });
-
-    await getApp().triggers.invalidate(project.id);
 
     return c.json({
       ...toTriggerResponse(updated),
-      platformUrl: platformUrl({
+      platformUrl: triggerPlatformUrl({
         projectSlug: project.slug,
-        path: `/automations?drawer.open=automation&drawer.automationId=${updated.id}`,
+        triggerId: updated.id,
       }),
     });
   },
@@ -393,20 +357,10 @@ secured.access(requires("triggers:manage")).delete(
     const { id } = c.req.param();
     logger.info({ projectId: project.id, triggerId: id }, "Deleting trigger");
 
-    const trigger = await prisma.trigger.findFirst({
-      where: { id, projectId: project.id, deleted: false },
+    await triggerService().softDelete({
+      projectId: project.id,
+      triggerId: id,
     });
-
-    if (!trigger) {
-      return c.json({ error: "Trigger not found" }, 404);
-    }
-
-    await prisma.trigger.update({
-      where: { id, projectId: project.id },
-      data: { deleted: true, active: false },
-    });
-
-    await getApp().triggers.invalidate(project.id);
 
     return c.json({ id, deleted: true });
   },

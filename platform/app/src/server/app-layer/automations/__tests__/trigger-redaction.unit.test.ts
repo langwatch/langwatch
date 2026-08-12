@@ -265,16 +265,33 @@ describe("persistPublicApiActionParams", () => {
   });
 
   describe("given a placeholder with nothing stored behind it", () => {
-    it("drops the field rather than saving the placeholder", async () => {
-      expect(
-        await persistPublicApiActionParams({
+    // The placeholder stands for a credential the automation already has, so
+    // with nothing stored it names no destination at all — and a channel with
+    // no destination is a configuration it cannot use.
+    it("refuses it rather than saving the placeholder", async () => {
+      await expect(
+        persistPublicApiActionParams({
           action: TriggerAction.SEND_SLACK_MESSAGE,
           incoming: {
             slackDelivery: "webhook",
             slackWebhook: REDACTED_CREDENTIAL,
           },
         }),
-      ).toEqual({ slackDelivery: "webhook", slackWebhook: undefined });
+      ).rejects.toMatchObject({ code: "invalid_action_params" });
+    });
+  });
+
+  describe("given a delivery configuration its channel cannot use", () => {
+    it("refuses it and names the field at fault", async () => {
+      await expect(
+        persistPublicApiActionParams({
+          action: TriggerAction.SEND_WEBHOOK,
+          incoming: { url: "http://example.com/hooks/langwatch" },
+        }),
+      ).rejects.toMatchObject({
+        code: "invalid_action_params",
+        meta: { field: "url" },
+      });
     });
   });
 
@@ -348,12 +365,14 @@ describe("persistPublicApiActionParams", () => {
 
   describe("given a customer endpoint saved without any header", () => {
     it("stores the destination without inventing one", async () => {
-      expect(
-        await persistPublicApiActionParams({
-          action: TriggerAction.SEND_WEBHOOK,
-          incoming: { url: "https://example.com/hooks/langwatch" },
-        }),
-      ).toEqual({ url: "https://example.com/hooks/langwatch" });
+      const saved = (await persistPublicApiActionParams({
+        action: TriggerAction.SEND_WEBHOOK,
+        incoming: { url: "https://example.com/hooks/langwatch" },
+      })) as Record<string, unknown>;
+
+      expect(saved.url).toBe("https://example.com/hooks/langwatch");
+      expect(saved.headersEncrypted).toBeUndefined();
+      expect(saved.signingSecretEncrypted).toBeUndefined();
     });
   });
 });

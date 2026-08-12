@@ -15,15 +15,27 @@ import {
   TriggerAction,
   TriggerKind,
 } from "~/generated/prisma/client";
+import { PrismaTriggerRepository } from "~/server/app-layer/automations/repositories/trigger.prisma.repository";
+import { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import { prisma } from "~/server/db";
 
-// The route invalidates the active-triggers cache after a successful write.
-// That is the only thing it needs the app layer for, and booting the whole app
-// to no-op one cache drop would buy nothing this suite asserts.
+/** A dataset automation states the dataset and how a trace maps onto it — the
+ *  delivery configuration its channel reads. */
+const DATASET_ACTION_PARAMS = {
+  datasetId: "dataset_1",
+  datasetMapping: {
+    mapping: { input: { source: "trace.input" } },
+    expansions: [],
+  },
+};
+
+// The route reads and writes through the app layer's trigger service. Wiring
+// that service over the real repository is what keeps this suite about the
+// route's own rules rather than about booting every other slice of the app.
 vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: () => ({ triggers: { invalidate: async () => {} } }),
+  getApp: () => ({
+    triggers: new TriggerService(new PrismaTriggerRepository(prisma)),
+  }),
 }));
 
 import { app } from "../[[...route]]/app";
@@ -93,7 +105,7 @@ describe("Feature: a REST-created automation must carry a condition", () => {
       const response = await createTrigger({
         name: "Omitted condition",
         action: TriggerAction.ADD_TO_DATASET,
-        actionParams: { datasetId: "dataset_1" },
+        actionParams: DATASET_ACTION_PARAMS,
       });
 
       expect(response.status).toBe(422);
@@ -112,7 +124,7 @@ describe("Feature: a REST-created automation must carry a condition", () => {
       const response = await createTrigger({
         name: "Empty condition",
         action: TriggerAction.ADD_TO_DATASET,
-        actionParams: { datasetId: "dataset_1" },
+        actionParams: DATASET_ACTION_PARAMS,
         filters: {},
       });
 
@@ -126,7 +138,7 @@ describe("Feature: a REST-created automation must carry a condition", () => {
       const response = await createTrigger({
         name: "Vacuous condition",
         action: TriggerAction.ADD_TO_DATASET,
-        actionParams: { datasetId: "dataset_1" },
+        actionParams: DATASET_ACTION_PARAMS,
         filters: { "metadata.labels": [] },
       });
 
@@ -142,7 +154,7 @@ describe("Feature: a REST-created automation must carry a condition", () => {
       const response = await createTrigger({
         name: "Vacuous key selector",
         action: TriggerAction.ADD_TO_DATASET,
-        actionParams: { datasetId: "dataset_1" },
+        actionParams: DATASET_ACTION_PARAMS,
         filters: { "metadata.labels": { region: [] } },
       });
 
@@ -156,7 +168,7 @@ describe("Feature: a REST-created automation must carry a condition", () => {
       const response = await createTrigger({
         name: "Real condition",
         action: TriggerAction.ADD_TO_DATASET,
-        actionParams: { datasetId: "dataset_1" },
+        actionParams: DATASET_ACTION_PARAMS,
         filters: { "metadata.labels": ["prod"] },
       });
 

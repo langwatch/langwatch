@@ -124,6 +124,60 @@ export class TriggerFiltersRequiredError extends HandledError {
   }
 }
 
+/**
+ * Every condition on the automation names a field this platform no longer
+ * filters on, so nothing is left to narrow it. Distinct from having no
+ * condition at all: the author wrote conditions, they just cannot be acted on.
+ */
+export class TriggerFiltersUnsupportedError extends HandledError {
+  declare readonly code: "trigger_filters_unsupported";
+
+  constructor(public readonly unknownFields: string[]) {
+    super(
+      "trigger_filters_unsupported",
+      "None of this automation's conditions can be used. Add at least one " +
+        "condition this platform can act on.",
+      {
+        meta: { field: "filters", unknownFields },
+        httpStatus: 422,
+      },
+    );
+    this.name = "TriggerFiltersUnsupportedError";
+  }
+}
+
+/**
+ * The automation names a delivery channel the project does not have — the
+ * webhook channel ships behind a release flag (ADR-040 §7), and the save path
+ * is gated as well as the picker so the flag holds for API callers too.
+ */
+export class TriggerChannelNotEnabledError extends HandledError {
+  declare readonly code: "trigger_channel_not_enabled";
+
+  constructor(channel: string) {
+    super(
+      "trigger_channel_not_enabled",
+      `This project does not deliver on the ${channel} channel.`,
+      { meta: { field: "action" }, httpStatus: 403 },
+    );
+    this.name = "TriggerChannelNotEnabledError";
+  }
+}
+
+/** No automation with that id in this project. Also what a caller sees for an
+ *  automation belonging to another project: an id it may not read is an id
+ *  that does not exist. */
+export class TriggerNotFoundError extends HandledError {
+  declare readonly code: "trigger_not_found";
+
+  constructor() {
+    super("trigger_not_found", "This automation no longer exists.", {
+      httpStatus: 404,
+    });
+    this.name = "TriggerNotFoundError";
+  }
+}
+
 export class MissingSlackWebhookError extends HandledError {
   declare readonly code: "missing_slack_webhook";
 
