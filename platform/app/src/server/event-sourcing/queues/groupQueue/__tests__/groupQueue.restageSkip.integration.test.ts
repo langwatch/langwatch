@@ -288,41 +288,38 @@ describe.skipIf(!hasTestcontainers)(
             { timeout: 15000, interval: 100 },
           );
 
-          // Wait long enough for the retry loop to surface any resurrection.
-          // Backoff schedule (shared.ts): 500ms -> 1s -> 2s -> 4s. A 4s wait
-          // covers ~3 retry cycles beyond the initial drop. With the bug,
-          // each cycle re-drains B and re-drops it (counter climbs to 2-4).
-          // With the fix, B was skipped by restageDrainedSiblings, so it is
-          // never re-staged, never re-drained, never re-dropped (counter = 1).
-          await new Promise((resolve) => setTimeout(resolve, 4000));
+          // Wait for the retry loop to surface any resurrection and to
+          // re-dispatch healthy sibling C. Backoff schedule (shared.ts):
+          // 500ms -> 1s -> 2s -> 4s, so C should reappear within the first
+          // few retry cycles; 20s is a generous CI-safe bound. Waiting on
+          // the positive observations instead of a fixed sleep keeps the
+          // test deterministic across runner speeds.
+          await vi.waitFor(
+            async () => {
+              // Positive-direction guard: the retry path actually ran (so
+              // the test exercised the catch block at line ~1078, not the
+              // exhausted/dead-letter branch). An inverted predicate
+              // (`if (!sibling.dropped) continue;`) that skips ALL siblings
+              // -- including healthy C -- would leave A retrying alone with
+              // retriedCount > 0 still true while C is silently lost.
+              expect(await retriedCount(name)).toBeGreaterThan(0);
 
-          // The fix's invariant: B was dropped exactly once. With the bug,
-          // the counter climbs past 1 within the 4s window.
+              // Functional correctness guard: healthy sibling C must be
+              // observed at least twice -- once in the initial batch (A,C),
+              // and at least once more in a retry batch -- proving
+              // restageDrainedSiblings actually re-staged C.
+              expect(
+                seenPayloads.filter((p) => p.id === "C").length,
+              ).toBeGreaterThanOrEqual(2);
+            },
+            { timeout: 20000, interval: 100 },
+          );
+
+          // The fix's invariant: B was dropped exactly once. By the time the
+          // waitFor above resolves, the retry loop has had ample time to
+          // re-drain B if the bug were present (the counter would climb
+          // past 1 within the same window).
           expect(await bodyUnreadableDropCount(name)).toBe(1);
-
-          // Positive-direction guard: the retry path actually ran (so the
-          // test exercised the catch block at line ~1078, not the
-          // exhausted/dead-letter branch). Without this assertion, an
-          // inverted predicate (`if (!sibling.dropped) continue;`) that
-          // skips ALL siblings -- including healthy C -- would still pass the
-          // drop-count assertion above while silently breaking healthy
-          // re-dispatch. A non-zero retry count proves the dispatched job A
-          // cycled through retryRestage, which only happens when the catch
-          // block executed the restageDrainedSiblings call under test.
-          expect(await retriedCount(name)).toBeGreaterThan(0);
-
-          // Functional correctness guard: healthy sibling C must be
-          // observed by the handler at least twice -- once in the initial
-          // batch (A,C), and at least once more in a retry batch (A,C) --
-          // proving restageDrainedSiblings actually re-staged C. The
-          // retriedCount assertion above only proves A cycled through
-          // retryRestage; an unconditional `continue;` (or any predicate
-          // that skips every sibling) would leave A retrying alone with
-          // retriedCount > 0 still true but C silently lost. This
-          // assertion closes that gap by directly observing C's
-          // re-dispatch across both processing paths.
-          const cAppearances = seenPayloads.filter((p) => p.id === "C").length;
-          expect(cAppearances).toBeGreaterThanOrEqual(2);
         });
 
         /**
@@ -427,35 +424,40 @@ describe.skipIf(!hasTestcontainers)(
             { timeout: 15000, interval: 100 },
           );
 
-          // Wait long enough for the retry loop to surface any
-          // resurrection. Backoff schedule (shared.ts): 500ms -> 1s -> 2s -> 4s.
-          // A 4s wait covers ~3 retry cycles beyond the initial drop. With
+          // Wait for the retry loop to resolve B's transient failure and
+          // re-dispatch the recoverable sibling. 20s is a generous CI-safe
+          // bound for the 500ms -> 1s -> 2s -> 4s backoff schedule. With
           // the bug (Promise.all), each cycle re-drains C and re-drops it
           // (counter climbs to 2-4). With the fix (Promise.allSettled), C
           // was marked dropped before B's transient rejection was
           // re-thrown, so restageDrainedSiblings skips C on every retry
           // (counter = 1).
-          await new Promise((resolve) => setTimeout(resolve, 4000));
+          await vi.waitFor(
+            async () => {
+              // Positive-direction guard: the retry path actually ran (so
+              // the test exercised the catch block that calls
+              // restageDrainedSiblings, not the exhausted/dead-letter
+              // branch). A regression that drops B along with C (and thus
+              // never retries) would still pass the drop-count assertion.
+              expect(await retriedCount(name)).toBeGreaterThan(0);
 
-          // The fix's invariant: C was dropped exactly once. With the bug,
-          // the counter climbs past 1 within the 4s window.
+              // B's transient failure resolved on retry (failureCounts now
+              // 0), so B must be observed by the handler at least once --
+              // proving the recoverable sibling was not permanently lost.
+              // A regression that drops B along with C would leave B absent
+              // from seenPayloads while still passing the drop-count check.
+              expect(
+                seenPayloads.filter((p) => p.id === "B").length,
+              ).toBeGreaterThanOrEqual(1);
+            },
+            { timeout: 20000, interval: 100 },
+          );
+
+          // The fix's invariant: C was dropped exactly once. By the time the
+          // waitFor above resolves, the retry loop has had ample time to
+          // re-drain C if the bug were present (the counter would climb
+          // past 1 within the same window).
           expect(await bodyUnreadableDropCount(name)).toBe(1);
-
-          // Positive-direction guard: the retry path actually ran (so the
-          // test exercised the catch block that calls restageDrainedSiblings,
-          // not the exhausted/dead-letter branch). Without this assertion, a
-          // regression that drops B along with C (and thus never retries)
-          // would still pass the drop-count assertion.
-          expect(await retriedCount(name)).toBeGreaterThan(0);
-
-          // B's transient failure resolved on retry (failureCounts now 0),
-          // so B must be observed by the handler at least once across all
-          // retries -- proving the recoverable sibling was not permanently
-          // lost. A regression that drops B along with C would leave B
-          // absent from seenPayloads while still passing the drop-count
-          // assertion above.
-          const bAppearances = seenPayloads.filter((p) => p.id === "B").length;
-          expect(bAppearances).toBeGreaterThanOrEqual(1);
         });
       });
     });
