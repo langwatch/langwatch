@@ -489,9 +489,10 @@ The fail-closed builders stay - they are the best part of today's design.
 They just all call the one engine:
 
 ```
- tRPC      protectedProcedure.permission("prompts:update")       ← input-driven
-           (projectId/teamId/organizationId extracted from         scope, no cast
-            validated input; today's middlewares become sugar)
+ tRPC      protectedProcedure                                    ← declared scope,
+             .permission("prompts:update", { scope: "project" })   read from the
+           (reads exactly that id off the validated input — no      validated input,
+            fallback chain; today's middlewares become sugar)       no cast
  Hono      SecuredApp permission argument (surface unchanged, engine inside);
            the packages/api versioned builder adopts AccessPolicy - its
            `auth: "none"` never ships as a third convention

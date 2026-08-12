@@ -440,6 +440,11 @@ schema-adjacent steps, M7's flag only after D0 completes.
    `resolveForViewer` delegating to `authz.check` as the A5 proof.
    The first slice is on `feat/adr-092-stage-d-annotations`, stacked on the
    engine PR: the annotation router, all 18 plain project checks, same
-   permission strings.
+   permission strings. That slice also froze the gate's scope contract while
+   it had a single adopter: `.permission(perm, { scope: "project" })`
+   declares which input id carries the scope — no fallback chain, missing
+   declared id fails loudly as a wiring bug. Every later slice uses the
+   declared form; the codemod should also extract the shared
+   `checkPermissionV2` test stub before converting twenty routers by hand.
 4. M1 backfill job behind a dry-run flag, so the parity sweep can run
    against production data without writing anything.

@@ -155,6 +155,26 @@ Feature: Unified authorization engine
   # Fail-closed surfaces
   # ============================================================================
 
+  @unit
+  Scenario: A procedure declares which scope its permission gate reads
+    Given a procedure gated on a permission with a declared project scope
+    When a request arrives carrying a project id and ids for wider scopes
+    Then the decision is made against the project's scope chain alone
+    And the wider-scope ids in the same input are never consulted
+
+  @unit
+  Scenario: A declared scope with no matching id in the input fails as a wiring bug
+    Given a procedure gated on a permission with a declared project scope
+    When a request arrives whose input carries only wider-scope ids
+    Then the request fails as an internal error, not a denial
+    And no grant information reaches the caller
+
+  @unit
+  Scenario: An unknown scope id denies without revealing whether it exists
+    Given a procedure gated on a permission with a declared project scope
+    When a request arrives carrying a project id that matches no project
+    Then the request is denied exactly like a permission denial
+
   # The HTTP half of this is already bound elsewhere:
   # specs/security/api-endpoint-authorization.feature covers the Hono
   # routes and their build-time enumeration. What is left unbound is the

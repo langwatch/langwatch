@@ -1,8 +1,8 @@
 /**
  * ADR-092 §5 — the tRPC adapter. `protectedProcedure.permission("…")` sugar
- * compiles down to this middleware: input-driven scope extraction, one
- * engine decision through the composed AuthzService, legacy-compatible
- * error shapes.
+ * compiles down to this middleware: a DECLARED scope read off the validated
+ * input, one engine decision through the composed AuthzService,
+ * legacy-compatible error shapes.
  *
  * New procedures opt in via `.permission()`; existing `.use(checkXxx…)`
  * sites keep the legacy path (now shadow-compared) until the stage-D
@@ -28,6 +28,13 @@ type ScopeInput = {
   organizationId?: string;
 };
 
+/** Which validated-input id carries the scope of a permission gate. */
+export type PermissionGateScope = "project" | "team" | "organization";
+
+export type PermissionGateOptions = {
+  scope: PermissionGateScope;
+};
+
 /** The tier and id a check was refused at - what PermissionDeniedError needs,
  *  which a resolved AuthzScopeRef also satisfies structurally. */
 type DeniedScope = { type: AuthzScopeRef["type"]; id: string };
@@ -43,12 +50,13 @@ type MiddlewareParams = {
 };
 
 /**
- * Engine-backed permission middleware. Scope precedence mirrors specificity:
- * projectId, then teamId, then organizationId — a procedure whose input
- * carries none of the three is a wiring bug and fails loudly.
+ * Engine-backed permission middleware. The procedure DECLARES which input
+ * id carries its scope — there is no fallback chain, so a gate can never
+ * silently check a wider scope than the one it was written against, and a
+ * declared id missing from the input is a wiring bug that fails loudly.
  */
 export const checkPermissionV2 =
-  (permission: AuthzPermission) =>
+  (permission: AuthzPermission, options: PermissionGateOptions) =>
   async ({ ctx, input, next }: MiddlewareParams) => {
     // `publicProcedure` exposes `.permission()` too, so a session is not a
     // given here. Answering "unauthenticated" before any id is looked at
@@ -58,7 +66,11 @@ export const checkPermissionV2 =
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
 
-    const scope = await requireScopeFromInput({ input, permission });
+    const scope = await requireScopeFromInput({
+      input,
+      permission,
+      level: options.scope,
+    });
 
     const { decision, grants } = await authz.checkDetailed({
       principal: { type: "user", id: user.id },
@@ -80,32 +92,26 @@ export const checkPermissionV2 =
   };
 
 /**
- * Resolve the check's scope from the procedure input, most specific id
- * first. No id at all is a wiring bug and fails loudly; an id that does not
- * resolve is denied.
+ * Resolve the gate's scope from the procedure input, reading exactly the
+ * declared id. A missing id is a wiring bug and fails loudly before any
+ * grants are read; an id that does not resolve is denied.
  */
 async function requireScopeFromInput({
   input,
   permission,
+  level,
 }: {
   input: ScopeInput;
   permission: AuthzPermission;
+  level: PermissionGateScope;
 }): Promise<AuthzScopeRef> {
-  const scope = await authzCollector.resolveScopeRef({
-    projectId: input.projectId,
-    teamId: input.projectId ? undefined : input.teamId,
-    organizationId:
-      input.projectId || input.teamId ? undefined : input.organizationId,
-  });
-  if (scope) return scope;
-
-  const requested = requestedScope(input);
-  if (!requested) {
+  const id = input[`${level}Id`];
+  if (!id) {
     // Nothing the caller did can fix this, so the sentence they read says
     // only that; which procedure is miswired goes to the log.
     logger.error(
-      { permission },
-      "permission procedure input carries no projectId, teamId, or organizationId",
+      { permission, declaredScope: level },
+      "permission gate declares a scope its procedure input does not carry",
     );
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
@@ -113,25 +119,24 @@ async function requireScopeFromInput({
     });
   }
 
+  const scope = await authzCollector.resolveScopeRef(
+    level === "project"
+      ? { projectId: id }
+      : level === "team"
+        ? { teamId: id }
+        : { organizationId: id },
+  );
+  if (scope) return scope;
+
   // An id that resolves to nothing answers exactly like an id the caller may
   // not touch. Two things used to leak here: the 401-with-prose told an
   // outsider whether an id EXISTS, and the missing error code left the
   // client rendering a generic "unknown error" for a denial it can name.
   throw deniedError({
     permission,
-    scope: requested,
+    scope: { type: level, id },
     denialReason: "no-membership",
   });
-}
-
-/** The tier the caller aimed at, by the same precedence the resolve uses. */
-function requestedScope(input: ScopeInput): DeniedScope | null {
-  if (input.projectId) return { type: "project", id: input.projectId };
-  if (input.teamId) return { type: "team", id: input.teamId };
-  if (input.organizationId) {
-    return { type: "organization", id: input.organizationId };
-  }
-  return null;
 }
 
 function deniedError({

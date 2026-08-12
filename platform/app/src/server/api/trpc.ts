@@ -53,7 +53,10 @@ import { ModelProviderDisabledError } from "~/server/modelProviders/modelProvide
 import { createWarnThrottle } from "~/server/observability/warnThrottle";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { captureException, toError } from "../../utils/posthogErrorCapture";
-import { checkPermissionV2 } from "../authz/trpc-middleware";
+import {
+  checkPermissionV2,
+  type PermissionGateOptions,
+} from "../authz/trpc-middleware";
 import type { OpsScope, PermissionMiddleware } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");
@@ -1206,12 +1209,14 @@ interface PendingPermissionProcedureBuilder<
     TCaller
   >;
   /**
-   * ADR-092 §5 sugar: declare the required permission and let the engine
-   * extract the scope (projectId / teamId / organizationId) from the
-   * validated input. New procedures prefer this over `.use(checkXxx…)`.
+   * ADR-092 §5 sugar: declare the required permission AND which input id
+   * carries its scope — `.permission("annotations:view", { scope:
+   * "project" })` reads exactly `input.projectId`, with no fallback chain.
+   * New procedures prefer this over `.use(checkXxx…)`.
    */
   permission: (
     permission: AuthzPermission,
+    options: PermissionGateOptions,
   ) => ProcedureBuilder<
     TContext,
     TMeta,
@@ -1284,8 +1289,8 @@ const permissionProcedureBuilder = <
       TCaller
     >["input"],
     use: (middleware) => withPermissionCheck(middleware),
-    permission: (permission) =>
-      withPermissionCheck(checkPermissionV2(permission)),
+    permission: (permission, options) =>
+      withPermissionCheck(checkPermissionV2(permission, options)),
   };
 };
 

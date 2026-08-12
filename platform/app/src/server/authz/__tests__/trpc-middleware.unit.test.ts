@@ -1,7 +1,7 @@
 /** @vitest-environment node */
 
 /**
- * The tRPC adapter's own behaviour: which id becomes the scope, what an
+ * The tRPC adapter's own behaviour: the DECLARED scope contract, what an
  * unauthenticated or miswired call gets, and the SHAPE of a refusal. The
  * engine's verdicts are @langwatch/authz's business and are stubbed here.
  *
@@ -71,57 +71,47 @@ beforeEach(() => {
 });
 
 describe("checkPermissionV2", () => {
-  describe("given input carrying every scope id", () => {
-    it("checks the most specific one, projectId first", async () => {
+  describe("given a gate declaring project scope and input carrying every id", () => {
+    /** @scenario "A procedure declares which scope its permission gate reads" */
+    it("resolves exactly the declared id and never consults the wider ones", async () => {
       const params = paramsFor({
         projectId: "proj-1",
-        teamId: "team-1",
-        organizationId: "org-1",
+        teamId: "team-9",
+        organizationId: "org-9",
       });
 
-      await checkPermissionV2("prompts:update")(params);
+      await checkPermissionV2("prompts:update", { scope: "project" })(params);
 
-      expect(resolveScopeRef).toHaveBeenCalledWith({
-        projectId: "proj-1",
-        teamId: undefined,
-        organizationId: undefined,
-      });
+      expect(resolveScopeRef).toHaveBeenCalledTimes(1);
+      expect(resolveScopeRef).toHaveBeenCalledWith({ projectId: "proj-1" });
     });
   });
 
-  describe("given input carrying a team and an organization", () => {
-    it("checks the team, the more specific of the two", async () => {
+  describe("given a gate declaring team scope", () => {
+    it("reads the team id even when a wider organization id is present", async () => {
       resolveScopeRef.mockResolvedValue({
         type: "team",
         id: "team-1",
         organizationId: "org-1",
       });
 
-      await checkPermissionV2("prompts:update")(
+      await checkPermissionV2("prompts:update", { scope: "team" })(
         paramsFor({ teamId: "team-1", organizationId: "org-1" }),
       );
 
-      expect(resolveScopeRef).toHaveBeenCalledWith({
-        projectId: undefined,
-        teamId: "team-1",
-        organizationId: undefined,
-      });
+      expect(resolveScopeRef).toHaveBeenCalledWith({ teamId: "team-1" });
     });
   });
 
-  describe("given input carrying only an organization", () => {
-    it("checks the organization", async () => {
+  describe("given a gate declaring organization scope", () => {
+    it("reads the organization id", async () => {
       resolveScopeRef.mockResolvedValue({ type: "organization", id: "org-1" });
 
-      await checkPermissionV2("organization:manage")(
-        paramsFor({ organizationId: "org-1" }),
-      );
+      await checkPermissionV2("organization:manage", {
+        scope: "organization",
+      })(paramsFor({ organizationId: "org-1" }));
 
-      expect(resolveScopeRef).toHaveBeenCalledWith({
-        projectId: undefined,
-        teamId: undefined,
-        organizationId: "org-1",
-      });
+      expect(resolveScopeRef).toHaveBeenCalledWith({ organizationId: "org-1" });
     });
   });
 
@@ -131,7 +121,7 @@ describe("checkPermissionV2", () => {
       params.ctx.session = null as any;
 
       const error = await rejection(() =>
-        checkPermissionV2("prompts:update")(params),
+        checkPermissionV2("prompts:update", { scope: "project" })(params),
       );
 
       expect(error).toBeInstanceOf(TRPCError);
@@ -141,28 +131,32 @@ describe("checkPermissionV2", () => {
     });
   });
 
-  describe("given a procedure whose input carries no scope id at all", () => {
-    it("fails as a wiring bug, with copy that promises the caller nothing", async () => {
-      resolveScopeRef.mockResolvedValue(null);
-
+  describe("given input carrying only ids for scopes the gate did not declare", () => {
+    /** @scenario "A declared scope with no matching id in the input fails as a wiring bug" */
+    it("fails as a wiring bug before reading any grants, promising the caller nothing", async () => {
       const error = await rejection(() =>
-        checkPermissionV2("prompts:update")(paramsFor({})),
+        checkPermissionV2("prompts:update", { scope: "project" })(
+          paramsFor({ teamId: "team-1", organizationId: "org-1" }),
+        ),
       );
 
       expect(error.code).toBe("INTERNAL_SERVER_ERROR");
       // The permission name and the miswiring go to the log, not to the user.
       expect(error.message).not.toContain("prompts:update");
       expect(error.cause).toBeUndefined();
+      expect(resolveScopeRef).not.toHaveBeenCalled();
+      expect(checkDetailed).not.toHaveBeenCalled();
     });
   });
 
-  describe("given an id the engine cannot resolve", () => {
+  describe("given a declared id the engine cannot resolve", () => {
+    /** @scenario "An unknown scope id denies without revealing whether it exists" */
     it("denies exactly as an engine denial does, leaking no existence", async () => {
       resolveScopeRef.mockResolvedValue(null);
       const params = paramsFor({ projectId: "ghost" });
 
       const unknown = await rejection(() =>
-        checkPermissionV2("prompts:update")(params),
+        checkPermissionV2("prompts:update", { scope: "project" })(params),
       );
 
       checkDetailed.mockResolvedValue({
@@ -171,7 +165,9 @@ describe("checkPermissionV2", () => {
       });
       resolveScopeRef.mockResolvedValue(PROJECT_SCOPE);
       const denied = await rejection(() =>
-        checkPermissionV2("prompts:update")(paramsFor({ projectId: "proj-1" })),
+        checkPermissionV2("prompts:update", { scope: "project" })(
+          paramsFor({ projectId: "proj-1" }),
+        ),
       );
 
       for (const error of [unknown, denied]) {
@@ -184,11 +180,13 @@ describe("checkPermissionV2", () => {
       expect(params.next).not.toHaveBeenCalled();
     });
 
-    it("names the tier the caller asked for, so the denial is about that scope", async () => {
+    it("names the tier the gate declared, so the denial is about that scope", async () => {
       resolveScopeRef.mockResolvedValue(null);
 
       const error = await rejection(() =>
-        checkPermissionV2("team:manage")(paramsFor({ teamId: "ghost-team" })),
+        checkPermissionV2("team:manage", { scope: "team" })(
+          paramsFor({ teamId: "ghost-team" }),
+        ),
       );
 
       expect((error.cause as HandledError).meta).toMatchObject({
@@ -206,7 +204,9 @@ describe("checkPermissionV2", () => {
       });
 
       const error = await rejection(() =>
-        checkPermissionV2("prompts:update")(paramsFor({ projectId: "proj-1" })),
+        checkPermissionV2("prompts:update", { scope: "project" })(
+          paramsFor({ projectId: "proj-1" }),
+        ),
       );
 
       expect(error.cause).toBeInstanceOf(LiteMemberRestrictedError);
@@ -221,7 +221,9 @@ describe("checkPermissionV2", () => {
     it("hands the organization role to the context and records that a check ran", async () => {
       const params = paramsFor({ projectId: "proj-1" });
 
-      const result = await checkPermissionV2("prompts:update")(params);
+      const result = await checkPermissionV2("prompts:update", {
+        scope: "project",
+      })(params);
 
       expect(checkDetailed).toHaveBeenCalledWith({
         principal: { type: "user", id: "alice" },
