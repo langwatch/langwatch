@@ -1,11 +1,7 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
-import type {
-  ErrorCluster,
-  ParkedGroupInfo,
-  ParkedTenant,
-  QueueInfo,
-} from "../types";
+import type { ParkedTenant } from "../snapshot/snapshot.types";
+import type { ErrorCluster, ParkedGroupInfo, QueueInfo } from "../types";
 
 /**
  * Every tenant currently over its in-flight cap, plus how many exist.

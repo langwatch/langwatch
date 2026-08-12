@@ -1,4 +1,4 @@
-import { IconButton, Menu, Portal } from "@chakra-ui/react";
+import { Field, IconButton, Input, Menu, Portal, Text } from "@chakra-ui/react";
 import { MoreVertical } from "lucide-react";
 import { useState } from "react";
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
@@ -18,6 +18,7 @@ type PendingAction = "pause" | "resume" | "clear" | "run" | null;
  */
 export function SchedulerRowActions({
   scheduleId,
+  targetType,
   targetId,
   projectName,
   status,
@@ -25,6 +26,8 @@ export function SchedulerRowActions({
   onDone,
 }: {
   scheduleId: string;
+  /** What kind of thing is scheduled, e.g. "briefing". Used as the copy's noun. */
+  targetType: string;
   targetId: string;
   /** Resolved project NAME, or null when it could not be resolved. */
   projectName: string | null;
@@ -108,6 +111,7 @@ export function SchedulerRowActions({
       <SchedulerConfirmations
         pending={pending}
         onClose={() => setPending(null)}
+        targetType={targetType}
         targetId={targetId}
         tenant={tenant}
         onRunNow={() => runNow.mutate({ scheduleId })}
@@ -122,12 +126,16 @@ export function SchedulerRowActions({
 /**
  * The four confirmations, split out so the menu component stays readable.
  *
- * Each names the target and the tenant: these controls are cross-tenant, and
- * the realistic failure is the right action on the wrong row.
+ * The copy's noun is the target TYPE, never its ksuid. An identifier an
+ * operator cannot read is not something they can check the sentence against, so
+ * putting one mid-sentence buys the appearance of specificity and none of the
+ * protection. The full identifier is still shown, on its own line, where it can
+ * be compared against the row that was clicked.
  */
 function SchedulerConfirmations({
   pending,
   onClose,
+  targetType,
   targetId,
   tenant,
   onRunNow,
@@ -137,6 +145,7 @@ function SchedulerConfirmations({
 }: {
   pending: PendingAction;
   onClose: () => void;
+  targetType: string;
   targetId: string;
   tenant: string | null;
   onRunNow: () => void;
@@ -144,17 +153,22 @@ function SchedulerConfirmations({
   onClearSlot: () => void;
   busy: boolean;
 }) {
+  // Run-now is the only control that can deliver something to a customer, so it
+  // is the only one gated on a resolved name — `canRunNow` withholds it
+  // otherwise, which is why this falls back for the reversible controls only.
   const project = tenant ?? "this project";
+  const target = `this ${targetType}`;
 
   return (
     <>
-      <ConfirmDialog
+      <RunNowConfirmation
         open={pending === "run"}
         onClose={onClose}
         onConfirm={onRunNow}
-        isLoading={busy}
-        title="Run this schedule now?"
-        description={`${targetId} will run for ${project} as soon as a worker picks it up, exactly as a scheduled run would. Anything it delivers goes to that project.`}
+        busy={busy}
+        targetType={targetType}
+        targetId={targetId}
+        project={project}
       />
 
       <ConfirmDialog
@@ -163,8 +177,10 @@ function SchedulerConfirmations({
         onConfirm={() => onSetActive(false)}
         isLoading={busy}
         title="Pause this schedule?"
-        description={`${targetId} will stop running for ${project} until you resume it. A run already in progress continues — pausing does not cancel it.`}
-      />
+        description={`${target} will stop running for ${project} until you resume it. A run already in progress continues — pausing does not cancel it.`}
+      >
+        <TargetIdentity targetId={targetId} />
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={pending === "resume"}
@@ -172,8 +188,10 @@ function SchedulerConfirmations({
         onConfirm={() => onSetActive(true)}
         isLoading={busy}
         title="Resume this schedule?"
-        description={`${targetId} will go back on the calendar for ${project} and run at its next scheduled time.`}
-      />
+        description={`${target} will go back on the calendar for ${project} and run at its next scheduled time.`}
+      >
+        <TargetIdentity targetId={targetId} />
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={pending === "clear"}
@@ -181,8 +199,85 @@ function SchedulerConfirmations({
         onConfirm={onClearSlot}
         isLoading={busy}
         title="Clear this stuck slot?"
-        description={`This releases the run ${targetId} has been holding for ${project} so it can be picked up again. If the original worker is somehow still alive, the slot could be worked twice.`}
-      />
+        description={`This releases the run ${target} has been holding for ${project} so it can be picked up again. If the original worker is somehow still alive, the slot could be worked twice.`}
+      >
+        <TargetIdentity targetId={targetId} />
+      </ConfirmDialog>
     </>
+  );
+}
+
+/** The identifier, shown where it can be compared rather than read as prose. */
+function TargetIdentity({ targetId }: { targetId: string }) {
+  return (
+    <Text
+      textStyle="xs"
+      fontFamily="mono"
+      color="fg.muted"
+      marginTop={2}
+      wordBreak="break-all"
+    >
+      {targetId}
+    </Text>
+  );
+}
+
+/**
+ * Run-now confirms by typed project name, not by one click.
+ *
+ * It is the only control here that is not reversible and the only one that can
+ * put something in front of a customer, so it is the one where the guard has to
+ * cost more than the muscle memory of pressing Confirm. Typing the project is
+ * also the check that matters: the realistic failure is the right action on the
+ * wrong tenant.
+ */
+function RunNowConfirmation({
+  open,
+  onClose,
+  onConfirm,
+  busy,
+  targetType,
+  targetId,
+  project,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  busy: boolean;
+  targetType: string;
+  targetId: string;
+  project: string;
+}) {
+  const [typed, setTyped] = useState("");
+
+  const close = () => {
+    setTyped("");
+    onClose();
+  };
+
+  return (
+    <ConfirmDialog
+      open={open}
+      onClose={close}
+      onConfirm={onConfirm}
+      isLoading={busy}
+      confirmDisabled={typed.trim() !== project}
+      title="Run this schedule now?"
+      description={`This ${targetType} will run for ${project} as soon as a worker picks it up, exactly as a scheduled run would. Anything it delivers goes to that project.`}
+    >
+      <TargetIdentity targetId={targetId} />
+      <Field.Root marginTop={4}>
+        <Field.Label textStyle="xs">
+          Type <strong>{project}</strong> to confirm
+        </Field.Label>
+        <Input
+          size="sm"
+          value={typed}
+          onChange={(event) => setTyped(event.target.value)}
+          placeholder={project}
+          autoComplete="off"
+        />
+      </Field.Root>
+    </ConfirmDialog>
   );
 }

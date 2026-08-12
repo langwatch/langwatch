@@ -109,7 +109,47 @@ describe("clusterGroups", () => {
         },
       ]);
 
-      expect(clusters[0]?.label).toBe("heavy/stem");
+      expect(clusters[0]?.totalPendingJobs).toBe(40);
+    });
+  });
+
+  describe("given one indexed group with no sibling", () => {
+    it("keeps the whole identifier, index included", () => {
+      // Shortening to the stem before anything is collapsed into it drops the
+      // one detail that tells this group apart from the sibling it does not
+      // have yet.
+      const clusters = clusterGroups([
+        {
+          queueName: "q",
+          groupId: "solo/stem:7",
+          pendingJobs: 1,
+          oldestJobMs: 1,
+        },
+      ]);
+
+      expect(clusters[0]?.label).toBe("solo/stem:7");
+    });
+  });
+
+  describe("given a second member joining an indexed cluster", () => {
+    it("collapses the label to the shared stem", () => {
+      const clusters = clusterGroups([
+        {
+          queueName: "q",
+          groupId: "pair/stem:1",
+          pendingJobs: 1,
+          oldestJobMs: 1,
+        },
+        {
+          queueName: "q",
+          groupId: "pair/stem:2",
+          pendingJobs: 1,
+          oldestJobMs: 1,
+        },
+      ]);
+
+      expect(clusters[0]?.label).toBe("pair/stem");
+      expect(clusters[0]?.members).toHaveLength(2);
     });
   });
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SLOT_STALE_AFTER_MS } from "~/shared/ops/schedulerControl";
 import {
   compareForAttention,
   deriveLoopHealth,
@@ -7,7 +8,6 @@ import {
   latenessMs,
   needsAttention,
   type SchedulerJobLike,
-  SLOT_STALE_AFTER_MS,
   summarize,
 } from "../schedulerStatus";
 
@@ -28,15 +28,15 @@ describe("deriveStatus", () => {
     describe("when its status is derived", () => {
       /** @scenario "An overdue schedule reads as overdue, not as a timestamp" */
       it("reads as overdue rather than as a timestamp", () => {
-        expect(deriveStatus(job({ nextRunAt: at(-2_520_000) }), NOW)).toBe(
-          "overdue",
-        );
+        expect(
+          deriveStatus({ job: job({ nextRunAt: at(-2_520_000) }), now: NOW }),
+        ).toBe("overdue");
       });
 
       it("states how late it is", () => {
-        expect(latenessMs(job({ nextRunAt: at(-2_520_000) }), NOW)).toBe(
-          2_520_000,
-        );
+        expect(
+          latenessMs({ job: job({ nextRunAt: at(-2_520_000) }), now: NOW }),
+        ).toBe(2_520_000);
       });
     });
   });
@@ -46,9 +46,9 @@ describe("deriveStatus", () => {
       it("is not called overdue yet", () => {
         // The loop leases a slot by pushing nextRunAt forward, so a row sits a
         // beat in the past during normal claiming.
-        expect(deriveStatus(job({ nextRunAt: at(-5_000) }), NOW)).toBe(
-          "scheduled",
-        );
+        expect(
+          deriveStatus({ job: job({ nextRunAt: at(-5_000) }), now: NOW }),
+        ).toBe("scheduled");
       });
     });
   });
@@ -56,16 +56,19 @@ describe("deriveStatus", () => {
   describe("given a claimed slot", () => {
     describe("when there are no prior attempts", () => {
       it("reads as running", () => {
-        expect(deriveStatus(job({ currentSlot: at(-1_000) }), NOW)).toBe(
-          "running",
-        );
+        expect(
+          deriveStatus({ job: job({ currentSlot: at(-1_000) }), now: NOW }),
+        ).toBe("running");
       });
     });
 
     describe("when prior attempts exist", () => {
       it("reads as retrying, not as a long-running execution", () => {
         expect(
-          deriveStatus(job({ currentSlot: at(-1_000), attempts: 3 }), NOW),
+          deriveStatus({
+            job: job({ currentSlot: at(-1_000), attempts: 3 }),
+            now: NOW,
+          }),
         ).toBe("retrying");
       });
     });
@@ -77,7 +80,10 @@ describe("deriveStatus", () => {
         // A switched-off schedule is not late; calling it overdue would bury
         // the schedules that genuinely are.
         expect(
-          deriveStatus(job({ active: false, nextRunAt: at(-86_400_000) }), NOW),
+          deriveStatus({
+            job: job({ active: false, nextRunAt: at(-86_400_000) }),
+            now: NOW,
+          }),
         ).toBe("paused");
       });
     });
@@ -106,9 +112,11 @@ describe("compareForAttention", () => {
           job({ active: false }),
         ];
 
-        const sorted = [...rows].sort((a, b) => compareForAttention(a, b, NOW));
+        const sorted = [...rows].sort((a, b) =>
+          compareForAttention({ a, b, now: NOW }),
+        );
 
-        expect(sorted.map((r) => deriveStatus(r, NOW))).toEqual([
+        expect(sorted.map((r) => deriveStatus({ job: r, now: NOW }))).toEqual([
           "overdue",
           "retrying",
           "scheduled",
@@ -124,7 +132,9 @@ describe("compareForAttention", () => {
       const sooner = job({ nextRunAt: at(60_000) });
 
       expect(
-        [later, sooner].sort((a, b) => compareForAttention(a, b, NOW))[0],
+        [later, sooner].sort((a, b) =>
+          compareForAttention({ a, b, now: NOW }),
+        )[0],
       ).toBe(sooner);
     });
   });
@@ -135,8 +145,8 @@ describe("summarize", () => {
     describe("when the header counts are derived", () => {
       /** @scenario "The header counts what needs attention" */
       it("counts overdue, failing, due-soon, active and paused", () => {
-        const counts = summarize(
-          [
+        const counts = summarize({
+          jobs: [
             job({ nextRunAt: at(-600_000) }),
             job({ nextRunAt: at(-900_000) }),
             job({ currentSlot: at(-1_000), attempts: 4 }),
@@ -144,8 +154,8 @@ describe("summarize", () => {
             job({ nextRunAt: at(7_200_000) }),
             job({ active: false }),
           ],
-          NOW,
-        );
+          now: NOW,
+        });
 
         expect(counts.overdue).toBe(2);
         expect(counts.failing).toBe(1);
@@ -158,7 +168,7 @@ describe("summarize", () => {
 
   describe("given nothing scheduled at all", () => {
     it("reports zeroes rather than throwing", () => {
-      expect(summarize([], NOW)).toEqual({
+      expect(summarize({ jobs: [], now: NOW })).toEqual({
         overdue: 0,
         failing: 0,
         dueWithinHour: 0,
@@ -174,10 +184,10 @@ describe("deriveLoopHealth", () => {
     describe("when loop health is derived", () => {
       /** @scenario "A stalled calendar loop is the headline, not a row detail" */
       it("reports the loop as unhealthy", () => {
-        const health = deriveLoopHealth(
-          [job({ nextRunAt: at(-600_000), lastSlot: at(-3_600_000) })],
-          NOW,
-        );
+        const health = deriveLoopHealth({
+          jobs: [job({ nextRunAt: at(-600_000), lastSlot: at(-3_600_000) })],
+          now: NOW,
+        });
 
         expect(health.healthy).toBe(false);
         expect(health.lastFiredAt).toBe(NOW - 3_600_000);
@@ -189,10 +199,10 @@ describe("deriveLoopHealth", () => {
     it("does not blame the loop", () => {
       // Work IS being delivered, so an overdue row is that schedule's problem
       // rather than evidence the loop stopped.
-      const health = deriveLoopHealth(
-        [job({ nextRunAt: at(-600_000), lastSlot: at(-5_000) })],
-        NOW,
-      );
+      const health = deriveLoopHealth({
+        jobs: [job({ nextRunAt: at(-600_000), lastSlot: at(-5_000) })],
+        now: NOW,
+      });
 
       expect(health.healthy).toBe(true);
     });
@@ -200,10 +210,10 @@ describe("deriveLoopHealth", () => {
 
   describe("given nothing is overdue", () => {
     it("treats silence as expected", () => {
-      const health = deriveLoopHealth(
-        [job({ nextRunAt: at(600_000), lastSlot: at(-86_400_000) })],
-        NOW,
-      );
+      const health = deriveLoopHealth({
+        jobs: [job({ nextRunAt: at(600_000), lastSlot: at(-86_400_000) })],
+        now: NOW,
+      });
 
       expect(health.healthy).toBe(true);
     });
@@ -211,10 +221,10 @@ describe("deriveLoopHealth", () => {
 
   describe("given an overdue schedule that has never fired", () => {
     it("reports the loop as unhealthy without a last-fired time", () => {
-      const health = deriveLoopHealth(
-        [job({ nextRunAt: at(-600_000), lastSlot: null })],
-        NOW,
-      );
+      const health = deriveLoopHealth({
+        jobs: [job({ nextRunAt: at(-600_000), lastSlot: null })],
+        now: NOW,
+      });
 
       expect(health.healthy).toBe(false);
       expect(health.lastFiredAt).toBeNull();
@@ -223,10 +233,10 @@ describe("deriveLoopHealth", () => {
 
   describe("given only paused schedules", () => {
     it("ignores them entirely", () => {
-      const health = deriveLoopHealth(
-        [job({ active: false, nextRunAt: at(-86_400_000) })],
-        NOW,
-      );
+      const health = deriveLoopHealth({
+        jobs: [job({ active: false, nextRunAt: at(-86_400_000) })],
+        now: NOW,
+      });
 
       expect(health.healthy).toBe(true);
       expect(health.lastFiredAt).toBeNull();
@@ -236,7 +246,7 @@ describe("deriveLoopHealth", () => {
 
 describe("isSlotStale", () => {
   describe("given a slot claimed moments ago", () => {
-    it("is not stale, so clearing is not offered", () => {
+    it("keeps clearing unavailable for a fresh claim", () => {
       // This gate guards the one control that can admit a second worker to a
       // slot; offering it against a healthy run is the failure mode.
       expect(
@@ -249,7 +259,7 @@ describe("isSlotStale", () => {
   });
 
   describe("given a slot held past the threshold", () => {
-    it("is stale", () => {
+    it("marks a held slot as stale", () => {
       const held = at(-SLOT_STALE_AFTER_MS - 1_000);
       expect(
         isSlotStale({
@@ -260,8 +270,49 @@ describe("isSlotStale", () => {
     });
   });
 
+  describe("given a slot held for exactly the threshold", () => {
+    it("marks it stale, so the boundary is inclusive", () => {
+      const held = at(-SLOT_STALE_AFTER_MS);
+      expect(
+        isSlotStale({
+          job: { ...job({ currentSlot: held }), updatedAt: held },
+          now: NOW,
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("given a slot with no updatedAt to read", () => {
+    it("falls back to the slot instant rather than never offering the repair", () => {
+      // The fallback is what keeps a wedged row repairable when the row has
+      // told us nothing since the claim.
+      expect(
+        isSlotStale({
+          job: job({ currentSlot: at(-SLOT_STALE_AFTER_MS - 1_000) }),
+          now: NOW,
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("given an updatedAt newer than the slot instant", () => {
+    it("measures from updatedAt, so a live worker is not raced", () => {
+      // The worker touched the row recently — bumping attempts, recording an
+      // error — so the slot is old but the worker is not gone.
+      expect(
+        isSlotStale({
+          job: {
+            ...job({ currentSlot: at(-SLOT_STALE_AFTER_MS - 60_000) }),
+            updatedAt: at(-1_000),
+          },
+          now: NOW,
+        }),
+      ).toBe(false);
+    });
+  });
+
   describe("given no slot in flight", () => {
-    it("is never stale", () => {
+    it("keeps slot clearing unavailable", () => {
       expect(isSlotStale({ job: job({ currentSlot: null }), now: NOW })).toBe(
         false,
       );

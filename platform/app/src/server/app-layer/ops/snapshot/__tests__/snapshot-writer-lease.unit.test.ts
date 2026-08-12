@@ -34,11 +34,11 @@ const makeQueueRepo = () => ({
   reconcileTotalPending: vi.fn().mockResolvedValue(null),
 });
 
-const makeSnapshotRepo = (held: boolean): SnapshotRepository => ({
-  acquireOrRenewLease: vi.fn().mockResolvedValue({ held, epoch: 1 }),
+const makeSnapshotRepo = (isHeld: boolean): SnapshotRepository => ({
+  acquireOrRenewLease: vi.fn().mockResolvedValue({ isHeld, epoch: 1 }),
   releaseLease: vi.fn().mockResolvedValue(undefined),
-  writeLive: vi.fn().mockResolvedValue(undefined),
-  writeDetail: vi.fn().mockResolvedValue(undefined),
+  writeLive: vi.fn().mockResolvedValue(true),
+  writeDetail: vi.fn().mockResolvedValue(true),
   readLive: vi.fn().mockResolvedValue(null),
   readDetail: vi.fn().mockResolvedValue(null),
 });
@@ -97,7 +97,7 @@ describe("snapshot writer lease gate", () => {
       await collector.discoverQueues();
       await collector.collect();
 
-      collector.stop();
+      await collector.stop();
 
       expect(snapshotRepo.releaseLease).toHaveBeenCalledWith({
         writerId: "holder",
@@ -113,7 +113,7 @@ describe("snapshot writer lease gate", () => {
       await collector.discoverQueues();
       await collector.collect();
 
-      collector.stop();
+      await collector.stop();
 
       expect(snapshotRepo.releaseLease).not.toHaveBeenCalled();
     });

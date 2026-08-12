@@ -191,16 +191,26 @@ export interface ScheduledJobRepository {
   // ── Operator control (ADR-091) ──────────────────────────────────────
   //
   // Cross-tenant, like `listForOps`, and gated at the router on `ops:manage`.
-  // The two mutations below are CONDITIONAL on `expectedNextRunAt` for the same
-  // reason `claim` is: it is the row's fencing token. An operator acting on a
-  // row the loop has since claimed affects zero rows and is told so, rather
-  // than overwriting a live lease.
+  // Every mutation carries `projectId` alongside the id: these are the only
+  // writes in the codebase that reach a project-level row without a tenant in
+  // scope, so the predicate is what keeps a stale or guessed id from touching
+  // another project's schedule.
+  //
+  // `releaseSlotForOps` and `requestImmediateRunForOps` are additionally
+  // CONDITIONAL on `expectedNextRunAt` for the same reason `claim` is: it is
+  // the row's fencing token. An operator acting on a row the loop has since
+  // claimed affects zero rows and is told so, rather than overwriting a live
+  // lease. `setActiveForOps` is not fenced that way — see its own note.
 
   /** One schedule by id, across projects. Null when it no longer exists. */
   findByIdForOps(params: { id: string }): Promise<ScheduledJobRecord | null>;
 
   /** Pause or resume a schedule. Never touches an in-flight slot. */
-  setActiveForOps(params: { id: string; active: boolean }): Promise<boolean>;
+  setActiveForOps(params: {
+    id: string;
+    projectId: string;
+    active: boolean;
+  }): Promise<boolean>;
 
   /**
    * Release a slot whose worker never settled it, and make the schedule
@@ -212,6 +222,7 @@ export interface ScheduledJobRepository {
    */
   releaseSlotForOps(params: {
     id: string;
+    projectId: string;
     expectedNextRunAt: Date;
     now: Date;
   }): Promise<boolean>;
@@ -228,6 +239,7 @@ export interface ScheduledJobRepository {
    */
   requestImmediateRunForOps(params: {
     id: string;
+    projectId: string;
     expectedNextRunAt: Date;
     now: Date;
   }): Promise<boolean>;

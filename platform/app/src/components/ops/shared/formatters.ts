@@ -32,7 +32,17 @@ export function formatDuration(
   completedAt?: string | null,
 ): string {
   const end = completedAt ? new Date(completedAt).getTime() : Date.now();
-  const ms = end - new Date(startedAt).getTime();
+  return formatDurationMs(end - new Date(startedAt).getTime());
+}
+
+/**
+ * A length of time, as a length of time.
+ *
+ * The alternative is reconstructing an instant (`Date.now() - elapsed`) so a
+ * relative formatter can subtract the clock back out, which reads as "5m ago"
+ * for something that is not in the past — it has lasted five minutes.
+ */
+export function formatDurationMs(ms: number): string {
   if (ms < 0) return "—";
   if (ms < 1000) return `${ms}ms`;
   const seconds = ms / 1000;

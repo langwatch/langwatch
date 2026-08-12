@@ -3,6 +3,7 @@ import {
   Card,
   Collapsible,
   HStack,
+  IconButton,
   Spinner,
   Table,
   Text,
@@ -95,15 +96,25 @@ function ParkedTenantRow({
 
   return (
     <>
-      <Table.Row
-        cursor="pointer"
-        onClick={() => setOpen((prior) => !prior)}
-        data-testid="parked-tenant-row"
-      >
+      <Table.Row data-testid="parked-tenant-row">
         <Table.Cell>
-          <Box color="fg.muted">
+          {/* The control is a real button, not a clickable row: a row cannot be
+              focused or activated from the keyboard, which puts the only route
+              to the drill-down behind a mouse. */}
+          <IconButton
+            aria-label={
+              open
+                ? `Hide parked groups for ${tenantId}`
+                : `Show parked groups for ${tenantId}`
+            }
+            aria-expanded={open}
+            variant="ghost"
+            size="2xs"
+            color="fg.muted"
+            onClick={() => setOpen((prior) => !prior)}
+          >
             {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          </Box>
+          </IconButton>
         </Table.Cell>
         <Table.Cell>
           <Text fontFamily="mono" textStyle="xs" title={tenantId}>

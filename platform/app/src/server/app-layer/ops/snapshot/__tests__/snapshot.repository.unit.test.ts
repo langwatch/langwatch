@@ -6,6 +6,7 @@ import {
 } from "../snapshot.repository";
 import {
   detailSnapshotSchema,
+  type LiveSnapshot,
   liveSnapshotSchema,
   parseSnapshot,
   SNAPSHOT_VERSION,
@@ -42,23 +43,88 @@ class FakeRedis {
     return next;
   }
 
+  /** TTL, in seconds, of the most recent successful lease renewal. */
+  public lastRenewTtlSeconds: number | null = null;
+
   async eval(
     script: string,
-    _numKeys: number,
-    key: string,
-    token: string,
-    _ttl?: string,
+    numKeys: number,
+    ...rest: string[]
   ): Promise<number> {
     this.evalCalls++;
-    const held = this.store.get(key) === token;
-    if (!held) return 0;
-    if (script.includes("DEL")) this.store.delete(key);
+    const keys = rest.slice(0, numKeys);
+    const argv = rest.slice(numKeys);
+
+    if (script.includes("DEL")) return this.release({ keys, argv });
+    if (script.includes("EXPIRE")) return this.renew({ keys, argv });
+    return this.writeFenced({ keys, argv });
+  }
+
+  private release({ keys, argv }: { keys: string[]; argv: string[] }): number {
+    if (!this.ownsLease({ leaseKey: keys[0]!, token: argv[0]! })) return 0;
+    this.store.delete(keys[0]!);
     return 1;
+  }
+
+  private renew({ keys, argv }: { keys: string[]; argv: string[] }): number {
+    if (!this.ownsLease({ leaseKey: keys[0]!, token: argv[0]! })) return 0;
+    this.lastRenewTtlSeconds = Number(argv[1]);
+    return 1;
+  }
+
+  /** Refuses unless the lease is still ours and the payload is not older. */
+  private writeFenced({
+    keys,
+    argv,
+  }: {
+    keys: string[];
+    argv: string[];
+  }): number {
+    const [artifactKey, leaseKey] = keys;
+    const [payload, token, , computedAt] = argv;
+    if (!this.ownsLease({ leaseKey: leaseKey!, token: token! })) return 0;
+    if (
+      this.isOlderThanStored({ key: artifactKey!, computedAt: computedAt! })
+    ) {
+      return 0;
+    }
+    this.store.set(artifactKey!, payload!);
+    return 1;
+  }
+
+  private ownsLease({
+    leaseKey,
+    token,
+  }: {
+    leaseKey: string;
+    token: string;
+  }): boolean {
+    return this.store.get(leaseKey) === token;
+  }
+
+  private isOlderThanStored({
+    key,
+    computedAt,
+  }: {
+    key: string;
+    computedAt: string;
+  }): boolean {
+    const existing = this.store.get(key);
+    if (!existing) return false;
+    const previous = Number(
+      (JSON.parse(existing) as { computedAt?: number }).computedAt,
+    );
+    return Number.isFinite(previous) && previous > Number(computedAt);
   }
 
   /** Simulates the lease TTL elapsing without a graceful release. */
   expireLease(): void {
     this.store.delete(SNAPSHOT_LEASE_KEY);
+  }
+
+  /** Hands the lease to somebody else mid-cycle. */
+  giveLeaseTo(writerId: string): void {
+    this.store.set(SNAPSHOT_LEASE_KEY, writerId);
   }
 }
 
@@ -67,6 +133,39 @@ const makeRepo = () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return { redis, repo: new SnapshotRedisRepository(redis as any) };
 };
+
+const liveSnapshot = (over: { computedAt: number }): LiveSnapshot => ({
+  version: SNAPSHOT_VERSION,
+  computedAt: over.computedAt,
+  writerId: "w",
+  leaseEpoch: 1,
+  queues: [],
+  totalGroups: 0,
+  totalPendingJobs: 0,
+  pendingDrift: 0,
+  throughputIngestedPerSec: 0,
+  completedPerSec: 0,
+  failedPerSec: 0,
+  totalCompleted: 0,
+  totalFailed: 0,
+  peakCompletedPerSec: 0,
+  peakFailedPerSec: 0,
+  peakIngestedPerSec: 0,
+  latencyP50Ms: 0,
+  latencyP99Ms: 0,
+  peakLatencyP50Ms: 0,
+  peakLatencyP99Ms: 0,
+  redisMemoryUsedBytes: 0,
+  redisMemoryPeakBytes: 0,
+  redisMemoryMaxBytes: 0,
+  redisConnectedClients: 0,
+  redisEngineCpuPercent: null,
+  processCpuPercent: 0,
+  processMemoryUsedMb: 0,
+  processMemoryTotalMb: 0,
+  pausedKeys: [],
+  throughputHistory: [],
+});
 
 describe("SnapshotRedisRepository", () => {
   describe("given two writers sharing one Redis", () => {
@@ -81,8 +180,8 @@ describe("SnapshotRedisRepository", () => {
         const a = await first.acquireOrRenewLease({ writerId: "writer-a" });
         const b = await second.acquireOrRenewLease({ writerId: "writer-b" });
 
-        expect(a.held).toBe(true);
-        expect(b.held).toBe(false);
+        expect(a.isHeld).toBe(true);
+        expect(b.isHeld).toBe(false);
       });
     });
 
@@ -93,7 +192,7 @@ describe("SnapshotRedisRepository", () => {
         const first = await repo.acquireOrRenewLease({ writerId: "writer-a" });
         const second = await repo.acquireOrRenewLease({ writerId: "writer-a" });
 
-        expect(second.held).toBe(true);
+        expect(second.isHeld).toBe(true);
         expect(second.epoch).toBe(first.epoch);
       });
     });
@@ -113,7 +212,7 @@ describe("SnapshotRedisRepository", () => {
         redis.expireLease();
         const after = await next.acquireOrRenewLease({ writerId: "next" });
 
-        expect(after.held).toBe(true);
+        expect(after.isHeld).toBe(true);
         expect(after.epoch).toBeGreaterThan(before.epoch);
       });
     });
@@ -135,7 +234,7 @@ describe("SnapshotRedisRepository", () => {
           writerId: "arriving",
         });
 
-        expect(taken.held).toBe(true);
+        expect(taken.isHeld).toBe(true);
       });
     });
   });
@@ -159,54 +258,77 @@ describe("SnapshotRedisRepository", () => {
         });
         await lapsed.releaseLease({ writerId: "lapsed" });
 
-        expect(renewAttempt.held).toBe(false);
+        expect(renewAttempt.isHeld).toBe(false);
         expect(await redis.get(SNAPSHOT_LEASE_KEY)).toBe("holder");
       });
     });
   });
 
-  describe("given a lease TTL", () => {
-    it("renews for the full window rather than a fraction of it", async () => {
-      // The renewal must restore the whole TTL; renewing for less would let a
-      // writer that is alive and renewing on schedule still lose the lease.
-      expect(LEASE_TTL_SECONDS).toBeGreaterThanOrEqual(4);
+  describe("given a writer renewing on schedule", () => {
+    describe("when the renewal lands", () => {
+      it("restores the whole window rather than a fraction of it", async () => {
+        // Renewing for less than the full TTL would let a writer that is alive
+        // and renewing on schedule still lose the lease.
+        const { redis, repo } = makeRepo();
+
+        await repo.acquireOrRenewLease({ writerId: "writer-a" });
+        await repo.acquireOrRenewLease({ writerId: "writer-a" });
+
+        expect(redis.lastRenewTtlSeconds).toBe(LEASE_TTL_SECONDS);
+      });
+    });
+  });
+
+  describe("given a writer that lost the lease during its scan", () => {
+    describe("when it publishes the payload it finished holding", () => {
+      /** @scenario "A writer that lost the lease cannot overwrite its successor" */
+      it("leaves the new writer's artifact in place", async () => {
+        const { redis, repo } = makeRepo();
+
+        await repo.acquireOrRenewLease({ writerId: "lapsed" });
+        await repo.writeLive({
+          writerId: "lapsed",
+          snapshot: liveSnapshot({ computedAt: 1_000 }),
+        });
+        redis.giveLeaseTo("successor");
+
+        const published = await repo.writeLive({
+          writerId: "lapsed",
+          snapshot: liveSnapshot({ computedAt: 2_000 }),
+        });
+
+        expect(published).toBe(false);
+        expect((await repo.readLive())?.computedAt).toBe(1_000);
+      });
+    });
+  });
+
+  describe("given two scans of one writer finishing out of order", () => {
+    describe("when the slower, older one publishes last", () => {
+      /** @scenario "An older snapshot never replaces a newer one" */
+      it("keeps the newer artifact", async () => {
+        const { repo } = makeRepo();
+
+        await repo.acquireOrRenewLease({ writerId: "writer-a" });
+        await repo.writeLive({
+          writerId: "writer-a",
+          snapshot: liveSnapshot({ computedAt: 5_000 }),
+        });
+
+        const published = await repo.writeLive({
+          writerId: "writer-a",
+          snapshot: liveSnapshot({ computedAt: 4_000 }),
+        });
+
+        expect(published).toBe(false);
+        expect((await repo.readLive())?.computedAt).toBe(5_000);
+      });
     });
   });
 });
 
 describe("parseSnapshot", () => {
-  const validLive = {
-    version: SNAPSHOT_VERSION,
-    computedAt: 1,
-    writerId: "w",
-    leaseEpoch: 1,
-    queues: [],
-    totalGroups: 0,
-    totalPendingJobs: 0,
-    pendingDrift: 0,
-    throughputIngestedPerSec: 0,
-    completedPerSec: 0,
-    failedPerSec: 0,
-    totalCompleted: 0,
-    totalFailed: 0,
-    peakCompletedPerSec: 0,
-    peakFailedPerSec: 0,
-    peakIngestedPerSec: 0,
-    latencyP50Ms: 0,
-    latencyP99Ms: 0,
-    peakLatencyP50Ms: 0,
-    peakLatencyP99Ms: 0,
-    redisMemoryUsedBytes: 0,
-    redisMemoryPeakBytes: 0,
-    redisMemoryMaxBytes: 0,
-    redisConnectedClients: 0,
-    redisEngineCpuPercent: null,
-    processCpuPercent: 0,
-    processMemoryUsedMb: 0,
-    processMemoryTotalMb: 0,
-    pausedKeys: [],
-    throughputHistory: [],
-  };
+  const validLive = liveSnapshot({ computedAt: 1 });
 
   describe("given a snapshot this reader understands", () => {
     it("returns it", () => {

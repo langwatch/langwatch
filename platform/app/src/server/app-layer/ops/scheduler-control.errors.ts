@@ -7,15 +7,19 @@ import { HandledError } from "@langwatch/handled-error";
  * code and copy in the client presentation registry. Anything else — a dead
  * Postgres, a bug — stays a plain Error and degrades to "unknown" with a trace
  * id, which is the honest answer for a failure we cannot name.
+ *
+ * None of them carry the schedule id in `meta`. `meta` is a client contract and
+ * no presentation reads it; the operator already knows which row they clicked.
+ * The id a support engineer needs is logged at the refusal instead, next to the
+ * reason it was refused.
  */
 
 export class ScheduleNotFoundError extends HandledError {
   declare readonly code: "schedule_not_found";
 
-  constructor(scheduleId: string) {
+  constructor() {
     super("schedule_not_found", "That schedule no longer exists.", {
       httpStatus: 404,
-      meta: { schedule_id: scheduleId },
       fault: "customer",
     });
     this.name = "ScheduleNotFoundError";
@@ -25,13 +29,12 @@ export class ScheduleNotFoundError extends HandledError {
 export class ScheduleInactiveError extends HandledError {
   declare readonly code: "schedule_inactive";
 
-  constructor(scheduleId: string) {
+  constructor() {
     super(
       "schedule_inactive",
       "That schedule is paused, so it will not be run.",
       {
         httpStatus: 409,
-        meta: { schedule_id: scheduleId },
         fault: "customer",
       },
     );
@@ -46,13 +49,12 @@ export class ScheduleInactiveError extends HandledError {
 export class ScheduleAlreadyInFlightError extends HandledError {
   declare readonly code: "schedule_already_in_flight";
 
-  constructor(scheduleId: string) {
+  constructor() {
     super(
       "schedule_already_in_flight",
       "The scheduler changed this slot first, so nothing was changed.",
       {
         httpStatus: 409,
-        meta: { schedule_id: scheduleId },
         fault: "customer",
       },
     );
@@ -63,13 +65,12 @@ export class ScheduleAlreadyInFlightError extends HandledError {
 export class ScheduleSlotNotStaleError extends HandledError {
   declare readonly code: "schedule_slot_not_stale";
 
-  constructor(scheduleId: string) {
+  constructor() {
     super(
       "schedule_slot_not_stale",
       "That slot is still current, so it was not cleared.",
       {
         httpStatus: 409,
-        meta: { schedule_id: scheduleId },
         fault: "customer",
       },
     );

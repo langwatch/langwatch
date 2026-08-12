@@ -1,7 +1,6 @@
 import { Box, Button, Input } from "@chakra-ui/react";
 import { Search } from "lucide-react";
 
-/** Filter box plus expand/collapse controls for the pipeline tree header. */
 export function PipelineTreeFilter({
   filter,
   onFilterChange,
@@ -27,6 +26,7 @@ export function PipelineTreeFilter({
         </Box>
         <Input
           size="xs"
+          aria-label="Filter pipelines"
           placeholder="Filter..."
           value={filter}
           onChange={(e) => onFilterChange(e.target.value)}

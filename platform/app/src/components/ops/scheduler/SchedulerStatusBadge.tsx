@@ -1,5 +1,5 @@
 import { Badge, HStack, Text } from "@chakra-ui/react";
-import { formatTimeAgo } from "~/components/ops/shared/formatters";
+import { formatDurationMs } from "~/components/ops/shared/formatters";
 import type { SchedulerJobStatus } from "./schedulerStatus";
 
 const PRESENTATION: Record<
@@ -44,7 +44,7 @@ export function SchedulerStatusBadge({
       </Badge>
       {status === "overdue" && (
         <Text textStyle="xs" color="red.500">
-          {formatTimeAgo(Date.now() - latenessMs)}
+          {formatDurationMs(latenessMs)} late
         </Text>
       )}
       {attempts > 0 && (

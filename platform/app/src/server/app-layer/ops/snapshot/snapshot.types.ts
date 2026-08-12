@@ -9,9 +9,10 @@ import type { PipelineNode } from "../types";
  * disagree about the shape, and rendering a half-understood payload is worse
  * than rendering the loading state for one pod-termination cycle.
  *
- * Bump this only for a breaking shape change. Additive optional fields do not
- * need a bump — they read as `undefined` on the old build, which is what the
- * defaulted parses below already express.
+ * Bump this only for a breaking shape change. Every field below is required,
+ * so any field ADDED without a bump has to be declared `.optional()` to stay
+ * readable by the build that does not write it — adding a required one is a
+ * breaking change and needs the bump.
  */
 export const SNAPSHOT_VERSION = 1;
 

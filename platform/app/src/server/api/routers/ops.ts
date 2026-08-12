@@ -127,7 +127,10 @@ export const opsRouter = createTRPCRouter({
   getBadgeCounts: protectedProcedure.use(opsViewPermission).query(() => {
     const ops = getApp().ops;
     if (!ops?.snapshotReader) {
-      return { blockedCount: 0, dlqCount: 0 };
+      // Same shape as the served path, `computedAt` included: a caller that has
+      // to branch on whether the field is there will eventually forget to, and
+      // read a degraded zero as a fresh all-clear.
+      return { blockedCount: 0, dlqCount: 0, computedAt: new Date() };
     }
     return ops.snapshotReader.getBadgeCounts();
   }),

@@ -1,7 +1,5 @@
 import type { BoundedSection, ParkedTenant } from "./snapshot/snapshot.types";
 
-export type { BoundedSection, ParkedTenant };
-
 /** One tenant's parked group, as the drill-down lists it. */
 export interface ParkedGroupInfo {
   groupId: string;

@@ -60,6 +60,21 @@ Feature: Shared ops snapshot with a single elected writer
     When the first writer's late write lands
     Then readers still observe a complete, validly-versioned snapshot
 
+  @unit
+  Scenario: A writer that lost the lease cannot overwrite its successor
+    Given a writer lost the snapshot lease while its scan was in flight
+    And the new holder has published a snapshot
+    When the departed writer publishes the payload it finished holding
+    Then the write is refused
+    And the new holder's snapshot is what readers see
+
+  @unit
+  Scenario: An older snapshot never replaces a newer one
+    Given a writer published a snapshot
+    When a slower scan from the same writer finishes with an earlier computed time
+    Then its write is refused
+    And the newer snapshot stays in place
+
   # ── The two artifacts ─────────────────────────────────────────────────
 
   @unit

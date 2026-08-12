@@ -25,11 +25,11 @@ import { TieredBlobStore } from "~/server/event-sourcing/queues/groupQueue/tiere
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
 import { normalizeErrorMessage } from "../normalize-error-message";
+import type { ParkedTenant } from "../snapshot/snapshot.types";
 import type {
   ErrorCluster,
   GroupInfo,
   ParkedGroupInfo,
-  ParkedTenant,
   QueueInfo,
 } from "../types";
 import type {

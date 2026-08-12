@@ -33,12 +33,19 @@ export function PipelineTreeCard({
   // continuity and wrong for a default view: an idle pipeline renders as a row
   // of pure whitespace, and half the tree was whitespace between the reader and
   // the two pipelines that had work. Idle rows fold away and say how many.
+  // Recursive on purpose: a root is a namespace, and namespaces usually carry
+  // no counters of their own. Classifying on the root's direct counts alone
+  // folded away every parent of a busy child — hiding the work rather than the
+  // whitespace this fold exists to remove.
   const { working, idle } = useMemo(() => {
-    const isWorking = (node: PipelineNode) =>
-      node.pending > 0 || node.active > 0 || node.blocked > 0;
+    const hasWork = (node: PipelineNode): boolean =>
+      node.pending > 0 ||
+      node.active > 0 ||
+      node.blocked > 0 ||
+      node.children.some(hasWork);
     return {
-      working: pipelineTree.filter(isWorking),
-      idle: pipelineTree.filter((node) => !isWorking(node)),
+      working: pipelineTree.filter(hasWork),
+      idle: pipelineTree.filter((node) => !hasWork(node)),
     };
   }, [pipelineTree]);
 

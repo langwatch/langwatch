@@ -17,7 +17,7 @@ export function HealthLine({
 }: {
   errorClusterCount: number;
   anomalyCount: number;
-  /** False until the anomaly query has actually answered. */
+  /** False unless the anomaly query SUCCEEDED — a failed one is not an answer. */
   anomaliesKnown: boolean;
 }) {
   if (errorClusterCount > 0 || anomalyCount > 0) return null;

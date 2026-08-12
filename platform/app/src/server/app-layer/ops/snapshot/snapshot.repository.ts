@@ -8,10 +8,18 @@ import {
   parseSnapshot,
 } from "./snapshot.types";
 
-export const SNAPSHOT_LIVE_KEY = "ops:snapshot:live";
-export const SNAPSHOT_DETAIL_KEY = "ops:snapshot:detail";
-export const SNAPSHOT_LEASE_KEY = "ops:snapshot:lease";
-export const SNAPSHOT_EPOCH_KEY = "ops:snapshot:epoch";
+/**
+ * The `{snapshot}` hash tag is load-bearing, not decoration.
+ *
+ * The fenced write below reads the lease and writes the artifact in one Lua
+ * call. On Redis Cluster a script may only touch keys in a single slot, so
+ * without a common hash tag the fence would fail with CROSSSLOT on exactly the
+ * deployments that need it most.
+ */
+export const SNAPSHOT_LIVE_KEY = "ops:{snapshot}:live";
+export const SNAPSHOT_DETAIL_KEY = "ops:{snapshot}:detail";
+export const SNAPSHOT_LEASE_KEY = "ops:{snapshot}:lease";
+export const SNAPSHOT_EPOCH_KEY = "ops:{snapshot}:epoch";
 
 /**
  * The lease outlives several write cycles on purpose. Too short and an
@@ -47,12 +55,51 @@ end
 return 0
 `;
 
+/**
+ * Publish only if we still own the lease AND we are not moving `computedAt`
+ * backwards.
+ *
+ * A scan is not instantaneous, so a writer can lose the lease part-way through
+ * one and finish holding a payload it is no longer entitled to publish. An
+ * unconditional SET at that moment overwrites the new writer's fresher artifact
+ * with a stale one, and every dashboard in the fleet reads the stale copy —
+ * ADR-090's single-writer guarantee holds for scanning but not for the write
+ * that follows it. The lease check closes that window.
+ *
+ * The `computedAt` check closes the smaller one behind it: a single writer runs
+ * the live and detail cycles concurrently, so a slow scan can still land after
+ * a faster later one. Both artifacts are snapshots of the same underlying
+ * state, so the newest observation always wins.
+ *
+ * KEYS: artifact, lease. ARGV: payload, writerId, ttlSeconds, computedAt.
+ */
+const WRITE_FENCED_LUA = `
+if redis.call('GET', KEYS[2]) ~= ARGV[2] then
+  return 0
+end
+local existing = redis.call('GET', KEYS[1])
+if existing then
+  local ok, decoded = pcall(cjson.decode, existing)
+  if ok and type(decoded) == 'table' then
+    local previous = tonumber(decoded.computedAt)
+    if previous and previous > tonumber(ARGV[4]) then
+      return 0
+    end
+  end
+end
+redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[3])
+return 1
+`;
+
 export interface LeaseState {
   /** True when this writer may scan and publish this cycle. */
-  held: boolean;
+  isHeld: boolean;
   /**
-   * Monotonic across acquisitions. Stamped into every artifact so a reader (or
-   * a human) can tell "the writer changed" from "the writer is stuck".
+   * Increments on every acquisition — including a re-acquisition by the pod
+   * that just lost it — and is stamped into every artifact. It answers "has the
+   * writer restarted since the payload I am looking at", which is what
+   * separates a stuck writer from a churning one. It is NOT a fleet-wide
+   * ordering of writers, and a pod that has never held the lease reports 0.
    */
   epoch: number;
 }
@@ -60,8 +107,16 @@ export interface LeaseState {
 export interface SnapshotRepository {
   acquireOrRenewLease(params: { writerId: string }): Promise<LeaseState>;
   releaseLease(params: { writerId: string }): Promise<void>;
-  writeLive(snapshot: LiveSnapshot): Promise<void>;
-  writeDetail(snapshot: DetailSnapshot): Promise<void>;
+  /** Resolves true when the artifact was published, false when fenced out. */
+  writeLive(params: {
+    snapshot: LiveSnapshot;
+    writerId: string;
+  }): Promise<boolean>;
+  /** Resolves true when the artifact was published, false when fenced out. */
+  writeDetail(params: {
+    snapshot: DetailSnapshot;
+    writerId: string;
+  }): Promise<boolean>;
   readLive(): Promise<LiveSnapshot | null>;
   readDetail(): Promise<DetailSnapshot | null>;
 }
@@ -74,9 +129,8 @@ export class SnapshotRedisRepository implements SnapshotRepository {
   /**
    * One round trip in the common case (renewal), two on a fresh acquisition.
    *
-   * A writer that renews keeps its epoch; a writer that acquires from cold
-   * takes a new one. That means the epoch changes exactly when the writer
-   * changes, which is the signal it exists to carry.
+   * A writer that renews keeps its epoch; any acquisition takes a fresh one
+   * from the shared counter.
    */
   async acquireOrRenewLease({
     writerId,
@@ -91,7 +145,7 @@ export class SnapshotRedisRepository implements SnapshotRepository {
       String(LEASE_TTL_SECONDS),
     );
     if (Number(renewed) === 1) {
-      return { held: true, epoch: this.currentEpoch };
+      return { isHeld: true, epoch: this.currentEpoch };
     }
 
     const acquired = await this.redis.set(
@@ -101,32 +155,68 @@ export class SnapshotRedisRepository implements SnapshotRepository {
       LEASE_TTL_SECONDS,
       "NX",
     );
-    if (acquired !== "OK") return { held: false, epoch: this.currentEpoch };
+    if (acquired !== "OK") return { isHeld: false, epoch: this.currentEpoch };
 
     this.currentEpoch = Number(await this.redis.incr(SNAPSHOT_EPOCH_KEY)) || 0;
-    return { held: true, epoch: this.currentEpoch };
+    return { isHeld: true, epoch: this.currentEpoch };
   }
 
   async releaseLease({ writerId }: { writerId: string }): Promise<void> {
     await this.redis.eval(RELEASE_LUA, 1, SNAPSHOT_LEASE_KEY, writerId);
   }
 
-  async writeLive(snapshot: LiveSnapshot): Promise<void> {
-    await this.redis.set(
-      SNAPSHOT_LIVE_KEY,
-      JSON.stringify(snapshot),
-      "EX",
-      LIVE_TTL_SECONDS,
-    );
+  async writeLive({
+    snapshot,
+    writerId,
+  }: {
+    snapshot: LiveSnapshot;
+    writerId: string;
+  }): Promise<boolean> {
+    return this.writeFenced({
+      key: SNAPSHOT_LIVE_KEY,
+      snapshot,
+      writerId,
+      ttlSeconds: LIVE_TTL_SECONDS,
+    });
   }
 
-  async writeDetail(snapshot: DetailSnapshot): Promise<void> {
-    await this.redis.set(
-      SNAPSHOT_DETAIL_KEY,
+  async writeDetail({
+    snapshot,
+    writerId,
+  }: {
+    snapshot: DetailSnapshot;
+    writerId: string;
+  }): Promise<boolean> {
+    return this.writeFenced({
+      key: SNAPSHOT_DETAIL_KEY,
+      snapshot,
+      writerId,
+      ttlSeconds: DETAIL_TTL_SECONDS,
+    });
+  }
+
+  private async writeFenced({
+    key,
+    snapshot,
+    writerId,
+    ttlSeconds,
+  }: {
+    key: string;
+    snapshot: LiveSnapshot | DetailSnapshot;
+    writerId: string;
+    ttlSeconds: number;
+  }): Promise<boolean> {
+    const written = await this.redis.eval(
+      WRITE_FENCED_LUA,
+      2,
+      key,
+      SNAPSHOT_LEASE_KEY,
       JSON.stringify(snapshot),
-      "EX",
-      DETAIL_TTL_SECONDS,
+      writerId,
+      String(ttlSeconds),
+      String(snapshot.computedAt),
     );
+    return Number(written) === 1;
   }
 
   async readLive(): Promise<LiveSnapshot | null> {

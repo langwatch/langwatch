@@ -67,6 +67,10 @@ export function clusterGroups<T extends ClusterableGroup>(
     const existing = byKey.get(key);
     if (existing) {
       existing.members.push(group);
+      // The stem only earns its place once something is actually collapsed
+      // into it. Until then it is a shortened identifier presented as a group
+      // name, which costs the operator the one detail that distinguishes it.
+      existing.label = stem;
       existing.totalPendingJobs += group.pendingJobs;
       existing.oldestJobMs = olderOf(existing.oldestJobMs, group.oldestJobMs);
       continue;
@@ -74,7 +78,7 @@ export function clusterGroups<T extends ClusterableGroup>(
 
     byKey.set(key, {
       key,
-      label: index === null ? group.groupId : stem,
+      label: group.groupId,
       members: [group],
       totalPendingJobs: group.pendingJobs,
       oldestJobMs: group.oldestJobMs,

@@ -373,7 +373,13 @@ export class OpsMetricsCollector {
     // every other pod — the exact divergence this design removes.
   }
 
-  stop(): void {
+  /**
+   * Awaits the lease release. The caller is a shutdown hook racing a process
+   * exit and a Redis disconnect, so a fire-and-forget release here is the same
+   * as no release at all: the connection closes first and the fleet waits out
+   * the full lease TTL for a writer it could have had immediately.
+   */
+  async stop(): Promise<void> {
     if (this.collectInterval) {
       clearInterval(this.collectInterval);
       this.collectInterval = null;
@@ -392,11 +398,11 @@ export class OpsMetricsCollector {
     // lease window, which is exactly the rolling-deploy case.
     if (this.snapshotRepo && this.holdsLease) {
       this.holdsLease = false;
-      void this.snapshotRepo
-        .releaseLease({ writerId: this.writerId })
-        .catch((err) => {
-          logger.warn({ error: err }, "Failed to release ops snapshot lease");
-        });
+      try {
+        await this.snapshotRepo.releaseLease({ writerId: this.writerId });
+      } catch (err) {
+        logger.warn({ error: err }, "Failed to release ops snapshot lease");
+      }
     }
   }
 
@@ -574,36 +580,39 @@ export class OpsMetricsCollector {
     const mem = process.memoryUsage();
     try {
       await this.snapshotRepo.writeLive({
-        version: SNAPSHOT_VERSION,
-        computedAt: Date.now(),
         writerId: this.writerId,
-        leaseEpoch: this.leaseEpoch,
-        queues: data.queues,
-        totalGroups: data.totalGroups,
-        totalPendingJobs: data.totalPendingJobs,
-        pendingDrift: data.pendingDrift,
-        throughputIngestedPerSec: data.throughputIngestedPerSec,
-        completedPerSec: data.completedPerSec,
-        failedPerSec: data.failedPerSec,
-        totalCompleted: data.totalCompleted,
-        totalFailed: data.totalFailed,
-        peakCompletedPerSec: data.peakCompletedPerSec,
-        peakFailedPerSec: data.peakFailedPerSec,
-        peakIngestedPerSec: data.peakIngestedPerSec,
-        latencyP50Ms: data.latencyP50Ms,
-        latencyP99Ms: data.latencyP99Ms,
-        peakLatencyP50Ms: data.peakLatencyP50Ms,
-        peakLatencyP99Ms: data.peakLatencyP99Ms,
-        redisMemoryUsedBytes: data.redisMemoryUsedBytes,
-        redisMemoryPeakBytes: data.redisMemoryPeakBytes,
-        redisMemoryMaxBytes: data.redisMemoryMaxBytes,
-        redisConnectedClients: data.redisConnectedClients,
-        redisEngineCpuPercent: data.redisEngineCpuPercent,
-        processCpuPercent: data.processCpuPercent,
-        processMemoryUsedMb: Math.round(mem.rss / 1024 / 1024),
-        processMemoryTotalMb: Math.round(os.totalmem() / 1024 / 1024),
-        pausedKeys: data.pausedKeys,
-        throughputHistory: data.throughputHistory,
+        snapshot: {
+          version: SNAPSHOT_VERSION,
+          computedAt: Date.now(),
+          writerId: this.writerId,
+          leaseEpoch: this.leaseEpoch,
+          queues: data.queues,
+          totalGroups: data.totalGroups,
+          totalPendingJobs: data.totalPendingJobs,
+          pendingDrift: data.pendingDrift,
+          throughputIngestedPerSec: data.throughputIngestedPerSec,
+          completedPerSec: data.completedPerSec,
+          failedPerSec: data.failedPerSec,
+          totalCompleted: data.totalCompleted,
+          totalFailed: data.totalFailed,
+          peakCompletedPerSec: data.peakCompletedPerSec,
+          peakFailedPerSec: data.peakFailedPerSec,
+          peakIngestedPerSec: data.peakIngestedPerSec,
+          latencyP50Ms: data.latencyP50Ms,
+          latencyP99Ms: data.latencyP99Ms,
+          peakLatencyP50Ms: data.peakLatencyP50Ms,
+          peakLatencyP99Ms: data.peakLatencyP99Ms,
+          redisMemoryUsedBytes: data.redisMemoryUsedBytes,
+          redisMemoryPeakBytes: data.redisMemoryPeakBytes,
+          redisMemoryMaxBytes: data.redisMemoryMaxBytes,
+          redisConnectedClients: data.redisConnectedClients,
+          redisEngineCpuPercent: data.redisEngineCpuPercent,
+          processCpuPercent: data.processCpuPercent,
+          processMemoryUsedMb: Math.round(mem.rss / 1024 / 1024),
+          processMemoryTotalMb: Math.round(os.totalmem() / 1024 / 1024),
+          pausedKeys: data.pausedKeys,
+          throughputHistory: data.throughputHistory,
+        },
       });
     } catch (err) {
       logger.warn({ error: err }, "Failed to publish live ops snapshot");
@@ -661,7 +670,10 @@ export class OpsMetricsCollector {
         };
 
         this.latestDetail = detail;
-        await this.snapshotRepo!.writeDetail(detail);
+        await this.snapshotRepo!.writeDetail({
+          snapshot: detail,
+          writerId: this.writerId,
+        });
         this.lastDetailAt = Date.now();
       } catch (err) {
         logger.warn({ error: err }, "Failed to publish detail ops snapshot");
@@ -1029,7 +1041,7 @@ export class OpsMetricsCollector {
         const lease = await this.snapshotRepo.acquireOrRenewLease({
           writerId: this.writerId,
         });
-        if (!lease.held) {
+        if (!lease.isHeld) {
           this.holdsLease = false;
           return;
         }

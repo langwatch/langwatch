@@ -294,9 +294,11 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
 
   async setActiveForOps({
     id,
+    projectId,
     active,
   }: {
     id: string;
+    projectId: string;
     active: boolean;
   }): Promise<boolean> {
     // Unconditional on `nextRunAt` on purpose: pausing is about whether the
@@ -304,10 +306,17 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
     // what the row is doing right now. An in-flight slot is left alone — the
     // confirmation copy says so, because a pause that silently killed a live
     // run would be a different and much larger promise.
+    //
+    // `updatedAt` is deliberately NOT bumped. While a slot is held it is the
+    // only evidence the scheduler has that the worker is still alive, and the
+    // stale-slot guard reads it as exactly that. Pausing is the first thing an
+    // operator does to a wedged schedule, so bumping it here would make the
+    // pause itself withdraw the repair for another full staleness window.
     const affected = await this.prisma.$executeRaw`
       UPDATE "ScheduledJob"
-      SET "active" = ${active}, "updatedAt" = now()
+      SET "active" = ${active}
       WHERE "id" = ${id}
+        AND "projectId" = ${projectId}
       -- @tenancy: scheduler cross-tenant ops control (system-owned, ops:manage)
     `;
     return affected === 1;
@@ -315,10 +324,12 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
 
   async releaseSlotForOps({
     id,
+    projectId,
     expectedNextRunAt,
     now,
   }: {
     id: string;
+    projectId: string;
     expectedNextRunAt: Date;
     now: Date;
   }): Promise<boolean> {
@@ -330,6 +341,7 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
           "nextRunAt" = ${toPgTimestampUtc(now)}::timestamp,
           "updatedAt" = now()
       WHERE "id" = ${id}
+        AND "projectId" = ${projectId}
         AND "nextRunAt" = ${toPgTimestampUtc(expectedNextRunAt)}::timestamp
       -- @tenancy: scheduler cross-tenant ops control (system-owned, ops:manage)
     `;
@@ -338,10 +350,12 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
 
   async requestImmediateRunForOps({
     id,
+    projectId,
     expectedNextRunAt,
     now,
   }: {
     id: string;
+    projectId: string;
     expectedNextRunAt: Date;
     now: Date;
   }): Promise<boolean> {
@@ -354,6 +368,7 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
       SET "nextRunAt" = ${toPgTimestampUtc(now)}::timestamp,
           "updatedAt" = now()
       WHERE "id" = ${id}
+        AND "projectId" = ${projectId}
         AND "active" = true
         AND "nextRunAt" = ${toPgTimestampUtc(expectedNextRunAt)}::timestamp
       -- @tenancy: scheduler cross-tenant ops control (system-owned, ops:manage)

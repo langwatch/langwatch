@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { SLOT_STALE_AFTER_MS } from "../../../shared/ops/schedulerControl";
 import type {
   ScheduledJobRecord,
   ScheduledJobRepository,
@@ -40,15 +41,6 @@ export interface OpsScheduledJob {
   lastError: string | null;
   updatedAt: string;
 }
-
-/**
- * How long a claimed slot must sit untouched before clearing it is offered.
- *
- * Comfortably past the loop's lease window, so "stale" means the worker has
- * genuinely stopped rather than that it is mid-run. Offering the repair sooner
- * would invite an operator to race a healthy worker.
- */
-export const SLOT_STALE_AFTER_MS = 15 * 60_000;
 
 /** What a control did, for the audit trail. */
 export type SchedulerControlAction =
@@ -138,10 +130,12 @@ export class SchedulerOpsService {
         ]).catch(() => new Map<string, string>())
       : new Map<string, string>();
 
-    return rows.map((row) => ({
-      ...toOpsScheduledJob(row),
-      projectName: names.get(row.projectId) ?? null,
-    }));
+    return rows.map((row) =>
+      toOpsScheduledJob({
+        row,
+        projectName: names.get(row.projectId) ?? null,
+      }),
+    );
   }
 
   /** Recent operator actions, newest first. Empty when nothing is recorded. */
@@ -166,13 +160,24 @@ export class SchedulerOpsService {
     actorUserId: string;
   }): Promise<OpsScheduledJob> {
     const row = await this.requireSchedule(scheduleId);
-    await this.repo.setActiveForOps({ id: scheduleId, active });
+    const applied = await this.repo.setActiveForOps({
+      id: scheduleId,
+      projectId: row.projectId,
+      active,
+    });
+    // Zero rows means the schedule was deleted between the read and the write.
+    // Auditing an unapplied control would put an action in the trail that never
+    // happened, which is worse than the operator seeing the failure.
+    if (!applied) {
+      this.refuse({ error: new ScheduleNotFoundError(), scheduleId });
+    }
+
     await this.record({
       actorUserId,
       action: active ? "ops.scheduler.resume" : "ops.scheduler.pause",
       row,
     });
-    return this.requireSchedule(scheduleId).then(toOpsScheduledJob);
+    return this.readBack(scheduleId);
   }
 
   /**
@@ -192,19 +197,24 @@ export class SchedulerOpsService {
     now?: Date;
   }): Promise<OpsScheduledJob> {
     const row = await this.requireSchedule(scheduleId);
-    if (!row.currentSlot) throw new ScheduleSlotNotStaleError(scheduleId);
+    if (!row.currentSlot) {
+      this.refuse({ error: new ScheduleSlotNotStaleError(), scheduleId });
+    }
 
     const heldForMs = now.getTime() - row.updatedAt.getTime();
     if (heldForMs < SLOT_STALE_AFTER_MS) {
-      throw new ScheduleSlotNotStaleError(scheduleId);
+      this.refuse({ error: new ScheduleSlotNotStaleError(), scheduleId });
     }
 
     const released = await this.repo.releaseSlotForOps({
       id: scheduleId,
+      projectId: row.projectId,
       expectedNextRunAt: row.nextRunAt,
       now,
     });
-    if (!released) throw new ScheduleAlreadyInFlightError(scheduleId);
+    if (!released) {
+      this.refuse({ error: new ScheduleAlreadyInFlightError(), scheduleId });
+    }
 
     await this.record({
       actorUserId,
@@ -212,7 +222,7 @@ export class SchedulerOpsService {
       row,
     });
     this.wake?.();
-    return this.requireSchedule(scheduleId).then(toOpsScheduledJob);
+    return this.readBack(scheduleId);
   }
 
   /**
@@ -235,26 +245,83 @@ export class SchedulerOpsService {
     const row = await this.requireSchedule(scheduleId);
     // A paused schedule refuses rather than firing once out of band — the whole
     // point of pausing is that nothing runs.
-    if (!row.active) throw new ScheduleInactiveError(scheduleId);
+    if (!row.active) {
+      this.refuse({ error: new ScheduleInactiveError(), scheduleId });
+    }
 
     const queued = await this.repo.requestImmediateRunForOps({
       id: scheduleId,
+      projectId: row.projectId,
       expectedNextRunAt: row.nextRunAt,
       now,
     });
-    if (!queued) throw new ScheduleAlreadyInFlightError(scheduleId);
+    if (!queued) {
+      // The update carries two predicates, so a miss has two possible causes
+      // and they call for different actions: re-read the row and report the one
+      // that actually happened. Telling an operator "already in flight" when
+      // another operator has just paused the schedule sends them to look for a
+      // worker that is not there.
+      const current = await this.repo.findByIdForOps({ id: scheduleId });
+      if (current && !current.active) {
+        this.refuse({ error: new ScheduleInactiveError(), scheduleId });
+      }
+      this.refuse({ error: new ScheduleAlreadyInFlightError(), scheduleId });
+    }
 
     await this.record({ actorUserId, action: "ops.scheduler.run_now", row });
     this.wake?.();
-    return this.requireSchedule(scheduleId).then(toOpsScheduledJob);
+    return this.readBack(scheduleId);
   }
 
   private async requireSchedule(
     scheduleId: string,
   ): Promise<ScheduledJobRecord> {
     const row = await this.repo.findByIdForOps({ id: scheduleId });
-    if (!row) throw new ScheduleNotFoundError(scheduleId);
-    return row;
+    if (!row) this.refuse({ error: new ScheduleNotFoundError(), scheduleId });
+    return row!;
+  }
+
+  /**
+   * Log which schedule was refused, then throw.
+   *
+   * The refusal codes are deliberately free of identifiers — `meta` is a client
+   * contract and nothing renders one. Support still needs to answer "which
+   * schedule", so it is recorded here, on the server, where it is not part of
+   * any contract.
+   */
+  private refuse({
+    error,
+    scheduleId,
+  }: {
+    error: Error;
+    scheduleId: string;
+  }): never {
+    logger.info(
+      { scheduleId, code: error.name },
+      "Refused scheduler operator control",
+    );
+    throw error;
+  }
+
+  /**
+   * Re-read a mutated schedule as the page renders it.
+   *
+   * Every control returns the same shape `listScheduledJobs` does, project name
+   * included. A mutation that returned the row with `projectName: null` would
+   * hand the caller a row it cannot merge into the list without blanking the
+   * one column the confirmations depend on.
+   */
+  private async readBack(scheduleId: string): Promise<OpsScheduledJob> {
+    const row = await this.requireSchedule(scheduleId);
+    const names = this.resolveProjectNames
+      ? await this.resolveProjectNames([row.projectId]).catch(
+          () => new Map<string, string>(),
+        )
+      : new Map<string, string>();
+    return toOpsScheduledJob({
+      row,
+      projectName: names.get(row.projectId) ?? null,
+    });
   }
 
   /**
@@ -289,10 +356,16 @@ export class SchedulerOpsService {
   }
 }
 
-function toOpsScheduledJob(row: ScheduledJobRecord): OpsScheduledJob {
+function toOpsScheduledJob({
+  row,
+  projectName,
+}: {
+  row: ScheduledJobRecord;
+  projectName: string | null;
+}): OpsScheduledJob {
   return {
     id: row.id,
-    projectName: null,
+    projectName,
     projectId: row.projectId,
     targetType: row.targetType,
     targetId: row.targetId,

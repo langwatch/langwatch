@@ -8,6 +8,8 @@
  * state of its own, sorts to the top, and is counted in the header.
  */
 
+import { SLOT_STALE_AFTER_MS } from "../../../shared/ops/schedulerControl";
+
 export interface SchedulerJobLike {
   nextRunAt: string;
   lastSlot: string | null;
@@ -35,10 +37,13 @@ export const OVERDUE_GRACE_MS = 30_000;
 /** No tick within this window means the calendar loop itself is the problem. */
 export const LOOP_STALE_MS = 120_000;
 
-export function deriveStatus(
-  job: SchedulerJobLike,
-  now: number,
-): SchedulerJobStatus {
+export function deriveStatus({
+  job,
+  now,
+}: {
+  job: SchedulerJobLike;
+  now: number;
+}): SchedulerJobStatus {
   // Paused wins: an inactive schedule is not late, it is switched off, and
   // reporting it as overdue would bury the schedules that genuinely are.
   if (!job.active) return "paused";
@@ -46,12 +51,18 @@ export function deriveStatus(
   // running long — the page used to show both as "In progress".
   if (job.currentSlot && job.attempts > 0) return "retrying";
   if (job.currentSlot) return "running";
-  if (latenessMs(job, now) > OVERDUE_GRACE_MS) return "overdue";
+  if (latenessMs({ job, now }) > OVERDUE_GRACE_MS) return "overdue";
   return "scheduled";
 }
 
 /** Milliseconds past due; zero or negative when the schedule is not late. */
-export function latenessMs(job: SchedulerJobLike, now: number): number {
+export function latenessMs({
+  job,
+  now,
+}: {
+  job: SchedulerJobLike;
+  now: number;
+}): number {
   return now - new Date(job.nextRunAt).getTime();
 }
 
@@ -67,16 +78,6 @@ const ATTENTION_ORDER: SchedulerJobStatus[] = [
 export function needsAttention(status: SchedulerJobStatus): boolean {
   return status === "overdue" || status === "retrying";
 }
-
-/**
- * How long a claimed slot must sit untouched before clearing it is offered.
- *
- * Mirrors `SLOT_STALE_AFTER_MS` on the service, which is the authority — this
- * copy decides whether the ACTION is offered, the server decides whether it is
- * allowed. Offering a repair the server would refuse is a worse experience than
- * hiding one it would allow, so the two are kept equal deliberately.
- */
-export const SLOT_STALE_AFTER_MS = 15 * 60_000;
 
 /** Whether a slot has been held long enough that clearing it is a repair. */
 export function isSlotStale({
@@ -97,14 +98,18 @@ export function isSlotStale({
  * Within a status, sooner-first matches how an operator reads the page: the
  * next thing to happen is the next thing to care about.
  */
-export function compareForAttention(
-  a: SchedulerJobLike,
-  b: SchedulerJobLike,
-  now: number,
-): number {
+export function compareForAttention({
+  a,
+  b,
+  now,
+}: {
+  a: SchedulerJobLike;
+  b: SchedulerJobLike;
+  now: number;
+}): number {
   const rank =
-    ATTENTION_ORDER.indexOf(deriveStatus(a, now)) -
-    ATTENTION_ORDER.indexOf(deriveStatus(b, now));
+    ATTENTION_ORDER.indexOf(deriveStatus({ job: a, now })) -
+    ATTENTION_ORDER.indexOf(deriveStatus({ job: b, now }));
   if (rank !== 0) return rank;
   return new Date(a.nextRunAt).getTime() - new Date(b.nextRunAt).getTime();
 }
@@ -117,10 +122,13 @@ export interface SchedulerHeaderCounts {
   paused: number;
 }
 
-export function summarize(
-  jobs: SchedulerJobLike[],
-  now: number,
-): SchedulerHeaderCounts {
+export function summarize({
+  jobs,
+  now,
+}: {
+  jobs: SchedulerJobLike[];
+  now: number;
+}): SchedulerHeaderCounts {
   const counts: SchedulerHeaderCounts = {
     overdue: 0,
     failing: 0,
@@ -130,7 +138,7 @@ export function summarize(
   };
 
   for (const job of jobs) {
-    tally({ counts, job, status: deriveStatus(job, now), now });
+    tally({ counts, job, status: deriveStatus({ job, now }), now });
   }
 
   return counts;
@@ -158,7 +166,7 @@ function tally({
   // flight, and counting it here would inflate "due soon" with work that is
   // being done — the operator is asking what is ABOUT to happen.
   if (status !== "scheduled") return;
-  const until = -latenessMs(job, now);
+  const until = -latenessMs({ job, now });
   if (until > 0 && until <= 3_600_000) counts.dueWithinHour++;
 }
 
@@ -170,10 +178,13 @@ function tally({
  * due, the loop is the suspect rather than any individual row. With nothing
  * due, silence is expected and says nothing either way.
  */
-export function deriveLoopHealth(
-  jobs: SchedulerJobLike[],
-  now: number,
-): { healthy: boolean; lastFiredAt: number | null } {
+export function deriveLoopHealth({
+  jobs,
+  now,
+}: {
+  jobs: SchedulerJobLike[];
+  now: number;
+}): { healthy: boolean; lastFiredAt: number | null } {
   const active = jobs.filter((job) => job.active);
 
   const firedAts = active
@@ -182,7 +193,7 @@ export function deriveLoopHealth(
   const lastFiredAt = firedAts.length > 0 ? Math.max(...firedAts) : null;
 
   const anythingOverdue = active.some(
-    (job) => latenessMs(job, now) > OVERDUE_GRACE_MS,
+    (job) => latenessMs({ job, now }) > OVERDUE_GRACE_MS,
   );
   if (!anythingOverdue) return { healthy: true, lastFiredAt };
   const quietFor = lastFiredAt === null ? Infinity : now - lastFiredAt;

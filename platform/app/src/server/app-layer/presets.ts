@@ -1478,7 +1478,7 @@ export function initializeDefaultApp(options?: {
   gracefulCloseables.push({
     name: "ops-snapshot",
     close: async () => {
-      ops.metricsCollector?.stop();
+      await ops.metricsCollector?.stop();
       ops.snapshotReader?.stop();
     },
   });

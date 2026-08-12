@@ -181,3 +181,34 @@ Feature: Operator control over the scheduler
     When the refusal reaches the page
     Then the operator is shown copy naming the cause and what to do
     And no generic unknown-error message is shown
+
+  @unit
+  Scenario: A run refused by a concurrent pause says the schedule is paused
+    Given an active schedule the operator has chosen to run now
+    And another operator pauses it before the write lands
+    When the run is refused
+    Then the reason names the schedule as inactive
+    And it does not claim the scheduler took the slot first
+
+  @unit
+  Scenario: A control that changed nothing is not recorded as though it did
+    Given a schedule that is deleted between being read and being paused
+    When the pause affects no rows
+    Then the operator is told the schedule no longer exists
+    And no audit record is written for the pause
+
+  # ── Acting on the right row ───────────────────────────────────────────
+
+  @unit
+  Scenario: A control names its project in the write, not only in the copy
+    Given an operator acts on a schedule
+    When any control writes to the row
+    Then the write is scoped to that schedule's project
+    And a schedule belonging to another project cannot be reached
+
+  @unit
+  Scenario: Pausing a wedged schedule does not withdraw the repair
+    Given a schedule whose slot has been held long enough to clear
+    When an operator pauses it first
+    Then clearing the stuck slot is still offered
+    And the staleness clock is not restarted by the pause

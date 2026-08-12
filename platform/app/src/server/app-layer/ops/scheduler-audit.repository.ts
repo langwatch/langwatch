@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import type {
+  SchedulerAuditEntryView,
   SchedulerAuditSink,
   SchedulerControlAction,
 } from "./scheduler-ops.service";
@@ -47,7 +48,7 @@ export class SchedulerAuditRepository implements SchedulerAuditSink {
     limit,
   }: {
     limit: number;
-  }): Promise<SchedulerAuditEntry[]> {
+  }): Promise<SchedulerAuditEntryView[]> {
     const rows = await this.prisma.auditLog.findMany({
       where: { targetKind: "scheduled_job" },
       orderBy: { createdAt: "desc" },
@@ -89,14 +90,4 @@ export class SchedulerAuditRepository implements SchedulerAuditSink {
       actor: row.userId ? (actors.get(row.userId) ?? null) : null,
     }));
   }
-}
-
-/** One operator action as the scheduler page lists it. */
-export interface SchedulerAuditEntry {
-  id: string;
-  at: string;
-  action: string;
-  scheduleId: string;
-  projectId: string | null;
-  actor: string | null;
 }

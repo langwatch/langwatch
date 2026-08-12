@@ -27,7 +27,7 @@ import { formatTimeAgo } from "~/components/ops/shared/formatters";
 import { OpsPageShell } from "~/components/ops/shared/OpsPageShell";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
-import { api } from "~/utils/api";
+import { api, type RouterOutputs } from "~/utils/api";
 
 export default function OpsSchedulerPage() {
   const jobs = api.ops.listScheduledJobs.useQuery(
@@ -36,17 +36,22 @@ export default function OpsSchedulerPage() {
   );
 
   const { hasAccess } = useOpsPermission();
-  const rows = jobs.data ?? [];
+  const rows = useMemo(() => jobs.data ?? [], [jobs.data]);
   // One `now` for the whole render so a row cannot be judged against a
-  // different instant than the header that summarises it.
-  const now = Date.now();
+  // different instant than the header that summarises it — and it advances with
+  // the data rather than with the clock, so an unrelated re-render cannot
+  // invalidate every memo below. The 10s refetch is what keeps it current.
+  const now = jobs.dataUpdatedAt || Date.now();
 
   const sorted = useMemo(
-    () => [...rows].sort((a, b) => compareForAttention(a, b, now)),
+    () => [...rows].sort((a, b) => compareForAttention({ a, b, now })),
     [rows, now],
   );
-  const counts = useMemo(() => summarize(rows, now), [rows, now]);
-  const loop = useMemo(() => deriveLoopHealth(rows, now), [rows, now]);
+  const counts = useMemo(() => summarize({ jobs: rows, now }), [rows, now]);
+  const loop = useMemo(
+    () => deriveLoopHealth({ jobs: rows, now }),
+    [rows, now],
+  );
 
   return (
     <OpsPageShell>
@@ -104,82 +109,15 @@ export default function OpsSchedulerPage() {
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  {sorted.map((job) => {
-                    const status = deriveStatus(job, now);
-                    return (
-                      <Table.Row key={job.id}>
-                        <Table.Cell>
-                          <HStack gap={2}>
-                            <Badge colorPalette="purple" variant="subtle">
-                              {job.targetType}
-                            </Badge>
-                            <Text
-                              textStyle="xs"
-                              title={`${job.targetId} · ${job.projectId}`}
-                            >
-                              {middleEllipsis(job.targetId, 28)}
-                            </Text>
-                            <Text textStyle="xs" color="fg.muted">
-                              {job.projectName ??
-                                middleEllipsis(job.projectId, 18)}
-                            </Text>
-                          </HStack>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Text textStyle="xs" fontFamily="mono">
-                            {job.cron}
-                          </Text>
-                          <Text textStyle="xs" color="fg.muted">
-                            {job.timezone}
-                          </Text>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Text
-                            textStyle="xs"
-                            title={new Date(job.nextRunAt).toLocaleString()}
-                          >
-                            {formatTimeAgo(new Date(job.nextRunAt).getTime())}
-                          </Text>
-                        </Table.Cell>
-                        <Table.Cell color="fg.muted">
-                          <Text
-                            textStyle="xs"
-                            title={
-                              job.lastSlot
-                                ? new Date(job.lastSlot).toLocaleString()
-                                : undefined
-                            }
-                          >
-                            {job.lastSlot
-                              ? formatTimeAgo(new Date(job.lastSlot).getTime())
-                              : "never"}
-                          </Text>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <SchedulerStatusBadge
-                            status={status}
-                            latenessMs={latenessMs(job, now)}
-                            attempts={job.attempts}
-                            lastError={job.lastError}
-                          />
-                        </Table.Cell>
-                        <Table.Cell>
-                          {/* A view-only operator is shown no control they
-                              cannot use, rather than one that errors. */}
-                          {hasAccess && (
-                            <SchedulerRowActions
-                              scheduleId={job.id}
-                              targetId={job.targetId}
-                              projectName={job.projectName}
-                              status={status}
-                              canClearSlot={isSlotStale({ job, now })}
-                              onDone={() => void jobs.refetch()}
-                            />
-                          )}
-                        </Table.Cell>
-                      </Table.Row>
-                    );
-                  })}
+                  {sorted.map((job) => (
+                    <ScheduleRow
+                      key={job.id}
+                      job={job}
+                      now={now}
+                      hasAccess={hasAccess}
+                      onDone={() => void jobs.refetch()}
+                    />
+                  ))}
                 </Table.Body>
               </Table.Root>
               <SchedulerRecentActions />
@@ -188,5 +126,86 @@ export default function OpsSchedulerPage() {
         </PageLayout.Container>
       </DashboardLayout>
     </OpsPageShell>
+  );
+}
+
+/** One schedule, with the row-level controls an `ops:manage` operator gets. */
+function ScheduleRow({
+  job,
+  now,
+  hasAccess,
+  onDone,
+}: {
+  job: RouterOutputs["ops"]["listScheduledJobs"][number];
+  now: number;
+  hasAccess: boolean;
+  onDone: () => void;
+}) {
+  const status = deriveStatus({ job, now });
+
+  return (
+    <Table.Row>
+      <Table.Cell>
+        <HStack gap={2}>
+          <Badge colorPalette="purple" variant="subtle">
+            {job.targetType}
+          </Badge>
+          <Text textStyle="xs" title={`${job.targetId} · ${job.projectId}`}>
+            {middleEllipsis(job.targetId, 28)}
+          </Text>
+          <Text textStyle="xs" color="fg.muted">
+            {job.projectName ?? middleEllipsis(job.projectId, 18)}
+          </Text>
+        </HStack>
+      </Table.Cell>
+      <Table.Cell>
+        <Text textStyle="xs" fontFamily="mono">
+          {job.cron}
+        </Text>
+        <Text textStyle="xs" color="fg.muted">
+          {job.timezone}
+        </Text>
+      </Table.Cell>
+      <Table.Cell>
+        <Text textStyle="xs" title={new Date(job.nextRunAt).toLocaleString()}>
+          {formatTimeAgo(new Date(job.nextRunAt).getTime())}
+        </Text>
+      </Table.Cell>
+      <Table.Cell color="fg.muted">
+        <Text
+          textStyle="xs"
+          title={
+            job.lastSlot ? new Date(job.lastSlot).toLocaleString() : undefined
+          }
+        >
+          {job.lastSlot
+            ? formatTimeAgo(new Date(job.lastSlot).getTime())
+            : "never"}
+        </Text>
+      </Table.Cell>
+      <Table.Cell>
+        <SchedulerStatusBadge
+          status={status}
+          latenessMs={latenessMs({ job, now })}
+          attempts={job.attempts}
+          lastError={job.lastError}
+        />
+      </Table.Cell>
+      <Table.Cell>
+        {/* A view-only operator is shown no control they cannot use, rather
+            than one that errors. */}
+        {hasAccess && (
+          <SchedulerRowActions
+            scheduleId={job.id}
+            targetType={job.targetType}
+            targetId={job.targetId}
+            projectName={job.projectName}
+            status={status}
+            canClearSlot={isSlotStale({ job, now })}
+            onDone={onDone}
+          />
+        )}
+      </Table.Cell>
+    </Table.Row>
   );
 }

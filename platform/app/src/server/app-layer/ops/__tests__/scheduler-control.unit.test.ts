@@ -1,9 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { SLOT_STALE_AFTER_MS } from "~/shared/ops/schedulerControl";
 import type { ScheduledJobRecord } from "../../scheduler/scheduler.types";
-import {
-  SchedulerOpsService,
-  SLOT_STALE_AFTER_MS,
-} from "../scheduler-ops.service";
+import { SchedulerOpsService } from "../scheduler-ops.service";
 
 const NOW = new Date("2026-08-11T12:00:00.000Z");
 const at = (offsetMs: number) => new Date(NOW.getTime() + offsetMs);
@@ -100,6 +98,7 @@ describe("SchedulerOpsService controls", () => {
         // The loop claims and executes; ops only moves the row's due instant.
         expect(repo.requestImmediateRunForOps).toHaveBeenCalledWith({
           id: "sched_1",
+          projectId: "project_acme",
           expectedNextRunAt: at(600_000),
           now: NOW,
         });
@@ -261,6 +260,7 @@ describe("SchedulerOpsService controls", () => {
 
       expect(repo.setActiveForOps).toHaveBeenCalledWith({
         id: "sched_1",
+        projectId: "project_acme",
         active: false,
       });
       expect(repo.releaseSlotForOps).not.toHaveBeenCalled();
@@ -285,6 +285,117 @@ describe("SchedulerOpsService controls", () => {
         "ops.scheduler.pause",
         "ops.scheduler.resume",
       ]);
+    });
+  });
+
+  describe("given another operator pauses the schedule mid-flight", () => {
+    describe("when the run-now write finds no matching row", () => {
+      /** @scenario "A run refused by a concurrent pause says the schedule is paused" */
+      it("names the pause rather than blaming the scheduler", async () => {
+        const { service, repo } = makeService(record());
+        repo.requestImmediateRunForOps.mockResolvedValue(false);
+        // The re-read sees what the write saw: somebody paused it.
+        repo.findByIdForOps
+          .mockResolvedValueOnce(record())
+          .mockResolvedValueOnce(record({ active: false }));
+
+        expect(
+          await codeOf(() =>
+            service.runNow({
+              scheduleId: "sched_1",
+              actorUserId: "u1",
+              now: NOW,
+            }),
+          ),
+        ).toBe("schedule_inactive");
+      });
+    });
+  });
+
+  describe("given a schedule deleted between the read and the write", () => {
+    describe("when a pause affects no rows", () => {
+      /** @scenario "A control that changed nothing is not recorded as though it did" */
+      it("reports it missing and writes no audit record", async () => {
+        const { service, repo, audit } = makeService(record());
+        repo.setActiveForOps.mockResolvedValue(false);
+
+        expect(
+          await codeOf(() =>
+            service.setActive({
+              scheduleId: "sched_1",
+              active: false,
+              actorUserId: "u1",
+            }),
+          ),
+        ).toBe("schedule_not_found");
+        expect(audit.append).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given any control writing to a schedule", () => {
+    /** @scenario "A control names its project in the write, not only in the copy" */
+    it("scopes every write to the row's project", async () => {
+      const { service, repo } = makeService(
+        record({
+          currentSlot: at(-SLOT_STALE_AFTER_MS - 60_000),
+          updatedAt: at(-SLOT_STALE_AFTER_MS - 60_000),
+        }),
+      );
+
+      await service.setActive({
+        scheduleId: "sched_1",
+        active: false,
+        actorUserId: "u1",
+      });
+      await service.clearStuckSlot({
+        scheduleId: "sched_1",
+        actorUserId: "u1",
+        now: NOW,
+      });
+      await service.runNow({
+        scheduleId: "sched_1",
+        actorUserId: "u1",
+        now: NOW,
+      });
+
+      for (const write of [
+        repo.setActiveForOps,
+        repo.releaseSlotForOps,
+        repo.requestImmediateRunForOps,
+      ]) {
+        expect(write).toHaveBeenCalledWith(
+          expect.objectContaining({ projectId: "project_acme" }),
+        );
+      }
+    });
+  });
+
+  describe("given a wedged schedule an operator paused first", () => {
+    describe("when they then clear the stuck slot", () => {
+      /** @scenario "Pausing a wedged schedule does not withdraw the repair" */
+      it("still allows the repair", async () => {
+        // Pausing is the first thing an operator does to a wedged schedule.
+        // The repair reads `updatedAt` as worker liveness, so a pause that
+        // touched it would hide the repair for another full staleness window
+        // at exactly the moment it is wanted.
+        const { service, repo } = makeService(
+          record({
+            active: false,
+            currentSlot: at(-SLOT_STALE_AFTER_MS - 60_000),
+            updatedAt: at(-SLOT_STALE_AFTER_MS - 60_000),
+          }),
+        );
+
+        await expect(
+          service.clearStuckSlot({
+            scheduleId: "sched_1",
+            actorUserId: "u1",
+            now: NOW,
+          }),
+        ).resolves.toBeDefined();
+        expect(repo.releaseSlotForOps).toHaveBeenCalled();
+      });
     });
   });
 
