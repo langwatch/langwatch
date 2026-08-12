@@ -6,6 +6,7 @@
  */
 import {
   type Organization,
+  type Prisma,
   type Project,
   type Team,
   TriggerAction,
@@ -69,6 +70,7 @@ describe("Feature: delivery credentials are redacted at the REST boundary", () =
         filters: JSON.stringify({ "metadata.labels": ["prod"] }),
         triggerKind: TriggerKind.AUTOMATION,
         ...data,
+        actionParams: data.actionParams as Prisma.InputJsonValue,
       },
     });
 
