@@ -83,6 +83,19 @@ Feature: Staged automation authoring drawer
       Then the query reads "trace.attribute.user_id:premium"
       And parsing that query back recognises the same attribute and key
 
+    # The key is the one place raw keystrokes flow straight into the query's
+    # field position, which the query language never escapes. A key with a
+    # space, a colon, or a quote can silently retarget what the clause
+    # matches instead of failing loudly, so it is rejected before it ever
+    # reaches the saved query — with the reason shown on the row, not a
+    # silent drop.
+    @unit
+    Scenario: An attribute key that would change the meaning of the filter is rejected
+      Given the user picks the trace attribute field in the condition builder
+      When the user types a key containing a space, a colon, or a quote
+      Then the row is not saved into the query
+      And the row shows why the key can't be saved
+
   Rule: No API can create an automation that fires on every trace
 
     The drawer has always blocked a condition-less automation, but only in the
@@ -190,6 +203,18 @@ Feature: Staged automation authoring drawer
       Then the user sees an explanation instead of an empty graph picker
       And a link to create a custom graph
       And the link opens in a new tab so the alert draft is not lost
+
+    # A fetch failure is not the same fact as "the project has no graphs" —
+    # telling the author to go create one they may already have is wrong,
+    # and unlike the genuine empty state there's something to retry.
+    @integration
+    Scenario: A failed graph list shows a retry, not the empty-project state
+      Given the user is creating an alert
+      And the graph list request fails
+      When the Subject section is shown
+      Then the user sees that the graphs could not be loaded
+      And no link to create a custom graph is offered
+      And the user can retry the request
 
   Rule: Notifications configure templates; actions configure destinations
 

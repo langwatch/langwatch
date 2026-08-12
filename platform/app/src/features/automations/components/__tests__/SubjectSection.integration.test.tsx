@@ -16,6 +16,12 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+/** Spy shared with the failed-load retry test — declared via `vi.hoisted`
+ *  since it's referenced inside the (hoisted) `~/utils/api` mock factory. */
+const { mockGraphsRefetch } = vi.hoisted(() => ({
+  mockGraphsRefetch: vi.fn(),
+}));
+
 /** What the two trace-preview queries return for the test at hand. */
 const server = vi.hoisted(() => ({
   preview: {
@@ -27,6 +33,8 @@ const server = vi.hoisted(() => ({
   graphs: [
     { id: "graph-1", name: "Latency", trigger: null as unknown },
   ] as Array<{ id: string; name: string; trigger: unknown }>,
+  graphsLoading: false,
+  graphsError: false,
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -34,8 +42,10 @@ vi.mock("~/utils/api", () => ({
     graphs: {
       getAll: {
         useQuery: () => ({
-          data: server.graphs,
-          isLoading: false,
+          data: server.graphsError ? undefined : server.graphs,
+          isLoading: server.graphsLoading,
+          isError: server.graphsError,
+          refetch: mockGraphsRefetch,
         }),
       },
       getById: {
@@ -134,6 +144,9 @@ describe("SubjectSection", () => {
     previewReturns(0);
     server.cap = { data: { cap: PLAN_CAP } };
     server.graphs = [{ id: "graph-1", name: "Latency", trigger: null }];
+    server.graphsLoading = false;
+    server.graphsError = false;
+    mockGraphsRefetch.mockClear();
   });
   afterEach(() => {
     cleanup();
@@ -221,6 +234,68 @@ describe("SubjectSection", () => {
         });
 
         expect(selectContainingOption(/select a graph/i)).toBeInTheDocument();
+      });
+    });
+
+    describe("when the graph list fails to load", () => {
+      /** @scenario "A failed graph list shows a retry, not the empty-project state" */
+      it("shows a load failure, not the no-graphs-yet empty state", () => {
+        server.graphsError = true;
+        seedFreshAlertDraft();
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(
+          screen.getByText(/couldn.t be loaded right now/i),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByText(/doesn.t have a custom graph yet/i),
+        ).not.toBeInTheDocument();
+      });
+
+      it("does not name the underlying error", () => {
+        server.graphsError = true;
+        seedFreshAlertDraft();
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.queryByText(/upstream|fetch|network/i)).toBeNull();
+      });
+
+      it("does not offer to create a graph the project may already have", () => {
+        server.graphsError = true;
+        seedFreshAlertDraft();
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(
+          screen.queryByRole("link", { name: /create a custom graph/i }),
+        ).not.toBeInTheDocument();
+      });
+
+      describe("when the user retries", () => {
+        it("re-runs the graph list query", async () => {
+          const user = userEvent.setup();
+          server.graphsError = true;
+          seedFreshAlertDraft();
+          render(<SubjectSection />, { wrapper: Wrapper });
+
+          await user.click(screen.getByRole("button", { name: /try again/i }));
+
+          expect(mockGraphsRefetch).toHaveBeenCalledTimes(1);
+        });
+      });
+    });
+
+    describe("while the graph list is still loading", () => {
+      it("shows neither the empty state nor the picker's missing-graph error", () => {
+        server.graphsLoading = true;
+        seedFreshAlertDraft();
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(
+          screen.queryByText(/doesn.t have a custom graph yet/i),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByText("Pick a custom graph to continue."),
+        ).not.toBeInTheDocument();
       });
     });
   });
