@@ -22,6 +22,7 @@ import {
   TIME_PERIOD_LABELS,
 } from "~/features/automations/logic/draftReducer";
 import { resolveSeriesLabel } from "~/features/automations/logic/seriesOptions";
+import { slackDestinationPresentation } from "~/features/automations/logic/slackDestinationPresentation";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -109,11 +110,23 @@ export function ViewAutomationDrawer({
   const destinationSummary = (): React.ReactNode => {
     if (!trigger) return null;
     switch (trigger.action) {
-      case "SEND_SLACK_MESSAGE":
-        // The webhook URL carries a secret token — mask it and surface the
-        // full URL only on hover, mirroring the list page's Slack cell.
-        return actionParams.slackWebhook ? (
-          <Tooltip content={actionParams.slackWebhook}>
+      case "SEND_SLACK_MESSAGE": {
+        // #6244: see `slackDestinationPresentation` — shared with the list
+        // page's "Notifies" cell so the decision can't drift between them.
+        const destination = slackDestinationPresentation(actionParams);
+        if (destination.kind === "bot") {
+          return destination.channelId ? (
+            <Text textStyle="sm">
+              Slack app · channel {destination.channelId}
+            </Text>
+          ) : (
+            <Text textStyle="sm" color="fg.muted">
+              Slack app
+            </Text>
+          );
+        }
+        return destination.tooltipUrl ? (
+          <Tooltip content={destination.tooltipUrl}>
             <Text
               textStyle="sm"
               lineClamp={1}
@@ -126,6 +139,7 @@ export function ViewAutomationDrawer({
         ) : (
           <Text textStyle="sm">Slack webhook</Text>
         );
+      }
       case "SEND_EMAIL":
         return actionParams.members?.length ? (
           <Text textStyle="sm" wordBreak="break-all">

@@ -54,6 +54,31 @@ const statusOf = (type: string | undefined): ToastStatus =>
   type && type in STATUS ? (type as ToastStatus) : "info";
 
 /**
+ * Chakra's base toast recipe pads `pe: "6"` (vs `ps: "4"`) to leave room for
+ * an ABSOLUTELY POSITIONED close button in the top-right corner — its own
+ * anatomy. This app's close trigger below is `position="static"` instead (a
+ * real flex item, not a floating corner button), so that extra 8px on the end
+ * is dead space no control ever occupies: on a toast without a close button it
+ * reads as the title/description sitting off-centre, shifted toward the
+ * start. Symmetric padding here removes the dead reservation; the close
+ * button, now a normal flex sibling, claims its own width automatically.
+ */
+export const SYMMETRIC_PADDING_END = "4";
+
+/**
+ * Chakra's `lg` shadow token in light mode is `0px 8px 16px
+ * {colors.gray.900/10}, 0px 0px 1px {colors.gray.900/30}` (vs `{black/64}`
+ * for the blur in dark mode) — tuned for a panel that's expected to sit
+ * there, wrong for a toast that has to read as "new, floating, temporary" in
+ * the half-second before anyone looks at it. Dark mode's shadow already has
+ * enough presence; light mode gets an explicit, stronger elevation on BOTH
+ * layers (the blur *and* the 1px ring) so the card actually separates from a
+ * near-white page instead of blending into it.
+ */
+export const LIGHT_MODE_ELEVATION =
+  "0 16px 32px -12px color-mix(in srgb, var(--chakra-colors-gray-900) 32%, transparent), 0 0 0 1px color-mix(in srgb, var(--chakra-colors-gray-900) 45%, transparent)";
+
+/**
  * The colour a toast's action reads in. Exported because it is the whole of the
  * rule: on a toast that already says something went right, the warm accent
  * reads as a warning about it, so success spends its own green there.
@@ -107,6 +132,12 @@ export const Toaster = () => {
           return (
             <Toast.Root
               width={{ md: "sm" }}
+              // See SYMMETRIC_PADDING_END above: the recipe's asymmetric
+              // padding assumes an absolutely-positioned close button this
+              // app doesn't use.
+              paddingInlineEnd={SYMMETRIC_PADDING_END}
+              boxShadow="lg"
+              _light={{ boxShadow: LIGHT_MODE_ELEVATION }}
               // zag hard-codes `role="status"` on every toast, which is a
               // polite live region: a screen reader finishes whatever it is
               // saying first, and an error can auto-dismiss before it is ever

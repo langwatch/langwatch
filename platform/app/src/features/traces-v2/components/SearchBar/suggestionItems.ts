@@ -60,8 +60,26 @@ function rankByMatch<T extends { keys: string[] }>(
  * lets the ranking pass operate over every candidate at once so a tight
  * prefix match in one group still wins over a contains match in another.
  */
+/**
+ * F13/#6716: `tokens` and `tokensEstimated` used to appear as two separate
+ * rows — a customer reading "Tokens" and "Tokens estimated" side by side has
+ * no way to tell those are the same metric with a qualifier on the value,
+ * not two different things to search on. `tokensEstimated` is still a real,
+ * separately-stored field (`metadata.ts`, `facet-registry.ts`) — the fold
+ * here is presentational only, scoped to what this file owns: the raw
+ * `tokensEstimated:` filter still parses and the sidebar facet still works,
+ * this only changes what the autocomplete surfaces. Typing "estimated" now
+ * finds `tokens` instead of a second field.
+ */
+const FOLDED_QUALIFIER_FIELDS = new Set(["tokensEstimated"]);
+const QUALIFIER_SYNONYMS: Record<string, string[]> = {
+  tokens: ["estimated"],
+};
+
 export function getFieldSuggestions(query: string): SuggestionItem[] {
-  const fieldItems = FIELD_NAMES.map((name) => {
+  const fieldItems = FIELD_NAMES.filter(
+    (name) => !FOLDED_QUALIFIER_FIELDS.has(name),
+  ).map((name) => {
     const meta = SEARCH_FIELDS[name];
     const label = meta?.label ?? name;
     return {
@@ -72,8 +90,9 @@ export function getFieldSuggestions(query: string): SuggestionItem[] {
         group: meta?.group ?? null,
       } satisfies SuggestionItem,
       // Match the typed query against both the human label and the raw
-      // field id, so `status`, `Status`, and `stat` all hit.
-      keys: [label, name],
+      // field id, so `status`, `Status`, and `stat` all hit. A folded field's
+      // synonyms (e.g. `tokens` answering to "estimated") extend this too.
+      keys: [label, name, ...(QUALIFIER_SYNONYMS[name] ?? [])],
     };
   });
   const prefixItems = DYNAMIC_PREFIXES.map((p) => ({

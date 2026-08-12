@@ -314,6 +314,108 @@ describe("ViewAutomationDrawer", () => {
     });
   });
 
+  describe("given a bot-delivery Slack automation with a channel", () => {
+    /** @scenario The automation view names its Slack destination */
+    it("names the delivery method and shows the destination channel", () => {
+      mockTriggerRow = {
+        id: "trigger_1",
+        name: "Errors to #ops",
+        action: "SEND_SLACK_MESSAGE",
+        customGraphId: null,
+        filters: "{}",
+        actionParams: {
+          slackDelivery: "bot",
+          slackChannelId: "C0123456",
+          slackBotTokenSet: true,
+        },
+      };
+      mockRecentFires = [];
+
+      renderDrawer();
+
+      // #6244: this used to read "Slack webhook" for every Slack
+      // automation, including bot deliveries that never carry a webhook at
+      // all.
+      expect(screen.getByText("Slack app · channel C0123456")).toBeDefined();
+      expect(screen.queryByText("Slack webhook")).toBeNull();
+    });
+  });
+
+  describe("given a bot-delivery Slack automation with no channel chosen yet", () => {
+    it("names the delivery method without inventing a channel", () => {
+      mockTriggerRow = {
+        id: "trigger_1",
+        name: "Draft Slack app automation",
+        action: "SEND_SLACK_MESSAGE",
+        customGraphId: null,
+        filters: "{}",
+        actionParams: {
+          slackDelivery: "bot",
+          slackBotTokenSet: true,
+        },
+      };
+      mockRecentFires = [];
+
+      renderDrawer();
+
+      expect(screen.getByText("Slack app")).toBeDefined();
+      expect(screen.queryByText(/channel/)).toBeNull();
+    });
+  });
+
+  describe("given a legacy Slack row saved before delivery method existed", () => {
+    it("falls back to webhook delivery and shows the masked URL on hover", () => {
+      mockTriggerRow = {
+        id: "trigger_1",
+        name: "Old-style Slack automation",
+        action: "SEND_SLACK_MESSAGE",
+        customGraphId: null,
+        filters: "{}",
+        // No `slackDelivery` key at all — the shape every row saved before
+        // bot delivery existed actually has.
+        actionParams: {
+          slackWebhook: "https://hooks.slack.com/services/legacy",
+        },
+      };
+      mockRecentFires = [];
+
+      renderDrawer();
+
+      expect(screen.getByText("Slack webhook")).toBeDefined();
+      expect(screen.queryByText("Slack app")).toBeNull();
+      // The masked label is a real tooltip trigger (the full URL shows on
+      // hover) — a distinct code path from the redacted case below, which
+      // renders no tooltip at all.
+      expect(document.querySelector('[data-scope="tooltip"]')).not.toBeNull();
+    });
+  });
+
+  describe("given a Slack webhook row read through a redacting boundary", () => {
+    it("shows the masked label without rendering the placeholder as a URL", () => {
+      mockTriggerRow = {
+        id: "trigger_1",
+        name: "Redacted webhook automation",
+        action: "SEND_SLACK_MESSAGE",
+        customGraphId: null,
+        filters: "{}",
+        actionParams: {
+          slackDelivery: "webhook",
+          // Not a real `https://hooks.slack.com/...` URL — stands in for
+          // whatever a redacting boundary substitutes for the secret.
+          slackWebhook: "[redacted]",
+        },
+      };
+      mockRecentFires = [];
+
+      renderDrawer();
+
+      expect(screen.getByText("Slack webhook")).toBeDefined();
+      // Never rendered as though `[redacted]` were a real, hoverable URL.
+      expect(screen.queryByText("[redacted]")).toBeNull();
+      expect(document.querySelector('[data-scope="tooltip"]')).toBeNull();
+    });
+  });
+
   describe("given a trace automation that never fired", () => {
     beforeEach(() => {
       mockTriggerRow = {

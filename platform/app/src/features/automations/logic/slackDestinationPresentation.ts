@@ -1,0 +1,56 @@
+import type { TriggerActionParams } from "./triggerActionParams";
+
+/**
+ * The one decision both Slack-destination display surfaces need: what kind
+ * of delivery a `SEND_SLACK_MESSAGE` row actually is, and what's safe to
+ * show for it. Pure and framework-free so `ViewAutomationDrawer.tsx` (the
+ * drawer) and `pages/[project]/automations.tsx` (the list page's "Notifies"
+ * cell) render the exact same call — each still owns its own JSX/styling,
+ * only the underlying decision is shared.
+ *
+ * #6244: before this, both surfaces (independently) rendered every Slack
+ * row as "Webhook"/"Slack webhook", including bot-token deliveries — which
+ * never carry a webhook at all — so neither could answer "where does this
+ * actually post?". Fixed once here instead of drifting into two
+ * hand-maintained copies again.
+ */
+export type SlackDestinationPresentation =
+  | {
+      kind: "bot";
+      /** The destination channel's raw Slack id (e.g. `C0123456`), or
+       *  `null` when the automation hasn't had one chosen yet. No channel
+       *  NAME is ever persisted (only the composer, live and
+       *  bot-token-authenticated, can resolve one) — the id is still the
+       *  exact identifier the author picked, so it's shown plainly rather
+       *  than hidden. */
+      channelId: string | null;
+    }
+  | {
+      kind: "webhook";
+      /** The webhook URL, ONLY when it's safe to show on hover — a real
+       *  Slack incoming webhook always starts `https://hooks.slack.com/…`.
+       *  `null` for an absent value, or a non-URL placeholder (e.g. a
+       *  future redaction substitute from the WS-8 REST-redaction work):
+       *  there is nothing meaningful to show on hover, so callers must
+       *  render the masked label with no tooltip rather than risk exposing
+       *  or misrepresenting the placeholder as though it were the URL. */
+      tooltipUrl: string | null;
+    };
+
+export function slackDestinationPresentation(
+  actionParams: Pick<
+    TriggerActionParams,
+    "slackDelivery" | "slackChannelId" | "slackWebhook"
+  >,
+): SlackDestinationPresentation {
+  // Absent `slackDelivery` means a legacy row saved before bot delivery
+  // existed — back-compat default to webhook.
+  if ((actionParams.slackDelivery ?? "webhook") === "bot") {
+    return { kind: "bot", channelId: actionParams.slackChannelId ?? null };
+  }
+  const webhook = actionParams.slackWebhook;
+  return {
+    kind: "webhook",
+    tooltipUrl: webhook?.startsWith("https://") ? webhook : null,
+  };
+}
