@@ -52,7 +52,7 @@ func TestPlaySeedFlagTakesTheSharedPresets(t *testing.T) {
 // itself. Calling it with no orchestrator proves the guard returns before
 // anything downstream is touched; without the guard this indexes an empty
 // slice and panics.
-// @scenario "The preset reaches the backgrounded launcher"
+// @scenario "The launcher refuses an invocation with no PR number"
 func TestPlayLaunchWithoutANumberFailsInsteadOfPanicking(t *testing.T) {
 	inv, err := parse(specByName(t, "play-launch"), nil)
 	if err != nil {

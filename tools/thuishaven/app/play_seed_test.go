@@ -211,7 +211,7 @@ func TestPlaySeedWithoutIngestNeverWaits(t *testing.T) {
 // A sandbox whose app never answers is one being torn down (or one whose PR
 // does not boot). Either way the ingest has nowhere to send data, so it must
 // give up rather than run the scripts against a stack that is not there.
-// @scenario "Preset data is ingested once the sandbox is serving"
+// @scenario "A sandbox that never serves is never seeded"
 func TestPlaySeedIngestGivesUpWhenTheAppNeverAnswers(t *testing.T) {
 	sup := &fakeSupervisor{notReady: true}
 	launchPlay(t, sup, "demo")

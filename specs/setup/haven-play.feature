@@ -220,6 +220,21 @@ Feature: haven play, a throwaway PR sandbox
     Given a preset that only switches the base seed
     Then the sandbox runs no ingest step and waits for nothing
 
+  # A sandbox whose app never answers is either being torn down or running a PR
+  # that does not boot. Either way the seeder has nowhere to send data.
+  @unit
+  Scenario: A sandbox that never serves is never seeded
+    Given a preset whose data goes through the collector
+    And the sandbox's app never answers
+    Then the ingest gives up instead of sending to a stack that is not there
+
+  # The launcher is dispatchable by hand, and the parser caps positionals
+  # without ever requiring them.
+  @unit
+  Scenario: The launcher refuses an invocation with no PR number
+    When the sandbox launcher is run with no arguments
+    Then it says a PR number is required rather than failing on the missing argument
+
   # The sandbox is the point; its sample data is not. A seeder that failed (or a
   # PR whose collector is the thing that is broken) must leave the PR running.
   @unit
