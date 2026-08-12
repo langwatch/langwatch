@@ -321,15 +321,18 @@ var table = []commandSpec{
 		maxArgs: 1,
 		flags: []flagSpec{
 			{long: "--allow-untrusted", summary: "proceed although not every PR author has write access (the only way in agent mode)"},
+			{long: "--seed", takesValue: true, value: "<preset>", summary: "seed the sandbox's database: " + strings.Join(app.SeedPresetNames(), ", ")},
 		},
 		run: runPlay,
 	},
 	{
 		// The backgrounded sandbox launcher `haven play` spawns in the play
-		// checkout - internal, like daemon: dispatchable, absent from help.
+		// checkout - internal, like daemon: dispatchable, absent from help. The
+		// preset travels as a positional because the launcher is a separate
+		// process: anything the parent parsed and did not pass on is lost.
 		name:    "play-launch",
-		args:    "<number>",
-		maxArgs: 1,
+		args:    "<number> [preset]",
+		maxArgs: 2,
 		hidden:  true,
 		run:     runPlayLaunchCmd,
 	},

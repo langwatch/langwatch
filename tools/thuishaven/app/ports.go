@@ -80,6 +80,11 @@ type Supervisor interface {
 	// runaway one-shot (tsgo) sit on a slot forever.
 	RunOnceBounded(ctx context.Context, name, dir, shell string, env []string, limits ReapLimits) error
 	Supervise(ctx context.Context, children []Child)
+	// WaitReady blocks until an HTTP GET to url gets a non-5xx response, the same
+	// probe Child.ReadyProbeURL gates a lane on. It reports false when the context
+	// ended first, so a caller that must not act on a stack that never came up
+	// (the play sandbox's seed ingest) can tell "ready" from "gave up".
+	WaitReady(ctx context.Context, name, url string) bool
 }
 
 // ReapLimits bounds a RunOnceBounded call. Either field left at 0 disables that
