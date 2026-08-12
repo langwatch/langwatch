@@ -73,13 +73,13 @@ Feature: The in-depth view of an automation
 
     @integration
     Scenario: The view shows the next scheduled firing
-      Given a schedule with an active calendar entry
+      Given a report with an active calendar entry
       When the user opens the View drawer for it
       Then the view shows the next time it sends
 
     @integration
-    Scenario: A paused schedule does not claim a next firing
-      Given a schedule that is paused
+    Scenario: A paused report does not claim a next firing
+      Given a report that is paused
       When the user opens the View drawer for it
       Then the view says it sends nothing while it is paused
 

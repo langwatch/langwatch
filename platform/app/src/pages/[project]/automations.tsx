@@ -73,14 +73,14 @@ type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
 /** What a saved row watches (`draft.source`), derived the same way the
  *  composer derives it — so the row-actions menu, the delete dialog, and the
  *  toast all name the row the way the customer does. Both automation subjects
- *  share one noun; only a schedule has its own (ADR-093 §1). */
+ *  share one noun; only a report has its own (ADR-093 §1). */
 function triggerSource(trigger: EnhancedTrigger): ConditionSource {
   if (trigger.customGraphId) return "customGraph";
   if (trigger.triggerKind === "REPORT") return "report";
   return "trace";
 }
 
-type AutomationSection = "overview" | "automations" | "schedules";
+type AutomationSection = "overview" | "automations" | "reports";
 
 const sectionDetails: Record<
   AutomationSection,
@@ -96,10 +96,10 @@ const sectionDetails: Record<
     description:
       "Watch a trace filter or a graph, and act when something matches.",
   },
-  schedules: {
-    title: "Schedules",
+  reports: {
+    title: "Reports",
     description:
-      "Send a dashboard, graph, or trace table on a recurring cadence.",
+      "Send a dashboard, graph, or trace table on a recurring schedule.",
   },
 };
 
@@ -109,7 +109,10 @@ const sectionFromPath = (pathname: string): AutomationSection => {
   // resolving to it, so a link issued before the merge still lands on the row
   // it was pointing at rather than on a dead route.
   if (pathname.includes("/automations/alerts")) return "automations";
-  if (pathname.includes("/automations/schedules")) return "schedules";
+  // A report is what the third concept is called; "/schedules" is the path it
+  // shipped under and keeps answering on, so no existing link breaks.
+  if (pathname.includes("/automations/schedules")) return "reports";
+  if (pathname.includes("/automations/reports")) return "reports";
   return "overview";
 };
 
@@ -125,7 +128,7 @@ function AutomationsPage() {
   // Row pending a delete confirmation (#6716: deletion was immediate and
   // irreversible). Holding the row itself, not just its id, lets the dialog
   // and the toast name the row the way the customer does (automation /
-  // schedule).
+  // report).
   const [pendingDelete, setPendingDelete] = useState<EnhancedTrigger | null>(
     null,
   );
@@ -178,7 +181,7 @@ function AutomationsPage() {
 
   // One table for everything that watches something (ADR-093 §1): a trace
   // filter and a graph metric are two subjects of one kind, not two kinds.
-  // Schedules keep their own tab — the clock is not something to watch.
+  // Reports keep their own tab — the clock is not something to watch.
   const reports = useMemo(
     () => (triggers.data ?? []).filter((t) => t.triggerKind === "REPORT"),
     [triggers.data],
@@ -562,7 +565,7 @@ function AutomationsPage() {
           icon: <Zap size={14} />,
         },
         {
-          label: "Schedules",
+          label: "Reports",
           href: `${basePath}/schedules`,
           icon: <Calendar size={14} />,
         },
@@ -609,7 +612,7 @@ function AutomationsPage() {
                           </Box>
                         </Menu.Item>
                         <Menu.Item
-                          value="schedule"
+                          value="report"
                           onClick={() =>
                             openDrawer("automation", {
                               initialSource: "report",
@@ -618,7 +621,7 @@ function AutomationsPage() {
                         >
                           <Box display="flex" alignItems="center" gap={2}>
                             <Calendar size={14} aria-hidden="true" />
-                            New schedule
+                            New report
                           </Box>
                         </Menu.Item>
                       </Menu.Content>
@@ -648,14 +651,14 @@ function AutomationsPage() {
                           ? (formatTimeAgo(overview.next.at) ?? "—")
                           : "—"
                       }
-                      sub={overview.nextName ?? "no schedules queued"}
+                      sub={overview.nextName ?? "no reports queued"}
                     />
                   </SimpleGrid>
 
                   <VStack align="stretch" gap={3} width="full">
                     <OverviewSectionHeading
                       title="Recent activity"
-                      summary="See what your automations and schedules have done recently."
+                      summary="See what your automations and reports have done recently."
                     />
                     <AutomationsHistory
                       fires={activity.data ?? []}
@@ -707,24 +710,24 @@ function AutomationsPage() {
                   </VStack>
                 </VStack>
               )}
-              {section === "schedules" && (
+              {section === "reports" && (
                 <VStack align="stretch" gap={4}>
                   <SectionHeader
                     icon={<Calendar size={18} />}
                     accent="purple"
-                    title="Schedules"
+                    title="Reports"
                     count={reports.length}
                     summary="Send a dashboard, a graph, or a table of traces on a recurring schedule."
-                    details="A schedule bundles a dashboard, a single graph, or a top-N trace table into a Slack or email digest on the schedule you set."
-                    addLabel="New schedule"
+                    details="A report bundles a dashboard, a single graph, or a top-N trace table into a Slack or email digest on the schedule you set."
+                    addLabel="New report"
                     onAdd={() =>
                       openDrawer("automation", { initialSource: "report" })
                     }
                   />
                   {reports.length === 0 ? (
                     <EmptyHint>
-                      No schedules yet. Create one for a recurring Slack or
-                      email digest.
+                      No reports yet. Create one for a recurring Slack or email
+                      digest.
                     </EmptyHint>
                   ) : (
                     <TableShell>
@@ -739,7 +742,7 @@ function AutomationsPage() {
                             <Table.ColumnHeader whiteSpace="nowrap">
                               <MetricHeader
                                 label="Next run"
-                                help="When this next goes out, straight from the scheduler. A paused schedule has no next run."
+                                help="When this next goes out, straight from the scheduler. A paused report has no next run."
                               />
                             </Table.ColumnHeader>
                             <Table.ColumnHeader whiteSpace="nowrap">

@@ -1,6 +1,6 @@
 Feature: Automations list pages, providers, and shared copy
 
-  The Overview/Automations/Schedules pages
+  The Overview/Automations/Reports pages
   (`pages/[project]/automations.tsx`) and two composer providers (dataset,
   annotation queue) carried a bundle of #6716 defects on top of the missing
   Overview create affordance (G5): deleting a row was immediate and
@@ -27,10 +27,10 @@ Feature: Automations list pages, providers, and shared copy
       And a stale copy of the row can no longer be read from the drawer cache
 
     @integration
-    Scenario: Deleting a schedule names it as a schedule, not an automation
-      Given the Schedules table has a row for an existing schedule
+    Scenario: Deleting a report names it as a report, not an automation
+      Given the Reports table has a row for an existing report
       When the user deletes it and confirms
-      Then the toast reads "Schedule deleted"
+      Then the toast reads "Report deleted"
 
     @integration
     Scenario: Cancelling the dialog leaves the row untouched

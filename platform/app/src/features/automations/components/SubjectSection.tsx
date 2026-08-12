@@ -72,7 +72,7 @@ const SUBJECT_HELP = {
   customGraph:
     "The metric this automation watches — one series on one of your analytics graphs.",
   report:
-    "What this schedule sends: a table of matching traces, a single graph, or a whole dashboard.",
+    "What this report sends: a table of matching traces, a single graph, or a whole dashboard.",
 } as const;
 
 /**
@@ -612,7 +612,7 @@ function TraceQuerySubject({
       <HStack justify="space-between" align="start" gap={3}>
         <Text textStyle="xs" color="fg.muted" flex={1}>
           {purpose === "report"
-            ? "The schedule sends the traces that match these conditions, the same filters you use in the traces view. Leave it empty to send the most recent traces."
+            ? "The report sends the traces that match these conditions, the same filters you use in the traces view. Leave it empty to send the most recent traces."
             : "The automation fires on every incoming trace that matches these conditions, the same filters you use in the traces view."}
         </Text>
         <SubjectModeToggle

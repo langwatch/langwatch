@@ -299,9 +299,9 @@ describe("ViewAutomationDrawer in-depth view", () => {
     });
   });
 
-  describe("given a paused schedule", () => {
+  describe("given a paused report", () => {
     describe("when the drawer renders", () => {
-      /** @scenario A paused schedule does not claim a next firing */
+      /** @scenario A paused report does not claim a next firing */
       it("says it sends nothing while it is paused, and marks it paused", () => {
         mockTriggerRow = {
           ...traceAutomation,
@@ -318,7 +318,7 @@ describe("ViewAutomationDrawer in-depth view", () => {
         renderDrawer();
 
         expect(
-          screen.getByText("Nothing, while this schedule is paused"),
+          screen.getByText("Nothing, while this report is paused"),
         ).toBeDefined();
         expect(screen.getByText(/Resume it/)).toBeDefined();
         // The state that explains the silence belongs with the identity too,
@@ -328,7 +328,7 @@ describe("ViewAutomationDrawer in-depth view", () => {
     });
   });
 
-  describe("given a paused alert", () => {
+  describe("given a paused graph-watching automation", () => {
     describe("when the drawer renders", () => {
       it("does not claim it is still being checked", () => {
         mockTriggerRow = { ...graphAlert, active: false };
@@ -341,7 +341,7 @@ describe("ViewAutomationDrawer in-depth view", () => {
         renderDrawer();
 
         expect(
-          screen.getByText("Nothing, while this alert is paused"),
+          screen.getByText("Nothing, while this automation is paused"),
         ).toBeDefined();
         expect(screen.queryByText("Checked as data arrives")).toBeNull();
       });

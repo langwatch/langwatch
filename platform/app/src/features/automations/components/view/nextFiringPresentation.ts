@@ -2,10 +2,16 @@
  * The words the automation view puts on "what happens next".
  *
  * Pure, so the copy is pinned by a test rather than by a screenshot. Each
- * answer is the honest one for its kind: a schedule has a real instant, a
- * digest has the boundary its next batch is sent on, and an alert has a
- * cadence rather than an instant — saying otherwise would invent a promise
- * the platform does not make.
+ * answer is the honest one for its kind: a report has a real instant, a digest
+ * has the boundary its next batch is sent on, and a graph-watching automation
+ * has a cadence rather than an instant — saying otherwise would invent a
+ * promise the platform does not make.
+ *
+ * `subject` and `kind` are the server's behaviour discriminators, and they keep
+ * the names the dispatch layer uses. What the reader sees is the merged
+ * vocabulary (ADR-093 §1) — one noun for both automation subjects, and "report"
+ * for the third concept — which is what `SUBJECT_NOUN` translates them into, at
+ * the one boundary where copy is chosen.
  */
 
 import { CADENCE_LABELS } from "@langwatch/automations/cadences";
@@ -37,20 +43,30 @@ export interface NextFiringPresentation {
   caveat: string | null;
 }
 
+/** The customer's word for each of the server's behaviour subjects. */
+const SUBJECT_NOUN: Record<
+  "schedule" | "alert" | "automation",
+  "report" | "automation"
+> = {
+  schedule: "report",
+  alert: "automation",
+  automation: "automation",
+};
+
 export function describeNextFiring(
   next: NextFiringResult,
 ): NextFiringPresentation {
   switch (next.kind) {
     case "paused":
       return {
-        summary: `Nothing, while this ${next.subject} is paused`,
+        summary: `Nothing, while this ${SUBJECT_NOUN[next.subject]} is paused`,
         at: null,
         caveat: pausedCaveat(next),
       };
     case "schedule": {
       if (!next.nextRunAt) {
         return {
-          summary: "Nothing is on the calendar for this schedule",
+          summary: "Nothing is on the calendar for this report",
           at: null,
           caveat: "Edit it and pick a schedule to put it back on the calendar.",
         };
@@ -83,7 +99,7 @@ export function describeNextFiring(
       return {
         summary: "Checked as data arrives",
         at: null,
-        caveat: `An alert waiting for data to stop arriving is also checked every ${formatDebounce(next.sweepIntervalMs)}.`,
+        caveat: `An automation waiting for data to stop arriving is also checked every ${formatDebounce(next.sweepIntervalMs)}.`,
       };
   }
 }

@@ -404,17 +404,20 @@ describe("presetLabels", () => {
     expect(presetLabels("customGraph", false).saveButton).not.toMatch(/alert/i);
   });
 
-  it("gives a report schedule copy — never automation copy (field-5015)", () => {
+  it("calls the third concept a report — never a schedule, never automation copy (field-5015)", () => {
+    // The schedule is when it goes out, which is one of its fields; the thing
+    // itself is the report it sends (decision by Alex, 2026-08-12).
     const create = presetLabels("report", false);
     expect(create).toMatchObject({
-      title: "New schedule",
-      saveButton: "Create schedule",
-      createdToast: "Schedule created",
-      updatedToast: "Schedule updated",
-      noun: "schedule",
+      title: "New report",
+      saveButton: "Create report",
+      createdToast: "Report created",
+      updatedToast: "Report updated",
+      noun: "report",
     });
     expect(create.saveButton).not.toMatch(/automation/i);
-    expect(presetLabels("report", true).title).toBe("Edit schedule");
+    expect(create.title).not.toMatch(/schedule/i);
+    expect(presetLabels("report", true).title).toBe("Edit report");
   });
 });
 

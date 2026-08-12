@@ -874,7 +874,7 @@ describe("AutomationDrawer", () => {
         expect(useAutomationStore.getState().draft.filterQuery).toBe(
           "status:error",
         );
-        expect(screen.getByText("Edit schedule")).toBeInTheDocument();
+        expect(screen.getByText("Edit report")).toBeInTheDocument();
       });
 
       it("hydrates a graph-source report without stranding a graph alert", async () => {
@@ -905,7 +905,7 @@ describe("AutomationDrawer", () => {
         renderDrawer({ automationId: "trigger-1" });
 
         const saveButton = await screen.findByRole("button", {
-          name: "Save schedule",
+          name: "Save report",
         });
         await waitFor(() => expect(saveButton).toBeEnabled());
         await user.click(saveButton);
@@ -938,7 +938,7 @@ describe("AutomationDrawer", () => {
         renderDrawer({ automationId: "trigger-1" });
 
         const saveButton = await screen.findByRole("button", {
-          name: "Save schedule",
+          name: "Save report",
         });
         await waitFor(() => expect(saveButton).toBeEnabled());
         await user.click(saveButton);
@@ -969,7 +969,7 @@ describe("AutomationDrawer", () => {
           );
         });
         expect(
-          await screen.findByRole("button", { name: "Save schedule" }),
+          await screen.findByRole("button", { name: "Save report" }),
         ).toBeDisabled();
         // And says why, in the cadence field itself.
         expect(
@@ -1049,7 +1049,7 @@ describe("AutomationDrawer", () => {
           target: { value: "Monday quality digest" },
         });
         const saveButton = screen.getByRole("button", {
-          name: "Save schedule",
+          name: "Save report",
         });
         await waitFor(() => expect(saveButton).toBeEnabled());
         await user.click(saveButton);

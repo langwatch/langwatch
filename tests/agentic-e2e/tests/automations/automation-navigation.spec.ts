@@ -39,10 +39,12 @@ test("automation overview keeps activity and setup guidance", async ({
   ).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath("alerts.png") });
 
-  await page.getByRole("link", { name: "Schedules", exact: true }).click();
+  // The tab is called Reports; the path it shipped under keeps answering, so
+  // no existing link breaks.
+  await page.getByRole("link", { name: "Reports", exact: true }).click();
   await expect(page).toHaveURL(`${basePath}/schedules`);
-  await expect(page.locator("h1", { hasText: "Schedules" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "New schedule" })).toHaveCount(
+  await expect(page.locator("h1", { hasText: "Reports" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "New report" })).toHaveCount(
     1,
   );
   await page.screenshot({ path: testInfo.outputPath("schedules.png") });
