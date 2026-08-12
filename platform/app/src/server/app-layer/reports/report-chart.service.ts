@@ -1,6 +1,10 @@
 import type { ReportChart } from "@langwatch/automations/templating/templateContext";
 import type { CustomGraph } from "@prisma/client";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
+import {
+  resolveGraphTimeScale,
+  withGroupedPipeline,
+} from "~/features/analytics/logic/graphQueryCompensation";
 import type {
   SeriesInputType,
   TimeseriesInputType,
@@ -105,6 +109,8 @@ async function mapWithConcurrency<T, R>(
 /** Minutes per bucket at or above which a bucket is a whole day. */
 const DAY_SCALE_MINUTES = 1440;
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 /**
  * Axis label for one time bucket. The TEMPLATE cannot do this — it has no idea
  * whether a bucket is an hour or a week, so it would render every daily bucket
@@ -189,7 +195,12 @@ async function buildChart({
   from: number;
   to: number;
 }): Promise<ReportChart> {
-  const graphData = graph.graph as unknown as CustomGraphInput;
+  // Same compensation the analytics UI applies before querying — without it,
+  // a summary/pie/donut panel that renders fine on screen comes back with
+  // empty buckets in a scheduled report (#6716).
+  const graphData = withGroupedPipeline(
+    graph.graph as unknown as CustomGraphInput,
+  );
   const type = chartTypeOf(graphData.graphType);
   const seriesInputs: SeriesInputType[] = (graphData.series ?? [])
     .slice(0, MAX_SERIES)
@@ -215,6 +226,16 @@ async function buildChart({
   };
   if (seriesInputs.length === 0) return empty;
 
+  // Same "full" forcing the analytics UI applies for summary charts — see
+  // `resolveGraphTimeScale`. Reused below for bucket-label formatting too, so
+  // the labels describe the resolution actually queried, not the graph's raw
+  // stored setting.
+  const timeScale = resolveGraphTimeScale({
+    graphType: graphData.graphType,
+    timeScale: graphData.timeScale ?? 60,
+    daysDifference: (to - from) / DAY_MS,
+  });
+
   const timeseries = await deps.getTimeseries({
     projectId,
     startDate: from,
@@ -222,7 +243,7 @@ async function buildChart({
     filters: (graph.filters ?? {}) as TimeseriesInputType["filters"],
     series: seriesInputs,
     groupBy: graphData.groupBy,
-    timeScale: graphData.timeScale ?? 60,
+    timeScale,
     // A report renders in the project's own frame; the scheduler already fires
     // in the report's timezone, so the buckets only need to be stable.
     timeZone: "UTC",
@@ -257,7 +278,6 @@ async function buildChart({
     };
   }
 
-  const timeScale = graphData.timeScale ?? 60;
   const categories = buckets.map((bucket) =>
     formatBucketLabel({ date: bucket.date, timeScale }),
   );

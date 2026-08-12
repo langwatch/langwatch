@@ -350,6 +350,24 @@ describe("dispatchScheduledReport", () => {
       });
       expect(sendSlack).toHaveBeenCalledTimes(1);
     });
+
+    it("links to the graph itself, not the generic analytics page", async () => {
+      const { deps, sendSlack } = makeDeps(
+        makeReportTrigger({
+          actionParams: {
+            source: { kind: "customGraph", customGraphId: "graph-9" },
+            schedule: { cron: "0 7 * * *", timezone: "UTC" },
+            slackWebhook: "https://hooks.slack.com/services/x",
+          },
+        } as Partial<Trigger>),
+        { charts: [makeChart()] },
+      );
+
+      await dispatchScheduledReport({ deps, fire });
+
+      const payload = JSON.stringify(sendSlack.mock.calls[0]![0].payload);
+      expect(payload).toContain("/acme/analytics/custom/graph-9");
+    });
   });
 
   describe("given a dashboard report is due", () => {
@@ -371,6 +389,28 @@ describe("dispatchScheduledReport", () => {
         kind: "dashboard",
         dashboardId: "dash-1",
       });
+    });
+
+    // B5.1 regression: the dashboard branch used to drop `source.dashboardId`
+    // entirely and link to the generic, dashboard-less `/analytics` route.
+    /** @scenario "The report email links to its own dashboard" */
+    it("links to its own dashboard, not the generic analytics page", async () => {
+      const { deps, sendSlack } = makeDeps(
+        makeReportTrigger({
+          actionParams: {
+            source: { kind: "dashboard", dashboardId: "dash-1" },
+            schedule: { cron: "0 7 * * *", timezone: "UTC" },
+            slackWebhook: "https://hooks.slack.com/services/x",
+          },
+        } as Partial<Trigger>),
+        { charts: [makeChart()] },
+      );
+
+      await dispatchScheduledReport({ deps, fire });
+
+      const payload = JSON.stringify(sendSlack.mock.calls[0]![0].payload);
+      expect(payload).toContain("/acme/analytics/reports?dashboard=dash-1");
+      expect(payload).not.toMatch(/"[^"]*\/acme\/analytics"/);
     });
   });
 
