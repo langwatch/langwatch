@@ -2,7 +2,10 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { slackDeliveryMethodOf } from "@langwatch/automations/providers/slack";
 import type { WebhookMethod } from "@langwatch/automations/providers/webhook";
 import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
-import { renderTriggerSlack } from "@langwatch/automations/templating/renderSlack";
+import {
+  renderTriggerSlack,
+  resolveSlackTemplateType,
+} from "@langwatch/automations/templating/renderSlack";
 import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
 import {
   buildTemplateContext,
@@ -531,8 +534,10 @@ async function dispatchNotifyDigest({
           });
         }
         const rendered = await renderTriggerSlack({
-          templateType:
-            t.slackTemplateType === "block_kit" ? "block_kit" : "string",
+          templateType: resolveSlackTemplateType({
+            configured: t.slackTemplateType,
+            deliveryMethod: "bot",
+          }),
           template: t.slackTemplate,
           context: buildContext(),
           allowGatedBlocks: true,
@@ -554,8 +559,10 @@ async function dispatchNotifyDigest({
       }
       if (hasCustomSlack) {
         const rendered = await renderTriggerSlack({
-          templateType:
-            t.slackTemplateType === "block_kit" ? "block_kit" : "string",
+          templateType: resolveSlackTemplateType({
+            configured: t.slackTemplateType,
+            deliveryMethod: "webhook",
+          }),
           template: t.slackTemplate,
           context: buildContext(),
         });

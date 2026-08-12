@@ -6,8 +6,8 @@ import { EXAMPLE_MATCHES } from "@langwatch/automations/templating/exampleContex
 import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
 import {
   renderTriggerSlack,
+  resolveSlackTemplateType,
   type SlackPayload,
-  type SlackTemplateType,
 } from "@langwatch/automations/templating/renderSlack";
 import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
 import {
@@ -103,15 +103,6 @@ const LIQUID_TEMPLATE_COLUMNS = [
   "emailSubjectTemplate",
   "emailBodyTemplate",
 ] as const satisfies readonly (keyof TemplateDraft)[];
-
-function normalizeSlackType(
-  raw: string | null | undefined,
-): SlackTemplateType | null {
-  return raw != null &&
-    (SLACK_TEMPLATE_TYPES as readonly string[]).includes(raw)
-    ? (raw as SlackTemplateType)
-    : null;
-}
 
 /**
  * Validates a template draft before it is persisted: every non-empty Liquid
@@ -324,10 +315,10 @@ export async function testFireTrigger(
 
   // Run the same validation save uses so a Test Fire can't bypass the
   // discriminator contract — without this, a draft with `slackTemplate`
-  // set but `slackTemplateType` unset would have `normalizeSlackType`
-  // collapse to null and quietly render the framework default while
-  // (from the operator's POV) "testing" their template. Validate first,
-  // dispatch second.
+  // set but `slackTemplateType` unset would have `resolveSlackTemplateType`
+  // pick the connection's default type and quietly render the framework
+  // default while (from the operator's POV) "testing" their template.
+  // Validate first, dispatch second.
   validateTemplateDraft(draft);
 
   if (channel === "email") {
@@ -402,7 +393,10 @@ export async function testFireTrigger(
   // the real chart/table/alert blocks render, exactly as a live fire would.
   if (input.botDestination) {
     const rendered = await renderTriggerSlack({
-      templateType: normalizeSlackType(draft.slackTemplateType),
+      templateType: resolveSlackTemplateType({
+        configured: draft.slackTemplateType,
+        deliveryMethod: "bot",
+      }),
       template: draft.slackTemplate ?? null,
       context,
       defaults,
@@ -430,7 +424,10 @@ export async function testFireTrigger(
     );
   }
   const rendered = await renderTriggerSlack({
-    templateType: normalizeSlackType(draft.slackTemplateType),
+    templateType: resolveSlackTemplateType({
+      configured: draft.slackTemplateType,
+      deliveryMethod: "webhook",
+    }),
     template: draft.slackTemplate ?? null,
     context,
     defaults,

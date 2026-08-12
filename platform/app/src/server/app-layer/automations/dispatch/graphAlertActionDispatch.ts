@@ -2,7 +2,7 @@ import { ALERT_TRIGGER_DEFAULTS } from "@langwatch/automations/templating/defaul
 import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
 import {
   renderTriggerSlack,
-  type SlackTemplateType,
+  resolveSlackTemplateType,
 } from "@langwatch/automations/templating/renderSlack";
 import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
 import type { GraphAlertTemplateContext } from "@langwatch/automations/templating/templateContext";
@@ -428,9 +428,6 @@ export async function dispatchGraphAlertAction({
   }
 
   if (trigger.action === "SEND_SLACK_MESSAGE") {
-    const templateType: SlackTemplateType | null =
-      trigger.slackTemplateType === "block_kit" ? "block_kit" : "string";
-
     // Bot connection (ADR-041): post via the Web API with the gate open so the
     // alert's chart/table/alert blocks render.
     if (input.botDestination) {
@@ -450,7 +447,10 @@ export async function dispatchGraphAlertAction({
         };
       }
       const rendered = await renderTriggerSlack({
-        templateType,
+        templateType: resolveSlackTemplateType({
+          configured: trigger.slackTemplateType,
+          deliveryMethod: "bot",
+        }),
         template: trigger.slackTemplate,
         context,
         defaults,
@@ -509,7 +509,10 @@ export async function dispatchGraphAlertAction({
       };
     }
     const rendered = await renderTriggerSlack({
-      templateType,
+      templateType: resolveSlackTemplateType({
+        configured: trigger.slackTemplateType,
+        deliveryMethod: "webhook",
+      }),
       template: trigger.slackTemplate,
       context,
       defaults,
