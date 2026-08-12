@@ -119,7 +119,15 @@ export function SlackBlockKitTemplatePicker({
   }).filter((opt) => opt.cadenceFit !== "both");
   const [otherOpen, setOtherOpen] = useState(false);
   const handleSelectOtherCadence = (option: SlackBlockKitTemplateOption) => {
-    selfInitiatedRef.current = otherCadence;
+    // A pick that lands on the SAME cadence as the live prop (two
+    // consecutive in-picker picks within the still-open other-cadence
+    // section, comparison-shopping between its layouts) never flips
+    // `cadence`, so the resync effect above never fires and never consumes
+    // the marker. Writing it anyway would leave it stale — a LATER, genuine
+    // external change that happens to land back on this same cadence value
+    // would then be misread as self-initiated and skip its regroup. Only
+    // write the marker when the pick actually changes the live cadence.
+    if (otherCadence !== cadence) selfInitiatedRef.current = otherCadence;
     onSelectOtherCadence(option);
   };
   const defaultId = pickDefaultSlackBlockKitTemplateId({
