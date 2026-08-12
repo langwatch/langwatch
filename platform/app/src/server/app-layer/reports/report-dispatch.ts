@@ -144,7 +144,11 @@ function viewUrl(source: ReportSource, baseHost: string, slug: string): string {
     case "customGraph":
       return `${base}/analytics/custom/${source.customGraphId}`;
     case "dashboard":
-      return `${base}/analytics`;
+      // Matches the deep link the dashboard page itself pushes to after
+      // creating a graph on it (`analytics/custom/index.tsx`) — dropping
+      // `dashboardId` here previously sent every dashboard report to the
+      // generic, dashboard-less `/analytics` route (#6716).
+      return `${base}/analytics/reports?dashboard=${source.dashboardId}`;
   }
 }
 

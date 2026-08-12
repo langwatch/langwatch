@@ -41,6 +41,11 @@ import type {
   ValueType,
 } from "recharts/types/component/DefaultTooltipContent";
 import type { z } from "zod";
+import {
+  resolveGraphTimeScale,
+  withGroupedPipeline,
+} from "~/features/analytics/logic/graphQueryCompensation";
+import { resolveSeriesValueFormat } from "~/features/analytics/logic/seriesValueFormat";
 import { describeError } from "~/features/errors";
 import { availableFilters } from "~/server/filters/registry";
 import type { FilterField } from "~/server/filters/types";
@@ -355,65 +360,24 @@ const CustomGraph_ = React.memo(
       defaultOnDataPointClick,
     ]);
 
-    const timeScale = useMemo(() => {
-      // Force "full" only for summary charts to get aggregated data
-      // Pie and donut charts use numeric timeScale with pipeline (same as stacked charts)
-      // When timeScale is a number with groupBy and no pipeline, the backend returns empty buckets
-      // But with a pipeline, numeric timeScale works correctly
-      const shouldUseFull = input.graphType === "summary";
-      const timeScale_ = shouldUseFull
-        ? "full"
-        : input.timeScale === "full"
-          ? input.timeScale
-          : parseInt(input.timeScale.toString(), 10);
+    // Compensations the raw stored graph JSON does not carry on its own —
+    // shared with the scheduled-report renderer so a panel that renders on
+    // screen does not come back blank in a report email (#6716).
+    // See `~/features/analytics/logic/graphQueryCompensation`.
+    const timeScale = useMemo(
+      () =>
+        resolveGraphTimeScale({
+          graphType: input.graphType,
+          timeScale: input.timeScale,
+          daysDifference,
+        }),
+      [input.graphType, input.timeScale, daysDifference],
+    );
 
-      // Show 1 hour granularity for full period when days difference is 2 days or less
-      if (
-        typeof timeScale_ === "number" &&
-        timeScale_ >= 1440 &&
-        daysDifference <= 2
-      ) {
-        return 60;
-      }
-
-      return timeScale_;
-    }, [input.graphType, input.timeScale, daysDifference]);
-
-    // For pie and donut charts without a pipeline, add a default pipeline to get grouped data
-    // The backend requires a pipeline to populate grouped buckets
-    const queryInput = useMemo((): CustomGraphInput => {
-      if (
-        (input.graphType === "pie" || input.graphType === "donnut") &&
-        input.groupBy &&
-        !input.series.some((s) => s.pipeline)
-      ) {
-        // Helper to add pipeline while preserving literal types
-        const addPipeline = (series: Series): Series => {
-          // Explicitly construct object to preserve literal types
-          const result = {
-            metric: series.metric,
-            aggregation: series.aggregation,
-            key: series.key,
-            subkey: series.subkey,
-            filters: series.filters,
-            asPercent: series.asPercent,
-            name: series.name,
-            colorSet: series.colorSet,
-            pipeline: {
-              field: "trace_id" as const,
-              aggregation: "sum" as const,
-            },
-          } satisfies Series;
-          return result;
-        };
-
-        return {
-          ...input,
-          series: input.series.map(addPipeline),
-        };
-      }
-      return input;
-    }, [input]);
+    const queryInput = useMemo(
+      (): CustomGraphInput => withGroupedPipeline(input),
+      [input],
+    );
 
     const timeseries = api.analytics.getTimeseries.useQuery(
       {
@@ -604,13 +568,14 @@ const CustomGraph_ = React.memo(
 
     const valueFormats = Array.from(
       new Set(
-        input.series.map((series) => {
-          if (series.aggregation === "cardinality") {
-            return "0a";
-          }
-          const metric = getMetric(series.metric);
-          return metric?.format ?? "0a";
-        }),
+        input.series.map(
+          (series) =>
+            resolveSeriesValueFormat({
+              asPercent: series.asPercent,
+              aggregation: series.aggregation,
+              metricFormat: getMetric(series.metric)?.format,
+            }) ?? "0a",
+        ),
       ),
     );
     const yAxisValueFormat = valueFormats.length === 1 ? valueFormats[0] : "";
@@ -647,8 +612,11 @@ const CustomGraph_ = React.memo(
         payload.payload?.key ?? (payload.dataKey as string),
       );
       const metric = series?.metric && getMetric(series.metric);
-      const effectiveFormat =
-        series?.aggregation === "cardinality" ? "0a" : metric?.format;
+      const effectiveFormat = resolveSeriesValueFormat({
+        asPercent: series?.asPercent,
+        aggregation: series?.aggregation,
+        metricFormat: metric?.format,
+      });
 
       return formatWith(effectiveFormat, value as number);
     };
@@ -1387,10 +1355,21 @@ const shapeDataForSummary = (
       // Sum all values across all time periods for summary charts
       const totalValue = values.reduce((sum, value) => sum + (value ?? 0), 0);
 
-      // Count aggregations should use integer format regardless of metric's default
+      // Count aggregations use integer format, percentage series use "0%",
+      // both regardless of the metric's own default.
       const isCardinalitySeries = series?.aggregation === "cardinality";
       const formatOverride =
-        isCardinalitySeries && metric ? { ...metric, format: "0a" } : metric;
+        metric && (isCardinalitySeries || series?.asPercent)
+          ? {
+              ...metric,
+              format:
+                resolveSeriesValueFormat({
+                  asPercent: series?.asPercent,
+                  aggregation: series?.aggregation,
+                  metricFormat: metric.format,
+                }) ?? metric.format,
+            }
+          : metric;
 
       return {
         key: aggKey,
