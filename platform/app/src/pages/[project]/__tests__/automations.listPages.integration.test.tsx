@@ -382,7 +382,7 @@ describe("given a Slack automation on the unified table", () => {
   });
 
   describe("when a row is a bot-delivery Slack automation", () => {
-    /** @scenario The Notifies cell names a bot-delivery Slack automation */
+    /** @scenario The delivery cell names a bot-delivery Slack automation */
     it("names the Slack app and its destination channel, not 'Webhook'", async () => {
       await renderPage();
 

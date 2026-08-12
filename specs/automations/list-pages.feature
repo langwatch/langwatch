@@ -1,6 +1,6 @@
 Feature: Automations list pages, providers, and shared copy
 
-  The Overview/Automations/Alerts/Schedules pages
+  The Overview/Automations/Schedules pages
   (`pages/[project]/automations.tsx`) and two composer providers (dataset,
   annotation queue) carried a bundle of #6716 defects on top of the missing
   Overview create affordance (G5): deleting a row was immediate and
@@ -8,24 +8,22 @@ Feature: Automations list pages, providers, and shared copy
   accessible name, and two provider panels had dead controls (dataset
   "+ Create New", the annotation-queue "Send to" listbox).
 
+  The Alerts tab is gone: automations and alerts are one list, whatever they
+  watch (ADR-093 §1). The two scenarios that pinned the "alert" delete noun
+  and the three-item Overview create menu moved to
+  `specs/automations/source-merge.feature`, which states the merged-world copy
+  and carries their bindings.
+
   Background:
     Given a user viewing the Automations page for a project
 
   Rule: Deleting a row asks for confirmation and names its kind
 
     @integration
-    Scenario: Deleting an alert asks for confirmation and names it as an alert
-      Given the Alerts table has a row for an existing alert
-      When the user opens its row actions and chooses Delete
-      Then a confirmation dialog appears before anything is deleted
-      And the dialog names the row "alert", not "automation"
-
-    @integration
     Scenario: Confirming the dialog deletes the row and the drawer cache
-      Given the delete confirmation dialog is open for an alert
+      Given the delete confirmation dialog is open for an automation
       When the user confirms the deletion
-      Then the alert is removed from the list
-      And the toast reads "Alert deleted"
+      Then the automation is removed from the list
       And a stale copy of the row can no longer be read from the drawer cache
 
     @integration
@@ -47,16 +45,7 @@ Feature: Automations list pages, providers, and shared copy
       Given the Automations table has at least one row
       When the row's actions menu is opened
       Then the View, Edit, and Delete items each resolve by accessible role and name
-      And the Delete item's accessible name includes the row's kind
-
-  Rule: The Overview offers a way to create every kind
-
-    @integration
-    Scenario: The Overview offers creating an automation, alert, or schedule
-      Given the user is on the Overview tab
-      When the user opens the create menu
-      Then it offers "New automation", "New alert", and "New schedule"
-      And choosing one opens the automation composer pre-set to that kind
+      And the Delete item's accessible name includes the noun for what the row is
 
   Rule: A dataset can be created inline from the dataset action's panel
 
@@ -104,10 +93,10 @@ Feature: Automations list pages, providers, and shared copy
       And shows the destination channel
 
     @integration
-    Scenario: The Notifies cell names a bot-delivery Slack automation
+    Scenario: The delivery cell names a bot-delivery Slack automation
       Given the Automations table has a bot-delivery Slack automation row
       When the table renders
-      Then the Notifies cell names the Slack app and its destination channel
+      Then the Delivery cell names the Slack app and its destination channel
       And it does not read as "Webhook"
 
   Rule: Estimated tokens is a qualifier on tokens, not a second field

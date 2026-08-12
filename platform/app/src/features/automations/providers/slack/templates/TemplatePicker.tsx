@@ -86,9 +86,9 @@ export function SlackBlockKitTemplatePicker({
   // them. Selecting still updates the highlight and the draft's cadence —
   // it just never reshuffles the list AS A RESULT OF THAT PICK.
   //
-  // The composer's facets are independently open (not a single-open
-  // accordion — see FacetSection), so the author can also change cadence
-  // from the separate Cadence section while this picker stays mounted. That
+  // The picker is opened from the Delivery step, whose cadence control sits
+  // beside the channel it belongs to (ADR-093 §4), so the author can change
+  // cadence there while this picker stays mounted. That
   // external change must still regroup the gallery — `groupingCadence`
   // exists to survive an in-picker pick, not to pin the picker to whatever
   // cadence happened to be active when it first mounted. `selfInitiatedRef`
