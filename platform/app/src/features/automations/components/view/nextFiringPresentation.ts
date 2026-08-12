@@ -9,7 +9,10 @@
  */
 
 import { CADENCE_LABELS } from "@langwatch/automations/cadences";
-import { isAutomationPauseReason } from "~/features/automations/logic/pauseReasons";
+import {
+  isAutomationPauseReason,
+  RUNAWAY_PAUSE_EXPLANATION,
+} from "~/features/automations/logic/pauseReasons";
 import { formatWindow } from "./evaluationPresentation";
 
 /** The `automation.getNextFiring` result, as the drawer receives it. */
@@ -95,7 +98,7 @@ function pausedCaveat(next: {
   pausedReason: string | null;
 }): string {
   if (isAutomationPauseReason(next.pausedReason)) {
-    return "This automation matched almost every trace in the project, so we paused it. Narrow its condition, then switch it back on.";
+    return RUNAWAY_PAUSE_EXPLANATION;
   }
   if (next.subject === "schedule") {
     return "Resume it to put it back on the calendar.";

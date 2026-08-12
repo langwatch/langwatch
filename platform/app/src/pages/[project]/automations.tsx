@@ -52,7 +52,10 @@ import {
   type ConditionSource,
   presetLabels,
 } from "~/features/automations/logic/draftReducer";
-import { RUNAWAY_PAUSE_REASON } from "~/features/automations/logic/pauseReasons";
+import {
+  RUNAWAY_PAUSE_EXPLANATION,
+  RUNAWAY_PAUSE_REASON,
+} from "~/features/automations/logic/pauseReasons";
 import { slackDestinationPresentation } from "~/features/automations/logic/slackDestinationPresentation";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
@@ -502,7 +505,7 @@ function AutomationsPage() {
               plain span, and a span with no tab stop can be hovered but never
               focused, so the explanation would be mouse-only. */}
           {pausedForVolume ? (
-            <Tooltip content="This automation matched almost every trace in the project, so we paused it. Narrow its condition, then switch it back on.">
+            <Tooltip content={RUNAWAY_PAUSE_EXPLANATION}>
               <Badge colorPalette="red" size="sm" tabIndex={0}>
                 Paused
               </Badge>
