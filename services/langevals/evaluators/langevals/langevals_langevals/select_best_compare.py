@@ -343,9 +343,9 @@ class SelectBestCompareEvaluator(
         ordered: list[CandidateInput],
     ) -> dict:
         """
-        Swap-and-reconcile: call `_judge` twice — once across `ordered` as
-        given, once with that same list fully reversed — and treat a
-        disagreement between the two verdicts as a tie rather than trusting
+        Swap-and-reconcile: call `_judge` twice, once across `ordered` as
+        given and once with that same list fully reversed, and leave the row
+        with no winner when the two verdicts disagree rather than trusting
         either individual call. `_judge` builds its own slot-to-candidate
         mapping from whatever list it's handed and translates the judge's
         slot pick back to the candidate's real id, so the reversed call

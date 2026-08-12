@@ -155,7 +155,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     )
     .option(
       "--project [slug]",
-      "Project login: pick a project in the browser and write its SDK key to .env (for the SDK, `langwatch eval`, prompts). Prefer this one if user is working on an agent project rather than trying to instrument their coding assistant.",
+      "Project login: write a project's SDK key to .env (for the SDK, `langwatch eval`, prompts). With a slug it uses your existing device login, no browser and no prompts; without one you pick the project in the browser. Prefer this one if user is working on an agent project rather than trying to instrument their coding assistant.",
     )
     .option(
       "--token <token>",

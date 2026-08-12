@@ -297,7 +297,7 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
   # ─────────────────────────────────────────────────────────────────────
 
   @bdd @cli @login @no-paste @api-key
-  Scenario: Interactive login (project mode) delivers the project API key via device-code-poll, no copy-paste
+  Scenario: Interactive login (project mode) delivers the project API key straight to the CLI, no copy-paste
     Given the user is in an interactive terminal and selected
       "Project / SDK API key" in the unified prompt
     When the CLI calls `POST /api/auth/cli/device-code` with body

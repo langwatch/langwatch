@@ -648,12 +648,13 @@ export default function CliAuthPage() {
                 <StatusCard
                   palette="green"
                   icon={CheckCircle2}
-                  title="API key sent!"
+                  title="API key approved"
                 >
                   The API key for{" "}
                   <strong>{action.projectName ?? "your project"}</strong> (
-                  {action.organizationName}) is now in your terminal, and your{" "}
-                  <code>.env</code> is updated. You can close this tab.
+                  {action.organizationName}) is on its way to your terminal, and
+                  the CLI will save it to your <code>.env</code>. You can close
+                  this tab.
                 </StatusCard>
               ) : (
                 <>

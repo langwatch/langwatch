@@ -263,7 +263,7 @@ describe("/cli/auth first-trace watch", () => {
     expect(screen.getByText(/You're signed in!/i)).toBeDefined();
   });
 
-  /** @scenario "Sending a project API key does not start the first-trace watcher" */
+  /** @scenario "Sending a project API key keeps the success card still, with no waiting line and no redirect" */
   it("does not watch for traces on the project API key flow", async () => {
     credentialTypeRef.current = "project_api_key";
     renderPage();
@@ -276,7 +276,7 @@ describe("/cli/auth first-trace watch", () => {
     );
     await user.click(screen.getByRole("button", { name: "Send API key" }));
     await waitFor(() =>
-      expect(screen.getByText(/API key sent!/i)).toBeDefined(),
+      expect(screen.getByText(/API key approved/i)).toBeDefined(),
     );
 
     await new Promise((resolve) => setTimeout(resolve, 500));
