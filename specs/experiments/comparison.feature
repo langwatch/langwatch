@@ -330,6 +330,28 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
   # "Winner: variant_2" above a paragraph about "Candidate C" puts the most
   # useful half of a comparison in a code the reader has no key for, so the
   # reasoning is translated with the same mapping the winner is.
+  #
+  # Two things make that work, and the first one carries most of the weight.
+  # The judge is asked to write "Candidate A" rather than a bare "A", because
+  # a bare "A" is also the English article and nothing downstream can tell the
+  # two apart with certainty. What arrives with the noun in front is
+  # translated unconditionally; a bare letter is translated only where the
+  # surrounding words rule the article out, so some bare letters survive into
+  # the text a customer reads. That is the deliberate trade: prose a
+  # substitution would corrupt is worse than a letter left standing.
+  @unit
+  Scenario: The judge is asked to name candidates rather than write bare letters
+    Given a Comparison evaluator judges a row
+    When the judge is briefed
+    Then it is told to write each slot as "Candidate A" and never as a bare letter
+    And the instruction holds even when the judge prompt has been customized
+    And the winning slot it records is still the bare label
+    # Asking twice, once more on the field the judge fills, raised compliance
+    # slightly and made the judge enumerate every candidate: a third more
+    # words for no reliable drop in bare letters. Reasoning a customer reads
+    # is worth more brief than exhaustive, so it is asked once.
+    And the reasoning it writes stays as brief as it was before the instruction
+
   @unit
   Scenario: The verdict reasoning names candidates, not slot letters
     Given a Comparison evaluator has judged a row with three variants
@@ -359,6 +381,11 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
     And letters written as a list item or in parentheses name their variants too
     And a letter introduced by a comparison word such as "compared with" names its variant
     And a capitalized article in title case, such as "compared with A Concise Answer", is untouched
+    # The honest limit of the fallback, and why the judge is asked not to
+    # produce this shape: the verb after a bare "A" comes from an open
+    # vocabulary, so no list of words can decide between a slot and an
+    # article. The letter stays rather than risk rewriting real prose.
+    And a bare "A" in front of an everyday verb, as in "A strikes the best balance", is left standing
 
   # An inconclusive row is the most expensive kind there is: both judge passes
   # were made and both were billed before they were found to disagree. The row

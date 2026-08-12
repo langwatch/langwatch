@@ -1003,6 +1003,92 @@ def test_system_message_tells_judge_to_ignore_candidate_order():
     assert "ignore the order" in system_msg.lower()
 
 
+def _judge_call_kwargs(settings: SelectBestCompareSettings, entry=None) -> dict:
+    """The kwargs of the single `completion` call one evaluation makes."""
+    evaluator = SelectBestCompareEvaluator(settings=settings)
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        return_value=_mock_completion_response("ok", "A"),
+    ) as mock_completion, patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        evaluator.evaluate(entry if entry is not None else _make_entry(3))
+
+    return mock_completion.call_args.kwargs
+
+
+# @scenario "The judge is asked to name candidates rather than write bare letters"
+def test_judge_is_told_to_write_candidate_a_rather_than_a_bare_letter():
+    """The upstream half of the slot translation. A bare "A" is also the
+    English article, so no downstream rule can separate the two with
+    certainty; a judge that always writes the noun in front never produces
+    the ambiguous form."""
+    kwargs = _judge_call_kwargs(
+        SelectBestCompareSettings(swap_and_reconcile=False)
+    )
+
+    system_msg = kwargs["messages"][0]["content"]
+    assert "Candidate A" in system_msg
+    assert "never as a bare letter" in system_msg
+
+
+# @scenario "The judge is asked to name candidates rather than write bare letters"
+def test_naming_rule_is_not_repeated_in_the_reasoning_field_description():
+    """Restating the rule on the field the judge is about to fill does raise
+    compliance a little, but it also pushes the judge into enumerating every
+    candidate: measured over 24 rows it lengthened the reasoning by a third
+    for no reliable drop in bare letters. The reasoning is customer-facing
+    and the schema already asks for brevity, so the rule is given once."""
+    kwargs = _judge_call_kwargs(
+        SelectBestCompareSettings(swap_and_reconcile=False)
+    )
+
+    reasoning_field = kwargs["tools"][0]["function"]["parameters"]["properties"][
+        "reasoning"
+    ]
+    assert "bare letter" not in reasoning_field["description"]
+    assert "keep it brief" in reasoning_field["description"]
+
+
+# @scenario "The judge is asked to name candidates rather than write bare letters"
+def test_naming_rule_survives_a_customized_judge_prompt():
+    """`settings.prompt` is a user escape hatch, but the slot anonymization
+    it renders is not optional, so neither is the rule that makes the slots
+    readable again. Carrying it in the four default templates would lose it
+    for exactly the users who edited them."""
+    kwargs = _judge_call_kwargs(
+        SelectBestCompareSettings(
+            swap_and_reconcile=False,
+            prompt="Rank these however you like:\n{candidates}",
+        )
+    )
+
+    assert "never as a bare letter" in kwargs["messages"][0]["content"]
+    assert "Rank these however you like" in kwargs["messages"][1]["content"]
+
+
+# @scenario "The judge is asked to name candidates rather than write bare letters"
+def test_winner_enum_still_takes_the_bare_slot_label():
+    """The naming rule is about prose only. If it bled into the tool call the
+    judge would answer "Candidate A", which is not in the enum, and the
+    out-of-enum fallback would silently award every row to the first slot."""
+    kwargs = _judge_call_kwargs(
+        SelectBestCompareSettings(swap_and_reconcile=False)
+    )
+
+    winner_field = kwargs["tools"][0]["function"]["parameters"]["properties"][
+        "winner"
+    ]
+    assert winner_field["enum"] == ["A", "B", "C", "tie"]
+    assert "Candidate A" not in winner_field["description"]
+    # And the rule says so in as many words, right where it is given.
+    assert "winner field still takes the bare label" in (
+        kwargs["messages"][0]["content"]
+    )
+
+
 # ---------------------------------------------------------------------------
 # temperature: gpt-5-family models require temperature=1.0 and reject any
 # other value (litellm precedent: model_to_dspy_lm in llm_answer_match.py).
@@ -1357,6 +1443,27 @@ def test_article_after_a_comparison_preposition_is_left_alone_in_lower_case():
     details = _details_for("C is stronger compared with a rambling answer.")
 
     assert details == "thorough is stronger compared with a rambling answer."
+
+
+# @scenario "A bare slot letter is translated only where it cannot be an article"
+@pytest.mark.parametrize(
+    "reasoning",
+    [
+        "Overall, A strikes the best balance of completeness and clarity.",
+        "A avoids unnecessary specifics while directly answering the question.",
+        "A balances clarity, actionable next steps, and an offer of help.",
+        "That extra practical guidance makes A the best choice.",
+    ],
+)
+def test_bare_a_before_an_everyday_verb_is_left_standing(reasoning):
+    """The limit of the fallback, pinned so nobody mistakes it for a bug in
+    the translation and goes chasing verbs. Every one of these is a real
+    reasoning from a ten-row run. The word after "A" comes from an open
+    vocabulary, so a follower list can only ever cover the verbs somebody
+    thought of, and widening it far enough to catch these would start
+    rewriting articles in ordinary prose, which is the worse failure. The
+    judge is asked upstream not to write this shape at all."""
+    assert _details_for(reasoning) == reasoning
 
 
 # @scenario "A bare slot letter is translated only where it cannot be an article"

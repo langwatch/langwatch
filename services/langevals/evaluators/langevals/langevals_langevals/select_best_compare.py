@@ -529,6 +529,34 @@ class SelectBestCompareEvaluator(
 
         effective_temperature = self._effective_temperature()
 
+        # The system message carries the rules that exist because of how the
+        # candidates are PRESENTED, anonymized and in an order we chose,
+        # rather than anything about the task. It lives here and not in the
+        # prompt templates for two reasons: `settings.prompt` is a user escape
+        # hatch, and a hand-tuned prompt still gets anonymized slots, so the
+        # rules that make them readable cannot be something the user can
+        # delete; and the templates are mirrored in the config form and in two
+        # generated catalogs, so every word added to them is a fourfold drift
+        # surface.
+        #
+        # "Write every slot as Candidate A" is the upstream half of
+        # `_translate_slot_references` below. A bare "A" is also the English
+        # article, so the translation can only rewrite it where the
+        # surrounding words rule the article out, and no follower list can
+        # cover an open verb vocabulary ("A strikes the best balance..." is
+        # left standing). A judge that always writes the noun in front never
+        # produces the ambiguous form in the first place, and "Candidate A"
+        # translates unconditionally. The guard stays as the fallback for the
+        # bare letters that still get through: over 24 rows of real gpt-5-mini
+        # output the rule took responses carrying a bare letter from 24 to 9,
+        # and bare letter tokens from 53 to 11, which is a much smaller surface
+        # for the guard to gamble on rather than none at all.
+        #
+        # Given once, here, and deliberately not repeated on the `reasoning`
+        # field below. Restating it there raised compliance slightly and
+        # lengthened the reasoning by a third, because a judge told twice to
+        # name slots starts enumerating every candidate. The reasoning is
+        # customer-facing prose and the schema already asks for brevity.
         response = completion(
             model=self.settings.model,
             temperature=effective_temperature,
@@ -540,8 +568,12 @@ class SelectBestCompareEvaluator(
                         "You are an impartial judge picking the best of "
                         "several candidate outputs. Reason briefly, then "
                         "pick the winning slot label using the provided "
-                        "function call. Judge the candidates' content only "
-                        "— ignore the order in which they are presented."
+                        "function call. Judge the candidates' content only, "
+                        "ignore the order in which they are presented. "
+                        "In your reasoning write every slot as "
+                        '"Candidate A", "Candidate B" and so on, never as a '
+                        "bare letter; the winner field still takes the bare "
+                        "label."
                     ),
                 },
                 {"role": "user", "content": rendered_prompt},
