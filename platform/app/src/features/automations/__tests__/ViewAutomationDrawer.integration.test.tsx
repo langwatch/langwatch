@@ -15,6 +15,11 @@ let mockRecentFires: Array<Record<string, unknown>> = [];
 const mockGraphRow: Record<string, unknown> | null = null;
 const mockDatasets: Array<Record<string, unknown>> = [];
 let mockWebhookDeliveries: Array<Record<string, unknown>> = [];
+let mockLatestEvaluation: Record<string, unknown> | null = null;
+let mockNextFiring: Record<string, unknown> | null = null;
+let mockMatchingTraces: Record<string, unknown> | undefined;
+let mockHasNextFirePage = false;
+const mockFetchNextFirePage = vi.fn();
 
 const { mockOpenDrawer, mockCloseDrawer } = vi.hoisted(() => ({
   mockOpenDrawer: vi.fn(),
@@ -46,47 +51,82 @@ vi.mock("~/components/automations/FilterDisplay", () => ({
   ),
 }));
 
+/**
+ * A faithful-enough stand-in for one react-query v4 hook result.
+ *
+ * `enabled: false` is the case that matters: such a query never resolves, so
+ * it reports `isLoading` FOREVER. A mock that hard-codes `isLoading: false`
+ * makes that state unrepresentable — which is how a permanent skeleton over
+ * every non-alert automation's history shipped once already.
+ *
+ * `undefined` means "has not resolved"; `null` means "resolved, and the
+ * answer is nothing" (an automation that was never evaluated), which is a
+ * settled query with `data === null`.
+ */
+const { fakeQuery } = vi.hoisted(() => ({
+  fakeQuery: (data: unknown, options?: { enabled?: boolean }) => {
+    const enabled = options?.enabled ?? true;
+    const settled = enabled && data !== undefined;
+    return {
+      data: data ?? undefined,
+      isLoading: !settled,
+      isFetching: enabled && !settled,
+      error: null,
+      refetch: vi.fn(),
+    };
+  },
+}));
+
 vi.mock("~/utils/api", () => ({
   api: {
     automation: {
       getTriggerById: {
-        useQuery: () => ({
-          data: mockTriggerRow,
-          isLoading: false,
-          error: null,
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockTriggerRow, options),
+      },
+      getFireHistory: {
+        useInfiniteQuery: (
+          _input: unknown,
+          options?: { enabled?: boolean },
+        ) => ({
+          ...fakeQuery(
+            { pages: [{ fires: mockRecentFires, nextCursor: null }] },
+            options,
+          ),
+          hasNextPage: mockHasNextFirePage,
+          isFetchingNextPage: false,
+          fetchNextPage: mockFetchNextFirePage,
         }),
       },
-      getRecentFires: {
-        useQuery: () => ({
-          data: mockRecentFires,
-          isLoading: false,
-          error: null,
-        }),
+      getLatestEvaluation: {
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockLatestEvaluation, options),
+      },
+      getNextFiring: {
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockNextFiring, options),
       },
       getWebhookDeliveries: {
-        useQuery: () => ({
-          data: mockWebhookDeliveries,
-          isLoading: false,
-          error: null,
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockWebhookDeliveries, options),
       },
     },
     graphs: {
       getById: {
-        useQuery: () => ({
-          data: mockGraphRow,
-          isLoading: false,
-          error: null,
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockGraphRow, options),
       },
     },
     dataset: {
       getAll: {
-        useQuery: () => ({
-          data: mockDatasets,
-          isLoading: false,
-          error: null,
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockDatasets, options),
+      },
+    },
+    tracesV2: {
+      list: {
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockMatchingTraces, options),
       },
     },
   },
@@ -104,6 +144,10 @@ describe("ViewAutomationDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockWebhookDeliveries = [];
+    mockLatestEvaluation = null;
+    mockNextFiring = { kind: "immediate", traceDebounceMs: 30_000 };
+    mockMatchingTraces = undefined;
+    mockHasNextFirePage = false;
   });
 
   afterEach(() => {
@@ -158,7 +202,7 @@ describe("ViewAutomationDrawer", () => {
 
         // A resolved incident shows when it fired and how long it lasted.
         expect(
-          screen.getByText(/about 5 hours ago · lasted 15m/),
+          screen.getByText(/about 5 hours ago · lasted 15 minutes/),
         ).toBeDefined();
       });
 
@@ -290,7 +334,7 @@ describe("ViewAutomationDrawer", () => {
 
         renderDrawer();
 
-        expect(screen.getByText(/lasted 1h 30m/)).toBeDefined();
+        expect(screen.getByText(/lasted 1 hour 30 minutes/)).toBeDefined();
       });
     });
 
@@ -309,7 +353,7 @@ describe("ViewAutomationDrawer", () => {
 
         renderDrawer();
 
-        expect(screen.getByText(/lasted 2h$/)).toBeDefined();
+        expect(screen.getByText(/lasted 2 hours$/)).toBeDefined();
       });
     });
   });
@@ -432,12 +476,12 @@ describe("ViewAutomationDrawer", () => {
     });
 
     describe("when the drawer renders", () => {
-      it("shows the automation kind badge and an empty fires state", () => {
+      it("shows the automation kind badge and an empty history state", () => {
         renderDrawer();
 
         expect(screen.getByText("Automation")).toBeDefined();
         expect(
-          screen.getByText("This automation has not fired yet."),
+          screen.getByText(/This automation has not fired yet\./),
         ).toBeDefined();
       });
     });

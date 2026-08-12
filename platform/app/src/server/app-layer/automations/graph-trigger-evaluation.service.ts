@@ -59,6 +59,10 @@ import type {
   GraphTriggerSentRepository,
   OpenGraphTriggerSent,
 } from "./repositories/trigger.repository";
+import type {
+  EvaluationSkipCode,
+  RecordEvaluationInput,
+} from "./repositories/trigger-latest-evaluation.repository";
 import { parseSeriesIndex } from "./seriesName";
 
 const logger = createLogger("langwatch:graph-trigger-evaluation");
@@ -133,6 +137,12 @@ export interface EvaluateGraphTriggerResult {
   status: GraphTriggerEvaluationStatus;
   /** Skip reason / breach value diagnostics for logs and tests. */
   detail?: string;
+  /**
+   * The stable code for a skip, alongside the human `detail`. `detail` is
+   * developer prose and changes freely; this is what the recorded evaluation
+   * stores and the drawer turns into customer copy, so it must stay stable.
+   */
+  skipCode?: EvaluationSkipCode;
   /** Current metric value; null when there were no buckets at all. */
   value?: number;
   /** Whether a provider call actually carried the alert to a customer. Only
@@ -180,6 +190,17 @@ export interface GraphTriggerEvaluationDeps {
     projectId: string;
   }): Promise<void>;
   notifier: GraphTriggerNotifier;
+  /**
+   * Record what this evaluation observed and decided, so the automation's
+   * view can answer "why is this alert not firing?".
+   *
+   * Optional: the evaluation is the product, the record is an observation of
+   * it, and every existing test double predates it. Where it is wired (the
+   * composition root always wires it), the implementation must never throw —
+   * `TriggerLatestEvaluationService.record` swallows its own failures — so a
+   * recording problem cannot suppress an alert.
+   */
+  recordEvaluation?(input: RecordEvaluationInput): Promise<void>;
   /** Base host for building deep links inside rendered templates
    *  (ADR-034 Phase 8.1). Injected, not read from env, so this service
    *  stays pure and testable. */
@@ -188,26 +209,118 @@ export interface GraphTriggerEvaluationDeps {
 }
 
 /**
- * Evaluate (and possibly fire / resolve) one custom-graph trigger.
+ * Evaluate (and possibly fire / resolve) one custom-graph trigger, and record
+ * what the evaluation observed.
  *
  * Returns a typed result so callers can plumb telemetry. Throws only
  * on genuine infrastructure errors; soft failures (trigger missing,
  * graph missing, no series) return a `skipped` result.
+ *
+ * The recording hop is deliberately a thin wrapper around the unchanged
+ * evaluation, so there is exactly one write site instead of one per return
+ * branch, and no branch can be added later that forgets to record. A thrown
+ * evaluation records nothing: the throw is redelivered by the outbox, and the
+ * retry's own outcome is the one worth showing.
  */
-export async function evaluateGraphTrigger({
-  deps,
-  triggerId,
-  projectId,
-  reason,
-}: {
+export async function evaluateGraphTrigger(params: {
   deps: GraphTriggerEvaluationDeps;
   triggerId: string;
   projectId: string;
   reason: GraphTriggerEvaluationReason;
 }): Promise<EvaluateGraphTriggerResult> {
+  // The condition the check ran against, captured by the evaluation as soon
+  // as it is known. Recorded alongside the observed value so the snapshot
+  // stays truthful after someone edits the alert's threshold.
+  const observed: ObservedCondition = { condition: null };
+  const result = await runGraphTriggerEvaluation({ ...params, observed });
+  if (params.deps.recordEvaluation) {
+    try {
+      await params.deps.recordEvaluation(
+        evaluationRecordOf({
+          result,
+          condition: observed.condition,
+          evaluatedAt: params.deps.now(),
+        }),
+      );
+    } catch (error) {
+      // An observation of the alert must never become a way to break the
+      // alert. A throw here would be redelivered by the outbox and
+      // re-evaluate a trigger that has already fired and already dispatched.
+      // The recording service swallows its own failures too; this is the
+      // guarantee for any other implementation of the hook.
+      logger.warn(
+        {
+          projectId: params.projectId,
+          triggerId: params.triggerId,
+          status: result.status,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "failed to record the alert's latest evaluation — the evaluation itself is unaffected",
+      );
+    }
+  }
+  return result;
+}
+
+interface ObservedCondition {
+  condition: {
+    threshold: number;
+    operator: string;
+    timePeriodMinutes: number;
+  } | null;
+}
+
+/**
+ * The snapshot one evaluation leaves behind. `already_firing` and
+ * `not_delivered` keep their own verdicts rather than collapsing into
+ * "fired": the reader's question is what happened on THIS check, and
+ * "the threshold was crossed but nothing was delivered" is the single most
+ * useful thing the product can say about a silent alert.
+ */
+function evaluationRecordOf({
+  result,
+  condition,
+  evaluatedAt,
+}: {
+  result: EvaluateGraphTriggerResult;
+  condition: ObservedCondition["condition"];
+  evaluatedAt: Date;
+}): RecordEvaluationInput {
+  return {
+    triggerId: result.triggerId,
+    projectId: result.projectId,
+    evaluatedAt,
+    verdict: result.status,
+    observedValue: result.value ?? null,
+    threshold: condition?.threshold ?? null,
+    operator: condition?.operator ?? null,
+    timePeriodMinutes: condition?.timePeriodMinutes ?? null,
+    skipCode: result.skipCode ?? null,
+  };
+}
+
+async function runGraphTriggerEvaluation({
+  deps,
+  triggerId,
+  projectId,
+  reason,
+  observed,
+}: {
+  deps: GraphTriggerEvaluationDeps;
+  triggerId: string;
+  projectId: string;
+  reason: GraphTriggerEvaluationReason;
+  observed: ObservedCondition;
+}): Promise<EvaluateGraphTriggerResult> {
   const trigger = await deps.loadTrigger({ triggerId, projectId });
   if (!trigger) {
-    return skipped({ triggerId, projectId, reason, detail: "trigger missing" });
+    return skipped({
+      triggerId,
+      projectId,
+      reason,
+      detail: "trigger missing",
+      code: "subject_missing",
+    });
   }
   if (!trigger.active) {
     return skipped({
@@ -215,6 +328,7 @@ export async function evaluateGraphTrigger({
       projectId,
       reason,
       detail: "trigger inactive",
+      code: "inactive",
     });
   }
   const customGraphId = trigger.customGraphId;
@@ -224,6 +338,7 @@ export async function evaluateGraphTrigger({
       projectId,
       reason,
       detail: "trigger has no customGraphId",
+      code: "subject_missing",
     });
   }
 
@@ -242,6 +357,7 @@ export async function evaluateGraphTrigger({
       projectId,
       reason,
       detail: "missing threshold / operator / timePeriod",
+      code: "incomplete_configuration",
     });
   }
   if (!seriesName) {
@@ -250,12 +366,27 @@ export async function evaluateGraphTrigger({
       projectId,
       reason,
       detail: "missing seriesName",
+      code: "incomplete_configuration",
     });
   }
+  // The condition is now known. Everything from here — a fire, a resolve, a
+  // quiet not-breached, or a skip on the graph itself — is an evaluation of
+  // THIS condition, and records it alongside whatever value it observed.
+  observed.condition = {
+    threshold,
+    operator,
+    timePeriodMinutes: timePeriod,
+  };
 
   const customGraph = await deps.loadCustomGraph({ customGraphId, projectId });
   if (!customGraph) {
-    return skipped({ triggerId, projectId, reason, detail: "graph not found" });
+    return skipped({
+      triggerId,
+      projectId,
+      reason,
+      detail: "graph not found",
+      code: "subject_missing",
+    });
   }
 
   const graphData = customGraph.graph as unknown as StoredGraphConfig | null;
@@ -265,6 +396,7 @@ export async function evaluateGraphTrigger({
       projectId,
       reason,
       detail: "graph has no series",
+      code: "incomplete_configuration",
     });
   }
 
@@ -279,6 +411,7 @@ export async function evaluateGraphTrigger({
       projectId,
       reason,
       detail: `series index ${seriesIndex} not in graph`,
+      code: "incomplete_configuration",
     });
   }
   const series = graphData.series[seriesIndex];
@@ -288,6 +421,7 @@ export async function evaluateGraphTrigger({
       projectId,
       reason,
       detail: "invalid series configuration",
+      code: "incomplete_configuration",
     });
   }
 
@@ -348,6 +482,7 @@ export async function evaluateGraphTrigger({
         projectId,
         reason,
         detail: "timeseries result exceeds the row ceiling",
+        code: "result_too_large",
       });
     }
     if (isSeriesPercentageUnsupported(error)) {
@@ -374,6 +509,7 @@ export async function evaluateGraphTrigger({
         projectId,
         reason,
         detail: "series cannot be shown as a percentage",
+        code: "series_percentage_unsupported",
       });
     }
     throw error;
@@ -449,6 +585,7 @@ export async function evaluateGraphTrigger({
         projectId,
         reason,
         detail: "project not found",
+        code: "subject_missing",
       });
     }
 
@@ -688,13 +825,24 @@ function skipped({
   projectId,
   reason,
   detail,
+  code,
 }: {
   triggerId: string;
   projectId: string;
   reason: GraphTriggerEvaluationReason;
   detail: string;
+  /** The stable counterpart to `detail`, recorded on the evaluation so the
+   *  automation's view can explain the skip in the customer's words. */
+  code: EvaluationSkipCode;
 }): EvaluateGraphTriggerResult {
-  return { triggerId, projectId, reason, status: "skipped", detail };
+  return {
+    triggerId,
+    projectId,
+    reason,
+    status: "skipped",
+    detail,
+    skipCode: code,
+  };
 }
 
 function noteIfNoData(operator: string, threshold: number): string | undefined {

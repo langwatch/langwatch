@@ -37,6 +37,7 @@ import {
   type GraphAlertActionParams,
   graphAlertActionParamsSchema,
 } from "~/server/app-layer/automations/graph-alert.builder";
+import { describeNextFiring } from "~/server/app-layer/automations/next-firing";
 import {
   resolveNotificationCadenceForCreate,
   resolveNotificationCadenceForUpdate,
@@ -57,6 +58,7 @@ import {
   reportActionParamsSchema,
 } from "~/server/app-layer/automations/report.builder";
 import { TriggerFireHistoryService } from "~/server/app-layer/automations/trigger-fire-history.service";
+import { TriggerLatestEvaluationService } from "~/server/app-layer/automations/trigger-latest-evaluation.service";
 import { redactTriggerForRead } from "~/server/app-layer/automations/trigger-redaction";
 import {
   type DraftProject,
@@ -535,6 +537,80 @@ export const automationRouter = createTRPCRouter({
     .query(async ({ input }) => {
       return getApp().triggers.getReportSchedules({
         projectId: input.projectId,
+      });
+    }),
+  /**
+   * One page of an automation's whole firing history, newest first — the
+   * automation view walks back through this. Same metadata-only contract as
+   * `getRecentFires`: fire history is gated by `triggers:view`, which is
+   * weaker than trace-content permission, so no fire ever carries a trace id.
+   */
+  getFireHistory: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        triggerId: z.string(),
+        limit: z.number().int().min(1).max(50).default(20),
+        cursor: z
+          .object({ createdAt: z.coerce.date(), id: z.string().min(1) })
+          .nullish(),
+      }),
+    )
+    .use(checkProjectPermission("triggers:view"))
+    .query(async ({ ctx, input }) => {
+      const fireHistory = TriggerFireHistoryService.create(ctx.prisma);
+      return fireHistory.getFireHistoryPage({
+        projectId: input.projectId,
+        triggerId: input.triggerId,
+        limit: input.limit,
+        cursor: input.cursor ?? null,
+      });
+    }),
+  /**
+   * What the alert's most recent check observed and decided. Null for an
+   * automation that has never been evaluated, and for kinds that are not
+   * evaluated on a threshold at all.
+   */
+  getLatestEvaluation: protectedProcedure
+    .input(z.object({ projectId: z.string(), triggerId: z.string() }))
+    .use(checkProjectPermission("triggers:view"))
+    .query(async ({ ctx, input }) => {
+      const evaluations = TriggerLatestEvaluationService.create(ctx.prisma);
+      return evaluations.getByTriggerId({
+        projectId: input.projectId,
+        triggerId: input.triggerId,
+      });
+    }),
+  /**
+   * When this automation acts next. A schedule's answer comes from the
+   * scheduler that owns the calendar entry; everything else is derived from
+   * what the dispatcher itself would do with a match found right now.
+   */
+  getNextFiring: protectedProcedure
+    .input(z.object({ projectId: z.string(), triggerId: z.string() }))
+    .use(checkProjectPermission("triggers:view"))
+    .query(async ({ input }) => {
+      const trigger = await getApp().triggers.getById({
+        triggerId: input.triggerId,
+        projectId: input.projectId,
+      });
+      if (!trigger) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Automation not found in this project.",
+        });
+      }
+      const schedules =
+        trigger.triggerKind === TriggerKind.REPORT
+          ? await getApp().triggers.getReportSchedules({
+              projectId: input.projectId,
+            })
+          : [];
+      return describeNextFiring({
+        trigger,
+        reportSchedule:
+          schedules.find((s) => s.triggerId === trigger.id) ?? null,
+        now: new Date(),
       });
     }),
   toggleTrigger: protectedProcedure
