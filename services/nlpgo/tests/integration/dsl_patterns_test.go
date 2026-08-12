@@ -83,6 +83,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/langwatch/langwatch/pkg/health"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/engineexec"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine"
@@ -167,7 +168,7 @@ func setupPatternStack(t *testing.T, llm *fakeLLMClient, langwatch http.HandlerF
 		LangWatchBaseURL: lwSrv.URL,
 	})
 
-	application := app.New(app.WithWorkflowExecutor(executorAdapter{eng: eng}))
+	application := app.New(app.WithWorkflowExecutor(engineexec.New(eng)))
 	probes := health.New("test")
 	probes.MarkStarted()
 	router := httpapi.NewRouter(httpapi.RouterDeps{
@@ -283,6 +284,17 @@ func TestPattern001_LinearChain_SignatureWithTemplateThenEvaluator(t *testing.T)
 	res := postSync(t, &stack{url: url}, body)
 	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
 	assert.Equal(t, "pattern-001", res.TraceID)
+
+	// The run's own accounting, not any single node's. It is filled by
+	// the app-layer translation, so a translation that drops it reports
+	// a free run and nothing else notices.
+	//
+	// Asserted as "carries a cost" rather than as an exact figure: only
+	// the evaluator's spend reaches this total today, because ns.Cost is
+	// set on the evaluator path alone, so the signature node's model
+	// spend is missing from it. That is tracked separately; pinning the
+	// current figure here would pin the gap.
+	assert.Positive(t, res.TotalCost, "total_cost should reach the caller")
 
 	// (1) The fake LLM saw the rendered system prompt — proves the
 	// template render happened in-engine, not just in a unit test.
@@ -926,7 +938,7 @@ func setupPatternStackWithUpstream(t *testing.T, llm *fakeLLMClient, langwatch h
 		LangWatchBaseURL: lwSrv.URL,
 	})
 
-	application := app.New(app.WithWorkflowExecutor(executorAdapter{eng: eng}))
+	application := app.New(app.WithWorkflowExecutor(engineexec.New(eng)))
 	probes := health.New("test")
 	probes.MarkStarted()
 	router := httpapi.NewRouter(httpapi.RouterDeps{App: application, Health: probes, Version: "test"})

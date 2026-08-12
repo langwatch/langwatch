@@ -15,6 +15,7 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 	"github.com/langwatch/langwatch/services/nlpgo"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/dispatcheradapter"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/engineexec"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/llmexecutor"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
@@ -115,7 +116,7 @@ func Root(ctx context.Context, _ []string) error {
 		AgentWorkflow:    agentWfRunner,
 		LangWatchBaseURL: resolveLangWatchBaseURL(cfg.Engine.LangWatchBaseURL, os.Getenv),
 	})
-	executor := engineAdapter{eng: eng}
+	executor := engineexec.New(eng)
 
 	application := app.New(
 		app.WithLogger(deps.Logger),

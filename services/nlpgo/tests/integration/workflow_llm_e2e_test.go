@@ -33,6 +33,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/services/aigateway/dispatcher"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/dispatcheradapter"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/engineexec"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/llmexecutor"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
@@ -61,7 +62,7 @@ func setupStackWithLLM(t *testing.T) *stack {
 	require.NoError(t, err)
 	eng := engine.New(engine.Options{HTTP: httpExec, Code: codeExec, LLM: llm})
 
-	executor := liveExecutorAdapter{eng: eng}
+	executor := engineexec.New(eng)
 	application := app.New(app.WithWorkflowExecutor(executor))
 	probes := health.New("test")
 	probes.MarkStarted()
@@ -70,61 +71,6 @@ func setupStackWithLLM(t *testing.T) *stack {
 	t.Cleanup(srv.Close)
 	t.Cleanup(upstream.Close)
 	return &stack{url: srv.URL, upstream: upstream, upstreamURL: upstream.URL}
-}
-
-// liveExecutorAdapter mirrors executorAdapter but is defined in this
-// file so the live build tag scoping is local — keeps the default
-// build path (without live_openai) free of any aigateway/dispatcher
-// imports.
-type liveExecutorAdapter struct{ eng *engine.Engine }
-
-func (a liveExecutorAdapter) ExecuteStream(ctx context.Context, req app.WorkflowRequest, opts app.WorkflowStreamOptions) (<-chan app.WorkflowStreamEvent, error) {
-	wf, err := dsl.ParseWorkflow(req.WorkflowJSON)
-	if err != nil {
-		ch := make(chan app.WorkflowStreamEvent, 1)
-		ch <- app.WorkflowStreamEvent{Type: "error", Payload: map[string]any{"message": err.Error()}}
-		close(ch)
-		return ch, nil
-	}
-	in, err := a.eng.ExecuteStream(ctx, engine.ExecuteRequest{
-		Workflow: wf, Inputs: req.Inputs, Origin: req.Origin, TraceID: req.TraceID,
-	}, engine.ExecuteStreamOptions{Heartbeat: opts.Heartbeat})
-	if err != nil {
-		ch := make(chan app.WorkflowStreamEvent, 1)
-		ch <- app.WorkflowStreamEvent{Type: "error", Payload: map[string]any{"message": err.Error()}}
-		close(ch)
-		return ch, nil
-	}
-	out := make(chan app.WorkflowStreamEvent, 16)
-	go func() {
-		defer close(out)
-		for ev := range in {
-			out <- app.WorkflowStreamEvent{Type: ev.Type, TraceID: ev.TraceID, Payload: ev.Payload}
-		}
-	}()
-	return out, nil
-}
-
-func (a liveExecutorAdapter) Execute(ctx context.Context, req app.WorkflowRequest) (*app.WorkflowResult, error) {
-	wf, err := dsl.ParseWorkflow(req.WorkflowJSON)
-	if err != nil {
-		return &app.WorkflowResult{Status: "error", Error: &app.WorkflowError{Type: "invalid_workflow", Message: err.Error()}}, nil
-	}
-	res, err := a.eng.Execute(ctx, engine.ExecuteRequest{Workflow: wf, Inputs: req.Inputs, Origin: req.Origin, TraceID: req.TraceID})
-	if err != nil {
-		return &app.WorkflowResult{Status: "error", Error: &app.WorkflowError{Type: "engine_error", Message: err.Error()}}, nil
-	}
-	out := &app.WorkflowResult{Status: res.Status, Result: res.Result, TraceID: res.TraceID}
-	if res.Error != nil {
-		out.Error = &app.WorkflowError{Type: res.Error.Type, Message: res.Error.Message, NodeID: res.Error.NodeID}
-	}
-	if len(res.Nodes) > 0 {
-		out.Nodes = make(map[string]any, len(res.Nodes))
-		for k, v := range res.Nodes {
-			out.Nodes[k] = v
-		}
-	}
-	return out, nil
 }
 
 // TestSync_RealWorkflowEndToEnd_OpenAI is the headline proof. A
