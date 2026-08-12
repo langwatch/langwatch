@@ -70,8 +70,14 @@ export const BLOCKED_CLOUD_DOMAINS = [
  * ALLOWED_PROXY_HOSTS.
  *
  * Everything else in BLOCKED_CLOUD_DOMAINS stays unconditional. Allowlisting
- * `metadata.google.internal` or `s3.amazonaws.com` must keep failing —
- * those are the SSRF targets the block exists for.
+ * `metadata.google.internal` or `s3.amazonaws.com` must keep failing.
+ * Those are the SSRF targets the block exists for.
+ *
+ * A host whose name also matches a cloud pattern once these suffixes are
+ * stripped stays blocked no matter what. `grafana.internal.local` reduces to
+ * `grafana.internal`, which hits `.internal`, so it can never be allowlisted.
+ * An on-premise DNS zone that collides with `.internal` is unreachable by
+ * design. Rename the zone or front it with a name that does not.
  *
  * Narrow by design: extend only with suffixes that are meaningless outside a
  * private network.

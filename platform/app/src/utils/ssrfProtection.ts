@@ -225,6 +225,14 @@ export function isBlockedCloudDomain(hostname: string): boolean {
 }
 
 /**
+ * On-premise DNS labels ("local", "localhost") that may be stripped off the
+ * end of a hostname before the cloud patterns are tested.
+ */
+const strippableLabels = new Set(
+  ALLOWLISTABLE_LOCAL_SUFFIXES.map((suffix) => suffix.slice(1)),
+);
+
+/**
  * Whether a blocked hostname is blocked *only* because of an on-premise
  * suffix (`.local`, `.localhost`) and may therefore be re-enabled for that
  * exact host via ALLOWED_PROXY_HOSTS.
@@ -240,14 +248,19 @@ function isAllowlistableLocalDomain(hostname: string): boolean {
   );
   if (!matchesLocalSuffix) return false;
 
-  // Strip the on-premise suffix before testing the cloud patterns, so a
-  // hostname cannot smuggle a cloud label past the check by appending
-  // ".local" — "metadata.google.internal.local" still reads as ".internal".
-  const withoutLocalSuffix = ALLOWLISTABLE_LOCAL_SUFFIXES.reduce(
-    (name, suffix) =>
-      name.endsWith(suffix) ? name.slice(0, -suffix.length) : name,
-    lowerHostname,
-  );
+  // Strip trailing on-premise labels one by one until none is left, then
+  // test the cloud patterns on what remains. Repeated or mixed suffixes
+  // cannot smuggle a cloud name past the check:
+  // "metadata.google.internal.local.local" reduces to
+  // "metadata.google.internal".
+  const labels = lowerHostname.split(".");
+  while (
+    labels.length > 1 &&
+    strippableLabels.has(labels[labels.length - 1]!)
+  ) {
+    labels.pop();
+  }
+  const withoutLocalSuffix = labels.join(".");
 
   const matchesCloudDomain = BLOCKED_CLOUD_DOMAINS.filter(
     (domain) => !ALLOWLISTABLE_LOCAL_SUFFIXES.includes(domain),
@@ -427,7 +440,10 @@ export function createSSRFValidator(config: SSRFConfig) {
       );
     }
 
-    const hostname = parsedUrl.hostname.toLowerCase();
+    // Drop the trailing dot of a fully-qualified name ("s3.amazonaws.com.").
+    // DNS treats both spellings as the same host, so every check below must
+    // see the dotless form or the dot walks the name past the suffix checks.
+    const hostname = parsedUrl.hostname.toLowerCase().replace(/\.$/, "");
     const port = parsedUrl.port
       ? parseInt(parsedUrl.port, 10)
       : parsedUrl.protocol === "https:"
