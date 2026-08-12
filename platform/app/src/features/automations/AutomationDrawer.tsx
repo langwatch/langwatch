@@ -68,6 +68,7 @@ import {
 import { api } from "~/utils/api";
 import { MainSectionList } from "./components/MainSectionList";
 import { ConfigurationSecondaryDrawer } from "./components/secondaries/ConfigurationSecondaryDrawer";
+import { AutomationWizard } from "./components/wizard/AutomationWizard";
 import { ALERT_TEMPLATE_VARIABLES } from "./editors/alertVariables";
 import { REPORT_TEMPLATE_VARIABLES } from "./editors/reportVariables";
 import {
@@ -86,12 +87,14 @@ import {
   templatesFromDraft,
 } from "./logic/draftReducer";
 import { useGraphAlertLabels } from "./logic/useGraphAlertLabels";
+import { nextStep, previousStep } from "./logic/wizardSteps";
 import { useAutomationStore } from "./state/automationStore";
 import {
   useConditionsSet,
   useConfigComplete,
   useDraft,
   useSection,
+  useWizardStep,
 } from "./state/selectors";
 
 /**
@@ -251,10 +254,15 @@ export function AutomationDrawer({
 
   const draft = useDraft();
   const section = useSection();
+  const step = useWizardStep();
   const conditionsSet = useConditionsSet();
   const configComplete = useConfigComplete();
   const isGraphAlert = draft.source === "customGraph";
-  const isReport = draft.source === "report";
+  // A schedule keeps the single-pane composer — the wizard authors the two
+  // things an automation can watch, and the clock is neither (ADR-093 §1).
+  // Read from the prefill too, so a fresh schedule never paints one frame of
+  // the wizard before the prefill effect lands.
+  const isReport = draft.source === "report" || initialSource === "report";
   // Single source of truth for every heading / button / toast noun. Treat a
   // graph-prefilled create as an alert from the first paint so the title
   // doesn't flash "Add automation" before the prefill effect lands.
@@ -268,8 +276,14 @@ export function AutomationDrawer({
   // the Type cards visibly in all three cases.
   const sourceLocked =
     (!!automationId && (isGraphAlert || isReport)) || !!prefilledGraphId;
+  // What a saved automation watches never changes — the graph slot is one
+  // automation per graph, so the conversion is a create plus a delete, which is
+  // exactly what the public API already refuses (ADR-093 §1). A drawer opened
+  // from a specific chart is pinned to that graph for the same reason.
+  const subjectLocked = !!automationId || !!prefilledGraphId;
   const dispatch = useAutomationStore((s) => s.dispatch);
   const setSection = useAutomationStore((s) => s.setSection);
+  const setStep = useAutomationStore((s) => s.setStep);
   const hydrate = useAutomationStore((s) => s.hydrate);
   const reset = useAutomationStore((s) => s.reset);
   const pushAttempt = useAutomationStore((s) => s.pushTestAttempt);
@@ -277,6 +291,15 @@ export function AutomationDrawer({
 
   // Wipe the singleton store on unmount — next open is a fresh slate.
   useEffect(() => () => reset(), [reset]);
+
+  // Editing opens on the review overview, always, and never on the Watch step:
+  // losing the overview while editing was the annoying part of the previous
+  // restructuring attempt (ADR-093 §4). Every step is reachable from the rail
+  // straight away, because they were all answered when the row was saved.
+  useEffect(() => {
+    if (automationId) setStep("review");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Baseline the close-guard diffs against: the hydrated row on edit, the
   // traces-prefilled (or empty) draft on create. Set once the relevant
@@ -1039,6 +1062,11 @@ export function AutomationDrawer({
     baselineRef.current !== null &&
     JSON.stringify(draft) !== baselineRef.current;
 
+  // Which footer the drawer is showing. Save and test fire live on the review
+  // overview; every other wizard step gets navigation instead. A schedule keeps
+  // the single-pane composer, so it always shows Save.
+  const showStepNavigation = !isReport && step !== "review";
+
   const requestClose = useCallback(() => {
     if (isDirty) {
       setConfirmDiscardOpen(true);
@@ -1096,21 +1124,70 @@ export function AutomationDrawer({
               </VStack>
             ) : (
               <Box css={{ zoom: 0.9 }}>
-                <MainSectionList
-                  isEdit={!!automationId}
-                  sourceLocked={sourceLocked}
-                  prefilledGraphId={prefilledGraphId}
-                  webhookEnabled={webhookEnabled}
-                />
+                {isReport ? (
+                  <MainSectionList
+                    isEdit={!!automationId}
+                    sourceLocked={sourceLocked}
+                    prefilledGraphId={prefilledGraphId}
+                    webhookEnabled={webhookEnabled}
+                  />
+                ) : (
+                  <AutomationWizard
+                    projectId={projectId}
+                    isEdit={!!automationId}
+                    prefilledGraphId={prefilledGraphId}
+                    subjectLocked={subjectLocked}
+                    webhookEnabled={webhookEnabled}
+                    graphName={graphName}
+                    seriesLabel={seriesLabel}
+                    onCreateNew={() => openDrawer("automation", {})}
+                  />
+                )}
               </Box>
             )}
           </Drawer.Body>
           <Drawer.Footer>
             <HStack width="full">
               <Spacer />
+              {/* Mid-wizard, the footer moves between steps and nothing else:
+                  saving and test-firing belong to the review overview, where
+                  the whole automation is on screen. Creating walks forward;
+                  editing entered this step from the overview, so its one way
+                  out is back to it. */}
+              {showStepNavigation ? (
+                automationId ? (
+                  <Button
+                    colorPalette="orange"
+                    onClick={() => setStep("review")}
+                  >
+                    Done
+                  </Button>
+                ) : (
+                  <>
+                    {previousStep(step) ? (
+                      <Button
+                        variant="ghost"
+                        onClick={() => setStep(previousStep(step)!)}
+                      >
+                        Back
+                      </Button>
+                    ) : null}
+                    <Button
+                      colorPalette="orange"
+                      onClick={() => setStep(nextStep(step)!)}
+                    >
+                      Continue
+                    </Button>
+                  </>
+                )
+              ) : null}
               {/* Send test sits next to Save (ADR-043 feedback): once a notify
                   channel is set up, fire the real message before committing. */}
-              {channel && !editLoading && !editError && !webhookReadOnly ? (
+              {!showStepNavigation &&
+              channel &&
+              !editLoading &&
+              !editError &&
+              !webhookReadOnly ? (
                 <Tooltip
                   content="Finish the delivery setup to send a test."
                   disabled={configComplete}
@@ -1125,25 +1202,27 @@ export function AutomationDrawer({
                   </Button>
                 </Tooltip>
               ) : null}
-              <Tooltip
-                content={saveDisabledReason({
-                  draft,
-                  nameSet,
-                  configComplete,
-                  actionPicked: !!draft.action,
-                  webhookReadOnly,
-                })}
-                disabled={canSave}
-              >
-                <Button
-                  colorPalette="orange"
-                  onClick={onSave}
-                  loading={upsert.isPending}
-                  disabled={!canSave}
+              {showStepNavigation ? null : (
+                <Tooltip
+                  content={saveDisabledReason({
+                    draft,
+                    nameSet,
+                    configComplete,
+                    actionPicked: !!draft.action,
+                    webhookReadOnly,
+                  })}
+                  disabled={canSave}
                 >
-                  {labels.saveButton}
-                </Button>
-              </Tooltip>
+                  <Button
+                    colorPalette="orange"
+                    onClick={onSave}
+                    loading={upsert.isPending}
+                    disabled={!canSave}
+                  >
+                    {labels.saveButton}
+                  </Button>
+                </Tooltip>
+              )}
             </HStack>
           </Drawer.Footer>
         </Drawer.Content>

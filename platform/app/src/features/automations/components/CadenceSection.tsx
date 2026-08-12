@@ -61,15 +61,20 @@ const CADENCE_HELP = {
 export function CadenceSection({
   isEdit = false,
   accordion,
+  title = "Cadence",
 }: {
   isEdit?: boolean;
   accordion?: FacetAccordionProps;
+  /** The wizard splits this facet across two steps and names it after what
+   *  it decides there — the firing rule in Watch, the sending timing in
+   *  Delivery (ADR-093 §4). The facet itself is unchanged. */
+  title?: string;
 }) {
   const draft = useDraft();
 
   return (
     <FacetSection
-      title="Cadence"
+      title={title}
       help={CADENCE_HELP[draft.source]}
       accordion={accordion}
       complete={cadenceIsSet(draft)}
