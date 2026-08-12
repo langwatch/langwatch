@@ -133,13 +133,26 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
     [selectedGraphQuery.data?.graph],
   );
 
-  const customGraphMissing = draft.customGraphId === null;
+  // Loading is not "no graph picked yet" — showing the error while the first
+  // fetch is still in flight would flash a false rejection before the data
+  // that would clear it has even arrived.
+  const customGraphMissing = draft.customGraphId === null && !graphs.isLoading;
   const seriesMissing =
     !!draft.customGraphId && draft.graphAlert.seriesName.length === 0;
   // A prefilled draft already carries its graph (opened from a dashboard chart
   // card), so an otherwise-empty project-wide list is beside the point there.
   const hasNoGraphs =
-    !isPrefilled && !graphs.isLoading && (graphs.data ?? []).length === 0;
+    !isPrefilled &&
+    !graphs.isLoading &&
+    !graphs.isError &&
+    (graphs.data ?? []).length === 0;
+  // Distinct from "no graphs yet": a fetch failure isn't emptiness, and
+  // offering to create a graph the project may already have would be wrong.
+  const graphsFailedToLoad = !isPrefilled && graphs.isError;
+
+  if (graphsFailedToLoad) {
+    return <GraphsLoadFailed onRetry={() => void graphs.refetch()} />;
+  }
 
   if (hasNoGraphs) {
     return <NoGraphsYet projectSlug={project?.slug} />;
@@ -257,6 +270,35 @@ function NoGraphsYet({ projectSlug }: { projectSlug?: string }) {
           </Text>
         </>
       ) : null}
+    </VStack>
+  );
+}
+
+/**
+ * Shown when the graph list request itself failed — distinct from
+ * `NoGraphsYet`, which means the project genuinely has none. Conflating the
+ * two would tell an author to go create a graph their project may already
+ * have, over a failure that has nothing to do with them. No raw error
+ * detail in the copy (customer-safe per error-handling.md); retry just
+ * re-runs the same query.
+ */
+function GraphsLoadFailed({ onRetry }: { onRetry: () => void }) {
+  return (
+    <VStack
+      align="start"
+      gap={2}
+      padding={3}
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="md"
+      bg="bg.subtle"
+    >
+      <Text textStyle="sm">
+        Your custom graphs couldn{"'"}t be loaded right now.
+      </Text>
+      <Button size="xs" variant="outline" onClick={onRetry}>
+        Try again
+      </Button>
     </VStack>
   );
 }
