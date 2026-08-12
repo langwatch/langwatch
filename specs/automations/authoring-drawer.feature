@@ -317,6 +317,44 @@ Feature: Staged automation authoring drawer
       When the user edits it
       Then the same staged drawer opens with the identity, conditions, configuration, cadence, debounce, and templates pre-filled
 
+  Rule: What a save writes is what the next open shows
+
+    The drawer reads the saved automation once per open and deliberately
+    ignores every later read, so an author's keystrokes are never overwritten
+    while they type. That makes the copy the app is holding the only thing the
+    next open can show: if a save leaves the previously read copy in place,
+    reopening latches onto it and shows the value the author just replaced,
+    while the stored automation holds the new one. The same rule covers what
+    the drawer offers to pick from — a graph created moments ago has to be on
+    the list of graphs a new alert can watch.
+
+    @integration
+    Scenario: Editing an automation shows the values that were last saved
+      Given a saved automation the user has opened for editing
+      When the user changes a value, saves, and opens that automation again
+      Then the drawer shows the value that was saved
+      And the value it replaced is gone
+
+    @integration
+    Scenario: A newly created graph is offered to a new alert without reloading
+      Given the user has just created a custom graph
+      When the user starts a new alert in the same session
+      Then the new graph is offered as the graph to watch
+
+  Rule: Creating an automation offers a way straight to it
+
+    Saving closes the drawer, and the author lands back wherever they started
+    — often not the automations list. The confirmation is the only moment the
+    app knows exactly which automation was just written, so it carries the way
+    to open it rather than leaving the author to find it by name.
+
+    @integration
+    Scenario: The creation toast links to the created automation
+      Given the user has completed every required section of a new automation
+      When the user creates it
+      Then the confirmation offers to open the automation that was created
+      And taking that offer opens that automation
+
   Rule: The settings list shows dispatch health
 
     Scenario: Last triggered and fired-count are available immediately

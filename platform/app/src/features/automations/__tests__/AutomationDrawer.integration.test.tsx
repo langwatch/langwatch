@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { TriggerAction } from "@prisma/client";
 import {
   cleanup,
   fireEvent,
@@ -12,22 +13,31 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { toaster } from "~/components/ui/toaster";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import type { FilterField } from "~/server/filters/types";
 import { AutomationDrawer } from "../AutomationDrawer";
+import { INITIAL_DRAFT } from "../logic/draftReducer";
 import { useAutomationStore } from "../state/automationStore";
 
 // The saved row the edit-mode query resolves to. Mutable so a test can
 // emulate a tRPC background refetch handing back a *different* row after the
 // author has begun editing.
 let mockTriggerRow: Record<string, unknown> | null = null;
+// The row the server holds, as opposed to the copy the client is showing
+// (`mockTriggerRow`). Only the save-round-trip test seeds it; invalidating
+// `getTriggerById` is what moves the server's row into the client's copy,
+// exactly as react-query's refetch-on-invalidate does.
+let mockServerTriggerRow: Record<string, unknown> | null = null;
 // Hoisted so these mock fns are initialized before any vi.mock factory runs —
 // a transitive import (AddParticipants -> ~/utils/api) triggers the api mock
 // during the hoisted import graph, before plain `const` declarations execute.
 const {
   mockGetTriggerByIdQuery,
   mockCloseDrawer,
+  mockOpenDrawer,
   mockInvalidate,
+  mockGetTriggerByIdInvalidate,
   mockGraphsGetAllInvalidate,
   mockGraphsGetByIdInvalidate,
   mockUpsertMutate,
@@ -41,7 +51,14 @@ const {
     error: null as Error | null,
   })),
   mockCloseDrawer: vi.fn(),
+  mockOpenDrawer: vi.fn(),
   mockInvalidate: vi.fn(),
+  // Invalidating drops the client's copy, so the next read comes from the
+  // server. Without a seeded server row this is the no-op the other tests
+  // expect.
+  mockGetTriggerByIdInvalidate: vi.fn(() => {
+    if (mockServerTriggerRow) mockTriggerRow = mockServerTriggerRow;
+  }),
   mockGraphsGetAllInvalidate: vi.fn(),
   mockGraphsGetByIdInvalidate: vi.fn(),
   mockUpsertMutate: vi.fn(),
@@ -50,7 +67,7 @@ const {
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
     closeDrawer: mockCloseDrawer,
-    openDrawer: vi.fn(),
+    openDrawer: mockOpenDrawer,
     drawerOpen: vi.fn(() => false),
     canGoBack: false,
     goBack: vi.fn(),
@@ -146,7 +163,10 @@ vi.mock("~/utils/api", () => ({
       },
     },
     useUtils: () => ({
-      automation: { getTriggers: { invalidate: mockInvalidate } },
+      automation: {
+        getTriggers: { invalidate: mockInvalidate },
+        getTriggerById: { invalidate: mockGetTriggerByIdInvalidate },
+      },
       graphs: {
         getAll: { invalidate: mockGraphsGetAllInvalidate },
         getById: { invalidate: mockGraphsGetByIdInvalidate },
@@ -231,6 +251,10 @@ describe("AutomationDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockTriggerRow = null;
+    mockServerTriggerRow = null;
+    // Several tests hand `mutate` a save-simulating implementation; drop it
+    // so the next test starts from an inert mutation.
+    mockUpsertMutate.mockReset();
     // Restore the default resolved-query shape — tests that emulate a
     // loading / errored edit query override this per-test.
     mockGetTriggerByIdQuery.mockImplementation(() => ({
@@ -719,6 +743,95 @@ describe("AutomationDrawer", () => {
         expect(useAutomationStore.getState().draft.filterQuery).toBe(
           "status:error",
         );
+      });
+    });
+  });
+
+  describe("given a saved automation is changed and saved", () => {
+    describe("when the author opens that same automation again", () => {
+      /** @scenario "Editing an automation shows the values that were last saved" */
+      it("shows the value that was saved, not the one it replaced", async () => {
+        const user = userEvent.setup();
+        mockServerTriggerRow = savedReportRow();
+        mockTriggerRow = mockServerTriggerRow;
+        mockUpsertMutate.mockImplementation(
+          (
+            input: { name: string },
+            opts?: { onSuccess?: (saved: { id: string }) => void },
+          ) => {
+            mockServerTriggerRow = savedReportRow({ name: input.name });
+            opts?.onSuccess?.({ id: "trigger-1" });
+          },
+        );
+
+        const firstOpen = renderDrawer({ automationId: "trigger-1" });
+        const nameInput = await screen.findByDisplayValue(
+          "Weekly error digest",
+        );
+        fireEvent.change(nameInput, {
+          target: { value: "Monday quality digest" },
+        });
+        const saveButton = screen.getByRole("button", {
+          name: "Save schedule",
+        });
+        await waitFor(() => expect(saveButton).toBeEnabled());
+        await user.click(saveButton);
+
+        // Reopening is a fresh mount, and the store wipes itself on unmount —
+        // so the only thing that can fill the name is the row the drawer
+        // reads back.
+        firstOpen.unmount();
+        renderDrawer({ automationId: "trigger-1" });
+
+        expect(
+          await screen.findByDisplayValue("Monday quality digest"),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByDisplayValue("Weekly error digest"),
+        ).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a fully configured new automation", () => {
+    describe("when the author creates it", () => {
+      /** @scenario "The creation toast links to the created automation" */
+      it("offers to open the automation that was created", async () => {
+        const user = userEvent.setup();
+        mockUpsertMutate.mockImplementation(
+          (
+            _input: unknown,
+            opts?: { onSuccess?: (saved: { id: string }) => void },
+          ) => opts?.onSuccess?.({ id: "trigger-created" }),
+        );
+        useAutomationStore.getState().hydrate({
+          ...INITIAL_DRAFT,
+          name: "Flag failing traces",
+          action: TriggerAction.SEND_EMAIL,
+          filterQuery: "status:error",
+          slices: {
+            ...INITIAL_DRAFT.slices,
+            [TriggerAction.SEND_EMAIL]: {
+              ...INITIAL_DRAFT.slices[TriggerAction.SEND_EMAIL],
+              members: ["ops@acme.com"],
+            },
+          },
+        });
+        renderDrawer();
+
+        const createButton = await screen.findByRole("button", {
+          name: "Create automation",
+        });
+        await waitFor(() => expect(createButton).toBeEnabled());
+        await user.click(createButton);
+
+        const created = vi.mocked(toaster.create).mock.calls[0]?.[0];
+        expect(created?.action?.label).toBe("View automation");
+
+        created?.action?.onClick?.();
+        expect(mockOpenDrawer).toHaveBeenCalledWith("viewAutomation", {
+          automationId: "trigger-created",
+        });
       });
     });
   });
