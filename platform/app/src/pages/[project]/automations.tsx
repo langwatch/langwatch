@@ -9,19 +9,21 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Calendar,
   Edit2,
   Eye,
   Filter,
   MoreVertical,
+  Plus,
   Trash,
   TrendingUp,
   Zap,
 } from "react-feather";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { DashboardLayout } from "~/components/DashboardLayout";
+import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { HoverableBigText } from "~/components/HoverableBigText";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { SectionNavigationLayout } from "~/components/ui/layouts/SectionNavigationLayout";
@@ -46,9 +48,14 @@ import {
   SectionHeader,
   TableShell,
 } from "~/features/automations/components/page/AutomationTableCells";
+import {
+  type ConditionSource,
+  presetLabels,
+} from "~/features/automations/logic/draftReducer";
 import { RUNAWAY_PAUSE_REASON } from "~/features/automations/logic/pauseReasons";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
+import { showErrorToast } from "~/features/errors";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { automationContextChip } from "~/features/langy/logic/langyContextChips";
 import type { Monitor, TriggerAction } from "~/generated/prisma/client";
@@ -59,6 +66,16 @@ import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
+
+/** The composer's Automation/Alert/Schedule facet (`draft.source`), derived
+ *  from a saved row the same way the three table sections already split the
+ *  list — so the row-actions menu, the delete dialog, and the toast copy all
+ *  name the kind the row actually is instead of defaulting to "automation". */
+function triggerSource(trigger: EnhancedTrigger): ConditionSource {
+  if (trigger.customGraphId) return "customGraph";
+  if (trigger.triggerKind === "REPORT") return "report";
+  return "trace";
+}
 
 type AutomationSection = "overview" | "automations" | "alerts" | "schedules";
 
@@ -101,6 +118,14 @@ function AutomationsPage() {
   const section = sectionFromPath(router.pathname);
   const details = sectionDetails[section];
   const basePath = project ? `/${project.slug}/automations` : "/auth/signin";
+  const trpcUtils = api.useContext();
+
+  // Row pending a delete confirmation (#6716: deletion was immediate and
+  // irreversible). Holding the row itself, not just its id, lets the dialog
+  // and the toast name the right kind (automation / alert / schedule).
+  const [pendingDelete, setPendingDelete] = useState<EnhancedTrigger | null>(
+    null,
+  );
 
   const triggers = api.automation.getTriggers.useQuery(
     {
@@ -219,21 +244,22 @@ function AutomationsPage() {
   const toggleTrigger = api.automation.toggleTrigger.useMutation();
   const deleteTriggerMutation = api.automation.deleteById.useMutation();
 
-  const handleToggleTrigger = (triggerId: string, active: boolean) => {
+  const handleToggleTrigger = (trigger: EnhancedTrigger, active: boolean) => {
+    const noun = presetLabels(triggerSource(trigger), false).noun;
     toggleTrigger.mutate(
-      { triggerId, active, projectId: project?.id ?? "" },
+      { triggerId: trigger.id, active, projectId: project?.id ?? "" },
       {
         onSuccess: () => {
           void triggers.refetch();
+          // The view/edit drawers read this row by id — without invalidating
+          // it too, reopening either after a toggle can still show the
+          // pre-toggle active state until something else happens to refetch it.
+          void trpcUtils.automation.getTriggerById.invalidate();
         },
-        onError: () => {
-          toaster.create({
-            title: "Update automation",
-            type: "error",
-            description: "Failed to update automation",
-            meta: {
-              closable: true,
-            },
+        onError: (error) => {
+          showErrorToast({
+            error,
+            fallbackTitle: `Couldn't update ${noun}`,
           });
         },
       },
@@ -255,30 +281,34 @@ function AutomationsPage() {
     return "";
   };
 
-  const deleteTrigger = (triggerId: string) => {
+  const deleteTrigger = (trigger: EnhancedTrigger) => {
+    const noun = presetLabels(triggerSource(trigger), false).noun;
     deleteTriggerMutation.mutate(
-      { triggerId, projectId: project?.id ?? "" },
+      { triggerId: trigger.id, projectId: project?.id ?? "" },
       {
         onSuccess: () => {
           toaster.create({
-            title: "Delete automation",
+            title: `Delete ${noun}`,
             type: "success",
-            description: "Automation deleted",
+            description: `${noun.charAt(0).toUpperCase()}${noun.slice(1)} deleted`,
             meta: {
               closable: true,
             },
           });
           void triggers.refetch();
+          // The view/edit drawers read this row by id — without invalidating
+          // it too, a still-open drawer for the deleted row would keep
+          // showing it as though nothing happened.
+          void trpcUtils.automation.getTriggerById.invalidate();
+          setPendingDelete(null);
         },
-        onError: () => {
-          toaster.create({
-            title: "Delete automation",
-            type: "error",
-            description: "Failed to delete automation",
-            meta: {
-              closable: true,
-            },
+        onError: (error) => {
+          showErrorToast({
+            error,
+            fallbackTitle: `Couldn't delete ${noun}`,
           });
+          // Leave the dialog open so the author can retry or cancel — closing
+          // it here would silently discard the confirmation they just gave.
         },
       },
     );
@@ -380,59 +410,70 @@ function AutomationsPage() {
     );
   };
 
-  const rowActionsMenu = (trigger: EnhancedTrigger) => (
-    <Menu.Root>
-      <Menu.Trigger asChild>
-        <Button
-          variant={"ghost"}
-          aria-label={`Actions for ${trigger.name}`}
-          onClick={(event) => {
-            event.stopPropagation();
-          }}
-        >
-          <MoreVertical />
-        </Button>
-      </Menu.Trigger>
-      <Menu.Content>
-        <Menu.Item
-          value="view"
-          onClick={(event) => {
-            event.stopPropagation();
-            openDrawer("viewAutomation", { automationId: trigger.id });
-          }}
-        >
-          <Box display="flex" alignItems="center" gap={2}>
-            <Eye size={14} />
-            View
-          </Box>
-        </Menu.Item>
-        <Menu.Item
-          value="edit"
-          onClick={(event) => {
-            event.stopPropagation();
-            openDrawer("automation", { automationId: trigger.id });
-          }}
-        >
-          <Box display="flex" alignItems="center" gap={2}>
-            <Edit2 size={14} />
-            Edit
-          </Box>
-        </Menu.Item>
-        <Menu.Item
-          value="delete"
-          onClick={(event) => {
-            event.stopPropagation();
-            deleteTrigger(trigger.id);
-          }}
-        >
-          <Box display="flex" alignItems="center" gap={2} color="red.fg">
-            <Trash size={14} />
-            Delete
-          </Box>
-        </Menu.Item>
-      </Menu.Content>
-    </Menu.Root>
-  );
+  const rowActionsMenu = (trigger: EnhancedTrigger) => {
+    const noun = presetLabels(triggerSource(trigger), false).noun;
+    return (
+      <Menu.Root>
+        <Menu.Trigger asChild>
+          <Button
+            variant={"ghost"}
+            aria-label={`Actions for ${trigger.name}`}
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+          >
+            <MoreVertical aria-hidden="true" />
+          </Button>
+        </Menu.Trigger>
+        <Menu.Content>
+          {/* `aria-label` is set explicitly (not left to the text content) so
+              View/Edit/Delete keep an accessible name distinguishing the row
+              they belong to — Playwright resolving them by their visible text
+              alone was masking that the accessibility tree had nothing to
+              announce. #6716. */}
+          <Menu.Item
+            value="view"
+            aria-label={`View ${trigger.name}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              openDrawer("viewAutomation", { automationId: trigger.id });
+            }}
+          >
+            <Box display="flex" alignItems="center" gap={2}>
+              <Eye size={14} aria-hidden="true" />
+              View
+            </Box>
+          </Menu.Item>
+          <Menu.Item
+            value="edit"
+            aria-label={`Edit ${trigger.name}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              openDrawer("automation", { automationId: trigger.id });
+            }}
+          >
+            <Box display="flex" alignItems="center" gap={2}>
+              <Edit2 size={14} aria-hidden="true" />
+              Edit
+            </Box>
+          </Menu.Item>
+          <Menu.Item
+            value="delete"
+            aria-label={`Delete ${noun} ${trigger.name}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              setPendingDelete(trigger);
+            }}
+          >
+            <Box display="flex" alignItems="center" gap={2} color="red.fg">
+              <Trash size={14} aria-hidden="true" />
+              Delete {noun}
+            </Box>
+          </Menu.Item>
+        </Menu.Content>
+      </Menu.Root>
+    );
+  };
 
   // No `key` here: the row is wrapped by <LangyContextTarget>, and the key
   // belongs on the outermost element of the iteration, not on the row inside it.
@@ -458,7 +499,7 @@ function AutomationsPage() {
             checked={trigger.active}
             inputProps={{ "aria-label": `Toggle ${trigger.name}` }}
             onCheckedChange={({ checked }) => {
-              handleToggleTrigger(trigger.id, checked);
+              handleToggleTrigger(trigger, checked);
             }}
           />
           {/* An automation that is running but silently dropping matches is
@@ -670,6 +711,58 @@ function AutomationsPage() {
 
               {section === "overview" && (
                 <VStack align="stretch" gap={8} width="full">
+                  {/* G5: the Overview had tiles, activity, and a use-case
+                      strip, but no way to actually start creating something —
+                      every other tab opens the composer from its own
+                      section header. This offers the same three kinds from
+                      one place. */}
+                  <HStack justify="flex-end">
+                    <Menu.Root>
+                      <Menu.Trigger asChild>
+                        <Button size="sm" colorPalette="orange">
+                          <Plus size={14} aria-hidden="true" /> Create
+                        </Button>
+                      </Menu.Trigger>
+                      <Menu.Content>
+                        <Menu.Item
+                          value="automation"
+                          onClick={() => openDrawer("automation", {})}
+                        >
+                          <Box display="flex" alignItems="center" gap={2}>
+                            <Zap size={14} aria-hidden="true" />
+                            New automation
+                          </Box>
+                        </Menu.Item>
+                        <Menu.Item
+                          value="alert"
+                          onClick={() =>
+                            openDrawer("automation", {
+                              initialSource: "customGraph",
+                            })
+                          }
+                        >
+                          <Box display="flex" alignItems="center" gap={2}>
+                            <TrendingUp size={14} aria-hidden="true" />
+                            New alert
+                          </Box>
+                        </Menu.Item>
+                        <Menu.Item
+                          value="schedule"
+                          onClick={() =>
+                            openDrawer("automation", {
+                              initialSource: "report",
+                            })
+                          }
+                        >
+                          <Box display="flex" alignItems="center" gap={2}>
+                            <Calendar size={14} aria-hidden="true" />
+                            New schedule
+                          </Box>
+                        </Menu.Item>
+                      </Menu.Content>
+                    </Menu.Root>
+                  </HStack>
+
                   <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
                     <StatTile
                       label="Firing now"
@@ -1009,6 +1102,28 @@ function AutomationsPage() {
           )}
         </VStack>
       </Box>
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+        title={
+          pendingDelete
+            ? `Delete ${presetLabels(triggerSource(pendingDelete), false).noun}`
+            : "Delete"
+        }
+        message={
+          pendingDelete
+            ? `This permanently deletes "${pendingDelete.name}". This action cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        tone="danger"
+        loading={deleteTriggerMutation.isLoading}
+        onConfirm={() => {
+          if (pendingDelete) deleteTrigger(pendingDelete);
+        }}
+      />
     </SectionNavigationLayout>
   );
 }
