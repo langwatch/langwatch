@@ -26,7 +26,8 @@
  * codex.user_prompt branch in extractIOFromLogRecord this class replaces).
  *
  * On the SPAN side, codex 0.137+ emits native spans under scope
- * `codex_cli_rs` to /v1/traces (Path B with `[otel.trace_exporter.otlp-http]`).
+ * `codex_cli_rs` (codex < 0.144) or `codex-app-server` (codex 0.144+) to
+ * /v1/traces (Path B with `[otel.trace_exporter.otlp-http]`).
  * The `session_task.turn` span carries the full per-turn metadata as
  * codex-namespaced attributes:
  *   - model
@@ -74,9 +75,19 @@ const CODEX_RUST_SCOPE_NAME = "codex_cli_rs";
  * usage record, so the redundant-usage skip below must never fire for it.
  */
 const CODEX_EXEC_SCOPE_NAME = "codex_exec";
+/**
+ * Codex 0.144+ renamed its instrumentation scope from `codex_cli_rs` to
+ * `codex-app-server` (the interactive TUI and the app server now share one
+ * scope name). Without this entry the CodexExtractor's scope gate bails
+ * before lifting `session_task.turn` attributes, so the model name, token
+ * counts, and reasoning effort never reach the canonical gen_ai.* keys
+ * and the trace summary shows no model.
+ */
+const CODEX_APP_SERVER_SCOPE_NAME = "codex-app-server";
 const CODEX_SCOPE_NAMES: ReadonlySet<string> = new Set([
   CODEX_RUST_SCOPE_NAME,
   CODEX_EXEC_SCOPE_NAME,
+  CODEX_APP_SERVER_SCOPE_NAME,
 ]);
 export const CODEX_TURN_SPAN_NAME = "session_task.turn";
 
