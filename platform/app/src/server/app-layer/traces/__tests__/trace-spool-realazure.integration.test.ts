@@ -44,6 +44,7 @@ const PROJECT_ID = `proj-spool-${RUN_ID}`;
 
 function driver(): AzureBlobDriver {
   return new AzureBlobDriver({
+    mode: "sharedKey",
     accountName: ACCOUNT_NAME!,
     accountKey: ACCOUNT_KEY!,
   });

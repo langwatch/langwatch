@@ -70,6 +70,7 @@ function azureSpoolStorage(): SpoolStorage {
 beforeAll(async () => {
   azurite = await startAzurite();
   driver = new AzureBlobDriver({
+    mode: "sharedKey",
     accountName: azurite.accountName,
     accountKey: azurite.accountKey,
     endpointBaseUrl: azurite.endpointBaseUrl,
