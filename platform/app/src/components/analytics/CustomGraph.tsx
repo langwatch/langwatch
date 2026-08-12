@@ -45,6 +45,7 @@ import {
   resolveGraphTimeScale,
   withGroupedPipeline,
 } from "~/features/analytics/logic/graphQueryCompensation";
+import { resolveSeriesValueFormat } from "~/features/analytics/logic/seriesValueFormat";
 import { describeError } from "~/features/errors";
 import { availableFilters } from "~/server/filters/registry";
 import type { FilterField } from "~/server/filters/types";
@@ -567,13 +568,14 @@ const CustomGraph_ = React.memo(
 
     const valueFormats = Array.from(
       new Set(
-        input.series.map((series) => {
-          if (series.aggregation === "cardinality") {
-            return "0a";
-          }
-          const metric = getMetric(series.metric);
-          return metric?.format ?? "0a";
-        }),
+        input.series.map(
+          (series) =>
+            resolveSeriesValueFormat({
+              asPercent: series.asPercent,
+              aggregation: series.aggregation,
+              metricFormat: getMetric(series.metric)?.format,
+            }) ?? "0a",
+        ),
       ),
     );
     const yAxisValueFormat = valueFormats.length === 1 ? valueFormats[0] : "";
@@ -610,8 +612,11 @@ const CustomGraph_ = React.memo(
         payload.payload?.key ?? (payload.dataKey as string),
       );
       const metric = series?.metric && getMetric(series.metric);
-      const effectiveFormat =
-        series?.aggregation === "cardinality" ? "0a" : metric?.format;
+      const effectiveFormat = resolveSeriesValueFormat({
+        asPercent: series?.asPercent,
+        aggregation: series?.aggregation,
+        metricFormat: metric?.format,
+      });
 
       return formatWith(effectiveFormat, value as number);
     };
@@ -1350,10 +1355,21 @@ const shapeDataForSummary = (
       // Sum all values across all time periods for summary charts
       const totalValue = values.reduce((sum, value) => sum + (value ?? 0), 0);
 
-      // Count aggregations should use integer format regardless of metric's default
+      // Count aggregations use integer format, percentage series use "0%",
+      // both regardless of the metric's own default.
       const isCardinalitySeries = series?.aggregation === "cardinality";
       const formatOverride =
-        isCardinalitySeries && metric ? { ...metric, format: "0a" } : metric;
+        metric && (isCardinalitySeries || series?.asPercent)
+          ? {
+              ...metric,
+              format:
+                resolveSeriesValueFormat({
+                  asPercent: series?.asPercent,
+                  aggregation: series?.aggregation,
+                  metricFormat: metric.format,
+                }) ?? metric.format,
+            }
+          : metric;
 
       return {
         key: aggKey,

@@ -1,3 +1,4 @@
+import { buildReportTemplateContext } from "@langwatch/automations/templating/templateContext";
 import { describe, expect, it, vi } from "vitest";
 import type { CustomGraph } from "~/generated/prisma/client";
 import type { TimeseriesResult } from "~/server/analytics/types";
@@ -438,6 +439,76 @@ describe("loadReportCharts", () => {
         projectId: "proj-1",
         dashboardId: "dash-1",
       });
+    });
+  });
+
+  describe("given one panel's query fails", () => {
+    /** @scenario "One panel's query failure does not blank the whole report" */
+    it("still delivers the healthy panel, marking only the failed one", async () => {
+      // Regression: mapWithConcurrency's all-or-nothing contract meant one
+      // bad panel (e.g. an unsupported series combination, a ClickHouse
+      // timeout) rejected loadReportCharts entirely, putting an otherwise
+      // healthy dashboard in the same "blank email" class as #6716 for
+      // reasons unrelated to the panels that queried fine.
+      const healthyGraph = makeGraph({
+        id: "healthy-graph",
+        name: "Healthy panel",
+        filters: { ok: ["true"] },
+      });
+      const badGraph = makeGraph({
+        id: "bad-graph",
+        name: "Bad panel",
+        filters: { boom: ["true"] },
+      });
+
+      const deps: ReportChartDeps = {
+        loadCustomGraph: vi.fn(async () => null),
+        loadDashboardGraphs: vi.fn(async () => [healthyGraph, badGraph]),
+        getTimeseries: vi.fn(async (input) => {
+          if ((input.filters as Record<string, unknown> | undefined)?.boom) {
+            throw new Error("unsupported series combination");
+          }
+          return {
+            previousPeriod: [],
+            currentPeriod: [{ date: "2026-07-11T09:00:00Z", [COUNT_KEY]: 5 }],
+          };
+        }),
+      };
+
+      const charts = await run({
+        deps,
+        source: { kind: "dashboard", dashboardId: "dash-1" },
+      });
+
+      expect(charts).toHaveLength(2);
+      const healthy = charts.find((c) => c.id === "healthy-graph")!;
+      const failed = charts.find((c) => c.id === "bad-graph")!;
+
+      expect(healthy.isEmpty).toBe(false);
+      expect(healthy.failed).toBeUndefined();
+      expect(healthy.series[0]!.data.map((p) => p.value)).toEqual([5]);
+
+      expect(failed.isEmpty).toBe(true);
+      expect(failed.failed).toBe(true);
+
+      // The report as a whole must not read as empty just because one of its
+      // panels failed — only the failed panel's own content is missing.
+      const context = buildReportTemplateContext({
+        trigger: { id: "trig-1", name: "Weekly dashboard" },
+        report: {
+          sourceLabel: "Dashboard",
+          scheduleLabel: "every Monday at 09:00 (UTC)",
+          sourceKind: "dashboard",
+        },
+        viewUrl:
+          "https://app.langwatch.ai/acme/analytics/reports?dashboard=dash-1",
+        charts,
+        occurredAt: new Date("2026-07-13T09:00:00.000Z"),
+        project: { id: "proj-1", name: "Acme", slug: "acme" },
+        baseHost: "https://app.langwatch.ai",
+      });
+
+      expect(context.report.isEmpty).toBe(false);
     });
   });
 

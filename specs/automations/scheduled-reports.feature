@@ -49,3 +49,13 @@ Feature: Scheduled report content and links
       When the report renders its charts
       Then that panel is marked empty
       And a panel with real data is never marked empty by the same check
+
+  Rule: One panel's failure does not sink the whole report
+
+    @unit
+    Scenario: One panel's query failure does not blank the whole report
+      Given a dashboard with two panels, one of which fails to query
+      When the report renders its charts
+      Then the panel that succeeded still carries its data
+      And the failed panel is marked failed rather than the whole report failing
+      And the report is not marked empty

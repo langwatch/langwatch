@@ -1,4 +1,5 @@
 import type { ReportChart } from "@langwatch/automations/templating/templateContext";
+import { createLogger } from "@langwatch/observability";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import {
   resolveGraphTimeScale,
@@ -17,6 +18,8 @@ import {
   extractSeriesPoints,
 } from "~/server/app-layer/analytics/series-points";
 import type { ReportSource } from "~/server/app-layer/automations/report.builder";
+
+const logger = createLogger("langwatch:report-chart");
 
 /**
  * Turn a report's chart source — one custom graph, or every panel on a
@@ -62,6 +65,36 @@ function chartTypeOf(
     default:
       return "line";
   }
+}
+
+/**
+ * `chartTypeOf`, tolerant of a graph whose stored JSON is missing or
+ * malformed — the fallback path for a panel that failed before it could
+ * even derive its own type.
+ */
+function safeChartTypeOf(graph: CustomGraph): ReportChart["type"] {
+  const graphType = (graph.graph as unknown as CustomGraphInput | null)
+    ?.graphType;
+  return chartTypeOf(graphType as CustomGraphInput["graphType"]);
+}
+
+/** The "nothing to plot" shape for a panel — no data yet, or none ever
+ *  because its query failed (`failed: true`, still `isEmpty: true`). */
+function emptyChartFor(
+  graph: CustomGraph,
+  opts: { type?: ReportChart["type"]; failed?: boolean } = {},
+): ReportChart {
+  return {
+    id: graph.id,
+    title: graph.name,
+    type: opts.type ?? safeChartTypeOf(graph),
+    categories: [],
+    series: [],
+    segments: [],
+    total: 0,
+    isEmpty: true,
+    ...(opts.failed ? { failed: true } : {}),
+  };
 }
 
 /** Slack caps what a chart can carry; past this it stops being readable. */
@@ -153,8 +186,34 @@ export async function loadReportCharts({
   // round-trips in series — but under a concurrency cap (ADR-044 §5) so a large
   // dashboard doesn't fire every panel's heavy ClickHouse query at once.
   return mapWithConcurrency(graphs, REPORT_CHART_QUERY_CONCURRENCY, (graph) =>
-    buildChart({ deps, graph, projectId, from, to }),
+    buildChartSafely({ deps, graph, projectId, from, to }),
   );
+}
+
+/**
+ * `buildChart`, isolated so one panel's query failure — an unsupported
+ * series combination, a ClickHouse timeout, anything — degrades to that one
+ * panel rendering empty rather than rejecting the whole report. Without
+ * this, `mapWithConcurrency`'s all-or-nothing contract meant a single bad
+ * panel put the *entire dashboard* in the same "blank email" class as #6716,
+ * for reasons that had nothing to do with the healthy panels next to it.
+ */
+async function buildChartSafely(params: {
+  deps: ReportChartDeps;
+  graph: CustomGraph;
+  projectId: string;
+  from: number;
+  to: number;
+}): Promise<ReportChart> {
+  try {
+    return await buildChart(params);
+  } catch (error) {
+    logger.error(
+      { projectId: params.projectId, graphId: params.graph.id, error },
+      "Report panel failed to load — sending the rest of the report without it",
+    );
+    return emptyChartFor(params.graph, { failed: true });
+  }
 }
 
 async function loadGraphs({
@@ -214,16 +273,7 @@ async function buildChart({
       asPercent: series.asPercent,
     }));
 
-  const empty: ReportChart = {
-    id: graph.id,
-    title: graph.name,
-    type,
-    categories: [],
-    series: [],
-    segments: [],
-    total: 0,
-    isEmpty: true,
-  };
+  const empty = emptyChartFor(graph, { type });
   if (seriesInputs.length === 0) return empty;
 
   // Same "full" forcing the analytics UI applies for summary charts — see
