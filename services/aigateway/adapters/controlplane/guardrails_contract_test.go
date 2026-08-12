@@ -170,24 +170,77 @@ func TestContentForPacksEachDirectionUnderItsOwnKey(t *testing.T) {
 	}
 }
 
-// controlPlaneRoot is the langwatch/ directory of the monorepo, relative to
-// this package. A checkout that does not carry the TypeScript side (a vendored
-// or split Go build) has no control plane to compare against and the test is
-// skipped. When the directory IS there, a missing or unreadable file is drift,
-// which is precisely what this test exists to catch, so it fails instead.
-var controlPlaneRoot = filepath.Join("..", "..", "..", "..", "langwatch")
+// monorepoRoot and controlPlaneRoot locate the TypeScript side relative to this
+// package. The control plane is the @langwatch/web app, which ADR-076 moved from
+// <root>/langwatch to <root>/platform/app.
+var (
+	monorepoRoot     = filepath.Join("..", "..", "..", "..")
+	controlPlaneRoot = filepath.Join(monorepoRoot, "platform", "app")
+)
 
+// The two witnesses that decide skip-versus-fail. Neither is a bare directory:
+// a directory is re-created by any stray file that lands under it, and one was.
+// A misplaced test restored langwatch/src/server, which re-satisfied the old
+// os.Stat(controlPlaneRoot, "src", "server") guard and turned a constant that
+// had been stale and silently skipping since the ADR-076 move into five red
+// tests on main. A witness has to be something only the real control plane can
+// produce, so these are a named repo-root manifest and a package identity.
+const (
+	workspaceManifest   = "pnpm-workspace.yaml"
+	controlPlanePackage = "@langwatch/web"
+)
+
+// readControlPlaneSource reads one control plane source file, or ends the test.
 func readControlPlaneSource(t *testing.T, parts ...string) string {
 	t.Helper()
-	if _, err := os.Stat(filepath.Join(controlPlaneRoot, "src", "server")); err != nil {
-		t.Skipf("control plane is not part of this checkout: %v", err)
-	}
+	requireControlPlane(t)
+
 	path := filepath.Join(append([]string{controlPlaneRoot}, parts...)...)
 	source, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("control plane source %s is missing or unreadable, which means the two sides have drifted: %v", path, err)
 	}
 	return string(source)
+}
+
+// requireControlPlane decides whether there is a control plane to compare
+// against. Skipping is reserved for a checkout that carries no TypeScript side
+// at all -- a vendored or split Go build -- and requires BOTH witnesses to be
+// absent: the pnpm workspace manifest at the repo root, and the control plane's
+// own package manifest at controlPlaneRoot. Either one alone is enough to run.
+//
+// THE AMBIGUOUS CASE FAILS, IT DOES NOT SKIP. A workspace present without the
+// control plane under it -- exactly the shape of the ADR-076 rename -- is a hard
+// failure naming the stale constant. That direction is deliberate: a false red
+// costs one path edit, while a false green costs an unenforced cross-language
+// contract that nobody is watching, which is the failure this file exists to
+// make loud. Do not relax this into a skip.
+func requireControlPlane(t *testing.T) {
+	t.Helper()
+
+	_, workspaceErr := os.Stat(filepath.Join(monorepoRoot, workspaceManifest))
+
+	// Parsed rather than pattern-matched so that reformatting the manifest
+	// cannot read as a missing control plane.
+	var manifest struct {
+		Name string `json:"name"`
+	}
+	data, readErr := os.ReadFile(filepath.Join(controlPlaneRoot, "package.json"))
+	controlPlanePresent := readErr == nil &&
+		json.Unmarshal(data, &manifest) == nil &&
+		manifest.Name == controlPlanePackage
+
+	switch {
+	case controlPlanePresent:
+		return
+	case workspaceErr == nil:
+		t.Fatalf("this checkout carries the monorepo (%s is at the repo root) but %s holds no %s package manifest: "+
+			"the control plane moved and controlPlaneRoot did not move with it. Repoint controlPlaneRoot.",
+			workspaceManifest, controlPlaneRoot, controlPlanePackage)
+	default:
+		t.Skipf("no TypeScript control plane in this checkout: no %s at the repo root and no %s package manifest at %s",
+			workspaceManifest, controlPlanePackage, controlPlaneRoot)
+	}
 }
 
 // The control plane's Zod schema is the other half of the contract. Reading it
