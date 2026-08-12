@@ -73,16 +73,24 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
     # The defaults are an empty runtimeClassName with acceptUnsandboxedRuntime
     # true, so Langy is available on any cluster and hardening is a deliberate
     # later step. Pinning a RuntimeClass the cluster does not define is what
-    # leaves the pod Pending — and that can only happen after an operator has
+    # stops the agent running — and that can only happen after an operator has
     # chosen to pin one, which is the scenario below.
 
-  Scenario: Pinning a RuntimeClass the cluster does not define leaves the pod Pending, not unsandboxed
+  Scenario: Pinning a RuntimeClass the cluster does not define fails closed, not unsandboxed
     Given an operator has pinned the langy-agent pod to a sandboxed runtime
     And the cluster defines no matching RuntimeClass
     When the install completes
     Then every other workload runs
-    And the langy-agent pod waits rather than running without its sandbox
-    And the install notes say where the reason for the wait is recorded
+    And no langy-agent pod runs without its sandbox
+    And the install notes say where the reason is recorded
+    # Not "Pending" — the pod never gets far enough to wait. Kubernetes'
+    # RuntimeClass admission plugin refuses to create a pod naming a class it
+    # cannot find (`pod rejected: RuntimeClass "..." not found`), so the
+    # ReplicaSet's create call is what fails and no pod object exists at all.
+    # That matters to the operator looking for it: `kubectl get pods` lists
+    # nothing, which reads like the install skipped Langy rather than like a
+    # failure. The reason is on the Deployment's ReplicaFailure condition, and
+    # printing that command is what NOTES.txt does here.
 
   Scenario: The guard does not fire when the agent is not chart-managed
     Given the chart does not manage the langy-agent pod
