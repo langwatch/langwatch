@@ -77,7 +77,8 @@ describe("redactTriggerForPublicApi", () => {
       });
 
       expect(
-        (redacted.actionParams as { signingSecret: unknown }).signingSecret,
+        (redacted.actionParams as unknown as { signingSecret: unknown })
+          .signingSecret,
       ).toBeNull();
     });
   });

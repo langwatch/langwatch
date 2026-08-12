@@ -45,10 +45,10 @@ describe("given a rendered toast", () => {
       // `ps` token (not the recipe's un-fixed `pe`, and not merely "some
       // truthy value").
       expect(style.paddingInlineEnd).toBe(
-        `var(--chakra-spacing-${toastSlotRecipe.base.root.ps})`,
+        `var(--chakra-spacing-${toastSlotRecipe.base!.root!.ps})`,
       );
       expect(style.paddingInlineEnd).not.toBe(
-        `var(--chakra-spacing-${toastSlotRecipe.base.root.pe})`,
+        `var(--chakra-spacing-${toastSlotRecipe.base!.root!.pe})`,
       );
     });
   });
