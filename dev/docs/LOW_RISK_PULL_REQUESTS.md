@@ -2,6 +2,8 @@
 
 This document describes when a pull request (PR) may be merged without manual review by using the `low-risk-change` label, in line with our ISO 27001 change management process (Annex A 8.32).
 
+For real code changes that exceed this policy but stay medium impact, see the sibling tier: [AI-Reviewed Pull Requests](AI_REVIEWED_PULL_REQUESTS.md).
+
 ## When a PR Is Low Risk
 
 A PR may be treated as **low risk** only if:
