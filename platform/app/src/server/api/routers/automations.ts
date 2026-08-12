@@ -41,7 +41,6 @@ import {
 import {
   actionParamsSchemaFor,
   persistActionParamsFor,
-  redactActionParamsFor,
 } from "~/server/app-layer/automations/providers/registry";
 import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
 import {
@@ -55,6 +54,7 @@ import {
   reportActionParamsSchema,
 } from "~/server/app-layer/automations/report.builder";
 import { TriggerFireHistoryService } from "~/server/app-layer/automations/trigger-fire-history.service";
+import { redactTriggerForRead } from "~/server/app-layer/automations/trigger-redaction";
 import {
   type DraftProject,
   type TestFireWebhookDestination,
@@ -77,22 +77,6 @@ import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { extractCheckKeys } from "../utils";
 import { buildRetryAfterMessage } from "./rateLimitMessage";
-
-/** Strip secrets from a trigger row before it leaves the server via the
- *  provider registry's redact hook: the encrypted Slack bot token (ADR-041)
- *  and webhook header values (ADR-040 §3 — names echo with the kept
- *  sentinel, values never return). Identity for every other action. */
-function redactTriggerForRead<
-  T extends { action: TriggerAction; actionParams: unknown },
->(trigger: T): T {
-  return {
-    ...trigger,
-    actionParams: redactActionParamsFor(
-      trigger.action,
-      trigger.actionParams ?? {},
-    ),
-  };
-}
 
 const templateDraftSchema = z.object({
   slackTemplateType: z.string().nullable().optional(),

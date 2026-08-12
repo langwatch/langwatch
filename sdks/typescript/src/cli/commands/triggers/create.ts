@@ -9,7 +9,6 @@ import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
-import { redactTriggerSecrets } from "./redact";
 
 /**
  * Returns the created trigger rather than printing it: the output port renders
@@ -77,8 +76,9 @@ export const createTriggerCommand = async (
     spinner.succeed(`Trigger "${trigger.name}" created (${trigger.id})`);
 
     return {
-      // See ./redact.ts — actionParams is plaintext and never shown to humans.
-      data: redactTriggerSecrets(trigger),
+      // The API redacts delivery credentials before it answers, so machine
+      // output is the response exactly as it arrived.
+      data: trigger,
       table: () => {
         console.log();
         console.log(`  ${chalk.gray("ID:")}     ${chalk.green(trigger.id)}`);

@@ -131,6 +131,25 @@ describe("getTriggerCommand()", () => {
     });
   });
 
+  describe("when a machine format is requested", () => {
+    // Machine output is the more exposed surface — it gets logged, piped and
+    // pasted into agent context. It carries what the API answered, and the API
+    // answers with delivery credentials replaced by the `[redacted]`
+    // placeholder, so the command hands the response through untouched.
+    /** @scenario "The command line prints what the API returned" */
+    it("returns the response payload as the API sent it", async () => {
+      const trigger = makeTrigger({
+        action: "SEND_SLACK_MESSAGE",
+        actionParams: { slackWebhook: "[redacted]" },
+      });
+      mockFetch.mockResolvedValue({ ok: true, json: async () => trigger });
+
+      const result = await getTriggerCommand("trigger_abc");
+
+      expect(result?.data).toEqual(trigger);
+    });
+  });
+
   describe("when trigger is not found", () => {
     it("exits with code 1", async () => {
       mockFetch.mockResolvedValue({ ok: false, status: 404 });
