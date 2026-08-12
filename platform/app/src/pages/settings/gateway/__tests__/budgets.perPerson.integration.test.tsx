@@ -164,12 +164,14 @@ describe("the Budgets list rendering a per-person template", () => {
     expect(bar).toHaveAttribute("aria-valuenow", "0");
   });
 
-  /** @scenario "Budget list Scope column resolves target name with VK link" */
+  /** @scenario "Budget list Scope column renders the shared scope chip on one line" */
   it("names the anchor the template hangs off in the Scope column", () => {
     renderWith([templateRow()]);
 
     expect(screen.getByText("prod-openai")).toBeInTheDocument();
-    expect(screen.getByText("attributed user")).toBeInTheDocument();
+    // The kind rides the chip's tooltip now, so the visible cell is the
+    // anchor's name alone.
+    expect(screen.queryByText("attributed user")).not.toBeInTheDocument();
   });
 
   /** @scenario "The budget list shows a per-person template as a cap and a headcount" */

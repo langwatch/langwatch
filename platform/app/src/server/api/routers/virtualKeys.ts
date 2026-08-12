@@ -46,6 +46,7 @@ import {
   VirtualKeyService,
   virtualKeyBudgetInputSchema,
 } from "~/server/gateway/virtualKey.service";
+import { loadDirectBudgetsForKeys } from "~/server/gateway/virtualKeyDirectBudget.service";
 import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
 import { authorizeInResolver } from "../rbac";
@@ -136,6 +137,11 @@ export const virtualKeysRouter = createTRPCRouter({
    * can see. Reads the cost path (`trace_summaries`), the same source the
    * Usage tab reads, so the number in the table matches the page a click
    * on it lands on.
+   *
+   * Keys that carry a budget of their own also get that budget's limit and
+   * its CURRENT-PERIOD spend, which is a different measurement from the
+   * month total: a daily cap is measured against today. Both travel in
+   * this one batched call so the table never asks per row.
    */
   spendThisMonth: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
@@ -166,11 +172,20 @@ export const virtualKeysRouter = createTRPCRouter({
         chRepo: undefined,
         spendRepo,
       });
-      const spend = await usage.spendByVirtualKey({
-        organizationId: input.organizationId,
-        virtualKeyIds: keys.map((k) => k.id),
-        window: { fromDate: startOfCurrentMonthUTC(now), toDate: now },
-      });
+      const [spend, directBudgets] = await Promise.all([
+        usage.spendByVirtualKey({
+          organizationId: input.organizationId,
+          virtualKeyIds: keys.map((k) => k.id),
+          window: { fromDate: startOfCurrentMonthUTC(now), toDate: now },
+        }),
+        loadDirectBudgetsForKeys({
+          prisma: ctx.prisma,
+          organizationId: input.organizationId,
+          virtualKeyIds: keys.map((k) => k.id),
+          chRepo: getApp().gateway.budgets,
+          now,
+        }),
+      ]);
       // Every visible key gets a row. With the spend source present, a
       // missing entry means the key genuinely spent nothing, so zero is
       // the honest render rather than an ambiguous blank.
@@ -178,6 +193,7 @@ export const virtualKeysRouter = createTRPCRouter({
         virtualKeyId: k.id,
         spentUsd: spend.get(k.id)?.spentUsd ?? "0",
         requests: spend.get(k.id)?.requests ?? 0,
+        budget: directBudgets.get(k.id) ?? null,
       }));
     }),
 
