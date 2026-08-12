@@ -51,74 +51,82 @@ vi.mock("~/components/automations/FilterDisplay", () => ({
   ),
 }));
 
+/**
+ * A faithful-enough stand-in for one react-query v4 hook result.
+ *
+ * `enabled: false` is the case that matters: such a query never resolves, so
+ * it reports `isLoading` FOREVER. A mock that hard-codes `isLoading: false`
+ * makes that state unrepresentable — which is how a permanent skeleton over
+ * every non-alert automation's history shipped once already.
+ *
+ * `undefined` means "has not resolved"; `null` means "resolved, and the
+ * answer is nothing" (an automation that was never evaluated), which is a
+ * settled query with `data === null`.
+ */
+const { fakeQuery } = vi.hoisted(() => ({
+  fakeQuery: (data: unknown, options?: { enabled?: boolean }) => {
+    const enabled = options?.enabled ?? true;
+    const settled = enabled && data !== undefined;
+    return {
+      data: data ?? undefined,
+      isLoading: !settled,
+      isFetching: enabled && !settled,
+      error: null,
+      refetch: vi.fn(),
+    };
+  },
+}));
+
 vi.mock("~/utils/api", () => ({
   api: {
     automation: {
       getTriggerById: {
-        useQuery: () => ({
-          data: mockTriggerRow,
-          isLoading: false,
-          error: null,
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockTriggerRow, options),
       },
       getFireHistory: {
-        useInfiniteQuery: () => ({
-          data: { pages: [{ fires: mockRecentFires, nextCursor: null }] },
-          isLoading: false,
+        useInfiniteQuery: (
+          _input: unknown,
+          options?: { enabled?: boolean },
+        ) => ({
+          ...fakeQuery(
+            { pages: [{ fires: mockRecentFires, nextCursor: null }] },
+            options,
+          ),
           hasNextPage: mockHasNextFirePage,
           isFetchingNextPage: false,
           fetchNextPage: mockFetchNextFirePage,
-          error: null,
         }),
       },
       getLatestEvaluation: {
-        useQuery: () => ({
-          data: mockLatestEvaluation,
-          isLoading: false,
-          error: null,
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockLatestEvaluation, options),
       },
       getNextFiring: {
-        useQuery: () => ({
-          data: mockNextFiring,
-          isLoading: false,
-          error: null,
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockNextFiring, options),
       },
       getWebhookDeliveries: {
-        useQuery: () => ({
-          data: mockWebhookDeliveries,
-          isLoading: false,
-          error: null,
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockWebhookDeliveries, options),
       },
     },
     graphs: {
       getById: {
-        useQuery: () => ({
-          data: mockGraphRow,
-          isLoading: false,
-          error: null,
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockGraphRow, options),
       },
     },
     dataset: {
       getAll: {
-        useQuery: () => ({
-          data: mockDatasets,
-          isLoading: false,
-          error: null,
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockDatasets, options),
       },
     },
     tracesV2: {
       list: {
-        useQuery: () => ({
-          data: mockMatchingTraces,
-          isFetching: false,
-          error: null,
-          refetch: vi.fn(),
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockMatchingTraces, options),
       },
     },
   },
@@ -194,7 +202,7 @@ describe("ViewAutomationDrawer", () => {
 
         // A resolved incident shows when it fired and how long it lasted.
         expect(
-          screen.getByText(/about 5 hours ago · lasted 15m/),
+          screen.getByText(/about 5 hours ago · lasted 15 minutes/),
         ).toBeDefined();
       });
 
@@ -326,7 +334,7 @@ describe("ViewAutomationDrawer", () => {
 
         renderDrawer();
 
-        expect(screen.getByText(/lasted 1h 30m/)).toBeDefined();
+        expect(screen.getByText(/lasted 1 hour 30 minutes/)).toBeDefined();
       });
     });
 
@@ -345,7 +353,7 @@ describe("ViewAutomationDrawer", () => {
 
         renderDrawer();
 
-        expect(screen.getByText(/lasted 2h$/)).toBeDefined();
+        expect(screen.getByText(/lasted 2 hours$/)).toBeDefined();
       });
     });
   });

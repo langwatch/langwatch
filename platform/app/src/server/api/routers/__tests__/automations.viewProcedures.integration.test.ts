@@ -74,6 +74,7 @@ function traceAutomationRow(overrides: Record<string, unknown> = {}) {
     notificationCadence: "immediate",
     traceDebounceMs: 30_000,
     active: true,
+    pausedReason: null,
     deleted: false,
     ...overrides,
   };
@@ -275,7 +276,7 @@ describe("automationRouter in-depth view reads", () => {
           triggerId: TRIGGER_ID,
         });
 
-        expect(next).toEqual({ kind: "schedule", nextRunAt, paused: false });
+        expect(next).toEqual({ kind: "schedule", nextRunAt });
       });
     });
 

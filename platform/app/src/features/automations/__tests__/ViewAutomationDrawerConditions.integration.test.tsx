@@ -39,58 +39,79 @@ vi.mock("~/components/automations/FilterDisplay", () => ({
   ),
 }));
 
+/**
+ * A faithful-enough stand-in for one react-query v4 hook result.
+ *
+ * `enabled: false` is the case that matters: such a query never resolves, so
+ * it reports `isLoading` FOREVER. A mock that hard-codes `isLoading: false`
+ * makes that state unrepresentable — which is how a permanent skeleton over
+ * every non-alert automation's history shipped once already.
+ *
+ * `undefined` means "has not resolved"; `null` means "resolved, and the
+ * answer is nothing" (an automation that was never evaluated), which is a
+ * settled query with `data === null`.
+ */
+const { fakeQuery } = vi.hoisted(() => ({
+  fakeQuery: (data: unknown, options?: { enabled?: boolean }) => {
+    const enabled = options?.enabled ?? true;
+    const settled = enabled && data !== undefined;
+    return {
+      data: data ?? undefined,
+      isLoading: !settled,
+      isFetching: enabled && !settled,
+      error: null,
+      refetch: vi.fn(),
+    };
+  },
+}));
+
 vi.mock("~/utils/api", () => ({
   api: {
     automation: {
       getTriggerById: {
-        useQuery: () => ({
-          data: mockTriggerRow,
-          isLoading: false,
-          error: null,
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockTriggerRow, options),
       },
       getFireHistory: {
-        useInfiniteQuery: () => ({
-          data: { pages: [{ fires: [], nextCursor: null }] },
-          isLoading: false,
+        useInfiniteQuery: (
+          _input: unknown,
+          options?: { enabled?: boolean },
+        ) => ({
+          ...fakeQuery({ pages: [{ fires: [], nextCursor: null }] }, options),
           hasNextPage: false,
           isFetchingNextPage: false,
           fetchNextPage: vi.fn(),
-          error: null,
         }),
       },
       getLatestEvaluation: {
-        useQuery: () => ({ data: null, isLoading: false, error: null }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(null, options),
       },
       getNextFiring: {
-        useQuery: () => ({
-          data: { kind: "immediate", traceDebounceMs: 30000 },
-          isLoading: false,
-          error: null,
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery({ kind: "immediate", traceDebounceMs: 30000 }, options),
       },
       getWebhookDeliveries: {
-        useQuery: () => ({ data: [], isLoading: false, error: null }),
-      },
-    },
-    tracesV2: {
-      list: {
-        useQuery: () => ({
-          data: undefined,
-          isFetching: false,
-          error: null,
-          refetch: vi.fn(),
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery([], options),
       },
     },
     graphs: {
       getById: {
-        useQuery: () => ({ data: null, isLoading: false, error: null }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(null, options),
       },
     },
     dataset: {
       getAll: {
-        useQuery: () => ({ data: [], isLoading: false, error: null }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery([], options),
+      },
+    },
+    tracesV2: {
+      list: {
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(undefined, options),
       },
     },
   },

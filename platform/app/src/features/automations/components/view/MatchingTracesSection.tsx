@@ -21,9 +21,15 @@ const STATUS_DOT_COLOR: Record<string, string> = {
  *
  * The composer answers "what would this match?" while you are writing the
  * query; a saved automation had no way to ask the same question, which is
- * what made a quiet automation unexplainable. This is the same read — the
- * exact query the dispatcher evaluates, against the last 7 days — asked from
- * the automation's own view.
+ * what made a quiet automation unexplainable. This runs the automation's own
+ * saved query text over the last 7 days, from its own view.
+ *
+ * It is a strong indication, not a proof of what the automation did: this is
+ * the traces search (ClickHouse over stored traces), while the dispatcher
+ * evaluates the same query text in memory against fold state as each trace
+ * settles. The two can disagree — a field that was unevaluable at dispatch
+ * time fails closed there and is simply searchable here, and a trace that has
+ * since fallen outside retention is missing here but was acted on then.
  *
  * Deliberately not automatic: a saved automation's view should not issue a
  * trace search every time it is opened. The reader asks, and gets an answer.

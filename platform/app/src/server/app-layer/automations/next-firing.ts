@@ -28,11 +28,21 @@ import type { ReportSchedule } from "./trigger.service";
 
 export type NextFiring =
   | {
+      /** Nothing happens next, whatever kind this is. Answered before every
+       *  other case: a paused automation that still described its cadence
+       *  contradicted the rest of its own drawer. */
+      kind: "paused";
+      /** The noun the copy uses for this automation. */
+      subject: "schedule" | "alert" | "automation";
+      /** Set when the PLATFORM paused it (`Trigger.pausedReason`), null when
+       *  a person switched it off. The two need different copy: one is a
+       *  choice, the other is something to fix. */
+      pausedReason: string | null;
+    }
+  | {
       kind: "schedule";
-      /** The scheduler's own next instant; null while the schedule is
-       *  paused. */
+      /** The scheduler's own next instant. */
       nextRunAt: Date | null;
-      paused: boolean;
     }
   | {
       kind: "digest";
@@ -63,6 +73,7 @@ export interface NextFiringSubject {
   notificationCadence: string;
   traceDebounceMs: number;
   active: boolean;
+  pausedReason: string | null;
 }
 
 export function describeNextFiring({
@@ -75,12 +86,20 @@ export function describeNextFiring({
   reportSchedule: ReportSchedule | null;
   now: Date;
 }): NextFiring {
-  if (trigger.triggerKind === TriggerKind.REPORT) {
+  const isReport = trigger.triggerKind === TriggerKind.REPORT;
+  // A schedule is paused by either half — the trigger flag or the scheduler
+  // entry — and every other kind by the flag alone. Answered first, for all
+  // four: a paused alert that still said "checked as data arrives" disagreed
+  // with the "this alert is paused" line in the history directly below it.
+  if (!trigger.active || (isReport && reportSchedule?.active === false)) {
     return {
-      kind: "schedule",
-      nextRunAt: reportSchedule?.nextRunAt ?? null,
-      paused: !trigger.active || reportSchedule?.active === false,
+      kind: "paused",
+      subject: pausedSubjectOf(trigger),
+      pausedReason: trigger.pausedReason,
     };
+  }
+  if (isReport) {
+    return { kind: "schedule", nextRunAt: reportSchedule?.nextRunAt ?? null };
   }
   if (trigger.customGraphId) {
     return {
@@ -103,6 +122,15 @@ export function describeNextFiring({
     return { kind: "immediate", traceDebounceMs: trigger.traceDebounceMs };
   }
   return { kind: "digest", cadence, windowClosesAt: scheduledFor };
+}
+
+/** The noun a paused automation is called by, which is the same distinction
+ *  the kind badge draws. */
+function pausedSubjectOf(
+  trigger: NextFiringSubject,
+): "schedule" | "alert" | "automation" {
+  if (trigger.triggerKind === TriggerKind.REPORT) return "schedule";
+  return trigger.customGraphId ? "alert" : "automation";
 }
 
 /** The column is a plain string, so an unrecognised value must degrade to the

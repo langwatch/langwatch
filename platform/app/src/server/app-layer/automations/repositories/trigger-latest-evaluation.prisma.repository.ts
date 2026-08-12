@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import type {
   EvaluationSkipCode,
@@ -6,6 +7,8 @@ import type {
   TriggerLatestEvaluation,
   TriggerLatestEvaluationRepository,
 } from "./trigger-latest-evaluation.repository";
+
+const logger = createLogger("langwatch:automations:latest-evaluation");
 
 export class PrismaTriggerLatestEvaluationRepository
   implements TriggerLatestEvaluationRepository
@@ -28,7 +31,7 @@ export class PrismaTriggerLatestEvaluationRepository
    *     write simply wins.
    */
   async upsert(input: RecordEvaluationInput): Promise<void> {
-    await this.prisma.$executeRaw`
+    const affectedRows = await this.prisma.$executeRaw`
       INSERT INTO "TriggerLatestEvaluation" (
         "triggerId", "projectId", "evaluatedAt", "verdict", "observedValue",
         "threshold", "operator", "timePeriodMinutes", "skipCode", "updatedAt"
@@ -48,6 +51,22 @@ export class PrismaTriggerLatestEvaluationRepository
         "updatedAt" = NOW()
       WHERE "TriggerLatestEvaluation"."projectId" = ${input.projectId}
     `;
+    // The conflict guard can block the update — it only fires when the stored
+    // row belongs to the same project, which is the tenancy check. Zero rows
+    // means the write was silently dropped, and a drawer stuck on a stale
+    // observation is exactly the confusion this feature exists to remove, so
+    // it is said out loud rather than left to be inferred from a frozen
+    // timestamp.
+    if (affectedRows === 0) {
+      logger.warn(
+        {
+          projectId: input.projectId,
+          triggerId: input.triggerId,
+          verdict: input.verdict,
+        },
+        "the latest-evaluation write affected no rows — an existing row for this trigger belongs to another project",
+      );
+    }
   }
 
   async findByTriggerId({

@@ -9,11 +9,17 @@
  */
 
 import { CADENCE_LABELS } from "@langwatch/automations/cadences";
+import { isAutomationPauseReason } from "~/features/automations/logic/pauseReasons";
 import { formatWindow } from "./evaluationPresentation";
 
 /** The `automation.getNextFiring` result, as the drawer receives it. */
 export type NextFiringResult =
-  | { kind: "schedule"; nextRunAt: string | Date | null; paused: boolean }
+  | {
+      kind: "paused";
+      subject: "schedule" | "alert" | "automation";
+      pausedReason: string | null;
+    }
+  | { kind: "schedule"; nextRunAt: string | Date | null }
   | { kind: "digest"; cadence: string; windowClosesAt: string | Date }
   | { kind: "immediate"; traceDebounceMs: number }
   | { kind: "alert"; sweepIntervalMs: number };
@@ -32,12 +38,18 @@ export function describeNextFiring(
   next: NextFiringResult,
 ): NextFiringPresentation {
   switch (next.kind) {
+    case "paused":
+      return {
+        summary: `Nothing, while this ${next.subject} is paused`,
+        at: null,
+        caveat: pausedCaveat(next),
+      };
     case "schedule": {
-      if (next.paused || !next.nextRunAt) {
+      if (!next.nextRunAt) {
         return {
-          summary: "Nothing, while this schedule is paused",
+          summary: "Nothing is on the calendar for this schedule",
           at: null,
-          caveat: "Resume it to put it back on the calendar.",
+          caveat: "Edit it and pick a schedule to put it back on the calendar.",
         };
       }
       return {
@@ -71,6 +83,27 @@ export function describeNextFiring(
         caveat: `An alert waiting for data to stop arriving is also checked every ${formatDebounce(next.sweepIntervalMs)}.`,
       };
   }
+}
+
+/**
+ * What to say about a pause. The platform pausing an automation for runaway
+ * volume is not the same event as a person switching it off, and the reader
+ * needs to know which one happened to them — the first has something to fix.
+ */
+function pausedCaveat(next: {
+  subject: "schedule" | "alert" | "automation";
+  pausedReason: string | null;
+}): string {
+  if (isAutomationPauseReason(next.pausedReason)) {
+    return "This automation matched almost every trace in the project, so we paused it. Narrow its condition, then switch it back on.";
+  }
+  if (next.subject === "schedule") {
+    return "Resume it to put it back on the calendar.";
+  }
+  if (next.subject === "alert") {
+    return "Resume it to start checking the metric again.";
+  }
+  return "Resume it to act on matching traces again.";
 }
 
 /** Spelled out, never abbreviated: "30 seconds", not "30s". */
