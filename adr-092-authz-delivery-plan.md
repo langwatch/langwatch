@@ -330,9 +330,16 @@ revocation-lag SLO green for a week.
 
 ## Where delivery stands (2026-08-12)
 
-Shipped on this branch (`feat/adr-092-unified-authz`, one commit, rebased
-onto main after the platform/app move):
+Shipped on this branch (`feat/adr-092-unified-authz`, rebased onto main after
+the platform/app move):
 
+- **The pure core is a workspace package, `@langwatch/authz`**
+  (`packages/authz`): registry, roles, engine, witness, passport/bitset,
+  `PermissionDeniedError` - Prisma-free (the Prisma enums are mirrored as
+  string unions at the seam), env-free, client-safe, with its own test suite
+  wired into app CI. The storage adapters stay in the app's
+  `src/server/authz/`: collector, epoch + cache, `GrantsService`, shadow,
+  the tRPC middleware.
 - **Stage A engine-side, complete.** Registry (126 permissions, append-only
   bitset order), roles as differences with the cell-for-cell parity suite,
   collector, the pure `decide()` walk with every legacy quirk tagged

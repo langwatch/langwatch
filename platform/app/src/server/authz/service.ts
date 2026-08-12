@@ -7,21 +7,23 @@
  *   await check({ ... })               → full AuthzDecision, never throws
  *   await effectivePermissions({ ... }) → string[] (feeds useCan)
  */
-import type { PrismaClient } from "@prisma/client";
-import { collectGrantsCached } from "./cache";
-import { collectResourceGrants } from "./collector";
 import {
+  ALL_PERMISSIONS,
+  type Authorized,
   type AuthzDecision,
+  type AuthzPermission,
   type AuthzPrincipalRef,
   type AuthzScopeRef,
   decide,
   explain,
+  mintWitness,
+  PermissionDeniedError,
   type ResourceGrant,
   scopeOrganizationId,
-} from "./engine";
-import { PermissionDeniedError } from "./errors";
-import { ALL_PERMISSIONS, type AuthzPermission } from "./registry";
-import { type Authorized, mintWitness } from "./witness";
+} from "@langwatch/authz";
+import type { PrismaClient } from "@prisma/client";
+import { collectGrantsCached } from "./cache";
+import { collectResourceGrants } from "./collector";
 
 function demoProjectId(): string | undefined {
   // Mirrors isDemoProject()'s dynamic read so tests can vary it per case.

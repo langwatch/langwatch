@@ -1,8 +1,5 @@
+import { type AuthzPermission, permissionSatisfiedBy } from "@langwatch/authz";
 import { useCallback } from "react";
-import {
-  type AuthzPermission,
-  permissionSatisfiedBy,
-} from "~/server/authz/registry";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 

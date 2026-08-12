@@ -7,15 +7,19 @@
  * sites keep the legacy path (now shadow-compared) until the stage-D
  * codemod.
  */
+import {
+  type AuthzDecision,
+  type AuthzPermission,
+  decide,
+  PermissionDeniedError,
+  scopeOrganizationId,
+} from "@langwatch/authz";
 import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { LiteMemberRestrictedError } from "../app-layer/permissions/errors";
 import type { Session } from "../auth";
 import { collectGrantsCached } from "./cache";
 import { resolveScopeRef } from "./collector";
-import { type AuthzDecision, decide, scopeOrganizationId } from "./engine";
-import { PermissionDeniedError } from "./errors";
-import type { AuthzPermission } from "./registry";
 
 type ScopeInput = {
   projectId?: string;

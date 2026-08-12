@@ -1,6 +1,6 @@
+import type { AuthzPermission } from "@langwatch/authz";
 import type { ReactNode } from "react";
 import { useCan } from "~/hooks/useCan";
-import type { AuthzPermission } from "~/server/authz/registry";
 
 /**
  * ADR-092 §5 — declarative permission gate backed by the engine-computed

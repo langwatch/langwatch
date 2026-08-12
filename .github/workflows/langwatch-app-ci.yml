@@ -309,6 +309,12 @@ jobs:
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/observability run test:unit
 
+      # @langwatch/authz is the pure authorization engine (ADR-092), raw
+      # TypeScript the app inlines the same way — same shard-1 arrangement.
+      - name: Run @langwatch/authz unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/authz run test
+
       - name: Run unit tests (shard ${{ matrix.shard }}/4)
         id: unit-tests
         working-directory: platform/app

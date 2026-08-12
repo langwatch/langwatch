@@ -29,6 +29,7 @@ describe("authz grants cache", () => {
   });
 
   describe("given a stable epoch", () => {
+    /** @scenario "Repeated checks with unchanged grants read nothing from the database" */
     it("collects once and serves the second read from memory", async () => {
       const prisma = makePrisma();
       const epochReader = vi.fn().mockResolvedValue(4);
@@ -51,6 +52,7 @@ describe("authz grants cache", () => {
   });
 
   describe("when a grant write bumps the epoch", () => {
+    /** @scenario "Revoking a binding takes effect on the caller's next request" */
     it("recollects on the next read", async () => {
       const prisma = makePrisma();
       const epochReader = vi

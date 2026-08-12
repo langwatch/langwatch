@@ -1,13 +1,17 @@
-import type { PrismaClient } from "@prisma/client";
-import { describe, expect, it, vi } from "vitest";
-import { collectGrants, collectResourceGrants } from "../collector";
 import {
   type AuthzScopeRef,
   type CollectedBinding,
   type CollectedGrants,
   decide,
   type ResourceGrant,
-} from "../engine";
+} from "@langwatch/authz";
+import type { PrismaClient } from "@prisma/client";
+import { describe, expect, it, vi } from "vitest";
+import {
+  collectGrants,
+  collectResourceGrants,
+  resolveResourceScopeRef,
+} from "../collector";
 import { GrantsService, GrantValidationError } from "../grants";
 import { check, effectivePermissions } from "../service";
 
@@ -69,6 +73,7 @@ describe("resource-tier grants (ADR-092 §8)", () => {
   describe("given trace t1 is shared with anyone", () => {
     const resourceGrants = [grantOn()];
 
+    /** @scenario "Sharing a trace covers its children without extra grants" */
     it("grants an anonymous caller traces:view on t1, marked public", () => {
       const decision = decide({
         grants: makeGrants(),
@@ -81,6 +86,7 @@ describe("resource-tier grants (ADR-092 §8)", () => {
       expect(decision.audience).toBe("public");
     });
 
+    /** @scenario "A share token grants exactly one permission on exactly one resource" */
     it("denies the same caller on a different trace in the same project", () => {
       const decision = decide({
         grants: makeGrants(),
@@ -92,6 +98,7 @@ describe("resource-tier grants (ADR-092 §8)", () => {
       expect(decision.denialReason).toBe("no-membership");
     });
 
+    /** @scenario "A share token grants exactly one permission on exactly one resource" */
     it("denies a permission the grant does not carry", () => {
       const decision = decide({
         grants: makeGrants(),
@@ -102,6 +109,7 @@ describe("resource-tier grants (ADR-092 §8)", () => {
       expect(decision.allowed).toBe(false);
     });
 
+    /** @scenario "Resource grants are anchored to their project" */
     it("denies a same-id trace anchored to a different project", () => {
       const decision = decide({
         grants: makeGrants(),
@@ -135,6 +143,7 @@ describe("resource-tier grants (ADR-092 §8)", () => {
   describe("given a shared thread and a trace inside it", () => {
     const resourceGrants = [grantOn({ kind: "thread", id: "thread-1" })];
 
+    /** @scenario "A shared thread covers its traces and their children" */
     it("covers the trace through its parent link — one grant, no child rows", () => {
       const decision = decide({
         grants: makeGrants(),
@@ -174,6 +183,7 @@ describe("resource-tier grants (ADR-092 §8)", () => {
         resourceGrants: [grantOn({ audience })],
       });
 
+    /** @scenario "A resource grant can name any audience" */
     it("user: matches only that signed-in user", () => {
       const audience = { kind: "user", id: "user-1" } as const;
       const dave = makeGrants({ principal: { type: "user", id: "user-1" } });
@@ -327,6 +337,7 @@ describe("collector at the resource tier", () => {
       expect(grants).toEqual([]);
     });
 
+    /** @scenario "A share link that is not presented grants nothing" */
     it("returns nothing when no token was presented — possession is the gate", async () => {
       const findMany = vi.fn();
       const prisma = { shareLink: { findMany } } as unknown as PrismaClient;
@@ -400,6 +411,7 @@ describe("collector at the resource tier", () => {
       ]);
     });
 
+    /** @scenario "Expired and view-exhausted share links grant nothing" */
     it("drops expired and view-exhausted links before the engine sees them", async () => {
       const findMany = vi
         .fn()
@@ -416,6 +428,69 @@ describe("collector at the resource tier", () => {
       expect(grants).toHaveLength(1);
       expect(grants[0]?.audience).toEqual({ kind: "anyone" });
     });
+  });
+});
+
+describe("resolveResourceScopeRef", () => {
+  it("derives the project lineage from the database, never the caller", async () => {
+    const findUnique = vi.fn().mockResolvedValue({
+      team: { id: TEAM, organizationId: ORG },
+    });
+    const prisma = { project: { findUnique } } as unknown as PrismaClient;
+    const scope = await resolveResourceScopeRef({
+      prisma,
+      projectId: PROJECT,
+      kind: "trace",
+      id: "trace-1",
+      parentThreadId: "thread-1",
+      shareTokens: ["tok-1"],
+    });
+    expect(scope).toEqual({
+      type: "resource",
+      kind: "trace",
+      id: "trace-1",
+      parents: [{ kind: "thread", id: "thread-1" }],
+      shareTokens: ["tok-1"],
+      projectId: PROJECT,
+      teamId: TEAM,
+      organizationId: ORG,
+    });
+    expect(findUnique).toHaveBeenCalledWith({
+      where: { id: PROJECT },
+      select: { team: { select: { id: true, organizationId: true } } },
+    });
+  });
+
+  it("returns null for an unknown project", async () => {
+    const prisma = {
+      project: { findUnique: vi.fn().mockResolvedValue(null) },
+    } as unknown as PrismaClient;
+    expect(
+      await resolveResourceScopeRef({
+        prisma,
+        projectId: "proj-ghost",
+        kind: "trace",
+        id: "trace-1",
+      }),
+    ).toBeNull();
+  });
+
+  it("gives a thread no parents — threads are the top of the shareable tree", async () => {
+    const prisma = {
+      project: {
+        findUnique: vi
+          .fn()
+          .mockResolvedValue({ team: { id: TEAM, organizationId: ORG } }),
+      },
+    } as unknown as PrismaClient;
+    const scope = await resolveResourceScopeRef({
+      prisma,
+      projectId: PROJECT,
+      kind: "thread",
+      id: "thread-1",
+      parentThreadId: "thread-9",
+    });
+    expect(scope).toMatchObject({ kind: "thread", parents: undefined });
   });
 });
 
@@ -462,6 +537,7 @@ describe("authz service on a resource scope", () => {
 
 describe("GrantsService and resource scopes", () => {
   describe("when a role binding is attached at a resource scope", () => {
+    /** @scenario "Resource-tier access is granted by sharing, never by a role binding" */
     it("rejects before touching storage — shares are not bindings", async () => {
       const service = new GrantsService({} as PrismaClient);
       await expect(
@@ -474,6 +550,7 @@ describe("GrantsService and resource scopes", () => {
       ).rejects.toBeInstanceOf(GrantValidationError);
     });
 
+    /** @scenario "Resource-tier access is granted by sharing, never by a role binding" */
     it("rejects replace() toward a resource scope the same way", async () => {
       const service = new GrantsService({} as PrismaClient);
       await expect(

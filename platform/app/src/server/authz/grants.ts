@@ -11,13 +11,13 @@
  */
 
 import { auditLog } from "@ee/audit-log/auditLog";
+import { type AuthzScopeRef, scopeOrganizationId } from "@langwatch/authz";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
-import type { Prisma, PrismaClient, TeamUserRole } from "@prisma/client";
+import type { PrismaClient, TeamUserRole } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { collectGrants } from "./collector";
-import type { AuthzScopeRef } from "./engine";
-import { scopeOrganizationId } from "./engine";
 import { bumpAuthzEpoch } from "./epoch";
 
 export class GrantValidationError extends HandledError {
@@ -79,31 +79,18 @@ export class GrantsService {
     const organizationId = scopeOrganizationId(where);
     await this.assertScopeBelongsToOrganization({ where, organizationId });
     if ("customRoleId" in role) {
-      const customRole = await this.prisma.customRole.findUnique({
-        where: { id: role.customRoleId },
-        select: { organizationId: true },
+      await this.assertCustomRoleInOrganization({
+        customRoleId: role.customRoleId,
+        organizationId,
       });
-      if (!customRole || customRole.organizationId !== organizationId) {
-        throw new GrantValidationError(
-          "Custom role does not belong to this organization",
-          { customRoleId: role.customRoleId },
-        );
-      }
     }
 
-    const bindingId = generate(KSUID_RESOURCES.ROLE_BINDING).toString();
-    await this.prisma.roleBinding.create({
-      data: {
-        id: bindingId,
-        organizationId,
-        scopeType: SCOPE_TYPE_FOR_REF[where.type],
-        scopeId: where.id,
-        role: "customRoleId" in role ? "CUSTOM" : role.builtin,
-        customRoleId: "customRoleId" in role ? role.customRoleId : null,
-        userId: who.type === "user" ? who.id : null,
-        groupId: who.type === "group" ? who.id : null,
-        apiKeyId: who.type === "apiKey" ? who.id : null,
-      },
+    const bindingId = await this.createBinding({
+      db: this.prisma,
+      who,
+      role,
+      where,
+      organizationId,
     });
 
     await this.recordAndBump({
@@ -126,6 +113,12 @@ export class GrantsService {
     role: GrantRole;
   }): Promise<void> {
     const binding = await this.requireBinding(bindingId);
+    if ("customRoleId" in role) {
+      await this.assertCustomRoleInOrganization({
+        customRoleId: role.customRoleId,
+        organizationId: binding.organizationId,
+      });
+    }
     await this.prisma.roleBinding.update({
       where: { id: bindingId },
       data: {
@@ -187,22 +180,40 @@ export class GrantsService {
         "replace() must stay within one organization",
       );
     }
-    await this.prisma.roleBinding.deleteMany({
-      where: {
-        organizationId,
-        scopeType: SCOPE_TYPE_FOR_REF[from.type],
-        scopeId: from.id,
-        ...principalWhere(who),
-      },
+    await this.assertScopeBelongsToOrganization({
+      where: to,
+      organizationId,
     });
-    const attached = await this.attach({ actor, who, role, where: to });
+    if ("customRoleId" in role) {
+      await this.assertCustomRoleInOrganization({
+        customRoleId: role.customRoleId,
+        organizationId,
+      });
+    }
+    const bindingId = await this.prisma.$transaction(async (tx) => {
+      await tx.roleBinding.deleteMany({
+        where: {
+          organizationId,
+          scopeType: SCOPE_TYPE_FOR_REF[from.type],
+          scopeId: from.id,
+          ...principalWhere(who),
+        },
+      });
+      return this.createBinding({
+        db: tx,
+        who,
+        role,
+        where: to,
+        organizationId,
+      });
+    });
     await this.recordAndBump({
       actor,
       organizationId,
       action: "authz.grants.replace",
-      metadata: { who, from, to, role, bindingId: attached.bindingId },
+      metadata: { who, from, to, role, bindingId },
     });
-    return attached;
+    return { bindingId };
   }
 
   /**
@@ -314,6 +325,73 @@ export class GrantsService {
     });
 
     return { removed, needsHumanDecision: { ownedApiKeys, personalTeams } };
+  }
+
+  /** The one INSERT. `db` accepts the client or a transaction handle so
+   *  attach() and replace() share the row shape and the duplicate mapping. */
+  private async createBinding({
+    db,
+    who,
+    role,
+    where,
+    organizationId,
+  }: {
+    db: Prisma.TransactionClient;
+    who: GrantPrincipal;
+    role: GrantRole;
+    where: Exclude<AuthzScopeRef, { type: "resource" }>;
+    organizationId: string;
+  }): Promise<string> {
+    const bindingId = generate(KSUID_RESOURCES.ROLE_BINDING).toString();
+    try {
+      await db.roleBinding.create({
+        data: {
+          id: bindingId,
+          organizationId,
+          scopeType: SCOPE_TYPE_FOR_REF[where.type],
+          scopeId: where.id,
+          role: "customRoleId" in role ? "CUSTOM" : role.builtin,
+          customRoleId: "customRoleId" in role ? role.customRoleId : null,
+          userId: who.type === "user" ? who.id : null,
+          groupId: who.type === "group" ? who.id : null,
+          apiKeyId: who.type === "apiKey" ? who.id : null,
+        },
+      });
+    } catch (error) {
+      // The six partial unique indexes on RoleBinding make a duplicate a
+      // knowable failure the caller can act on - name it instead of letting
+      // a raw P2002 degrade to "unknown error".
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new GrantValidationError(
+          "This principal already holds a role binding at this scope - update or revoke the existing one",
+          { scopeType: where.type, scopeId: where.id },
+        );
+      }
+      throw error;
+    }
+    return bindingId;
+  }
+
+  private async assertCustomRoleInOrganization({
+    customRoleId,
+    organizationId,
+  }: {
+    customRoleId: string;
+    organizationId: string;
+  }): Promise<void> {
+    const customRole = await this.prisma.customRole.findUnique({
+      where: { id: customRoleId },
+      select: { organizationId: true },
+    });
+    if (!customRole || customRole.organizationId !== organizationId) {
+      throw new GrantValidationError(
+        "Custom role does not belong to this organization",
+        { customRoleId },
+      );
+    }
   }
 
   private async requireBinding(bindingId: string) {

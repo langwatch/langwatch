@@ -9,7 +9,6 @@
  * the shadow comparison (shadow.ts) depends on this file matching legacy
  * behaviour, warts and all.
  */
-import type { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import {
   bindingScopeCanGrantPermission,
   permissionSatisfiedBy,
@@ -24,6 +23,15 @@ import {
 // ============================================================================
 // Types
 // ============================================================================
+
+/**
+ * Mirror Prisma's enums as plain string unions so this package stays
+ * Prisma-free. The app-side collector assigns the generated enum values into
+ * these directly; a new enum member added in the schema surfaces as a type
+ * error at that seam, never silently here.
+ */
+export type TeamUserRole = "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+export type RoleBindingScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
 
 export type AuthzScopeRef =
   | { type: "project"; id: string; teamId: string; organizationId: string }
@@ -400,9 +408,12 @@ export function decide({
   };
 
   // Demo project: any authenticated caller gets the demo-viewer bag on the
-  // one configured project. Mirrors isDemoProject().
+  // one configured project. Mirrors isDemoProject(), which legacy only ever
+  // reaches behind a session - so anonymous principals are excluded here
+  // too, and their only path stays the resource tier.
   if (
     scope.type === "project" &&
+    grants.principal.type !== "anonymous" &&
     demoProjectId &&
     scope.id === demoProjectId &&
     builtinRolePermissions("demo-viewer").has(permission)

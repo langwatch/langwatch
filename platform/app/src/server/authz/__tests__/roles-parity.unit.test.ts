@@ -4,6 +4,15 @@
  * the legacy bags in server/api/rbac.ts — hierarchy rules included. The
  * shadow rollout and every later stage stand on this suite being green.
  */
+
+import {
+  ALL_PERMISSIONS,
+  bindingScopeCanGrantPermission,
+  builtinRoleGrants,
+  builtinRolePermissions,
+  permissionSatisfiedBy,
+  roleKeyForTeamRole,
+} from "@langwatch/authz";
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -15,16 +24,6 @@ import {
   type Permission,
   teamRoleHasPermission,
 } from "../../api/rbac";
-import {
-  ALL_PERMISSIONS,
-  bindingScopeCanGrantPermission,
-  permissionSatisfiedBy,
-} from "../registry";
-import {
-  builtinRoleGrants,
-  builtinRolePermissions,
-  roleKeyForTeamRole,
-} from "../roles";
 
 describe("built-in role parity with legacy bags", () => {
   describe.each(

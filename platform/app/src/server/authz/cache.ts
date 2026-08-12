@@ -5,9 +5,9 @@
  * bumps the epoch). No epoch available (tests, Redis down, flag off) means
  * no caching — always correct, just slower.
  */
+import type { AuthzPrincipalRef, CollectedGrants } from "@langwatch/authz";
 import type { PrismaClient } from "@prisma/client";
 import { collectGrants } from "./collector";
-import type { AuthzPrincipalRef, CollectedGrants } from "./engine";
 import { getAuthzEpoch } from "./epoch";
 
 const MAX_ENTRIES = 10_000;

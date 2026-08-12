@@ -6,9 +6,12 @@
 
 ## Decision, in one paragraph
 
-We will collapse LangWatch authorization into a single `server/authz/` module
-built from three nouns - **permission** (a verb on a resource), **role** (a
-named set of permissions), **role binding** (who holds which role, where) -
+We will collapse LangWatch authorization into a single authz module - the pure
+half (registry, roles, engine, witness, passport) as the `@langwatch/authz`
+workspace package, the storage half (collector, cache, grants, shadow, tRPC
+adapter) in the app's `server/authz/` - built from three nouns - **permission**
+(a verb on a resource), **role** (a named set of permissions), **role binding**
+(who holds which role, where) -
 resolved by **one engine** that every surface (tRPC, Hono, services, workers,
 frontend) and every principal (user, API key, share token, demo visitor,
 platform ops, with group membership expanded into user grants) goes through.

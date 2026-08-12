@@ -65,6 +65,7 @@ describe("authz engine decide()", () => {
       ],
     });
 
+    /** @scenario "Grants are an additive union across scopes" */
     it("grants via the union — the narrower binding is inert", () => {
       const decision = decide({
         grants,
@@ -90,6 +91,7 @@ describe("authz engine decide()", () => {
       ).toBe(true);
     });
 
+    /** @scenario "Narrow access is expressed by granting less, not by overriding" */
     it("denies update on that project", () => {
       const decision = decide({
         grants,
@@ -100,6 +102,7 @@ describe("authz engine decide()", () => {
       expect(decision.denialReason).toBe("no-binding");
     });
 
+    /** @scenario "Narrow access is expressed by granting less, not by overriding" */
     it("denies everything on a different project (scope chain filter)", () => {
       expect(
         decide({ grants, permission: "traces:view", scope: otherProjectScope })
@@ -111,6 +114,7 @@ describe("authz engine decide()", () => {
   describe("given the ADR-021 scope fence", () => {
     const customRolePermissions = new Map([["cr-1", ["governance:manage"]]]);
 
+    /** @scenario "A permission can only be granted at scopes where its resource exists" */
     it("never grants an org-exclusive permission from a TEAM binding, even via custom role", () => {
       const grants = makeGrants({
         bindings: [
@@ -179,6 +183,7 @@ describe("authz engine decide()", () => {
   });
 
   describe("given a lite member (EXTERNAL org role)", () => {
+    /** @scenario "Lite member capability comes from the lite-member role's own grants" */
     it("caps a team MEMBER binding at the lite-member bag", () => {
       const grants = makeGrants({
         organizationRole: "EXTERNAL",
@@ -202,6 +207,7 @@ describe("authz engine decide()", () => {
       expect(denied.denialReason).toBe("lite-member-restricted");
     });
 
+    /** @scenario "Seat classification is billing data and never consulted for access" */
     it("honours an explicit non-empty custom role over the cap", () => {
       const grants = makeGrants({
         organizationRole: "EXTERNAL",
@@ -414,7 +420,8 @@ describe("authz engine decide()", () => {
   });
 
   describe("given the demo project", () => {
-    it("grants demo-bag permissions to anyone, and nothing else", () => {
+    /** @scenario "The demo project opens for signed-in callers only" */
+    it("grants demo-bag permissions to any signed-in caller, and nothing else", () => {
       const grants = makeGrants({
         organizationRole: null,
         isOrgMember: false,
@@ -436,6 +443,21 @@ describe("authz engine decide()", () => {
         }).allowed,
       ).toBe(false);
     });
+
+    /** @scenario "The demo project opens for signed-in callers only" */
+    it("denies the demo bag to an anonymous caller — legacy only reaches it behind a session", () => {
+      const decision = decide({
+        grants: makeGrants({
+          principal: { type: "anonymous" },
+          organizationRole: null,
+          isOrgMember: false,
+        }),
+        permission: "traces:view",
+        scope: projectScope,
+        demoProjectId: PROJECT,
+      });
+      expect(decision.allowed).toBe(false);
+    });
   });
 });
 
@@ -456,6 +478,7 @@ describe("authz engine decideWithCeiling()", () => {
       ],
     });
 
+    /** @scenario "An API key is capped by its owner's current grants" */
     it("denies what the key alone would grant (owner ceiling)", () => {
       const decision = decideWithCeiling({
         keyGrants,
@@ -476,6 +499,45 @@ describe("authz engine decideWithCeiling()", () => {
           scope: projectScope,
         }).allowed,
       ).toBe(true);
+    });
+  });
+
+  describe("given an owner who holds more than the key", () => {
+    /** @scenario "Promotion does not grow a scoped API key" */
+    it("denies what only the owner holds — a scoped key never grows", () => {
+      const ownerGrants = makeGrants({
+        bindings: [
+          binding({ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG }),
+        ],
+      });
+      const decision = decideWithCeiling({
+        keyGrants,
+        ownerGrants,
+        permission: "project:delete",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("no-binding");
+    });
+  });
+
+  describe("given a lite-member owner", () => {
+    /** @scenario "A lite member's API key is capped exactly like their session" */
+    it("caps the key exactly like the owner's own session", () => {
+      const ownerGrants = makeGrants({
+        organizationRole: "EXTERNAL",
+        bindings: [
+          binding({ role: "MEMBER", scopeType: "TEAM", scopeId: TEAM }),
+        ],
+      });
+      const decision = decideWithCeiling({
+        keyGrants,
+        ownerGrants,
+        permission: "datasets:manage",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("owner-ceiling");
     });
   });
 

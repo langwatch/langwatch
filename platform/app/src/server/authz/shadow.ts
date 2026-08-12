@@ -15,16 +15,16 @@
  * tagged `ceiling-legacy-fallback`.
  */
 
-import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
-import { collectGrants, resolveScopeRef } from "./collector";
 import {
   type AuthzPrincipalRef,
   type AuthzScopeRef,
   type CollectedGrants,
   decide,
   decideWithCeiling,
-} from "./engine";
+} from "@langwatch/authz";
+import { createLogger } from "@langwatch/observability";
+import type { PrismaClient } from "@prisma/client";
+import { collectGrants, resolveScopeRef } from "./collector";
 
 const logger = createLogger("langwatch:authz:shadow");
 

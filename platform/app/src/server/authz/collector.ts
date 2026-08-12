@@ -3,7 +3,6 @@
  * Postgres. One snapshot per (principal, organization) feeds any number of
  * pure decide() calls, and is what the stage-F epoch cache stores.
  */
-import type { PrismaClient, ShareVisibility } from "@prisma/client";
 import type {
   AuthzPrincipalRef,
   AuthzScopeRef,
@@ -12,7 +11,9 @@ import type {
   GrantAudience,
   LegacyTeamMembership,
   ResourceGrant,
-} from "./engine";
+  ShareableResourceKind,
+} from "@langwatch/authz";
+import type { PrismaClient, ShareVisibility } from "@prisma/client";
 
 /**
  * Resolve a scope reference from the ids a request carries. Project ids are
@@ -56,6 +57,50 @@ export async function resolveScopeRef({
     return { type: "organization", id: organizationId };
   }
   return null;
+}
+
+/**
+ * Resolve a resource-tier scope from a stored resource's own facts. The
+ * project lineage (team, organization) is derived here, never taken from the
+ * request - same posture as resolveScopeRef. `parentThreadId` MUST be the
+ * stored trace's own thread id (the ThreadId on the fetched row), never a
+ * caller-supplied value: parent links close share grants over children, so a
+ * forged parent would let one shared thread unlock unrelated traces.
+ * Returns null when the project does not exist.
+ */
+export async function resolveResourceScopeRef({
+  prisma,
+  projectId,
+  kind,
+  id,
+  parentThreadId,
+  shareTokens,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+  kind: ShareableResourceKind;
+  id: string;
+  parentThreadId?: string;
+  shareTokens?: readonly string[];
+}): Promise<AuthzScopeRef | null> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { team: { select: { id: true, organizationId: true } } },
+  });
+  if (!project?.team) return null;
+  return {
+    type: "resource",
+    kind,
+    id,
+    parents:
+      kind === "trace" && parentThreadId
+        ? [{ kind: "thread", id: parentThreadId }]
+        : undefined,
+    shareTokens,
+    projectId,
+    teamId: project.team.id,
+    organizationId: project.team.organizationId,
+  };
 }
 
 async function prefetchCustomRolePermissions({

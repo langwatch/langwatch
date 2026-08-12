@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   GrantsService,
@@ -147,6 +148,86 @@ describe("GrantsService.attach", () => {
       ).rejects.toBeInstanceOf(GrantValidationError);
     });
   });
+
+  describe("when the scope already holds an identical binding", () => {
+    /** @scenario "Attaching a duplicate role binding is rejected with a named error" */
+    it("names the duplicate instead of leaking a raw P2002", async () => {
+      const prisma = makePrisma();
+      prisma.roleBinding.create.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+          code: "P2002",
+          clientVersion: "test",
+        }),
+      );
+      const service = new GrantsService(prisma as unknown as PrismaClient);
+      await expect(
+        service.attach({
+          actor,
+          who: { type: "user", id: "user-1" },
+          role: { builtin: "MEMBER" },
+          where: { type: "team", id: TEAM, organizationId: ORG },
+        }),
+      ).rejects.toMatchObject({ code: "grant_validation_failed" });
+      expect(bumpAuthzEpoch).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("GrantsService.update", () => {
+  describe("when re-pointing at another organization's custom role", () => {
+    /** @scenario "A role binding can never reference another organization's custom role" */
+    it("rejects with the same tenancy rule as attach", async () => {
+      const prisma = makePrisma();
+      prisma.customRole.findUnique.mockResolvedValue({
+        organizationId: "org-other",
+      });
+      const service = new GrantsService(prisma as unknown as PrismaClient);
+      await expect(
+        service.update({
+          actor,
+          bindingId: "rb-1",
+          role: { customRoleId: "cr-foreign" },
+        }),
+      ).rejects.toMatchObject({ code: "grant_validation_failed" });
+      expect(prisma.roleBinding.update).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("GrantsService.replace", () => {
+  describe("when narrowing an org grant to a team grant", () => {
+    /** @scenario "Replacing a grant is one atomic swap" */
+    it("deletes and re-creates inside one transaction, with one audit record", async () => {
+      const prisma = makePrisma();
+      const tx = {
+        roleBinding: {
+          deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+          create: vi.fn().mockResolvedValue({}),
+        },
+      };
+      prisma.$transaction.mockImplementation(
+        async (fn: (handle: unknown) => Promise<unknown>) => fn(tx),
+      );
+      const service = new GrantsService(prisma as unknown as PrismaClient);
+      const result = await service.replace({
+        actor,
+        who: { type: "user", id: "user-1" },
+        from: { type: "organization", id: ORG },
+        to: { type: "team", id: TEAM, organizationId: ORG },
+        role: { builtin: "MEMBER" },
+      });
+      expect(result.bindingId).toBe("rb_test_ksuid");
+      expect(tx.roleBinding.deleteMany).toHaveBeenCalledTimes(1);
+      expect(tx.roleBinding.create).toHaveBeenCalledTimes(1);
+      expect(prisma.roleBinding.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.roleBinding.create).not.toHaveBeenCalled();
+      expect(auditLog).toHaveBeenCalledTimes(1);
+      expect(auditLog).toHaveBeenCalledWith(
+        expect.objectContaining({ action: "authz.grants.replace" }),
+      );
+      expect(bumpAuthzEpoch).toHaveBeenCalledTimes(1);
+    });
+  });
 });
 
 describe("GrantsService.offboard", () => {
@@ -178,6 +259,7 @@ describe("GrantsService.offboard", () => {
   }
 
   describe("when every grant source deletes cleanly", () => {
+    /** @scenario "Offboarding a user removes every grant, with proof" */
     it("returns the removal counts, the manifest, and bumps the epoch", async () => {
       const tx = makeTx();
       const prisma = makePrisma({
@@ -220,6 +302,7 @@ describe("GrantsService.offboard", () => {
   });
 
   describe("when something still resolves after the deletes", () => {
+    /** @scenario "Offboarding a user removes every grant, with proof" */
     it("throws and rolls the transaction back (the proof step)", async () => {
       const tx = makeTx({ stillMember: true });
       const prisma = makePrisma({
