@@ -1,9 +1,10 @@
-import { Text, VStack } from "@chakra-ui/react";
+import { Text, useDisclosure, VStack } from "@chakra-ui/react";
 import type { DatasetActionParams } from "@langwatch/automations/providers/dataset";
 import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
 import type { Dataset } from "@prisma/client";
 import { Database } from "lucide-react";
 import { useEffect } from "react";
+import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
 import { DatasetSelector } from "~/components/datasets/DatasetSelector";
 import {
   type DatasetColumns,
@@ -134,6 +135,7 @@ function DatasetConfigForm({
   onChange,
   ctx,
 }: ConfigFormProps<DatasetSlice>) {
+  const createDatasetDrawer = useDisclosure();
   const datasets = api.dataset.getAll.useQuery(
     { projectId: ctx.projectId },
     { enabled: !!ctx.projectId, refetchOnWindowFocus: false },
@@ -150,6 +152,15 @@ function DatasetConfigForm({
       datasetId,
       mapping: deriveMappingFromColumns(columnsOf(dataset)),
     });
+  };
+
+  // #6716: "+ Create New" was a no-op (`onCreateNew={() => {}}`) — a project
+  // with zero datasets had no way to get one from inside this panel. Reuses
+  // the same create-dataset drawer `AddDatasetRecordDrawer` opens for the
+  // same affordance, then selects the newly created dataset the moment it
+  // lands, exactly as picking an existing one would.
+  const onDatasetCreated = ({ datasetId }: { datasetId: string }) => {
+    void datasets.refetch().then(() => selectDataset(datasetId));
   };
 
   // Backfill a default mapping for a row that already has a dataset but no
@@ -176,14 +187,17 @@ function DatasetConfigForm({
         localStorageDatasetId={slice.datasetId}
         errors={{}}
         setValue={(_field: string, value: string) => selectDataset(value)}
-        onCreateNew={() => {
-          // noop
-        }}
+        onCreateNew={createDatasetDrawer.onOpen}
       />
       <Text color="fg.muted" textStyle="xs">
         Columns map to the matching trace fields automatically; refine the
         mapping from the dataset view after creating.
       </Text>
+      <AddOrEditDatasetDrawer
+        open={createDatasetDrawer.open}
+        onClose={createDatasetDrawer.onClose}
+        onSuccess={onDatasetCreated}
+      />
     </VStack>
   );
 }
