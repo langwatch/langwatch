@@ -3,9 +3,10 @@ Feature: One automation flow with a subject choice
   Automation and alert merge into one flow. An automation watches something
   — a trace filter, or a graph — applies a rule, and delivers. There is no
   type card and no source card: the wizard opens by asking what to watch,
-  and the rule shape follows the answer. Reports stay a separate concept
-  with their own tab and entry point — the schedule is when a report goes
-  out, not the name of the thing. The wizard is three steps — Watch,
+  and the rule shape follows the answer. Reports — the renamed third
+  concept, formerly "Schedule"; a report sends on a schedule, which is
+  its description, not its name — stay separate with their own tab and
+  entry point. The wizard is three steps — Watch,
   Delivery, Review — linear to create, opening on the review overview to
   edit. Slack becomes a project-level integration: the bot token is
   configured once per project and rotated in one place, and the composer
@@ -156,7 +157,7 @@ Feature: One automation flow with a subject choice
 
     Automations and alerts were two near-identical tables. They become one
     table whose columns say what each row watches and where it delivers.
-    Reports keep their own tab.
+    Reports keep their own tab, under their renamed noun.
 
     @integration
     Scenario: The unified table lists automations watching filters and graphs together
@@ -176,7 +177,7 @@ Feature: One automation flow with a subject choice
       Given the project has a report
       When the user opens the automations list
       Then the report is not in the automations table
-      And the reports tab lists it
+      And the tab named "Reports" lists it
 
     # Inverts the bound list-pages.feature delete-noun scenarios (in flight
     # via #6884), which asserted the dialog and toast say "alert". R0 removed
@@ -186,7 +187,7 @@ Feature: One automation flow with a subject choice
       Given the unified table has a row that watches a graph
       When the user deletes it and confirms
       Then the confirmation dialog and the toast name it an automation
-      And deleting a report still names it a report
+      And deleting a report names it a report
 
     # Supersedes list-pages.feature's "The Overview offers creating an
     # automation, alert, or schedule" (in flight via #6884), which R0 removed
