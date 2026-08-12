@@ -82,7 +82,7 @@ export const webhookActionParamsSchema = z
       .describe("Where the request goes. https only, and not a private host."),
     method: z.enum(["POST", "PUT", "PATCH"]).optional(),
     headers: z
-      .record(z.string())
+      .record(z.string(), z.string())
       .optional()
       .describe(
         "Static headers sent with every delivery. The values are credentials: they read back as [redacted], and sending [redacted] back keeps the stored ones. Changing `url` means sending the values again in the same call.",
@@ -109,7 +109,7 @@ export const datasetActionParamsSchema = z
       .describe("The dataset matched traces are appended to."),
     datasetMapping: z
       .object({
-        mapping: z.record(z.unknown()),
+        mapping: z.record(z.string(), z.unknown()),
         expansions: z.array(z.string()).optional(),
       })
       .describe("How a trace becomes a row in that dataset."),
@@ -181,14 +181,14 @@ export const triggerSchema = z
     id: z.string(),
     name: z.string(),
     action: z.string(),
-    actionParams: z.record(z.unknown()).default({}),
-    filters: z.record(z.unknown()).default({}),
+    actionParams: z.record(z.string(), z.unknown()).default({}),
+    filters: z.record(z.string(), z.unknown()).default({}),
     filterQuery: z.string().nullable().optional(),
     kind: z.string().optional(),
     customGraphId: z.string().nullable().optional(),
     notificationCadence: z.string().nullable().optional(),
     traceDebounceMs: z.number().nullable().optional(),
-    templates: z.record(z.unknown()).optional(),
+    templates: z.record(z.string(), z.unknown()).optional(),
     active: z.boolean(),
     message: z.string().nullable(),
     alertType: z.string().nullable(),

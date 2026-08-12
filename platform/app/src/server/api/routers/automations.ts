@@ -3,7 +3,6 @@ import {
   MAX_TRACE_DEBOUNCE_MS,
   MIN_TRACE_DEBOUNCE_MS,
   NOTIFICATION_CADENCES,
-  type NotificationCadence,
 } from "@langwatch/automations/cadences";
 import { EMAIL_RX } from "@langwatch/automations/providers/email";
 import type { SlackActionParams } from "@langwatch/automations/providers/slack";
