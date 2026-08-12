@@ -4,9 +4,9 @@
 
 **Status:** Proposed
 
-**Builds on:** [ADR-043](./043-automation-facet-model.md) (the facet model — this ADR amends it in two named places, see §4), [ADR-037](./037-automation-operator-surfaces.md) (operator surfaces), [ADR-041](./041-modern-block-kit-notification-template-suite.md) (templates), [ADR-044](./044-scheduled-reports-automation-kind.md) (schedules, which stay separate), [ADR-021](./021-multi-scope-targeting-and-tenancy.md) (the scoped-resource storage shape §5 adopts).
+**Builds on:** [ADR-043](./043-automation-facet-model.md) (the facet model — this ADR amends it in two named places, see §4), [ADR-037](./037-automation-operator-surfaces.md) (operator surfaces), [ADR-041](./041-modern-block-kit-notification-template-suite.md) (templates), [ADR-044](./044-scheduled-reports-automation-kind.md) (the third kind, which stays separate and whose customer noun this ADR renames), [ADR-021](./021-multi-scope-targeting-and-tenancy.md) (the scoped-resource storage shape §5 adopts).
 
-**Supersedes in part:** ADR-037's "Why section rows + secondary drawers, not a linear wizard" ruling — it rejected a stepper because "a stepper forces a single path and blocks revisiting earlier choices"; the step rail (every completed step's summary stays visible and clickable) and Review-as-home editing are this ADR's direct answer to that objection, restoring non-linear access inside a stepped create. And ADR-044's naming recommendation to "surface the three kinds as first-class cards in the type picker (Automation · Alert · Report)" — the merged flow deletes that picker (§1).
+**Supersedes in part:** ADR-037's "Why section rows + secondary drawers, not a linear wizard" ruling — it rejected a stepper because "a stepper forces a single path and blocks revisiting earlier choices"; the step rail (every completed step's summary stays visible and clickable) and Review-as-home editing are this ADR's direct answer to that objection, restoring non-linear access inside a stepped create. And ADR-044's naming recommendation to "surface the three kinds as first-class cards in the type picker (Automation · Alert · Report)" — the merged flow deletes that picker (§1). ADR-044 is also superseded on the third concept's customer noun: the UI it shipped says "Schedule", and this ADR renames it **Report** (§1).
 
 **Relates to:** [ADR-052](./052-automations-on-process-manager-substrate.md) (dispatch is untouched), [#6717](https://github.com/langwatch/langwatch/issues/6717) (the decisions this records), [#6716](https://github.com/langwatch/langwatch/issues/6716) (the bug bash that motivated them), PR [#6891](https://github.com/langwatch/langwatch/pull/6891) (the public-API contract this must not break).
 
@@ -22,13 +22,13 @@ ADR-043 already did the structural work: every automation is one object seen thr
 
 The composer has a second, independent problem the 2026-08-04 call agreed on without agreeing on the fix: the drawer asks for too much at once. A previous restructuring attempt taught one concrete lesson — losing the overview while editing was the annoying part, not the number of fields.
 
-These decisions were settled by Alex on 2026-08-12 and are recorded here, not relitigated: merge Automation + Alert into one flow (Schedule stays separate); drop the Type card — the flow opens with what the automation watches, and no separate source label is shown to customers at all; steps for the composer (not accordion-trimming); Builder stays the condition editor's default with Code as the toggle; one unified list table; project-level Slack integration; multi-channel delivery deferred.
+These decisions were settled by Alex on 2026-08-12 and are recorded here, not relitigated: merge Automation + Alert into one flow, with the third concept staying separate and renamed **Report** (picked by Alex on 2026-08-12 after re-checking the Aug-4 transcript, where Rogério's line is "it should be like a report instead of a schedule"); drop the Type card — the flow opens with what the automation watches, and no separate source label is shown to customers at all; steps for the composer (not accordion-trimming); Builder stays the condition editor's default with Code as the toggle; one unified list table; project-level Slack integration; multi-channel delivery deferred.
 
 ## Decision
 
 ### 1. One flow, one opening question
 
-An **automation** is one thing: it watches something, applies a rule, and delivers. The former "Alert" is an automation that watches a graph. **Schedule remains a separate concept** — the clock is not something to watch, and a report has no rule.
+An **automation** is one thing: it watches something, applies a rule, and delivers. The former "Alert" is an automation that watches a graph. **The third concept remains separate and is renamed "Report"** — the clock is not something to watch, and a report has no rule. The rename follows what the thing *is* rather than when it runs: a report is what the customer receives; "scheduled" — "sends on a schedule" — becomes the description, never the name. Tab "Reports", "New report", "this report".
 
 There is no type card and no source card left to pick — not even a renamed one. The flow opens with the subject itself: **"What should this automation watch?" — a trace filter or a graph** — and the subject's configuration follows inline. Choosing the subject *is* choosing what was formerly the kind; the rule shape follows from it (a filter → per-trace conditions, Builder by default with Code as the toggle — decided, not open; a graph → series + operator/threshold/window). Asking "which source?" and then "which subject?" was two questions with one answer, so the first question is deleted rather than renamed. "Source" stops being a customer-facing concept entirely; it survives only as a derived wire field (§2).
 
@@ -40,7 +40,8 @@ There is no type card and no source card left to pick — not even a renamed one
    ├─ Automations   ──┐ two tables,        ├─ Automations ── ONE table,
    ├─ Alerts        ──┘ same columns       │    Watches + Delivery columns,
    └─ Schedules                            │    filter chips: Filter | Graph
-                                           └─ Schedules   (own tab, unchanged)
+                                           └─ Reports    (own tab; noun renamed
+                                                          from "Schedules")
    Composer: three Type cards, THEN        Composer: the subject IS step 1
    a subject                               ┌─ What should this automation watch? ─┐
    ┌────────────┐┌───────────┐┌──────────┐ │ ◉ A trace filter   ○ A graph        │
@@ -48,7 +49,7 @@ There is no type card and no source card left to pick — not even a renamed one
    │ (trace)    ││ (graph)   ││ (clock)  │ │ │ subject configuration, inline   │ │
    └────────────┘└───────────┘└──────────┘ │ └─────────────────────────────────┘ │
                                            └─────────────────────────────────────┘
-                                           Schedules: created from their own
+                                           Reports: created from their own
                                            entry point, never a third option
 ```
 
@@ -68,7 +69,9 @@ The public API shipped full parity days ago (#6891): `triggerKind` immutability,
 |---|---|---|---|
 | `AUTOMATION` | `AUTOMATION` | `trace_search` | Watches a trace filter |
 | `ALERT` | `ALERT` | `graph_metric` | Watches a graph |
-| `REPORT` | `REPORT` | `schedule` | Schedule (separate surface) |
+| `REPORT` | `REPORT` | `report` | Report (separate surface) |
+
+The third value is `report`, not `schedule`: the `source` alias is unshipped (F1), so the choice is free now and would be an API break later, and it pleasantly aligns wire, storage (`kind: REPORT`), and the renamed customer noun on one word.
 
 - **Reads** publish both fields, always consistent.
 - **Writes** accept either. Sending both is allowed when they agree; a mismatched pair is refused with a stable code (`trigger_source_kind_mismatch`) rather than one silently winning.
@@ -82,7 +85,7 @@ One axis, three layers, and each layer keeps its own word for it — deliberatel
 | Layer | Says | Values |
 |---|---|---|
 | UI | "watches" | a trace filter / a graph (no label says "type" or "source") |
-| Wire | `kind` + derived `source` | `AUTOMATION` / `ALERT` / `REPORT` + `trace_search` / `graph_metric` / `schedule` |
+| Wire | `kind` + derived `source` | `AUTOMATION` / `ALERT` / `REPORT` + `trace_search` / `graph_metric` / `report` |
 | Storage | `triggerKind` | the unchanged enum (§3) |
 
 Bound spec files that speak in alert nouns about wire and dispatch behaviour (`public-api.feature`, `process-manager-dispatch.feature`, `dispatch-timing.feature`) keep those nouns deliberately: at their layer, "alert" remains the kind's name. Only customer-facing copy scenarios change words (§3's rebinding table).
@@ -105,8 +108,8 @@ Most bound scenarios in the automations corpus pin behaviour the merge does not 
 
 | File | Bound scenarios affected | What the merge does to them | Unit |
 |---|---|---|---|
-| `specs/automations/list-pages.feature` (in flight via [#6884](https://github.com/langwatch/langwatch/pull/6884)) | "Deleting an alert asks for confirmation and names it as an alert", "…the toast reads 'Alert deleted'", "the Delete item's accessible name includes the row's kind" | **Inverted.** In the merged world the noun is "automation" for both subjects (schedules keep "schedule"). Rebind with the merged-world copy; `source-merge.feature` states that copy now ("Deleting names the row an automation") | F6 |
-| `specs/automations/list-pages.feature` | "The Overview offers creating an automation, alert, or schedule" | **Superseded.** The Overview's create menu offers "New automation" and "New schedule"; `source-merge.feature` carries the superseding scenario | F6 |
+| `specs/automations/list-pages.feature` (in flight via [#6884](https://github.com/langwatch/langwatch/pull/6884)) | "Deleting an alert asks for confirmation and names it as an alert", "…the toast reads 'Alert deleted'", "Deleting a schedule names it as a schedule", "the Delete item's accessible name includes the row's kind" | **Inverted.** In the merged world the noun is "automation" for both subjects, and the third kind's noun becomes "report" ("Report deleted"). Rebind with the merged-world copy; `source-merge.feature` states that copy now ("Deleting names the row an automation") | F6 |
+| `specs/automations/list-pages.feature` | "The Overview offers creating an automation, alert, or schedule" | **Superseded.** The Overview's create menu offers "New automation" and "New report"; `source-merge.feature` carries the superseding scenario | F6 |
 | `specs/automations/authoring-drawer.feature` | "An external cadence change regroups the gallery…" (its trigger is "the separate Cadence section") | **Rebind.** The external trigger becomes the Delivery step's cadence control; the regroup-vs-stable-order behaviour itself is unchanged | F7, with R0 |
 | `specs/automations/automation-authoring-cap-advice.feature` | "An over-ceiling condition on a persist action shows the advice" and its siblings (the advice reads the *drafted action*) | **Reseated.** The advice needs condition estimate *and* action class, which the wizard no longer shows at once; see §4 for where it renders. Rebind to the new seats | F7, with R0 |
 | `platform/app/specs/monitors/slack-bot-delivery.feature` (untagged; note the second specs root) | "A bot automation is incomplete without a token and channel", "The author is guided to create a Slack app" | **Retired/rewritten.** The composer stops asking for a token (§5); the guidance moves to the settings card | F3 |
@@ -253,7 +256,7 @@ Templates always create a **new** graph rather than binding an existing one: `cu
 
 ## Consequences
 
-- Customer vocabulary shrinks: "automation" (defined by what it watches) and "schedule". No customer-facing label says "type" or "source" at all. Copy, docs, and empty states stop needing to explain the automation/alert distinction; the delete-copy noun defect class (#6716) loses its fuel.
+- Customer vocabulary shrinks: "automation" (defined by what it watches) and "report" (which sends on a schedule). No customer-facing label says "type", "source", or "schedule"-as-a-noun at all. Copy, docs, and empty states stop needing to explain the automation/alert distinction; the delete-copy noun defect class (#6716) loses its fuel.
 - The type-lock question closes as by-design: what an automation watches is immutable, stated in the flow and enforced by the existing API contract.
 - The unified list must keep row actions coherent with the View drawer's new role as the in-depth history view (#6899): View for history and what-happens-next, Edit for the wizard overview, Delete confirmed. One table, one row-action model.
 - New failure modes ship with stable codes and presentation-registry entries: `trigger_source_kind_mismatch`, `slack_integration_missing`, `slack_integration_invalid_token` (rotation/save-time `auth.test` failure). Each lands with the unit that introduces it, in `logic/codes.ts` (sorted) + `presentation.ts` in the same change.
@@ -265,7 +268,7 @@ Templates always create a **new** graph rather than binding an existing one: `cu
 - **Multi-channel delivery** (one automation → email + Slack + webhook at once). Future ADR. The open data-model question (a `TriggerDelivery` junction vs a `deliveries` JSON array, and how dispatch keys off `action`) is *not* pre-decided here; this ADR only refuses to obstruct it: source/rule stay independent of delivery count, and the project-level token removes the per-delivery credential problem.
 - **Team/org-shared Slack integrations** (one workspace serving many projects). The `@unique projectId` table migrates into the scoped-resources junction shape if wanted.
 - **Automatic healing of legacy tokens** (falling through to the project token when a stored token fails `invalid_auth`). Attractive, but it reintroduces silent retargeting through the back door; revisit with delivery-failure surfacing (#6716 G3 territory).
-- **Schedules inside the wizard.** Schedule keeps its current composer path; unifying its authoring shell can ride a later polish pass without design risk.
+- **Reports inside the wizard.** Report keeps its current composer path; unifying its authoring shell can ride a later polish pass without design risk.
 - **Slack-app OAuth install flow.** ADR-041's deferral stands; §5 decides only save-time identity pinning via `auth.test`.
 - **Code-editor default flip and Builder retirement** — *decided, not deferred*: Builder stays the default, Code stays the toggle. Recorded so the earlier musings do not resurface as an open question.
 
@@ -277,7 +280,7 @@ Phase-2 structure per the bug-bash plan: **one reference PR first, no fan-out un
 
 Everything behind a `release_automations_source_merge` feature flag; flag off is byte-identical behaviour. (The name sits loose against ADR-005's `{type}_{area}_{feature}_{descriptor}` grammar — deliberate, with ADR-044's `release_scheduled_reports` as the precedent for a three-token automations release flag.)
 
-**Scope:** the merged three-step wizard for create and edit (subject-first Watch step, both subjects, Review-as-home), the vocabulary change everywhere the flow speaks (no type card, no source label), and the unified list as a **read-only view** (one table, Watches + Delivery columns; Schedules tab untouched).
+**Scope:** the merged three-step wizard for create and edit (subject-first Watch step, both subjects, Review-as-home), the vocabulary change everywhere the flow speaks (no type card, no source label), and the unified list as a **read-only view** (one table, Watches + Delivery columns; the third tab is renamed "Reports", not restructured).
 
 **Files (owned):**
 - `platform/app/src/features/automations/components/AutomationTypePicker.tsx` → retired into the Watch step; the subject choice absorbs the picker
