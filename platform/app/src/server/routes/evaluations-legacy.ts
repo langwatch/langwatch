@@ -1488,6 +1488,11 @@ async function handleEvaluatorCall(
         ? {
             status: "skipped",
             details: result!.details,
+            // An evaluation that declines to score can still have spent
+            // money: the comparison judge pays for both of its passes before
+            // finding they disagree. Only the fields named here leave the
+            // boundary, so the cost is carried across explicitly.
+            ...(result!.cost ? { cost: result!.cost } : {}),
             ...(isGuardrail ? { passed: true } : {}),
           }
         : {

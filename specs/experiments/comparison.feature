@@ -360,6 +360,19 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
     And a letter introduced by a comparison word such as "compared with" names its variant
     And a capitalized article in title case, such as "compared with A Concise Answer", is untouched
 
+  # An inconclusive row is the most expensive kind there is: both judge passes
+  # were made and both were billed before they were found to disagree. The row
+  # scores nothing, which is the point, but reporting it as free understates
+  # exactly the rows a reader would want to know cost them the most. The money
+  # travels whether the row was judged from the SDK or from the workbench.
+  @integration
+  Scenario: An inconclusive row still reports what it cost
+    Given a row whose two judge passes disagreed
+    When I read what the run spent
+    Then that row reports the cost of both judge calls
+    And it still reports no winner, no score and no verdict
+    And a row that declined before calling the judge reports no cost at all
+
   # The two passes are shown the candidates in opposite orders, so slot A of
   # the second pass is a different variant from slot A of the first. Reading
   # one pass with the other's key would attribute the words to the wrong
