@@ -171,16 +171,22 @@ func TestContentForPacksEachDirectionUnderItsOwnKey(t *testing.T) {
 }
 
 // controlPlaneRoot is the platform/app/ directory of the monorepo, relative to
-// this package. A checkout that does not carry the TypeScript side (a vendored
-// or split Go build) has no control plane to compare against and the test is
-// skipped. When the directory IS there, a missing or unreadable file is drift,
-// which is precisely what this test exists to catch, so it fails instead.
+// this package. services/aigateway lives in the root Go module, so this package
+// is only ever compiled from a full checkout that also carries the TypeScript
+// side; there is no vendored or split Go build to accommodate. An unreachable
+// control plane is therefore a broken checkout or a stale path, never a
+// legitimate configuration, and it fails the test.
+//
+// This used to skip instead. That is how a stale path survived: the constant was
+// invalidated by the ADR-076 restructure and every run silently skipped for over
+// a week rather than going red (#6895). A contract test that can quietly decline
+// to run is worse than no contract test, because it still reports success.
 var controlPlaneRoot = filepath.Join("..", "..", "..", "..", "platform", "app")
 
 func readControlPlaneSource(t *testing.T, parts ...string) string {
 	t.Helper()
 	if _, err := os.Stat(filepath.Join(controlPlaneRoot, "src", "server")); err != nil {
-		t.Skipf("control plane is not part of this checkout: %v", err)
+		t.Fatalf("control plane is not readable at %s, so this contract cannot be checked: %v", controlPlaneRoot, err)
 	}
 	path := filepath.Join(append([]string{controlPlaneRoot}, parts...)...)
 	source, err := os.ReadFile(path)
