@@ -179,6 +179,62 @@ func TestExtractSkipsLinksInsideFencedCodeBlocks(t *testing.T) {
 	}
 }
 
+// A shorter fence inside a longer one is content, not a terminator — closing
+// on it would leave the rest of the sample being checked as prose.
+func TestExtractKeepsALongerFenceOpenAcrossAShorterOne(t *testing.T) {
+	document := "" +
+		"````markdown\n" +
+		"```bash\n" +
+		"[inner](https://langwatch.ai/inner)\n" +
+		"```\n" +
+		"[still-inside](https://langwatch.ai/still-inside)\n" +
+		"````\n" +
+		"[outside](https://langwatch.ai/outside)\n"
+
+	links := linkcheck.Extract(document)
+
+	if len(links) != 1 || links[0].Target != "https://langwatch.ai/outside" {
+		t.Fatalf("got %v, want only the link after the closing fence", targetsOf(links))
+	}
+}
+
+func TestExtractClosesAFenceOnlyOnItsOwnMarker(t *testing.T) {
+	document := "" +
+		"~~~\n" +
+		"```\n" +
+		"[inside](https://langwatch.ai/inside)\n" +
+		"~~~\n" +
+		"[outside](https://langwatch.ai/outside)\n"
+
+	links := linkcheck.Extract(document)
+
+	if len(links) != 1 || links[0].Target != "https://langwatch.ai/outside" {
+		t.Fatalf("got %v, want only the link after the tilde fence closed", targetsOf(links))
+	}
+}
+
+// Four or more spaces make an indented code block, not a fence, so a line
+// like that must not be mistaken for one and swallow the rest of the file.
+func TestExtractDoesNotTreatADeeplyIndentedRunAsAFence(t *testing.T) {
+	document := "" +
+		"    ```\n" +
+		"[after](https://langwatch.ai/after)\n"
+
+	links := linkcheck.Extract(document)
+
+	if len(links) != 1 || links[0].Target != "https://langwatch.ai/after" {
+		t.Fatalf("got %v, want the link after an indented run", targetsOf(links))
+	}
+}
+
+func targetsOf(links []linkcheck.Link) []string {
+	found := make([]string, 0, len(links))
+	for _, link := range links {
+		found = append(found, link.Target)
+	}
+	return found
+}
+
 // @scenario "A relative link to a path that no longer exists fails the check"
 func TestRunFailsOnARelativeLinkToAnAbsentPath(t *testing.T) {
 	checker := linkcheck.Checker{RepoRoot: t.TempDir()}

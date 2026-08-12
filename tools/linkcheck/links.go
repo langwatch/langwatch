@@ -62,20 +62,67 @@ var (
 // build.
 func Extract(document string) []Link {
 	var links []Link
-	inFence := false
+	var fence fences
 
 	for index, line := range strings.Split(document, "\n") {
-		if isFenceDelimiter(line) {
-			inFence = !inFence
+		if fence.crossed(line) || fence.inside() {
 			continue
 		}
-		if inFence {
-			continue
-		}
-
 		links = append(links, linksInLine(line, index+1)...)
 	}
 	return links
+}
+
+// fences tracks whether Extract is inside a fenced code block. A block closes
+// only on its own marker, at least as long as the one that opened it, so a
+// ``` line inside a ```` block does not end it early and leave the rest of the
+// sample being checked as prose.
+type fences struct {
+	marker byte
+	length int
+}
+
+func (f *fences) inside() bool { return f.length > 0 }
+
+// crossed reports whether the line opens or closes a block, and records the
+// new state if it does.
+func (f *fences) crossed(line string) bool {
+	marker, length, ok := fenceDelimiter(line)
+	if !ok {
+		return false
+	}
+
+	switch {
+	case !f.inside():
+		f.marker, f.length = marker, length
+		return true
+	case marker == f.marker && length >= f.length:
+		f.marker, f.length = 0, 0
+		return true
+	default:
+		return false
+	}
+}
+
+// fenceDelimiter reports a line's fence marker and run length. CommonMark
+// allows up to three spaces of indentation before one; a deeper indent is an
+// indented code block, not a fence.
+func fenceDelimiter(line string) (byte, int, bool) {
+	trimmed := strings.TrimLeft(line, " ")
+	if len(line)-len(trimmed) > 3 {
+		return 0, 0, false
+	}
+
+	for _, marker := range []byte{'`', '~'} {
+		length := 0
+		for length < len(trimmed) && trimmed[length] == marker {
+			length++
+		}
+		if length >= 3 {
+			return marker, length, true
+		}
+	}
+	return 0, 0, false
 }
 
 // linksInLine returns a line's links, markdown first then HTML — pattern
@@ -101,11 +148,6 @@ func firstCapture(match []string) string {
 		}
 	}
 	return ""
-}
-
-func isFenceDelimiter(line string) bool {
-	trimmed := strings.TrimSpace(line)
-	return strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~")
 }
 
 // Classify says how a target should be resolved.
