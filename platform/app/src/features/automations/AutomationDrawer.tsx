@@ -138,9 +138,9 @@ function templateValidationTitle(error: unknown): string | undefined {
   return TEMPLATE_FIELD_TITLES[String(handled.meta.field ?? "")];
 }
 
-/** Facet-ordered "why can't I save yet" copy: Name → Type → Subject →
- *  Cadence → Severity → Delivery. Type is always chosen (the source defaults
- *  to an automation), so it never contributes a message. */
+/** Facet-ordered "why can't I save yet" copy: Name → Subject → Cadence →
+ *  Severity → Delivery. What it watches is always answered — the draft opens
+ *  on a trace filter — so it never contributes a message. */
 function saveDisabledReason({
   draft,
   nameSet,
@@ -183,7 +183,7 @@ function subjectTodo(draft: AutomationDraft): string {
 function cadenceTodo(draft: AutomationDraft): string {
   switch (draft.source) {
     case "customGraph":
-      return "set the alert threshold";
+      return "set the firing threshold";
     case "report":
       return "set a schedule";
     case "trace":
@@ -198,9 +198,9 @@ function cadenceTodo(draft: AutomationDraft): string {
  * - Owns the data-loading lifecycle: scaffold (synchronous client),
  *   trigger row prefill on edit, traces-view filter prefill on create.
  * - Owns the live preview / test-fire / upsert mutations.
- * - Renders three pieces: the main drawer with `<MainSectionList/>`, the
- *   Filters secondary, and the Configuration secondary (which itself
- *   delegates the inner config to the active provider's ConfigForm).
+ * - Renders the drawer body — the three-step wizard for an automation, the
+ *   single-pane composer for a schedule (ADR-093 §4) — and the Configuration
+ *   secondary, which delegates the inner config to the provider's ConfigForm.
  *
  * Everything else lives in `components/`, `state/`, `providers/`, or
  * `logic/`. Adding a new action type doesn't change this file.
@@ -263,19 +263,13 @@ export function AutomationDrawer({
   // Read from the prefill too, so a fresh schedule never paints one frame of
   // the wizard before the prefill effect lands.
   const isReport = draft.source === "report" || initialSource === "report";
-  // Single source of truth for every heading / button / toast noun. Treat a
-  // graph-prefilled create as an alert from the first paint so the title
-  // doesn't flash "Add automation" before the prefill effect lands.
+  // Single source of truth for every heading / button / toast noun. A schedule
+  // is read off the prefill too, so a fresh one never flashes the automation
+  // heading before the prefill effect lands.
   const labels = presetLabels(
-    prefilledGraphId ? "customGraph" : draft.source,
+    isReport ? "report" : draft.source,
     !!automationId,
   );
-  // A saved graph alert or report can't become a trace automation mid-edit
-  // (the kind decides the row's whole shape — schedule, source, dispatcher),
-  // and a drawer opened from a specific chart is pinned to that alert — lock
-  // the Type cards visibly in all three cases.
-  const sourceLocked =
-    (!!automationId && (isGraphAlert || isReport)) || !!prefilledGraphId;
   // What a saved automation watches never changes — the graph slot is one
   // automation per graph, so the conversion is a create plus a delete, which is
   // exactly what the public API already refuses (ADR-093 §1). A drawer opened
@@ -603,7 +597,7 @@ export function AutomationDrawer({
     if (automationId || seededNameFromGraph.current) return;
     if (!prefilledGraphId || !graphName) return;
     if (useAutomationStore.getState().draft.name.trim() !== "") return;
-    dispatch({ type: "SET_NAME", value: `${graphName} alert` });
+    dispatch({ type: "SET_NAME", value: `${graphName} automation` });
     seededNameFromGraph.current = true;
   }, [automationId, prefilledGraphId, graphName, dispatch]);
   const previewContext = useMemo<
@@ -1127,7 +1121,6 @@ export function AutomationDrawer({
                 {isReport ? (
                   <MainSectionList
                     isEdit={!!automationId}
-                    sourceLocked={sourceLocked}
                     prefilledGraphId={prefilledGraphId}
                     webhookEnabled={webhookEnabled}
                   />

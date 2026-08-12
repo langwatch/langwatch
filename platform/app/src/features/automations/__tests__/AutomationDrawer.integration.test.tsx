@@ -487,9 +487,9 @@ describe("AutomationDrawer", () => {
     });
   });
 
-  describe("given the drawer opens as a new alert from the page", () => {
+  describe("given the drawer opens to watch a graph from the page", () => {
     describe("when it mounts with initialSource customGraph", () => {
-      it("opens a fresh alert draft with severity defaulted to warning", async () => {
+      it("opens a fresh graph-watching draft with severity defaulted to warning", async () => {
         renderDrawer({ initialSource: "customGraph" });
 
         await waitFor(() => {
@@ -499,7 +499,9 @@ describe("AutomationDrawer", () => {
         });
         // No graph is prefilled or locked — the user picks it.
         expect(useAutomationStore.getState().draft.customGraphId).toBeNull();
-        expect(screen.getByText("New alert")).toBeInTheDocument();
+        // One noun for both subjects: nothing calls this an alert (ADR-093 §1).
+        expect(screen.getByText("Add automation")).toBeInTheDocument();
+        expect(screen.queryByText("New alert")).not.toBeInTheDocument();
       });
 
       it("keeps the graph select enabled so the user picks the graph", async () => {
