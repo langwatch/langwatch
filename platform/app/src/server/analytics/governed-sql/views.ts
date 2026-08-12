@@ -50,7 +50,9 @@
 import { GOVERNED_VIEW_CATALOG } from "./catalog/governedViews";
 import {
   columnExpression,
+  type GovernedDedupStrategy,
   type GovernedViewDefinition,
+  governedGrainColumns,
   governedPostgresViews,
   governedViewSourceColumns,
   isPostgresResident,
@@ -69,28 +71,8 @@ import {
 } from "./provisioning";
 
 /**
- * How a view collapses a `ReplacingMergeTree`'s versions to one row.
- *
- * A choice with a measurement behind it rather than a preference, so it is a
- * parameter: the isolation suite measures each against the real tables and the
- * shipped default is whichever won. See
- * `__tests__/governedViews.integration.test.ts`.
- *
- *  - `in-tuple` — the repository pattern from
- *    `dev/docs/best_practices/clickhouse-queries.md`: an `IN` over
- *    `(keys…, max(version))`. Correct, and the inner scope carries no predicate
- *    from the caller's query, so it reads the tenant's whole history on every
- *    query however narrow the caller's time filter is.
- *  - `final` — `FROM … FINAL`. The caller's `WHERE` reaches the read, so a time
- *    predicate prunes partitions in the only scope there is.
- *  - `none` — no deduplication. Exposes every unmerged version as its own row,
- *    which silently doubles aggregates. Here to be measured against, never to
- *    be shipped.
- */
-export type GovernedDedupStrategy = "in-tuple" | "final" | "none";
-
-/**
- * The strategy the shipped views use.
+ * The strategy the shipped views use where a catalog entry pins none of its
+ * own (`GovernedViewDedup.strategy`, in `./catalog/types.ts`).
  *
  * Set by measurement, not by preference. Against `trace_summaries` carrying
  * 4,004 rows for two tenants across eight weekly partitions, on
@@ -113,13 +95,22 @@ export type GovernedDedupStrategy = "in-tuple" | "final" | "none";
  * subquery is written; a view has neither, which is what makes it the wrong
  * shape here rather than a wrong pattern there.
  *
- * `FINAL` costs exactly what no deduplication costs, prunes the full 8×, and is
- * correct across partitions — a version whose business time moved into a
+ * `FINAL` costs exactly what no deduplication costs, prunes the full 8×, and
+ * follows a row across partitions — a version whose business time moved into a
  * different week still resolves to the newer row, because
  * `do_not_merge_across_partitions_select_final` is 0 by default. The repository
  * guidance against `FINAL` is about point lookups dragging heavy columns
  * through a merge; these views scan partitions, where the merge is the cheap
  * half and the unbounded subquery is the expensive one.
+ *
+ * What it cannot do is collapse two versions that carry two *sort keys*. It
+ * merges on the table's `ORDER BY`, so a source whose sort key holds a column
+ * the write path moves keeps both versions and doubles every aggregate over
+ * them, silently. That is a property of the source rather than of the strategy,
+ * which is why it is answered per entry (`GovernedViewDedup.strategy`) rather
+ * than by moving the default: the tables whose sort keys hold still —
+ * every one but `evaluation_analytics` today — would pay the unbounded subquery
+ * above for a correctness problem they do not have.
  *
  * Re-measured on every run by the pruning case in
  * `__tests__/governedViews.integration.test.ts`.
@@ -322,14 +313,45 @@ function postgresTenantPredicate({
 }
 
 /**
- * The `WHERE` clause that keeps one version per logical row, or `null` when the
- * strategy needs none.
+ * The strategy one view is rendered with: its own where it pins one, and the
+ * caller's default otherwise.
  *
- * Only the key columns appear in the inner scope. Adding the caller's time
- * range there would be the cheaper query and the wrong answer: if the newest
- * version of a row moved out of the range, the subquery reports an older
- * version's stamp and the outer scope matches that older row, so the view
- * returns stale data with no error and no gap.
+ * The entry wins because the reason an entry pins a strategy is a property of
+ * its source table that no default can be right about — see
+ * {@link SHIPPED_GOVERNED_DEDUP}. The default still reaches every other view,
+ * which is what keeps the measurement case able to render the whole catalog
+ * three ways.
+ */
+function dedupStrategyFor({
+  view,
+  dedup,
+}: {
+  view: GovernedViewDefinition;
+  dedup: GovernedDedupStrategy;
+}): GovernedDedupStrategy {
+  return view.dedup.strategy ?? dedup;
+}
+
+/**
+ * The `WHERE` clause that keeps one version per logical row.
+ *
+ * Groups by the dataset's grain rather than by the source's sort key, which is
+ * the whole reason an entry reaches for this strategy: where the two differ,
+ * the sort key holds a column the write path moves, and grouping by it would
+ * report a `max()` per *version* and match every one of them.
+ *
+ * Only those columns appear in the inner scope. Adding the caller's time range
+ * there would be the cheaper query and the wrong answer: if the newest version
+ * of a row moved out of the range, the subquery reports an older version's
+ * stamp and the outer scope matches that older row, so the view returns stale
+ * data with no error and no gap.
+ *
+ * One residual, and it is the reason the repositories rank their candidates
+ * (`evaluation-analytics.clickhouse.repository.ts`): two writers resuming from
+ * the same committed version can stamp the same `UpdatedAt`, and both rows then
+ * satisfy the `IN`. A view has no per-key `LIMIT 1` to break that tie, so such a
+ * pair is returned as two rows — rare, visible as a duplicate, and a far smaller
+ * error than `FINAL`'s silent double-count of every multi-version row.
  */
 function dedupPredicate(
   view: GovernedViewDefinition,
@@ -349,8 +371,9 @@ function dedupPredicate(
         : `governed view ${view.name} deduplicates on a version column it does not declare`,
     );
   }
-  const outerKeys = view.dedup.keyColumns.map(sourceColumn);
-  const innerKeys = view.dedup.keyColumns.map(quotedColumn);
+  const grain = governedGrainColumns(view);
+  const outerKeys = grain.map(sourceColumn);
+  const innerKeys = grain.map(quotedColumn);
   const version = quotedColumn(versionColumn);
   return (
     `WHERE (${[...outerKeys, sourceColumn(versionColumn)].join(", ")}) IN (\n` +
@@ -368,6 +391,9 @@ function dedupPredicate(
  * catalog has changed must converge on the current definition, and a view that
  * silently kept an older column list would expose a column the catalog no
  * longer claims.
+ *
+ * `dedup` is the default strategy; an entry pinning its own wins over it — see
+ * {@link dedupStrategyFor}.
  */
 export function governedViewStatement({
   names,
@@ -385,6 +411,7 @@ export function governedViewStatement({
   // to collapse and neither dedup shape applies; what it needs instead is the
   // predicate that keeps the read off the primary from being a whole-table one.
   const postgres = isPostgresResident(view);
+  const strategy = dedupStrategyFor({ view, dedup });
   const projection = view.columns
     .map((column) => {
       // The engine table already carries the catalog's names and types — the
@@ -399,10 +426,10 @@ export function governedViewStatement({
     })
     .join(",\n");
   const aliased = `${relation} AS ${SOURCE_ALIAS}`;
-  const from = dedup === "final" && !postgres ? `${aliased} FINAL` : aliased;
+  const from = strategy === "final" && !postgres ? `${aliased} FINAL` : aliased;
   const where = postgres
     ? `\n${postgresTenantPredicate({ names })}`
-    : dedup === "in-tuple"
+    : strategy === "in-tuple"
       ? `\n${dedupPredicate(view, relation)}`
       : "";
   return (

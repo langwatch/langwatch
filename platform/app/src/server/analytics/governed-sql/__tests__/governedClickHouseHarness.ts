@@ -638,6 +638,37 @@ export function movedPartitionTraceId(tenantId: string): string {
 }
 
 /**
+ * The evaluation seeded twice, its two versions carrying two *sort keys*.
+ *
+ * `evaluation_analytics` sorts by `(TenantId, OccurredAt, EvaluationId)` and its
+ * fold writes a moving progress watermark into `OccurredAt`, so a second
+ * lifecycle event does not supersede the first row — it writes a row the engine
+ * files under a different key. `FINAL` merges by that key and nothing else, so
+ * it returns both, and every `count`, `sum` and `avg` over the dataset counts
+ * this evaluation twice while looking entirely healthy.
+ *
+ * The two versions are a partition apart as well as a key apart, so the case
+ * also covers a dedup shape that resolves the latest version only within one
+ * partition.
+ */
+export const EVALUATION_DEDUP_FIXTURE = {
+  evaluationIdSuffix: "dedup-eval",
+  staleWeek: 0,
+  latestWeek: SEED_WEEK_COUNT - 1,
+  staleScore: 0.11,
+  latestScore: 0.97,
+  staleDurationMs: 13,
+  latestDurationMs: 26,
+  staleUpdatedAt: "2026-03-02 00:00:00.000",
+  latestUpdatedAt: "2026-03-02 00:00:01.000",
+} as const;
+
+/** The evaluation id the moving-sort-key dedup fixture uses for a tenant. */
+export function evaluationDedupId(tenantId: string): string {
+  return `${tenantId}-${EVALUATION_DEDUP_FIXTURE.evaluationIdSuffix}`;
+}
+
+/**
  * One bucket of a rollup, written as two partial rows in two parts.
  *
  * The shape an `AggregatingMergeTree` is for and the one a reader can get
@@ -655,21 +686,112 @@ export const ROLLUP_MERGE_FIXTURE = {
   spanType: "llm",
   evaluatorType: "rollup_merge_judge",
   status: "processed",
-  /** The two parts, and what each measure is in each. */
-  parts: [
-    { count: 2, cost: 0.5, duration: 10, tokens: 30, score: 1.5 },
-    { count: 3, cost: 0.25, duration: 5, tokens: 12, score: 0.75 },
+  /**
+   * The two parts of the trace bucket, keyed by the column each value is
+   * written to.
+   *
+   * Every measure carries a different number, in both parts and therefore in
+   * the total — which is the difference between proving the view merges and
+   * proving it merges *the right column*. Feeding the same number to two
+   * same-typed columns, as this fixture used to, means a view whose
+   * `TraceCount` reads `SpanCount` returns exactly what the assertion expects.
+   */
+  traceParts: [
+    {
+      SpanCount: 7,
+      TraceCount: 5,
+      ErrorCount: 1,
+      CostSum: 0.5,
+      NonBilledCostSum: 0.125,
+      DurationSum: 900,
+      PromptTokensSum: 130,
+      CompletionTokensSum: 45,
+      CacheReadTokensSum: 22,
+      CacheWriteTokensSum: 11,
+      ReasoningTokensSum: 60,
+    },
+    {
+      SpanCount: 6,
+      TraceCount: 4,
+      ErrorCount: 2,
+      CostSum: 0.25,
+      NonBilledCostSum: 0.0625,
+      DurationSum: 400,
+      PromptTokensSum: 90,
+      CompletionTokensSum: 35,
+      CacheReadTokensSum: 18,
+      CacheWriteTokensSum: 9,
+      ReasoningTokensSum: 70,
+    },
+  ],
+  /** The two parts of the evaluation bucket, on the same rule. */
+  evaluationParts: [
+    {
+      EvalCount: 20,
+      PassCount: 11,
+      FailCount: 5,
+      ErrorCount: 3,
+      SkippedCount: 1,
+      ScoreSum: 12.5,
+      ScoreCount: 16,
+      DurationSum: 640,
+      CostSum: 0.5,
+      NonBilledCostSum: 0.125,
+    },
+    {
+      EvalCount: 14,
+      PassCount: 8,
+      FailCount: 4,
+      ErrorCount: 2,
+      SkippedCount: 0,
+      ScoreSum: 6.25,
+      ScoreCount: 12,
+      DurationSum: 320,
+      CostSum: 0.25,
+      NonBilledCostSum: 0.0625,
+    },
   ],
 } as const;
 
-/** What the merged bucket must add up to, stated separately from the parts. */
-export const ROLLUP_MERGE_TOTALS = {
-  count: 5,
-  cost: 0.75,
-  duration: 15,
-  tokens: 42,
-  score: 2.25,
-} as const;
+/**
+ * What each merged bucket must add up to, stated rather than summed from the
+ * parts — the arithmetic is the claim, and a test that derives it from the same
+ * numbers it seeds only proves that addition works.
+ *
+ * Every measure of a rollup appears here, and the suite pins that: a measure
+ * added to the catalog with no total to check against would otherwise be a
+ * column nothing ever reads back.
+ */
+export const ROLLUP_MERGE_TOTALS: {
+  readonly trace: Readonly<Record<string, number>>;
+  readonly evaluation: Readonly<Record<string, number>>;
+} = {
+  trace: {
+    SpanCount: 13,
+    TraceCount: 9,
+    ErrorCount: 3,
+    CostSum: 0.75,
+    NonBilledCostSum: 0.1875,
+    DurationSum: 1_300,
+    PromptTokensSum: 220,
+    CompletionTokensSum: 80,
+    CacheReadTokensSum: 40,
+    CacheWriteTokensSum: 20,
+    ReasoningTokensSum: 130,
+  },
+  evaluation: {
+    EvalCount: 34,
+    PassCount: 19,
+    FailCount: 9,
+    ErrorCount: 5,
+    SkippedCount: 1,
+    ScoreSum: 18.75,
+    ScoreCount: 28,
+    DurationSum: 960,
+    CostSum: 0.75,
+    NonBilledCostSum: 0.1875,
+  },
+};
 
 interface TraceSummarySeed {
   TenantId: string;
@@ -1024,6 +1146,7 @@ async function seedAnalyticsProjections({
     occurredAt,
     updatedAt,
     score,
+    durationMs = 340,
   }: {
     tenantId: string;
     evaluationId: string;
@@ -1031,6 +1154,7 @@ async function seedAnalyticsProjections({
     occurredAt: string;
     updatedAt: string;
     score: number;
+    durationMs?: number;
   }) => ({
     TenantId: tenantId,
     EvaluationId: evaluationId,
@@ -1051,7 +1175,7 @@ async function seedAnalyticsProjections({
     ConversationId: `${tenantId}-thread`,
     CustomerId: `${tenantId}-customer`,
     Origin: "sdk",
-    DurationMs: 340,
+    DurationMs: durationMs,
     TotalCost: 0.0009,
     NonBilledCost: 0.0,
     Attributes: {
@@ -1079,9 +1203,23 @@ async function seedAnalyticsProjections({
     ),
   });
 
-  for (const updatedAt of [
-    DEDUP_FIXTURE.staleUpdatedAt,
-    DEDUP_FIXTURE.latestUpdatedAt,
+  // The two versions of one evaluation, each carrying its own `OccurredAt` —
+  // the fold's watermark having moved between them — so they are two sort keys
+  // rather than two versions of one, and a separate insert each so the engine
+  // has two parts to reconcile.
+  for (const version of [
+    {
+      week: EVALUATION_DEDUP_FIXTURE.staleWeek,
+      updatedAt: EVALUATION_DEDUP_FIXTURE.staleUpdatedAt,
+      score: EVALUATION_DEDUP_FIXTURE.staleScore,
+      durationMs: EVALUATION_DEDUP_FIXTURE.staleDurationMs,
+    },
+    {
+      week: EVALUATION_DEDUP_FIXTURE.latestWeek,
+      updatedAt: EVALUATION_DEDUP_FIXTURE.latestUpdatedAt,
+      score: EVALUATION_DEDUP_FIXTURE.latestScore,
+      durationMs: EVALUATION_DEDUP_FIXTURE.latestDurationMs,
+    },
   ]) {
     await admin.insert({
       table: `${database}.evaluation_analytics`,
@@ -1089,14 +1227,12 @@ async function seedAnalyticsProjections({
       values: tenants.map((tenant) =>
         evaluationAnalyticsRow({
           tenantId: tenant.tenantId,
-          evaluationId: `${tenant.tenantId}-${DEDUP_FIXTURE.traceIdSuffix}-eval`,
+          evaluationId: evaluationDedupId(tenant.tenantId),
           traceId: dedupTraceId(tenant.tenantId),
-          occurredAt: seedWeekStart(SEED_WEEK_COUNT - 1),
-          updatedAt,
-          score:
-            updatedAt === DEDUP_FIXTURE.latestUpdatedAt
-              ? DEDUP_FIXTURE.latestSpanCount
-              : DEDUP_FIXTURE.staleSpanCount,
+          occurredAt: seedWeekStart(version.week),
+          updatedAt: version.updatedAt,
+          score: version.score,
+          durationMs: version.durationMs,
         }),
       ),
     });
@@ -1150,8 +1286,10 @@ async function seedAnalyticsProjections({
   });
 
   // One insert per part, so the bucket really is two rows on disk rather than
-  // one the client summed on the way in.
-  for (const part of ROLLUP_MERGE_FIXTURE.parts) {
+  // one the client summed on the way in. Each part is spread by column name,
+  // so what the fixture says a measure is and what lands in that measure's
+  // column are the same statement.
+  for (const part of ROLLUP_MERGE_FIXTURE.traceParts) {
     await admin.insert({
       table: `${database}.trace_analytics_rollup`,
       format: "JSONEachRow",
@@ -1160,20 +1298,12 @@ async function seedAnalyticsProjections({
         BucketStart: ROLLUP_MERGE_FIXTURE.bucketStart,
         Model: ROLLUP_MERGE_FIXTURE.model,
         SpanType: ROLLUP_MERGE_FIXTURE.spanType,
-        SpanCount: part.count,
-        TraceCount: part.count,
-        ErrorCount: 0,
-        CostSum: part.cost,
-        NonBilledCostSum: 0,
-        DurationSum: part.duration,
-        PromptTokensSum: part.tokens,
-        CompletionTokensSum: 0,
-        CacheReadTokensSum: 0,
-        CacheWriteTokensSum: 0,
-        ReasoningTokensSum: 0,
+        ...part,
       })),
     });
+  }
 
+  for (const part of ROLLUP_MERGE_FIXTURE.evaluationParts) {
     await admin.insert({
       table: `${database}.evaluation_analytics_rollup`,
       format: "JSONEachRow",
@@ -1182,16 +1312,7 @@ async function seedAnalyticsProjections({
         BucketStart: ROLLUP_MERGE_FIXTURE.bucketStart,
         EvaluatorType: ROLLUP_MERGE_FIXTURE.evaluatorType,
         Status: ROLLUP_MERGE_FIXTURE.status,
-        EvalCount: part.count,
-        PassCount: part.count,
-        FailCount: 0,
-        ErrorCount: 0,
-        SkippedCount: 0,
-        ScoreSum: part.score,
-        ScoreCount: part.count,
-        DurationSum: part.duration,
-        CostSum: part.cost,
-        NonBilledCostSum: 0,
+        ...part,
       })),
     });
   }

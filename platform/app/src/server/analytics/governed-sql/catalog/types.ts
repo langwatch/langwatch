@@ -44,6 +44,32 @@ export const GOVERNED_COLUMN_UNITS = [
 export type GovernedColumnUnit = (typeof GOVERNED_COLUMN_UNITS)[number];
 
 /**
+ * How a view collapses its source's rows to one per logical record.
+ *
+ * A choice with a measurement behind it rather than a preference, so it is a
+ * parameter: the isolation suite measures each against the real tables and the
+ * shipped default is whichever won. See `../views.ts` for the measurement, and
+ * {@link GovernedViewDedup.strategy} for the entry that pins its own.
+ *
+ *  - `in-tuple` — the repository pattern from
+ *    `dev/docs/best_practices/clickhouse-queries.md`: an `IN` over
+ *    `(grain columns…, max(version))`. Correct whatever the engine's sort key
+ *    is, and the inner scope carries no predicate from the caller's query, so
+ *    it reads the tenant's whole history on every query however narrow the
+ *    caller's time filter is.
+ *  - `final` — `FROM … FINAL`. The caller's `WHERE` reaches the read, so a time
+ *    predicate prunes partitions in the only scope there is. Collapses on the
+ *    *table's* `ORDER BY` and nothing else, which is why a source whose sort key
+ *    carries a moving column needs `in-tuple` instead.
+ *  - `none` — no deduplication. Exposes every unmerged version as its own row,
+ *    which silently doubles aggregates. Here to be measured against, never to
+ *    be shipped, and never to be pinned on an entry.
+ *
+ * @see ../views.ts — how each is rendered, and the measurement that chose the default
+ */
+export type GovernedDedupStrategy = "in-tuple" | "final" | "none";
+
+/**
  * One exposed column.
  *
  * `gates` is a set rather than a single value because a column can require more
@@ -83,6 +109,27 @@ export interface GovernedViewColumn {
    */
   readonly sourceColumns: readonly string[];
   /**
+   * Set when the source stores this column as `SimpleAggregateFunction(sum, T)`
+   * and the view must read it back as plain `T`.
+   *
+   * A flag rather than an expression, because the expression is the one place a
+   * measure can be *mislabelled* and nothing notices: written by hand, every
+   * summed column says its own name and its own cast a second time, and a
+   * copy-paste that leaves `TraceCount` reading `SpanCount` still type-checks,
+   * still returns a number, and still passes a fixture whose measures share a
+   * value. Declared this way the cast is derived centrally — `to<type>` over
+   * this column's single source column — so the three facts cannot disagree.
+   *
+   * The cast is what keeps the published type a type a caller can reason about.
+   * Measured against 25.10.2.65, a view that passes such a column straight
+   * through reports it to `system.columns` — and therefore to the schema
+   * endpoint — as `SimpleAggregateFunction(sum, UInt64)`, which tells the caller
+   * nothing except which storage engine is underneath. The values are identical
+   * either way: the merge has already run by the time the projection does, so
+   * the cast reads the merged total, not one part's share of it.
+   */
+  readonly summed?: boolean;
+  /**
    * SQL over the source table producing this column. Defaults to the single
    * entry in {@link sourceColumns} when the column is passed through unchanged.
    *
@@ -100,16 +147,36 @@ export interface GovernedViewColumn {
 /** What identifies one row of a view, and how the source's versions collapse to it. */
 export interface GovernedViewDedup {
   /**
-   * Columns identifying one logical row — the source table's `ORDER BY`.
+   * The source table's `ORDER BY` — the key its engine collapses on.
    *
-   * This is the dataset's grain, which is what the fanout diagnostic reads to
-   * decide whether a join can multiply rows. Only these narrow both scopes of
-   * the dedup. A range filter on a business-time column inside the `max()`
-   * scope silently returns stale rows: if the newest version moved out of the
-   * range, the subquery reports an older version's stamp and the outer scope
-   * matches that older row.
+   * A statement about the *table*, not about the dataset: `FINAL` merges by this
+   * key and nothing else, so it is what the `final` strategy can promise. What
+   * one row of the dataset *is* — the grain a join has to match to avoid
+   * multiplying rows — is {@link GovernedViewDefinition.grainColumns}, which is
+   * the same list on every source whose sort key holds still and a narrower one
+   * where it does not.
+   *
+   * Checked against `system.tables.sorting_key` by the integration suite, so an
+   * entry that gets it wrong is a red test rather than a diagnostic that quietly
+   * describes a key the engine is not using.
    */
   readonly keyColumns: readonly string[];
+  /**
+   * The strategy this dataset needs, when the shipped default is wrong for it.
+   *
+   * Absent on almost every entry: the default is measured and applies to every
+   * source whose sort key is stable. Present where a source's sort key carries a
+   * column the write path *moves* — `evaluation_analytics` writes its progress
+   * watermark into `OccurredAt`, which is second in its sort key — because
+   * `FINAL` then collapses nothing (two lifecycle versions of one evaluation
+   * carry two `OccurredAt`s, so they are two different sort keys) and every
+   * `sum`, `count` and `avg` a caller writes counts the row twice. The owning
+   * repositories refuse `FINAL` on those tables for exactly this reason.
+   *
+   * `none` must never be pinned here — it is a measurement baseline, and an
+   * entry naming it would ship undeduplicated rows.
+   */
+  readonly strategy?: GovernedDedupStrategy;
   /**
    * The engine's version column: `argMax`/`max` over this picks the survivor.
    *
@@ -214,6 +281,27 @@ export interface GovernedViewDefinition {
   readonly gates: readonly FieldProtection[];
   /** What one row of the view is, after deduplication. */
   readonly grain: string;
+  /**
+   * {@link GovernedViewDefinition.grain} as columns: the identity of one
+   * logical row.
+   *
+   * Two consumers read it, and they are the reason it is separate from
+   * {@link GovernedViewDedup.keyColumns}. The fanout diagnostic asks whether a
+   * join matched enough of a dataset's identity for one row to meet one row —
+   * a question about the *dataset*, where the engine's sort key can be wider
+   * and reporting the surplus as unmatched is a false alarm on the join the
+   * schema endpoint itself advertises. The `in-tuple` strategy groups by it, so
+   * what the view collapses on and what the diagnostic calls a row are one
+   * declaration rather than two that have to agree.
+   *
+   * Absent — and defaulted to the sort key by {@link governedGrainColumns} —
+   * wherever the two are the same list, which is most of the catalog.
+   *
+   * Always a subset of the sort key: a grain *wider* than the key the engine
+   * collapses on would mean the engine merges rows the dataset considers
+   * distinct, which is lost data rather than a duplicate.
+   */
+  readonly grainColumns?: readonly string[];
   /** Columns another governed view can be joined to this one on. */
   readonly joinKeys: readonly string[];
   /**
@@ -262,6 +350,30 @@ export function governedColumnGates({
 }
 
 /**
+ * The plain numeric types a summed measure can be read back as.
+ *
+ * Bounded rather than "whatever the entry says", because the cast is built by
+ * concatenation: a type this does not match — `Nullable(Float64)`, or an
+ * aggregate function's own name — would produce `toNullable(Float64)(…)`, which
+ * is a provisioning error at best and a differently-typed column at worst.
+ */
+const SUMMED_COLUMN_TYPE = /^(?:U?Int(?:8|16|32|64|128|256)|Float(?:32|64))$/;
+
+/**
+ * The columns identifying one logical row of a dataset.
+ *
+ * The declared grain where an entry has one, and the source's sort key
+ * otherwise — which is the same list wherever the engine collapses on exactly
+ * what the dataset calls a row. Read by the fanout diagnostic and by the
+ * `in-tuple` view body, so both mean the same thing by construction.
+ */
+export function governedGrainColumns(
+  view: GovernedViewDefinition,
+): readonly string[] {
+  return view.grainColumns ?? view.dedup.keyColumns;
+}
+
+/**
  * SQL producing a column from the source table.
  *
  * `source` qualifies one of the source table's columns — see
@@ -272,7 +384,19 @@ export function columnExpression(
   column: GovernedViewColumn,
   source: (name: string) => string,
 ): string {
-  if (column.expression) return column.expression(source);
+  if (column.expression) {
+    // Refused rather than resolved in either direction: a summed measure's SQL
+    // is derived from its own name and type precisely so that no second
+    // statement of them can drift, and honouring an expression here would
+    // reopen the mislabelling `summed` exists to close.
+    if (column.summed) {
+      throw new Error(
+        `governed-sql catalog: column "${column.name}" is a summed measure and also declares an ` +
+          `expression; the cast is derived from the column itself, so an expression could name another one`,
+      );
+    }
+    return column.expression(source);
+  }
   if (column.sourceColumns.length !== 1) {
     throw new Error(
       `governed-sql catalog: column "${column.name}" reads ${column.sourceColumns.length} source columns ` +
@@ -288,7 +412,14 @@ export function columnExpression(
       `governed-sql catalog: column "${column.name}" declares an empty source column name`,
     );
   }
-  return source(only);
+  if (!column.summed) return source(only);
+  if (!SUMMED_COLUMN_TYPE.test(column.type)) {
+    throw new Error(
+      `governed-sql catalog: summed column "${column.name}" declares type "${column.type}", which is not a ` +
+        `plain numeric type the merged total can be cast to`,
+    );
+  }
+  return `to${column.type}(${source(only)})`;
 }
 
 /**
@@ -298,7 +429,8 @@ export function columnExpression(
  * built from them: without a grant on those the view's own `IN`-tuple cannot be
  * evaluated, and the view fails with an access error rather than a wrong
  * answer — a failure mode that looks like a broken catalog and is really a
- * missing grant.
+ * missing grant. The grain columns need no clause of their own because they are
+ * a subset of the key columns, which the unit suite pins.
  */
 export function governedViewSourceColumns(
   view: GovernedViewDefinition,

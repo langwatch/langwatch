@@ -37,7 +37,10 @@
  * @see specs/analytics/governed-sql-api.feature
  */
 
-import type { GovernedViewDefinition } from "./catalog/types";
+import {
+  type GovernedViewDefinition,
+  governedGrainColumns,
+} from "./catalog/types";
 import type { GovernedSqlColumn, GovernedSqlResultLimits } from "./executor";
 import type {
   AcceptedGovernedSql,
@@ -256,14 +259,22 @@ function fanoutForPair({
 /**
  * The grain columns a join left unmatched — the reason one row can meet many.
  *
- * A dataset's grain is its deduplication key: match every column of it and one
- * row answers, match fewer and the rest of them multiply.
+ * A dataset's grain is the identity of one of its rows: match every column of
+ * it and one row answers, match fewer and the rest of them multiply.
+ *
+ * Read from {@link governedGrainColumns} rather than from the source's sort
+ * key, because the two are not always the same list and the difference is a
+ * false alarm rather than a finding. `trace_metrics` is sorted
+ * `(TenantId, OccurredAt, TraceId)` for range scans while still being one row
+ * per trace, so a join on the `(TenantId, TraceId)` the schema endpoint
+ * advertises would otherwise be reported as fanning out on `OccurredAt` — the
+ * diagnostic contradicting the schema, on the join it told the caller to write.
  */
 function unmatchedGrainColumns(
   view: GovernedViewDefinition,
   matched: ReadonlySet<string>,
 ): readonly string[] {
-  return view.dedup.keyColumns.filter((column) => {
+  return governedGrainColumns(view).filter((column) => {
     const lowered = column.toLowerCase();
     return (
       !matched.has(lowered) && !IMPLICITLY_MATCHED_KEY_COLUMNS.has(lowered)

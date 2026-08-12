@@ -29,8 +29,10 @@ import { CONTENT_CATEGORIES } from "../../../data-privacy/dataPrivacy.types";
 import { CONTENT_KEY_CATALOG } from "../../../data-privacy/dropKeyCatalog";
 import { GOVERNED_VIEW_CATALOG } from "../catalog/governedViews";
 import {
+  type GovernedDedupStrategy,
   governedAllowedTables,
   governedGatedColumns,
+  governedGrainColumns,
   isContentGated,
   isPostgresResident,
 } from "../catalog/types";
@@ -42,7 +44,6 @@ import {
 } from "../provisioning";
 import { validateGovernedSql } from "../validation/validate";
 import {
-  type GovernedDedupStrategy,
   governedGrantedSourceColumns,
   governedSourceTables,
   governedViewSetupStatements,
@@ -53,6 +54,8 @@ import {
   CLICKHOUSE_ERROR_CODE,
   DEDUP_FIXTURE,
   dedupTraceId,
+  EVALUATION_DEDUP_FIXTURE,
+  evaluationDedupId,
   expectClickHouseError,
   expectOnlyTenantA,
   type GovernedClickHouseHarness,
@@ -214,6 +217,84 @@ describe("given the governed views provisioned over the shipped fact tables", ()
               `${view.name}.${column.name}: catalog says ${column.type}, view returns ${byName.get(column.name)}`,
           );
         expect(wrong).toEqual([]);
+      }
+    });
+
+    /**
+     * The rule the catalog states and nothing enforced: an entry's key columns
+     * are the source's whole `ORDER BY`. Everything downstream is derived from
+     * that claim — the `final` strategy collapses on the table's sort key and on
+     * nothing an entry says, so a wrong declaration produces a view that
+     * deduplicates differently from the catalog's description of it, and a
+     * fanout diagnostic that describes a key the engine is not using.
+     *
+     * Read from `system.tables` rather than from the migration text, because the
+     * migrations are a sequence of `CREATE`s and `ALTER`s and the resulting sort
+     * key is what the engine merges on.
+     */
+    /** @scenario "Every governed view's dedup declaration matches the table it reads" */
+    it("declares the sort key and the engine its source table actually has", async () => {
+      const resident = GOVERNED_VIEW_CATALOG.filter(
+        (candidate) => !isPostgresResident(candidate),
+      );
+      expect(
+        resident.length,
+        "no ClickHouse-resident dataset — this case is inspecting nothing",
+      ).toBeGreaterThan(0);
+
+      for (const view of resident) {
+        const [source] = await selectRows<{
+          sorting_key: string;
+          engine: string;
+          engine_full: string;
+        }>(
+          harness.admin,
+          `SELECT sorting_key, engine, engine_full FROM system.tables ` +
+            `WHERE database = '${facts}' AND name = '${view.sourceTable}'`,
+        );
+        expect(
+          source,
+          `${view.sourceTable} is not on the server — the migrations did not run`,
+        ).toBeDefined();
+
+        const sortingKey = source!.sorting_key.split(", ");
+        expect(
+          [...view.dedup.keyColumns],
+          `${view.name} declares a key its source does not sort by`,
+        ).toEqual(sortingKey);
+
+        // The grain can be narrower than the sort key — that is what a
+        // time-leading analytics table is — but never something the engine does
+        // not sort by, which would be a row identity no dedup shape can honour.
+        for (const column of governedGrainColumns(view)) {
+          expect(
+            sortingKey,
+            `${view.name} calls ${column} part of its grain, but ${view.sourceTable} does not sort by it`,
+          ).toContain(column);
+        }
+
+        // The engine family, both ways round: an entry says its rows are summed
+        // or superseded, and the table has to be the engine that does it.
+        expect(
+          source!.engine.includes("AggregatingMergeTree"),
+          `${view.name} declares aggregating=${String(Boolean(view.dedup.aggregating))} over ${source!.engine}`,
+        ).toBe(Boolean(view.dedup.aggregating));
+        expect(
+          source!.engine.includes("ReplacingMergeTree"),
+          `${view.name} declares versionColumn=${String(view.dedup.versionColumn)} over ${source!.engine}`,
+        ).toBe(view.dedup.versionColumn !== undefined);
+
+        // And the *named* version column is the engine's own, which is the trap
+        // `stored_spans` sets: it supersedes on `StartTime`, not `UpdatedAt`.
+        if (view.dedup.versionColumn) {
+          const engineArguments = /^\w+\(([^)]*)\)/
+            .exec(source!.engine_full)?.[1]
+            ?.split(/,\s*/);
+          expect(
+            engineArguments,
+            `${view.name} reads ${source!.engine_full}, which supersedes on nothing`,
+          ).toContain(view.dedup.versionColumn);
+        }
       }
     });
 
@@ -462,14 +543,74 @@ describe("given the governed views provisioned over the shipped fact tables", ()
     });
 
     /**
-     * The same claim for every view, stated as a count: one row per key. A
+     * The version whose *sort key* moved: the case `FINAL` cannot answer at all,
+     * because it merges on the source's `ORDER BY` and the two versions no
+     * longer share one. `evaluation_analytics` folds its progress watermark into
+     * `OccurredAt`, which is second in that key, so this is the ordinary shape
+     * of an evaluation that received a second lifecycle event rather than an
+     * edge case — and the failure it produces is not a visible duplicate but
+     * every aggregate over the dataset counting the evaluation twice.
+     */
+    /** @scenario "A dataset whose sort key moves is deduplicated by its own identity" */
+    it("returns one row for a record whose two versions carry two sort keys", async () => {
+      const evaluationId = evaluationDedupId(harness.tenantA.tenantId);
+
+      // The control, on the physical table: two rows, under two sort keys, in
+      // two partitions. Without it a view that deduplicates nothing passes,
+      // because there would have been one row all along.
+      const versions = await selectRows<{
+        Score: number;
+        OccurredAt: string;
+        partition: string;
+      }>(
+        harness.admin,
+        `SELECT Score, OccurredAt, _partition_id AS partition FROM ${facts}.evaluation_analytics ` +
+          `WHERE TenantId = '${harness.tenantA.tenantId}' AND EvaluationId = '${evaluationId}'`,
+      );
+      expect(
+        versions.length,
+        "the source table holds one version — a view that does not deduplicate would pass this",
+      ).toBe(2);
+      expect(
+        new Set(versions.map((row) => row.OccurredAt)).size,
+        "both versions carry the same OccurredAt, so they share a sort key and this case is not being exercised",
+      ).toBe(2);
+      expect(
+        new Set(versions.map((row) => row.partition)).size,
+        "both versions landed in the same partition — the cross-partition half is not being exercised",
+      ).toBe(2);
+
+      const deduped = await selectRows<{ Score: number; DurationMs: string }>(
+        tenantA,
+        `SELECT Score, DurationMs FROM ${database}.evaluation_metrics ` +
+          `WHERE EvaluationId = '${evaluationId}'`,
+      );
+      expect(
+        deduped,
+        "the view returned both versions, so every count, sum and average over this dataset double-counts",
+      ).toHaveLength(1);
+      expect(
+        Number(deduped[0]!.Score),
+        "the view returned the stale version",
+      ).toBeCloseTo(EVALUATION_DEDUP_FIXTURE.latestScore);
+      expect(Number(deduped[0]!.DurationMs)).toBe(
+        EVALUATION_DEDUP_FIXTURE.latestDurationMs,
+      );
+    });
+
+    /**
+     * The same claim for every view, stated as a count: one row per record. A
      * duplicate here silently doubles every aggregate a caller writes, which is
      * the failure mode nobody notices.
+     *
+     * Grouped by the dataset's grain rather than by its source's sort key —
+     * grouping by the key the engine collapses on would ask each view whether it
+     * did what the engine already does, which is a question no view can fail.
      */
     /** @scenario "A governed view returns one row per logical record, the latest version" */
-    it("returns exactly one row per key for every view", async () => {
+    it("returns exactly one row per record for every view", async () => {
       for (const view of GOVERNED_VIEW_CATALOG) {
-        const keys = view.dedup.keyColumns.join(", ");
+        const keys = governedGrainColumns(view).join(", ");
         const duplicated = await selectScalar<string>(
           tenantA,
           `SELECT count() AS value FROM (` +
@@ -491,60 +632,83 @@ describe("given the governed views provisioned over the shipped fact tables", ()
    * "returned the right number" can come apart.
    */
   describe("when a rollup table holds two partial rows for one bucket", () => {
+    /**
+     * Read back measure by measure, over every measure the catalog declares,
+     * against totals no two of which are the same number. Both halves are
+     * load-bearing: a bucket whose measures share a value is a bucket where
+     * `TraceCount` reading `SpanCount` returns exactly what the assertion
+     * expects, and a case that checks four of eleven measures is a case a
+     * mislabelled twelfth walks straight past.
+     */
     /** @scenario "A pre-aggregated dataset returns one merged row per bucket" */
-    it("returns one merged row, each measure the sum of the parts", async () => {
-      // The control, on the physical table: without it a view that merges
-      // nothing passes, because the bucket would have been one row all along.
-      const parts = await selectScalar<string>(
-        harness.admin,
-        `SELECT count() AS value FROM ${facts}.trace_analytics_rollup ` +
-          `WHERE TenantId = '${harness.tenantA.tenantId}' ` +
-          `AND Model = '${ROLLUP_MERGE_FIXTURE.model}'`,
-      );
-      expect(
-        Number(parts),
-        "the bucket is stored as one row — a view that does not merge would pass this",
-      ).toBe(ROLLUP_MERGE_FIXTURE.parts.length);
+    it("returns one merged row, each measure the sum of its own column's parts", async () => {
+      for (const [name, filter, parts, totals] of [
+        [
+          "trace_metrics_by_minute",
+          `Model = '${ROLLUP_MERGE_FIXTURE.model}'`,
+          ROLLUP_MERGE_FIXTURE.traceParts,
+          ROLLUP_MERGE_TOTALS.trace,
+        ],
+        [
+          "evaluation_metrics_by_minute",
+          `EvaluatorType = '${ROLLUP_MERGE_FIXTURE.evaluatorType}'`,
+          ROLLUP_MERGE_FIXTURE.evaluationParts,
+          ROLLUP_MERGE_TOTALS.evaluation,
+        ],
+      ] as const) {
+        const view = GOVERNED_VIEW_CATALOG.find(
+          (entry) => entry.name === name,
+        )!;
+        const measures = view.columns.filter((column) => column.summed);
+        const expected = totals;
 
-      const merged = await selectRows<{
-        SpanCount: string;
-        TraceCount: string;
-        CostSum: number;
-        DurationSum: string;
-        PromptTokensSum: string;
-      }>(
-        tenantA,
-        `SELECT SpanCount, TraceCount, CostSum, DurationSum, PromptTokensSum ` +
-          `FROM ${database}.trace_metrics_by_minute ` +
-          `WHERE Model = '${ROLLUP_MERGE_FIXTURE.model}'`,
-      );
-      expect(merged).toHaveLength(1);
-      expect(Number(merged[0]!.SpanCount)).toBe(ROLLUP_MERGE_TOTALS.count);
-      expect(Number(merged[0]!.TraceCount)).toBe(ROLLUP_MERGE_TOTALS.count);
-      expect(Number(merged[0]!.CostSum)).toBeCloseTo(ROLLUP_MERGE_TOTALS.cost);
-      expect(Number(merged[0]!.DurationSum)).toBe(ROLLUP_MERGE_TOTALS.duration);
-      expect(Number(merged[0]!.PromptTokensSum)).toBe(
-        ROLLUP_MERGE_TOTALS.tokens,
-      );
+        // The fixture's own controls, before it is trusted to prove anything.
+        // Every measure has a total, so a measure added to the catalog cannot
+        // be silently unchecked; and no two totals are equal, so a view that
+        // read one measure out of another's column reports a number that
+        // belongs to something else.
+        expect(
+          measures.map((column) => column.name).sort(),
+          `${name} declares a measure the merge fixture states no total for`,
+        ).toEqual(Object.keys(expected).sort());
+        expect(
+          new Set(Object.values(expected)).size,
+          `${name}'s totals repeat a value, so swapping those two measures would pass`,
+        ).toBe(Object.values(expected).length);
 
-      const evaluations = await selectRows<{
-        EvalCount: string;
-        ScoreSum: number;
-        CostSum: number;
-      }>(
-        tenantA,
-        `SELECT EvalCount, ScoreSum, CostSum ` +
-          `FROM ${database}.evaluation_metrics_by_minute ` +
-          `WHERE EvaluatorType = '${ROLLUP_MERGE_FIXTURE.evaluatorType}'`,
-      );
-      expect(evaluations).toHaveLength(1);
-      expect(Number(evaluations[0]!.EvalCount)).toBe(ROLLUP_MERGE_TOTALS.count);
-      expect(Number(evaluations[0]!.ScoreSum)).toBeCloseTo(
-        ROLLUP_MERGE_TOTALS.score,
-      );
-      expect(Number(evaluations[0]!.CostSum)).toBeCloseTo(
-        ROLLUP_MERGE_TOTALS.cost,
-      );
+        // The control on the physical table: without it a view that merges
+        // nothing passes, because the bucket would have been one row all along.
+        const stored = await selectScalar<string>(
+          harness.admin,
+          `SELECT count() AS value FROM ${facts}.${view.sourceTable} ` +
+            `WHERE TenantId = '${harness.tenantA.tenantId}' AND ${filter}`,
+        );
+        expect(
+          Number(stored),
+          `the ${name} bucket is stored as one row — a view that does not merge would pass this`,
+        ).toBe(parts.length);
+
+        const merged = await selectRows<Record<string, string | number>>(
+          tenantA,
+          `SELECT ${measures.map((column) => column.name).join(", ")} ` +
+            `FROM ${database}.${name} WHERE ${filter}`,
+        );
+        expect(merged, `${name} did not merge the bucket`).toHaveLength(1);
+
+        for (const column of measures) {
+          const actual = Number(merged[0]![column.name]);
+          const total = expected[column.name]!;
+          const where = `${name}.${column.name} is ${actual}, the parts add up to ${total}`;
+          // A float measure is compared approximately and an integer one
+          // exactly, because an integer measure landing near its total rather
+          // than on it is a real failure.
+          if (column.type.startsWith("Float")) {
+            expect(actual, where).toBeCloseTo(total);
+          } else {
+            expect(actual, where).toBe(total);
+          }
+        }
+      }
     });
 
     /**

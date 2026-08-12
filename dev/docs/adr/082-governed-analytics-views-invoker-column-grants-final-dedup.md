@@ -125,7 +125,7 @@ never hand-listed.
 - These objects are provisioning statements, not goose migrations. Deployment
   wiring is a later slice of #6480.
 
-## Amendment: aggregating sources, a third answer to "which row survives" (2026-08-11, #6856)
+## Amendment: aggregating sources, moving sort keys, and what a grain is (2026-08-11, #6856)
 
 Exposing the modern analytics projections
 ([#6856](https://github.com/langwatch/langwatch/issues/6856)) brought the first
@@ -133,11 +133,11 @@ source tables that are **not** `ReplacingMergeTree`s: `trace_analytics_rollup`
 and `evaluation_analytics_rollup` are `AggregatingMergeTree`s, whose rows for one
 sort key are *summed* rather than one superseding the others.
 
-The decision above still holds, unchanged: `FINAL` is what the view uses.
-Measured against 25.10.2.65 with merges stopped and a bucket written as two
-parts, `FINAL` over an `AggregatingMergeTree` returns one row per sort key with
-each `SimpleAggregateFunction(sum, …)` column summed across the parts. What
-changes is what the catalog has to *say*, on two points:
+The decision above holds for them: `FINAL` is what those views use. Measured
+against 25.10.2.65 with merges stopped and a bucket written as two parts, `FINAL`
+over an `AggregatingMergeTree` returns one row per sort key with each
+`SimpleAggregateFunction(sum, …)` column summed across the parts. What changes is
+what the catalog has to *say*, and — for one dataset — which strategy it uses.
 
 **A catalog entry declares an aggregating source explicitly**
 (`GovernedViewDedup.aggregating`), and such an entry declares no version column.
@@ -147,17 +147,52 @@ aggregating entry would otherwise be indistinguishable from a `ReplacingMergeTre
 entry that forgot to name its version. `dedupPredicate` and the guard now branch
 on the flag rather than on the absence.
 
-**The key columns are the source's whole `ORDER BY`.** This was already true of
-the existing entries and is now stated as the rule, because on an aggregating
-source getting it wrong is not a duplicate row — it is a *wrong number*, one
-model's cost summed into another's under a key that merged too much.
+**The key columns are the source's whole `ORDER BY`, and an integration case now
+enforces it** against `system.tables.sorting_key` and `engine`. Stating the rule
+was not enough: under the shipped `final` strategy the engine collapses on the
+table's own `ORDER BY` and on nothing an entry says, so a wrong declaration does
+not change a single returned number — it changes the *diagnostic*, which then
+describes a grain the engine is not using and reports fan-out on joins that do
+not fan out (or stays silent on ones that do). The rule is true by construction
+now rather than by review.
 
-**Rollup measures are cast to their plain types in the view body**
-(`toUInt64`, `toInt64`, `toFloat64`). A view that passes such a column straight
-through reports it to `system.columns`, and therefore to the schema endpoint, as
-`SimpleAggregateFunction(sum, UInt64)` — the name of a storage engine where a
-caller expects the type of a number. `FINAL` has already merged the parts by the
-time the projection runs, so the cast reads the merged total.
+**The grain is a separate declaration from the sort key**
+(`GovernedViewDefinition.grainColumns`). The analytics projections are sorted
+time-first for range scans, so `trace_analytics` sorts by
+`(TenantId, OccurredAt, TraceId)` while still being one row per trace. Publishing
+the sort key as the grain made the fanout diagnostic contradict the schema
+endpoint on the very join it advertises — `(TenantId, TraceId)` reported as
+fanning out on `OccurredAt`. The diagnostic reads the grain; `keyColumns` stays
+the engine's key, which is what the enforcement above compares.
+
+**`evaluation_metrics` pins the `in-tuple` strategy** (`GovernedViewDedup
+.strategy`), the one entry in the catalog that does not take the measured
+default. `evaluation_analytics` folds its progress watermark —
+`max(previous, event time)` — straight into `OccurredAt`, which is second in its
+sort key, so two lifecycle versions of one evaluation are two *keys*: `FINAL`
+merges neither into the other and returns both. That is not a visible duplicate;
+it is every `count`, `sum` and `avg` a caller writes over the dataset silently
+counting the evaluation once per version. The owning repository refuses `FINAL`
+on this table for the same reason. The cost is the one the measurement above
+found — the `max()` subquery carries no predicate from the caller's query, so it
+reads the tenant's whole evaluation history per query — and it is paid on this
+dataset only, rather than by moving the default onto tables whose sort keys hold
+still. The residual is a tie: two writers that stamp the same `UpdatedAt` both
+satisfy the `IN`, and a view has no per-key `LIMIT 1` to rank them, so such a pair
+returns two rows — rare, and visible as a duplicate rather than as a plausible
+number.
+
+**Rollup measures declare `summed` and the cast is derived from it**
+(`to<published type>` over the column's own source column). A view that passes
+such a column straight through reports it to `system.columns`, and therefore to
+the schema endpoint, as `SimpleAggregateFunction(sum, UInt64)` — the name of a
+storage engine where a caller expects the type of a number. The merge has run by
+the time the projection does, so the cast reads the merged total. The cast is
+derived rather than written because a hand-written one restates the column's name
+and its type beside it: a copy-paste leaving `TraceCount` reading `SpanCount`
+type-checks, returns a number, and passes any fixture whose measures share a
+value. The merge fixture now gives every measure a distinct value and total, so
+that second guard can disagree with the first.
 
 Two datasets now answer "how many traces" (`traces` and `trace_metrics`), and two
 answer it for evaluations. That is deliberate and is not two sources of truth:

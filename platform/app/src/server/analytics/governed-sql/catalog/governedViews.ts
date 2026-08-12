@@ -51,13 +51,23 @@
  *
  * Most source tables are `ReplacingMergeTree`s carrying more than one version
  * of a row until merges catch up, so each view deduplicates and each entry
- * states the identity of the row that survives — and states it as the source's
- * whole `ORDER BY`, because that is the key the engine itself collapses on. The
- * `_by_minute` rollups are `AggregatingMergeTree`s instead, whose rows for one
- * key are summed rather than superseded — which their entries declare, because
- * reading one as if it had versions would expose each unmerged partial row as
- * its own answer. See `../views.ts` for how, and for the measurement behind the
- * choice.
+ * states two things about its rows. `dedup.keyColumns` is the source's whole
+ * `ORDER BY` — the key the *engine* collapses on, which is what `FINAL` can
+ * promise and nothing more. `grainColumns` is what one row of the *dataset* is,
+ * declared only where the two differ, which is where the sort key leads with a
+ * business time so that range scans are monotonic. Both analytics projections
+ * are sorted that way, and they answer it differently: `trace_analytics` freezes
+ * its `OccurredAt` as a storage anchor, so the engine's key and the trace are
+ * the same row, while `evaluation_analytics` writes its progress watermark into
+ * `OccurredAt`, which moves — so that entry pins the `in-tuple` strategy and is
+ * deduplicated by the evaluation rather than by the engine's key.
+ *
+ * The `_by_minute` rollups are `AggregatingMergeTree`s instead, whose rows for
+ * one key are summed rather than superseded — which their entries declare,
+ * because reading one as if it had versions would expose each unmerged partial
+ * row as its own answer. Their measures declare `summed` and the cast back to a
+ * plain type is derived from it. See `../views.ts` for how, and for the
+ * measurement behind the default.
  *
  * @see ./types.ts — the shapes, and the derivations the validator reads
  * @see specs/analytics/governed-sql-api.feature
@@ -790,31 +800,16 @@ const SIMULATIONS: GovernedViewDefinition = {
 };
 
 /**
- * A `SimpleAggregateFunction(sum, T)` column, read back as plain `T`.
- *
- * The cast is what keeps the published type a type a caller can reason about.
- * Measured against 25.10.2.65, a view that passes such a column straight
- * through reports it to `system.columns` — and therefore to the schema
- * endpoint — as `SimpleAggregateFunction(sum, UInt64)`, which tells the caller
- * nothing except which storage engine is underneath. The values are identical
- * either way: `FINAL` has already merged the parts by the time the projection
- * runs, so the cast reads the merged total, not one part's share of it.
- */
-function summedColumn(
-  name: string,
-  cast: "toUInt64" | "toInt64" | "toFloat64",
-): (source: (column: string) => string) => string {
-  return (source) => `${cast}(${source(name)})`;
-}
-
-/**
  * Trace metrics: one row per trace, the analytics projection of the same fold.
  *
- * The grain is the source's whole `ORDER BY`, which includes `OccurredAt`.
- * That column is a storage anchor written once and frozen (migration 00061), so
- * for every row the current fold writes there is one row per trace — but rows
- * predating the anchor could move partitions, and the engine collapses only on
- * the full key, so a distinct count is the honest way to count traces here.
+ * One row per trace is the *grain*; the source's `ORDER BY` is wider, leading
+ * with `OccurredAt` so that range scans are monotonic over a part. The two
+ * agree for every row the current fold writes, because `OccurredAt` here is a
+ * storage anchor written once and frozen (migration 00061, ADR-071). Where they
+ * can still come apart is a row written before that freeze, or one whose anchor
+ * a post-miss rebuild re-stamped: those carry two `OccurredAt`s, which the
+ * engine reads as two keys and `FINAL` therefore keeps — so `uniqExact(TraceId)`
+ * is the honest way to count traces here, as the description says.
  */
 const TRACE_METRICS: GovernedViewDefinition = {
   name: "trace_metrics",
@@ -822,7 +817,8 @@ const TRACE_METRICS: GovernedViewDefinition = {
   description:
     "One row per trace, time-sorted, carrying its metrics and the user, conversation, customer and origin dimensions. Count traces with uniqExact(TraceId).",
   gates: [],
-  grain: "one row per (TenantId, OccurredAt, TraceId), latest version only",
+  grain: "one row per (TenantId, TraceId), latest version only",
+  grainColumns: ["TenantId", "TraceId"],
   joinKeys: ["TenantId", "TraceId"],
   timeColumn: "OccurredAt",
   freshness: PROJECTION_FRESHNESS,
@@ -1054,7 +1050,12 @@ const TRACE_METRICS_BY_MINUTE: GovernedViewDefinition = {
   gates: [],
   grain:
     "one merged row per (TenantId, BucketStart, Model, SpanType), every measure summed",
-  joinKeys: ["TenantId", "BucketStart"],
+  // The whole bucket key, not the `(TenantId, BucketStart)` prefix a caller is
+  // most likely to want: every column here is a *sum*, so a join that matches
+  // less than the key meets several buckets and multiplies them — a wrong
+  // number rather than a repeated row. The prefix is still expressible; what
+  // the schema no longer does is advertise it as the way to join this dataset.
+  joinKeys: ["TenantId", "BucketStart", "Model", "SpanType"],
   timeColumn: "BucketStart",
   freshness: PROJECTION_FRESHNESS,
   dedup: {
@@ -1101,7 +1102,7 @@ const TRACE_METRICS_BY_MINUTE: GovernedViewDefinition = {
       description: "Spans recorded in the bucket.",
       gates: [],
       sourceColumns: ["SpanCount"],
-      expression: summedColumn("SpanCount", "toUInt64"),
+      summed: true,
     },
     {
       name: "TraceCount",
@@ -1110,7 +1111,7 @@ const TRACE_METRICS_BY_MINUTE: GovernedViewDefinition = {
         "Traces started in the bucket. Counts a trace once its root span arrives, so a trace with no root span contributes measures and no count.",
       gates: [],
       sourceColumns: ["TraceCount"],
-      expression: summedColumn("TraceCount", "toUInt64"),
+      summed: true,
     },
     {
       name: "ErrorCount",
@@ -1119,7 +1120,7 @@ const TRACE_METRICS_BY_MINUTE: GovernedViewDefinition = {
         "Traces in the bucket whose root span ended in an error status.",
       gates: [],
       sourceColumns: ["ErrorCount"],
-      expression: summedColumn("ErrorCount", "toUInt64"),
+      summed: true,
     },
     {
       name: "CostSum",
@@ -1128,7 +1129,7 @@ const TRACE_METRICS_BY_MINUTE: GovernedViewDefinition = {
       description: "Total cost of the bucket's spans, in USD.",
       gates: ["costs"],
       sourceColumns: ["CostSum"],
-      expression: summedColumn("CostSum", "toFloat64"),
+      summed: true,
     },
     {
       name: "NonBilledCostSum",
@@ -1138,7 +1139,7 @@ const TRACE_METRICS_BY_MINUTE: GovernedViewDefinition = {
         "Cost of the bucket's spans that is not billed, in USD. Billed cost is the difference from CostSum.",
       gates: ["costs"],
       sourceColumns: ["NonBilledCostSum"],
-      expression: summedColumn("NonBilledCostSum", "toFloat64"),
+      summed: true,
     },
     {
       name: "DurationSum",
@@ -1148,7 +1149,7 @@ const TRACE_METRICS_BY_MINUTE: GovernedViewDefinition = {
         "Total wall-clock duration of the bucket's traces, in milliseconds.",
       gates: [],
       sourceColumns: ["DurationSum"],
-      expression: summedColumn("DurationSum", "toInt64"),
+      summed: true,
     },
     {
       name: "PromptTokensSum",
@@ -1157,7 +1158,7 @@ const TRACE_METRICS_BY_MINUTE: GovernedViewDefinition = {
       description: "Prompt tokens across the bucket's spans.",
       gates: [],
       sourceColumns: ["PromptTokensSum"],
-      expression: summedColumn("PromptTokensSum", "toUInt64"),
+      summed: true,
     },
     {
       name: "CompletionTokensSum",
@@ -1166,7 +1167,7 @@ const TRACE_METRICS_BY_MINUTE: GovernedViewDefinition = {
       description: "Completion tokens across the bucket's spans.",
       gates: [],
       sourceColumns: ["CompletionTokensSum"],
-      expression: summedColumn("CompletionTokensSum", "toUInt64"),
+      summed: true,
     },
     {
       name: "CacheReadTokensSum",
@@ -1176,7 +1177,7 @@ const TRACE_METRICS_BY_MINUTE: GovernedViewDefinition = {
         "Tokens served from the provider's prompt cache across the bucket's spans.",
       gates: [],
       sourceColumns: ["CacheReadTokensSum"],
-      expression: summedColumn("CacheReadTokensSum", "toUInt64"),
+      summed: true,
     },
     {
       name: "CacheWriteTokensSum",
@@ -1186,7 +1187,7 @@ const TRACE_METRICS_BY_MINUTE: GovernedViewDefinition = {
         "Tokens written into the provider's prompt cache across the bucket's spans.",
       gates: [],
       sourceColumns: ["CacheWriteTokensSum"],
-      expression: summedColumn("CacheWriteTokensSum", "toUInt64"),
+      summed: true,
     },
     {
       name: "ReasoningTokensSum",
@@ -1195,24 +1196,38 @@ const TRACE_METRICS_BY_MINUTE: GovernedViewDefinition = {
       description: "Reasoning tokens across the bucket's spans.",
       gates: [],
       sourceColumns: ["ReasoningTokensSum"],
-      expression: summedColumn("ReasoningTokensSum", "toUInt64"),
+      summed: true,
     },
   ],
 };
 
-/** Evaluation metrics: one row per evaluation, the analytics projection. */
+/**
+ * Evaluation metrics: one row per evaluation, the analytics projection.
+ *
+ * The one entry in the catalog that does not take the shipped dedup strategy.
+ * `evaluation_analytics` is sorted `(TenantId, OccurredAt, EvaluationId)`,
+ * and the fold writes its progress watermark — `max(previous, event time)` —
+ * straight into `OccurredAt`, so an evaluation that received a second lifecycle
+ * event carries two sort keys. `FINAL` merges by the sort key and nothing else,
+ * so it would keep both rows: not a visible duplicate, but every `count`, `sum`
+ * and `avg` a caller writes over this dataset silently counting that evaluation
+ * twice. The owning repository refuses `FINAL` on this table for the same
+ * reason, and deduplicates the way this entry does — `max(UpdatedAt)` per
+ * evaluation, whatever `OccurredAt` each version carries.
+ */
 const EVALUATION_METRICS: GovernedViewDefinition = {
   name: "evaluation_metrics",
   sourceTable: "evaluation_analytics",
   description:
-    "One row per evaluation, time-sorted, carrying its outcome, cost and the trace dimensions it inherited. Count evaluations with uniqExact(EvaluationId).",
+    "One row per evaluation, its latest state, time-sorted, carrying its outcome, cost and the trace dimensions it inherited.",
   gates: [],
-  grain:
-    "one row per (TenantId, OccurredAt, EvaluationId), latest version only",
+  grain: "one row per (TenantId, EvaluationId), latest version only",
+  grainColumns: ["TenantId", "EvaluationId"],
   joinKeys: ["TenantId", "TraceId"],
   timeColumn: "OccurredAt",
   freshness: PROJECTION_FRESHNESS,
   dedup: {
+    strategy: "in-tuple",
     keyColumns: ["TenantId", "OccurredAt", "EvaluationId"],
     versionColumn: "UpdatedAt",
   },
@@ -1392,7 +1407,8 @@ const EVALUATION_METRICS_BY_MINUTE: GovernedViewDefinition = {
   gates: [],
   grain:
     "one merged row per (TenantId, BucketStart, EvaluatorType, Status), every measure summed",
-  joinKeys: ["TenantId", "BucketStart"],
+  // The whole bucket key, for the reason `trace_metrics_by_minute` states.
+  joinKeys: ["TenantId", "BucketStart", "EvaluatorType", "Status"],
   timeColumn: "BucketStart",
   freshness: PROJECTION_FRESHNESS,
   dedup: {
@@ -1436,7 +1452,7 @@ const EVALUATION_METRICS_BY_MINUTE: GovernedViewDefinition = {
       description: "Evaluations that finished in the bucket.",
       gates: [],
       sourceColumns: ["EvalCount"],
-      expression: summedColumn("EvalCount", "toUInt64"),
+      summed: true,
     },
     {
       name: "PassCount",
@@ -1445,7 +1461,7 @@ const EVALUATION_METRICS_BY_MINUTE: GovernedViewDefinition = {
         "Evaluations in the bucket the evaluator passed. Zero for evaluators that emit only a score.",
       gates: [],
       sourceColumns: ["PassCount"],
-      expression: summedColumn("PassCount", "toUInt64"),
+      summed: true,
     },
     {
       name: "FailCount",
@@ -1454,7 +1470,7 @@ const EVALUATION_METRICS_BY_MINUTE: GovernedViewDefinition = {
         "Evaluations in the bucket the evaluator failed. Zero for evaluators that emit only a score.",
       gates: [],
       sourceColumns: ["FailCount"],
-      expression: summedColumn("FailCount", "toUInt64"),
+      summed: true,
     },
     {
       name: "ErrorCount",
@@ -1462,7 +1478,7 @@ const EVALUATION_METRICS_BY_MINUTE: GovernedViewDefinition = {
       description: "Evaluations in the bucket that ended in an error.",
       gates: [],
       sourceColumns: ["ErrorCount"],
-      expression: summedColumn("ErrorCount", "toUInt64"),
+      summed: true,
     },
     {
       name: "SkippedCount",
@@ -1470,7 +1486,7 @@ const EVALUATION_METRICS_BY_MINUTE: GovernedViewDefinition = {
       description: "Evaluations in the bucket that were skipped.",
       gates: [],
       sourceColumns: ["SkippedCount"],
-      expression: summedColumn("SkippedCount", "toUInt64"),
+      summed: true,
     },
     {
       name: "ScoreSum",
@@ -1479,7 +1495,7 @@ const EVALUATION_METRICS_BY_MINUTE: GovernedViewDefinition = {
         "Scores added up across the bucket. Divide by ScoreCount for the average score.",
       gates: [],
       sourceColumns: ["ScoreSum"],
-      expression: summedColumn("ScoreSum", "toFloat64"),
+      summed: true,
     },
     {
       name: "ScoreCount",
@@ -1488,7 +1504,7 @@ const EVALUATION_METRICS_BY_MINUTE: GovernedViewDefinition = {
         "Evaluations in the bucket that emitted a numeric score, the denominator for ScoreSum.",
       gates: [],
       sourceColumns: ["ScoreCount"],
-      expression: summedColumn("ScoreCount", "toUInt64"),
+      summed: true,
     },
     {
       name: "DurationSum",
@@ -1498,7 +1514,7 @@ const EVALUATION_METRICS_BY_MINUTE: GovernedViewDefinition = {
         "Total wall-clock duration of the bucket's evaluations, in milliseconds.",
       gates: [],
       sourceColumns: ["DurationSum"],
-      expression: summedColumn("DurationSum", "toInt64"),
+      summed: true,
     },
     {
       name: "CostSum",
@@ -1507,7 +1523,7 @@ const EVALUATION_METRICS_BY_MINUTE: GovernedViewDefinition = {
       description: "Total cost of the bucket's evaluations, in USD.",
       gates: ["costs"],
       sourceColumns: ["CostSum"],
-      expression: summedColumn("CostSum", "toFloat64"),
+      summed: true,
     },
     {
       name: "NonBilledCostSum",
@@ -1517,7 +1533,7 @@ const EVALUATION_METRICS_BY_MINUTE: GovernedViewDefinition = {
         "Cost of the bucket's evaluations that is not billed, in USD. Billed cost is the difference from CostSum.",
       gates: ["costs"],
       sourceColumns: ["NonBilledCostSum"],
-      expression: summedColumn("NonBilledCostSum", "toFloat64"),
+      summed: true,
     },
   ],
 };

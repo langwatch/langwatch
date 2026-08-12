@@ -35,6 +35,7 @@ import {
   governedColumnGates,
   governedContentGatedColumns,
   governedGatedColumns,
+  governedGrainColumns,
   governedViewSourceColumns,
   governedVisibleViews,
   isContentGated,
@@ -98,15 +99,38 @@ describe("given the governed view catalog", () => {
           `${view.name} has no dedup key`,
         ).toBeGreaterThan(0);
 
-        // The key columns are the dataset's grain, which the fanout diagnostic
-        // reads against the columns a caller can actually name — so they have
-        // to be exposed, whichever residence the dataset has.
-        for (const column of view.dedup.keyColumns) {
+        // Both key sets are read against the columns a caller can actually
+        // name — the grain by the fanout diagnostic, the engine key by the view
+        // body — so both have to be exposed, whichever residence the dataset
+        // has.
+        for (const column of [
+          ...view.dedup.keyColumns,
+          ...governedGrainColumns(view),
+        ]) {
           expect(
             columnNames,
-            `${view.name} declares a grain column it does not expose`,
+            `${view.name} declares a key column it does not expose`,
           ).toContain(column);
         }
+
+        // A grain wider than the key the engine collapses on would mean the
+        // engine merges rows the dataset calls distinct — lost data, not a
+        // duplicate. It is also what keeps the grant sufficient: the source
+        // columns are derived from the key columns, and the `in-tuple` body
+        // names the grain.
+        for (const column of governedGrainColumns(view)) {
+          expect(
+            view.dedup.keyColumns,
+            `${view.name} calls ${column} part of its grain, but its source does not sort by it`,
+          ).toContain(column);
+        }
+
+        // `none` is the measurement baseline: pinned on an entry it would ship
+        // every unmerged version as its own row.
+        expect(
+          view.dedup.strategy,
+          `${view.name} pins the dedup strategy that does not deduplicate`,
+        ).not.toBe("none");
 
         if (isPostgresResident(view)) {
           // Nothing to collapse: PostgreSQL keeps one row per key, and a
@@ -465,8 +489,15 @@ describe("given the governed view catalog", () => {
         // *on*, or a measure it merges. A dimension missing from the key set
         // is the silent failure — the view would merge across it and add two
         // models' costs together under one row.
+        //
+        // Which is which is read from the column's own `summed` declaration
+        // rather than from "it has an expression": an expression is how a
+        // measure used to be written, and any column can have one — the
+        // filtered attribute maps do — so classifying by its presence would
+        // have called a filtered map a measure and a hand-written measure a
+        // dimension.
         const measures = view.columns
-          .filter((column) => column.expression !== undefined)
+          .filter((column) => column.summed)
           .map((column) => column.name);
         expect(
           [...view.dedup.keyColumns, ...measures].sort(),
@@ -477,6 +508,38 @@ describe("given the governed view catalog", () => {
           `${view.name} merges on a column that is itself a measure`,
         ).toEqual([]);
       }
+    });
+
+    /**
+     * Every column of a rollup is a sum, so a join matching less than the whole
+     * bucket key does not repeat a row — it adds several buckets' measures
+     * together under one. Advertising the prefix as the join surface is
+     * therefore advertising a wrong number.
+     */
+    /** @scenario "A pre-aggregated dataset advertises its whole bucket key as its join keys" */
+    it("advertises the whole bucket key as its join keys, not a prefix of it", () => {
+      for (const view of aggregating) {
+        expect(
+          [...view.joinKeys].sort(),
+          `${view.name} advertises a join on part of its bucket key, which multiplies its measures`,
+        ).toEqual([...governedGrainColumns(view)].sort());
+      }
+    });
+
+    /**
+     * The control for the case above: a dataset whose rows are records rather
+     * than buckets legitimately advertises a foreign key it is *not* unique on
+     * — `evaluations` joins to `traces` on `TraceId`, many to one — and the
+     * fanout diagnostic is what tells a caller about that. Without this, the
+     * rule above could be read as "join keys are always the grain", which the
+     * shipped catalog does not say and must not start saying.
+     */
+    /** @scenario "A pre-aggregated dataset advertises its whole bucket key as its join keys" */
+    it("leaves a record dataset free to advertise a foreign key it is not unique on", () => {
+      const evaluations = governedViewByName("evaluations")!;
+      expect([...evaluations.joinKeys].sort()).not.toEqual(
+        [...governedGrainColumns(evaluations)].sort(),
+      );
     });
 
     /** @scenario "A pre-aggregated dataset declares that its rows merge rather than supersede" */
@@ -491,6 +554,133 @@ describe("given the governed view catalog", () => {
       for (const view of versioned) {
         expect(view.dedup.versionColumn, `${view.name}`).toBeDefined();
       }
+    });
+  });
+
+  /**
+   * The dataset whose engine key and grain come apart. `evaluation_analytics`
+   * sorts by `(TenantId, OccurredAt, EvaluationId)` and its fold writes a moving
+   * watermark into `OccurredAt`, so the engine sees one evaluation's versions as
+   * different keys — `FINAL` keeps all of them and every aggregate counts the
+   * evaluation once per version, with nothing in the result that looks wrong.
+   */
+  describe("when a dataset's source sorts by a column its write path moves", () => {
+    const evaluationMetrics = governedViewByName("evaluation_metrics")!;
+
+    /** @scenario "A dataset whose sort key moves declares the strategy that deduplicates it" */
+    it("deduplicates by the record rather than by the engine's key", () => {
+      expect(
+        evaluationMetrics.dedup.strategy,
+        "evaluation_metrics takes the default strategy, which collapses on a key its source moves",
+      ).toBe("in-tuple");
+      expect([...governedGrainColumns(evaluationMetrics)]).toEqual([
+        "TenantId",
+        "EvaluationId",
+      ]);
+      expect(
+        governedGrainColumns(evaluationMetrics).length,
+        "the grain is the whole sort key, so this dataset needs no strategy of its own",
+      ).toBeLessThan(evaluationMetrics.dedup.keyColumns.length);
+      expect(evaluationMetrics.dedup.versionColumn).toBe("UpdatedAt");
+    });
+
+    /**
+     * The control. Pinning a strategy is a claim about one source table, and a
+     * catalog that pinned it everywhere would have moved the default instead —
+     * paying an unbounded subquery per query on every dataset to fix one.
+     */
+    it("leaves the datasets whose sort keys hold still on the shipped default", () => {
+      const pinned = GOVERNED_VIEW_CATALOG.filter(
+        (view) => view.dedup.strategy !== undefined,
+      ).map((view) => view.name);
+      expect(pinned).toEqual(["evaluation_metrics"]);
+    });
+  });
+
+  /**
+   * A measure's SQL, which is the one thing about a rollup column that can be
+   * wrong without anything noticing: a cast returns a number whatever column it
+   * reads, and a fixture whose measures share a value agrees with either
+   * reading. So the column states what it is once — its name, its published
+   * type, and `summed` — and the SQL is derived from those rather than written
+   * a second time beside them.
+   */
+  describe("when a summed measure is declared", () => {
+    const summed = GOVERNED_VIEW_CATALOG.flatMap((view) =>
+      view.columns
+        .filter((column) => column.summed)
+        .map((column) => ({ view, column })),
+    );
+
+    /** @scenario "A summed measure reads the column it is named after" */
+    it("reads its own column, so no measure can be labelled as another", () => {
+      expect(
+        summed.length,
+        "no dataset declares a summed measure — this case is inspecting nothing",
+      ).toBeGreaterThan(0);
+
+      for (const { view, column } of summed) {
+        expect(
+          [...column.sourceColumns],
+          `${view.name}.${column.name} is a summed measure reading another column, which no cast or type would reveal`,
+        ).toEqual([column.name]);
+      }
+    });
+
+    /** @scenario "A summed measure reads the column it is named after" */
+    it("casts it to exactly the type the schema endpoint publishes", () => {
+      for (const { view, column } of summed) {
+        expect(
+          expressionOf(column),
+          `${view.name}.${column.name} does not read back as the type it publishes`,
+        ).toBe(`to${column.type}(${SOURCE(column.name)})`);
+      }
+    });
+
+    /**
+     * The flag says "the engine stores this as `SimpleAggregateFunction(sum,
+     * …)`", which is only true under an `AggregatingMergeTree`. On any other
+     * source the cast would be describing an engine that is not underneath it.
+     */
+    it("appears only on a dataset whose source aggregates", () => {
+      for (const { view, column } of summed) {
+        expect(
+          view.dedup.aggregating,
+          `${view.name}.${column.name} is summed, but ${view.sourceTable} does not aggregate`,
+        ).toBe(true);
+      }
+    });
+
+    /**
+     * The derivation refuses to be talked out of itself. Both refusals are the
+     * same guarantee from two directions: the SQL for a summed measure comes
+     * from the column, and there is no way to supply SQL that says otherwise.
+     */
+    it("refuses a hand-written expression beside the flag", () => {
+      expect(() =>
+        expressionOf({
+          name: "TraceCount",
+          type: "UInt64",
+          description: "Traces in the bucket.",
+          gates: [],
+          sourceColumns: ["TraceCount"],
+          summed: true,
+          expression: (source) => `toUInt64(${source("SpanCount")})`,
+        }),
+      ).toThrow(/summed measure and also declares an expression/);
+    });
+
+    it("refuses a type the merged total cannot be cast to", () => {
+      expect(() =>
+        expressionOf({
+          name: "CostSum",
+          type: "Nullable(Float64)",
+          description: "Cost of the bucket.",
+          gates: [],
+          sourceColumns: ["CostSum"],
+          summed: true,
+        }),
+      ).toThrow(/not a plain numeric type/);
     });
   });
 
