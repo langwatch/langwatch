@@ -48,6 +48,30 @@ Feature: Per-series filters and percentage mode on analytics graphs
     Then only the filtered series is narrowed to traces holding a matching span
 
   @integration
+  Scenario: A per-series filter narrows its series on a grouped graph
+    Given a graph counting traces grouped by span type, with one filtered series and one unfiltered
+    When the graph is queried over a window
+    Then every group reports the filtered count for one series and the whole count for the other
+
+  @integration
+  Scenario: A per-series filter narrows its series alongside an evaluation measurement
+    Given a graph pairing an evaluation score with a trace count filtered to traces with an error
+    When the graph is queried over a window
+    Then the trace count covers only traces with an error and the score is unaffected
+
+  @integration
+  Scenario: A filtered average or extremum reports no value when nothing matched
+    Given a graph reporting the shortest trace duration, filtered to something no trace matches
+    When the graph is queried over a window that does hold traces
+    Then the series reports no value rather than a duration of zero
+
+  @unit
+  Scenario: An alert on a series the query refuses is skipped, not retried forever
+    Given an alert watching a series that cannot be shown as a percentage
+    When the alert is evaluated
+    Then the evaluation is skipped instead of failing, so other alerts keep running
+
+  @integration
   Scenario: Grouping by error status puts each trace in exactly one bucket
     Given a graph counting traces grouped by whether the trace contains an error
     When the graph is queried over a window

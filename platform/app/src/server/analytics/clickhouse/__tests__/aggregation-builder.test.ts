@@ -965,6 +965,41 @@ describe("aggregation-builder", () => {
         expect(result.sql).toContain("AND ((ts.ContainsErrorStatus = 1))");
       });
 
+      // ClickHouse's `-If` combinators do NOT return NULL for an empty match
+      // set when the source column is non-nullable — `minIf` returns 0. A
+      // filtered latency floor would then draw a real-looking 0ms line for
+      // every bucket the filter excluded, where the row parser and ES both
+      // leave a non-additive series absent.
+      describe("when the aggregation is not additive", () => {
+        it("reports no value instead of zero for a bucket nothing matched", () => {
+          const result = buildTimeseriesQuery({
+            ...baseInput,
+            series: [
+              {
+                metric:
+                  "performance.completion_time" as FlattenAnalyticsMetricsEnum,
+                aggregation: "min" as const,
+                filters: { "traces.error": ["true"] },
+              },
+            ],
+          });
+
+          expect(result.sql).toContain(
+            "if(countIf((ts.ContainsErrorStatus = 1)) > 0, min",
+          );
+          expect(result.sql).toContain(", NULL) AS 0__");
+        });
+
+        it("leaves an additive aggregation unguarded, because zero is the truth there", () => {
+          const result = buildTimeseriesQuery({
+            ...baseInput,
+            series: [errorSeries(["true"])],
+          });
+
+          expect(result.sql).not.toContain("NULL) AS 0__");
+        });
+      });
+
       describe("when the series is also shown as a percentage", () => {
         // @scenario "Percentage mode on an unfiltered series leaves the series unchanged"
         it("leaves an unfiltered series exactly as it was", () => {

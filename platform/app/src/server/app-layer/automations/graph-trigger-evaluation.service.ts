@@ -30,6 +30,7 @@ import {
 import { buildGraphAlertTemplateContext } from "@langwatch/automations/templating/templateContext";
 import { createLogger } from "@langwatch/observability";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
+import { isSeriesPercentageUnsupported } from "~/server/analytics/errors";
 import type { CustomGraph, Project, Trigger } from "~/generated/prisma/client";
 import type {
   SeriesInputType,
@@ -323,31 +324,59 @@ export async function evaluateGraphTrigger({
       maxResultRows: GRAPH_TRIGGER_MAX_RESULT_ROWS,
     });
   } catch (error) {
-    if (!isResultTooLarge(error)) throw error;
-    // A configuration fault, not an outage: this graph's `groupBy` has more
-    // distinct values than a threshold read can carry. Retrying re-asks the
-    // identical question, so this must NOT reach the caller's failure count —
-    // an evaluation that throws is redelivered, and a permanently oversized
-    // trigger would then re-fail on every delivery until it quarantined its
-    // tenant's whole lane, taking every OTHER trigger in that project down
-    // with it. Skipping isolates the damage to the one misconfigured trigger.
-    logger.error(
-      {
-        projectId,
+    if (isResultTooLarge(error)) {
+      // A configuration fault, not an outage: this graph's `groupBy` has more
+      // distinct values than a threshold read can carry. Retrying re-asks the
+      // identical question, so this must NOT reach the caller's failure count —
+      // an evaluation that throws is redelivered, and a permanently oversized
+      // trigger would then re-fail on every delivery until it quarantined its
+      // tenant's whole lane, taking every OTHER trigger in that project down
+      // with it. Skipping isolates the damage to the one misconfigured trigger.
+      logger.error(
+        {
+          projectId,
+          triggerId,
+          reason,
+          groupBy: graphData.groupBy,
+          timePeriodMinutes: timePeriod,
+          maxResultRows: GRAPH_TRIGGER_MAX_RESULT_ROWS,
+        },
+        "graph trigger evaluation skipped: timeseries result exceeds the row ceiling",
+      );
+      return skipped({
         triggerId,
+        projectId,
         reason,
-        groupBy: graphData.groupBy,
-        timePeriodMinutes: timePeriod,
-        maxResultRows: GRAPH_TRIGGER_MAX_RESULT_ROWS,
-      },
-      "graph trigger evaluation skipped: timeseries result exceeds the row ceiling",
-    );
-    return skipped({
-      triggerId,
-      projectId,
-      reason,
-      detail: "timeseries result exceeds the row ceiling",
-    });
+        detail: "timeseries result exceeds the row ceiling",
+      });
+    }
+    if (isSeriesPercentageUnsupported(error)) {
+      // Same class, same treatment: the saved series asks for a percentage of a
+      // per-entity measurement, which the query builder refuses because the
+      // unfiltered denominator would be taken over a different set of entities.
+      // Re-asking cannot change the answer, so rethrowing would redeliver this
+      // trigger forever and quarantine its tenant's lane. The series' metric
+      // rides in the log line rather than on the error, since this is the one
+      // caller that needs to know WHICH series has to be edited.
+      logger.error(
+        {
+          projectId,
+          triggerId,
+          reason,
+          seriesIndex,
+          seriesMetric: series.metric,
+          seriesAggregation: series.aggregation,
+        },
+        "graph trigger evaluation skipped: series cannot be shown as a percentage",
+      );
+      return skipped({
+        triggerId,
+        projectId,
+        reason,
+        detail: "series cannot be shown as a percentage",
+      });
+    }
+    throw error;
   }
   // The stored `seriesName` identifies WHICH series the trigger watches
   // (`{index}/{key|metric}/{aggregation}` — parsed above via
