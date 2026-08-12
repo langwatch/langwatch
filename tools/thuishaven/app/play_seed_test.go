@@ -211,7 +211,7 @@ func TestPlaySeedWithoutIngestNeverWaits(t *testing.T) {
 // A sandbox whose app never answers is one being torn down (or one whose PR
 // does not boot). Either way the ingest has nowhere to send data, so it must
 // give up rather than run the scripts against a stack that is not there.
-// @scenario "A sandbox that never serves is never seeded"
+// @scenario "A sandbox that never serves keeps its base seed and nothing more"
 func TestPlaySeedIngestGivesUpWhenTheAppNeverAnswers(t *testing.T) {
 	sup := &fakeSupervisor{notReady: true}
 	launchPlay(t, sup, "demo")
@@ -220,6 +220,11 @@ func TestPlaySeedIngestGivesUpWhenTheAppNeverAnswers(t *testing.T) {
 	}
 	if steps := shellsMatching(sup, "pnpm run seed:"); len(steps) != 0 {
 		t.Errorf("ran %v against a stack that never came up, want nothing", steps)
+	}
+	// The base seed runs before the services and is unaffected: what the app
+	// never answering costs is the collector-borne data, not the identity.
+	if env := envForShell(t, sup, "prisma:seed"); !strings.Contains(env, "HAVEN_SEED_PRESET=demo") {
+		t.Errorf("seed env = %q, want the base seed to have run regardless", env)
 	}
 }
 

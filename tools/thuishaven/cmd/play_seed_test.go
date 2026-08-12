@@ -52,7 +52,9 @@ func TestPlaySeedFlagTakesTheSharedPresets(t *testing.T) {
 // itself. Calling it with no orchestrator proves the guard returns before
 // anything downstream is touched; without the guard this indexes an empty
 // slice and panics.
-// @scenario "The launcher refuses an invocation with no PR number"
+//
+// No @scenario: play-launch is internal (hidden from help, spawned by `haven
+// play`), so its argument handling is not behavior the feature file describes.
 func TestPlayLaunchWithoutANumberFailsInsteadOfPanicking(t *testing.T) {
 	inv, err := parse(specByName(t, "play-launch"), nil)
 	if err != nil {
