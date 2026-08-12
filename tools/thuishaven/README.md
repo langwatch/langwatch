@@ -91,8 +91,9 @@ haven play [pr]  run a PR in a throwaway sandbox: own checkout, own
                  No argument opens a picker of open PRs (terminal only).
                  --seed <preset> seeds it from the same registry `db seed`
                  reads, so it can open on data rather than the onboarding
-                 screen (demo/traces/mass load data; onboarding, post-
-                 onboarding and bare only move the flags)
+                 screen: demo, traces and mass load data, onboarding and
+                 post-onboarding move the onboarding flag, bare is the
+                 identity alone
                  Trust-gated: every commit author must have write access, or a
                  two-step confirmation — y/N, then the PR number typed back
                  after it discloses that the code runs as you, from this
