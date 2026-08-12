@@ -7,8 +7,8 @@ import {
 } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ExportConfigDialog } from "~/components/messages/ExportConfigDialog";
-import { ExportProgress } from "~/components/messages/ExportProgress";
+import { ExportConfigDialog } from "../ExportConfigDialog";
+import { ExportProgress } from "../ExportProgress";
 import { useTracesV2Presence } from "~/features/presence/hooks/useTracesV2Presence";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useLensFilterDirtySync } from "../../hooks/useLensFilterDirtySync";

@@ -1,11 +1,10 @@
 /**
  * @vitest-environment jsdom
  *
- * The legacy Traces page and the legacy trace drawer both render this banner
- * to warn that the view is going away. What is under test is the warning copy
- * and the "Open Trace Explorer" CTA target: the page variant lands on the
- * Trace Explorer, and the drawer variant (which carries a traceId) deep-links
- * the same trace into the Trace Explorer drawer.
+ * The legacy trace drawer renders this banner to warn that the view is going
+ * away. What is under test is the warning copy and the "Open Trace Explorer"
+ * CTA target: carrying a traceId deep-links the same trace into the Trace
+ * Explorer drawer, and without one the CTA lands on the Trace Explorer.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -46,9 +45,8 @@ describe("LegacyTracesDeprecationBanner", () => {
     });
   });
 
-  describe("when shown on the legacy Traces page", () => {
-    /** @scenario "The legacy Traces page warns that it is going away" */
-    it("warns the view is going away and offers to open the Trace Explorer", async () => {
+  describe("when the banner has no trace to carry", () => {
+    it("offers to open the Trace Explorer", async () => {
       const user = userEvent.setup();
       renderBanner(<LegacyTracesDeprecationBanner />);
 
@@ -68,9 +66,7 @@ describe("LegacyTracesDeprecationBanner", () => {
     /** @scenario "The legacy trace drawer warns that it is going away" */
     it("warns and opens the same trace in the Trace Explorer drawer", async () => {
       const user = userEvent.setup();
-      renderBanner(
-        <LegacyTracesDeprecationBanner variant="compact" traceId="trace-xyz" />,
-      );
+      renderBanner(<LegacyTracesDeprecationBanner traceId="trace-xyz" />);
 
       expect(
         screen.getByText("This view is going away soon"),

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { shouldShowGenericTranslateError } from "~/components/messages/translationError";
+import { shouldShowGenericTranslateError } from "../utils/translationError";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";

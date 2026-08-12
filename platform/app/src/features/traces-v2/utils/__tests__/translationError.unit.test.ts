@@ -3,7 +3,7 @@ import {
   extractAiCallFailedInfo,
   extractMissingModelInfo,
   extractProviderDisabledInfo,
-} from "../../../utils/trpcError";
+} from "~/utils/trpcError";
 import { shouldShowGenericTranslateError } from "../translationError";
 
 // The gating logic is what we own here; the extractors are a boundary

@@ -1,4 +1,4 @@
-import { useExportTraces } from "~/components/messages/useExportTraces";
+import { useExportTraces } from "./useExportTraces";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useFilterStore } from "../stores/filterStore";
 

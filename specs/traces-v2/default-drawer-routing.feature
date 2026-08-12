@@ -1,15 +1,19 @@
 # Trace Explorer default routing — Gherkin Spec
 # Implementation: platform/app/src/hooks/useDrawer.ts (routeTraceDrawerForV2 +
-# the openDrawer interception) and the legacy deprecation banner in
-# platform/app/src/components/messages/LegacyTracesDeprecationBanner.tsx
+# the openDrawer interception), the legacy path redirects under
+# platform/app/src/pages/[project]/messages/, and the legacy deprecation
+# banner in platform/app/src/components/LegacyTracesDeprecationBanner.tsx
 #
 # The Trace Explorer is the default trace experience. The former per-device
 # opt-in is gone: every request to open a trace's details (no matter which
 # screen triggered it — evaluation results, a workflow run panel, the command
 # bar, a feedback row) goes through the same open-drawer call, which routes to
-# the Trace Explorer drawer. The legacy Traces page remains reachable only
-# through its sidebar entry, keeps its legacy drawer so the view stays
-# coherent, and warns that it is going away.
+# the Trace Explorer drawer.
+#
+# The legacy Traces page has been removed. Its path survives only as a
+# redirect, so old bookmarks and shared links keep working. The legacy trace
+# drawer is still registered, because links shared before the change name it
+# explicitly, and it warns that it is going away.
 
 Feature: Trace Explorer is the default trace experience from every entry point
   As an operator viewing traces
@@ -36,24 +40,31 @@ Feature: Trace Explorer is the default trace experience from every entry point
       When I search for a trace ID in the command bar and select the result
       Then the Trace Explorer opens with that trace's drawer
 
-  Rule: The legacy Traces page is the only place that keeps the legacy drawer
+  Rule: The legacy Traces page is gone and its path redirects
 
     @integration
-    Scenario: Opening a trace from the legacy Traces page uses the legacy drawer
-      Given I navigated to the legacy Traces page from the sidebar
-      When I open a trace's details from the legacy traces table
-      Then the legacy trace drawer opens for that trace
+    Scenario: The legacy Traces path lands on the Trace Explorer
+      Given I have a bookmark to the legacy Traces page
+      When I open the bookmark
+      Then I land on the Trace Explorer
 
     @integration
-    Scenario: The legacy Traces page warns that it is going away
-      When I visit the legacy Traces page
-      Then I see a notice that this view is going away soon
-      And the notice offers to open the Trace Explorer
+    Scenario: A filtered legacy Traces link keeps what it was filtered by
+      Given I have a link to the legacy Traces page carrying filters
+      When I open the link
+      Then I land on the Trace Explorer
+      And the link's filters are still in the address
+
+    @integration
+    Scenario: The sidebar no longer offers the legacy Traces page
+      When I look at the project sidebar
+      Then Trace Explorer is the only traces entry
+
+  Rule: The legacy trace drawer stays reachable for links that name it
 
     @integration
     Scenario: The legacy trace drawer warns that it is going away
-      Given I navigated to the legacy Traces page from the sidebar
-      When I open a trace's details from the legacy traces table
+      Given I opened a link that names the legacy trace drawer
       Then the legacy drawer shows a notice that this view is going away soon
       And the notice can open the same trace in the Trace Explorer
 

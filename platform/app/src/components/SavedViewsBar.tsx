@@ -37,13 +37,13 @@ import { CSS } from "@dnd-kit/utilities";
 import { Check, MoreVertical, User, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useRef, useState } from "react";
-import type { SavedView } from "../../hooks/useSavedViews";
-import { useSavedViews } from "../../hooks/useSavedViews";
-import { getOriginColor } from "../../utils/originColors";
-import { getColorForString } from "../../utils/rotatingColors";
-import { ConfirmDialog } from "../gateway/ConfirmDialog";
-import { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "../MainMenu";
-import { Menu } from "../ui/menu";
+import type { SavedView } from "../hooks/useSavedViews";
+import { useSavedViews } from "../hooks/useSavedViews";
+import { getOriginColor } from "../utils/originColors";
+import { getColorForString } from "../utils/rotatingColors";
+import { ConfirmDialog } from "./gateway/ConfirmDialog";
+import { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
+import { Menu } from "./ui/menu";
 
 /**
  * Returns badge colors for a view.

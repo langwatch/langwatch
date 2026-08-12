@@ -135,11 +135,11 @@ describe("provider registry parity", () => {
         scheduleLabel: "every Monday at 09:00 (UTC)",
         sourceKind: "traceQuery",
       },
-      viewUrl: "https://app.langwatch.ai/acme/messages",
+      viewUrl: "https://app.langwatch.ai/acme/traces",
       traces: [
         {
           traceId: "trace_a",
-          url: "https://app.langwatch.ai/acme/messages/trace_a",
+          url: "https://app.langwatch.ai/acme/traces/trace_a",
           timestamp: "2026-01-05T08:30:00.000Z",
           input: "502 upstream timeout",
           output: "",
@@ -150,7 +150,7 @@ describe("provider registry parity", () => {
         },
         {
           traceId: "trace_b",
-          url: "https://app.langwatch.ai/acme/messages/trace_b",
+          url: "https://app.langwatch.ai/acme/traces/trace_b",
           timestamp: "2026-01-05T08:45:00.000Z",
           input: "tool call failed",
           output: "",

@@ -19,7 +19,6 @@ import { usePublicEnv } from "../hooks/usePublicEnv";
 import { api } from "../utils/api";
 import { featureIcons } from "../utils/featureIcons";
 import { projectRoutes } from "../utils/routes";
-import { useTableView } from "./messages/HeaderButtons";
 import { CollapsibleMenuGroup } from "./sidebar/CollapsibleMenuGroup";
 import {
   CODING_AGENT_LINK_WINDOW_DAYS,
@@ -173,15 +172,6 @@ export const MainMenu = React.memo(function MainMenu({
                 project={project}
                 isActive={router.pathname.includes("/traces")}
                 showLabel={showExpanded}
-              />
-              <PageMenuLink
-                path={projectRoutes.messages.path}
-                icon={featureIcons.traces.icon}
-                label={projectRoutes.messages.title}
-                project={project}
-                isActive={router.pathname.includes("/messages")}
-                showLabel={showExpanded}
-                legacy
               />
               <PageMenuLink
                 path={projectRoutes.online_evaluations.path}
@@ -502,21 +492,13 @@ const PageMenuLink = ({
   legacy,
   legacyLabel,
 }: PageMenuLinkProps) => {
-  const { isTableView } = useTableView();
-
-  const viewModeQuery = path.includes("/messages")
-    ? isTableView
-      ? "?view=table"
-      : "?view=list"
-    : "";
-
   const destination = projectScopedDestination({ path, label, project });
 
   return (
     <SideMenuLink
       icon={icon}
       label={label}
-      href={destination.href && destination.href + viewModeQuery}
+      href={destination.href}
       unavailableReason={destination.unavailableReason}
       isActive={isActive}
       badgeNumber={badgeNumber}

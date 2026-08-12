@@ -2,8 +2,8 @@ import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Download } from "lucide-react";
 import { useState } from "react";
 import type { ExportFormat, ExportMode } from "~/server/export/types";
-import { Dialog } from "../ui/dialog";
-import { Radio, RadioGroup } from "../ui/radio";
+import { Dialog } from "~/components/ui/dialog";
+import { Radio, RadioGroup } from "~/components/ui/radio";
 
 interface ExportConfigDialogProps {
   isOpen: boolean;

@@ -3,20 +3,18 @@ import { LuArrowRight, LuTriangleAlert } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 interface LegacyTracesDeprecationBannerProps {
-  variant?: "full" | "compact";
   /** When set, the CTA deep-links to this trace inside the Trace Explorer drawer. */
   traceId?: string;
 }
 
 /**
- * Deprecation notice shown on the legacy Traces page and inside the legacy
- * trace drawer. Trace Explorer is the default experience everywhere else;
- * this view only remains reachable through the sidebar's legacy entry and
- * will be removed. Deliberately not dismissible — it is a removal warning,
- * not an announcement.
+ * Deprecation notice shown inside the legacy trace drawer. The legacy Traces
+ * page is gone and Trace Explorer is the trace experience; the drawer stays
+ * registered only because links shared before the change name it explicitly,
+ * and it will be removed too. Deliberately not dismissible — it is a removal
+ * warning, not an announcement.
  */
 export function LegacyTracesDeprecationBanner({
-  variant = "full",
   traceId,
 }: LegacyTracesDeprecationBannerProps) {
   const { project } = useOrganizationTeamProject({
@@ -39,14 +37,12 @@ export function LegacyTracesDeprecationBanner({
     window.location.href = `/${projectSlug}/traces${suffix}`;
   };
 
-  const isCompact = variant === "compact";
-
   return (
     <HStack
       width="full"
       gap={{ base: 2.5, md: 3.5 }}
       paddingX={{ base: 4, md: 5 }}
-      paddingY={isCompact ? 2 : 2.5}
+      paddingY={2}
       align="center"
       bg="orange.subtle"
       color="orange.fg"
@@ -54,22 +50,11 @@ export function LegacyTracesDeprecationBanner({
       borderBottomColor="orange.muted"
       flexShrink={0}
     >
-      <Icon as={LuTriangleAlert} boxSize={isCompact ? 3.5 : 4} flexShrink={0} />
+      <Icon as={LuTriangleAlert} boxSize={3.5} flexShrink={0} />
       <VStack align="start" gap={0} flex={1} minWidth={0}>
-        <Text
-          textStyle={isCompact ? "xs" : "sm"}
-          fontWeight="600"
-          truncate
-          width="full"
-        >
+        <Text textStyle="xs" fontWeight="600" truncate width="full">
           This view is going away soon
         </Text>
-        {!isCompact && (
-          <Text textStyle="xs" opacity={0.9}>
-            Trace Explorer is now the default way to explore your traces. This
-            legacy view will be removed in an upcoming release.
-          </Text>
-        )}
       </VStack>
       <Button
         size="xs"

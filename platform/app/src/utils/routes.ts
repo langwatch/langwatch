@@ -16,10 +16,6 @@ export const projectRoutes = {
     path: "/[project]/workflows",
     title: "Workflows",
   },
-  messages: {
-    path: "/[project]/messages",
-    title: "Traces",
-  },
   traces_v2: {
     path: "/[project]/traces",
     title: "Trace Explorer",
@@ -84,20 +80,23 @@ export const projectRoutes = {
     title: "Experiment Details",
     parent: "experiments",
   },
+  // Legacy /messages trace paths. These render redirects to the Trace
+  // Explorer, so they parent onto it rather than onto a list page that no
+  // longer exists.
   message: {
     path: "/[project]/messages/[trace]",
     title: "Trace",
-    parent: "messages",
+    parent: "traces_v2",
   },
   message_open_tab: {
     path: "/[project]/messages/[trace]/[opentab]",
     title: "trace",
-    parent: "messages",
+    parent: "traces_v2",
   },
   message_open_tab_span: {
     path: "/[project]/messages/[trace]/[opentab]/[span]",
     title: "trace",
-    parent: "messages",
+    parent: "traces_v2",
   },
   settings: {
     path: "/settings",
@@ -328,8 +327,8 @@ export function buildRoutePath(
  *      org-scope WorkspaceSwitcher wants).
  *
  * `routePattern` is the Next.js route pattern (`router.pathname`, e.g.
- * `/[project]/messages`); `resolvedPathname` is the concrete URL path
- * (`window.location.pathname`, e.g. `/acme/messages`) used for the literal-slug
+ * `/[project]/traces`); `resolvedPathname` is the concrete URL path
+ * (`window.location.pathname`, e.g. `/acme/traces`) used for the literal-slug
  * and return_to branches.
  */
 export function buildProjectSwitchHref({

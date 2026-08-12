@@ -80,17 +80,12 @@ export const navigationCommands: Command[] = [
       "logs",
       "requests",
       "history",
+      // Carried over from the removed "Traces (Legacy)" entry so operators
+      // who still search by the old name land on the Trace Explorer.
+      "legacy",
+      "old",
     ],
     path: "/[project]/traces",
-  },
-  {
-    id: "nav-traces",
-    label: "Traces (Legacy)",
-    description: "The legacy traces view, going away soon",
-    icon: ListTree,
-    category: "navigation",
-    keywords: ["messages", "logs", "legacy", "old"],
-    path: "/[project]/messages",
   },
   {
     id: "nav-simulations",

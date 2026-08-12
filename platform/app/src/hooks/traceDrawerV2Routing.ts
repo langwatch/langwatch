@@ -3,30 +3,28 @@ import type { DrawerType } from "../components/drawerRegistry";
 /**
  * Route a drawer-open request to the Trace Explorer drawer.
  *
- * The Trace Explorer is the default trace experience: every request to open a
- * trace's details — no matter which screen triggered it (evaluation results,
- * workflow run panels, the command bar, a feedback row) — opens the new
- * drawer. Instead of each "view trace" call site deciding which drawer to use
- * (several historically diverged), all opens funnel through `openDrawer`,
- * which routes here. A `traceDetails` open carrying a trace id becomes a
- * `traceV2Details` open; every other drawer — and a trace open with no id —
- * passes through untouched.
+ * The Trace Explorer is the trace experience: every request to open a trace's
+ * details — no matter which screen triggered it (evaluation results, workflow
+ * run panels, the command bar, a feedback row) — opens the new drawer.
+ * Instead of each "view trace" call site deciding which drawer to use (several
+ * historically diverged), all opens funnel through `openDrawer`, which routes
+ * here. A `traceDetails` open carrying a trace id becomes a `traceV2Details`
+ * open; every other drawer — and a trace open with no id — passes through
+ * untouched.
  *
- * The single exception is the legacy Traces page itself: an operator who
- * deliberately navigated to the legacy view gets the legacy drawer there, so
- * the page stays coherent until it is removed.
+ * There is no longer an exception: the legacy Traces page, which used to keep
+ * the legacy drawer so that view stayed coherent, has been removed. The legacy
+ * drawer is still registered so a link shared before the change (one naming
+ * `drawer.open=traceDetails` outright) resolves, but nothing routes to it.
  *
- * Kept pure (the caller decides whether it is on the legacy page and passes
- * that in, and the only import is a type) so the branch logic is testable
+ * Kept pure (the only import is a type) so the branch logic is testable
  * without touching a router or the drawer component registry.
  */
 export function routeTraceDrawerForV2(
   drawer: DrawerType,
   props: Record<string, unknown> | undefined,
-  onLegacyTracesPage: boolean,
 ): { drawer: DrawerType; props: Record<string, unknown> | undefined } {
   if (
-    !onLegacyTracesPage &&
     drawer === "traceDetails" &&
     typeof props?.traceId === "string" &&
     props.traceId

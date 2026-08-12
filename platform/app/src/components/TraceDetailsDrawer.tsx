@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "../components/ui/drawer";
 import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
-import { LegacyTracesDeprecationBanner } from "./messages/LegacyTracesDeprecationBanner";
+import { LegacyTracesDeprecationBanner } from "./LegacyTracesDeprecationBanner";
 import { TraceDetails } from "./traces/TraceDetails";
 
 interface TraceDetailsDrawerProps {
@@ -43,10 +43,7 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
           overflowY="auto"
           id="conversation-scroll-container"
         >
-          <LegacyTracesDeprecationBanner
-            variant="compact"
-            traceId={props.traceId}
-          />
+          <LegacyTracesDeprecationBanner traceId={props.traceId} />
           <TraceDetails
             traceId={props.traceId}
             selectedTab={props.selectedTab}

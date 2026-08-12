@@ -46,7 +46,7 @@ vi.mock("~/components/traces/TraceDetails", () => ({
 // LegacyTracesDeprecationBanner pulls in tRPC (publicEnv →
 // useOrganizationTeamProject) which requires withTRPC context this test
 // does not provide.
-vi.mock("~/components/messages/LegacyTracesDeprecationBanner", () => ({
+vi.mock("~/components/LegacyTracesDeprecationBanner", () => ({
   LegacyTracesDeprecationBanner: () => null,
 }));
 

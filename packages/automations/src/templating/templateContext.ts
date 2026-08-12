@@ -687,7 +687,7 @@ export function buildExampleReportTemplateContext({
           },
         ].map((trace, index) => ({
           ...trace,
-          url: `${baseHost}/${projectSlug}/messages/${trace.traceId}`,
+          url: `${baseHost}/${projectSlug}/traces/${trace.traceId}`,
           timestamp: new Date(
             occurredAt.getTime() - (index + 1) * 60 * 60 * 1000,
           ).toISOString(),
@@ -745,7 +745,7 @@ export function buildExampleReportTemplateContext({
     },
     viewUrl:
       sourceKind === "traceQuery"
-        ? `${baseHost}/${projectSlug}/messages`
+        ? `${baseHost}/${projectSlug}/traces`
         : `${baseHost}/${projectSlug}/analytics`,
     traces: exampleTraces,
     charts: exampleCharts,

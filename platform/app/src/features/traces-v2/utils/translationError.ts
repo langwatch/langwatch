@@ -2,7 +2,7 @@ import {
   extractAiCallFailedInfo,
   extractMissingModelInfo,
   extractProviderDisabledInfo,
-} from "../../utils/trpcError";
+} from "~/utils/trpcError";
 
 /**
  * Whether the inline-translation failure handler should raise its own

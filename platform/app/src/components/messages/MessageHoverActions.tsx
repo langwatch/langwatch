@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import { Edit } from "react-feather";
 import { AnnotationPopover } from "~/features/traces-v2/components/TraceDrawer/conversationView/AnnotationPopover";
+import { shouldShowGenericTranslateError } from "~/features/traces-v2/utils/translationError";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import { stringifyIfObject } from "~/utils/stringifyIfObject";
@@ -13,10 +14,8 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import type { Trace } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { getExtractedInput } from "../../utils/traceExtraction";
-
 import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
-import { shouldShowGenericTranslateError } from "./translationError";
 
 export const useTranslationState = () => {
   const [translatedTextInput, setTranslatedTextInput] = useState<string | null>(
