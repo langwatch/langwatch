@@ -29,6 +29,7 @@ import {
 } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
+import { stripTokenAccumulationControlAttributes } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import {
   extractFreeTextTerms,
   translateFilterToClickHouse,
@@ -219,7 +220,7 @@ export function mapTraceSummaryToHeader(
     lastUsedPromptVersionNumber: summary.lastUsedPromptVersionNumber ?? null,
     lastUsedPromptVersionId: summary.lastUsedPromptVersionId ?? null,
     lastUsedPromptSpanId: summary.lastUsedPromptSpanId ?? null,
-    attributes: summary.attributes,
+    attributes: stripTokenAccumulationControlAttributes(summary.attributes),
   };
 }
 

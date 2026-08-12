@@ -680,6 +680,16 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain(
         "langwatch.reserved.skip_token_accumulation",
       );
+      expect(result.sql).toContain(
+        "langwatch.reserved.token_accumulation_candidate",
+      );
+      expect(result.sql).toContain(
+        "langwatch.reserved.token_accumulation_authority",
+      );
+      expect(result.sql).toContain(
+        "OVER (PARTITION BY TenantId, TraceId) AS AuthoritySpanCount",
+      );
+      expect(result.sql).toContain("AuthoritySpanCount > 0");
       // Traces without span-model rows fall back to their primary model.
       expect(result.sql).toContain(
         "if(empty(ts.Models), 'unknown', ts.Models[1])",

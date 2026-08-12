@@ -31,8 +31,130 @@ export const LAST_TOKEN_EVENTS = new Set([
  */
 export const NON_BILLABLE_ATTR = ATTR_KEYS.LANGWATCH_COST_NON_BILLABLE;
 
+const CONDITIONAL_CANDIDATE_TOTALS_ATTR =
+  ATTR_KEYS.LANGWATCH_RESERVED_TOKEN_ACCUMULATION_CANDIDATE_TOTALS;
+const CONDITIONAL_AUTHORITY_TOTALS_ATTR =
+  ATTR_KEYS.LANGWATCH_RESERVED_TOKEN_ACCUMULATION_AUTHORITY_TOTALS;
+const RESERVED_CACHE_READ_TOKENS = "langwatch.reserved.cache_read_tokens";
+const RESERVED_CACHE_CREATION_TOKENS =
+  "langwatch.reserved.cache_creation_tokens";
+const RESERVED_REASONING_TOKENS = "langwatch.reserved.reasoning_tokens";
+
+interface ConditionalUsageTotals {
+  observed: boolean;
+  promptTokens: number;
+  completionTokens: number;
+  cost: number;
+  nonBilledCost: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  reasoningTokens: number;
+}
+
+const EMPTY_CONDITIONAL_USAGE_TOTALS: ConditionalUsageTotals = {
+  observed: false,
+  promptTokens: 0,
+  completionTokens: 0,
+  cost: 0,
+  nonBilledCost: 0,
+  cacheReadTokens: 0,
+  cacheCreationTokens: 0,
+  reasoningTokens: 0,
+};
+
 function markerIsTrue(value: unknown): boolean {
   return value === true || value === "true";
+}
+
+function parseConditionalCandidateTotals(
+  value: string | undefined,
+): ConditionalUsageTotals {
+  if (!value) return { ...EMPTY_CONDITIONAL_USAGE_TOTALS };
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    const number = (key: keyof ConditionalUsageTotals): number => {
+      const candidate = parsed[key];
+      return typeof candidate === "number" && Number.isFinite(candidate)
+        ? Math.max(0, candidate)
+        : 0;
+    };
+    return {
+      observed: parsed.observed === true,
+      promptTokens: number("promptTokens"),
+      completionTokens: number("completionTokens"),
+      cost: number("cost"),
+      nonBilledCost: number("nonBilledCost"),
+      cacheReadTokens: number("cacheReadTokens"),
+      cacheCreationTokens: number("cacheCreationTokens"),
+      reasoningTokens: number("reasoningTokens"),
+    };
+  } catch {
+    return { ...EMPTY_CONDITIONAL_USAGE_TOTALS };
+  }
+}
+
+function addNullableTotal(
+  total: number | null,
+  contribution: number,
+  precision?: number,
+): number | null {
+  const resolved = (total ?? 0) + contribution;
+  if (resolved <= Number.EPSILON) return null;
+  return precision === undefined ? resolved : Number(resolved.toFixed(precision));
+}
+
+function applyReservedTotalDelta(
+  attributes: Record<string, string>,
+  key: string,
+  delta: number,
+): void {
+  const resolved = Number(attributes[key] ?? "0") + delta;
+  if (resolved <= Number.EPSILON) {
+    delete attributes[key];
+    return;
+  }
+  attributes[key] = String(resolved);
+}
+
+function addCandidateTotals(
+  totals: ConditionalUsageTotals,
+  contribution: ConditionalUsageTotals,
+): ConditionalUsageTotals {
+  return {
+    observed: true,
+    promptTokens: totals.promptTokens + contribution.promptTokens,
+    completionTokens: totals.completionTokens + contribution.completionTokens,
+    cost: totals.cost + contribution.cost,
+    nonBilledCost: totals.nonBilledCost + contribution.nonBilledCost,
+    cacheReadTokens: totals.cacheReadTokens + contribution.cacheReadTokens,
+    cacheCreationTokens:
+      totals.cacheCreationTokens + contribution.cacheCreationTokens,
+    reasoningTokens: totals.reasoningTokens + contribution.reasoningTokens,
+  };
+}
+
+function selectConditionalUsageTotals(
+  candidate: ConditionalUsageTotals,
+  authority: ConditionalUsageTotals,
+): ConditionalUsageTotals {
+  return authority.observed ? authority : candidate;
+}
+
+function subtractCandidateTotals(
+  minuend: ConditionalUsageTotals,
+  subtrahend: ConditionalUsageTotals,
+): ConditionalUsageTotals {
+  return {
+    observed: minuend.observed,
+    promptTokens: minuend.promptTokens - subtrahend.promptTokens,
+    completionTokens: minuend.completionTokens - subtrahend.completionTokens,
+    cost: minuend.cost - subtrahend.cost,
+    nonBilledCost: minuend.nonBilledCost - subtrahend.nonBilledCost,
+    cacheReadTokens: minuend.cacheReadTokens - subtrahend.cacheReadTokens,
+    cacheCreationTokens:
+      minuend.cacheCreationTokens - subtrahend.cacheCreationTokens,
+    reasoningTokens: minuend.reasoningTokens - subtrahend.reasoningTokens,
+  };
 }
 
 /**
@@ -165,6 +287,116 @@ export class SpanCostService {
     return markerIsTrue(
       span.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION],
     );
+  }
+
+  /**
+   * Resolve usage that is only conditionally redundant across sibling spans.
+   * Candidate and authority totals are tracked independently. The fold uses
+   * one complete observed side at a time. Candidates remain countable until
+   * any authority is observed, then the authority aggregate replaces them via
+   * signed deltas. The stored span and its per-span detail remain unchanged.
+   */
+  resolveConditionalTokenAccumulation({
+    state,
+    span,
+  }: {
+    state: TraceSummaryData;
+    span: NormalizedSpan;
+  }): { state: TraceSummaryData; span: NormalizedSpan } {
+    if (this.isTokenAccumulationSkipped(span)) return { state, span };
+
+    const isCandidate = markerIsTrue(
+      span.spanAttributes[
+        ATTR_KEYS.LANGWATCH_RESERVED_TOKEN_ACCUMULATION_CANDIDATE
+      ],
+    );
+    const isAuthority = markerIsTrue(
+      span.spanAttributes[
+        ATTR_KEYS.LANGWATCH_RESERVED_TOKEN_ACCUMULATION_AUTHORITY
+      ],
+    );
+    if (!isCandidate && !isAuthority) return { state, span };
+
+    const attributes = { ...state.attributes };
+    const candidateTotals = parseConditionalCandidateTotals(
+      attributes[CONDITIONAL_CANDIDATE_TOTALS_ATTR],
+    );
+    const authorityTotals = parseConditionalCandidateTotals(
+      attributes[CONDITIONAL_AUTHORITY_TOTALS_ATTR],
+    );
+    const previousApplied = selectConditionalUsageTotals(
+      candidateTotals,
+      authorityTotals,
+    );
+    const metrics = this.extractTokenMetrics(span);
+    const cache = this.extractCacheTokens(span);
+    const contribution: ConditionalUsageTotals = {
+      observed: true,
+      promptTokens: metrics.promptTokens,
+      completionTokens: metrics.completionTokens,
+      cost: metrics.cost,
+      nonBilledCost: this.isSpanCostNonBillable(span) ? metrics.cost : 0,
+      cacheReadTokens: cache.cacheReadTokens,
+      cacheCreationTokens: cache.cacheCreationTokens,
+      reasoningTokens: cache.reasoningTokens,
+    };
+    const nextCandidateTotals = isCandidate
+      ? addCandidateTotals(candidateTotals, contribution)
+      : candidateTotals;
+    const nextAuthorityTotals = isAuthority
+      ? addCandidateTotals(authorityTotals, contribution)
+      : authorityTotals;
+    attributes[CONDITIONAL_CANDIDATE_TOTALS_ATTR] =
+      JSON.stringify(nextCandidateTotals);
+    attributes[CONDITIONAL_AUTHORITY_TOTALS_ATTR] =
+      JSON.stringify(nextAuthorityTotals);
+    const delta = subtractCandidateTotals(
+      selectConditionalUsageTotals(nextCandidateTotals, nextAuthorityTotals),
+      previousApplied,
+    );
+    applyReservedTotalDelta(
+      attributes,
+      RESERVED_CACHE_READ_TOKENS,
+      delta.cacheReadTokens,
+    );
+    applyReservedTotalDelta(
+      attributes,
+      RESERVED_CACHE_CREATION_TOKENS,
+      delta.cacheCreationTokens,
+    );
+    applyReservedTotalDelta(
+      attributes,
+      RESERVED_REASONING_TOKENS,
+      delta.reasoningTokens,
+    );
+
+    return {
+      state: {
+        ...state,
+        attributes,
+        totalPromptTokenCount: addNullableTotal(
+          state.totalPromptTokenCount,
+          delta.promptTokens,
+        ),
+        totalCompletionTokenCount: addNullableTotal(
+          state.totalCompletionTokenCount,
+          delta.completionTokens,
+        ),
+        totalCost: addNullableTotal(state.totalCost, delta.cost, 6),
+        nonBilledCost: addNullableTotal(
+          state.nonBilledCost,
+          delta.nonBilledCost,
+          6,
+        ),
+      },
+      span: {
+        ...span,
+        spanAttributes: {
+          ...span.spanAttributes,
+          [ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION]: "true",
+        },
+      },
+    };
   }
 
   extractTokenTiming(span: NormalizedSpan): {

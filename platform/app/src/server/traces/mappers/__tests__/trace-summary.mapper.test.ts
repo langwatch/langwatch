@@ -448,3 +448,33 @@ describe("mapAttributesToMetadata — otel_log_record_count sibling", () => {
     });
   });
 });
+
+describe("mapAttributesToMetadata internal token-accumulation controls", () => {
+  it("does not expose fold bookkeeping as custom metadata", () => {
+    const summary = makeSummary({
+      attributes: {
+        "metadata.customer": "kept",
+        "langwatch.reserved.token_accumulation_candidate": "true",
+        "langwatch.reserved.token_accumulation_authority": "true",
+        "langwatch.reserved.token_accumulation_candidate_totals": "{}",
+        "langwatch.reserved.token_accumulation_authority_totals": "{}",
+      },
+    });
+
+    const trace = mapTraceSummaryToTrace(summary, [], "project-1");
+
+    expect(trace.metadata.customer).toBe("kept");
+    expect(trace.metadata).not.toHaveProperty(
+      "langwatch.reserved.token_accumulation_candidate",
+    );
+    expect(trace.metadata).not.toHaveProperty(
+      "langwatch.reserved.token_accumulation_authority",
+    );
+    expect(trace.metadata).not.toHaveProperty(
+      "langwatch.reserved.token_accumulation_candidate_totals",
+    );
+    expect(trace.metadata).not.toHaveProperty(
+      "langwatch.reserved.token_accumulation_authority_totals",
+    );
+  });
+});

@@ -193,6 +193,9 @@ describe("CodexExtractor.applyLog", () => {
       new CodexExtractor().apply(ctx);
 
       expect(ctx.out["gen_ai.usage.reasoning_tokens"]).toBe(10);
+      expect(
+        ctx.out["langwatch.reserved.token_accumulation_authority"],
+      ).toBeUndefined();
     });
 
     it("flags a non-turn codex span carrying usage as a redundant token copy", () => {
@@ -423,8 +426,27 @@ describe("CodexExtractor.applyLog", () => {
   });
 });
 
-describe("CodexExtractor.apply on the codex_exec scope (exec wire, no turn rollup)", () => {
-  it("keeps the response span's tokens counted: no skip marker under codex_exec", () => {
+describe("CodexExtractor.apply on the codex_exec scope", () => {
+  it("marks a usage-bearing turn rollup as the conditional authority", () => {
+    const ctx = createExtractorContext(
+      {
+        "codex.turn.token_usage.input_tokens": 13005,
+        "codex.turn.token_usage.output_tokens": 16,
+      },
+      {
+        name: "session_task.turn",
+        instrumentationScope: { name: "codex_exec", version: "0.146.0" },
+      },
+    );
+
+    new CodexExtractor().apply(ctx);
+
+    expect(
+      ctx.out["langwatch.reserved.token_accumulation_authority"],
+    ).toBe("true");
+  });
+
+  it("marks response usage as a conditional duplicate without hard-skipping it", () => {
     const ctx = createExtractorContext(
       {
         "gen_ai.usage.input_tokens": 13005,
@@ -442,6 +464,9 @@ describe("CodexExtractor.apply on the codex_exec scope (exec wire, no turn rollu
     expect(
       ctx.out["langwatch.reserved.skip_token_accumulation"],
     ).toBeUndefined();
+    expect(
+      ctx.out["langwatch.reserved.token_accumulation_candidate"],
+    ).toBe("true");
   });
 
   it("still types the response span as a model call, which the skip marker is independent of", () => {

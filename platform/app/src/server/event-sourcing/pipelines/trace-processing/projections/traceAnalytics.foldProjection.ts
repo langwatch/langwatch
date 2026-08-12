@@ -936,14 +936,33 @@ export function applySpanToAnalytics({
   }
 
   const view = asTraceSummaryStateView(state);
+  const conditionalUsage = spanCostService.resolveConditionalTokenAccumulation(
+    { state: view, span },
+  );
+  const resolvedView = conditionalUsage.state;
+  const accumulationSpan = conditionalUsage.span;
+  const resolvedState: TraceAnalyticsData = {
+    ...state,
+    attributes: resolvedView.attributes,
+    totalCost: resolvedView.totalCost,
+    nonBilledCost: resolvedView.nonBilledCost,
+    totalPromptTokenCount: resolvedView.totalPromptTokenCount,
+    totalCompletionTokenCount: resolvedView.totalCompletionTokenCount,
+  };
 
-  const timing = spanTimingService.accumulateTiming({ state: view, span });
-  const tokens = spanCostService.accumulateTokens({
-    state: view,
+  const timing = spanTimingService.accumulateTiming({
+    state: resolvedView,
     span,
+  });
+  const tokens = spanCostService.accumulateTokens({
+    state: resolvedView,
+    span: accumulationSpan,
     totalDurationMs: timing.totalDurationMs,
   });
-  const status = spanStatusService.accumulateStatus({ state: view, span });
+  const status = spanStatusService.accumulateStatus({
+    state: resolvedView,
+    span,
+  });
 
   // Slim does not run TraceIOAccumulationService — but
   // `TraceAttributeAccumulationService.accumulateAttributes` requires the IO
@@ -952,7 +971,7 @@ export function applySpanToAnalytics({
   // discovered, so the reserved output_source / *_is_fallback keys land on
   // the attribute map identically to a trace with no IO-bearing span.
   const attributes = traceAttributeAccumulationService.accumulateAttributes({
-    state: view,
+    state: resolvedView,
     span,
     outputSource: OUTPUT_SOURCE.INFERRED,
     inputIsFallback: false,
@@ -961,7 +980,7 @@ export function applySpanToAnalytics({
     outputMediaRefs: null,
   });
 
-  accumulateReservedTokenSums(attributes, span);
+  accumulateReservedTokenSums(attributes, accumulationSpan);
 
   const newModels = spanCostService.extractModelsFromSpan(span);
   const models = mergeModelsMostRecentFirst(state.models, newModels);
@@ -978,7 +997,7 @@ export function applySpanToAnalytics({
   } = traceNameResolutionService.resolveFromSpan({ state: view, span });
 
   return {
-    ...state,
+    ...resolvedState,
     traceId: state.traceId || span.traceId,
     spanCount: state.spanCount + 1,
     occurredAt: timing.occurredAt,
