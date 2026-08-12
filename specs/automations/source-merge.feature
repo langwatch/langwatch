@@ -1,12 +1,16 @@
-Feature: One automation flow with a source
+Feature: One automation flow with a subject choice
 
-  Automation and alert merge into one flow. An automation takes its input
-  from a source — a trace search, or a graph metric — applies a rule, and
-  delivers. Schedules stay a separate concept with their own tab and entry
-  point. The composer becomes a wizard: linear to create, opening on the
-  review overview to edit. Slack becomes a project-level integration: the
-  bot token is configured once per project and rotated in one place, and
-  the composer only ever asks for a channel.
+  Automation and alert merge into one flow. An automation watches something
+  — a trace filter, or a graph — applies a rule, and delivers. There is no
+  type card and no source card: the wizard opens by asking what to watch,
+  and the rule shape follows the answer. Schedules stay a separate concept
+  with their own tab and entry point. The wizard is three steps — Watch,
+  Delivery, Review — linear to create, opening on the review overview to
+  edit. Slack becomes a project-level integration: the bot token is
+  configured once per project and rotated in one place, and the composer
+  only ever asks for a channel. On the wire, "source" survives as a
+  derived alias beside the unchanged kind discriminator; no screen shows
+  the word.
 
   Every scenario here is @unimplemented: this file ships with the design
   (ADR-093) and enforces nothing until the reference implementation binds
@@ -17,56 +21,65 @@ Feature: One automation flow with a source
   Background:
     Given a user in a project
 
-  Rule: One flow, two sources
+  Rule: One flow, one opening question
 
-    The former Alert is an automation whose source is a graph metric. The
-    source says where the input comes from; it is picked first and never
-    changes on a saved automation, because the graph slot and the report
-    calendar make a conversion a create plus a delete.
+    The former Alert is an automation that watches a graph. The wizard's
+    first step is the subject itself: a trace filter or a graph, with the
+    subject configured inline. What a saved automation watches never
+    changes, because the graph slot and the report calendar make the
+    conversion a create plus a delete.
 
     @integration @unimplemented
-    Scenario: Creating a trace-search automation through the wizard
-      When the user creates an automation with the trace search source
+    Scenario: The wizard opens by asking what to watch
+      When the user starts creating an automation
+      Then the first step asks what the automation should watch
+      And it offers a trace filter and a graph
+      And no type or source picker is shown
+
+    @integration @unimplemented
+    Scenario: Creating an automation that watches a trace filter
+      When the user chooses to watch a trace filter
       And sets a condition, a delivery channel, and a name
-      Then the review step shows the source, rule, delivery, and name together
+      Then the review step shows what it watches, the rule, the delivery, and the name together
       And saving creates one automation that acts on matching traces
 
     @integration @unimplemented
-    Scenario: Creating a graph-metric automation through the wizard
-      When the user creates an automation with the graph metric source
+    Scenario: Creating an automation that watches a graph
+      When the user chooses to watch a graph
       And picks a graph, a series, and a threshold rule
       And sets a delivery channel and a name
       Then saving creates one automation that fires when the metric crosses the threshold
 
     @integration @unimplemented
     Scenario: The wizard keeps completed steps in view
-      Given the user has completed the source and subject steps
+      Given the user has completed the watch step
       When the user is on the delivery step
-      Then each completed step shows a one-line summary
-      And the user can return to a completed step without losing later answers
+      Then the completed step shows a one-line summary
+      And the user can return to it without losing later answers
 
     @integration @unimplemented
-    Scenario: A graph-metric automation with no graphs offers a way forward
+    Scenario: Watching a graph with no graphs offers a way forward
       Given the project has no custom graphs
-      When the user reaches the subject step with the graph metric source
+      When the user chooses to watch a graph
       Then the step offers creating a graph
       And the step offers a template that ships with its own graph
 
     @integration @unimplemented
-    Scenario: A saved automation's source cannot change
-      Given a saved automation with the trace search source
+    Scenario: What a saved automation watches cannot change
+      Given a saved automation that watches a trace filter
       When the user edits it
-      Then the source reads as locked with an explanation
-      And the wizard offers creating a new automation for a different source
+      Then the filter-or-graph choice reads as locked with an explanation
+      And the filter itself remains editable
+      And the wizard offers creating a new automation to watch something else
 
     @integration @unimplemented
-    Scenario: Changing the source over the API is refused
-      Given a saved automation with the graph metric source
-      When an API request changes its source
+    Scenario: Changing what an automation watches over the API is refused
+      Given a saved automation that watches a graph
+      When an API request changes its kind or source
       Then the request is refused with the machine-readable kind-immutable code
       And the stored automation is unchanged
 
-  Rule: Editing opens on the overview, not on step one
+  Rule: Editing opens on the overview, not on the watch step
 
     The lesson from the previous restructuring attempt: losing the overview
     while editing was the annoying part. Editing is hub-and-spoke — the
@@ -91,24 +104,24 @@ Feature: One automation flow with a source
       When the user closes the wizard without saving
       Then the stored automation is unchanged
 
-  Rule: One list for automations, whatever their source
+  Rule: One list for automations, whatever they watch
 
     Automations and alerts were two near-identical tables. They become one
     table whose columns say what each row watches and where it delivers.
     Schedules keep their own tab.
 
     @integration @unimplemented
-    Scenario: The unified table lists both sources together
-      Given the project has a trace-search automation and a graph-metric automation
+    Scenario: The unified table lists automations watching filters and graphs together
+      Given the project has an automation watching a trace filter and one watching a graph
       When the user opens the automations list
       Then both appear in one table
-      And each row shows its source and its delivery channel
+      And each row shows what it watches and where it delivers
 
     @integration @unimplemented
-    Scenario: Filtering the list by source
-      Given the project has automations of both sources
-      When the user filters the list to graph metric
-      Then only graph-metric automations are shown
+    Scenario: Filtering the list to graph-watching automations
+      Given the project has automations watching filters and graphs
+      When the user filters the list to graph
+      Then only graph-watching automations are shown
 
     @integration @unimplemented
     Scenario: Schedules stay on their own tab
@@ -162,7 +175,9 @@ Feature: One automation flow with a source
     Existing automations carry their own encrypted token, possibly for a
     different workspace than the one the project later connects. Delivery
     never silently retargets: the automation's own token wins until it is
-    explicitly cleared. Migration is a deliberate, cheap act.
+    explicitly cleared. The rotation gap that accepts is handled by
+    visibility — every unmigrated token is flagged where the automation
+    appears — never by silence.
 
     @integration @unimplemented
     Scenario: A legacy automation keeps delivering with its own token
@@ -170,6 +185,13 @@ Feature: One automation flow with a source
       And the project also has a Slack integration
       When the automation fires
       Then the delivery uses the automation's own token
+
+    @integration @unimplemented
+    Scenario: An automation using its own token is flagged where it appears
+      Given an automation that stores its own Slack bot token
+      When the user sees it in the automations list or opens its drawer
+      Then it says the automation uses its own Slack token
+      And it offers switching to the project integration
 
     @integration @unimplemented
     Scenario: Switching a legacy automation to the project integration
@@ -193,13 +215,13 @@ Feature: One automation flow with a source
 
   Rule: A use-case template ships with its graph
 
-    Picking a template must save work: a graph-metric template carries a
+    Picking a template must save work: a graph-watching template carries a
     graph specification and creates the graph with the automation. It
     always creates a new graph — a graph can back only one automation, so
     reusing one the user already has an automation on would be refused.
 
     @integration @unimplemented
-    Scenario: A graph-metric template creates its graph
+    Scenario: A graph-watching template creates its graph
       When the user picks the error spike template and saves the automation
       Then a new graph backing the automation is created
       And the automation's rule watches that graph
@@ -213,7 +235,8 @@ Feature: One automation flow with a source
   Rule: Old kind-based API clients keep working
 
     The wire keeps kind as the discriminator; source is a derived alias
-    published beside it. Neither is scheduled for removal.
+    published beside it, and it is wire vocabulary only — no screen shows
+    the word. Neither field is scheduled for removal.
 
     @integration @unimplemented
     Scenario: Creating with the kind field still works
