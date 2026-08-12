@@ -18,10 +18,15 @@
  * This is an integration test rather than a unit test because the components
  * are rendered: the proof is what the page shows, not what the detector
  * returns.
+ *
+ * The last block covers reading a verdict the cell is too small to hold: the
+ * Winner cell expands over the table, and the ways back out of that overlay
+ * are part of the verdict being readable at all.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -30,6 +35,8 @@ import type {
   ExperimentRunWithItems,
 } from "~/server/experiments-v3/services/types";
 import { BatchEvaluationResultsTable } from "../BatchEvaluationResultsTable";
+import { ComparisonWinnerCell } from "../ComparisonWinnerCell";
+import type { BatchComparisonColumn, BatchComparisonVerdict } from "../types";
 import { transformBatchEvaluationData } from "../types";
 import { WinRateChart } from "../WinRateChart";
 
@@ -400,6 +407,88 @@ describe("an n-way comparison logged by the code-first SDK", () => {
           // One tie, from row 3. The skipped row is not a tie.
           { name: "Tie", wins: 1 },
         ]);
+      });
+    });
+  });
+});
+
+/**
+ * Reasoning long enough to trip the cell's overflow heuristic, which collapses
+ * anything past a few hundred characters and offers the fade overlay instead.
+ */
+const OVERFLOWING_REASONING = Array.from(
+  { length: 8 },
+  (_, pass) =>
+    `Pass ${pass + 1}: gpt-5-mini gives the reset link and stops, while the ` +
+    `other two spend a paragraph restating the question before they get to it.`,
+).join(" ");
+
+const OVERFLOWING_COLUMN: BatchComparisonColumn = {
+  evaluatorId: COMPARISON_EVALUATOR,
+  name: COMPARISON_NAME,
+  variants: TARGET_NAMES.map((name) => ({ id: name, name })),
+  verdictsByRow: {},
+};
+
+const OVERFLOWING_VERDICT: BatchComparisonVerdict = {
+  rowIndex: 0,
+  winnerId: "gpt-5-mini",
+  reasoning: OVERFLOWING_REASONING,
+  winnerOutput: "gpt-5-mini answer for row 0",
+};
+
+const CLOSE_HINT = "click outside or press Escape to close";
+
+describe("a verdict too long to fit its cell", () => {
+  /** Renders the cell and clicks the fade overlay to open it over the table. */
+  const expandVerdict = async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ComparisonWinnerCell
+        column={OVERFLOWING_COLUMN}
+        verdict={OVERFLOWING_VERDICT}
+      />,
+      { wrapper: Wrapper },
+    );
+
+    await user.click(screen.getByTestId("comparison-winner-expand"));
+
+    return user;
+  };
+
+  describe("given the reader has expanded it over the table", () => {
+    it("names both ways back out", async () => {
+      await expandVerdict();
+
+      expect(screen.getByText(CLOSE_HINT)).toBeDefined();
+    });
+
+    // The backdrop is a fixed, full-viewport box that swallows every pointer
+    // event, so leaving it behind does more than ignore a keystroke: the
+    // toolbar above the table stops responding until the reader happens to
+    // click the backdrop itself.
+    describe("when Escape is pressed", () => {
+      /** @scenario "Dismissing an expanded verdict" */
+      it("takes the backdrop out of the page along with the overlay", async () => {
+        const user = await expandVerdict();
+        expect(screen.getByTestId("comparison-winner-backdrop")).toBeDefined();
+
+        await user.keyboard("{Escape}");
+
+        expect(screen.queryByTestId("comparison-winner-backdrop")).toBeNull();
+        expect(screen.queryByText(CLOSE_HINT)).toBeNull();
+      });
+    });
+
+    describe("when the backdrop is clicked", () => {
+      it("takes the backdrop out of the page along with the overlay", async () => {
+        const user = await expandVerdict();
+
+        await user.click(screen.getByTestId("comparison-winner-backdrop"));
+
+        expect(screen.queryByTestId("comparison-winner-backdrop")).toBeNull();
+        expect(screen.queryByText(CLOSE_HINT)).toBeNull();
       });
     });
   });

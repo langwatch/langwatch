@@ -92,7 +92,7 @@ Feature: Batch Evaluation Results Visualization
     Given a target execution failed with an error longer than two lines
     When I click on the error cell
     Then the error expands into an overlay showing the full message
-    And I can dismiss the expanded view by clicking outside
+    And I can dismiss the expanded view by clicking outside or by pressing Escape
 
   @unimplemented
   Scenario: Expand long target output
@@ -101,7 +101,7 @@ Feature: Batch Evaluation Results Visualization
     Then a fade overlay appears at the bottom of the cell
     When I click on the cell
     Then the output expands to show the full content
-    And I can dismiss the expanded view by clicking outside
+    And I can dismiss the expanded view by clicking outside or by pressing Escape
 
   # ============================================================================
   # Evaluator Results Display

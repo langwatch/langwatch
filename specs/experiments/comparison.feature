@@ -116,6 +116,20 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
     Then I see "variant_2" named as the winner
     And I do not see the losing variants listed alongside it
 
+  # A verdict too long for its cell expands over the table behind a
+  # full-viewport backdrop. An overlay that only closes on an outside click
+  # leaves the reader stranded: the backdrop keeps swallowing pointer events,
+  # so the toolbar above the table stops responding until they happen to click
+  # the backdrop itself.
+  @integration
+  Scenario: Dismissing an expanded verdict
+    Given a Comparison verdict too long to fit its cell
+    When I click the cell to read all of it
+    Then the verdict expands over the table
+    And it tells me it closes on an outside click or on Escape
+    When I press Escape
+    Then the expanded verdict closes and the table is clickable again
+
   Scenario: Clicking the winner highlights its source column
     Given a Comparison verdict names "variant_2" as the winner
     When I click on the winner's name
