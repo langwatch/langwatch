@@ -65,6 +65,11 @@ func Extract(document string) []Link {
 	var fence fences
 
 	for index, line := range strings.Split(document, "\n") {
+		// A CRLF document leaves a carriage return on every line. Dropping it
+		// here rather than in one helper keeps fence detection and link
+		// matching agreeing about where a line ends.
+		line = strings.TrimSuffix(line, "\r")
+
 		if fence.crossed(line) || fence.inside() {
 			continue
 		}

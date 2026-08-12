@@ -244,6 +244,23 @@ func TestExtractDoesNotCloseAFenceOnALineCarryingAnInfoString(t *testing.T) {
 	}
 }
 
+// A CRLF document must behave like an LF one. The failure mode is silent:
+// an unrecognized closing fence swallows the rest of the file, and the run
+// still prints a tick.
+func TestExtractHandlesCarriageReturns(t *testing.T) {
+	document := "" +
+		"```bash\r\n" +
+		"# [sample](https://langwatch.ai/sample)\r\n" +
+		"```\r\n" +
+		"[after](https://langwatch.ai/after)\r\n"
+
+	links := linkcheck.Extract(document)
+
+	if len(links) != 1 || links[0].Target != "https://langwatch.ai/after" {
+		t.Fatalf("got %v, want the link after the CRLF closing fence", targetsOf(links))
+	}
+}
+
 func targetsOf(links []linkcheck.Link) []string {
 	found := make([]string, 0, len(links))
 	for _, link := range links {
