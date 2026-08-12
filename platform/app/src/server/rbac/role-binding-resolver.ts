@@ -13,7 +13,7 @@ import {
   type Permission,
   teamRoleHasPermission,
 } from "../api/rbac";
-import { authzShadow } from "../authz/runtime";
+import { authzShadowFor } from "../authz/shadow";
 import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 import {
   MalformedCustomRolePermissionsError,
@@ -300,7 +300,7 @@ export async function checkRoleBindingPermission({
   // cap here), auto-tagged knownDivergence by shadow.ts.
   const scopeIds = scopeRefToIds(scope, organizationId);
   if (resolvedPrincipal.type === "user") {
-    authzShadow.userPermissionCheck({
+    authzShadowFor(prisma).userPermissionCheck({
       userId: resolvedPrincipal.id,
       permission,
       legacyAllowed: permitted,
@@ -308,7 +308,7 @@ export async function checkRoleBindingPermission({
       ...scopeIds,
     });
   } else {
-    authzShadow.apiKeyPermissionCheck({
+    authzShadowFor(prisma).apiKeyPermissionCheck({
       apiKeyId: resolvedPrincipal.id,
       ownerUserId: null,
       organizationId,
@@ -642,7 +642,7 @@ export async function resolveApiKeyPermission({
 
   // ADR-092 stage A4: engine ceiling-algebra shadow comparison.
   const scopeIds = scopeRefToIds(scope, organizationId);
-  authzShadow.apiKeyPermissionCheck({
+  authzShadowFor(prisma).apiKeyPermissionCheck({
     apiKeyId,
     ownerUserId: userId,
     organizationId,

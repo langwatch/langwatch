@@ -11,7 +11,7 @@ import {
   ProjectPermissionDeniedError,
 } from "~/server/app-layer/permissions/errors";
 import type { Session } from "~/server/auth";
-import { authzShadow } from "~/server/authz/runtime";
+import { authzShadowFor } from "~/server/authz/shadow";
 import { isAdmin } from "../../../ee/admin/isAdmin";
 import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 
@@ -1137,7 +1137,7 @@ export async function resolveProjectPermission(
 
   // ADR-092 stage A4: engine shadow comparison — async, never affects the
   // legacy answer.
-  authzShadow.userPermissionCheck({
+  authzShadowFor(ctx.prisma).userPermissionCheck({
     userId: context.userId,
     permission,
     legacyAllowed: permitted,
@@ -1257,7 +1257,7 @@ export async function resolveTeamPermission(
   });
 
   // ADR-092 stage A4: engine shadow comparison.
-  authzShadow.userPermissionCheck({
+  authzShadowFor(ctx.prisma).userPermissionCheck({
     userId: ctx.session.user.id,
     permission,
     legacyAllowed: permitted,
@@ -1295,7 +1295,7 @@ export async function hasOrganizationPermission(
   );
   // ADR-092 stage A4: engine shadow comparison.
   if (ctx.session?.user) {
-    authzShadow.userPermissionCheck({
+    authzShadowFor(ctx.prisma).userPermissionCheck({
       userId: ctx.session.user.id,
       permission,
       legacyAllowed: permitted,

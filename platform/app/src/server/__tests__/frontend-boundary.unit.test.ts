@@ -594,3 +594,97 @@ describe("browser-only UI never reaches the backend", () => {
     });
   });
 });
+
+/**
+ * The same boundary, walked the other way. A handful of `src/server/` modules
+ * are imported by CLIENT code for their values — the rbac vocabulary
+ * (`~/server/api/rbac`) supplies role helpers to `useOrganizationTeamProject`
+ * and friends — so everything they pull at module scope lands in the browser
+ * bundle and in every jsdom test graph. One import from rbac.ts into the authz
+ * composition root put Prisma, redis and the EE audit writer into the client
+ * graph: the t3-env client guard then throws at module load, which is a white
+ * screen in the browser and eleven failed-to-load jsdom suites in CI. Worse,
+ * the composition root's graph loops back into rbac.ts through
+ * `~/utils/constants`, so rbac's own exports evaluate to `undefined`
+ * mid-cycle. The env guard only fires where env access is live, so no import
+ * probe can catch this under test config — the graph itself is the invariant.
+ */
+const CLIENT_IMPORTED_SERVER_MODULES = ["server/api/rbac.ts"].map((p) =>
+  path.join(SRC, p),
+);
+
+/** Module-scope state no client graph may reach: prisma, redis, EE audit. */
+const SERVER_ONLY_STATE = new Set(
+  [
+    path.join(SRC, "server/db.ts"),
+    path.join(SRC, "server/redis.ts"),
+    path.join(SRC, "server/authz/runtime.ts"),
+    path.join(SRC, "server/authz/epoch.ts"),
+    path.join(APP_ROOT, "ee/audit-log/auditLog.ts"),
+  ].map((p) => path.resolve(p)),
+);
+
+/** Breadth-first from `root` over value imports; the chain to the first hit. */
+const chainToServerOnlyState = (root: string): string[] | null => {
+  const { children } = walkImportGraph([root]);
+  const parent = new Map<string, string>();
+  const seen = new Set([root]);
+  const queue = [root];
+
+  while (queue.length > 0) {
+    const file = queue.shift()!;
+    if (SERVER_ONLY_STATE.has(path.resolve(file))) {
+      const chain = [file];
+      let cursor = file;
+      while (parent.has(cursor)) {
+        cursor = parent.get(cursor)!;
+        chain.push(cursor);
+      }
+      return chain.reverse().map(rel);
+    }
+    for (const kid of children.get(file) ?? []) {
+      if (seen.has(kid)) continue;
+      seen.add(kid);
+      parent.set(kid, file);
+      queue.push(kid);
+    }
+  }
+  return null;
+};
+
+describe("client-imported vocabulary never reaches server-only state", () => {
+  describe("given the import graph rooted at each client-imported server module", () => {
+    it("finds no chain into prisma, redis, the audit writer, or the authz composition root", () => {
+      const violations = CLIENT_IMPORTED_SERVER_MODULES.map((file) =>
+        chainToServerOnlyState(file),
+      )
+        .filter((chain): chain is string[] => chain !== null)
+        .map((chain) => chain.join("\n     -> "));
+
+      expect(violations).toEqual([]);
+    });
+  });
+
+  // Self-validation, so the guard above cannot pass vacuously: a direct
+  // prisma import and a transitive composition-root import must both report.
+  describe("given a server file that imports prisma directly", () => {
+    it("reports a chain, proving the walker sees the edge", () => {
+      const chain = chainToServerOnlyState(
+        path.join(SRC, "server/api/trpc.ts"),
+      );
+
+      expect(chain).not.toBeNull();
+    });
+  });
+
+  describe("given a server file that reaches the composition root transitively", () => {
+    it("reports the chain through runtime.ts", () => {
+      const chain = chainToServerOnlyState(
+        path.join(SRC, "server/api/routers/authz.ts"),
+      );
+
+      expect(chain).not.toBeNull();
+      expect(chain).toContain("server/authz/runtime.ts");
+    });
+  });
+});
