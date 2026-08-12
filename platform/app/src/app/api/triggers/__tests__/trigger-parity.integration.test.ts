@@ -69,14 +69,14 @@ describe("Feature: automations over the public API express what the dashboard ex
     "Content-Type": "application/json",
   });
 
-  const post = (path: string, body?: Record<string, unknown>) =>
+  const post = async (path: string, body?: Record<string, unknown>) =>
     app.request(path, {
       method: "POST",
       headers: headers(),
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
 
-  const patch = (path: string, body: Record<string, unknown>) =>
+  const patch = async (path: string, body: Record<string, unknown>) =>
     app.request(path, {
       method: "PATCH",
       headers: headers(),

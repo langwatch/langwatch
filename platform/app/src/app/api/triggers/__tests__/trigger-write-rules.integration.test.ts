@@ -41,7 +41,7 @@ describe("Feature: the API saves what the dashboard would accept", () => {
     "Content-Type": "application/json",
   });
 
-  const createTrigger = (body: Record<string, unknown>) =>
+  const createTrigger = async (body: Record<string, unknown>) =>
     app.request("/api/triggers", {
       method: "POST",
       headers: headers(),

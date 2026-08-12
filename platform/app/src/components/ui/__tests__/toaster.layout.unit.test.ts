@@ -27,8 +27,8 @@ describe("given the toast card's material", () => {
       // The override must equal the recipe's `ps` (what a close-button-free
       // toast should look like) and must NOT equal the recipe's own `pe` —
       // otherwise this "fix" would just be re-asserting the broken default.
-      expect(SYMMETRIC_PADDING_END).toBe(toastSlotRecipe.base.root.ps);
-      expect(SYMMETRIC_PADDING_END).not.toBe(toastSlotRecipe.base.root.pe);
+      expect(SYMMETRIC_PADDING_END).toBe(toastSlotRecipe.base!.root!.ps);
+      expect(SYMMETRIC_PADDING_END).not.toBe(toastSlotRecipe.base!.root!.pe);
     });
   });
 
