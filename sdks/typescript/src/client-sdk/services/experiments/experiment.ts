@@ -100,12 +100,18 @@ type SummaryEntry = Pick<BatchEntry, "duration" | "error" | "cost" | "target_id"
 
 /**
  * AsyncLocalStorage for iteration context isolation.
- * This stores the current item and index for each iteration,
+ * This stores the current item, index and trace for each iteration,
  * preventing race conditions in concurrent execution.
+ *
+ * `traceId` is the row's own iteration trace, and is null for a row whose
+ * targets each opened a trace of their own: there is no single trace such a
+ * row belongs to, and naming one would attribute its comparison to a trace
+ * that judged something else.
  */
 type IterationContext = {
   index: number;
   item: unknown;
+  traceId: string | null;
 };
 const iterationContextStorage = new AsyncLocalStorage<IterationContext>();
 
@@ -157,10 +163,6 @@ export class Experiment {
   // the row is compared. Insertion-ordered, and reaped oldest-first past
   // MAX_COMPARISON_ROWS_RETAINED.
   private capturedOutputs = new Map<number, Map<string, CapturedTargetOutput>>();
-
-  // Current iteration context (for log/evaluate calls)
-  private currentTraceId: string | null = null;
-  private currentIndex: number | null = null;
 
   // Track whether withTarget() was used in the current iteration
   // If so, we don't create dataset entries in executeItem()
@@ -345,14 +347,12 @@ export class Experiment {
     this.iterationUsedWithTarget.set(index, false);
 
     // Set up iteration context (thread-safe via AsyncLocalStorage)
-    const iterationContext: IterationContext = { index, item };
+    const iterationContext: IterationContext = { index, item, traceId: null };
 
     // If evaluation uses targets, skip creating iteration-level traces
     // Each withTarget() call will create its own independent trace
     if (this.evaluationUsesTargets) {
       await iterationContextStorage.run(iterationContext, async () => {
-        this.currentIndex = index;
-
         try {
           // Create a minimal span context for the callback
           const span = {
@@ -370,8 +370,6 @@ export class Experiment {
         } catch (err) {
           error = err instanceof Error ? err : new Error(String(err));
           this.logger.error(`Evaluation error at index ${index}:`, error);
-        } finally {
-          this.currentIndex = null;
         }
       });
     } else {
@@ -390,9 +388,10 @@ export class Experiment {
             const spanContext = otelSpan.spanContext();
             const traceId = spanContext.traceId;
 
-            // Set current context for log/evaluate calls
-            this.currentTraceId = traceId;
-            this.currentIndex = index;
+            // The row's own trace, for the log/evaluate/compare calls made
+            // inside it. It rides the iteration context rather than the
+            // instance, so a row reads its own trace and never a neighbour's.
+            iterationContext.traceId = traceId;
             capturedTraceId = traceId;
 
             try {
@@ -414,8 +413,6 @@ export class Experiment {
               this.logger.error(`Evaluation error at index ${index}:`, error);
             } finally {
               span.end();
-              this.currentTraceId = null;
-              this.currentIndex = null;
             }
           }
         );
@@ -498,9 +495,11 @@ export class Experiment {
       targetId = this.registerTarget(target, metadata);
     }
 
-    // Use trace ID from context, then current iteration, then OTEL context
+    // Use trace ID from the target, then the row being iterated, then OTEL context
     const traceId =
-      targetContext?.traceId ?? this.currentTraceId ?? this.getTraceIdFromContext();
+      targetContext?.traceId ??
+      iterationContextStorage.getStore()?.traceId ??
+      this.getTraceIdFromContext();
 
     const result: EvaluationResult = {
       name: metric,
@@ -582,9 +581,11 @@ export class Experiment {
     } = options;
 
     const startTime = Date.now();
-    // Use trace ID from context, then current iteration, then OTEL context
+    // Use trace ID from the target, then the row being iterated, then OTEL context
     const traceId =
-      targetContext?.traceId ?? this.currentTraceId ?? this.getTraceIdFromContext();
+      targetContext?.traceId ??
+      iterationContextStorage.getStore()?.traceId ??
+      this.getTraceIdFromContext();
     const spanId = targetContext?.spanId ?? this.getSpanIdFromContext();
 
     try {
@@ -808,7 +809,9 @@ export class Experiment {
         data,
         settings,
         name,
-        traceId: this.currentTraceId ?? this.getTraceIdFromContext(),
+        traceId:
+          iterationContextStorage.getStore()?.traceId ??
+          this.getTraceIdFromContext(),
         spanId: this.getSpanIdFromContext(),
       });
     } catch (error) {
@@ -837,15 +840,18 @@ export class Experiment {
    *
    * Inferred from the row being processed, the same way withTarget() and
    * log() infer theirs, so a comparison inside a run() callback never repeats
-   * an index the SDK already has. What it deliberately does not do is fall
-   * back to a row: judging row 0 because no row was named would hand back a
-   * confident verdict about candidates the caller never asked about.
+   * an index the SDK already has. It reads that row from the iteration's own
+   * context, which is what keeps a run of many rows at once from handing one
+   * row's comparison the row a neighbour happens to be on.
+   *
+   * What it deliberately does not do is fall back to a row: judging row 0
+   * because no row was named would hand back a confident verdict about
+   * candidates the caller never asked about.
    */
   private resolveComparisonRow(index?: number): number {
-    const resolved =
-      index ?? iterationContextStorage.getStore()?.index ?? this.currentIndex;
+    const resolved = index ?? iterationContextStorage.getStore()?.index;
 
-    if (resolved === null || resolved === undefined) {
+    if (resolved === undefined) {
       throw new ComparisonError(
         "Cannot compare: no row was given and none could be inferred. Pass index explicitly when comparing outside a run() iteration."
       );
@@ -885,7 +891,9 @@ export class Experiment {
     this.pushEvaluation({
       name,
       evaluator: COMPARISON_EVALUATOR_SLUG,
-      trace_id: this.currentTraceId ?? this.getTraceIdFromContext(),
+      trace_id:
+        iterationContextStorage.getStore()?.traceId ??
+        this.getTraceIdFromContext(),
       status,
       // The results page keys a comparison column off this candidate list.
       data: {
@@ -968,7 +976,7 @@ export class Experiment {
 
     // Get iteration context (thread-safe via AsyncLocalStorage)
     const iterationContext = iterationContextStorage.getStore();
-    const index = iterationContext?.index ?? this.currentIndex ?? 0;
+    const index = iterationContext?.index ?? 0;
     const currentItem = iterationContext?.item;
 
     // Mark that withTarget() was used - prevents executeItem from creating a dataset entry

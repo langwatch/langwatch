@@ -166,6 +166,21 @@ Feature: Comparison from the SDK (code-first n-way judging)
     Then the comparison fails asking me to name the row
     And no judge call is made
 
+  # Rows run several at a time, so the row a verdict belongs to cannot be
+  # whichever row the experiment happened to touch last. A verdict filed
+  # against another row's trace is worse than one filed against no trace:
+  # opened from the results page it shows the run of a different row, so it
+  # reads as evidence about candidates the judge never saw.
+  @unit
+  Scenario: A concurrent run keeps every verdict on its own row
+    Given a run over several rows, judged while earlier rows are still running
+    When each row compares the targets it produced
+    Then every verdict is filed against the row whose outputs it judged
+    And no verdict carries a trace belonging to another row
+    And a row that has a trace of its own keeps it
+    And a comparison that cannot tell which row it is for still asks, rather
+      than judging the row a neighbour is on
+
   @unit
   Scenario: The judge may return a tie
     Given the judge found no candidate clearly better

@@ -46,6 +46,7 @@ export type LoggedEvaluation = {
   name: string;
   evaluator: string;
   status: string;
+  trace_id?: string | null;
   inputs?: { candidates?: { id: string }[] } | null;
   score?: number | null;
   label?: string | null;
