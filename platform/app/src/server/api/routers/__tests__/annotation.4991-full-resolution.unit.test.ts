@@ -45,12 +45,6 @@ vi.mock("../../rbac", async (importOriginal) => {
   return {
     ...actual,
     hasProjectPermission: vi.fn(() => Promise.resolve(true)),
-    checkProjectPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
     checkPermissionOrPubliclyShared:
       () =>
       async ({ ctx, next }: any) => {
@@ -59,6 +53,19 @@ vi.mock("../../rbac", async (importOriginal) => {
       },
   };
 });
+
+// The router gates on `.permission(...)`, which the engine middleware answers
+// (ADR-092 stage D). This file is about which trace reads the queue surfaces
+// make, so the gate is opened here and the decision itself is covered by the
+// authz suites.
+vi.mock("~/server/authz/trpc-middleware", () => ({
+  checkPermissionV2:
+    () =>
+    async ({ ctx, next }: any) => {
+      ctx.permissionChecked = true;
+      return next();
+    },
+}));
 
 vi.mock("../../utils", () => ({
   getUserProtectionsForProject: vi.fn().mockResolvedValue({

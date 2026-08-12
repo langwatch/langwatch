@@ -438,5 +438,8 @@ schema-adjacent steps, M7's flag only after D0 completes.
 3. Stage-D retrofit PR: flip representative routers to `.permission()` and
    route the first legacy write path through `grants.*` (member add), with
    `resolveForViewer` delegating to `authz.check` as the A5 proof.
+   The first slice is on `feat/adr-092-stage-d-annotations`, stacked on the
+   engine PR: the annotation router, all 18 plain project checks, same
+   permission strings.
 4. M1 backfill job behind a dry-run flag, so the parity sweep can run
    against production data without writing anything.

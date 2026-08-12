@@ -7,18 +7,17 @@ vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    checkProjectPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-  };
-});
+// The router gates on `.permission(...)`, which the engine middleware answers
+// (ADR-092 stage D). This file is about which tenant a queue may name, so the
+// gate is opened here and the decision itself is covered by the authz suites.
+vi.mock("~/server/authz/trpc-middleware", () => ({
+  checkPermissionV2:
+    () =>
+    async ({ ctx, next }: any) => {
+      ctx.permissionChecked = true;
+      return next();
+    },
+}));
 
 const projectFindUnique = vi.fn();
 const organizationUserCount = vi.fn();
