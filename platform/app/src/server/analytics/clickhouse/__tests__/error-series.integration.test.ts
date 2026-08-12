@@ -62,6 +62,37 @@ const traceCount = (index: number) => ({
   alias: `${index}__metadata_trace_id__cardinality`,
 });
 
+/** Traces the evaluation-run fixtures cover, and the score each one carries. */
+const EVALUATED = [
+  { id: "err-0", score: 0.2 },
+  { id: "err-1", score: 0.4 },
+  { id: "ok-0", score: 0.9 },
+] as const;
+
+const EVALUATED_WITH_ERROR = EVALUATED.filter((evaluated) =>
+  TRACES.some((trace) => trace.id === evaluated.id && trace.hasError),
+).length;
+
+const EVALUATOR_ID = `${TENANT_ID}-evaluator`;
+
+function evaluationRunRow(evaluated: (typeof EVALUATED)[number]) {
+  return {
+    ProjectionId: `proj-eval-${TENANT_ID}-${evaluated.id}`,
+    TenantId: TENANT_ID,
+    EvaluationId: `eval-${TENANT_ID}-${evaluated.id}`,
+    Version: "1",
+    EvaluatorId: EVALUATOR_ID,
+    EvaluatorType: "custom",
+    TraceId: `${TENANT_ID}-${evaluated.id}`,
+    Status: "processed",
+    Score: evaluated.score,
+    Passed: 1,
+    Label: "PASS",
+    LastProcessedEventId: `evt-${TENANT_ID}-${evaluated.id}`,
+    UpdatedAt: new Date(T0).toISOString(),
+  };
+}
+
 function traceSummaryRow(trace: (typeof TRACES)[number]) {
   return {
     ProjectionId: `proj-${TENANT_ID}-${trace.id}`,
@@ -163,12 +194,7 @@ describe("per-series filters and percentage mode", () => {
 
     // Pre-clean: an aborted earlier run leaves its rows behind (afterAll never
     // ran) and a second fixture copy doubles every count assertion.
-    for (const table of ["trace_summaries", "stored_spans"] as const) {
-      await ch.exec({
-        query: `ALTER TABLE ${table} DELETE WHERE TenantId = {tenantId:String} SETTINGS mutations_sync = 1`,
-        query_params: { tenantId: TENANT_ID },
-      });
-    }
+    await deleteTenantRows();
 
     await ch.insert({
       table: "trace_summaries",
@@ -182,16 +208,30 @@ describe("per-series filters and percentage mode", () => {
       format: "JSONEachRow",
       clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
     });
+    await ch.insert({
+      table: "evaluation_runs",
+      values: EVALUATED.map(evaluationRunRow),
+      format: "JSONEachRow",
+      clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+    });
   }, 60_000);
 
   afterAll(async () => {
-    for (const table of ["trace_summaries", "stored_spans"] as const) {
+    await deleteTenantRows();
+  });
+
+  async function deleteTenantRows(): Promise<void> {
+    for (const table of [
+      "trace_summaries",
+      "stored_spans",
+      "evaluation_runs",
+    ] as const) {
       await ch.exec({
         query: `ALTER TABLE ${table} DELETE WHERE TenantId = {tenantId:String} SETTINGS mutations_sync = 1`,
         query_params: { tenantId: TENANT_ID },
       });
     }
-  });
+  }
 
   describe("given a graph with an errors series and a no-errors series", () => {
     describe("when the graph is queried over a window", () => {
@@ -290,6 +330,130 @@ describe("per-series filters and percentage mode", () => {
 
         expect(rows.length).toBeGreaterThan(0);
         expect(numberAt(rows[0], series.alias)).toBe(0);
+      });
+    });
+  });
+
+  // The grouped path aggregates OUTSIDE the scan, over a CTE where the `ts`
+  // alias no longer exists, so the predicate rides as a hoisted per-trace
+  // boolean column. Executing it is the only way to prove that hoist lands on
+  // the right trace.
+  describe("given a grouped graph with one filtered and one unfiltered series", () => {
+    describe("when the graph is queried over a window", () => {
+      // @scenario "A per-series filter narrows its series on a grouped graph"
+      it("narrows only the filtered series within every group", async () => {
+        const [filtered, unfiltered] = [traceCount(0), traceCount(1)];
+        const rows = await runCurrent({
+          ...WINDOW,
+          timeScale: 1440,
+          groupBy: "metadata.span_type",
+          series: [
+            { ...filtered, filters: { "traces.error": ["true"] } },
+            unfiltered,
+          ],
+        });
+
+        const totals = new Map<string, { filtered: number; all: number }>();
+        for (const row of rows) {
+          const key = String(row.group_key);
+          const running = totals.get(key) ?? { filtered: 0, all: 0 };
+          running.filtered += numberAt(row, filtered.alias);
+          running.all += numberAt(row, unfiltered.alias);
+          totals.set(key, running);
+        }
+
+        const expected = (spanType: string, hasError?: boolean) =>
+          TRACES.filter(
+            (trace) =>
+              trace.spanType === spanType &&
+              (hasError === undefined || trace.hasError === hasError),
+          ).length;
+
+        expect(totals.get("llm")).toEqual({
+          filtered: expected("llm", true),
+          all: expected("llm"),
+        });
+        expect(totals.get("agent")).toEqual({
+          filtered: expected("agent", true),
+          all: expected("agent"),
+        });
+      });
+    });
+  });
+
+  // Mixing an evaluation metric with a trace metric routes through a different
+  // CTE again — one that pre-aggregates per trace to undo the evaluation-run
+  // fan-out. It carries the same hoisted boolean, and it is the path most
+  // likely to attribute a filter to the wrong row.
+  describe("given a graph pairing an evaluation score with a filtered trace count", () => {
+    describe("when the graph is queried over a window", () => {
+      // @scenario "A per-series filter narrows its series alongside an evaluation measurement"
+      it("counts only traces with an error and leaves the score alone", async () => {
+        const [filtered, unfiltered] = [traceCount(1), traceCount(2)];
+        const rows = await runCurrent({
+          ...WINDOW,
+          series: [
+            {
+              metric:
+                "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              aggregation: "avg" as const,
+            },
+            { ...filtered, filters: { "traces.error": ["true"] } },
+            unfiltered,
+          ],
+        });
+
+        const averageScore =
+          EVALUATED.reduce((total, evaluated) => total + evaluated.score, 0) /
+          EVALUATED.length;
+
+        expect(numberAt(rows[0], filtered.alias)).toBe(EVALUATED_WITH_ERROR);
+        expect(numberAt(rows[0], unfiltered.alias)).toBe(EVALUATED.length);
+        expect(
+          numberAt(rows[0], "0__evaluations_evaluation_score__avg"),
+        ).toBeCloseTo(averageScore, 6);
+      });
+    });
+  });
+
+  describe("given a filtered series whose aggregation is not additive", () => {
+    describe("when the window holds traces but the filter matches none", () => {
+      // @scenario "A filtered average or extremum reports no value when nothing matched"
+      it("reports no value rather than a duration of zero", async () => {
+        const alias = "0__performance_completion_time__min";
+        const rows = await runCurrent({
+          ...WINDOW,
+          series: [
+            {
+              metric:
+                "performance.completion_time" as FlattenAnalyticsMetricsEnum,
+              aggregation: "min" as const,
+              filters: { "spans.type": ["no-span-type-matches-this"] },
+            },
+          ],
+        });
+
+        expect(rows.length).toBeGreaterThan(0);
+        expect(rows[0]?.[alias] ?? null).toBeNull();
+      });
+    });
+
+    describe("when the filter does match traces", () => {
+      it("still reports the real measurement", async () => {
+        const alias = "0__performance_completion_time__min";
+        const rows = await runCurrent({
+          ...WINDOW,
+          series: [
+            {
+              metric:
+                "performance.completion_time" as FlattenAnalyticsMetricsEnum,
+              aggregation: "min" as const,
+              filters: { "traces.error": ["true"] },
+            },
+          ],
+        });
+
+        expect(numberAt(rows[0], alias)).toBe(200);
       });
     });
   });

@@ -7,8 +7,8 @@
 
 import { MAX_PROCESSED_SPANS } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import { snakeCase } from "../../../utils/stringCasing";
-import { SeriesPercentageUnsupportedError } from "../errors";
 import type { FilterField } from "../../filters/types";
+import { SeriesPercentageUnsupportedError } from "../errors";
 import { isZeroWhenAbsentSeries, type SeriesInputType } from "../registry";
 import {
   buildJoinClause,
@@ -254,6 +254,16 @@ interface SeriesMetric extends MetricTranslation {
    * was a no-op.
    */
   asPercent: boolean;
+  /**
+   * Whether an absent value for this series genuinely means zero
+   * ({@link isZeroWhenAbsentSeries}). Counts and sums are additive: no matching
+   * rows IS zero. Averages, extrema and percentiles are not — and ClickHouse's
+   * `-If` combinators do NOT return NULL for an empty match set when the source
+   * column is non-nullable, they return 0. Left alone, a filtered `min` over a
+   * bucket nothing matched would report a real-looking 0 where the row parser
+   * and Elasticsearch both leave the series absent.
+   */
+  zeroWhenAbsent: boolean;
 }
 
 /**
@@ -323,51 +333,51 @@ interface AggregateCall {
  * Parametric aggregates (`quantileTDigest(0.5)(col)`) have two paren groups;
  * the SECOND is the argument list and the one a condition is appended to.
  */
-function findOutermostAggregate(expression: string): AggregateCall | null {
-  let index = 0;
-  while (index < expression.length) {
-    const char = expression[index]!;
-    if (char === "'" || char === '"' || char === "`") {
-      index = skipQuoted(expression, index);
-      continue;
-    }
-    if (!/[A-Za-z_]/.test(char)) {
-      index += 1;
-      continue;
-    }
-    const nameStart = index;
-    while (
-      index < expression.length &&
-      /[A-Za-z0-9_]/.test(expression[index]!)
-    ) {
-      index += 1;
-    }
-    const name = expression.slice(nameStart, index);
-    let cursor = index;
-    while (cursor < expression.length && /\s/.test(expression[cursor]!)) {
-      cursor += 1;
-    }
-    if (expression[cursor] !== "(") continue;
-    if (!AGGREGATE_FUNCTION_NAMES.has(name)) continue;
+const FUNCTION_CALL_PATTERN = /([A-Za-z_][A-Za-z0-9_]*)\s*\(/g;
 
-    let argsOpen = cursor;
-    let argsClose = matchClosingParen(expression, argsOpen);
-    // Parametric aggregate: the first group holds the level, the second the
-    // arguments the condition belongs in.
-    let afterFirst = argsClose + 1;
-    while (
-      afterFirst < expression.length &&
-      /\s/.test(expression[afterFirst]!)
-    ) {
-      afterFirst += 1;
-    }
-    if (expression[afterFirst] === "(") {
-      argsOpen = afterFirst;
-      argsClose = matchClosingParen(expression, argsOpen);
-    }
-    return { nameStart, name, argsOpen, argsClose };
+function findOutermostAggregate(expression: string): AggregateCall | null {
+  for (const match of expression.matchAll(FUNCTION_CALL_PATTERN)) {
+    const name = match[1]!;
+    if (!AGGREGATE_FUNCTION_NAMES.has(name)) continue;
+    if (isInsideStringLiteral(expression, match.index)) continue;
+    const firstOpen = match.index + match[0].length - 1;
+    return {
+      nameStart: match.index,
+      name,
+      ...resolveArgumentGroup(expression, firstOpen),
+    };
   }
   return null;
+}
+
+/**
+ * Which paren group of a call holds its arguments.
+ *
+ * A parametric aggregate (`quantileTDigest(0.5)(col)`) has two: the first
+ * carries the level, the second the arguments a condition is appended to.
+ */
+function resolveArgumentGroup(
+  expression: string,
+  firstOpen: number,
+): { argsOpen: number; argsClose: number } {
+  const firstClose = matchClosingParen(expression, firstOpen);
+  const afterFirst = skipWhitespace(expression, firstClose + 1);
+  if (expression[afterFirst] !== "(") {
+    return { argsOpen: firstOpen, argsClose: firstClose };
+  }
+  return {
+    argsOpen: afterFirst,
+    argsClose: matchClosingParen(expression, afterFirst),
+  };
+}
+
+/** Index of the first non-whitespace character at or after `from`. */
+function skipWhitespace(expression: string, from: number): number {
+  let index = from;
+  while (index < expression.length && /\s/.test(expression[index]!)) {
+    index += 1;
+  }
+  return index;
 }
 
 /** Index just past the string literal opened at `start`. */
@@ -385,22 +395,62 @@ function skipQuoted(expression: string, start: number): number {
   return expression.length;
 }
 
-/** Index of the `)` matching the `(` at `open`, quote- and nesting-aware. */
+/**
+ * Does `position` fall inside a string literal?
+ *
+ * Metric expressions carry attribute keys (`ts.Attributes['langwatch.user_id']`)
+ * and quoted nested columns (`ss."Events.Name"`), so a name that looks like a
+ * function call inside one must not be read as an identifier.
+ */
+function isInsideStringLiteral(expression: string, position: number): boolean {
+  let index = 0;
+  while (index < position) {
+    if (!isQuote(expression[index])) {
+      index += 1;
+      continue;
+    }
+    const end = skipQuoted(expression, index);
+    if (end > position) return true;
+    index = end;
+  }
+  return false;
+}
+
+function isQuote(char: string | undefined): boolean {
+  return char === "'" || char === '"' || char === "`";
+}
+
+/**
+ * One step of a quote-aware left-to-right scan: where the next character
+ * begins, and how this one moves the bracket depth. Shared so the two scanners
+ * below hold the depth rule in one place instead of two.
+ */
+function scanStep(
+  expression: string,
+  index: number,
+): { next: number; delta: number } {
+  const char = expression[index]!;
+  if (isQuote(char)) return { next: skipQuoted(expression, index), delta: 0 };
+  if (char === "(" || char === "[") return { next: index + 1, delta: 1 };
+  if (char === ")" || char === "]") return { next: index + 1, delta: -1 };
+  return { next: index + 1, delta: 0 };
+}
+
+/**
+ * Index of the `)` matching the `(` at `open`, quote- and nesting-aware.
+ *
+ * Square brackets count toward the same depth. They are always balanced within
+ * the parens (they only ever appear as map access), so a `]` can never bring
+ * the depth to zero ahead of the matching `)`.
+ */
 function matchClosingParen(expression: string, open: number): number {
   let depth = 0;
   let index = open;
   while (index < expression.length) {
-    const char = expression[index]!;
-    if (char === "'" || char === '"' || char === "`") {
-      index = skipQuoted(expression, index);
-      continue;
-    }
-    if (char === "(") depth += 1;
-    if (char === ")") {
-      depth -= 1;
-      if (depth === 0) return index;
-    }
-    index += 1;
+    const { next, delta } = scanStep(expression, index);
+    depth += delta;
+    if (depth === 0 && delta < 0) return index;
+    index = next;
   }
   throw new Error(`Unbalanced parentheses in metric expression: ${expression}`);
 }
@@ -412,18 +462,13 @@ function splitTopLevelArguments(argumentList: string): string[] {
   let start = 0;
   let index = 0;
   while (index < argumentList.length) {
-    const char = argumentList[index]!;
-    if (char === "'" || char === '"' || char === "`") {
-      index = skipQuoted(argumentList, index);
-      continue;
-    }
-    if (char === "(" || char === "[") depth += 1;
-    if (char === ")" || char === "]") depth -= 1;
-    if (char === "," && depth === 0) {
+    const { next, delta } = scanStep(argumentList, index);
+    depth += delta;
+    if (depth === 0 && argumentList[index] === ",") {
       args.push(argumentList.slice(start, index));
       start = index + 1;
     }
-    index += 1;
+    index = next;
   }
   args.push(argumentList.slice(start));
   return args;
@@ -480,17 +525,28 @@ function withAggregateCondition(expression: string, condition: string): string {
  * of no value at all, and the result is a percentage rather than a fraction.
  * It is only ever reached with a condition — an unfiltered series has nothing
  * to be a percentage OF, and ES treated that combination as a no-op too.
+ *
+ * A NON-additive series (average, extremum, percentile) additionally gets an
+ * emptiness guard. `minIf(x, cond)` over a bucket nothing matched returns 0,
+ * not NULL, whenever `x` is a non-nullable column — so without the guard a
+ * filtered latency floor would draw a 0ms line for every bucket the filter
+ * excluded. `countIf(cond) > 0` is the only reliable "did anything match"
+ * signal, and NULL is what the row parser
+ * (`_timeseries-row-parser.ts` → `isZeroWhenAbsentSeries`) and Elasticsearch
+ * both treat as "no data here".
  */
 function shapeSeriesExpression({
   selectExpression,
   alias,
   condition,
   asPercent,
+  zeroWhenAbsent,
 }: {
   selectExpression: string;
   alias: string;
   condition: string | null;
   asPercent: boolean;
+  zeroWhenAbsent: boolean;
 }): string {
   if (!condition) return selectExpression;
   const base = stripSelectExpressionAlias(selectExpression, alias);
@@ -498,8 +554,12 @@ function shapeSeriesExpression({
   // NULL; there is no aggregate to condition and no number to divide.
   if (base === "NULL") return selectExpression;
   const filtered = withAggregateCondition(base, condition);
-  if (!asPercent) return `${filtered} AS ${alias}`;
-  return `if(${base} > 0, (${filtered}) / (${base}) * 100, 0) AS ${alias}`;
+  // Percentage mode already answers the empty bucket, with ES's own 0.
+  if (asPercent) {
+    return `if(${base} > 0, (${filtered}) / (${base}) * 100, 0) AS ${alias}`;
+  }
+  if (zeroWhenAbsent) return `${filtered} AS ${alias}`;
+  return `if(countIf(${condition}) > 0, ${filtered}, NULL) AS ${alias}`;
 }
 
 /**
@@ -1112,7 +1172,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     // entities, which is a second scan rather than a second aggregate. Refuse
     // it by name instead of answering with a number that looks right.
     if (series.asPercent && seriesCondition && translation.requiresSubquery) {
-      throw new SeriesPercentageUnsupportedError(series.metric);
+      throw new SeriesPercentageUnsupportedError();
     }
     metricTranslations.push({
       ...translation,
@@ -1121,6 +1181,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
         ? seriesConditionColumnName(i)
         : null,
       asPercent: series.asPercent === true && seriesCondition !== null,
+      zeroWhenAbsent: isZeroWhenAbsentSeries(series),
     });
     for (const join of translation.requiredJoins) {
       allJoins.add(join);
@@ -1364,6 +1425,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
         alias: metric.alias,
         condition: metric.seriesCondition,
         asPercent: metric.asPercent,
+        zeroWhenAbsent: metric.zeroWhenAbsent,
       }),
     );
   }
@@ -1523,6 +1585,7 @@ function buildMixedEvalTimeseriesQuery({
         alias: quoteIdentifier(metric.alias),
         condition: metric.seriesConditionColumn,
         asPercent: metric.asPercent,
+        zeroWhenAbsent: metric.zeroWhenAbsent,
       }),
     );
   };
@@ -1899,6 +1962,7 @@ function buildArrayJoinTimeseriesQuery({
         seriesCondition: translation.seriesCondition,
         seriesConditionColumn: translation.seriesConditionColumn,
         asPercent: translation.asPercent,
+        zeroWhenAbsent: translation.zeroWhenAbsent,
       });
     }
   }
@@ -2112,6 +2176,7 @@ function buildArrayJoinTimeseriesQuery({
           alias: quoteIdentifier(metric.alias),
           condition: metric.seriesConditionColumn,
           asPercent: metric.asPercent,
+          zeroWhenAbsent: metric.zeroWhenAbsent,
         }),
       );
       continue;
@@ -2129,6 +2194,7 @@ function buildArrayJoinTimeseriesQuery({
         alias: metric.alias,
         condition: metric.seriesConditionColumn,
         asPercent: metric.asPercent,
+        zeroWhenAbsent: metric.zeroWhenAbsent,
       }),
     );
   }
@@ -2513,6 +2579,7 @@ function buildSubqueryTimeseriesQuery(
       alias: metric.alias,
       condition: metric.seriesCondition,
       asPercent: metric.asPercent,
+      zeroWhenAbsent: metric.zeroWhenAbsent,
     });
     simpleSelectExprs.push(
       shaped.replace(` AS ${metric.alias}`, ` AS ${quotedAlias}`),
@@ -2750,6 +2817,7 @@ function buildDateBucketedPipelineQuery({
           alias: m.alias,
           condition: m.seriesCondition,
           asPercent: m.asPercent,
+          zeroWhenAbsent: m.zeroWhenAbsent,
         });
         return shaped.replace(` AS ${m.alias}`, ` AS ${quotedAlias}`);
       }),
