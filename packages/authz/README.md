@@ -36,6 +36,160 @@ deterministic function of that snapshot.
  useCan / RequireCan (client)          passport + bitset (stage F)
 ```
 
+## Using it
+
+Which door you walk through depends on what you are writing:
+
+| You are writing... | Use |
+|---|---|
+| a tRPC procedure | `protectedProcedure.permission("...")` |
+| a service, worker, or anything server-side | `require_()` (throws, returns a witness) or `can()` (boolean) |
+| a Hono route | nothing inline - the service it calls does `require_()` |
+| React UI | `useCan()` / `<RequireCan>` |
+| an admin surface that changes who can do what | `GrantsService` verbs |
+| a share page (anonymous viewer with a link) | `resolveResourceScopeRef` + `check()` with the presented tokens |
+
+### Protecting a tRPC procedure
+
+`.permission()` replaces the whole `.use(checkUserPermissionForProject(...))`
+family. The middleware resolves the scope from the input's most specific id
+(`projectId`, then `teamId`, then `organizationId`), collects once, decides,
+and throws the legacy-compatible error shape on denial. An input with none of
+the three ids fails loudly - that is a wiring bug, not a denial.
+
+```ts
+export const tracesRouter = createTRPCRouter({
+  getById: protectedProcedure
+    .permission("traces:view")
+    .input(z.object({ projectId: z.string(), traceId: z.string() }))
+    .query(({ ctx, input }) => { ... }),
+});
+```
+
+### Checking in server code
+
+Build the scope with a resolver - never by hand. The resolvers exist so that
+lineage facts (a project's team and organization) come from storage; a
+hand-built literal is the one way to lie to the engine.
+
+```ts
+import { can, require_ } from "~/server/authz/service";
+import { resolveScopeRef } from "~/server/authz/collector";
+
+const scope = await resolveScopeRef({ prisma, projectId });
+if (!scope) throw new NotFoundError(...);          // unknown id: deny, don't leak
+
+// Boolean - for branching:
+if (await can({ prisma, principal: { type: "user", id: userId }, permission: "datasets:manage", scope })) { ... }
+
+// Throw-on-denial - for guarding. The returned witness is the proof object
+// repositories following the witness convention accept instead of a raw id,
+// which makes "forgot the permission check" fail to compile:
+const authorized = await require_({
+  prisma,
+  principal: { type: "user", id: userId },
+  permission: "datasets:manage",
+  scope,
+});
+await datasetsRepository.deleteAll(authorized);
+```
+
+`check()` is `can()` with the full decision (via, denialReason, audience) when
+you need to explain or log; `effectivePermissions()` is the whole set at a
+scope, and is what the `authz.effectivePermissions` router serves the client.
+
+### Checking in the browser
+
+The client never re-derives decisions from role names. It asks the server for
+the effective set once per scope and tests against it with the same hierarchy
+helper the engine uses - a typo'd permission string fails `pnpm typecheck`.
+
+```tsx
+const { can, isLoading } = useCan();
+if (can("prompts:update")) { ... }        // false while loading - fail closed
+
+<RequireCan permission="prompts:update" fallback={null}>
+  <EditButton />
+</RequireCan>
+```
+
+### Sharing and anonymous callers
+
+A share link viewer has no session. The share page resolves the resource
+scope with the tokens the request presented; the collector reads only live,
+presented links, and `decide()` answers through the resource tier - the ONLY
+path an anonymous principal can take.
+
+```ts
+const scope = await resolveResourceScopeRef({
+  prisma,
+  projectId: trace.projectId,      // off the FETCHED trace row, never the URL
+  kind: "trace",
+  id: trace.id,
+  parentThreadId: trace.threadId,  // same: the stored row's own thread
+  shareTokens: [presentedToken],
+});
+const decision = await check({ prisma, principal: { type: "anonymous" }, permission: "traces:view", scope });
+// decision.audience === "public" → serializers apply the public redactions
+```
+
+### Changing who can do what
+
+`GrantsService` is the one write surface. Every mutation validates tenancy,
+names its failures (`grant_validation_failed`, never a raw database error),
+writes an audit event, and bumps the org's epoch so caches die on the next
+request.
+
+```ts
+const grants = new GrantsService(prisma);
+
+await grants.attach({ actor, who: { type: "user", id }, role: { builtin: "MEMBER" }, where: teamScope });
+await grants.update({ actor, bindingId, role: { customRoleId } });
+await grants.revoke({ actor, bindingId });
+
+// The REDUCE verb - narrowing is one atomic swap, never two bindings fighting:
+await grants.replace({ actor, who, from: orgScope, to: teamScope, role: { builtin: "MEMBER" } });
+
+// Offboarding proves the result inside the transaction and reports what
+// still needs a human decision (owned API keys, personal workspaces):
+const report = await grants.offboard({ actor, userId, organizationId });
+```
+
+Resource scopes are rejected here by design: resource-tier access is granted
+by *sharing* the resource, not by a role binding.
+
+### Adding to the vocabulary
+
+1. Append the action or resource **at the end** in `registry.ts` - never
+   reorder, never insert. Bitset indices are derived from declaration order
+   and ship inside signed passports.
+2. If built-in roles should grant it, add it to the role *differences* in
+   `roles.ts` (member = viewer + additions, admin = member + additions).
+3. Update the pinned count and append to the full-order list in the app-side
+   `registry.unit.test.ts` - the test failing is the reminder, not the enemy.
+4. Write the behaviour as a scenario in
+   `specs/rbac/unified-authorization-engine.feature`, tag it, and bind it
+   with a `@scenario` annotation on the covering test.
+
+### Naming a failure
+
+A new `HandledError` code is not done until the customer can read it: add the
+code to `platform/app/src/features/errors/logic/codes.ts` (sorted) and write
+its copy in `presentation.ts` in the same change - `codes.unit.test.ts` fails
+otherwise, and an unregistered code reaches customers as "unknown error".
+
+### What not to do
+
+| Mistake | Instead |
+|---|---|
+| Hand-building an `AuthzScopeRef` literal in a route or service | Resolve it (`resolveScopeRef`, `resolveResourceScopeRef`) - lineage comes from storage, resource anchors from the fetched row |
+| Comparing role names (`role === "ADMIN"`) to gate behaviour | Ask for a permission - roles are grant bundles, not checks |
+| Inserting a permission mid-registry because it "belongs with" its siblings | Append only; the order test exists to stop exactly this |
+| Re-exporting `passport.ts` from the barrel, or importing it client-side | The barrel stays browser-safe (`useCan` imports it); passports are server-only, `@langwatch/authz/passport` |
+| Toasting `error.message` from a denied mutation | The code-keyed presentation registry renders the copy (`permission_denied`) |
+| Calling `decide()` with a hand-assembled `CollectedGrants` in production code | `collectGrantsCached` is the one reader; hand-assembly is for tests |
+| A new error code without `codes.ts` + `presentation.ts` entries | Both, in the same change - the guard test enforces it |
+
 ## Bible of terms
 
 Use these words exactly; every synonym that predates ADR-092 maps onto one of
