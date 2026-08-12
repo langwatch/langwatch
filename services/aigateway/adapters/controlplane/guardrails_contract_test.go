@@ -170,12 +170,12 @@ func TestContentForPacksEachDirectionUnderItsOwnKey(t *testing.T) {
 	}
 }
 
-// controlPlaneRoot is the langwatch/ directory of the monorepo, relative to
+// controlPlaneRoot is the platform/app/ directory of the monorepo, relative to
 // this package. A checkout that does not carry the TypeScript side (a vendored
 // or split Go build) has no control plane to compare against and the test is
 // skipped. When the directory IS there, a missing or unreadable file is drift,
 // which is precisely what this test exists to catch, so it fails instead.
-var controlPlaneRoot = filepath.Join("..", "..", "..", "..", "langwatch")
+var controlPlaneRoot = filepath.Join("..", "..", "..", "..", "platform", "app")
 
 func readControlPlaneSource(t *testing.T, parts ...string) string {
 	t.Helper()
