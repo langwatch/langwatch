@@ -16,7 +16,17 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
-/** What the two trace-preview queries return for the test at hand. */
+/** Spy shared with the failed-load retry test — declared via `vi.hoisted`
+ *  since it's referenced inside the (hoisted) `~/utils/api` mock factory. */
+const { mockGraphsRefetch } = vi.hoisted(() => ({
+  mockGraphsRefetch: vi.fn(),
+}));
+
+/** What the two trace-preview queries return for the test at hand.
+ *  `graphs` and `graphsError` are independent — react-query's `isError`
+ *  does NOT imply `data` is empty: a background refetch failure leaves the
+ *  last good `data` in place, and a test needs to represent that state
+ *  without the mock coupling the two together for it. */
 const server = vi.hoisted(() => ({
   preview: {
     data: null as { totalHits: number; items: unknown[] } | null,
@@ -24,6 +34,11 @@ const server = vi.hoisted(() => ({
     error: null as unknown,
   },
   cap: { data: null as { cap: number } | null },
+  graphs: [{ id: "graph-1", name: "Latency", trigger: null as unknown }] as
+    | Array<{ id: string; name: string; trigger: unknown }>
+    | undefined,
+  graphsLoading: false,
+  graphsError: false,
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -31,8 +46,10 @@ vi.mock("~/utils/api", () => ({
     graphs: {
       getAll: {
         useQuery: () => ({
-          data: [{ id: "graph-1", name: "Latency", trigger: null }],
-          isLoading: false,
+          data: server.graphs,
+          isLoading: server.graphsLoading,
+          isError: server.graphsError,
+          refetch: mockGraphsRefetch,
         }),
       },
       getById: {
@@ -95,6 +112,15 @@ const seedGraphDraft = () =>
     customGraphId: "graph-1",
   });
 
+/** A brand-new alert draft — no graph chosen yet (matches `INITIAL_DRAFT`'s
+ *  `customGraphId: null`), distinct from `seedGraphDraft`'s already-picked
+ *  graph. */
+const seedFreshAlertDraft = () =>
+  useAutomationStore.getState().hydrate({
+    ...INITIAL_DRAFT,
+    source: "customGraph",
+  });
+
 const seedTraceDraft = (action: TriggerAction) =>
   useAutomationStore.getState().hydrate({
     ...INITIAL_DRAFT,
@@ -121,6 +147,10 @@ describe("SubjectSection", () => {
     useAutomationStore.getState().reset();
     previewReturns(0);
     server.cap = { data: { cap: PLAN_CAP } };
+    server.graphs = [{ id: "graph-1", name: "Latency", trigger: null }];
+    server.graphsLoading = false;
+    server.graphsError = false;
+    mockGraphsRefetch.mockClear();
   });
   afterEach(() => {
     cleanup();
@@ -169,6 +199,132 @@ describe("SubjectSection", () => {
         expect(
           useAutomationStore.getState().draft.graphAlert.seriesName.length,
         ).toBeGreaterThan(0);
+      });
+    });
+
+    describe("when the project has no custom graphs yet", () => {
+      /** @scenario "A project with no custom graphs offers to create one" */
+      it("explains there is nothing to watch yet and offers to create one", () => {
+        server.graphs = [];
+        seedFreshAlertDraft();
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(
+          screen.getByText(/doesn.t have a custom graph yet/i),
+        ).toBeInTheDocument();
+        const link = screen.getByRole("link", {
+          name: /create a custom graph/i,
+        });
+        expect(link).toHaveAttribute("href", "/proj/analytics/custom");
+        // Opens in a new tab so the in-progress alert draft is not lost.
+        expect(link).toHaveAttribute("target", "_blank");
+      });
+
+      it("does not show a graph or series picker", () => {
+        server.graphs = [];
+        seedFreshAlertDraft();
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.queryAllByRole("combobox")).toHaveLength(0);
+      });
+    });
+
+    describe("when opened prefilled even though the project has no other graphs", () => {
+      it("still shows the locked graph picker, not the empty state", () => {
+        server.graphs = [];
+        seedGraphDraft();
+        render(<SubjectSection prefilledGraphId="graph-1" />, {
+          wrapper: Wrapper,
+        });
+
+        expect(selectContainingOption(/select a graph/i)).toBeInTheDocument();
+      });
+    });
+
+    describe("when the graph list fails to load with no data ever cached", () => {
+      /** @scenario "A failed graph list shows a retry, not the empty-project state" */
+      it("shows a load failure, not the no-graphs-yet empty state", () => {
+        server.graphsError = true;
+        server.graphs = undefined;
+        seedFreshAlertDraft();
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(
+          screen.getByText(/couldn.t be loaded right now/i),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByText(/doesn.t have a custom graph yet/i),
+        ).not.toBeInTheDocument();
+      });
+
+      it("does not name the underlying error", () => {
+        server.graphsError = true;
+        server.graphs = undefined;
+        seedFreshAlertDraft();
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.queryByText(/upstream|fetch|network/i)).toBeNull();
+      });
+
+      it("does not offer to create a graph the project may already have", () => {
+        server.graphsError = true;
+        server.graphs = undefined;
+        seedFreshAlertDraft();
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(
+          screen.queryByRole("link", { name: /create a custom graph/i }),
+        ).not.toBeInTheDocument();
+      });
+
+      describe("when the user retries", () => {
+        it("re-runs the graph list query", async () => {
+          const user = userEvent.setup();
+          server.graphsError = true;
+          server.graphs = undefined;
+          seedFreshAlertDraft();
+          render(<SubjectSection />, { wrapper: Wrapper });
+
+          await user.click(screen.getByRole("button", { name: /try again/i }));
+
+          expect(mockGraphsRefetch).toHaveBeenCalledTimes(1);
+        });
+      });
+    });
+
+    describe("when a background refetch fails but a good graph list is still cached", () => {
+      // react-query's v4 `error` reducer case sets `status: 'error'`
+      // unconditionally while leaving the last good `data` in place — the
+      // gap v5 split into isLoadingError/isRefetchError. A reconnect
+      // refetch, or another surface invalidating `graphs.getAll` (the B3
+      // fix does this after a graph create/update), can land here with a
+      // populated, already-selected picker still on screen.
+      it("keeps showing the working picker with the selection intact, not the failure screen", () => {
+        server.graphsError = true; // data stays server.graphs's beforeEach default (non-empty)
+        seedGraphDraft(); // customGraphId: "graph-1" — already selected
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(
+          screen.queryByText(/couldn.t be loaded right now/i),
+        ).not.toBeInTheDocument();
+        const graphSelect = selectContainingOption(/select a graph/i);
+        expect(graphSelect).toBeInTheDocument();
+        expect(graphSelect).toHaveValue("graph-1");
+      });
+    });
+
+    describe("while the graph list is still loading", () => {
+      it("shows neither the empty state nor the picker's missing-graph error", () => {
+        server.graphsLoading = true;
+        seedFreshAlertDraft();
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(
+          screen.queryByText(/doesn.t have a custom graph yet/i),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByText("Pick a custom graph to continue."),
+        ).not.toBeInTheDocument();
       });
     });
   });

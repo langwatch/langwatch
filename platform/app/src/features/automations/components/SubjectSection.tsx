@@ -14,8 +14,10 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { NotificationCadence } from "@langwatch/automations/cadences";
+import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
+import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
 import { describeError } from "~/features/errors";
 import type { FilterParam } from "~/hooks/useFilterParams";
@@ -131,9 +133,36 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
     [selectedGraphQuery.data?.graph],
   );
 
-  const customGraphMissing = draft.customGraphId === null;
+  // Loading is not "no graph picked yet" — showing the error while the first
+  // fetch is still in flight would flash a false rejection before the data
+  // that would clear it has even arrived.
+  const customGraphMissing = draft.customGraphId === null && !graphs.isLoading;
   const seriesMissing =
     !!draft.customGraphId && draft.graphAlert.seriesName.length === 0;
+  // A prefilled draft already carries its graph (opened from a dashboard chart
+  // card), so an otherwise-empty project-wide list is beside the point there.
+  const hasNoGraphs =
+    !isPrefilled &&
+    !graphs.isLoading &&
+    !graphs.isError &&
+    (graphs.data ?? []).length === 0;
+  // Distinct from "no graphs yet": a fetch failure isn't emptiness, and
+  // offering to create a graph the project may already have would be wrong.
+  // Gated on `data == null` too — react-query's `error` state leaves the
+  // last good `data` in place on a background refetch failure (a stale
+  // graph list is still a working picker), so without this check a failed
+  // reconnect refetch would rip a populated, already-selected picker out
+  // from under the author and replace it with the failure screen.
+  const graphsFailedToLoad =
+    !isPrefilled && graphs.isError && graphs.data == null;
+
+  if (graphsFailedToLoad) {
+    return <GraphsLoadFailed onRetry={() => void graphs.refetch()} />;
+  }
+
+  if (hasNoGraphs) {
+    return <NoGraphsYet projectSlug={project?.slug} />;
+  }
 
   return (
     <VStack align="stretch" gap={4}>
@@ -202,6 +231,80 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
         </NativeSelect.Root>
         <Field.ErrorText>Pick a series to monitor.</Field.ErrorText>
       </Field.Root>
+    </VStack>
+  );
+}
+
+/**
+ * Shown instead of an empty, error-flagged graph picker when the project has
+ * no custom graphs yet — there is nothing to watch until one exists, so the
+ * fix is a way to create one, not a picker that can only ever be wrong. Also
+ * covers the #6716 case where a template opens this same drawer with no
+ * graph attached: either way, the author lands here with the same way out.
+ * The link opens in a new tab so this alert draft is still exactly as left
+ * when the author comes back to finish it.
+ */
+function NoGraphsYet({ projectSlug }: { projectSlug?: string }) {
+  return (
+    <VStack
+      align="start"
+      gap={2}
+      padding={3}
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="md"
+      bg="bg.subtle"
+    >
+      <Text textStyle="sm">
+        This project doesn{"'"}t have a custom graph yet. An alert watches a
+        metric on one, so create a graph first, then come back here to pick it.
+      </Text>
+      {projectSlug ? (
+        <>
+          <Link
+            href={`/${projectSlug}/analytics/custom`}
+            target="_blank"
+            rel="noopener noreferrer"
+            asChild
+          >
+            <Button size="xs" variant="outline">
+              <Plus size={13} /> Create a custom graph
+            </Button>
+          </Link>
+          <Text textStyle="2xs" color="fg.muted">
+            Opens in a new tab, so this alert stays exactly as you left it.
+          </Text>
+        </>
+      ) : null}
+    </VStack>
+  );
+}
+
+/**
+ * Shown when the graph list request itself failed — distinct from
+ * `NoGraphsYet`, which means the project genuinely has none. Conflating the
+ * two would tell an author to go create a graph their project may already
+ * have, over a failure that has nothing to do with them. No raw error
+ * detail in the copy (customer-safe per error-handling.md); retry just
+ * re-runs the same query.
+ */
+function GraphsLoadFailed({ onRetry }: { onRetry: () => void }) {
+  return (
+    <VStack
+      align="start"
+      gap={2}
+      padding={3}
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="md"
+      bg="bg.subtle"
+    >
+      <Text textStyle="sm">
+        Your custom graphs couldn{"'"}t be loaded right now.
+      </Text>
+      <Button size="xs" variant="outline" onClick={onRetry}>
+        Try again
+      </Button>
     </VStack>
   );
 }

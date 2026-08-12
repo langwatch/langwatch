@@ -19,6 +19,7 @@ import {
   type Condition,
   type ConditionOperator,
   defaultOperatorForField,
+  isConditionComplete,
   operatorsForValueType,
   queryToConditions,
   serializeConditions,
@@ -35,13 +36,103 @@ const OPERATOR_LABEL: Record<ConditionOperator, string> = {
   between: "between",
 };
 
-/** The non-prefix fields, in the same order and labelling the traces
- *  autocomplete uses, so the builder's field list reads identically. */
-const FIELD_OPTIONS = getFieldSuggestions("")
-  .filter((s) => !s.isPrefix)
-  .map((s) => ({ value: s.field, label: s.label }));
+/** One selectable field: a plain field (`status`, `cost`) or a custom-
+ *  attribute prefix (`trace.attribute.<key>`, `span.attribute.<key>`,
+ *  `event.attribute.<key>`). Picking a prefix opens a key sub-input
+ *  (`ConditionRow`) so the row can target one specific attribute. */
+interface FieldOption {
+  value: string;
+  label: string;
+  isPrefix: boolean;
+}
+
+/** Every field the traces autocomplete offers, in the same order and
+ *  labelling it uses, so the builder's field list reads identically —
+ *  including the custom-attribute prefixes, so a condition on a custom
+ *  attribute is expressible here too, not just in Code mode. */
+const FIELD_OPTIONS: FieldOption[] = getFieldSuggestions("").map((s) => ({
+  value: s.field,
+  label: s.label,
+  isPrefix: s.isPrefix ?? false,
+}));
 
 const FIELD_COLLECTION = createListCollection({ items: FIELD_OPTIONS });
+
+/** The prefix option a row's field belongs to, or `null` for a plain field
+ *  (or no field yet). Matches both a bare prefix (just picked, no key typed
+ *  yet) and a prefix with a key already appended — the two states
+ *  `ConditionRow` needs to tell apart to render the key sub-input. */
+export function matchAttributePrefix(field: string): FieldOption | null {
+  return (
+    FIELD_OPTIONS.find((opt) => opt.isPrefix && field.startsWith(opt.value)) ??
+    null
+  );
+}
+
+/** A prefix with no key typed yet (`"trace.attribute."`) can't serialise to
+ *  a valid query clause — there's nothing to compare against — so it's
+ *  excluded from the query the builder emits until a key is entered. */
+export function isPrefixOnly(field: string): boolean {
+  return FIELD_OPTIONS.some((opt) => opt.isPrefix && opt.value === field);
+}
+
+/** Customer-facing constraint for a custom-attribute key, shown inline when
+ *  `attributeFieldRoundTrips` rejects one. Names the constraint rather than
+ *  the mechanism — the author doesn't need to know it's a query-language
+ *  restriction, only what to change. */
+export const ATTRIBUTE_KEY_ERROR =
+  "This key can't be saved as written — remove any spaces, colons, or quotes.";
+
+/**
+ * True unless `condition` is a completed custom-attribute row whose key
+ * would change what the saved filter means. Every other field comes from
+ * the fixed `FIELD_OPTIONS` dropdown and is always safe; the attribute key
+ * is the only place a user's raw keystrokes flow straight into `field`, and
+ * `serializeCondition` inserts `field` into the query unescaped (only the
+ * value goes through `escapeValue`). A key containing whitespace or liqe
+ * syntax — a space, `:`, a quote, a bracket — can silently retarget the
+ * clause (`trace.attribute.foo bar` parses as two unrelated clauses,
+ * `trace.attribute. ` fails to parse at all) instead of failing loudly.
+ *
+ * Verified by round-tripping the row's own serialised form back through the
+ * same parser the query editor and dispatcher use: if it doesn't come back
+ * as the exact one clause it was built from, the key isn't safe to save.
+ */
+export function attributeFieldRoundTrips(condition: Condition): boolean {
+  if (!matchAttributePrefix(condition.field)) return true;
+  if (!isConditionComplete(condition)) return true; // nothing to check yet
+  const serialized = serializeConditions([condition]);
+  if (!serialized) return true; // unreachable given isConditionComplete above
+  const reparsed = queryToConditions(serialized);
+  if (!reparsed || reparsed.length !== 1) return false;
+  const [only] = reparsed;
+  return (
+    only.field === condition.field &&
+    only.operator === condition.operator &&
+    only.value === condition.value &&
+    (only.valueTo ?? "") === (condition.valueTo ?? "")
+  );
+}
+
+let blankRowCounter = 0;
+function blankCondition(): Condition {
+  return {
+    id: `blank${blankRowCounter++}`,
+    field: "",
+    operator: "is",
+    value: "",
+  };
+}
+
+/** A brand-new builder with zero rows reads as broken — nothing to fill in
+ *  but a small "Add a condition" button, right where an "Add at least one
+ *  condition." warning sits below it. Seeding one blank, editable row makes
+ *  the surface read as ready-to-fill instead. It still doesn't serialise to
+ *  anything (an empty field skips `isConditionComplete`), so save-gating on
+ *  an untouched draft is unaffected. */
+function withMinimumRow(conditions: Condition[]): Condition[] {
+  return conditions.length > 0 ? conditions : [blankCondition()];
+}
 
 /**
  * The structured, no-code front-end over the trace query language. Rows are
@@ -61,8 +152,8 @@ export function ConditionBuilder({
   query: string;
   onChange: (query: string) => void;
 }) {
-  const [conditions, setConditions] = useState<Condition[]>(
-    () => queryToConditions(query) ?? [],
+  const [conditions, setConditions] = useState<Condition[]>(() =>
+    withMinimumRow(queryToConditions(query) ?? []),
   );
   // The last string we emitted, so the parent echoing it straight back doesn't
   // re-parse (and clobber the ids / in-progress blank rows) on every keystroke.
@@ -75,12 +166,20 @@ export function ConditionBuilder({
     const parsed = queryToConditions(query);
     // A non-structurable value shouldn't reach us; if it does, don't wipe the
     // user's rows — leave them be and let Code mode own that query.
-    if (parsed) setConditions(parsed);
+    if (parsed) setConditions(withMinimumRow(parsed));
   }, [query]);
 
   const commit = (next: Condition[]) => {
     setConditions(next);
-    const q = serializeConditions(next);
+    // A prefix the author picked but hasn't typed a key into yet has nothing
+    // to compare against, and a key that would change what the clause means
+    // (whitespace, `:`, a quote) must never reach the saved query — both are
+    // excluded the same way any other half-filled row is, with the reason
+    // shown inline on the row (see `attributeFieldRoundTrips`).
+    const usable = next.filter(
+      (c) => !isPrefixOnly(c.field) && attributeFieldRoundTrips(c),
+    );
+    const q = serializeConditions(usable);
     lastEmitted.current = q;
     onChange(q);
   };
@@ -134,6 +233,7 @@ export function ConditionBuilder({
           <ConditionRow
             condition={condition}
             onField={(field) => setField(condition.id, field)}
+            onFieldKey={(field) => update(condition.id, { field })}
             onOperator={(operator) => update(condition.id, { operator })}
             onValue={(value) => update(condition.id, { value })}
             onValueTo={(valueTo) => update(condition.id, { valueTo })}
@@ -157,6 +257,7 @@ export function ConditionBuilder({
 function ConditionRow({
   condition,
   onField,
+  onFieldKey,
   onOperator,
   onValue,
   onValueTo,
@@ -164,6 +265,10 @@ function ConditionRow({
 }: {
   condition: Condition;
   onField: (field: string) => void;
+  /** Updates just the key portion of a custom-attribute field
+   *  (`trace.attribute.<key>`), leaving the operator and value alone —
+   *  unlike `onField`, this isn't a field switch. */
+  onFieldKey: (field: string) => void;
   onOperator: (operator: ConditionOperator) => void;
   onValue: (value: string) => void;
   onValueTo: (valueTo: string) => void;
@@ -182,43 +287,35 @@ function ConditionRow({
     [operators],
   );
 
-  return (
-    <HStack gap={2} align="center">
-      <Box width="190px" flexShrink={0}>
-        <Select.Root
-          size="sm"
-          collection={FIELD_COLLECTION}
-          value={condition.field ? [condition.field] : []}
-          onValueChange={({ value }) => value[0] && onField(value[0])}
-        >
-          <Select.Trigger>
-            <Select.ValueText placeholder="Field…" />
-          </Select.Trigger>
-          <Select.Content>
-            {FIELD_OPTIONS.map((item) => (
-              <Select.Item key={item.value} item={item}>
-                <Text>{item.label}</Text>
-              </Select.Item>
-            ))}
-          </Select.Content>
-        </Select.Root>
-      </Box>
+  const attributePrefix = matchAttributePrefix(condition.field);
+  const attributeKey = attributePrefix
+    ? condition.field.slice(attributePrefix.value.length)
+    : "";
+  // Only meaningful once the row is otherwise complete — a key the author
+  // hasn't finished typing yet isn't wrong, just unfinished.
+  const attributeKeyInvalid = !attributeFieldRoundTrips(condition);
 
-      {condition.field ? (
-        <Box width="100px" flexShrink={0}>
+  return (
+    <VStack align="stretch" gap={1}>
+      <HStack gap={2} align="center" flexWrap="wrap" rowGap={2}>
+        <Box width="190px" flexShrink={0}>
           <Select.Root
             size="sm"
-            collection={operatorCollection}
-            value={[condition.operator]}
-            onValueChange={({ value }) =>
-              value[0] && onOperator(value[0] as ConditionOperator)
+            collection={FIELD_COLLECTION}
+            value={
+              attributePrefix
+                ? [attributePrefix.value]
+                : condition.field
+                  ? [condition.field]
+                  : []
             }
+            onValueChange={({ value }) => value[0] && onField(value[0])}
           >
             <Select.Trigger>
-              <Select.ValueText />
+              <Select.ValueText placeholder="Field…" />
             </Select.Trigger>
             <Select.Content>
-              {operatorCollection.items.map((item) => (
+              {FIELD_OPTIONS.map((item) => (
                 <Select.Item key={item.value} item={item}>
                   <Text>{item.label}</Text>
                 </Select.Item>
@@ -226,29 +323,74 @@ function ConditionRow({
             </Select.Content>
           </Select.Root>
         </Box>
-      ) : null}
 
-      {condition.field ? (
-        <Box flex={1} minWidth={0}>
-          <ValueControl
-            condition={condition}
-            valueType={valueType}
-            onValue={onValue}
-            onValueTo={onValueTo}
-          />
-        </Box>
-      ) : null}
+        {attributePrefix ? (
+          <Box width="130px" flexShrink={0}>
+            <Input
+              size="sm"
+              placeholder="attribute key"
+              aria-label={`${attributePrefix.label} key`}
+              value={attributeKey}
+              aria-invalid={attributeKeyInvalid}
+              borderColor={attributeKeyInvalid ? "border.error" : undefined}
+              onChange={(e) =>
+                onFieldKey(attributePrefix.value + e.target.value)
+              }
+            />
+          </Box>
+        ) : null}
 
-      <IconButton
-        aria-label="Remove condition"
-        size="sm"
-        variant="ghost"
-        color="fg.muted"
-        onClick={onRemove}
-      >
-        <X size={15} />
-      </IconButton>
-    </HStack>
+        {condition.field ? (
+          <Box width="100px" flexShrink={0}>
+            <Select.Root
+              size="sm"
+              collection={operatorCollection}
+              value={[condition.operator]}
+              onValueChange={({ value }) =>
+                value[0] && onOperator(value[0] as ConditionOperator)
+              }
+            >
+              <Select.Trigger>
+                <Select.ValueText />
+              </Select.Trigger>
+              <Select.Content>
+                {operatorCollection.items.map((item) => (
+                  <Select.Item key={item.value} item={item}>
+                    <Text>{item.label}</Text>
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+          </Box>
+        ) : null}
+
+        {condition.field ? (
+          <Box flex={1} minWidth={0}>
+            <ValueControl
+              condition={condition}
+              valueType={valueType}
+              onValue={onValue}
+              onValueTo={onValueTo}
+            />
+          </Box>
+        ) : null}
+
+        <IconButton
+          aria-label="Remove condition"
+          size="sm"
+          variant="ghost"
+          color="fg.muted"
+          onClick={onRemove}
+        >
+          <X size={15} />
+        </IconButton>
+      </HStack>
+      {attributeKeyInvalid ? (
+        <Text textStyle="2xs" color="fg.error">
+          {ATTRIBUTE_KEY_ERROR}
+        </Text>
+      ) : null}
+    </VStack>
   );
 }
 
