@@ -13,8 +13,13 @@ import {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  decryptWebhookHeaders,
+  type WebhookStoredActionParams,
+} from "~/server/app-layer/automations/providers/webhook/server";
 import { REDACTED_CREDENTIAL } from "~/server/app-layer/automations/trigger-redaction";
 import { prisma } from "~/server/db";
+import { decrypt, encrypt } from "~/utils/encryption";
 
 // The route invalidates the active-triggers cache after a successful write.
 // That is the only thing it needs the app layer for, and booting the whole app
@@ -28,6 +33,9 @@ import { app } from "../[[...route]]/app";
 const SLACK_WEBHOOK =
   "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXX";
 const WEBHOOK_HEADER_VALUE = "Bearer sk-live-abcdefghijklmnop";
+const WEBHOOK_SIGNING_SECRET = "whsec-abcdefghijklmnopqrstuvwxyz";
+const SLACK_BOT_TOKEN = "xoxb-000000000000-abcdefghijkl";
+const ENDPOINT_URL = "https://example.com/hooks/langwatch";
 
 describe("Feature: delivery credentials are redacted at the REST boundary", () => {
   const ns = `triggers-redaction-${nanoid(8)}`;
@@ -57,6 +65,20 @@ describe("Feature: delivery credentials are redacted at the REST boundary", () =
         ...data,
       },
     });
+
+  /** The read-modify-write an integrator performs: read the automation, then
+   *  send the delivery configuration back exactly as it arrived. */
+  const writeBack = async (id: string) => {
+    const read = (await (
+      await app.request(`/api/triggers/${id}`, { headers: headers() })
+    ).json()) as { actionParams: Record<string, unknown> };
+
+    return app.request(`/api/triggers/${id}`, {
+      method: "PATCH",
+      headers: headers(),
+      body: JSON.stringify({ actionParams: read.actionParams }),
+    });
+  };
 
   beforeAll(async () => {
     organization = await prisma.organization.create({
@@ -104,13 +126,18 @@ describe("Feature: delivery credentials are redacted at the REST boundary", () =
             slackWebhook: SLACK_WEBHOOK,
           },
         });
+        // The at-rest shape the product writes: header values are encrypted
+        // (ADR-040 §3), and only their names are readable without the key.
         await storeTrigger({
           name: `Endpoint delivery ${ns}`,
           action: TriggerAction.SEND_WEBHOOK,
           actionParams: {
-            url: "https://example.com/hooks/langwatch",
+            url: ENDPOINT_URL,
             method: "POST",
-            headers: { Authorization: WEBHOOK_HEADER_VALUE },
+            headersEncrypted: encrypt(
+              JSON.stringify({ Authorization: WEBHOOK_HEADER_VALUE }),
+            ),
+            signingSecretEncrypted: encrypt(WEBHOOK_SIGNING_SECRET),
           },
         });
 
@@ -124,6 +151,8 @@ describe("Feature: delivery credentials are redacted at the REST boundary", () =
         expect(body).not.toContain("hooks.slack.com");
         expect(body).not.toContain(WEBHOOK_HEADER_VALUE);
         expect(body).not.toContain("sk-live");
+        expect(body).not.toContain(WEBHOOK_SIGNING_SECRET);
+        expect(body).not.toContain("headersEncrypted");
 
         const listed = JSON.parse(body) as {
           id: string;
@@ -141,8 +170,9 @@ describe("Feature: delivery credentials are redacted at the REST boundary", () =
         // The delivery shape stays readable: the destination and the header
         // name are still there for an integrator to reason about.
         expect(endpointRow?.actionParams).toMatchObject({
-          url: "https://example.com/hooks/langwatch",
+          url: ENDPOINT_URL,
           headers: { Authorization: REDACTED_CREDENTIAL },
+          signingSecret: REDACTED_CREDENTIAL,
         });
       });
     });
@@ -263,15 +293,33 @@ describe("Feature: delivery credentials are redacted at the REST boundary", () =
         },
       });
 
-      const read = (await (
-        await app.request(`/api/triggers/${stored.id}`, { headers: headers() })
-      ).json()) as { actionParams: Record<string, unknown> };
+      const response = await writeBack(stored.id);
+
+      expect(response.status).toBe(200);
+      expect(
+        await prisma.trigger.findUniqueOrThrow({
+          where: { id: stored.id, projectId: projectId() },
+        }),
+      ).toMatchObject({ actionParams: { slackWebhook: SLACK_WEBHOOK } });
+    });
+
+    /** @scenario "A destination the caller did type is the one that is saved" */
+    it("saves a destination the caller typed", async () => {
+      const stored = await storeTrigger({
+        name: `Retargeted ${ns}`,
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+        actionParams: {
+          slackDelivery: "webhook",
+          slackWebhook: SLACK_WEBHOOK,
+        },
+      });
+      const typed = "https://hooks.slack.com/services/T1/B1/typed";
 
       const response = await app.request(`/api/triggers/${stored.id}`, {
         method: "PATCH",
         headers: headers(),
         body: JSON.stringify({
-          actionParams: { ...read.actionParams, slackDelivery: "webhook" },
+          actionParams: { slackDelivery: "webhook", slackWebhook: typed },
         }),
       });
 
@@ -280,7 +328,113 @@ describe("Feature: delivery credentials are redacted at the REST boundary", () =
         await prisma.trigger.findUniqueOrThrow({
           where: { id: stored.id, projectId: projectId() },
         }),
-      ).toMatchObject({ actionParams: { slackWebhook: SLACK_WEBHOOK } });
+      ).toMatchObject({ actionParams: { slackWebhook: typed } });
+    });
+
+    /** @scenario "An integrator writes the read response back and the stored credential survives" */
+    it("keeps the header value and the signing secret of a customer endpoint", async () => {
+      const stored = await storeTrigger({
+        name: `Endpoint round trip ${ns}`,
+        action: TriggerAction.SEND_WEBHOOK,
+        actionParams: {
+          url: ENDPOINT_URL,
+          method: "POST",
+          headersEncrypted: encrypt(
+            JSON.stringify({ Authorization: WEBHOOK_HEADER_VALUE }),
+          ),
+          signingSecretEncrypted: encrypt(WEBHOOK_SIGNING_SECRET),
+        },
+      });
+
+      const response = await writeBack(stored.id);
+
+      expect(response.status).toBe(200);
+      const saved = (
+        await prisma.trigger.findUniqueOrThrow({
+          where: { id: stored.id, projectId: projectId() },
+        })
+      ).actionParams as unknown as WebhookStoredActionParams;
+      // Assert on what the deliveries can actually use: the header the request
+      // will carry, and the secret it will be signed with.
+      expect(decryptWebhookHeaders(saved)).toEqual({
+        Authorization: WEBHOOK_HEADER_VALUE,
+      });
+      expect(decrypt(saved.signingSecretEncrypted!)).toBe(
+        WEBHOOK_SIGNING_SECRET,
+      );
+    });
+
+    /** @scenario "Writing back a Slack bot connection keeps its saved token" */
+    it("keeps the saved bot token of a Slack bot connection", async () => {
+      const stored = await storeTrigger({
+        name: `Bot round trip ${ns}`,
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+        actionParams: {
+          slackDelivery: "bot",
+          slackChannelId: "C123",
+          slackBotToken: encrypt(SLACK_BOT_TOKEN),
+        },
+      });
+
+      const response = await writeBack(stored.id);
+
+      expect(response.status).toBe(200);
+      const saved = (
+        await prisma.trigger.findUniqueOrThrow({
+          where: { id: stored.id, projectId: projectId() },
+        })
+      ).actionParams as { slackBotToken: string; slackChannelId: string };
+      expect(decrypt(saved.slackBotToken)).toBe(SLACK_BOT_TOKEN);
+      expect(saved.slackChannelId).toBe("C123");
+    });
+  });
+
+  describe("when an automation is deleted", () => {
+    /** @scenario "Deleting a trigger reports the deletion" */
+    it("names the automation and reports it deleted", async () => {
+      const stored = await storeTrigger({
+        name: `Deleted ${ns}`,
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+        actionParams: {
+          slackDelivery: "webhook",
+          slackWebhook: SLACK_WEBHOOK,
+        },
+      });
+
+      const response = await app.request(`/api/triggers/${stored.id}`, {
+        method: "DELETE",
+        headers: headers(),
+      });
+
+      expect(response.status).toBe(200);
+      const body = await response.text();
+      expect(body).not.toContain(SLACK_WEBHOOK);
+      expect(JSON.parse(body)).toEqual({ id: stored.id, deleted: true });
+    });
+  });
+
+  describe("given an automation stored before header values were encrypted", () => {
+    it("still reads, with the header name kept and the value hidden", async () => {
+      const stored = await storeTrigger({
+        name: `Legacy endpoint ${ns}`,
+        action: TriggerAction.SEND_WEBHOOK,
+        actionParams: {
+          url: ENDPOINT_URL,
+          headers: { Authorization: WEBHOOK_HEADER_VALUE },
+        },
+      });
+
+      const response = await app.request(`/api/triggers/${stored.id}`, {
+        headers: headers(),
+      });
+
+      expect(response.status).toBe(200);
+      const body = await response.text();
+      expect(body).not.toContain(WEBHOOK_HEADER_VALUE);
+      expect(JSON.parse(body).actionParams).toMatchObject({
+        url: ENDPOINT_URL,
+        headers: { Authorization: REDACTED_CREDENTIAL },
+      });
     });
   });
 });

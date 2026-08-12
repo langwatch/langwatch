@@ -47,6 +47,19 @@ Feature: Automations over the public API
       When the automation is renamed over the API
       Then no credential value appears anywhere in the response
 
+    @integration
+    Scenario: Deleting a trigger reports the deletion
+      Given an automation that delivers to a Slack incoming webhook
+      When the automation is deleted over the API
+      Then the response names the deleted automation and says it is deleted
+
+    @unit
+    Scenario: A delivery configuration that cannot be read comes back empty
+      Given a stored automation whose saved credentials cannot be read back
+      When the automation is redacted for the public API
+      Then its delivery configuration is returned empty
+      And the rest of the automation is still readable
+
     @unit
     Scenario: The delivery shape survives redaction
       Given an automation that delivers to a customer endpoint with an authorization header
@@ -59,6 +72,33 @@ Feature: Automations over the public API
       Given a stored automation whose delivery channel is not one this server offers
       When the automation is redacted for the public API
       Then its delivery configuration is returned empty
+
+  Rule: Writing the read response back keeps the stored credential
+
+    An integrator reads an automation, changes one thing and writes the whole
+    object back. Every credential in that payload is the placeholder, or — for
+    a stored Slack bot token — the flag saying one is set. Each of them means
+    "keep what is stored", whichever channel it belongs to and whether the
+    value is held as it was given or encrypted at rest.
+
+    @integration
+    Scenario: An integrator writes the read response back and the stored credential survives
+      Given an automation that delivers to a customer endpoint with an authorization header and a signing secret
+      When the integrator reads it over the API and writes the response back unchanged
+      Then the automation still delivers with the same header value
+      And it still signs its deliveries with the same secret
+
+    @integration
+    Scenario: Writing back a Slack bot connection keeps its saved token
+      Given an automation that delivers through a Slack bot connection
+      When the integrator reads it over the API and writes the response back unchanged
+      Then the automation still delivers with the saved bot token
+
+    @integration
+    Scenario: A destination the caller did type is the one that is saved
+      Given an automation that delivers to a Slack incoming webhook
+      When the integrator writes back a different webhook URL
+      Then the automation delivers to the URL the integrator typed
 
   Rule: Clients read the redacted response as it arrives
 
