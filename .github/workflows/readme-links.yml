@@ -1,0 +1,71 @@
+name: readme-links
+
+# Resolves every link in the README, so a page renamed on the docs site fails
+# here rather than under the first person who clones the repository.
+#
+# Nine of the README's links were dead when this was written — seven docs pages
+# renamed under docs/integration/ and a hybrid-setup page that had moved out of
+# /self-hosting/ entirely. Nothing in this repository failed when they broke,
+# because none of the changes that broke them happened in this repository.
+#
+# That is why it runs on a schedule as well as on pull requests: this class of
+# rot needs no commit here to happen. The scheduled run is the one that catches
+# it; the pull-request run only stops us adding a new dead link.
+#
+# Only 404 and 410 fail the run. A bot block, a rate limit or a timeout is
+# reported as unverified and does not gate — npmjs.com answers 403 to CI egress
+# addresses, and a check that fails on that is a check people learn to ignore.
+#
+# No path filter: a filtered workflow in this repository needs a complementary
+# "-unmodified" stub so branch protection still resolves (specs/ci/path-filters.feature),
+# and this check is under a minute. Always running is the cheaper arrangement.
+#
+# Runs the checker from the PR head, so the trigger stays `pull_request` — never
+# `pull_request_target`. It needs no token.
+#
+# Spec: specs/ci/readme-link-check.feature
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  schedule:
+    # Mondays, 07:00 UTC — a dead link found at the start of the week gets
+    # fixed that week.
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: readme-links-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  readme-links:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          persist-credentials: false
+          # The job reads the README and builds the checker, so it takes a
+          # working tree — but never the marketing media, which is 165 MB of
+          # .gif and .mp4 it would fetch and not open.
+          # See specs/ci/lean-checkout.feature.
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+            !/assets/
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Check README links
+        run: go run ./cmd/linkcheck README.md
