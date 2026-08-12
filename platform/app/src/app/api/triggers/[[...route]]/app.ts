@@ -13,6 +13,10 @@ import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
 import { TriggerFiltersRequiredError } from "~/server/app-layer/automations/errors";
+import {
+  redactTriggerForPublicApi,
+  resolveRedactedCredentials,
+} from "~/server/app-layer/automations/trigger-redaction";
 import { prisma } from "~/server/db";
 import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
@@ -36,6 +40,10 @@ const triggerResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
   action: triggerActionEnum,
+  /** The delivery configuration, with every credential value replaced by the
+   *  `[redacted]` placeholder. Which channel is configured, which destination
+   *  is set and which header names are in play all survive; the values never
+   *  leave. Sending the placeholder back on an update keeps the stored value. */
   actionParams: z.record(z.unknown()),
   filters: z.record(z.unknown()),
   active: z.boolean(),
@@ -83,11 +91,15 @@ function toTriggerResponse(trigger: Trigger) {
     filters = trigger.filters as Record<string, unknown>;
   }
 
+  // Every verb answers through here, so the redaction is applied once for the
+  // whole surface: list, read, create, update.
+  const { actionParams } = redactTriggerForPublicApi(trigger);
+
   return {
     id: trigger.id,
     name: trigger.name,
     action: trigger.action,
-    actionParams: (trigger.actionParams ?? {}) as Record<string, unknown>,
+    actionParams: (actionParams ?? {}) as Record<string, unknown>,
     filters,
     active: trigger.active,
     message: trigger.message,
@@ -214,12 +226,20 @@ secured.access(requires("triggers:create")).post(
       throw new TriggerFiltersRequiredError();
     }
 
+    // A create has nothing stored behind the placeholder, so a field sent as
+    // `[redacted]` (a listing copied into a create call) is dropped rather
+    // than saved as that string.
+    const actionParams = resolveRedactedCredentials({
+      incoming: body.actionParams,
+      stored: {},
+    });
+
     const trigger = await prisma.trigger.create({
       data: {
         id: nanoid(),
         name: body.name,
         action: body.action,
-        actionParams: body.actionParams as Prisma.InputJsonValue,
+        actionParams: actionParams as Prisma.InputJsonValue,
         filters: JSON.stringify(body.filters),
         projectId: project.id,
         lastRunAt: new Date().getTime(),
@@ -300,7 +320,15 @@ secured.access(requires("triggers:update")).patch(
     if (body.message !== undefined) data.message = body.message;
     if (body.alertType !== undefined) data.alertType = body.alertType;
     if (body.filters !== undefined) data.filters = JSON.stringify(body.filters);
-    if (body.actionParams !== undefined) data.actionParams = body.actionParams;
+    // Read-modify-write is the normal integration shape, and a credential the
+    // caller never touched comes back to us as the placeholder. Each of those
+    // keeps the value already stored.
+    if (body.actionParams !== undefined) {
+      data.actionParams = resolveRedactedCredentials({
+        incoming: body.actionParams,
+        stored: trigger.actionParams,
+      });
+    }
 
     const updated = await prisma.trigger.update({
       where: { id, projectId: project.id },
