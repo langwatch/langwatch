@@ -14,6 +14,10 @@ import { createLogger } from "@langwatch/observability";
 import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 import { env } from "~/env.mjs";
+// Predates the boundary lint, and named in CLAUDE.md as one of the few imports
+// that do. A 38-line string helper that happens to live under a component
+// directory; moving it to a framework-free module is the fix, not an exemption.
+// biome-ignore lint/plugin: pre-existing; see CLAUDE.md
 import { normalizeToSnakeCase } from "~/optimization_studio/components/properties/llm-configs/normalizeToSnakeCase";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";

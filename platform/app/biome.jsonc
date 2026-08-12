@@ -78,6 +78,20 @@
 			"!!**/node_modules/langwatch/dist/*.d.ts"
 		]
 	},
+	// A REGISTERED PLUGIN IS NOT THE SAME AS AN ENFORCED ONE, and this array is
+	// the whole difference. `no-raw-error-toast.grit` shipped in #6010, lost its
+	// entry here in the ADR-076 restructure, and spent the time since reporting
+	// nothing: `pnpm lint:plugins` ran `--only=plugin` against an empty list and
+	// exited green having checked no rules at all.
+	//
+	// There is no separate CI job to add — `pnpm lint` is `biome check`, which
+	// runs whatever is listed here, and CI already gates that. Registration IS
+	// the enforcement. When adding a plugin, verify it appears below and that
+	// its fixtures still produce a non-zero count.
+	"plugins": [
+		"./biome-plugins/no-raw-error-toast.grit",
+		"./biome-plugins/no-client-imports-in-server.grit"
+	],
 	"formatter": {
 		"enabled": true,
 		"indentStyle": "tab"
