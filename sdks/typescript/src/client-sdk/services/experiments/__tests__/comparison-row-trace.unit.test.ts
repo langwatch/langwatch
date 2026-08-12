@@ -76,19 +76,39 @@ describe("Experiment.compare", () => {
     return owners;
   };
 
-  const describeAttribution = (
+  type Mismatch = {
+    source: string;
+    row: number | null | undefined;
+    tracedToRow: number | string;
+  };
+
+  /**
+   * How many of these entries name a trace, and which of those name a row
+   * other than their own. An entry with no trace id is evidence of nothing,
+   * so it is counted out rather than passed silently: the count is what makes
+   * "no mismatches" mean something, since a run that attributed nothing would
+   * otherwise read the same as a run that attributed everything correctly.
+   */
+  const attribution = (
     owners: Map<string, number>,
+    source: string,
     entries: { row: number | null | undefined; traceId: string | null | undefined }[]
-  ): { row: number | null | undefined; tracedToRow: number | string }[] =>
-    entries
-      .filter(
-        (entry) => entry.traceId && owners.get(entry.traceId) !== entry.row
-      )
-      .map((entry) => ({
-        row: entry.row,
-        tracedToRow:
-          owners.get(entry.traceId ?? "") ?? "a trace no row of this run opened",
-      }));
+  ): { traced: number; mismatched: Mismatch[] } => {
+    const traced = entries.filter((entry) => entry.traceId);
+
+    return {
+      traced: traced.length,
+      mismatched: traced
+        .filter((entry) => owners.get(entry.traceId!) !== entry.row)
+        .map((entry) => ({
+          source,
+          row: entry.row,
+          tracedToRow:
+            owners.get(entry.traceId ?? "") ??
+            "a trace no row of this run opened",
+        })),
+    };
+  };
 
   describe("given rows compared while an earlier row is still being processed", () => {
     describe("when every row compares its own targets", () => {
@@ -131,27 +151,42 @@ describe("Experiment.compare", () => {
         expect(harness.judgeRequests).toHaveLength(CAPITALS.length);
         expect(recorded).toHaveLength(CAPITALS.length);
 
+        const judged = attribution(
+          owners,
+          "judge request",
+          harness.judgeRequests.map((request) => ({
+            row: request.data.row_index,
+            traceId: request.trace_id,
+          }))
+        );
+        const filed = attribution(
+          owners,
+          "recorded evaluation",
+          recorded.map((evaluation) => ({
+            row: evaluation.index,
+            traceId: evaluation.trace_id,
+          }))
+        );
+
+        // One traced comparison per side, not four. Only the row that runs
+        // before any withTarget() call gets an iteration span, because the
+        // switch to target-rooted traces is a run-wide latch, so the other
+        // rows compare with no row-level trace to be attributed to. Asserting
+        // the count is what keeps "no mismatches" meaningful: blanking every
+        // trace id would leave nothing to mismatch. Give every row its own
+        // trace and this number becomes CAPITALS.length, which is a change to
+        // make here deliberately rather than discover as a passing test.
         expect({
-          judged: describeAttribution(
-            owners,
-            harness.judgeRequests.map((request) => ({
-              row: request.data.row_index,
-              traceId: request.trace_id,
-            }))
-          ),
-          recorded: describeAttribution(
-            owners,
-            recorded.map((evaluation) => ({
-              row: evaluation.index,
-              traceId: evaluation.trace_id,
-            }))
-          ),
-        }).toEqual({ judged: [], recorded: [] });
+          mismatched: [...judged.mismatched, ...filed.mismatched],
+          tracedJudged: judged.traced,
+          tracedRecorded: filed.traced,
+        }).toEqual({ mismatched: [], tracedJudged: 1, tracedRecorded: 1 });
       });
 
       /**
-       * The row that does own a trace keeps it: dropping every trace id would
-       * satisfy the attribution check above while losing what it protects.
+       * The check above proves no verdict was filed under a neighbour's row.
+       * This one proves the trace a verdict does carry is the row's own
+       * iteration trace, and not some other trace the run happened to open.
        */
       it("keeps the trace of the row that has one", async () => {
         const experiment = await createExperiment();

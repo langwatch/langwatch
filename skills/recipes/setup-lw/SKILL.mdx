@@ -31,11 +31,7 @@ That variable is the whole of the CI setup: every command resolves the key from 
 
 Locally, run plain `langwatch login`. It asks where you are logging in (cloud or self-hosted) and how you will use LangWatch (AI tools, project SDK key, or both), then finishes in the browser. No credential is ever typed or pasted into the terminal: you pick the project on the approval page and its key comes back to the CLI over the same channel, so none of it reaches your shell history. A project SDK key lands as `LANGWATCH_API_KEY` in `.env` in the current directory, so keep `.env` out of version control; an AI-tools login lands in `~/.langwatch/config.json`. `langwatch login --device` skips the questions and goes straight to that RFC 8628 device flow via company SSO.
 
-`langwatch login --api-key <key>` writes a key you already hold straight to `.env`, with no browser and no prompts. It is the only non-interactive way to hand `login` a key, and the key travels through the process argument list, so it is not how a runner should supply one: with `LANGWATCH_API_KEY` set the CLI already has the key, and the flag adds nothing but the file. Reach for it when something downstream genuinely needs the key on disk, and note that a runner can write that file with no key in argv at all:
-
-```bash
-echo "LANGWATCH_API_KEY=$LANGWATCH_API_KEY" >> .env
-```
+`langwatch login --api-key <key>` writes a key you already hold straight to `.env`, with no browser and no prompts. It is the only non-interactive way to hand `login` a key, and the key travels through the process argument list, so it is not how a runner should supply one: with `LANGWATCH_API_KEY` set the CLI already has the key, and the flag adds nothing but the file. Reach for it when something downstream genuinely needs the key on disk. It rewrites an existing `LANGWATCH_API_KEY` line rather than adding a second one, which is why it beats appending to `.env` from a shell: a second line makes the credential ambiguous, and one re-run of an append is all it takes to get one.
 
 `langwatch login --project <slug>` writes a project's key to `.env` with no key on the command line either, but it authenticates through an existing device login, so it suits a developer machine or a long-lived agent box rather than a fresh CI runner.
 
@@ -75,4 +71,4 @@ langwatch status          # resource counts: proves auth + endpoint + project in
 | Connection refused / DNS errors | Self-hosted endpoint wrong or unreachable | Check `langwatch config get endpoint` and `LANGWATCH_ENDPOINT`; verify the instance URL loads in a browser from this machine |
 | Right credentials, wrong data | Talking to the wrong project or instance | `langwatch projects list`; re-login with a key from the intended project |
 | Old shell ignores new `.env` | Env vars already exported | Start a new shell, or `unset LANGWATCH_API_KEY LANGWATCH_ENDPOINT` so `.env` is re-read |
-| A command hangs waiting for input | Interactive prompt in a non-interactive context | Set `LANGWATCH_API_KEY` and re-run with the non-interactive flags (`-y`, `-o json`): the CLI never prompts when it detects an agent |
+| A command hangs waiting for input | Interactive prompt in a non-interactive context | No flag answers prompts globally. Set `LANGWATCH_API_KEY` so nothing needs `login`, then pass the flag that command takes: `--force` for `prompt tag delete`, `--force-local` or `--force-remote` for `prompt push`, `-y` for `logout`, `skills install`, `skills uninstall` and `skills update`. `-o json` only selects an output format; on `skills` it turns the confirmation into an error rather than a prompt, elsewhere it changes nothing |
