@@ -891,6 +891,7 @@ model Trigger {
   traceDebounceMs      Int                       @default(30000)
   TriggerSent          TriggerSent[]
   webhookDeliveries    WebhookEndpointDelivery[]
+  latestEvaluation     TriggerLatestEvaluation?
   customGraphId        String?                   @unique
   customGraph          CustomGraph?              @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
 
@@ -1577,6 +1578,46 @@ model TriggerSent {
   @@index([projectId])
   @@index([customGraphId])
   @@index([resolvedAt])
+}
+
+// The most recent evaluation of one alert — what the evaluator observed, what
+// it compared that against, and what it decided. Exactly ONE row per trigger
+// (`triggerId` is the primary key, the write is an upsert), so this is a
+// bounded snapshot and never a log: storage is one row per alert and there is
+// nothing to retain or prune.
+//
+// Deliberately its own table rather than rows on `TriggerSent`: that ledger is
+// the FIRE history, arbitrated by the `openIncidentKey` claim, and every
+// "last fired" / "fires in the last 30 days" / "currently firing" read counts
+// its rows. A non-fire evaluation written there would change all of those
+// answers and sit next to the claim that guards at-most-once notification.
+// This table is read-only to every existing path and cannot affect it.
+model TriggerLatestEvaluation {
+  triggerId String  @id
+  trigger   Trigger @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+  projectId String
+
+  evaluatedAt DateTime @db.Timestamptz(3)
+  // What the evaluator decided: fired | already_firing | resolved |
+  // not_breached | not_delivered | skipped. A plain string, not an enum: the
+  // set follows the evaluator's own result status, and a value this table has
+  // never seen must degrade to "checked" in the UI rather than fail a read.
+  verdict     String
+  // The metric value the evaluation observed, and the condition it was
+  // compared against. Null when the check was skipped before reading the
+  // metric — which is exactly the case the reader needs explained.
+  observedValue     Float?
+  threshold         Float?
+  operator          String?
+  timePeriodMinutes Int?
+  // Why a skipped check was skipped, as a stable code (never prose): the UI
+  // maps it to customer copy, and an unrecognised code degrades to a generic
+  // explanation.
+  skipCode String?
+
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
 }
 
 // ADR-031: recipient unsubscribe / suppression list for trigger emails. A row

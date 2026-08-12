@@ -38,6 +38,23 @@ export interface TriggerFire {
   resolvedAt: Date | null;
 }
 
+/**
+ * A page of one trigger's fire history, newest first.
+ *
+ * `nextCursor` is the `(createdAt, id)` pair of the row after the page —
+ * paired because `createdAt` alone is not unique: a burst of matches inside
+ * the same millisecond would otherwise drop or repeat rows across pages.
+ */
+export interface TriggerFirePage {
+  fires: TriggerFire[];
+  nextCursor: TriggerFireCursor | null;
+}
+
+export interface TriggerFireCursor {
+  createdAt: Date;
+  id: string;
+}
+
 export interface TriggerFireHistoryRepository {
   findAllStatsForProject(params: {
     projectId: string;
@@ -49,6 +66,19 @@ export interface TriggerFireHistoryRepository {
     triggerId: string;
     limit: number;
   }): Promise<TriggerFire[]>;
+
+  /**
+   * One page of the trigger's whole fire history, newest first. The drawer's
+   * history walks back through this rather than through a fixed "recent"
+   * window — an automation that fired 400 times is entitled to show all 400.
+   * Same metadata-only contract as every other read here.
+   */
+  findPageByTriggerId(params: {
+    projectId: string;
+    triggerId: string;
+    limit: number;
+    cursor: TriggerFireCursor | null;
+  }): Promise<TriggerFirePage>;
 
   /**
    * Every trigger's recent fires across the project, newest first — the feed
