@@ -155,6 +155,9 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The README link checker, for the same reason: specs/ci/readme-link-check.feature
   // describes what CI asserts about the README, and only these Go tests assert it.
   "tools/linkcheck",
+  // The CLI half of the same tool: the verdict-to-exit-code step is the part
+  // CI gates on, so the "check fails" / "check passes" scenarios bind here.
+  "cmd/linkcheck",
 ];
 
 /**

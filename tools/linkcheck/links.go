@@ -50,22 +50,49 @@ var (
 	htmlAttr     = regexp.MustCompile(`(?:href|src)\s*=\s*"([^"]+)"`)
 )
 
-// Extract returns every link in the document, in the order they appear. The
-// README's badges and hero image are raw HTML rather than markdown, so href
-// and src attributes count as links too.
+// Extract returns every link in the document, line by line. The README's
+// badges and hero image are raw HTML rather than markdown, so href and src
+// attributes count as links too.
+//
+// Fenced code blocks are skipped: a link inside a ```bash sample is
+// illustration, and checking it turns a documentation example into a red
+// build.
 func Extract(document string) []Link {
 	var links []Link
+	inFence := false
+
 	for index, line := range strings.Split(document, "\n") {
-		for _, pattern := range []*regexp.Regexp{markdownLink, htmlAttr} {
-			for _, match := range pattern.FindAllStringSubmatch(line, -1) {
-				target := strings.TrimSpace(match[1])
-				if target != "" {
-					links = append(links, Link{Target: target, Line: index + 1})
-				}
+		if isFenceDelimiter(line) {
+			inFence = !inFence
+			continue
+		}
+		if inFence {
+			continue
+		}
+
+		links = append(links, linksInLine(line, index+1)...)
+	}
+	return links
+}
+
+// linksInLine returns a line's links, markdown first then HTML — pattern
+// order, not the order they sit in the text.
+func linksInLine(line string, number int) []Link {
+	var links []Link
+	for _, pattern := range []*regexp.Regexp{markdownLink, htmlAttr} {
+		for _, match := range pattern.FindAllStringSubmatch(line, -1) {
+			target := strings.TrimSpace(match[1])
+			if target != "" {
+				links = append(links, Link{Target: target, Line: number})
 			}
 		}
 	}
 	return links
+}
+
+func isFenceDelimiter(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	return strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~")
 }
 
 // Classify says how a target should be resolved.

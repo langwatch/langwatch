@@ -31,7 +31,8 @@ import (
 func main() {
 	root := flag.String("root", "", "repository root (default: nearest ancestor holding go.work)")
 	offline := flag.Bool("offline", false, "check repository paths only, never the network")
-	timeout := flag.Duration("timeout", 20*time.Second, "per-request timeout")
+	timeout := flag.Duration("timeout", 20*time.Second, "per-attempt request timeout")
+	budget := flag.Duration("budget", 4*time.Minute, "overall deadline for the whole run")
 	flag.Parse()
 
 	repoRoot := *root
@@ -63,7 +64,15 @@ func main() {
 		checker.Fetch = linkcheck.HTTPFetcher(*timeout)
 	}
 
-	failed, err := run(context.Background(), checker, documents)
+	// The whole run is bounded, not just each request. Sequential fetches at
+	// the per-attempt timeout would otherwise outlast the job's own
+	// timeout-minutes and turn a slow third-party host into a red build —
+	// the opposite of treating an unanswered link as unverified. Past the
+	// budget the remaining fetches fail fast and report as unverified.
+	ctx, cancel := context.WithTimeout(context.Background(), *budget)
+	failed, err := run(ctx, checker, documents)
+	cancel()
+
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "linkcheck: %v\n", err)
 		os.Exit(2)

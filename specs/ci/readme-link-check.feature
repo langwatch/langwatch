@@ -11,9 +11,12 @@ Feature: The README's links keep pointing at pages that exist
   # `vercel-ai-sdk`), and the hybrid-setup page, which had moved out of
   # /self-hosting/ entirely.
   #
-  # The check runs on pull requests that touch the README and on a schedule,
-  # because the second class of rot needs no commit here to happen: the link
-  # dies when the docs site changes, not when this repository does.
+  # The check runs on every pull request and on a schedule. It carries no path
+  # filter because a filtered workflow here needs a complementary "-unmodified"
+  # stub for branch protection to resolve (specs/ci/path-filters.feature), and
+  # the check is under a minute. The scheduled run is the one that matters:
+  # this rot needs no commit here to happen, because the link dies when the
+  # docs site changes, not when this repository does.
   #
   # Only 404 and 410 fail the run. A link check that fails on every non-2xx
   # answer fails on npmjs.com returning 403 to a datacentre IP and on any
