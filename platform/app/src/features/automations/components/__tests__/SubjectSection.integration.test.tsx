@@ -22,7 +22,11 @@ const { mockGraphsRefetch } = vi.hoisted(() => ({
   mockGraphsRefetch: vi.fn(),
 }));
 
-/** What the two trace-preview queries return for the test at hand. */
+/** What the two trace-preview queries return for the test at hand.
+ *  `graphs` and `graphsError` are independent — react-query's `isError`
+ *  does NOT imply `data` is empty: a background refetch failure leaves the
+ *  last good `data` in place, and a test needs to represent that state
+ *  without the mock coupling the two together for it. */
 const server = vi.hoisted(() => ({
   preview: {
     data: null as { totalHits: number; items: unknown[] } | null,
@@ -30,9 +34,9 @@ const server = vi.hoisted(() => ({
     error: null as unknown,
   },
   cap: { data: null as { cap: number } | null },
-  graphs: [
-    { id: "graph-1", name: "Latency", trigger: null as unknown },
-  ] as Array<{ id: string; name: string; trigger: unknown }>,
+  graphs: [{ id: "graph-1", name: "Latency", trigger: null as unknown }] as
+    | Array<{ id: string; name: string; trigger: unknown }>
+    | undefined,
   graphsLoading: false,
   graphsError: false,
 }));
@@ -42,7 +46,7 @@ vi.mock("~/utils/api", () => ({
     graphs: {
       getAll: {
         useQuery: () => ({
-          data: server.graphsError ? undefined : server.graphs,
+          data: server.graphs,
           isLoading: server.graphsLoading,
           isError: server.graphsError,
           refetch: mockGraphsRefetch,
@@ -237,10 +241,11 @@ describe("SubjectSection", () => {
       });
     });
 
-    describe("when the graph list fails to load", () => {
+    describe("when the graph list fails to load with no data ever cached", () => {
       /** @scenario "A failed graph list shows a retry, not the empty-project state" */
       it("shows a load failure, not the no-graphs-yet empty state", () => {
         server.graphsError = true;
+        server.graphs = undefined;
         seedFreshAlertDraft();
         render(<SubjectSection />, { wrapper: Wrapper });
 
@@ -254,6 +259,7 @@ describe("SubjectSection", () => {
 
       it("does not name the underlying error", () => {
         server.graphsError = true;
+        server.graphs = undefined;
         seedFreshAlertDraft();
         render(<SubjectSection />, { wrapper: Wrapper });
 
@@ -262,6 +268,7 @@ describe("SubjectSection", () => {
 
       it("does not offer to create a graph the project may already have", () => {
         server.graphsError = true;
+        server.graphs = undefined;
         seedFreshAlertDraft();
         render(<SubjectSection />, { wrapper: Wrapper });
 
@@ -274,6 +281,7 @@ describe("SubjectSection", () => {
         it("re-runs the graph list query", async () => {
           const user = userEvent.setup();
           server.graphsError = true;
+          server.graphs = undefined;
           seedFreshAlertDraft();
           render(<SubjectSection />, { wrapper: Wrapper });
 
@@ -281,6 +289,27 @@ describe("SubjectSection", () => {
 
           expect(mockGraphsRefetch).toHaveBeenCalledTimes(1);
         });
+      });
+    });
+
+    describe("when a background refetch fails but a good graph list is still cached", () => {
+      // react-query's v4 `error` reducer case sets `status: 'error'`
+      // unconditionally while leaving the last good `data` in place — the
+      // gap v5 split into isLoadingError/isRefetchError. A reconnect
+      // refetch, or another surface invalidating `graphs.getAll` (the B3
+      // fix does this after a graph create/update), can land here with a
+      // populated, already-selected picker still on screen.
+      it("keeps showing the working picker with the selection intact, not the failure screen", () => {
+        server.graphsError = true; // data stays server.graphs's beforeEach default (non-empty)
+        seedGraphDraft(); // customGraphId: "graph-1" — already selected
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(
+          screen.queryByText(/couldn.t be loaded right now/i),
+        ).not.toBeInTheDocument();
+        const graphSelect = selectContainingOption(/select a graph/i);
+        expect(graphSelect).toBeInTheDocument();
+        expect(graphSelect).toHaveValue("graph-1");
       });
     });
 
