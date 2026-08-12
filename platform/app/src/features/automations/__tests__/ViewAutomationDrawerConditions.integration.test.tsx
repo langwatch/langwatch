@@ -49,11 +49,38 @@ vi.mock("~/utils/api", () => ({
           error: null,
         }),
       },
-      getRecentFires: {
-        useQuery: () => ({ data: [], isLoading: false, error: null }),
+      getFireHistory: {
+        useInfiniteQuery: () => ({
+          data: { pages: [{ fires: [], nextCursor: null }] },
+          isLoading: false,
+          hasNextPage: false,
+          isFetchingNextPage: false,
+          fetchNextPage: vi.fn(),
+          error: null,
+        }),
+      },
+      getLatestEvaluation: {
+        useQuery: () => ({ data: null, isLoading: false, error: null }),
+      },
+      getNextFiring: {
+        useQuery: () => ({
+          data: { kind: "immediate", traceDebounceMs: 30000 },
+          isLoading: false,
+          error: null,
+        }),
       },
       getWebhookDeliveries: {
         useQuery: () => ({ data: [], isLoading: false, error: null }),
+      },
+    },
+    tracesV2: {
+      list: {
+        useQuery: () => ({
+          data: undefined,
+          isFetching: false,
+          error: null,
+          refetch: vi.fn(),
+        }),
       },
     },
     graphs: {

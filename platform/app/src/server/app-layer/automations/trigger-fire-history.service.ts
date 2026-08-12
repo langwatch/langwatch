@@ -2,7 +2,9 @@ import type { PrismaClient } from "@prisma/client";
 import { PrismaTriggerFireHistoryRepository } from "./repositories/trigger-fire-history.prisma.repository";
 import type {
   TriggerFire,
+  TriggerFireCursor,
   TriggerFireHistoryRepository,
+  TriggerFirePage,
   TriggerFireStats,
 } from "./repositories/trigger-fire-history.repository";
 
@@ -51,6 +53,29 @@ export class TriggerFireHistoryService {
     limit: number;
   }): Promise<TriggerFire[]> {
     return this.repo.findAllRecentByTriggerId({ projectId, triggerId, limit });
+  }
+
+  /**
+   * One page of a trigger's whole fire history, newest first — the automation
+   * view's history walks back through this. Metadata only.
+   */
+  async getFireHistoryPage({
+    projectId,
+    triggerId,
+    limit,
+    cursor,
+  }: {
+    projectId: string;
+    triggerId: string;
+    limit: number;
+    cursor: TriggerFireCursor | null;
+  }): Promise<TriggerFirePage> {
+    return this.repo.findPageByTriggerId({
+      projectId,
+      triggerId,
+      limit,
+      cursor,
+    });
   }
 
   /**

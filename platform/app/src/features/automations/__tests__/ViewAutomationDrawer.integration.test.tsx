@@ -15,6 +15,11 @@ let mockRecentFires: Array<Record<string, unknown>> = [];
 const mockGraphRow: Record<string, unknown> | null = null;
 const mockDatasets: Array<Record<string, unknown>> = [];
 let mockWebhookDeliveries: Array<Record<string, unknown>> = [];
+let mockLatestEvaluation: Record<string, unknown> | null = null;
+let mockNextFiring: Record<string, unknown> | null = null;
+let mockMatchingTraces: Record<string, unknown> | undefined;
+let mockHasNextFirePage = false;
+const mockFetchNextFirePage = vi.fn();
 
 const { mockOpenDrawer, mockCloseDrawer } = vi.hoisted(() => ({
   mockOpenDrawer: vi.fn(),
@@ -56,9 +61,26 @@ vi.mock("~/utils/api", () => ({
           error: null,
         }),
       },
-      getRecentFires: {
+      getFireHistory: {
+        useInfiniteQuery: () => ({
+          data: { pages: [{ fires: mockRecentFires, nextCursor: null }] },
+          isLoading: false,
+          hasNextPage: mockHasNextFirePage,
+          isFetchingNextPage: false,
+          fetchNextPage: mockFetchNextFirePage,
+          error: null,
+        }),
+      },
+      getLatestEvaluation: {
         useQuery: () => ({
-          data: mockRecentFires,
+          data: mockLatestEvaluation,
+          isLoading: false,
+          error: null,
+        }),
+      },
+      getNextFiring: {
+        useQuery: () => ({
+          data: mockNextFiring,
           isLoading: false,
           error: null,
         }),
@@ -89,6 +111,16 @@ vi.mock("~/utils/api", () => ({
         }),
       },
     },
+    tracesV2: {
+      list: {
+        useQuery: () => ({
+          data: mockMatchingTraces,
+          isFetching: false,
+          error: null,
+          refetch: vi.fn(),
+        }),
+      },
+    },
   },
 }));
 
@@ -104,6 +136,10 @@ describe("ViewAutomationDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockWebhookDeliveries = [];
+    mockLatestEvaluation = null;
+    mockNextFiring = { kind: "immediate", traceDebounceMs: 30_000 };
+    mockMatchingTraces = undefined;
+    mockHasNextFirePage = false;
   });
 
   afterEach(() => {
@@ -432,12 +468,12 @@ describe("ViewAutomationDrawer", () => {
     });
 
     describe("when the drawer renders", () => {
-      it("shows the automation kind badge and an empty fires state", () => {
+      it("shows the automation kind badge and an empty history state", () => {
         renderDrawer();
 
         expect(screen.getByText("Automation")).toBeDefined();
         expect(
-          screen.getByText("This automation has not fired yet."),
+          screen.getByText(/This automation has not fired yet\./),
         ).toBeDefined();
       });
     });
