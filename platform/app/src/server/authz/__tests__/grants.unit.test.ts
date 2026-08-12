@@ -173,7 +173,46 @@ describe("GrantsService.attach", () => {
   });
 });
 
+describe("GrantsService.revoke", () => {
+  describe("when revoking an existing binding", () => {
+    /** @scenario "Revoking a binding takes effect on the caller's next request" */
+    it("deletes the row and bumps the epoch so the next check recollects", async () => {
+      const prisma = makePrisma();
+      const service = new GrantsService(prisma as unknown as PrismaClient);
+      await service.revoke({ actor, bindingId: "rb-1" });
+      expect(prisma.roleBinding.delete).toHaveBeenCalledWith({
+        where: { id: "rb-1" },
+      });
+      expect(bumpAuthzEpoch).toHaveBeenCalledWith({ organizationId: ORG });
+      expect(auditLog).toHaveBeenCalledWith(
+        expect.objectContaining({ action: "authz.grants.revoke" }),
+      );
+    });
+  });
+});
+
 describe("GrantsService.update", () => {
+  describe("when the role change collides with a sibling binding", () => {
+    it("names the duplicate instead of leaking a raw P2002", async () => {
+      const prisma = makePrisma();
+      prisma.roleBinding.update.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+          code: "P2002",
+          clientVersion: "test",
+        }),
+      );
+      const service = new GrantsService(prisma as unknown as PrismaClient);
+      await expect(
+        service.update({
+          actor,
+          bindingId: "rb-1",
+          role: { builtin: "MEMBER" },
+        }),
+      ).rejects.toMatchObject({ code: "grant_validation_failed" });
+      expect(bumpAuthzEpoch).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when re-pointing at another organization's custom role", () => {
     /** @scenario "A role binding can never reference another organization's custom role" */
     it("rejects with the same tenancy rule as attach", async () => {

@@ -73,7 +73,6 @@ describe("resource-tier grants (ADR-092 §8)", () => {
   describe("given trace t1 is shared with anyone", () => {
     const resourceGrants = [grantOn()];
 
-    /** @scenario "Sharing a trace covers its children without extra grants" */
     it("grants an anonymous caller traces:view on t1, marked public", () => {
       const decision = decide({
         grants: makeGrants(),

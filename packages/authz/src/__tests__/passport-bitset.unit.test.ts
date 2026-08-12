@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   bitsetFromBase64Url,
   bitsetHasPermission,
@@ -36,16 +36,8 @@ describe("permission bitsets", () => {
 });
 
 describe("authz passports", () => {
-  const originalSecret = process.env.AUTHZ_PASSPORT_SECRET;
   const now = () => 1_700_000_000_000;
-
-  beforeEach(() => {
-    process.env.AUTHZ_PASSPORT_SECRET = "test-passport-secret";
-  });
-  afterEach(() => {
-    if (originalSecret === undefined) delete process.env.AUTHZ_PASSPORT_SECRET;
-    else process.env.AUTHZ_PASSPORT_SECRET = originalSecret;
-  });
+  const secret = "test-passport-secret";
 
   function mint(epoch = 7) {
     return mintPassport({
@@ -55,6 +47,7 @@ describe("authz passports", () => {
         { scopeKey: "project:proj-1", permissions: ["traces:view"] },
       ],
       epoch,
+      secret,
       ttlSeconds: 60,
       now,
     });
@@ -66,6 +59,7 @@ describe("authz passports", () => {
       const verification = verifyPassport({
         token: token!,
         currentEpoch: 7,
+        secret,
         now,
       });
       expect(verification.ok).toBe(true);
@@ -93,9 +87,9 @@ describe("authz passports", () => {
         }),
       ).toString("base64url")}.${signature}`;
 
-      expect(verifyPassport({ token: tampered, currentEpoch: 7, now })).toEqual(
-        { ok: false, reason: "bad-signature" },
-      );
+      expect(
+        verifyPassport({ token: tampered, currentEpoch: 7, secret, now }),
+      ).toEqual({ ok: false, reason: "bad-signature" });
     });
   });
 
@@ -106,6 +100,7 @@ describe("authz passports", () => {
         verifyPassport({
           token,
           currentEpoch: 7,
+          secret,
           now: () => now() + 61_000,
         }),
       ).toEqual({ ok: false, reason: "expired" });
@@ -115,7 +110,7 @@ describe("authz passports", () => {
   describe("when a grant write bumped the epoch after minting", () => {
     it("fails with stale-epoch — revocation outruns the TTL", () => {
       const token = mint(7)!;
-      expect(verifyPassport({ token, currentEpoch: 8, now })).toEqual({
+      expect(verifyPassport({ token, currentEpoch: 8, secret, now })).toEqual({
         ok: false,
         reason: "stale-epoch",
       });
@@ -125,18 +120,35 @@ describe("authz passports", () => {
   describe("when the epoch store is unavailable", () => {
     it("fails closed", () => {
       const token = mint()!;
-      expect(verifyPassport({ token, currentEpoch: null, now })).toEqual({
+      expect(
+        verifyPassport({ token, currentEpoch: null, secret, now }),
+      ).toEqual({
         ok: false,
         reason: "stale-epoch",
       });
     });
   });
 
-  describe("when no secret is configured", () => {
+  describe("when no secret is provided", () => {
     it("mints nothing and verifies nothing", () => {
-      delete process.env.AUTHZ_PASSPORT_SECRET;
-      expect(mint()).toBeNull();
-      expect(verifyPassport({ token: "a.b", currentEpoch: 1, now })).toEqual({
+      expect(
+        mintPassport({
+          principal: { type: "user", id: "alice" },
+          organizationId: "org-1",
+          scopedPermissions: [],
+          epoch: 1,
+          secret: undefined,
+          now,
+        }),
+      ).toBeNull();
+      expect(
+        verifyPassport({
+          token: "a.b",
+          currentEpoch: 1,
+          secret: undefined,
+          now,
+        }),
+      ).toEqual({
         ok: false,
         reason: "no-secret",
       });

@@ -20,7 +20,7 @@ export class PermissionDeniedError extends HandledError {
       "permission_denied",
       denialReason === "lite-member-restricted"
         ? "This feature is not available for your account"
-        : `You do not have permission to access this ${scope.type} resource`,
+        : `You do not have permission to access this ${scope.type}`,
       {
         httpStatus: 403,
         meta: {

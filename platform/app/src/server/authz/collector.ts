@@ -60,12 +60,16 @@ export async function resolveScopeRef({
 }
 
 /**
- * Resolve a resource-tier scope from a stored resource's own facts. The
- * project lineage (team, organization) is derived here, never taken from the
- * request - same posture as resolveScopeRef. `parentThreadId` MUST be the
- * stored trace's own thread id (the ThreadId on the fetched row), never a
- * caller-supplied value: parent links close share grants over children, so a
- * forged parent would let one shared thread unlock unrelated traces.
+ * Resolve a resource-tier scope from a stored resource's own facts.
+ *
+ * What this function verifies: the project's team/organization lineage is
+ * read from Postgres here, never taken from the request - same posture as
+ * resolveScopeRef. What it CANNOT verify: that `id` lives in `projectId`,
+ * and that `parentThreadId` is the trace's own thread - traces live in
+ * ClickHouse. Both anchors MUST come off the stored row the caller already
+ * fetched (that read is scoped by projectId, which is what enforces them).
+ * Passing request input for either reopens the forged-parent hole: one
+ * shared thread would unlock unrelated traces through the parent link.
  * Returns null when the project does not exist.
  */
 export async function resolveResourceScopeRef({

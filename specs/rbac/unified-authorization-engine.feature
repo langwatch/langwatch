@@ -117,7 +117,11 @@ Feature: Unified authorization engine
     And sarah's permission "datasets:manage" is denied
     # The denial reason is "lite-member-restricted" so the UI can explain it.
 
-  @unit
+  # Unit-unprovable today: CollectedGrants has no seat field to hold constant,
+  # because seat classification lives in billing tables the engine never
+  # reads. Stage C separates the concepts; the proving test is an integration
+  # test over billing + authz together.
+  @unimplemented
   Scenario: Seat classification is billing data and never consulted for access
     Given user "sarah" is classified as a lite seat for billing
     And sarah has been granted a custom role with "datasets:manage" on "chatbot"
@@ -247,7 +251,10 @@ Feature: Unified authorization engine
   # The resource tier (ADR-092 §8) — sharing is a grant on the tree
   # ============================================================================
 
-  @unit
+  # Needs the first child-read consumer (a span/log read that authorizes AT
+  # its trace's node) - no such call site exists yet, so a unit binding here
+  # would assert the parent grant and call it child coverage.
+  @unimplemented
   Scenario: Sharing a trace covers its children without extra grants
     Given trace "t1" in project "chatbot" is shared with anyone via a share link
     When a visitor presenting the link reads t1's spans, logs, and metrics

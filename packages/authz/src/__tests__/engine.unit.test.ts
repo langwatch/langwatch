@@ -207,7 +207,6 @@ describe("authz engine decide()", () => {
       expect(denied.denialReason).toBe("lite-member-restricted");
     });
 
-    /** @scenario "Seat classification is billing data and never consulted for access" */
     it("honours an explicit non-empty custom role over the cap", () => {
       const grants = makeGrants({
         organizationRole: "EXTERNAL",

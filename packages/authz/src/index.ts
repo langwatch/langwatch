@@ -61,9 +61,6 @@ export {
   bitsetToBase64Url,
   encodePermissionBitset,
 } from "./bitset";
-export {
-  MAX_PASSPORT_TTL_SECONDS,
-  mintPassport,
-  verifyPassport,
-} from "./passport";
-export type { PassportPayload, PassportVerification } from "./passport";
+// passport.ts is deliberately NOT re-exported here: it uses node:crypto, and
+// this barrel must stay browser-safe (useCan imports it). Server code that
+// wires passports (stage F) imports "@langwatch/authz/passport".

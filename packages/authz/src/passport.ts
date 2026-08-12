@@ -42,11 +42,6 @@ export type PassportVerification =
         | "no-secret";
     };
 
-function passportSecret(): string | undefined {
-  // Dedicated secret (plan decision D6); internal knob, read directly.
-  return process.env.AUTHZ_PASSPORT_SECRET ?? undefined;
-}
-
 function sign(payload: string, secret: string): Buffer {
   return createHmac("sha256", secret).update(payload).digest();
 }
@@ -56,6 +51,7 @@ export function mintPassport({
   organizationId,
   scopedPermissions,
   epoch,
+  secret,
   ttlSeconds = MAX_PASSPORT_TTL_SECONDS,
   now = () => Date.now(),
 }: {
@@ -63,10 +59,13 @@ export function mintPassport({
   organizationId: string;
   scopedPermissions: Array<{ scopeKey: string; permissions: Iterable<string> }>;
   epoch: number;
+  /** The dedicated signing secret (plan decision D6) - the app passes
+   *  AUTHZ_PASSPORT_SECRET in when stage F wires passports. Parameterised
+   *  for purity: this package reads no env. Missing = minting disabled. */
+  secret: string | undefined;
   ttlSeconds?: number;
   now?: () => number;
 }): string | null {
-  const secret = passportSecret();
   if (!secret) return null;
 
   const payload: PassportPayload = {
@@ -92,15 +91,17 @@ export function mintPassport({
 export function verifyPassport({
   token,
   currentEpoch,
+  secret,
   now = () => Date.now(),
 }: {
   token: string;
   /** Fetched from the epoch store by the caller; null disables epoch check
    *  and fails closed (a passport must be provably fresh). */
   currentEpoch: number | null;
+  /** Same secret the minter was given; missing fails closed. */
+  secret: string | undefined;
   now?: () => number;
 }): PassportVerification {
-  const secret = passportSecret();
   if (!secret) return { ok: false, reason: "no-secret" };
 
   const parts = token.split(".");

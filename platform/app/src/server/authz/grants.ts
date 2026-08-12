@@ -32,7 +32,9 @@ export class OffboardIncompleteError extends HandledError {
     super(
       "offboard_incomplete",
       "Offboarding left resolvable grants behind; transaction rolled back",
-      { httpStatus: 500, meta },
+      // fault: the proof failing means OUR deletes missed a grant source -
+      // a platform defect, never something the admin did wrong.
+      { httpStatus: 500, fault: "platform", meta },
     );
     this.name = "OffboardIncompleteError";
   }
@@ -119,13 +121,20 @@ export class GrantsService {
         organizationId: binding.organizationId,
       });
     }
-    await this.prisma.roleBinding.update({
-      where: { id: bindingId },
-      data: {
-        role: "customRoleId" in role ? "CUSTOM" : role.builtin,
-        customRoleId: "customRoleId" in role ? role.customRoleId : null,
-      },
-    });
+    try {
+      await this.prisma.roleBinding.update({
+        where: { id: bindingId },
+        data: {
+          role: "customRoleId" in role ? "CUSTOM" : role.builtin,
+          customRoleId: "customRoleId" in role ? role.customRoleId : null,
+        },
+      });
+    } catch (error) {
+      // A role change can collide with a sibling binding the principal
+      // already holds at the same scope - same knowable failure as attach.
+      this.throwIfDuplicateBinding(error, { bindingId });
+      throw error;
+    }
     await this.recordAndBump({
       actor,
       organizationId: binding.organizationId,
@@ -358,21 +367,35 @@ export class GrantsService {
         },
       });
     } catch (error) {
-      // The six partial unique indexes on RoleBinding make a duplicate a
-      // knowable failure the caller can act on - name it instead of letting
-      // a raw P2002 degrade to "unknown error".
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
-        throw new GrantValidationError(
-          "This principal already holds a role binding at this scope - update or revoke the existing one",
-          { scopeType: where.type, scopeId: where.id },
-        );
-      }
+      this.throwIfDuplicateBinding(error, {
+        scopeType: where.type,
+        scopeId: where.id,
+      });
       throw error;
     }
     return bindingId;
+  }
+
+  /**
+   * The six partial unique indexes on RoleBinding make a duplicate a
+   * knowable failure the caller can act on - name it instead of letting a
+   * raw P2002 degrade to "unknown error". The indexes key on the role too,
+   * so this only fires when the principal already holds this SAME role (or
+   * custom role) at the scope.
+   */
+  private throwIfDuplicateBinding(
+    error: unknown,
+    meta: Record<string, unknown>,
+  ): void {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      throw new GrantValidationError(
+        "This principal already holds this role at this scope - update or revoke the existing binding",
+        meta,
+      );
+    }
   }
 
   private async assertCustomRoleInOrganization({

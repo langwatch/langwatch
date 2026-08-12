@@ -97,10 +97,15 @@ write path must bump the epoch **before** `AUTHZ_EPOCH_CACHE` ever ships on
 (M7). Every step is expand → dual-run → verify → cut over → delete, one flag
 per cutover.
 
-## Flags (read by the app adapters, not this package)
+## Flags (read by the app adapters - this package reads no env at all)
 
 ```
  AUTHZ_V2_SHADOW        0 | 1 | 0.0-1.0   shadow-comparison sample rate (default off)
  AUTHZ_EPOCH_CACHE      0 | 1             L1 grants cache (default off = always collect)
- AUTHZ_PASSPORT_SECRET  hex               enables passport minting (unset = disabled)
+ AUTHZ_PASSPORT_SECRET  hex               passed INTO mintPassport/verifyPassport by the
+                                          app when stage F wires them (unset = disabled)
 ```
+
+`passport.ts` is not re-exported from the package barrel - it uses
+`node:crypto`, and the barrel stays browser-safe for `useCan`. Server code
+imports `@langwatch/authz/passport`.
