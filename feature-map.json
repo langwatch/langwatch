@@ -808,31 +808,37 @@
           "sdk": {
             "python": "langwatch.triggers",
             "typescript": "langwatch.triggers",
-            "go": "client.Triggers"
+            "go": null
           },
           "cli": [
             "trigger list",
             "trigger get",
             "trigger create",
             "trigger update",
+            "trigger enable",
+            "trigger disable",
+            "trigger test-fire",
+            "trigger fires",
             "trigger delete"
           ],
           "skill": null,
-          "docs": null
+          "docs": "/api-reference/triggers/overview"
         },
         "platform": {
           "ui": "/alerts",
           "mcp": [
             "platform_list_triggers",
+            "platform_get_trigger",
             "platform_create_trigger",
             "platform_update_trigger",
+            "platform_test_fire_trigger",
             "platform_delete_trigger"
           ],
           "skill": null,
-          "docs": null
+          "docs": "/api-reference/triggers/overview"
         },
         "api": "/api/triggers",
-        "docs": null
+        "docs": "/api-reference/triggers/overview"
       },
       "sync": null,
       "produces": [

@@ -3406,10 +3406,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List all active triggers (automations) for the project */
+        /** @description List the project's automations, newest first. Paused automations are included. */
         get: operations["getApiTriggers"];
         put?: never;
-        /** @description Create a new trigger (automation) */
+        /** @description Create an automation. Send `customGraphId` + `graphAlert` for an alert on a metric, `report` for a scheduled report, or conditions for a trace automation. The delivery channel is fixed at creation. */
         post: operations["postApiTriggers"];
         delete?: never;
         options?: never;
@@ -3432,8 +3432,76 @@ export interface paths {
         delete: operations["deleteApiTriggersById"];
         options?: never;
         head?: never;
-        /** @description Update a trigger (name, active state, message, filters) */
+        /** @description Update an automation. Every field is optional and what is left out is left alone, except `actionParams`, which replaces the delivery configuration as a whole. The delivery channel cannot be changed. */
         patch: operations["patchApiTriggersById"];
+        trace?: never;
+    };
+    "/api/triggers/{id}/fires": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description What this automation has done: its fires, newest first. Metadata only — no trace ids and no trace content. */
+        get: operations["getApiTriggersByIdFires"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/triggers/{id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Resume an automation. A report's schedule is put back on the calendar. */
+        post: operations["postApiTriggersByIdEnable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/triggers/{id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Pause an automation. A report stops claiming its schedule. */
+        post: operations["postApiTriggersByIdDisable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/triggers/{id}/test-fire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Send this automation's message to the destination it is configured with, so you can confirm it arrives. Nothing is recorded as a fire. */
+        post: operations["postApiTriggersByIdTest-fire"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/webhooks/v1/endpoints": {
@@ -24333,12 +24401,29 @@ export interface operations {
                         id: string;
                         name: string;
                         /** @enum {string} */
-                        action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE";
+                        action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
                         actionParams: {
                             [key: string]: unknown;
                         };
                         filters: {
                             [key: string]: unknown;
+                        };
+                        filterQuery: string | null;
+                        /**
+                         * @description What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+                         * @enum {string}
+                         */
+                        kind: "AUTOMATION" | "ALERT" | "REPORT";
+                        customGraphId: string | null;
+                        notificationCadence: string | null;
+                        traceDebounceMs: number | null;
+                        /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                        templates: {
+                            /** @enum {string|null} */
+                            slackTemplateType?: "string" | "block_kit" | null;
+                            slackTemplate?: string | null;
+                            emailSubjectTemplate?: string | null;
+                            emailBodyTemplate?: string | null;
                         };
                         active: boolean;
                         message: string | null;
@@ -24411,19 +24496,419 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
+                    /** @constant */
+                    action: "SEND_EMAIL";
+                    /** @description Email delivery. */
+                    actionParams: {
+                        /** @description Who receives the email. Any address, not only teammates. */
+                        members: string[];
+                    };
                     name: string;
-                    /** @enum {string} */
-                    action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE";
-                    /** @default {} */
-                    actionParams?: {
-                        [key: string]: unknown;
-                    };
                     filters?: {
-                        [key: string]: unknown;
+                        [key: string]: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
                     };
+                    /** @description The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`. */
+                    filterQuery?: string | null;
                     message?: string;
                     /** @enum {string} */
                     alertType?: "CRITICAL" | "WARNING" | "INFO";
+                    /** @description Set to make this an alert on that graph. `graphAlert` and `alertType` are then required. */
+                    customGraphId?: string;
+                    /** @description The rule an alert fires by: series, operator, threshold, window. */
+                    graphAlert?: {
+                        threshold: number;
+                        /** @enum {string} */
+                        operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                        timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                        seriesName: string;
+                    };
+                    /** @description What a scheduled report renders and when it sends. */
+                    report?: {
+                        source: {
+                            /** @constant */
+                            kind: "dashboard";
+                            dashboardId: string;
+                        } | {
+                            /** @constant */
+                            kind: "customGraph";
+                            customGraphId: string;
+                        } | {
+                            /** @constant */
+                            kind: "traceQuery";
+                            /** @default {} */
+                            filters?: {
+                                [key: string]: unknown;
+                            };
+                            metric?: string;
+                            /** @default 5 */
+                            topN?: number;
+                        };
+                        schedule: {
+                            cron: string;
+                            timezone: string;
+                        };
+                        /** @default false */
+                        compareToPrevious?: boolean;
+                    };
+                    /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                    templates?: {
+                        /** @enum {string|null} */
+                        slackTemplateType?: "string" | "block_kit" | null;
+                        slackTemplate?: string | null;
+                        emailSubjectTemplate?: string | null;
+                        emailBodyTemplate?: string | null;
+                    };
+                    /**
+                     * @description How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace.
+                     * @enum {string}
+                     */
+                    notificationCadence?: "immediate" | "5min_digest" | "15min_digest" | "hourly_digest";
+                    /** @description How long to wait for a trace to settle before the conditions are read. */
+                    traceDebounceMs?: number;
+                } | {
+                    /** @constant */
+                    action: "SEND_SLACK_MESSAGE";
+                    /** @description Slack delivery, by incoming webhook or by bot connection. */
+                    actionParams: {
+                        /**
+                         * @description How the message reaches Slack. `webhook` posts to an incoming webhook URL, `bot` posts as the LangWatch Slack app. Absent means `webhook`.
+                         * @enum {string}
+                         */
+                        slackDelivery?: "webhook" | "bot";
+                        /** @description The incoming webhook URL, for `webhook` delivery. A credential: it reads back as the placeholder, and sending the placeholder back keeps the stored one. */
+                        slackWebhook?: string;
+                        /** @description The channel the bot posts in, for `bot` delivery. */
+                        slackChannelId?: string;
+                        /** @description The bot token, for `bot` delivery. A credential: it never reads back. Send `slackBotTokenSet: true` to keep the stored one. */
+                        slackBotToken?: string;
+                        /** @description Read: whether a bot token is stored. Write: `true` keeps the stored one. */
+                        slackBotTokenSet?: boolean;
+                    };
+                    name: string;
+                    filters?: {
+                        [key: string]: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                    };
+                    /** @description The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`. */
+                    filterQuery?: string | null;
+                    message?: string;
+                    /** @enum {string} */
+                    alertType?: "CRITICAL" | "WARNING" | "INFO";
+                    /** @description Set to make this an alert on that graph. `graphAlert` and `alertType` are then required. */
+                    customGraphId?: string;
+                    /** @description The rule an alert fires by: series, operator, threshold, window. */
+                    graphAlert?: {
+                        threshold: number;
+                        /** @enum {string} */
+                        operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                        timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                        seriesName: string;
+                    };
+                    /** @description What a scheduled report renders and when it sends. */
+                    report?: {
+                        source: {
+                            /** @constant */
+                            kind: "dashboard";
+                            dashboardId: string;
+                        } | {
+                            /** @constant */
+                            kind: "customGraph";
+                            customGraphId: string;
+                        } | {
+                            /** @constant */
+                            kind: "traceQuery";
+                            /** @default {} */
+                            filters?: {
+                                [key: string]: unknown;
+                            };
+                            metric?: string;
+                            /** @default 5 */
+                            topN?: number;
+                        };
+                        schedule: {
+                            cron: string;
+                            timezone: string;
+                        };
+                        /** @default false */
+                        compareToPrevious?: boolean;
+                    };
+                    /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                    templates?: {
+                        /** @enum {string|null} */
+                        slackTemplateType?: "string" | "block_kit" | null;
+                        slackTemplate?: string | null;
+                        emailSubjectTemplate?: string | null;
+                        emailBodyTemplate?: string | null;
+                    };
+                    /**
+                     * @description How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace.
+                     * @enum {string}
+                     */
+                    notificationCadence?: "immediate" | "5min_digest" | "15min_digest" | "hourly_digest";
+                    /** @description How long to wait for a trace to settle before the conditions are read. */
+                    traceDebounceMs?: number;
+                } | {
+                    /** @constant */
+                    action: "SEND_WEBHOOK";
+                    /** @description Delivery to a customer endpoint over HTTP. */
+                    actionParams: {
+                        /** @description Where the request goes. https only, and not a private host. */
+                        url: string;
+                        /**
+                         * @description The HTTP method. Absent means POST.
+                         * @enum {string}
+                         */
+                        method?: "POST" | "PUT" | "PATCH";
+                        /** @description Static headers sent with every delivery. The values are credentials: they read back as the placeholder, and sending the placeholder back keeps the stored ones. Changing `url` means sending the values again in the same request. */
+                        headers?: {
+                            [key: string]: string;
+                        };
+                        /** @description A Liquid template for the JSON body. Absent sends the standard LangWatch envelope. */
+                        bodyTemplate?: string | null;
+                        /** @description Signs every delivery so the receiver can verify it came from LangWatch. A credential: it reads back as the placeholder, and sending the placeholder back keeps the stored one. */
+                        signingSecret?: string | null;
+                    };
+                    name: string;
+                    filters?: {
+                        [key: string]: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                    };
+                    /** @description The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`. */
+                    filterQuery?: string | null;
+                    message?: string;
+                    /** @enum {string} */
+                    alertType?: "CRITICAL" | "WARNING" | "INFO";
+                    /** @description Set to make this an alert on that graph. `graphAlert` and `alertType` are then required. */
+                    customGraphId?: string;
+                    /** @description The rule an alert fires by: series, operator, threshold, window. */
+                    graphAlert?: {
+                        threshold: number;
+                        /** @enum {string} */
+                        operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                        timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                        seriesName: string;
+                    };
+                    /** @description What a scheduled report renders and when it sends. */
+                    report?: {
+                        source: {
+                            /** @constant */
+                            kind: "dashboard";
+                            dashboardId: string;
+                        } | {
+                            /** @constant */
+                            kind: "customGraph";
+                            customGraphId: string;
+                        } | {
+                            /** @constant */
+                            kind: "traceQuery";
+                            /** @default {} */
+                            filters?: {
+                                [key: string]: unknown;
+                            };
+                            metric?: string;
+                            /** @default 5 */
+                            topN?: number;
+                        };
+                        schedule: {
+                            cron: string;
+                            timezone: string;
+                        };
+                        /** @default false */
+                        compareToPrevious?: boolean;
+                    };
+                    /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                    templates?: {
+                        /** @enum {string|null} */
+                        slackTemplateType?: "string" | "block_kit" | null;
+                        slackTemplate?: string | null;
+                        emailSubjectTemplate?: string | null;
+                        emailBodyTemplate?: string | null;
+                    };
+                    /**
+                     * @description How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace.
+                     * @enum {string}
+                     */
+                    notificationCadence?: "immediate" | "5min_digest" | "15min_digest" | "hourly_digest";
+                    /** @description How long to wait for a trace to settle before the conditions are read. */
+                    traceDebounceMs?: number;
+                } | {
+                    /** @constant */
+                    action: "ADD_TO_DATASET";
+                    /** @description Append matched traces to a dataset. */
+                    actionParams: {
+                        /** @description The dataset matched traces are appended to. */
+                        datasetId: string;
+                        /** @description How a trace becomes a row in that dataset. */
+                        datasetMapping: {
+                            mapping: {
+                                [key: string]: unknown;
+                            };
+                            expansions?: string[];
+                        };
+                    };
+                    name: string;
+                    filters?: {
+                        [key: string]: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                    };
+                    /** @description The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`. */
+                    filterQuery?: string | null;
+                    message?: string;
+                    /** @enum {string} */
+                    alertType?: "CRITICAL" | "WARNING" | "INFO";
+                    /** @description Set to make this an alert on that graph. `graphAlert` and `alertType` are then required. */
+                    customGraphId?: string;
+                    /** @description The rule an alert fires by: series, operator, threshold, window. */
+                    graphAlert?: {
+                        threshold: number;
+                        /** @enum {string} */
+                        operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                        timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                        seriesName: string;
+                    };
+                    /** @description What a scheduled report renders and when it sends. */
+                    report?: {
+                        source: {
+                            /** @constant */
+                            kind: "dashboard";
+                            dashboardId: string;
+                        } | {
+                            /** @constant */
+                            kind: "customGraph";
+                            customGraphId: string;
+                        } | {
+                            /** @constant */
+                            kind: "traceQuery";
+                            /** @default {} */
+                            filters?: {
+                                [key: string]: unknown;
+                            };
+                            metric?: string;
+                            /** @default 5 */
+                            topN?: number;
+                        };
+                        schedule: {
+                            cron: string;
+                            timezone: string;
+                        };
+                        /** @default false */
+                        compareToPrevious?: boolean;
+                    };
+                    /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                    templates?: {
+                        /** @enum {string|null} */
+                        slackTemplateType?: "string" | "block_kit" | null;
+                        slackTemplate?: string | null;
+                        emailSubjectTemplate?: string | null;
+                        emailBodyTemplate?: string | null;
+                    };
+                    /**
+                     * @description How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace.
+                     * @enum {string}
+                     */
+                    notificationCadence?: "immediate" | "5min_digest" | "15min_digest" | "hourly_digest";
+                    /** @description How long to wait for a trace to settle before the conditions are read. */
+                    traceDebounceMs?: number;
+                } | {
+                    /** @constant */
+                    action: "ADD_TO_ANNOTATION_QUEUE";
+                    /** @description Queue matched traces for a person to label. */
+                    actionParams: {
+                        /** @description Who the queued items go to. */
+                        annotators: {
+                            id: string;
+                            name: string;
+                        }[];
+                    };
+                    name: string;
+                    filters?: {
+                        [key: string]: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
+                    };
+                    /** @description The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`. */
+                    filterQuery?: string | null;
+                    message?: string;
+                    /** @enum {string} */
+                    alertType?: "CRITICAL" | "WARNING" | "INFO";
+                    /** @description Set to make this an alert on that graph. `graphAlert` and `alertType` are then required. */
+                    customGraphId?: string;
+                    /** @description The rule an alert fires by: series, operator, threshold, window. */
+                    graphAlert?: {
+                        threshold: number;
+                        /** @enum {string} */
+                        operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                        timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                        seriesName: string;
+                    };
+                    /** @description What a scheduled report renders and when it sends. */
+                    report?: {
+                        source: {
+                            /** @constant */
+                            kind: "dashboard";
+                            dashboardId: string;
+                        } | {
+                            /** @constant */
+                            kind: "customGraph";
+                            customGraphId: string;
+                        } | {
+                            /** @constant */
+                            kind: "traceQuery";
+                            /** @default {} */
+                            filters?: {
+                                [key: string]: unknown;
+                            };
+                            metric?: string;
+                            /** @default 5 */
+                            topN?: number;
+                        };
+                        schedule: {
+                            cron: string;
+                            timezone: string;
+                        };
+                        /** @default false */
+                        compareToPrevious?: boolean;
+                    };
+                    /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                    templates?: {
+                        /** @enum {string|null} */
+                        slackTemplateType?: "string" | "block_kit" | null;
+                        slackTemplate?: string | null;
+                        emailSubjectTemplate?: string | null;
+                        emailBodyTemplate?: string | null;
+                    };
+                    /**
+                     * @description How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace.
+                     * @enum {string}
+                     */
+                    notificationCadence?: "immediate" | "5min_digest" | "15min_digest" | "hourly_digest";
+                    /** @description How long to wait for a trace to settle before the conditions are read. */
+                    traceDebounceMs?: number;
                 };
             };
         };
@@ -24438,12 +24923,29 @@ export interface operations {
                         id: string;
                         name: string;
                         /** @enum {string} */
-                        action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE";
+                        action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
                         actionParams: {
                             [key: string]: unknown;
                         };
                         filters: {
                             [key: string]: unknown;
+                        };
+                        filterQuery: string | null;
+                        /**
+                         * @description What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+                         * @enum {string}
+                         */
+                        kind: "AUTOMATION" | "ALERT" | "REPORT";
+                        customGraphId: string | null;
+                        notificationCadence: string | null;
+                        traceDebounceMs: number | null;
+                        /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                        templates: {
+                            /** @enum {string|null} */
+                            slackTemplateType?: "string" | "block_kit" | null;
+                            slackTemplate?: string | null;
+                            emailSubjectTemplate?: string | null;
+                            emailBodyTemplate?: string | null;
                         };
                         active: boolean;
                         message: string | null;
@@ -24527,12 +25029,29 @@ export interface operations {
                         id: string;
                         name: string;
                         /** @enum {string} */
-                        action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE";
+                        action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
                         actionParams: {
                             [key: string]: unknown;
                         };
                         filters: {
                             [key: string]: unknown;
+                        };
+                        filterQuery: string | null;
+                        /**
+                         * @description What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+                         * @enum {string}
+                         */
+                        kind: "AUTOMATION" | "ALERT" | "REPORT";
+                        customGraphId: string | null;
+                        notificationCadence: string | null;
+                        traceDebounceMs: number | null;
+                        /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                        templates: {
+                            /** @enum {string|null} */
+                            slackTemplateType?: "string" | "block_kit" | null;
+                            slackTemplate?: string | null;
+                            emailSubjectTemplate?: string | null;
+                            emailBodyTemplate?: string | null;
                         };
                         active: boolean;
                         message: string | null;
@@ -24710,11 +25229,129 @@ export interface operations {
                     /** @enum {string|null} */
                     alertType?: "CRITICAL" | "WARNING" | "INFO" | null;
                     filters?: {
-                        [key: string]: unknown;
+                        [key: string]: string[] | {
+                            [key: string]: string[];
+                        } | {
+                            [key: string]: {
+                                [key: string]: string[];
+                            };
+                        };
                     };
-                    actionParams?: {
+                    /** @description The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`. */
+                    filterQuery?: string | null;
+                    /** @enum {string} */
+                    action?: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
+                    actionParams?: ({
+                        /** @description Who receives the email. Any address, not only teammates. */
+                        members: string[];
+                    } & {
                         [key: string]: unknown;
+                    }) | ({
+                        /**
+                         * @description How the message reaches Slack. `webhook` posts to an incoming webhook URL, `bot` posts as the LangWatch Slack app. Absent means `webhook`.
+                         * @enum {string}
+                         */
+                        slackDelivery?: "webhook" | "bot";
+                        /** @description The incoming webhook URL, for `webhook` delivery. A credential: it reads back as the placeholder, and sending the placeholder back keeps the stored one. */
+                        slackWebhook?: string;
+                        /** @description The channel the bot posts in, for `bot` delivery. */
+                        slackChannelId?: string;
+                        /** @description The bot token, for `bot` delivery. A credential: it never reads back. Send `slackBotTokenSet: true` to keep the stored one. */
+                        slackBotToken?: string;
+                        /** @description Read: whether a bot token is stored. Write: `true` keeps the stored one. */
+                        slackBotTokenSet?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    }) | ({
+                        /** @description Where the request goes. https only, and not a private host. */
+                        url: string;
+                        /**
+                         * @description The HTTP method. Absent means POST.
+                         * @enum {string}
+                         */
+                        method?: "POST" | "PUT" | "PATCH";
+                        /** @description Static headers sent with every delivery. The values are credentials: they read back as the placeholder, and sending the placeholder back keeps the stored ones. Changing `url` means sending the values again in the same request. */
+                        headers?: {
+                            [key: string]: string;
+                        };
+                        /** @description A Liquid template for the JSON body. Absent sends the standard LangWatch envelope. */
+                        bodyTemplate?: string | null;
+                        /** @description Signs every delivery so the receiver can verify it came from LangWatch. A credential: it reads back as the placeholder, and sending the placeholder back keeps the stored one. */
+                        signingSecret?: string | null;
+                    } & {
+                        [key: string]: unknown;
+                    }) | ({
+                        /** @description The dataset matched traces are appended to. */
+                        datasetId: string;
+                        /** @description How a trace becomes a row in that dataset. */
+                        datasetMapping: {
+                            mapping: {
+                                [key: string]: unknown;
+                            };
+                            expansions?: string[];
+                        };
+                    } & {
+                        [key: string]: unknown;
+                    }) | ({
+                        /** @description Who the queued items go to. */
+                        annotators: {
+                            id: string;
+                            name: string;
+                        }[];
+                    } & {
+                        [key: string]: unknown;
+                    });
+                    /** @description The rule this alert fires by. Only for an automation that is one. */
+                    graphAlert?: {
+                        threshold: number;
+                        /** @enum {string} */
+                        operator: "gt" | "lt" | "gte" | "lte" | "eq";
+                        timePeriod: 1 | 5 | 15 | 30 | 60 | 1440;
+                        seriesName: string;
                     };
+                    /** @description What this report renders and when. Only for one that is a report. */
+                    report?: {
+                        source: {
+                            /** @constant */
+                            kind: "dashboard";
+                            dashboardId: string;
+                        } | {
+                            /** @constant */
+                            kind: "customGraph";
+                            customGraphId: string;
+                        } | {
+                            /** @constant */
+                            kind: "traceQuery";
+                            /** @default {} */
+                            filters?: {
+                                [key: string]: unknown;
+                            };
+                            metric?: string;
+                            /** @default 5 */
+                            topN?: number;
+                        };
+                        schedule: {
+                            cron: string;
+                            timezone: string;
+                        };
+                        /** @default false */
+                        compareToPrevious?: boolean;
+                    };
+                    /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                    templates?: {
+                        /** @enum {string|null} */
+                        slackTemplateType?: "string" | "block_kit" | null;
+                        slackTemplate?: string | null;
+                        emailSubjectTemplate?: string | null;
+                        emailBodyTemplate?: string | null;
+                    };
+                    /**
+                     * @description How often a notification automation is allowed to send. A new one starts on a five-minute digest, which is what keeps a broad condition from sending a message per matching trace.
+                     * @enum {string}
+                     */
+                    notificationCadence?: "immediate" | "5min_digest" | "15min_digest" | "hourly_digest";
+                    /** @description How long to wait for a trace to settle before the conditions are read. */
+                    traceDebounceMs?: number;
                 };
             };
         };
@@ -24729,12 +25366,29 @@ export interface operations {
                         id: string;
                         name: string;
                         /** @enum {string} */
-                        action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE";
+                        action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
                         actionParams: {
                             [key: string]: unknown;
                         };
                         filters: {
                             [key: string]: unknown;
+                        };
+                        filterQuery: string | null;
+                        /**
+                         * @description What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+                         * @enum {string}
+                         */
+                        kind: "AUTOMATION" | "ALERT" | "REPORT";
+                        customGraphId: string | null;
+                        notificationCadence: string | null;
+                        traceDebounceMs: number | null;
+                        /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                        templates: {
+                            /** @enum {string|null} */
+                            slackTemplateType?: "string" | "block_kit" | null;
+                            slackTemplate?: string | null;
+                            emailSubjectTemplate?: string | null;
+                            emailBodyTemplate?: string | null;
                         };
                         active: boolean;
                         message: string | null;
@@ -24744,6 +25398,424 @@ export interface operations {
                         updatedAt: string;
                         /** Format: uri */
                         platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Trigger not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiTriggersByIdFires: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        triggerId: string;
+                        customGraphId: string | null;
+                        firedAt: string;
+                        resolvedAt: string | null;
+                    }[];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Trigger not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiTriggersByIdEnable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trigger resumed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        /** @enum {string} */
+                        action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
+                        actionParams: {
+                            [key: string]: unknown;
+                        };
+                        filters: {
+                            [key: string]: unknown;
+                        };
+                        filterQuery: string | null;
+                        /**
+                         * @description What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+                         * @enum {string}
+                         */
+                        kind: "AUTOMATION" | "ALERT" | "REPORT";
+                        customGraphId: string | null;
+                        notificationCadence: string | null;
+                        traceDebounceMs: number | null;
+                        /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                        templates: {
+                            /** @enum {string|null} */
+                            slackTemplateType?: "string" | "block_kit" | null;
+                            slackTemplate?: string | null;
+                            emailSubjectTemplate?: string | null;
+                            emailBodyTemplate?: string | null;
+                        };
+                        active: boolean;
+                        message: string | null;
+                        /** @enum {string|null} */
+                        alertType: "CRITICAL" | "WARNING" | "INFO" | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Trigger not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiTriggersByIdDisable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trigger paused */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        /** @enum {string} */
+                        action: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
+                        actionParams: {
+                            [key: string]: unknown;
+                        };
+                        filters: {
+                            [key: string]: unknown;
+                        };
+                        filterQuery: string | null;
+                        /**
+                         * @description What this automation is about: matching traces, a metric crossing a threshold, or a schedule.
+                         * @enum {string}
+                         */
+                        kind: "AUTOMATION" | "ALERT" | "REPORT";
+                        customGraphId: string | null;
+                        notificationCadence: string | null;
+                        traceDebounceMs: number | null;
+                        /** @description The Liquid templates this automation's message is rendered from. Absent fields render the LangWatch default for the channel. */
+                        templates: {
+                            /** @enum {string|null} */
+                            slackTemplateType?: "string" | "block_kit" | null;
+                            slackTemplate?: string | null;
+                            emailSubjectTemplate?: string | null;
+                            emailBodyTemplate?: string | null;
+                        };
+                        active: boolean;
+                        message: string | null;
+                        /** @enum {string|null} */
+                        alertType: "CRITICAL" | "WARNING" | "INFO" | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Trigger not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    "postApiTriggersByIdTest-fire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Test fire sent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        channel: "email" | "slack" | "webhook";
+                        recipientCount: number;
+                        /** @description Whether the LangWatch default message was rendered because this automation states no template of its own. */
+                        usedDefault: boolean;
+                        missingVariables: string[];
+                        errors: string[];
+                        /** @description Webhook only: what the endpoint answered with. */
+                        httpStatus?: number;
                     };
                 };
             };
