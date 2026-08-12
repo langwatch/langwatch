@@ -68,7 +68,7 @@ const { fakeQuery } = vi.hoisted(() => ({
     const enabled = options?.enabled ?? true;
     const settled = enabled && data !== undefined;
     return {
-      data: data ?? undefined,
+      data,
       isLoading: !settled,
       isFetching: enabled && !settled,
       error: null,
