@@ -48,60 +48,82 @@ vi.mock("~/components/automations/FilterDisplay", () => ({
   ),
 }));
 
+/**
+ * A faithful-enough stand-in for one react-query v4 hook result.
+ *
+ * `enabled: false` is the case that matters: such a query never resolves, so
+ * it reports `isLoading` FOREVER. A mock that hard-codes `isLoading: false`
+ * makes that state unrepresentable — which is how a permanent skeleton over
+ * every non-alert automation's history shipped once already.
+ *
+ * `undefined` means "has not resolved"; `null` means "resolved, and the
+ * answer is nothing" (an automation that was never evaluated), which is a
+ * settled query with `data === null`.
+ */
+const { fakeQuery } = vi.hoisted(() => ({
+  fakeQuery: (data: unknown, options?: { enabled?: boolean }) => {
+    const enabled = options?.enabled ?? true;
+    const settled = enabled && data !== undefined;
+    return {
+      data: data ?? undefined,
+      isLoading: !settled,
+      isFetching: enabled && !settled,
+      error: null,
+      refetch: vi.fn(),
+    };
+  },
+}));
+
 vi.mock("~/utils/api", () => ({
   api: {
     automation: {
       getTriggerById: {
-        useQuery: () => ({
-          data: mockTriggerRow,
-          isLoading: false,
-          error: null,
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockTriggerRow, options),
       },
       getFireHistory: {
-        useInfiniteQuery: () => ({
-          data: { pages: [{ fires: mockFires, nextCursor: null }] },
-          isLoading: false,
+        useInfiniteQuery: (
+          _input: unknown,
+          options?: { enabled?: boolean },
+        ) => ({
+          ...fakeQuery(
+            { pages: [{ fires: mockFires, nextCursor: null }] },
+            options,
+          ),
           hasNextPage: false,
           isFetchingNextPage: false,
           fetchNextPage: vi.fn(),
-          error: null,
         }),
       },
       getLatestEvaluation: {
-        useQuery: () => ({
-          data: mockLatestEvaluation,
-          isLoading: false,
-          error: null,
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockLatestEvaluation, options),
       },
       getNextFiring: {
-        useQuery: () => ({
-          data: mockNextFiring,
-          isLoading: false,
-          error: null,
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockNextFiring, options),
       },
       getWebhookDeliveries: {
-        useQuery: () => ({ data: [], isLoading: false, error: null }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery([], options),
       },
     },
     graphs: {
       getById: {
-        useQuery: () => ({ data: null, isLoading: false, error: null }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(null, options),
       },
     },
     dataset: {
       getAll: {
-        useQuery: () => ({ data: [], isLoading: false, error: null }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery([], options),
       },
     },
     tracesV2: {
       list: {
-        useQuery: () => ({
-          data: mockMatchingTraces,
-          isFetching: false,
-          error: null,
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) => ({
+          ...fakeQuery(mockMatchingTraces, options),
           refetch: mockTracesRefetch,
         }),
       },
@@ -280,13 +302,18 @@ describe("ViewAutomationDrawer in-depth view", () => {
   describe("given a paused schedule", () => {
     describe("when the drawer renders", () => {
       /** @scenario A paused schedule does not claim a next firing */
-      it("says it sends nothing while it is paused", () => {
+      it("says it sends nothing while it is paused, and marks it paused", () => {
         mockTriggerRow = {
           ...traceAutomation,
           triggerKind: "REPORT",
           filterQuery: null,
+          active: false,
         };
-        mockNextFiring = { kind: "schedule", nextRunAt: null, paused: true };
+        mockNextFiring = {
+          kind: "paused",
+          subject: "schedule",
+          pausedReason: null,
+        };
 
         renderDrawer();
 
@@ -294,6 +321,75 @@ describe("ViewAutomationDrawer in-depth view", () => {
           screen.getByText("Nothing, while this schedule is paused"),
         ).toBeDefined();
         expect(screen.getByText(/Resume it/)).toBeDefined();
+        // The state that explains the silence belongs with the identity too,
+        // not only in the answer further down the drawer.
+        expect(screen.getByText("Paused")).toBeDefined();
+      });
+    });
+  });
+
+  describe("given a paused alert", () => {
+    describe("when the drawer renders", () => {
+      it("does not claim it is still being checked", () => {
+        mockTriggerRow = { ...graphAlert, active: false };
+        mockNextFiring = {
+          kind: "paused",
+          subject: "alert",
+          pausedReason: null,
+        };
+
+        renderDrawer();
+
+        expect(
+          screen.getByText("Nothing, while this alert is paused"),
+        ).toBeDefined();
+        expect(screen.queryByText("Checked as data arrives")).toBeNull();
+      });
+    });
+  });
+
+  describe("given an automation the platform paused for runaway volume", () => {
+    describe("when the drawer renders", () => {
+      it("explains what it did and what to change", () => {
+        mockTriggerRow = { ...traceAutomation, active: false };
+        mockNextFiring = {
+          kind: "paused",
+          subject: "automation",
+          pausedReason: "runaway_volume",
+        };
+
+        renderDrawer();
+
+        expect(
+          screen.getByText("Nothing, while this automation is paused"),
+        ).toBeDefined();
+        expect(
+          screen.getByText(/matched almost every trace in the project/),
+        ).toBeDefined();
+      });
+    });
+  });
+
+  describe("given a trace automation that has fired repeatedly", () => {
+    describe("when the drawer renders", () => {
+      it("collapses a run of same-minute fires into one counted row", () => {
+        mockTriggerRow = traceAutomation;
+        const firedAt = Date.now() - 6 * MINUTE_MS;
+        mockFires = Array.from({ length: 3 }, (_, index) => ({
+          id: `sent_${index}`,
+          triggerId: "trigger_1",
+          customGraphId: null,
+          createdAt: new Date(firedAt),
+          resolvedAt: null,
+        }));
+
+        renderDrawer();
+
+        expect(screen.getByText("Fired 3 times")).toBeDefined();
+        expect(screen.getByText(/6 minutes ago/)).toBeDefined();
+        // The whole history must render for a non-alert automation: it asks
+        // for no evaluation, and a disabled query reports `isLoading` forever.
+        expect(screen.queryByText(/has not fired yet/)).toBeNull();
       });
     });
   });

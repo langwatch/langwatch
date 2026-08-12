@@ -1,4 +1,4 @@
-import { Box, Code, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Code, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 import { api, type RouterOutputs } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
@@ -36,7 +36,9 @@ export function WebhookDeliverySection({
       <Text textStyle="xs" color="fg.muted" fontWeight="medium">
         Recent deliveries
       </Text>
-      {deliveriesQuery.isLoading ? null : deliveries.length === 0 ? (
+      {deliveriesQuery.isLoading ? (
+        <Skeleton height="60px" width="full" />
+      ) : deliveries.length === 0 ? (
         <Text textStyle="sm" color="fg.muted">
           No delivery attempts recorded yet.
         </Text>

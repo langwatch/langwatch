@@ -49,14 +49,21 @@ export function HistorySection({
       getNextPageParam: (lastPage) => lastPage.nextCursor,
     },
   );
+  // Only an alert is evaluated against a threshold, so only an alert asks.
+  const wantsEvaluation = !!projectId && isGraphAlert;
   const evaluationQuery = api.automation.getLatestEvaluation.useQuery(
     { projectId, triggerId: automationId },
-    { enabled: !!projectId && isGraphAlert },
+    { enabled: wantsEvaluation },
   );
 
   const fires = (historyQuery.data?.pages ?? []).flatMap((page) => page.fires);
   const evaluation = evaluationQuery.data ?? null;
-  const isLoading = historyQuery.isLoading || evaluationQuery.isLoading;
+  // A disabled query reports `isLoading` forever — it has no data and never
+  // will — so the evaluation read only counts towards the skeleton when it is
+  // actually enabled. Without the gate every trace automation and every
+  // schedule sat under a permanent skeleton and never showed its history.
+  const isLoading =
+    historyQuery.isLoading || (wantsEvaluation && evaluationQuery.isLoading);
 
   return (
     <VStack align="start" gap={2} width="full">
@@ -308,15 +315,23 @@ function groupFiresByLabel(
 }
 
 /**
- * How long an incident stayed open, as compact copy for the fire list
- * ("lasted 15m"). Sub-minute incidents show seconds so a fast recovery
- * doesn't read as "lasted 0m".
+ * How long an incident stayed open ("lasted 15 minutes"). Spelled out, never
+ * abbreviated — a saved pixel is not worth a guess. Sub-minute incidents show
+ * seconds so a fast recovery doesn't read as "lasted 0 minutes".
  */
 export function formatDurationBetween(from: Date, to: Date): string {
   const minutes = differenceInMinutes(to, from);
-  if (minutes < 1) return `${Math.max(differenceInSeconds(to, from), 1)}s`;
-  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 1) {
+    return plural(Math.max(differenceInSeconds(to, from), 1), "second");
+  }
+  if (minutes < 60) return plural(minutes, "minute");
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
-  return rest > 0 ? `${hours}h ${rest}m` : `${hours}h`;
+  return rest > 0
+    ? `${plural(hours, "hour")} ${plural(rest, "minute")}`
+    : plural(hours, "hour");
+}
+
+function plural(count: number, unit: string): string {
+  return `${count} ${count === 1 ? unit : `${unit}s`}`;
 }

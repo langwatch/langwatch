@@ -21,6 +21,7 @@ import {
   OPERATOR_LABELS,
   TIME_PERIOD_LABELS,
 } from "~/features/automations/logic/draftReducer";
+import { isAutomationPauseReason } from "~/features/automations/logic/pauseReasons";
 import { resolveSeriesLabel } from "~/features/automations/logic/seriesOptions";
 import { slackDestinationPresentation } from "~/features/automations/logic/slackDestinationPresentation";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
@@ -233,19 +234,37 @@ export function ViewAutomationDrawer({
                       : "Automation")}
               </Heading>
             )}
-            {isGraphAlert ? (
-              <Badge colorPalette="purple" gap={1}>
-                <TrendingUp size={12} />
-                Alert
-              </Badge>
-            ) : isSchedule ? (
-              <Badge colorPalette="purple" gap={1}>
-                <Calendar size={12} />
-                Schedule
-              </Badge>
-            ) : trigger ? (
-              <Badge colorPalette="gray">Automation</Badge>
-            ) : null}
+            <HStack gap={2}>
+              {isGraphAlert ? (
+                <Badge colorPalette="purple" gap={1}>
+                  <TrendingUp size={12} />
+                  Alert
+                </Badge>
+              ) : isSchedule ? (
+                <Badge colorPalette="purple" gap={1}>
+                  <Calendar size={12} />
+                  Schedule
+                </Badge>
+              ) : trigger ? (
+                <Badge colorPalette="gray">Automation</Badge>
+              ) : null}
+              {/* Paused is the first thing that explains a silent automation,
+                  so it sits with the identity rather than only in the answer
+                  further down. `tabIndex` is what makes the tooltip
+                  reachable: Badge renders a plain span, and a span with no tab
+                  stop can be hovered but never focused. */}
+              {trigger && !trigger.active ? (
+                isAutomationPauseReason(trigger.pausedReason) ? (
+                  <Tooltip content="This automation matched almost every trace in the project, so we paused it. Narrow its condition, then switch it back on.">
+                    <Badge colorPalette="red" tabIndex={0}>
+                      Paused
+                    </Badge>
+                  </Tooltip>
+                ) : (
+                  <Badge colorPalette="red">Paused</Badge>
+                )
+              ) : null}
+            </HStack>
           </VStack>
         </Drawer.Header>
         <Drawer.Body>

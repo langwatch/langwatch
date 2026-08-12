@@ -14,6 +14,7 @@ function subject(
     notificationCadence: "immediate",
     traceDebounceMs: 30_000,
     active: true,
+    pausedReason: null,
     ...overrides,
   };
 }
@@ -35,11 +36,7 @@ describe("describeNextFiring", () => {
           now: NOW,
         });
 
-        expect(next).toEqual({
-          kind: "schedule",
-          nextRunAt,
-          paused: false,
-        });
+        expect(next).toEqual({ kind: "schedule", nextRunAt });
       });
     });
 
@@ -59,7 +56,49 @@ describe("describeNextFiring", () => {
           now: NOW,
         });
 
-        expect(next).toMatchObject({ kind: "schedule", paused: true });
+        expect(next).toEqual({
+          kind: "paused",
+          subject: "schedule",
+          pausedReason: null,
+        });
+      });
+    });
+  });
+
+  describe("given an automation that is switched off", () => {
+    describe("when it is a graph alert", () => {
+      it("says nothing happens next, rather than quoting its cadence", () => {
+        const next = describeNextFiring({
+          trigger: subject({ customGraphId: "graph-1", active: false }),
+          reportSchedule: null,
+          now: NOW,
+        });
+
+        expect(next).toEqual({
+          kind: "paused",
+          subject: "alert",
+          pausedReason: null,
+        });
+      });
+    });
+
+    describe("when it is a trace automation the platform paused", () => {
+      it("carries the reason so the copy can say who paused it", () => {
+        const next = describeNextFiring({
+          trigger: subject({
+            active: false,
+            pausedReason: "runaway_volume",
+            notificationCadence: "5min_digest",
+          }),
+          reportSchedule: null,
+          now: NOW,
+        });
+
+        expect(next).toEqual({
+          kind: "paused",
+          subject: "automation",
+          pausedReason: "runaway_volume",
+        });
       });
     });
   });
