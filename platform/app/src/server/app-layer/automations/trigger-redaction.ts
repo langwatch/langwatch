@@ -152,6 +152,13 @@ export function redactTriggerForPublicApi<
  * keep another channel's stale credential. So the two are separated by the
  * channel's own schema, the hook decides the delivery half, and the rule half
  * is carried across untouched (the same split the dashboard save makes).
+ *
+ * Slicing by the current channel alone holds because an update cannot change a
+ * trigger's `action`: the channel that owns the stored delivery fields is the
+ * same one that owns the incoming ones. Make the channel switchable and the
+ * split has to widen to the union of every provider's field names, or the
+ * outgoing channel's credentials would be carried across as if they were the
+ * rule the automation fires by.
  */
 export async function persistPublicApiActionParams({
   action,
@@ -183,8 +190,10 @@ export async function persistPublicApiActionParams({
 
 /** The fields a channel declares as its own, read off the schema it publishes
  *  for them. A schema that is not an object shape claims nothing by name, and
- *  the whole payload goes to the hook as it did before. */
-function deliveryFieldNames(schema: ZodTypeAny): Set<string> {
+ *  the whole payload goes to the hook as it did before — which is why every
+ *  provider's schema is held to an object shape by
+ *  `provider-delivery-fields.unit.test.ts`. Exported for that test. */
+export function deliveryFieldNames(schema: ZodTypeAny): Set<string> {
   let current: ZodTypeAny = schema;
   while (current instanceof ZodEffects) current = current.innerType();
   if (current instanceof ZodObject) {
