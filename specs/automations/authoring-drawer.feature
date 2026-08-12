@@ -56,6 +56,33 @@ Feature: Staged automation authoring drawer
       When the When section is shown
       Then it is pre-filled with the active trace filters
 
+    # A brand-new drawer used to show zero condition rows plus an
+    # "Add at least one condition." line — reading as broken rather than
+    # empty. One blank, editable row makes the surface read as ready to
+    # fill in; it still doesn't count as a condition until it's filled in,
+    # so save-gating on an untouched draft is unchanged.
+    @integration
+    Scenario: A fresh trace automation starts with one editable condition
+      Given the user opened the drawer from automation settings
+      When the When section is shown
+      Then one empty, editable condition row is already there
+      And the automation still cannot be saved until it is filled in
+
+  Rule: The condition builder can target a custom attribute
+
+    A trace's custom attributes (`trace.attribute.<key>`, `span.attribute.<key>`,
+    `event.attribute.<key>`) were only reachable from the Code editor — the
+    Builder dropped them, so a condition on a custom attribute forced the
+    author into raw query syntax with no field picker to guide them.
+
+    @unit
+    Scenario: A builder condition on a custom attribute round-trips to the code editor
+      Given the user picks the trace attribute field in the condition builder
+      And types "user_id" as the attribute key and "premium" as the value
+      When the condition builder serialises the row
+      Then the query reads "trace.attribute.user_id:premium"
+      And parsing that query back recognises the same attribute and key
+
   Rule: No API can create an automation that fires on every trace
 
     The drawer has always blocked a condition-less automation, but only in the
@@ -146,6 +173,23 @@ Feature: Staged automation authoring drawer
       Given a link that names the drawer the API used to hand out
       When the app resolves that URL
       Then it opens the automation authoring drawer
+
+  Rule: An alert needs a custom graph to watch
+
+    An alert's Subject is a series on a custom graph — there is nothing to
+    watch until one exists. A project with none used to show the picker
+    anyway: a bare "Select a graph…" with no options and an error, with no
+    way out. This is also where the #6716 "a template opens the drawer with
+    no graph attached" case lands, since it is the same empty list.
+
+    @integration
+    Scenario: A project with no custom graphs offers to create one
+      Given the user is creating an alert
+      And the project has no custom graphs yet
+      When the Subject section is shown
+      Then the user sees an explanation instead of an empty graph picker
+      And a link to create a custom graph
+      And the link opens in a new tab so the alert draft is not lost
 
   Rule: Notifications configure templates; actions configure destinations
 
@@ -304,6 +348,15 @@ Feature: Staged automation authoring drawer
       When the user saves
       Then saving is blocked with the template error
       And no template change is persisted
+
+    # #6716: leaving the name blank used to block Save with no visible reason
+    # on the form itself — the only clue was a tooltip on a disabled button.
+    @integration
+    Scenario: Saving without a name points at the name field
+      Given the user has completed every section except the name
+      When the user tries to save
+      Then the name field shows that a name is required
+      And saving is blocked
 
     Scenario: Abandoning the drawer persists nothing
       Given the user has partially configured a new automation
