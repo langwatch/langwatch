@@ -140,3 +140,34 @@ paths = [
 description = "Synthetic JWT-shaped fixture proving bearer-token redaction; signs nothing, grants nothing"
 targetRules = ["jwt", "generic-api-key"]
 paths = ['''platform/app/src/server/stored-objects/__tests__/azure-secret-hygiene\.unit\.test\.ts''']
+
+# The three synthetic credentials the secret-redaction tests assign to a named
+# key. Same argument as the Azure fixture above: a test that proves a secret is
+# scrubbed has to hand it something shaped like the thing a real leak would be,
+# and gitleaks' `generic-api-key` rule fires on the `TOKEN": "<high-entropy
+# value>"` shape without being able to tell the fixture from what it imitates.
+#
+# Naming the values, as this file requires:
+#   sk-live-abc123    printed by a code node in the nlpgo stdout/stderr
+#                     redaction test. Already the repository's stand-in leak in
+#                     services/langyagent and services/aigateway, where it sits
+#                     in prose rather than an assignment and so goes unflagged.
+#   hunter2-signing   the second secret in that same test, present to prove the
+#                     scrub covers every entry in the map and not just the first.
+#   tok-live-abc123   the `{{ secrets.NAME }}` value in the scenario HTTP target
+#                     test.
+# No provider issued any of them, none has ever authenticated anything, and
+# there is nothing to revoke.
+#
+# Scoped by VALUE rather than by path, which is the stronger of the two: any
+# other high-entropy string in these files is still caught, and the same fixture
+# stays covered wherever else it is used. Scoped to `generic-api-key` on top, so
+# every provider-specific rule still applies to these values too.
+[[allowlists]]
+description = "Synthetic credential fixtures in the secret-redaction tests; issued by nobody, revocable nowhere"
+targetRules = ["generic-api-key"]
+regexes = [
+  '''sk-live-abc123''',
+  '''hunter2-signing''',
+  '''tok-live-abc123''',
+]
