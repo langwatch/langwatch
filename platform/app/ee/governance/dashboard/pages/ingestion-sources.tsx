@@ -67,6 +67,7 @@ type SourceType =
   | "copilot_studio"
   | "openai_compliance"
   | "claude_compliance"
+  | "anthropic_admin"
   | "databricks_genie"
   | "s3_custom"
   | "http_custom";
@@ -124,6 +125,13 @@ const SOURCE_TYPE_OPTIONS: Array<{
     label: "Anthropic Claude Enterprise Compliance",
     mode: "pull",
     blurb: "Polls Anthropic's compliance API with a workspace API key.",
+  },
+  {
+    value: "anthropic_admin",
+    label: "Anthropic Admin API (usage & cost)",
+    mode: "pull",
+    blurb:
+      "Polls Anthropic's organization usage/cost reports with an Admin API key (sk-ant-admin-...). Pick ONE report per source: usage (token counts, we price them) or cost (invoice amounts, carried verbatim). Never create both for the same org — the same spend would be counted twice.",
   },
   {
     value: "databricks_genie",
@@ -198,6 +206,7 @@ const PULL_ADAPTER_FOR_SOURCE: Partial<Record<SourceType, string>> = {
   copilot_studio: "copilot_studio",
   openai_compliance: "openai_compliance",
   claude_compliance: "claude_compliance",
+  anthropic_admin: "anthropic_admin",
   databricks_genie: "databricks_genie",
   http_custom: "http_polling",
 };
@@ -212,6 +221,7 @@ const PULL_SCHEDULE_DEFAULTS: Record<string, string> = {
   copilot_studio: "*/15 * * * *",
   openai_compliance: "*/15 * * * *",
   claude_compliance: "*/15 * * * *",
+  anthropic_admin: "0 * * * *",
   databricks_genie: "*/15 * * * *",
   http_polling: "*/15 * * * *",
 };
@@ -331,9 +341,11 @@ function IngestionSourcesPage() {
         ? buildHttpCustomPullConfig(composer)
         : composer.sourceType === "databricks_genie"
           ? buildDatabricksGeniePullConfig(composer)
-          : pullAdapter
-            ? { adapter: pullAdapter }
-            : null;
+          : composer.sourceType === "anthropic_admin"
+            ? buildAnthropicAdminPullConfig(composer)
+            : pullAdapter
+              ? { adapter: pullAdapter }
+              : null;
     if (composer.sourceType === "http_custom" && !pullConfig) {
       // buildHttpCustomPullConfig returns null when required fields are
       // empty - keep the drawer open so the user can fix the form.
@@ -341,6 +353,15 @@ function IngestionSourcesPage() {
         title: "Missing required HTTP source fields",
         description:
           "URL, auth header value, token, events JSONPath, cursor JSONPath, and event mapping are all required.",
+        type: "error",
+      });
+      return;
+    }
+    if (composer.sourceType === "anthropic_admin" && !pullConfig) {
+      toaster.create({
+        title: "Missing or invalid Anthropic fields",
+        description:
+          "Admin API key is required, report must be `usage` or `cost`, bucket width (if set) must be 1m/1h/1d, and the backfill start must be a parseable date.",
         type: "error",
       });
       return;
@@ -1069,6 +1090,37 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "300",
     },
   ],
+  anthropic_admin: [
+    {
+      // `credentials*` prefix routes this into the encrypted `credentials`
+      // subtree — same rule as the Genie token below.
+      key: "credentialsToken",
+      label: "Admin API key",
+      placeholder: "sk-ant-admin-...",
+      hint: "Generate under Anthropic Admin Console → API Keys → Admin Keys. A regular workspace key returns 401 on the organization reports. We encrypt this server-side.",
+      required: true,
+      secret: true,
+    },
+    {
+      key: "report",
+      label: "Report (usage or cost)",
+      placeholder: "cost",
+      hint: "Exactly one per source. `cost` carries Anthropic's invoice amounts verbatim; `usage` pulls token counts that we price ourselves. Never create both reports for the same organization — the same spend would be counted twice.",
+      required: true,
+    },
+    {
+      key: "bucketWidth",
+      label: "Bucket width (optional, usage report only)",
+      placeholder: "1d",
+      hint: "1m, 1h or 1d. Only affects the usage report; cost is always daily. Default 1d.",
+    },
+    {
+      key: "startingAt",
+      label: "Backfill start (optional)",
+      placeholder: "2026-08-01",
+      hint: "Date or ISO instant the first run reads from. Empty = 24 hours back.",
+    },
+  ],
   databricks_genie: [
     {
       key: "workspaceUrl",
@@ -1284,6 +1336,45 @@ function buildHttpCustomPullConfig(
 }
 
 /**
+ * The Anthropic Admin adapter config, or null when a required field is empty
+ * or `report` is not one of the two values the adapter accepts. Nothing
+ * validates pullConfig against the adapter schema at save time — a bad value
+ * here would sit in the row looking fine and fail on every pull — so the
+ * builder is the last checkpoint before the database.
+ */
+export function buildAnthropicAdminPullConfig(
+  c: ComposerState,
+): Record<string, unknown> | null {
+  const p = c.parserConfig;
+  const token = (p.credentialsToken ?? "").trim();
+  const report = (p.report ?? "").trim().toLowerCase();
+  if (!token || (report !== "usage" && report !== "cost")) return null;
+
+  const bucketWidth = (p.bucketWidth ?? "").trim();
+  if (bucketWidth && !["1m", "1h", "1d"].includes(bucketWidth)) return null;
+
+  // The adapter schema wants a full ISO instant (`z.string().datetime()`);
+  // admins type dates. Normalize, and reject anything Date can't parse.
+  const startingAtRaw = (p.startingAt ?? "").trim();
+  let startingAt: string | undefined;
+  if (startingAtRaw) {
+    const parsed = Date.parse(startingAtRaw);
+    if (Number.isNaN(parsed)) return null;
+    startingAt = new Date(parsed).toISOString();
+  }
+
+  return {
+    adapter: "anthropic_admin",
+    report,
+    ...(bucketWidth ? { bucketWidth } : {}),
+    ...(startingAt ? { startingAt } : {}),
+    schedule:
+      c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.anthropic_admin || "0 * * * *",
+    credentials: { token },
+  };
+}
+
+/**
  * The Databricks Genie adapter config, or null when a required field is empty.
  *
  * Genie needs a real builder rather than the bare `{ adapter }` the other
@@ -1421,6 +1512,11 @@ function PullScheduleField({
  */
 const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
   {
+    // `report`/`bucketWidth` pass through unchanged, but `startingAt` is
+    // normalized to an ISO instant by the builder — the raw form value
+    // winning the merge would fail the adapter's `.datetime()` check at
+    // pull time.
+    anthropic_admin: ["report", "bucketWidth", "startingAt"],
     databricks_genie: ["workspaceUrl", "spaceIds"],
   };
 

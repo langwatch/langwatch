@@ -50,6 +50,7 @@ export type SourceType =
   | "copilot_studio"
   | "openai_compliance"
   | "claude_compliance"
+  | "anthropic_admin"
   | "databricks_genie"
   | "s3_custom"
   | "http_custom";
@@ -62,6 +63,7 @@ export const SUPPORTED_SOURCE_TYPES: readonly SourceType[] = [
   "copilot_studio",
   "openai_compliance",
   "claude_compliance",
+  "anthropic_admin",
   "databricks_genie",
   "s3_custom",
   "http_custom",
