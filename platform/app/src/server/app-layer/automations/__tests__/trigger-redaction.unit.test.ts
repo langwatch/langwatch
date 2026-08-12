@@ -1,15 +1,18 @@
 import { TriggerAction } from "@prisma/client";
 import { describe, expect, it } from "vitest";
+import { decrypt, encrypt } from "~/utils/encryption";
+import { decryptWebhookHeaders } from "../providers/webhook/server";
 import {
+  persistPublicApiActionParams,
   REDACTED_CREDENTIAL,
   redactTriggerForPublicApi,
   redactTriggerForRead,
-  resolveRedactedCredentials,
 } from "../trigger-redaction";
 
 const SLACK_WEBHOOK =
   "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXX";
 const HEADER_VALUE = "Bearer sk-live-abcdefghijklmnop";
+const SIGNING_SECRET = "whsec-abcdefghijklmnopqrstuvwxyz";
 
 describe("redactTriggerForPublicApi", () => {
   describe("given a Slack automation", () => {
@@ -92,6 +95,48 @@ describe("redactTriggerForPublicApi", () => {
     });
   });
 
+  describe("given a webhook automation whose header is encrypted at rest", () => {
+    it("keeps the header name and hides the value", () => {
+      const redacted = redactTriggerForPublicApi({
+        action: TriggerAction.SEND_WEBHOOK,
+        actionParams: {
+          url: "https://example.com/hooks/langwatch",
+          headersEncrypted: encrypt(
+            JSON.stringify({ Authorization: HEADER_VALUE }),
+          ),
+          signingSecretEncrypted: encrypt(SIGNING_SECRET),
+        },
+      });
+
+      expect(redacted.actionParams).toMatchObject({
+        url: "https://example.com/hooks/langwatch",
+        headers: { Authorization: REDACTED_CREDENTIAL },
+        signingSecret: REDACTED_CREDENTIAL,
+      });
+      const serialized = JSON.stringify(redacted);
+      expect(serialized).not.toContain("sk-live");
+      expect(serialized).not.toContain("whsec");
+      expect(serialized).not.toContain("headersEncrypted");
+    });
+  });
+
+  describe("given a stored row whose saved credentials cannot be read back", () => {
+    /** @scenario "A delivery configuration that cannot be read comes back empty" */
+    it("returns an empty delivery configuration and keeps the rest readable", () => {
+      const redacted = redactTriggerForPublicApi({
+        id: "trigger_1",
+        action: TriggerAction.SEND_WEBHOOK,
+        actionParams: {
+          url: "https://example.com/hooks/langwatch",
+          headersEncrypted: "not-something-this-server-can-read",
+        },
+      });
+
+      expect(redacted.actionParams).toEqual({});
+      expect(redacted.id).toBe("trigger_1");
+    });
+  });
+
   describe("given a stored row naming a channel this server does not offer", () => {
     /** @scenario "A delivery channel the server no longer offers returns nothing" */
     it("returns an empty delivery configuration", () => {
@@ -134,55 +179,126 @@ describe("redactTriggerForRead", () => {
   });
 });
 
-describe("resolveRedactedCredentials", () => {
-  describe("given a placeholder for a field that is already stored", () => {
-    it("keeps the stored value", () => {
-      const resolved = resolveRedactedCredentials({
-        incoming: {
-          slackWebhook: REDACTED_CREDENTIAL,
-          slackDelivery: "webhook",
-        },
-        stored: { slackWebhook: SLACK_WEBHOOK, slackDelivery: "webhook" },
+describe("persistPublicApiActionParams", () => {
+  describe("given the read response written back for a customer endpoint", () => {
+    it("keeps the stored header value and signing secret", async () => {
+      const stored = {
+        url: "https://example.com/hooks/langwatch",
+        method: "POST",
+        headersEncrypted: encrypt(
+          JSON.stringify({ Authorization: HEADER_VALUE }),
+        ),
+        signingSecretEncrypted: encrypt(SIGNING_SECRET),
+      };
+      const read = redactTriggerForPublicApi({
+        action: TriggerAction.SEND_WEBHOOK,
+        actionParams: stored,
       });
 
-      expect(resolved).toEqual({
-        slackWebhook: SLACK_WEBHOOK,
-        slackDelivery: "webhook",
+      const saved = (await persistPublicApiActionParams({
+        action: TriggerAction.SEND_WEBHOOK,
+        incoming: read.actionParams,
+        stored,
+      })) as { headersEncrypted: string; signingSecretEncrypted: string };
+
+      expect(decryptWebhookHeaders(saved)).toEqual({
+        Authorization: HEADER_VALUE,
       });
-    });
-
-    it("resolves it inside a nested record too", () => {
-      const resolved = resolveRedactedCredentials({
-        incoming: { headers: { Authorization: REDACTED_CREDENTIAL } },
-        stored: { headers: { Authorization: HEADER_VALUE } },
-      });
-
-      expect(resolved).toEqual({ headers: { Authorization: HEADER_VALUE } });
-    });
-  });
-
-  describe("given a placeholder for a field with nothing stored behind it", () => {
-    it("drops the field rather than saving the placeholder", () => {
-      const resolved = resolveRedactedCredentials({
-        incoming: {
-          slackWebhook: REDACTED_CREDENTIAL,
-          slackDelivery: "webhook",
-        },
-        stored: {},
-      });
-
-      expect(resolved).toEqual({ slackDelivery: "webhook" });
+      expect(decrypt(saved.signingSecretEncrypted)).toBe(SIGNING_SECRET);
     });
   });
 
-  describe("given a real value", () => {
-    it("takes the value the caller sent", () => {
-      const resolved = resolveRedactedCredentials({
-        incoming: { slackWebhook: SLACK_WEBHOOK },
-        stored: { slackWebhook: "https://hooks.slack.com/services/OLD" },
+  describe("given the read response written back for a Slack bot connection", () => {
+    it("keeps the stored bot token", async () => {
+      const stored = {
+        slackDelivery: "bot",
+        slackChannelId: "C123",
+        slackBotToken: encrypt("xoxb-000000000000-abcdefghijkl"),
+      };
+      const read = redactTriggerForPublicApi({
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+        actionParams: stored,
       });
 
-      expect(resolved).toEqual({ slackWebhook: SLACK_WEBHOOK });
+      const saved = (await persistPublicApiActionParams({
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+        incoming: read.actionParams,
+        stored,
+      })) as { slackBotToken: string };
+
+      expect(decrypt(saved.slackBotToken)).toBe(
+        "xoxb-000000000000-abcdefghijkl",
+      );
+    });
+  });
+
+  describe("given the read response written back for a Slack incoming webhook", () => {
+    it("keeps the stored webhook URL", async () => {
+      const stored = { slackDelivery: "webhook", slackWebhook: SLACK_WEBHOOK };
+      const read = redactTriggerForPublicApi({
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+        actionParams: stored,
+      });
+
+      expect(
+        await persistPublicApiActionParams({
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+          incoming: read.actionParams,
+          stored,
+        }),
+      ).toEqual(stored);
+    });
+  });
+
+  describe("given a destination the caller typed", () => {
+    it("saves what the caller typed", async () => {
+      const typed = "https://hooks.slack.com/services/T1/B1/typed";
+
+      expect(
+        await persistPublicApiActionParams({
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+          incoming: { slackDelivery: "webhook", slackWebhook: typed },
+          stored: { slackDelivery: "webhook", slackWebhook: SLACK_WEBHOOK },
+        }),
+      ).toEqual({ slackDelivery: "webhook", slackWebhook: typed });
+    });
+  });
+
+  describe("given a placeholder with nothing stored behind it", () => {
+    it("drops the field rather than saving the placeholder", async () => {
+      expect(
+        await persistPublicApiActionParams({
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+          incoming: {
+            slackDelivery: "webhook",
+            slackWebhook: REDACTED_CREDENTIAL,
+          },
+        }),
+      ).toEqual({ slackDelivery: "webhook", slackWebhook: undefined });
+    });
+  });
+
+  describe("given a delivery that carries no credential", () => {
+    it("stores what the caller sent", async () => {
+      const actionParams = { members: ["someone@example.com"] };
+
+      expect(
+        await persistPublicApiActionParams({
+          action: TriggerAction.SEND_EMAIL,
+          incoming: actionParams,
+        }),
+      ).toEqual(actionParams);
+    });
+  });
+
+  describe("given a customer endpoint saved without any header", () => {
+    it("stores the destination without inventing one", async () => {
+      expect(
+        await persistPublicApiActionParams({
+          action: TriggerAction.SEND_WEBHOOK,
+          incoming: { url: "https://example.com/hooks/langwatch" },
+        }),
+      ).toEqual({ url: "https://example.com/hooks/langwatch" });
     });
   });
 });

@@ -10,8 +10,8 @@ import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
 import { TriggerFiltersRequiredError } from "~/server/app-layer/automations/errors";
 import {
+  persistPublicApiActionParams,
   redactTriggerForPublicApi,
-  resolveRedactedCredentials,
 } from "~/server/app-layer/automations/trigger-redaction";
 import { prisma } from "~/server/db";
 import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
@@ -222,12 +222,13 @@ secured.access(requires("triggers:create")).post(
       throw new TriggerFiltersRequiredError();
     }
 
-    // A create has nothing stored behind the placeholder, so a field sent as
-    // `[redacted]` (a listing copied into a create call) is dropped rather
-    // than saved as that string.
-    const actionParams = resolveRedactedCredentials({
+    // The channel's own provider owns the at-rest form of its delivery
+    // configuration, so a create hands the payload to it. Nothing is stored
+    // yet, so a field sent as `[redacted]` (a listing copied into a create
+    // call) is dropped rather than saved as that string.
+    const actionParams = await persistPublicApiActionParams({
+      action: body.action,
       incoming: body.actionParams,
-      stored: {},
     });
 
     const trigger = await prisma.trigger.create({
@@ -317,10 +318,13 @@ secured.access(requires("triggers:update")).patch(
     if (body.alertType !== undefined) data.alertType = body.alertType;
     if (body.filters !== undefined) data.filters = JSON.stringify(body.filters);
     // Read-modify-write is the normal integration shape, and a credential the
-    // caller never touched comes back to us as the placeholder. Each of those
-    // keeps the value already stored.
+    // caller never touched comes back to us as the placeholder — or, for a
+    // stored bot token, as the flag that says one is set. The channel's
+    // provider resolves both against what it stored, so each of those keeps
+    // the credential the automation already delivers with.
     if (body.actionParams !== undefined) {
-      data.actionParams = resolveRedactedCredentials({
+      data.actionParams = await persistPublicApiActionParams({
+        action: trigger.action,
         incoming: body.actionParams,
         stored: trigger.actionParams,
       });
