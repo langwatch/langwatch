@@ -300,5 +300,66 @@ describe("SlackBlockKitTemplatePicker", () => {
         .map((el) => el.getAttribute("aria-label"));
       expect(namesAfterInPickerPick).toEqual(namesAfterExternalChange);
     });
+
+    it("still regroups after two consecutive in-picker picks land on the same cadence", async () => {
+      const user = userEvent.setup();
+      render(<StatefulPicker onPick={vi.fn()} exposeExternalCadenceControl />, {
+        wrapper: Wrapper,
+      });
+
+      // Expand the digest section and pick two different digest layouts in a
+      // row without leaving it — comparison-shopping between the digest
+      // templates the registry offers, which the still-open disclosure
+      // supports. "Digest — inline rich" (unlike "evaluator chart"/"table")
+      // carries no gated block, so it stays clickable on this webhook
+      // connection. The first pick genuinely changes the cadence prop
+      // ("immediate" -> "digest"); the second does not (cadence is already
+      // "digest"), which is exactly the case the marker guard has to survive.
+      await user.click(screen.getByText(/more layouts for digest cadences/i));
+      await user.click(
+        screen.getByRole("button", { name: /use digest — compact template/i }),
+      );
+      await user.click(
+        screen.getByRole("button", {
+          name: /use digest — inline rich template/i,
+        }),
+      );
+
+      // Neither in-picker pick should have regrouped the gallery on its own
+      // — same contract as the sibling test above.
+      expect(
+        screen.getByRole("button", { name: /use compact alert template/i }),
+      ).toBeInTheDocument();
+
+      // Now the cadence changes externally, twice: once back to "immediate"
+      // (a no-op for the grouping, since it was never anything else) and
+      // once back to "digest" — the value the second in-picker pick would
+      // have left a stale, unconsumed marker on on a run with the bug. If
+      // that marker check is wrong, this change is misread as a pick made in
+      // the picker and the regroup is skipped.
+      const externalToggle = screen.getByRole("button", {
+        name: /change cadence in the cadence section/i,
+      });
+      await user.click(externalToggle);
+      await user.click(externalToggle);
+
+      // The gallery must reflect the real (digest) cadence now: the digest
+      // layouts lead the PRIMARY grid (the first 4 buttons — digest cadence
+      // has exactly 4 trace templates). The disclosure is still open from
+      // the setup above and now holds the immediate layouts instead, so
+      // "Compact alert" is still somewhere in the document — checked by
+      // POSITION, not presence.
+      const primaryNames = screen
+        .getAllByRole("button", { name: /^use .+ template$/i })
+        .slice(0, 4)
+        .map((el) => el.getAttribute("aria-label"));
+      expect(primaryNames).toEqual(
+        expect.arrayContaining([
+          "Use Digest — compact template",
+          "Use Digest — inline rich template",
+        ]),
+      );
+      expect(primaryNames).not.toContain("Use Compact alert template");
+    });
   });
 });
