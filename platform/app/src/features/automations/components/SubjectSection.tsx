@@ -149,7 +149,13 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
     (graphs.data ?? []).length === 0;
   // Distinct from "no graphs yet": a fetch failure isn't emptiness, and
   // offering to create a graph the project may already have would be wrong.
-  const graphsFailedToLoad = !isPrefilled && graphs.isError;
+  // Gated on `data == null` too — react-query's `error` state leaves the
+  // last good `data` in place on a background refetch failure (a stale
+  // graph list is still a working picker), so without this check a failed
+  // reconnect refetch would rip a populated, already-selected picker out
+  // from under the author and replace it with the failure screen.
+  const graphsFailedToLoad =
+    !isPrefilled && graphs.isError && graphs.data == null;
 
   if (graphsFailedToLoad) {
     return <GraphsLoadFailed onRetry={() => void graphs.refetch()} />;
