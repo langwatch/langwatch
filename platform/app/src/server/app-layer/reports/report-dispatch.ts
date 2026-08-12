@@ -6,7 +6,7 @@ import { REPORT_TRIGGER_DEFAULTS } from "@langwatch/automations/templating/defau
 import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
 import {
   renderTriggerSlack,
-  type SlackTemplateType,
+  resolveSlackTemplateType,
 } from "@langwatch/automations/templating/renderSlack";
 import {
   buildReportTemplateContext,
@@ -282,9 +282,6 @@ export async function dispatchScheduledReport({
     }
 
     if (trigger.action === "SEND_SLACK_MESSAGE") {
-      const templateType: SlackTemplateType | null =
-        trigger.slackTemplateType === "block_kit" ? "block_kit" : "string";
-
       // ADR-041: a bot connection posts via the Web API with the gate open.
       const slackParams = (trigger.actionParams ?? {}) as SlackActionParams;
       if (slackDeliveryMethodOf(slackParams) === "bot") {
@@ -292,7 +289,10 @@ export async function dispatchScheduledReport({
         const channel = slackParams.slackChannelId?.trim();
         if (!token || !channel) return false;
         const rendered = await renderTriggerSlack({
-          templateType,
+          templateType: resolveSlackTemplateType({
+            configured: trigger.slackTemplateType,
+            deliveryMethod: "bot",
+          }),
           template: trigger.slackTemplate,
           context,
           defaults: REPORT_TRIGGER_DEFAULTS,
@@ -310,7 +310,10 @@ export async function dispatchScheduledReport({
       const webhook = params.slackWebhook ?? null;
       if (!webhook) return false;
       const rendered = await renderTriggerSlack({
-        templateType,
+        templateType: resolveSlackTemplateType({
+          configured: trigger.slackTemplateType,
+          deliveryMethod: "webhook",
+        }),
         template: trigger.slackTemplate,
         context,
         defaults: REPORT_TRIGGER_DEFAULTS,
