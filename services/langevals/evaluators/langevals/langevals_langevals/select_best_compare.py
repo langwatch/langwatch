@@ -831,8 +831,16 @@ _NON_ARTICLE_FOLLOWERS = frozenset(
 
 # Comparisons the judge draws against another candidate. What follows one of
 # these is a candidate, not the start of a noun phrase.
+#
+# The prepositions carry as much of this as the verbs do: "compared with A",
+# "compared to A", "measured against A" and "set alongside A" are the judge's
+# ordinary way of naming the candidate it weighed the winner against. They are
+# safe for the same reason "than" is: a capitalized article after one of them
+# only happens in title case, which the next-word check below rules out.
 _COMPARATIVE_PRECEDERS = frozenset(
     {
+        "against",
+        "alongside",
         "beats",
         "chose",
         "outperforms",
@@ -840,9 +848,11 @@ _COMPARATIVE_PRECEDERS = frozenset(
         "picked",
         "prefers",
         "than",
+        "to",
         "unlike",
         "versus",
         "vs",
+        "with",
     }
 )
 

@@ -174,6 +174,19 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
     When I view the run on the results page
     Then "variant_3" is still shown, with zero wins
 
+  # Dogfood, on a run of 4, 0 and 3 wins: the "3" showed above its bar and the
+  # winner's "4" showed nowhere. The leading bar is as tall as the chart allows,
+  # so its count was drawn past the top edge and cut off, leaving the one tally
+  # the reader came for as the only one missing. The room for it is reserved as
+  # a fixed strip of the chart rather than by stretching the axis, which would
+  # give back less and less room as the counts climb.
+  @integration
+  Scenario: The leading candidate's win count stays legible
+    Given 30 rows have been evaluated where variant_1 wins 14, variant_2 wins 10, variant_3 wins 4, and 2 ties
+    When I view the win-rate chart on the results page
+    Then I can read "14" above variant_1's bar
+    And I can read it just as well on a run ten times longer
+
   # Customer feedback, 2026-07-08 call: reusing the same prompt as two
   # variants (e.g. re-testing gpt-4.1 vs gpt-5-mini) made them
   # indistinguishable in the scoreboard and per-row verdicts. What differs
@@ -344,6 +357,8 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
     When I read the reasoning
     Then both letters name their variants
     And letters written as a list item or in parentheses name their variants too
+    And a letter introduced by a comparison word such as "compared with" names its variant
+    And a capitalized article in title case, such as "compared with A Concise Answer", is untouched
 
   # The two passes are shown the candidates in opposite orders, so slot A of
   # the second pass is a different variant from slot A of the first. Reading

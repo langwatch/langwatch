@@ -1306,6 +1306,60 @@ def test_bare_slot_letters_are_translated_in_verb_and_comparison_contexts():
 
 
 # @scenario "A bare slot letter is translated only where it cannot be an article"
+def test_preposition_led_comparison_translates_the_bare_letter():
+    """"Compared with A" is how a judge names the candidate it weighed the
+    winner against, and it reached three rows in ten of a real run. The
+    letter has to translate there, exactly as it does after "than"."""
+    details = _details_for(
+        "It is clear and succinct compared with A (some repetition) and "
+        "B (lacks the soft-delete details)."
+    )
+
+    assert details == (
+        "It is clear and succinct compared with plain (some repetition) and "
+        "detailed (lacks the soft-delete details)."
+    )
+
+
+# @scenario "A bare slot letter is translated only where it cannot be an article"
+@pytest.mark.parametrize(
+    "preposition",
+    ["with", "to", "against", "alongside"],
+)
+def test_every_comparison_preposition_translates_the_bare_letter(preposition):
+    details = _details_for(f"C reads better compared {preposition} A.")
+
+    assert details == f"thorough reads better compared {preposition} plain."
+
+
+# @scenario "Reasoning prose survives the slot translation"
+@pytest.mark.parametrize(
+    "preposition",
+    ["with", "to", "against", "alongside"],
+)
+def test_title_case_after_a_comparison_preposition_keeps_its_article(preposition):
+    """A capitalized article only turns up in title case, and there the word
+    after it is capitalized too. That is what keeps the prepositions safe to
+    treat as comparisons: "compared with A Concise Answer" is a phrase, not a
+    reference to slot A."""
+    reasoning = f"C is stronger compared {preposition} A Concise Answer."
+
+    assert _details_for(reasoning) == (
+        f"thorough is stronger compared {preposition} A Concise Answer."
+    )
+
+
+# @scenario "Reasoning prose survives the slot translation"
+def test_article_after_a_comparison_preposition_is_left_alone_in_lower_case():
+    """The article the judge actually writes is lowercase, and a bare
+    lowercase letter is prose long before it is a slot. The real slot
+    reference in the same sentence still translates."""
+    details = _details_for("C is stronger compared with a rambling answer.")
+
+    assert details == "thorough is stronger compared with a rambling answer."
+
+
+# @scenario "A bare slot letter is translated only where it cannot be an article"
 def test_list_and_parenthesised_slot_references_are_translated():
     details = _details_for(
         "A: one-liner. B: hedged. C: complete with an example. The pick is (C)."
