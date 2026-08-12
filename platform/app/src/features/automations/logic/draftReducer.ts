@@ -268,7 +268,7 @@ export function reducer(
   }
 }
 
-/** The Automation / Schedule noun set for one preset. */
+/** The Automation / Report noun set for one preset. */
 export interface PresetLabels {
   /** Drawer heading. */
   title: string;
@@ -290,8 +290,14 @@ export interface PresetLabels {
  * There are two nouns, not three (ADR-093 §1): an automation is defined by
  * what it watches, and watching a graph is not a different kind of thing from
  * watching a trace filter — that split was a distinction the product drew and
- * customers did not. A schedule stays separate, because the clock is not
- * something to watch and a report has no rule. The storage enum and the wire
+ * customers did not. A report stays separate, because the clock is not
+ * something to watch and a report has no rule.
+ *
+ * The third concept is called a **report**, not a schedule (decision by Alex,
+ * 2026-08-12): a schedule is when it goes out, which is one of its fields — the
+ * thing itself is the report it sends. The scheduling vocabulary stays wherever
+ * it describes timing ("sends on a schedule"); only the name of the object
+ * changes. The storage enum (`REPORT`, which already agreed) and the wire
  * discriminator are untouched; this is vocabulary.
  */
 export function presetLabels(
@@ -301,11 +307,11 @@ export function presetLabels(
   switch (source) {
     case "report":
       return {
-        title: isEdit ? "Edit schedule" : "New schedule",
-        saveButton: isEdit ? "Save schedule" : "Create schedule",
-        createdToast: "Schedule created",
-        updatedToast: "Schedule updated",
-        noun: "schedule",
+        title: isEdit ? "Edit report" : "New report",
+        saveButton: isEdit ? "Save report" : "Create report",
+        createdToast: "Report created",
+        updatedToast: "Report updated",
+        noun: "report",
       };
     // One noun for both subjects: a graph-watching automation is an
     // automation, and the delete dialog, the toast, and the drawer heading all

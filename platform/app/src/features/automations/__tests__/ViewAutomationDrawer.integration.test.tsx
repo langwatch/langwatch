@@ -194,7 +194,10 @@ describe("ViewAutomationDrawer", () => {
         renderDrawer();
 
         expect(screen.getByText("p95 latency alert")).toBeDefined();
-        expect(screen.getByText("Alert")).toBeDefined();
+        // One noun for both subjects, so the badge says what it watches
+        // rather than naming a kind that no longer exists (ADR-093 §1).
+        expect(screen.getByText("Watches a graph")).toBeDefined();
+        expect(screen.queryByText("Alert")).toBeNull();
       });
 
       it("lists recent fires with resolution durations", () => {
@@ -476,10 +479,10 @@ describe("ViewAutomationDrawer", () => {
     });
 
     describe("when the drawer renders", () => {
-      it("shows the automation kind badge and an empty history state", () => {
+      it("shows what it watches and an empty history state", () => {
         renderDrawer();
 
-        expect(screen.getByText("Automation")).toBeDefined();
+        expect(screen.getByText("Watches a trace filter")).toBeDefined();
         expect(
           screen.getByText(/This automation has not fired yet\./),
         ).toBeDefined();

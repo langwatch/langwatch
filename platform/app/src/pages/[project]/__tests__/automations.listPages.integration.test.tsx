@@ -4,7 +4,7 @@
  * specs/automations/list-pages.feature
  * specs/automations/source-merge.feature
  *
- * Covers the WS-6 defects that live on the Automations/Schedules list pages
+ * Covers the WS-6 defects that live on the Automations/Reports list pages
  * (no delete confirmation, delete copy naming the wrong kind, row actions with
  * no accessible name, the Overview tab having no way to create anything —
  * #6716, G5) and the merged list those defects now live on: one table for
@@ -226,8 +226,8 @@ describe("given the unified automations table", () => {
       ).toBeInTheDocument();
     });
 
-    /** @scenario "Schedules stay on their own tab" */
-    it("keeps schedules out of it and lists them on their own tab", async () => {
+    /** @scenario "Reports stay on their own tab" */
+    it("keeps reports out of it and lists them on their own tab", async () => {
       const automationsTab = await renderPage();
       expect(screen.queryByText("Weekly digest")).not.toBeInTheDocument();
       automationsTab.unmount();
@@ -338,7 +338,7 @@ describe("given the unified automations table", () => {
   });
 });
 
-describe("given the Schedules table", () => {
+describe("given the Reports table", () => {
   beforeEach(() => {
     mockPathnameRef.current = "/test-project/automations/schedules";
     mockDeleteMutate.mockReset();
@@ -349,23 +349,23 @@ describe("given the Schedules table", () => {
     cleanup();
   });
 
-  describe("when the user deletes a schedule row", () => {
-    /** @scenario Deleting a schedule names it as a schedule, not an automation */
-    it("names the row a schedule, not an automation", async () => {
+  describe("when the user deletes a report row", () => {
+    /** @scenario Deleting a report names it as a report, not an automation */
+    it("names the row a report, not an automation", async () => {
       mockDeleteMutate.mockImplementation((_input, opts) => opts.onSuccess());
       const user = userEvent.setup();
       await renderPage();
 
       await user.click(screen.getByLabelText("Actions for Weekly digest"));
       await user.click(
-        screen.getByRole("menuitem", { name: /Delete schedule Weekly digest/ }),
+        screen.getByRole("menuitem", { name: /Delete report Weekly digest/ }),
       );
       await user.click(screen.getByRole("button", { name: "Delete" }));
 
       expect(mockToastCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          title: "Delete schedule",
-          description: "Schedule deleted",
+          title: "Delete report",
+          description: "Report deleted",
         }),
       );
     });
@@ -416,8 +416,8 @@ describe("given the Overview tab", () => {
   });
 
   describe("when the user opens the create menu", () => {
-    /** @scenario "The Overview offers creating an automation or a schedule" */
-    it("offers an automation and a schedule, and no longer an alert", async () => {
+    /** @scenario "The Overview offers creating an automation or a report" */
+    it("offers an automation and a report, and no longer an alert", async () => {
       const user = userEvent.setup();
       await renderPage();
 
@@ -427,7 +427,7 @@ describe("given the Overview tab", () => {
         screen.getByRole("menuitem", { name: "New automation" }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole("menuitem", { name: "New schedule" }),
+        screen.getByRole("menuitem", { name: "New report" }),
       ).toBeInTheDocument();
       // What an automation watches is chosen in its own first step now, so
       // there is nothing left for a third menu item to pre-set (ADR-093 §1).

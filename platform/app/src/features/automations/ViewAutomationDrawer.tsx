@@ -229,27 +229,26 @@ export function ViewAutomationDrawer({
               <Skeleton height="24px" width="200px" />
             ) : (
               <Heading size="md">
-                {trigger?.name ??
-                  (isGraphAlert
-                    ? "Alert"
-                    : isSchedule
-                      ? "Schedule"
-                      : "Automation")}
+                {trigger?.name ?? (isSchedule ? "Report" : "Automation")}
               </Heading>
             )}
             <HStack gap={2}>
-              {isGraphAlert ? (
-                <Badge colorPalette="purple" gap={1}>
-                  <TrendingUp size={12} />
-                  Alert
-                </Badge>
-              ) : isSchedule ? (
+              {/* The badge says what the row IS, and after the merge there
+                  are two answers, not three (ADR-093 §1) — so for an
+                  automation it says what it watches, which is the only
+                  distinction left between the two subjects. */}
+              {isSchedule ? (
                 <Badge colorPalette="purple" gap={1}>
                   <Calendar size={12} />
-                  Schedule
+                  Report
+                </Badge>
+              ) : isGraphAlert ? (
+                <Badge colorPalette="purple" gap={1}>
+                  <TrendingUp size={12} />
+                  Watches a graph
                 </Badge>
               ) : trigger ? (
-                <Badge colorPalette="gray">Automation</Badge>
+                <Badge colorPalette="gray">Watches a trace filter</Badge>
               ) : null}
               {/* Paused is the first thing that explains a silent automation,
                   so it sits with the identity rather than only in the answer
