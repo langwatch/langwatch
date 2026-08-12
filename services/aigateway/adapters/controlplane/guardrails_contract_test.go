@@ -279,11 +279,22 @@ func controlPlaneVerdict(root string) (controlPlaneStatus, string) {
 			manifestPath, readErr)
 	}
 
-	if _, err := os.Stat(filepath.Join(root, workspaceManifest)); err == nil {
+	workspacePath := filepath.Join(root, workspaceManifest)
+	_, statErr := os.Stat(workspacePath)
+	switch {
+	case statErr == nil:
 		return controlPlaneFatal, fmt.Sprintf(
 			"this checkout carries the monorepo (%s is at the repo root) but %s holds no %s package manifest: "+
 				"the control plane moved and controlPlaneRoot did not move with it. Repoint controlPlaneRoot.",
 			workspaceManifest, cpRoot, controlPlanePackage)
+
+	case !errors.Is(statErr, fs.ErrNotExist):
+		// Exactly as strict as the manifest witness above. Anything other
+		// than "not there" leaves the no-TypeScript-side premise unproven.
+		return controlPlaneFatal, fmt.Sprintf(
+			"%s exists but could not be read, so this checkout cannot be shown to carry no TypeScript side: %v. "+
+				"An unreadable witness is not an absent one.",
+			workspacePath, statErr)
 	}
 
 	return controlPlaneSkip, fmt.Sprintf(
@@ -309,7 +320,7 @@ func requireControlPlane(t *testing.T) {
 }
 
 // dispatchControlPlaneVerdict turns a verdict into an action. The one thing it
-// must never do is let an unrecognised verdict fall through to a skip, so the
+// must never do is let an unrecognized verdict fall through to a skip, so the
 // default fails; it is unreachable while controlPlaneStatus has three values and
 // is here for the edit that adds a fourth.
 func dispatchControlPlaneVerdict(r controlPlaneReporter, root string) {
@@ -322,7 +333,7 @@ func dispatchControlPlaneVerdict(r controlPlaneReporter, root string) {
 	case controlPlaneFatal:
 		r.Fatal(reason)
 	default:
-		r.Fatal(fmt.Sprintf("unrecognised control plane verdict %q", status))
+		r.Fatal(fmt.Sprintf("unrecognized control plane verdict %q", status))
 	}
 }
 
@@ -413,6 +424,15 @@ func TestControlPlaneVerdictDecidesEachWitnessCombination(t *testing.T) {
 			wantReasonContains: "could not be read",
 		},
 		{
+			// The workspace witness has to be exactly as strict as the
+			// manifest witness above: a witness that will not stat is present,
+			// not absent, so the both-absent premise for skipping is false.
+			name:               "the workspace manifest is present but will not stat",
+			fixture:            controlPlaneFixture{workspaceUnreadable: true},
+			want:               controlPlaneFatal,
+			wantReasonContains: "An unreadable witness is not an absent one",
+		},
+		{
 			name:               "neither witness is present",
 			fixture:            controlPlaneFixture{},
 			want:               controlPlaneSkip,
@@ -446,13 +466,14 @@ func TestControlPlaneVerdictDecidesEachWitnessCombination(t *testing.T) {
 // controlPlaneFixture describes which witnesses a temp repo root carries. The
 // zero value is a checkout with no TypeScript side at all.
 type controlPlaneFixture struct {
-	workspace       bool   // pnpm-workspace.yaml at the repo root
-	controlPlaneDir bool   // platform/app exists, possibly empty
-	manifest        string // written to platform/app/package.json when set
-	manifestIsDir   bool   // platform/app/package.json exists but will not open
+	workspace           bool   // pnpm-workspace.yaml at the repo root
+	workspaceUnreadable bool   // pnpm-workspace.yaml exists but will not stat
+	controlPlaneDir     bool   // platform/app exists, possibly empty
+	manifest            string // written to platform/app/package.json when set
+	manifestIsDir       bool   // platform/app/package.json exists but will not open
 }
 
-// build materialises the fixture under t.TempDir() and returns the repo root.
+// build materializes the fixture under t.TempDir() and returns the repo root.
 func (f controlPlaneFixture) build(t *testing.T) string {
 	t.Helper()
 
@@ -460,10 +481,19 @@ func (f controlPlaneFixture) build(t *testing.T) string {
 	if f.workspace {
 		writeControlPlaneFile(t, filepath.Join(root, workspaceManifest), "packages:\n  - platform/app\n")
 	}
+	if f.workspaceUnreadable {
+		// A symlink pointing at itself stats as ELOOP rather than ENOENT,
+		// which is the cheapest deterministic unreadable witness -- and like
+		// the directory below, it holds when the suite runs as root.
+		loop := filepath.Join(root, workspaceManifest)
+		if err := os.Symlink(loop, loop); err != nil {
+			t.Fatalf("symlink loop %s: %v", loop, err)
+		}
+	}
 
 	cpRoot := controlPlaneRootFor(root)
 	if f.controlPlaneDir || f.manifest != "" || f.manifestIsDir {
-		if err := os.MkdirAll(cpRoot, 0o755); err != nil {
+		if err := os.MkdirAll(cpRoot, 0o750); err != nil {
 			t.Fatalf("mkdir %s: %v", cpRoot, err)
 		}
 	}
@@ -474,7 +504,7 @@ func (f controlPlaneFixture) build(t *testing.T) string {
 		// A directory opens but will not read, which is the cheapest
 		// deterministic stand-in for an unreadable manifest -- unlike a
 		// permission bit, it also holds when the suite runs as root.
-		if err := os.MkdirAll(manifestPath, 0o755); err != nil {
+		if err := os.MkdirAll(manifestPath, 0o750); err != nil {
 			t.Fatalf("mkdir %s: %v", manifestPath, err)
 		}
 	case f.manifest != "":
@@ -485,7 +515,7 @@ func (f controlPlaneFixture) build(t *testing.T) string {
 
 func writeControlPlaneFile(t *testing.T, path, contents string) {
 	t.Helper()
-	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
 		t.Fatalf("write %s: %v", path, err)
 	}
 }
