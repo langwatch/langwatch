@@ -19,7 +19,6 @@ import {
   MoreVertical,
   Plus,
   Trash,
-  TrendingUp,
   Zap,
 } from "react-feather";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
@@ -38,10 +37,10 @@ import { UseCaseStrip } from "~/features/automations/components/page/Automations
 import { AutomationsHistory } from "~/features/automations/components/page/AutomationsHistory";
 import {
   AlertRuleCell,
-  AlertSubjectCell,
   describeSchedule,
   EmptyHint,
   FiringStatus,
+  GraphWatchCell,
   LastFiredCell,
   MetricHeader,
   ReportRunCells,
@@ -71,17 +70,17 @@ import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
 
-/** The composer's Automation/Alert/Schedule facet (`draft.source`), derived
- *  from a saved row the same way the three table sections already split the
- *  list — so the row-actions menu, the delete dialog, and the toast copy all
- *  name the kind the row actually is instead of defaulting to "automation". */
+/** What a saved row watches (`draft.source`), derived the same way the
+ *  composer derives it — so the row-actions menu, the delete dialog, and the
+ *  toast all name the row the way the customer does. Both automation subjects
+ *  share one noun; only a schedule has its own (ADR-093 §1). */
 function triggerSource(trigger: EnhancedTrigger): ConditionSource {
   if (trigger.customGraphId) return "customGraph";
   if (trigger.triggerKind === "REPORT") return "report";
   return "trace";
 }
 
-type AutomationSection = "overview" | "automations" | "alerts" | "schedules";
+type AutomationSection = "overview" | "automations" | "schedules";
 
 const sectionDetails: Record<
   AutomationSection,
@@ -94,12 +93,8 @@ const sectionDetails: Record<
   },
   automations: {
     title: "Automations",
-    description: "Act on every incoming trace that matches your filters.",
-  },
-  alerts: {
-    title: "Alerts",
     description:
-      "Get told when a metric crosses a threshold and when it recovers.",
+      "Watch a trace filter or a graph, and act when something matches.",
   },
   schedules: {
     title: "Schedules",
@@ -110,7 +105,10 @@ const sectionDetails: Record<
 
 const sectionFromPath = (pathname: string): AutomationSection => {
   if (pathname.includes("/automations/automations")) return "automations";
-  if (pathname.includes("/automations/alerts")) return "alerts";
+  // Alerts and automations are one list now (ADR-093 §1). The old path keeps
+  // resolving to it, so a link issued before the merge still lands on the row
+  // it was pointing at rather than on a dead route.
+  if (pathname.includes("/automations/alerts")) return "automations";
   if (pathname.includes("/automations/schedules")) return "schedules";
   return "overview";
 };
@@ -126,7 +124,8 @@ function AutomationsPage() {
 
   // Row pending a delete confirmation (#6716: deletion was immediate and
   // irreversible). Holding the row itself, not just its id, lets the dialog
-  // and the toast name the right kind (automation / alert / schedule).
+  // and the toast name the row the way the customer does (automation /
+  // schedule).
   const [pendingDelete, setPendingDelete] = useState<EnhancedTrigger | null>(
     null,
   );
@@ -141,7 +140,7 @@ function AutomationsPage() {
   );
 
   // Fire-history rollup for the metric columns (last fired, 30-day count,
-  // open alert incidents). Triggers that never fired have no entry.
+  // open incidents). Triggers that never fired have no entry.
   const triggerStats = api.automation.getTriggerStats.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
@@ -177,22 +176,20 @@ function AutomationsPage() {
     { enabled: !!project?.id },
   );
 
-  // Alerts react to a custom graph's metric; automations react to traces.
-  // Distinct shapes, so they get distinct tables.
-  const alerts = useMemo(
-    () => (triggers.data ?? []).filter((t) => !!t.customGraphId),
-    [triggers.data],
-  );
+  // One table for everything that watches something (ADR-093 §1): a trace
+  // filter and a graph metric are two subjects of one kind, not two kinds.
+  // Schedules keep their own tab — the clock is not something to watch.
   const reports = useMemo(
     () => (triggers.data ?? []).filter((t) => t.triggerKind === "REPORT"),
     [triggers.data],
   );
-  const traceAutomations = useMemo(
-    () =>
-      (triggers.data ?? []).filter(
-        (t) => !t.customGraphId && t.triggerKind !== "REPORT",
-      ),
+  const automations = useMemo(
+    () => (triggers.data ?? []).filter((t) => t.triggerKind !== "REPORT"),
     [triggers.data],
+  );
+  const graphAutomationCount = useMemo(
+    () => automations.filter((t) => !!t.customGraphId).length,
+    [automations],
   );
   // Only needed to resolve dataset names on ADD_TO_DATASET rows. Gated on
   // the project being loaded (an empty projectId trips the permission
@@ -223,7 +220,7 @@ function AutomationsPage() {
   const graphsQuery = api.graphs.getAll.useQuery(
     { projectId: project?.id ?? "" },
     {
-      enabled: !!project?.id && (alerts.length > 0 || reportsUseGraph),
+      enabled: !!project?.id && (graphAutomationCount > 0 || reportsUseGraph),
       retry: false,
     },
   );
@@ -565,11 +562,6 @@ function AutomationsPage() {
           icon: <Zap size={14} />,
         },
         {
-          label: "Alerts",
-          href: `${basePath}/alerts`,
-          icon: <TrendingUp size={14} />,
-        },
-        {
           label: "Schedules",
           href: `${basePath}/schedules`,
           icon: <Calendar size={14} />,
@@ -591,127 +583,14 @@ function AutomationsPage() {
             </Text>
           ) : (
             <>
-              {section === "alerts" && (
-                <VStack align="stretch" gap={4}>
-                  <SectionHeader
-                    icon={<TrendingUp size={18} />}
-                    accent="orange"
-                    title="Alerts"
-                    count={alerts.length}
-                    summary="Get told when a metric crosses a threshold, and again when it recovers."
-                    details="An alert watches one series on an analytics graph. When the value crosses your threshold it notifies your channel; when it returns to normal it sends a recovery notice."
-                    addLabel="New alert"
-                    onAdd={() =>
-                      openDrawer("automation", {
-                        initialSource: "customGraph",
-                      })
-                    }
-                  />
-                  {alerts.length === 0 ? (
-                    <UseCaseStrip
-                      kind="alert"
-                      onOpen={(prefill) => openDrawer("automation", prefill)}
-                    />
-                  ) : (
-                    <TableShell>
-                      <Table.Root variant="line" width="full">
-                        <Table.Header>
-                          <Table.Row>
-                            <Table.ColumnHeader>Name</Table.ColumnHeader>
-                            <Table.ColumnHeader>Watches</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
-                              Fires when
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader>Notifies</Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
-                              <MetricHeader
-                                label="Last fired"
-                                help="When this alert last crossed its threshold and notified you."
-                              />
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader whiteSpace="nowrap">
-                              <MetricHeader
-                                label="Status"
-                                help="Firing while the metric is past its threshold, back to OK when it recovers."
-                              />
-                            </Table.ColumnHeader>
-                            <Table.ColumnHeader>Active</Table.ColumnHeader>
-                            <Table.ColumnHeader />
-                          </Table.Row>
-                        </Table.Header>
-                        <Table.Body>
-                          {alerts.map((trigger) => {
-                            const actionParams =
-                              trigger.actionParams as TriggerActionParams;
-                            const stats = statsByTriggerId.get(trigger.id);
-                            return (
-                              // Armed, the row can be handed to Langy; its own click (open the
-                              // automation) is untouched. The chip id matches the one the
-                              // `/automations/<id>` route derives, so the row and the open
-                              // automation are one chip.
-                              <LangyContextTarget
-                                key={trigger.id}
-                                target={automationContextChip({
-                                  automationId: trigger.id,
-                                  name: trigger.name,
-                                })}
-                              >
-                                <Table.Row {...sharedRowProps(trigger)}>
-                                  <Table.Cell fontWeight="medium">
-                                    {trigger.name}
-                                  </Table.Cell>
-                                  <Table.Cell maxWidth="260px">
-                                    <AlertSubjectCell
-                                      graphName={
-                                        trigger.customGraph?.name ?? null
-                                      }
-                                      graph={graphJsonById.get(
-                                        trigger.customGraphId ?? "",
-                                      )}
-                                      seriesName={actionParams.seriesName}
-                                    />
-                                  </Table.Cell>
-                                  <Table.Cell whiteSpace="nowrap">
-                                    <AlertRuleCell
-                                      actionParams={actionParams}
-                                    />
-                                  </Table.Cell>
-                                  <Table.Cell>
-                                    {actionItems(trigger.action, actionParams)}
-                                  </Table.Cell>
-                                  <Table.Cell whiteSpace="nowrap">
-                                    <LastFiredCell
-                                      trigger={trigger}
-                                      stats={stats}
-                                    />
-                                  </Table.Cell>
-                                  <Table.Cell whiteSpace="nowrap">
-                                    <FiringStatus
-                                      firing={!!stats?.currentlyFiring}
-                                    />
-                                  </Table.Cell>
-                                  {activeCell(trigger)}
-                                  <Table.Cell>
-                                    {rowActionsMenu(trigger)}
-                                  </Table.Cell>
-                                </Table.Row>
-                              </LangyContextTarget>
-                            );
-                          })}
-                        </Table.Body>
-                      </Table.Root>
-                    </TableShell>
-                  )}
-                </VStack>
-              )}
-
               {section === "overview" && (
                 <VStack align="stretch" gap={8} width="full">
                   {/* G5: the Overview had tiles, activity, and a use-case
                       strip, but no way to actually start creating something —
-                      every other tab opens the composer from its own
-                      section header. This offers the same three kinds from
-                      one place. */}
+                      every other tab opens the composer from its own section
+                      header. Two things can be created, because there are two
+                      kinds left (ADR-093 §1): what an automation watches is
+                      chosen inside its own first step, not here. */}
                   <HStack justify="flex-end">
                     <Menu.Root>
                       <Menu.Trigger asChild>
@@ -727,19 +606,6 @@ function AutomationsPage() {
                           <Box display="flex" alignItems="center" gap={2}>
                             <Zap size={14} aria-hidden="true" />
                             New automation
-                          </Box>
-                        </Menu.Item>
-                        <Menu.Item
-                          value="alert"
-                          onClick={() =>
-                            openDrawer("automation", {
-                              initialSource: "customGraph",
-                            })
-                          }
-                        >
-                          <Box display="flex" alignItems="center" gap={2}>
-                            <TrendingUp size={14} aria-hidden="true" />
-                            New alert
                           </Box>
                         </Menu.Item>
                         <Menu.Item
@@ -765,7 +631,7 @@ function AutomationsPage() {
                       value={overview.firingNow}
                       sub={
                         overview.firingNow > 0
-                          ? "alerts over their threshold"
+                          ? "automations over their threshold"
                           : "all clear"
                       }
                       alert={overview.firingNow > 0}
@@ -789,7 +655,7 @@ function AutomationsPage() {
                   <VStack align="stretch" gap={3} width="full">
                     <OverviewSectionHeading
                       title="Recent activity"
-                      summary="See what alerts, schedules, and automations have done recently."
+                      summary="See what your automations and schedules have done recently."
                     />
                     <AutomationsHistory
                       fires={activity.data ?? []}
@@ -808,13 +674,15 @@ function AutomationsPage() {
                       title="Popular uses"
                       summary="Start from a common workflow and tailor it to your project."
                     />
+                    {/* Grouped by what each one watches, which is the only
+                        distinction left between them (ADR-093 §1). */}
                     <VStack align="stretch" gap={2}>
                       <Text
                         textStyle="xs"
                         fontWeight="semibold"
                         color="fg.muted"
                       >
-                        Alerts
+                        Watching a graph
                       </Text>
                       <UseCaseStrip
                         kind="alert"
@@ -828,7 +696,7 @@ function AutomationsPage() {
                         fontWeight="semibold"
                         color="fg.muted"
                       >
-                        Automations
+                        Watching a trace filter
                       </Text>
                       <UseCaseStrip
                         kind="automation"
@@ -839,7 +707,6 @@ function AutomationsPage() {
                   </VStack>
                 </VStack>
               )}
-
               {section === "schedules" && (
                 <VStack align="stretch" gap={4}>
                   <SectionHeader
@@ -964,42 +831,54 @@ function AutomationsPage() {
                   )}
                 </VStack>
               )}
-
               {section === "automations" && (
                 <VStack align="stretch" gap={4}>
                   <SectionHeader
                     icon={<Zap size={18} />}
                     accent="blue"
                     title="Automations"
-                    count={traceAutomations.length}
-                    summary="Act on every incoming trace that matches your filters."
-                    details="An automation runs on each trace matching your filters: post to Slack or email, add rows to a dataset, or queue traces for annotation."
+                    count={automations.length}
+                    summary="Watch a trace filter or a graph, and act when something matches."
+                    details="An automation watches either the traces matching your conditions or one series on an analytics graph. When it fires it posts to Slack or email, adds rows to a dataset, or queues traces for annotation."
                     addLabel="New automation"
                     onAdd={() => openDrawer("automation", {})}
                   />
-                  {traceAutomations.length === 0 ? (
-                    <UseCaseStrip
-                      kind="automation"
-                      onOpen={(prefill) => openDrawer("automation", prefill)}
-                    />
+                  {automations.length === 0 ? (
+                    <VStack align="stretch" gap={4}>
+                      <UseCaseStrip
+                        kind="automation"
+                        onOpen={(prefill) => openDrawer("automation", prefill)}
+                      />
+                      <UseCaseStrip
+                        kind="alert"
+                        showLabel={false}
+                        onOpen={(prefill) => openDrawer("automation", prefill)}
+                      />
+                    </VStack>
                   ) : (
                     <TableShell>
                       <Table.Root variant="line" width="full">
                         <Table.Header>
                           <Table.Row>
                             <Table.ColumnHeader>Name</Table.ColumnHeader>
-                            <Table.ColumnHeader>Acts on</Table.ColumnHeader>
-                            <Table.ColumnHeader>Then</Table.ColumnHeader>
+                            <Table.ColumnHeader>Watches</Table.ColumnHeader>
+                            <Table.ColumnHeader>Delivery</Table.ColumnHeader>
                             <Table.ColumnHeader whiteSpace="nowrap">
                               <MetricHeader
                                 label="Last fired"
-                                help="When this automation last matched a trace and ran its action. Automations on a digest schedule also show when the next bundled send is due."
+                                help="When this automation last fired and ran its delivery. Automations on a digest schedule also show when the next bundled send is due."
                               />
                             </Table.ColumnHeader>
                             <Table.ColumnHeader whiteSpace="nowrap">
                               <MetricHeader
-                                label="Fires (30d)"
+                                label="Fires (30 days)"
                                 help="Times this automation fired in the last 30 days."
+                              />
+                            </Table.ColumnHeader>
+                            <Table.ColumnHeader whiteSpace="nowrap">
+                              <MetricHeader
+                                label="Status"
+                                help="A graph-watching automation is firing while its metric is past the threshold, and back to OK when it recovers."
                               />
                             </Table.ColumnHeader>
                             <Table.ColumnHeader>Active</Table.ColumnHeader>
@@ -1007,10 +886,11 @@ function AutomationsPage() {
                           </Table.Row>
                         </Table.Header>
                         <Table.Body>
-                          {traceAutomations.map((trigger) => {
+                          {automations.map((trigger) => {
                             const actionParams =
                               trigger.actionParams as TriggerActionParams;
                             const stats = statsByTriggerId.get(trigger.id);
+                            const watchesGraph = !!trigger.customGraphId;
                             return (
                               // Armed, the row can be handed to Langy; its own click (open the
                               // automation) is untouched. The chip id matches the one the
@@ -1028,33 +908,58 @@ function AutomationsPage() {
                                     {trigger.name}
                                   </Table.Cell>
                                   <Table.Cell maxWidth="360px">
-                                    <VStack gap={2} align="stretch">
-                                      {applyChecks(
-                                        trigger.checks?.filter(
-                                          (check): check is Monitor => !!check,
-                                        ) ?? [],
-                                      )}
-
-                                      {trigger.filterQuery ? (
-                                        // ADR-043: a trace-subject automation shows
-                                        // its search query.
-                                        <Code
-                                          size="sm"
-                                          variant="surface"
-                                          whiteSpace="pre-wrap"
-                                          wordBreak="break-word"
-                                        >
-                                          {trigger.filterQuery}
-                                        </Code>
-                                      ) : trigger.filters &&
-                                        typeof trigger.filters === "string" &&
-                                        trigger.filters !== "{}" ? (
-                                        <FilterDisplay
-                                          filters={trigger.filters}
-                                          hasBorder={true}
+                                    {watchesGraph ? (
+                                      <VStack gap={0} align="start">
+                                        <GraphWatchCell
+                                          graphName={
+                                            trigger.customGraph?.name ?? null
+                                          }
+                                          graph={graphJsonById.get(
+                                            trigger.customGraphId ?? "",
+                                          )}
+                                          seriesName={actionParams.seriesName}
                                         />
-                                      ) : null}
-                                    </VStack>
+                                        <AlertRuleCell
+                                          actionParams={actionParams}
+                                        />
+                                      </VStack>
+                                    ) : (
+                                      <VStack gap={2} align="stretch">
+                                        <Text
+                                          textStyle="sm"
+                                          fontWeight="medium"
+                                          lineClamp={1}
+                                        >
+                                          Trace filter
+                                        </Text>
+                                        {applyChecks(
+                                          trigger.checks?.filter(
+                                            (check): check is Monitor =>
+                                              !!check,
+                                          ) ?? [],
+                                        )}
+
+                                        {trigger.filterQuery ? (
+                                          // ADR-043: a trace-subject automation
+                                          // shows its search query.
+                                          <Code
+                                            size="sm"
+                                            variant="surface"
+                                            whiteSpace="pre-wrap"
+                                            wordBreak="break-word"
+                                          >
+                                            {trigger.filterQuery}
+                                          </Code>
+                                        ) : trigger.filters &&
+                                          typeof trigger.filters === "string" &&
+                                          trigger.filters !== "{}" ? (
+                                          <FilterDisplay
+                                            filters={trigger.filters}
+                                            hasBorder={true}
+                                          />
+                                        ) : null}
+                                      </VStack>
+                                    )}
                                   </Table.Cell>
                                   <Table.Cell>
                                     <VStack align="start" gap={0}>
@@ -1079,6 +984,21 @@ function AutomationsPage() {
                                     <Text as="span" color="fg.muted">
                                       {stats?.recentFireCount ?? 0}
                                     </Text>
+                                  </Table.Cell>
+                                  <Table.Cell whiteSpace="nowrap">
+                                    {/* Only a threshold rule has something to
+                                        be firing or recovered from; a trace
+                                        filter acts per match and has no such
+                                        state to report. */}
+                                    {watchesGraph ? (
+                                      <FiringStatus
+                                        firing={!!stats?.currentlyFiring}
+                                      />
+                                    ) : (
+                                      <Text textStyle="sm" color="fg.muted">
+                                        —
+                                      </Text>
+                                    )}
                                   </Table.Cell>
                                   {activeCell(trigger)}
                                   <Table.Cell>

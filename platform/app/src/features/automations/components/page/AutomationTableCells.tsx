@@ -315,7 +315,12 @@ export function EmptyHint({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function AlertSubjectCell({
+/**
+ * The "Watches" cell for a graph-watching automation. Names the graph the way
+ * the wizard's rail and review overview do — "Graph · <name>" — so the list and
+ * the composer say one thing about the same row (ADR-093 §1).
+ */
+export function GraphWatchCell({
   graphName,
   graph,
   seriesName,
@@ -331,7 +336,7 @@ export function AlertSubjectCell({
     <VStack align="start" gap={0}>
       {graphName ? (
         <Text textStyle="sm" fontWeight="medium" lineClamp={1}>
-          {graphName}
+          {`Graph · ${graphName}`}
         </Text>
       ) : (
         <Text textStyle="sm" color="fg.muted">
@@ -347,9 +352,9 @@ export function AlertSubjectCell({
   );
 }
 
-/** Alert "Fires when" cell — the threshold rule (the cadence facet). Mirrors
- *  the dashboard "Configure Alert" copy (`greater than`, `over 5 minutes`) so
- *  both creation paths read the same. */
+/** The firing rule under a graph-watching row's "Watches" cell. Mirrors the
+ *  dashboard "Configure Alert" copy (`greater than`, `over 5 minutes`) so both
+ *  creation paths read the same. */
 export function AlertRuleCell({
   actionParams,
 }: {

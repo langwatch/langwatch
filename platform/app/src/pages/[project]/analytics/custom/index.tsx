@@ -401,7 +401,7 @@ function AnalyticsCustomGraphContent({
                     {customId ? (
                       form.watch("alert.enabled") ? (
                         <Tooltip
-                          content="Alert configured"
+                          content="Edit automation"
                           positioning={{ placement: "top" }}
                         >
                           <Box
@@ -437,7 +437,7 @@ function AnalyticsCustomGraphContent({
                           }
                         >
                           <Bell width={16} />
-                          Add alert
+                          Add automation
                         </Button>
                       )
                     ) : null}

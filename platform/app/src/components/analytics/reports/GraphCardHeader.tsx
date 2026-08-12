@@ -139,13 +139,13 @@ export function GraphCardHeader({
            */}
           {trigger?.active ? (
             <Tooltip
-              content="Edit alert"
+              content="Edit automation"
               positioning={{ placement: "top" }}
               showArrow
             >
               <Box
                 role="button"
-                aria-label="Edit alert"
+                aria-label="Edit automation"
                 tabIndex={0}
                 padding={1}
                 cursor="pointer"
@@ -179,7 +179,7 @@ export function GraphCardHeader({
               }}
             >
               <Bell width={16} />
-              Add alert
+              Add automation
             </Button>
           )}
         </>
