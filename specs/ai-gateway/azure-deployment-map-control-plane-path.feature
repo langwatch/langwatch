@@ -136,11 +136,16 @@ Feature: Azure deployment resolution on the control-plane / virtual-key dispatch
 
   # --- E. Non-recurrence: a fourth dispatch path cannot ship without the call ---
 
+  # Structural on purpose. The behavioural cover for this defect is the lane
+  # outline in section D, and an enumerated lane list cannot fail for the lane
+  # nobody has added yet -- which is the shape all three recurrences took. The
+  # guarantee is about code that does not exist, so no runtime phrasing can
+  # hold it; the call-site count is the only instrument that reaches it.
   @unit
   Scenario: Credential construction passes through exactly one deployment chokepoint
-    Given the aigateway service after the fix
-    When its non-test deployment self-map call sites are enumerated
-    Then there is exactly one
+    Given the non-test dispatch code of the aigateway service
+    When its deployment self-map call sites are enumerated
+    Then there is exactly one, so a dispatch path added later inherits the resolution instead of restating it
 
   # Not enforced: untrue as written on this tree. deploymentMapModelIDs in
   # adapters/providers/models_discovery.go reads a credential's deployment map
@@ -164,7 +169,13 @@ Feature: Azure deployment resolution on the control-plane / virtual-key dispatch
 
   # --- F. Documentation correctness ---
 
-  @unit
+  # Not enforced: a test can only string-match the prose, and that match is
+  # wrong in both directions -- it fails on a reworded comment that is still
+  # true, and passes on any false comment that happens to carry the token. The
+  # invariant the comment describes is held structurally by the chokepoint
+  # count in section E; the wording is a review-time check. Left unasserted
+  # rather than weakened to whatever passes.
+  @unit @unimplemented
   Scenario: The self-map helper's documented invariant is true after the fix
     Given the deployment self-map helper's doc comment
     When it is read
@@ -306,9 +317,9 @@ Feature: Azure deployment resolution on the control-plane / virtual-key dispatch
 #
 # Count: 26 AC items (AC1-AC25 plus AC18b) -> 26 scenarios. No AC unmapped.
 #
-# Enforcement: 19 scenarios are bound to Go tests. 7 carry @unimplemented, each
+# Enforcement: 18 scenarios are bound to Go tests. 8 carry @unimplemented, each
 # with its reason stated inline above the scenario -- AC3 (asserts the pre-fix
 # tree), AC13 (untrue on this tree: a discovery-path consumer bypasses the
-# chokepoint), AC14 (a negative compile), AC21 (codegen and TypeScript
-# surfaces), AC22 (compares two trees), AC24 (the test gate itself), AC25
-# (revert and deploy coupling).
+# chokepoint), AC14 (a negative compile), AC15 (a string match on prose is not
+# a proof of the prose), AC21 (codegen and TypeScript surfaces), AC22 (compares
+# two trees), AC24 (the test gate itself), AC25 (revert and deploy coupling).
