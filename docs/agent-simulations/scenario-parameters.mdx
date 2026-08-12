@@ -1,0 +1,245 @@
+---
+title: Scenario Run Parameters
+sidebarTitle: Run parameters
+keywords: langwatch, agent simulations, scenario parameters, run parameters, params, suite run, tenant, fixture
+description: Declare the values a scenario depends on, give them defaults, and change them when a run starts, from the platform, the API, the command line or an SDK.
+---
+
+# Scenario Run Parameters
+
+A run parameter is a constant the whole run shares. It is the same field the [experiments run API](/evaluations/experiments/ci-cd#choosing-what-to-evaluate) takes to merge constants into every dataset row, and the same field a workflow run takes as its entry inputs. A scenario declares the names it depends on, whoever starts the run supplies the values, and one scenario then covers the gold account and the platinum one, the European tenant and the American one, without being rewritten.
+
+## Declare the parameters on the scenario
+
+Open the scenario and add one row per parameter under **Parameters**. Each row is a name, an optional description, and an optional default value.
+
+<img src="/images/simulations/scenario-parameters-form.png" alt="The scenario editor with a Parameters section declaring a fixture parameter with a description and a default value, referenced as params.fixture in the situation and criteria" width="100%" />
+
+- **Name** is what every template reads. It starts with a letter or an underscore and continues with letters, digits and underscores, up to 64 characters. A name outside that grammar is rejected when you save.
+- **Description** is shown beside the field when someone starts a run, so write it for whoever is about to type a value. Up to 500 characters.
+- **Default value** is what a run uses when it supplies nothing for that name. Values are typed: `42` is the number, `true` is the boolean, and everything else is text. To keep text that would otherwise read as a number or a boolean, quote it, so `"007"` stays the string `007`.
+
+A scenario declares at most 20 parameters, and a duplicate name is rejected.
+
+Declarations travel over the scenarios API too: `POST /api/scenarios` and `PATCH /api/scenarios/{id}` carry the same rows as a `parameters` array of `{ name, description, defaultValue }`, and reading a scenario back returns them.
+
+<Warning>
+  A resolved value is recorded on the run and readable by anyone who can open it. Parameters are for fixture ids, tenants, plans and regions, never for credentials. An API key belongs in a project secret, which the target reads as `{{ secrets.NAME }}` and which is never shown back. See [Testing agents behind authentication](/agent-simulations/authenticated-agents).
+</Warning>
+
+## Supply the values when a run starts
+
+A supplied value wins over the scenario's default. A name nobody supplies falls back to the default declared on the scenario.
+
+### From the run confirmation dialog
+
+Running a suite from the platform opens the confirmation dialog with one field per parameter, already filled in with the declared defaults. Every parameter that any scenario in the run declares gets a field. Changing a value there changes what that run uses and leaves the scenario untouched. Fields are typed the same way defaults are, so `42` is the number and `"007"` is the string.
+
+<img src="/images/simulations/scenario-parameters-run-dialog.png" alt="The suite run confirmation dialog with a Parameters block, the fixture field prefilled from the scenario's default value" width="100%" />
+
+The suite editor's **Save and Run** button starts the run without opening the dialog, so it always runs with the declared defaults. Use it when the defaults are what you want, and start the run from the suite itself when you need to change a value first.
+
+### From the API
+
+`POST /api/suites/{id}/run` takes a `parameters` object of names to values, where a value is a string, a number or a boolean:
+
+```bash
+curl -X POST "https://app.langwatch.ai/api/suites/suite_abc123/run" \
+  -H "X-Auth-Token: ${LANGWATCH_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "parameters": {
+      "account_tier": "platinum",
+      "region": "eu-central",
+      "seed_fixtures": true
+    }
+  }'
+```
+
+The response carries the batch id the scheduled runs share:
+
+```json
+{
+  "scheduled": true,
+  "batchRunId": "batch_xyz789",
+  "setId": "set_abc123",
+  "jobCount": 6,
+  "skippedArchived": { "scenarios": [], "targets": [] },
+  "items": []
+}
+```
+
+See the [suite run endpoint reference](/api-reference/suites/action-run) for the full request and response.
+
+### From the command line
+
+Every run command takes a repeatable `--param key=value`:
+
+```bash
+langwatch suite run <suite-id> --param account_tier=platinum --param region=eu-central
+langwatch scenario run <scenario-id> --target http:<agent-id> --param account_tier=platinum
+```
+
+A value is read as the type it looks like. Exactly `true` or `false` is a boolean, a number that renders back to exactly what you typed is a number, and everything else stays text. That last rule is what keeps `007`, `1.50` and a twenty digit account number as text instead of turning them into numbers that no longer match the account they name. Repeating a name keeps the last value, so a wrapper script can append an override to a command line it did not write.
+
+### From the SDKs
+
+<Tabs>
+  <Tab title="Python">
+```python
+import langwatch
+
+langwatch.setup()
+
+result = langwatch.suites.run(
+    "suite_abc123",
+    parameters={"account_tier": "platinum", "region": "eu-central"},
+)
+print(result["batchRunId"])
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+const result = await langwatch.suites.run("suite_abc123", {
+  parameters: { account_tier: "platinum", region: "eu-central" },
+});
+console.log(result.batchRunId);
+```
+  </Tab>
+</Tabs>
+
+## Read the values in the scenario's own text
+
+The situation and every criterion read a resolved value as `{{ params.NAME }}`. Both are rendered before the run starts, so the simulated user is briefed with the value and the judge scores against the same one.
+
+```text title="Situation"
+A customer on the {{ params.account_tier }} plan asks to move their subscription
+to the {{ params.region }} region.
+```
+
+```text title="Criterion"
+Agent quotes the {{ params.account_tier }} plan's transfer fee
+```
+
+A scenario that declares no parameters and receives no values is never read as a template. Its text is handed on byte identical, so prose that happens to contain `{{` or `{%` reaches the simulated user and the judge exactly as it was written. Declaring a parameter is what opts the scenario into templating.
+
+## Deliver the values to the target under test
+
+Each target type reads the same resolved values in its own idiom:
+
+| Target | How it reads a value |
+|---|---|
+| **HTTP agent** | `{{ params.NAME }}` in the url and in the body template |
+| **Prompt** | `{{ params.NAME }}` in the prompt template |
+| **Code agent** | `params.NAME` in the Python, keeping its type |
+| **Workflow** | One entry input per name, exactly like a workflow run |
+
+### HTTP agents
+
+The url and the body template both render against the run's parameters, so a value can pick the endpoint, a query string, or a field in the request body:
+
+```text title="URL"
+https://api.your-company.internal/{{ params.region }}/chat
+```
+
+```json title="Body template"
+{
+  "thread_id": "{{ threadId }}",
+  "messages": {{ messages }},
+  "account_tier": "{{ params.account_tier }}"
+}
+```
+
+<img src="/images/simulations/scenario-parameters-body-template.png" alt="The HTTP agent body template editor referencing params.fixture, with the available variables hint listing params.NAME" width="100%" />
+
+Header values and the auth fields read project secrets rather than parameters. See [Testing agents behind authentication](/agent-simulations/authenticated-agents#referencing-project-secrets-from-an-http-target).
+
+### Prompt targets
+
+A prompt target renders `{{ params.NAME }}` in its template before the model is called, so the same prompt can be exercised against several plans or regions.
+
+### Code agents
+
+A code agent reads parameters from the injected `params` namespace, the same way it reads `secrets`. Values keep their type, so a boolean is a `bool` and a number is a number, and you do not have to parse them back out of strings:
+
+```python
+import requests
+
+
+class Code:
+    def __call__(self, message: str):
+        response = requests.post(
+            f"https://api.your-company.internal/{params.region}/chat",
+            json={
+                "message": message,
+                "account_tier": params.account_tier,
+                "seed_fixtures": params.seed_fixtures,  # a real bool
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+        return {"output": response.json()["reply"]}
+```
+
+`params` is injected into the module globals, so do not import or assign a name of your own over it. A run that resolved no parameters leaves it undefined, exactly like `secrets`, so `params.region` in that run raises `NameError` rather than reading an empty value.
+
+### Workflow targets
+
+A workflow target receives the run's parameters as entry inputs, which is exactly what the workflow run and experiment run APIs already do with their own `parameters` field. A workflow that is parameterized for those runs works unchanged as a scenario target.
+
+<Note>
+  A parameter reaches a downstream node only if the entry node has an edge carrying it. Adding a parameter to the run does not add the edge, so open the workflow and connect the new entry field to the node that reads it.
+</Note>
+
+Inside the workflow, a code node reads `params.NAME` with the original type, while entry inputs arrive as strings.
+
+## Limits
+
+| Limit | Value |
+|---|---|
+| Parameters declared on one scenario | 20 |
+| Names one run supplies values for | 50 |
+| All of a run's values together | 16 kilobytes |
+| One string value | 4096 characters |
+| Parameter name | 64 characters |
+| Parameter description | 500 characters |
+
+## When a run is rejected
+
+| Error | What happened | What to do |
+|---|---|---|
+| `scenario_parameter_unknown` | The run supplied a name no scenario in it declares, usually a typo. The message names the rejected key and the names the run does accept. | Fix the spelling, or declare the parameter on the scenario that should read it. |
+| `scenario_parameter_missing` | The situation or a criterion reads a name that resolved to nothing, because the run supplied no value and the scenario declares no default. The message names the parameter and the field that reads it. | Supply a value for this run, or give the parameter a default on the scenario. |
+| `scenario_parameter_template_invalid` | A field references a parameter in a way that cannot be rendered. | Check the reference is written as `{{ params.name }}`. |
+
+Every check runs before any job is scheduled, so a rejected run costs nothing.
+
+## Where the resolved values are recorded
+
+The values a run resolved are stored on the run itself, so a result can always be read back with the inputs that produced it.
+
+- The run detail drawer shows them under **Parameters**, one row per name.
+- The CSV export carries them as one JSON object per run, in the `parameters` column of a criteria export and the `run_parameters` column of a full export. One column rather than one per name, so the header stays the same whichever scenarios the export covers.
+
+<img src="/images/simulations/scenario-parameters-run-drawer.png" alt="The simulation run detail drawer with the Parameters section showing the resolved value the run used, next to the rendered criteria and the judge's verdict" width="100%" />
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Authenticated agents" icon="key" href="/agent-simulations/authenticated-agents">
+    Reference project secrets from an HTTP target or a code agent
+  </Card>
+  <Card title="Running experiments in CI/CD" icon="rotate" href="/evaluations/experiments/ci-cd">
+    The same parameters field on experiment runs
+  </Card>
+  <Card title="Command line interface" icon="terminal" href="/integration/cli">
+    Every run command and its flags
+  </Card>
+  <Card title="Suite run endpoint" icon="code" href="/api-reference/suites/action-run">
+    The full request and response for a suite run
+  </Card>
+</CardGroup>

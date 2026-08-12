@@ -16,7 +16,12 @@ import type {
 import { slugify } from "~/utils/slugify";
 import { AgentRepository } from "../agents/agent.repository";
 import { LlmConfigRepository } from "../prompt-config/repositories/llm-config.repository";
-import { ScenarioRepository } from "../scenarios/scenario.repository";
+import type { RunParameterValues } from "../scenarios/parameters";
+import { resolveRunParameters } from "../scenarios/resolve-run-parameters";
+import {
+  ScenarioRepository,
+  type ScenarioRunConfig,
+} from "../scenarios/scenario.repository";
 import {
   AllScenariosArchivedError,
   AllTargetsArchivedError,
@@ -270,6 +275,12 @@ export class SuiteService {
    * @throws {InvalidTargetReferencesError} if any target references are missing (deleted)
    * @throws {AllScenariosArchivedError} if all scenarios are archived
    * @throws {AllTargetsArchivedError} if all targets are archived
+   * @throws {ScenarioParameterUnknownError} if a supplied parameter name is
+   *   declared by no scenario in the run
+   * @throws {ScenarioParameterMissingError} if a scenario's text reads a
+   *   parameter the run resolved no value for
+   * @throws {ScenarioParameterTemplateInvalidError} if a scenario that
+   *   declares parameters has text that cannot be rendered
    */
   async run(params: {
     suite: SimulationSuite;
@@ -277,6 +288,8 @@ export class SuiteService {
     organizationId: string;
     idempotencyKey: string;
     batchRunId?: string;
+    /** Values supplied for the run, overriding each scenario's own defaults. */
+    parameters?: RunParameterValues;
   }): Promise<SuiteRunResult> {
     return tracer.withActiveSpan(
       "SuiteService.run",
@@ -301,6 +314,13 @@ export class SuiteService {
           targets,
         });
 
+        // Every parameter check runs before the first job is scheduled, so a
+        // rejected run leaves nothing half-started behind it.
+        const parametersByScenarioId = await resolveRunParameters({
+          scenarios: resolved.scenarioConfigs,
+          values: params.parameters,
+        });
+
         const result = await this.suiteRunService.startRun({
           suiteId: suite.id,
           projectId,
@@ -311,6 +331,7 @@ export class SuiteService {
           skippedArchived: resolved.skippedArchived,
           idempotencyKey: params.idempotencyKey,
           batchRunId: params.batchRunId,
+          parametersByScenarioId,
         });
 
         span.setAttribute("suite.batch_run_id", result.batchRunId);
@@ -416,6 +437,7 @@ export class SuiteService {
   }): Promise<{
     activeScenarioIds: string[];
     scenarioNameMap: Map<string, string>;
+    scenarioConfigs: ScenarioRunConfig[];
     activeTargets: SuiteTarget[];
     skippedArchived: SuiteRunResult["skippedArchived"];
   }> {
@@ -452,21 +474,24 @@ export class SuiteService {
       throw new AllTargetsArchivedError();
     }
 
-    // Fetch scenario names for display in queued job rows
-    const scenarioNameRows =
+    // One read for everything the scheduler needs off each scenario: the name
+    // shown on the queued job row, and the parameters and text the run has to
+    // resolve before it schedules anything.
+    const scenarioConfigs =
       scenarioResolution.active.length > 0
-        ? await this.scenarioRepository.findNamesByIds({
+        ? await this.scenarioRepository.findRunConfigByIds({
             ids: scenarioResolution.active,
             projectId,
           })
         : [];
     const scenarioNameMap = new Map(
-      scenarioNameRows.map((r) => [r.id, r.name]),
+      scenarioConfigs.map((scenario) => [scenario.id, scenario.name]),
     );
 
     return {
       activeScenarioIds: scenarioResolution.active,
       scenarioNameMap,
+      scenarioConfigs,
       activeTargets: targetResolution.active,
       skippedArchived: {
         scenarios: scenarioResolution.archived,

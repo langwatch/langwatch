@@ -28,6 +28,7 @@ import { useRunScenario } from "../../hooks/useRunScenario";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
 import type { CustomComponentConfig } from "../../optimization_studio/types/dsl";
 import type { TypedAgent } from "../../server/agents/agent.repository";
+import { parseScenarioParameterDefinitions } from "../../server/scenarios/parameters";
 import { api } from "../../utils/api";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
@@ -472,10 +473,18 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   // Use initial data from complexProps (new scenario from modal) or from DB (editing)
   const initialFormData =
     props.initialFormData ?? complexPropsData.initialFormData;
-  const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(
-    () => scenario ?? initialFormData ?? undefined,
-    [scenario, initialFormData],
-  );
+  const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(() => {
+    // A stored scenario carries its parameters as JSON, including the null a
+    // scenario that never declared any has, so they are read through the
+    // tolerant parser before the form sees them.
+    if (scenario) {
+      return {
+        ...scenario,
+        parameters: parseScenarioParameterDefinitions(scenario.parameters),
+      };
+    }
+    return initialFormData ?? undefined;
+  }, [scenario, initialFormData]);
 
   return (
     <Drawer.Root

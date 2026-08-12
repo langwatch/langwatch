@@ -9,17 +9,21 @@ import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { fetchBatchRuns, tallyBatchRuns } from "../../utils/batchRunProgress";
+import { parseRunParameterFlags } from "../../utils/keyValueFlags";
+
 export const runSuiteCommand = async (
   id: string,
-  options: { wait?: boolean; format?: string },
+  options: { wait?: boolean; format?: string; param?: string[] },
 ): Promise<void> => {
   await resolveCredentials();
+
+  const parameters = parseRunParameterFlags({ pairs: options.param });
 
   const service = new SuitesApiService();
   const spinner = createSpinner(`Scheduling suite run "${id}"...`).start();
 
   try {
-    const result = await service.run(id);
+    const result = await service.run(id, { parameters });
 
     spinner.succeed(
       `Suite run scheduled: ${result.jobCount} job${result.jobCount !== 1 ? "s" : ""} (batch: ${result.batchRunId})`,

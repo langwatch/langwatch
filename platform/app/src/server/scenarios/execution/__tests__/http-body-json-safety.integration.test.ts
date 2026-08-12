@@ -107,6 +107,7 @@ describe("HTTP agent body JSON safety (n8n regression)", () => {
       url: srv.url,
       method: "POST",
       headers: [],
+      secrets: {},
       outputPath: "$.choices[0].message.content",
       ...overrides,
     };

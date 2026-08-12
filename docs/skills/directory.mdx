@@ -803,9 +803,9 @@ NEVER invent your own agent testing framework. Use `@langwatch/scenario` (Python
 If the user's request is **general** ("add scenarios", "test my agent"):
 
 - Read the codebase to understand the agent's architecture
-- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
+- Study git history to understand what changed and why. Focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Generate comprehensive coverage (happy path, edge cases, error handling)
-- For conversational agents, include multi-turn scenarios — that's where the interesting edge cases live (context retention, topic switching, recovery from misunderstandings)
+- For conversational agents, include multi-turn scenarios, since that's where the interesting edge cases live (context retention, topic switching, recovery from misunderstandings)
 - ALWAYS run the tests after writing them. If they fail, debug and fix the test or the agent code.
 - After tests are green, transition to consultant mode (see Consultant Mode below) and suggest 2-3 domain-specific improvements.
 
@@ -831,7 +831,7 @@ Scenarios sit at the **top of the testing pyramid** and test the agent as a comp
 
 Best practices:
 
-- NEVER check for regex or word matches in agent responses — use JudgeAgent criteria instead
+- NEVER check for regex or word matches in agent responses. Use JudgeAgent criteria instead
 - Use script functions for deterministic checks (tool calls, file existence) and judge criteria for semantic evaluation
 - Cover more ground with fewer well-designed scenarios rather than many shallow ones
 
@@ -981,46 +981,46 @@ describe("My Agent", () => {
 
 ### Step 4.5: Instrument for observability (REQUIRED before running)
 
-ALWAYS instrument before running — an uninstrumented scenario run emits no traces, so you lose the OTel/LangWatch observability that makes failures debuggable. This is not optional.
+ALWAYS instrument before running: an uninstrumented scenario run emits no traces, so you lose the OTel/LangWatch observability that makes failures debuggable. This is not optional.
 
 There are two distinct things to wire:
 
-**1. Scenario-run tracing** — call `setupScenarioTracing()` once at the top of the test file so the simulator, judge, and adapter spans are captured:
+**1. Scenario-run tracing**: call `setupScenarioTracing()` once at the top of the test file so the simulator, judge, and adapter spans are captured:
 
 ```typescript
-// TypeScript — the import and call go at the very top of the test file,
+// TypeScript: the import and call go at the very top of the test file,
 // before any other imports or setup that might create spans of their own
 import { setupScenarioTracing } from "@langwatch/scenario";
 setupScenarioTracing();
 ```
 
-For Python, scenario tracing is configured via `scenario.configure(...)` combined with `langwatch.setup()` — defer the exact call signature to the `tracing` skill.
+For Python, scenario tracing is configured via `scenario.configure(...)` combined with `langwatch.setup()`. Defer the exact call signature to the `tracing` skill.
 
-**2. Agent-under-test tracing** — instrument YOUR OWN agent code so its internal LLM calls, tool invocations, and chain spans are captured:
+**2. Agent-under-test tracing**: instrument YOUR OWN agent code so its internal LLM calls, tool invocations, and chain spans are captured:
 
 - Python: `import langwatch; langwatch.setup()` at startup, then decorate the agent entry point with `@langwatch.trace()`.
 - TypeScript: call `setupObservability` from the `langwatch` package in your agent's initialization.
 
 **Per-adapter nuance for voice:** when the adapter IS the agent (OpenAI Realtime, Gemini Live), the scenario tracing covers the session. When connecting to a deployed agent (Pipecat/Twilio/ElevenLabs hosted) or wrapping a text agent (Composable), the user's agent process must be instrumented separately in its own codebase.
 
-For framework-specific instrumentation (OpenAI/LangGraph/Vercel/Mastra/Agno), use the `tracing` skill — do not hand-roll. The `tracing` skill prompt is: "Instrument my code with LangWatch".
+For framework-specific instrumentation (OpenAI/LangGraph/Vercel/Mastra/Agno), use the `tracing` skill, do not hand-roll. The `tracing` skill prompt is: "Instrument my code with LangWatch".
 
 **Prerequisite:** Traces only reach LangWatch if `LANGWATCH_API_KEY` is set in the environment (plus `LANGWATCH_ENDPOINT` for self-hosted). If setup runs but no traces appear in the LangWatch UI, the key is missing.
 
-**VERIFY after the run:** confirm traces were emitted — the scenario run prints a LangWatch trace URL, or the LangWatch UI shows ≥1 trace for the run. A green test with zero traces means instrumentation was skipped.
+**VERIFY after the run:** confirm traces were emitted: the scenario run prints a LangWatch trace URL, or the LangWatch UI shows ≥1 trace for the run. A green test with zero traces means instrumentation was skipped.
 
 ### Step 5: Run the Tests
 
 For Python: `pytest -s test_my_agent.py` (or `uv run pytest ...`).
 For TypeScript: `npx vitest run my-agent.test.ts` (or `pnpm vitest run ...`).
 
-ALWAYS run the tests. If they fail, debug and fix them — an unrun scenario test is useless.
+ALWAYS run the tests. If they fail, debug and fix them. An unrun scenario test is useless.
 
 ---
 
 ## Red Teaming (Code Approach)
 
-Red teaming uses `RedTeamAgent` instead of `UserSimulatorAgent` for adversarial attacks. NEVER invent your own red teaming framework — `@langwatch/scenario` already provides crescendo escalation, per-turn scoring, refusal detection, backtracking, and early exit.
+Red teaming uses `RedTeamAgent` instead of `UserSimulatorAgent` for adversarial attacks. NEVER invent your own red teaming framework. `@langwatch/scenario` already provides crescendo escalation, per-turn scoring, refusal detection, backtracking, and early exit.
 
 Read the docs first:
 
@@ -1028,7 +1028,7 @@ Read the docs first:
 langwatch scenario-docs advanced/red-teaming
 ```
 
-CRITICAL: Do NOT guess the `RedTeamAgent` API — it has specific configuration for attack strategies, scoring, and escalation phases.
+CRITICAL: Do NOT guess the `RedTeamAgent` API. It has specific configuration for attack strategies, scoring, and escalation phases.
 
 **Python:**
 
@@ -1118,7 +1118,7 @@ If the user asks for **voice testing** (e.g. "add voice testing to my agent", "t
 
 CRITICAL: Do NOT write a text-only scenario when the user asked for voice. The judge cannot evaluate "audible empathy" or "noise robustness" against a text transcript.
 
-Voice agents especially need observability — latency, interruptions, and STT/TTS spans are exactly what makes voice failures diagnosable. Instrument per Step 4.5 above (both `setupScenarioTracing()` and the agent-under-test) before running. See `langwatch scenario-docs voice/recipes/observability` for voice-specific OTel guidance.
+Voice agents especially need observability: latency, interruptions, and STT/TTS spans are exactly what makes voice failures diagnosable. Instrument per Step 4.5 above (both `setupScenarioTracing()` and the agent-under-test) before running. See `langwatch scenario-docs voice/recipes/observability` for voice-specific OTel guidance.
 
 ### Step 1: Read the voice docs
 
@@ -1138,7 +1138,7 @@ Also browse the runnable voice examples:
 
 There are dozens of patterns there (angry customer with cafe noise, password-reset trap, multi-intent rush, accent + disfluency, background cross-talk, security pressure). Match the user's domain to the closest existing example before writing one from scratch.
 
-### Step 2: Pick the right voice adapter — and understand how it connects to the user's agent
+### Step 2: Pick the right voice adapter, and understand how it connects to the user's agent
 
 Detect the user's transport from their codebase and pick the matching adapter. **Critically**, every adapter has a different idea of "what is the agent under test":
 
@@ -1151,7 +1151,7 @@ Detect the user's transport from their codebase and pick the matching adapter. *
 | OpenAI Realtime model is the agent                                                                    | `scenario.OpenAIRealtimeAgentAdapter(model=..., instructions=..., voice=..., tools=...)` | Same shape as Gemini Live. The **adapter IS the agent**. Copy prod `model`, `instructions`, `voice`, and `tools` into the constructor. Without those, you're testing OpenAI defaults, not the user's agent.                                                                                                                   |
 | Text-only stack (chat completions, LangGraph, Mastra, plain SDK) with no deployed voice transport yet | `scenario.ComposableVoiceAgent(stt=..., llm=<wrap their agent>, tts=...)`                | Wraps the user's existing text agent in STT → agent → TTS. **Be explicit in your reply** that this tests a *voice wrapper* around their text logic, not a production voice transport. If they want to test a real deployed voice transport, they need to ship one first (Pipecat, Twilio, ElevenLabs hosted, OpenAI Realtime). |
 
-If you can't tell from the codebase which path the user is on, ASK before generating a test. Picking the wrong adapter means the test exercises something the user hasn't deployed — and they will (rightly) call it useless.
+If you can't tell from the codebase which path the user is on, ASK before generating a test. Picking the wrong adapter means the test exercises something the user hasn't deployed, and they will (rightly) call it useless.
 
 ### Step 3: Seed a VOICE on the user simulator
 
@@ -1159,7 +1159,7 @@ Without a `voice=` on the simulator, the "caller" stays silent and the scenario 
 
 ```python
 scenario.UserSimulatorAgent(
-    voice="elevenlabs/EXAVITQu4vr4xnSDxMaL",  # Sarah — mature female
+    voice="elevenlabs/EXAVITQu4vr4xnSDxMaL",  # Sarah, mature female
     persona="...",
 )
 ```
@@ -1179,7 +1179,7 @@ audio_effects=[
 
 ### TypeScript equivalents
 
-The same adapters, simulator voice, and effects are available in TypeScript via thin factory functions on the `scenario` object. Pick the adapter the same way (Step 2) — the mapping is one-to-one:
+The same adapters, simulator voice, and effects are available in TypeScript via thin factory functions on the `scenario` object. Pick the adapter the same way (Step 2). The mapping is one-to-one:
 
 | User's stack                          | TypeScript adapter                                                    |
 | ------------------------------------- | --------------------------------------------------------------------- |
@@ -1196,7 +1196,7 @@ Seed a voice on the simulator and layer effects the same way:
 import scenario, { voice } from "@langwatch/scenario";
 
 scenario.userSimulatorAgent({
-  voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL", // Sarah — mature female
+  voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL", // Sarah, mature female
   persona: "...",
   audioEffects: [
     voice.effects.backgroundNoise("cafe", 0.4), // presets: cafe / office / street / airport
@@ -1213,7 +1213,7 @@ The default `UserSimulatorAgent` system prompt encodes a text-chat style ("very 
 
 > "You are SPEAKING ON A PHONE, not typing. Talk in natural spoken sentences (full clauses with subjects and verbs), not telegraphic phrases. Real callers don't speak like google queries."
 
-### Worked example (Python, Pipecat WS — adapter connects to the user's deployed bot)
+### Worked example (Python, Pipecat WS: adapter connects to the user's deployed bot)
 
 ```python
 import os
@@ -1261,7 +1261,7 @@ async def test_angry_customer_billing_error():
             ),
             scenario.JudgeAgent(criteria=[
                 "The agent acknowledged the customer's frustration before asking for account info",
-                "The agent stayed calm — did not match the customer's hostility",
+                "The agent stayed calm and did not match the customer's hostility",
                 "The agent moved toward resolving the double charge (refund, escalation, callback)",
                 "The user simulator's turns carried ElevenLabs tonal markers, driving audibly angry speech",
             ]),
@@ -1277,9 +1277,9 @@ async def test_angry_customer_billing_error():
     assert result.success, result.reasoning
 ```
 
-### Worked example (Python, OpenAI Realtime — adapter IS the agent, mirror prod config)
+### Worked example (Python, OpenAI Realtime: adapter IS the agent, mirror prod config)
 
-Use this shape when the user's production agent IS an OpenAI Realtime model. Copy their prod `model`, `voice`, `instructions`, and `tools` into the constructor — anything you leave as a placeholder is what you are testing.
+Use this shape when the user's production agent IS an OpenAI Realtime model. Copy their prod `model`, `voice`, `instructions`, and `tools` into the constructor. Anything you leave as a placeholder is what you are testing.
 
 ```python
 import pytest
@@ -1287,7 +1287,7 @@ import scenario
 from scenario.config.voice_models import OPENAI_REALTIME_MODEL
 from scenario.types import AgentRole
 
-# Mirror the user's PROD config — same model, same system prompt,
+# Mirror the user's PROD config: same model, same system prompt,
 # same voice, same tools. Otherwise this exercises OpenAI defaults,
 # not their agent.
 PROD_MODEL = OPENAI_REALTIME_MODEL
@@ -1321,19 +1321,19 @@ async def test_realtime_greeting():
     assert result.success, result.reasoning
 ```
 
-### Worked example (TypeScript, OpenAI Realtime — adapter drives the model session)
+### Worked example (TypeScript, OpenAI Realtime: adapter drives the model session)
 
 Use this shape when the user's production agent IS an OpenAI Realtime model.
-The adapter drives the session directly — import the same `instructions` and `tools` your production agent uses rather than copy-pasting them inline.
+The adapter drives the session directly, so import the same `instructions` and `tools` your production agent uses rather than copy-pasting them inline.
 One source of truth keeps the test aligned with what is actually deployed.
 
 ```typescript
 import scenario, { voice } from "@langwatch/scenario";
 import { describe, it, expect } from "vitest";
-// Import your production agent config — don't duplicate it here
+// Import your production agent config, don't duplicate it here
 import { AGENT_INSTRUCTIONS, AGENT_TOOLS } from "../src/billing-agent";
 
-describe("Voice agent — angry billing", () => {
+describe("Voice agent: angry billing", () => {
   it("acknowledges frustration before pivoting to logistics", async () => {
     const result = await scenario.run({
       name: "angry billing error in a noisy cafe",
@@ -1365,7 +1365,7 @@ describe("Voice agent — angry billing", () => {
         scenario.judgeAgent({
           criteria: [
             "The agent acknowledged the customer's frustration before asking for account info",
-            "The agent stayed calm — did not match the customer's hostility",
+            "The agent stayed calm and did not match the customer's hostility",
             "The agent moved toward resolving the double charge",
           ],
         }),
@@ -1382,9 +1382,9 @@ describe("Voice agent — angry billing", () => {
 });
 ```
 
-### Worked example (TypeScript, Pipecat WS — adapter connects to the user's deployed bot)
+### Worked example (TypeScript, Pipecat WS: adapter connects to the user's deployed bot)
 
-Use this shape when the user's voice bot is a **deployed Pipecat / Twilio Media Streams WebSocket** that is already reachable. The adapter only connects — it does NOT start the bot, so the bot must be running (a fixture, a staging deploy, or `make bot` in another terminal) when the test runs.
+Use this shape when the user's voice bot is a **deployed Pipecat / Twilio Media Streams WebSocket** that is already reachable. The adapter only connects, it does NOT start the bot, so the bot must be running (a fixture, a staging deploy, or `make bot` in another terminal) when the test runs.
 
 ```typescript
 import scenario, { voice } from "@langwatch/scenario";
@@ -1394,7 +1394,7 @@ import { describe, it, expect } from "vitest";
 // The adapter does NOT spin it up.
 const BOT_WS_URL = process.env.PIPECAT_BOT_URL ?? "ws://localhost:8765/stream";
 
-describe("Voice agent — angry billing (Pipecat WS)", () => {
+describe("Voice agent: angry billing (Pipecat WS)", () => {
   it("acknowledges frustration before pivoting to logistics", async () => {
     const result = await scenario.run({
       name: "angry billing error in a noisy cafe",
@@ -1424,7 +1424,7 @@ describe("Voice agent — angry billing (Pipecat WS)", () => {
         scenario.judgeAgent({
           criteria: [
             "The agent acknowledged the customer's frustration before asking for account info",
-            "The agent stayed calm — did not match the customer's hostility",
+            "The agent stayed calm and did not match the customer's hostility",
             "The agent moved toward resolving the double charge",
           ],
         }),
@@ -1437,11 +1437,11 @@ describe("Voice agent — angry billing (Pipecat WS)", () => {
       ],
     });
     expect(result.success).toBe(true);
-  }, 240_000); // voice scenarios are slow — TTS + transport + multi-turn
+  }, 240_000); // voice scenarios are slow: TTS + transport + multi-turn
 });
 ```
 
-### Run them with pytest / vitest — do NOT write a runner script
+### Run them with pytest / vitest, do NOT write a runner script
 
 Scenarios ARE tests. Each `scenario.run(...)` call lives inside an `it(...)` (TypeScript) or an `async def test_*` (Python). You run them with `pytest` / `vitest` like any other test in the project. Concretely:
 
@@ -1455,7 +1455,7 @@ pnpm vitest run tests/voice/billing.test.ts
 
 Do NOT generate a `main.py` / `run_scenarios.py` / `runner.ts` that loops over scenarios and calls `scenario.run(...)` itself. The test runner already gives you: per-test isolation, parallelism (within a process, via worker threads), reruns of just the failing case (`pytest --lf`, `vitest --reporter=verbose -t ...`), CI integration, watch mode, snapshots, and per-test timeouts. A custom runner re-implements all of that and ships with none of it wired up.
 
-Voice scenarios in particular are slow — each `scenario.run` takes 30–120s of wall-clock. Run a fleet in parallel by letting the test runner do it, **but cap the concurrency** at ~3 to stay under ElevenLabs's starter-tier TTS limit (and OpenAI Realtime / Gemini Live per-account WS caps):
+Voice scenarios in particular are slow: each `scenario.run` takes 30–120s of wall-clock. Run a fleet in parallel by letting the test runner do it, **but cap the concurrency** at ~3 to stay under ElevenLabs's starter-tier TTS limit (and OpenAI Realtime / Gemini Live per-account WS caps):
 
 ```python
 # Python: pytest-asyncio-concurrent groups same-file async tests into a thread pool.
@@ -1497,7 +1497,7 @@ describe.concurrent("voice agent", () => {
 });
 ```
 
-If the user is on a paid tier with higher TTS limits, bump the group/maxConcurrency to match what their plan allows. The point isn't the magic number "3" — it's "let the test runner schedule it, set the cap to match the rate limit, don't hand-roll a worker pool."
+If the user is on a paid tier with higher TTS limits, bump the group/maxConcurrency to match what their plan allows. The point isn't the magic number "3", it's "let the test runner schedule it, set the cap to match the rate limit, don't hand-roll a worker pool."
 
 ### Voice-specific gotchas
 
@@ -1524,7 +1524,7 @@ Then drive everything via `langwatch scenario --help` and `langwatch suite --hel
 | **suite** (a *run plan*) | A reusable plan pairing scenarios × targets × repeats. Use it when the same set should run again later. | `langwatch suite …` |
 | **simulation run** | One scenario executed once against one target. Runs triggered together share a `batchRunId`. | `langwatch simulation-run …` |
 
-"Simulations" is what the product calls the results surface — the same work seen from the other end. There is no `langwatch simulation` command; results live under `langwatch simulation-run`.
+"Simulations" is what the product calls the results surface, the same work seen from the other end. There is no `langwatch simulation` command; results live under `langwatch simulation-run`.
 
 ### The flow
 
@@ -1541,7 +1541,7 @@ langwatch scenario create "Angry refund request" \
 ```
 
 - `<name>` (positional) and `--situation` are the only **required** inputs.
-- `--criteria` and `--labels` each take **one comma-separated string** — not repeated flags, not space-separated. A criterion therefore cannot contain a comma; rephrase instead.
+- `--criteria` and `--labels` each take **one comma-separated string**, not repeated flags, not space-separated. A criterion therefore cannot contain a comma; rephrase instead.
 - Returns `{ id, name, situation, criteria, labels, platformUrl }`. Keep the `id`.
 - `langwatch scenario update <id>` **replaces** `--criteria` / `--labels` wholesale rather than merging. Pass the complete list you want to end up with.
 
@@ -1560,7 +1560,7 @@ langwatch suite get <suiteId> --format json          # read .scenarioIds
 langwatch suite update <suiteId> --scenarios "<existingId1>,<existingId2>,<newScenarioId>"
 ```
 
-Leaving an existing id out silently drops that scenario from the plan — no warning, no undo. `--targets` and `--labels` on `suite update` replace the same way.
+Leaving an existing id out silently drops that scenario from the plan, no warning, no undo. `--targets` and `--labels` on `suite update` replace the same way.
 
 #### 3. List what can be tested
 
@@ -1571,27 +1571,32 @@ langwatch prompt list --format json    # -> [{ id, handle, name, version, model 
 
 #### 4. ASK: which agent(s) or prompt(s)?
 
-Show the names (with each agent's type) and let the user choose — **multiple choice**. One target runs as a single scenario run (step 5); several targets need a run plan (step 6), because every scenario runs against each target.
+Show the names (with each agent's type) and let the user choose, **multiple choice**. One target runs as a single scenario run (step 5); several targets need a run plan (step 6), because every scenario runs against each target.
 
 Never invent a target and never quietly default to the first row.
 
-#### 5. Run it — the one-command path
+#### 5. Run it, the one-command path
 
 ```bash
 langwatch scenario run <scenarioId> --target http:<agentId> --format json
+
+# With values for the parameters the scenario declares
+langwatch scenario run <scenarioId> --target http:<agentId> \
+  --param account_tier=platinum --param region=eu-central --format json
 ```
 
-That is the whole thing. No suite to create first. Under the hood it makes a throwaway run plan, runs it, and deletes it — so the results appear under Simulations, but no run plan survives to re-run later. That is the right trade for a one-off check; reach for step 6 when the user will want it again.
+That is the whole thing. No suite to create first. Under the hood it makes a throwaway run plan, runs it, and deletes it, so the results appear under Simulations, but no run plan survives to re-run later. That is the right trade for a one-off check; reach for step 6 when the user will want it again.
 
 Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `http`, `code`, `workflow`.
 
-- For `http`, `code` and `workflow` the `referenceId` is the **Agent id** from `agent list`, and the type must match that agent's own `type`. `http:` is **never a URL** — the URL, method and headers live in the agent's config. A `workflow:` target is likewise the Agent id.
-- For `prompt` the `referenceId` is the prompt's **`id`** from `prompt list --format json` — not its handle, not its name.
-- `--target` is **required** and takes exactly **one** value. (`suite create` spells the same idea `--targets`, plural and variadic — see below.)
+- For `http`, `code` and `workflow` the `referenceId` is the **Agent id** from `agent list`, and the type must match that agent's own `type`. `http:` is **never a URL**: the URL, method and headers live in the agent's config. A `workflow:` target is likewise the Agent id.
+- For `prompt` the `referenceId` is the prompt's **`id`** from `prompt list --format json`, not its handle, not its name.
+- `--target` is **required** and takes exactly **one** value. (`suite create` spells the same idea `--targets`, plural and variadic, see below.)
 - Bad references are caught when the run is scheduled, not when the scenario was created: `Invalid target references: …` means you invented an id. Go back to step 3 and read a real one.
-- Add `--wait` only when the caller can afford to block: it polls every 3s for up to 10 minutes and exits non-zero if any run failed — which is the point in CI. In an interactive turn, skip it, hand over the link, and let the page stream results in.
+- Add `--wait` only when the caller can afford to block: it polls every 3s for up to 10 minutes and exits non-zero if any run failed, which is the point in CI. In an interactive turn, skip it, hand over the link, and let the page stream results in.
+- `--param name=value` is repeatable and supplies one value for a parameter the scenario **declares** (`langwatch scenario get <id> --format json` lists them under `parameters`). It overrides that parameter's default for this run only. Without any `--param`, the run uses the declared defaults. A name no scenario in the run declares is rejected before anything is scheduled, so do not invent one. Exactly `true`/`false` reads as a boolean and a plain number as a number; everything else stays text, which is what keeps `007` an id rather than the number 7.
 
-#### 6. Or create a run plan — reusable, and the only way to hit several targets
+#### 6. Or create a run plan: reusable, and the only way to hit several targets
 
 ```bash
 langwatch suite create "Refund regression" \
@@ -1601,9 +1606,12 @@ langwatch suite create "Refund regression" \
   --format json
 
 langwatch suite run <suiteId> --format json
+
+# With values for the parameters the scenarios declare
+langwatch suite run <suiteId> --param account_tier=platinum --format json
 ```
 
-- `--scenarios` and `--targets` are both **required** and take **different shapes**: `--scenarios` is one comma-separated string; `--targets` is space-separated and variadic. `--targets http:a,prompt:b` does not error — it parses as the single target `http` → `a,prompt:b` and fails later. Keep them apart.
+- `--scenarios` and `--targets` are both **required** and take **different shapes**: `--scenarios` is one comma-separated string; `--targets` is space-separated and variadic. `--targets http:a,prompt:b` does not error: it parses as the single target `http` → `a,prompt:b` and fails later. Keep them apart.
 - Suite names must be unique in the project (the slug comes from the name); a duplicate answers `A suite with this name already exists`.
 - The run count is `scenarios × targets × repeatCount`. Three scenarios × two targets × `--repeat-count 2` is twelve real LLM conversations. Say the number before launching anything large.
 - `suite run` returns `{ scheduled, batchRunId, setId, jobCount, skippedArchived, items }`. `jobCount: 0` with entries in `skippedArchived` means everything referenced is archived and nothing ran.
@@ -1615,20 +1623,20 @@ langwatch simulation-run list --scenario-set-id <setId> --batch-run-id <batchRun
 langwatch simulation-run get <scenarioRunId> --format json      # messages, verdict, cost
 ```
 
-`--batch-run-id` only works alongside `--scenario-set-id`. `--status` and `--name` filter **client-side, after** the server has applied `--limit` — raise `--limit` if a filtered list looks suspiciously short.
+`--batch-run-id` only works alongside `--scenario-set-id`. `--status` and `--name` filter **client-side, after** the server has applied `--limit`. Raise `--limit` if a filtered list looks suspiciously short.
 
 #### 7. Send the user to the run
 
 Hand over the link instead of narrating what the run is doing.
 
-- A run plan's batch: `/<projectSlug>/simulations/run-plans/<suiteSlug>/<batchRunId>` — the run-plan half is the suite's own `platformUrl` (`langwatch suite get <suiteId> --format json`), with `/<batchRunId>` appended.
+- A run plan's batch: `/<projectSlug>/simulations/run-plans/<suiteSlug>/<batchRunId>`. The run-plan half is the suite's own `platformUrl` (`langwatch suite get <suiteId> --format json`), with `/<batchRunId>` appended.
 - A one-command `scenario run`: its plan was ephemeral and is already deleted, so link to `/<projectSlug>/simulations`, where the batch shows up in All Runs.
 
-Neither `scenario run` nor `suite run` returns a `platformUrl` of its own. If you are an in-product assistant, do not paste URLs into prose — run the command whose result carries the link and let the product render it as a navigable action.
+Neither `scenario run` nor `suite run` returns a `platformUrl` of its own. If you are an in-product assistant, do not paste URLs into prose. Run the command whose result carries the link and let the product render it as a navigable action.
 
 ### Iterating
 
-Review the results, sharpen the scenario with `langwatch scenario update <id> --criteria "…"`, and run it again. ALWAYS run the scenario — an unrun scenario is worth nothing.
+Review the results, sharpen the scenario with `langwatch scenario update <id> --criteria "…"`, and run it again. ALWAYS run the scenario. An unrun scenario is worth nothing.
 
 ### When the choice is the user's, ask
 
@@ -1658,44 +1666,44 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 
 ### Code Approach
 
-- Do NOT write a scenario without instrumenting — a green run that emits no traces is half the value; call `setupScenarioTracing()` (run-level) and instrument the agent-under-test (`langwatch.setup()` / `setupObservability`) BEFORE running, and confirm traces appear in the LangWatch UI.
-- Do NOT create your own testing framework — `@langwatch/scenario` already handles simulation, judging, multi-turn, and tool-call verification
-- Do NOT write a `main.py` / `run_scenarios.py` / custom runner that loops over scenarios. Each scenario IS a test (`it(...)` / `async def test_*`) — run them with `pytest` or `vitest`. The test runner already gives you parallelism, retries of just the failing case, watch mode, CI integration, and per-test timeouts; a runner script re-implements all of that and ships with none of it wired up.
-- Do NOT invent a JSON / YAML / TOML "scenario DSL" with keys like `{ "name": ..., "description": ..., "criteria": [...] }` and then load it into a generic loop. The whole point of Scenario being code is that each test is real code: you can use `for`, `if`, parametrize (`@pytest.mark.parametrize`, `it.each(...)`), pull a fixture, call a helper to mint a session, branch by environment, share setup via a `conftest.py`, mock a tool inline — none of which a DSL gives you. The moment a teammate needs a new edge case ("only on Tuesdays the agent should escalate"), the DSL grows another key, then another, until it's a worse version of Python/TypeScript with none of the tooling. If the same boilerplate repeats across scenarios, extract a helper FUNCTION that returns an `AgentAdapter` / a built `UserSimulatorAgent` / a script tuple — keep each scenario its own test case so it stays grep-able and debuggable.
-- Do NOT use regex or word matching to evaluate responses — always use `JudgeAgent` natural-language criteria
+- Do NOT write a scenario without instrumenting: a green run that emits no traces is half the value; call `setupScenarioTracing()` (run-level) and instrument the agent-under-test (`langwatch.setup()` / `setupObservability`) BEFORE running, and confirm traces appear in the LangWatch UI.
+- Do NOT create your own testing framework. `@langwatch/scenario` already handles simulation, judging, multi-turn, and tool-call verification
+- Do NOT write a `main.py` / `run_scenarios.py` / custom runner that loops over scenarios. Each scenario IS a test (`it(...)` / `async def test_*`), so run them with `pytest` or `vitest`. The test runner already gives you parallelism, retries of just the failing case, watch mode, CI integration, and per-test timeouts; a runner script re-implements all of that and ships with none of it wired up.
+- Do NOT invent a JSON / YAML / TOML "scenario DSL" with keys like `{ "name": ..., "description": ..., "criteria": [...] }` and then load it into a generic loop. The whole point of Scenario being code is that each test is real code: you can use `for`, `if`, parametrize (`@pytest.mark.parametrize`, `it.each(...)`), pull a fixture, call a helper to mint a session, branch by environment, share setup via a `conftest.py`, mock a tool inline, none of which a DSL gives you. The moment a teammate needs a new edge case ("only on Tuesdays the agent should escalate"), the DSL grows another key, then another, until it's a worse version of Python/TypeScript with none of the tooling. If the same boilerplate repeats across scenarios, extract a helper FUNCTION that returns an `AgentAdapter` / a built `UserSimulatorAgent` / a script tuple, and keep each scenario its own test case so it stays grep-able and debuggable.
+- Do NOT use regex or word matching to evaluate responses. Always use `JudgeAgent` natural-language criteria
 - Do NOT forget `@pytest.mark.asyncio` and `@pytest.mark.agent_test` (Python)
 - Do NOT forget a generous timeout (e.g. `30_000` ms) for TypeScript tests
-- Do NOT import from made-up packages like `agent_tester`, `simulation_framework`, `langwatch.testing` — the only valid imports are `scenario` (Python) and `@langwatch/scenario` (TypeScript)
+- Do NOT import from made-up packages like `agent_tester`, `simulation_framework`, `langwatch.testing`. The only valid imports are `scenario` (Python) and `@langwatch/scenario` (TypeScript)
 
 ### Red Teaming
 
-- Do NOT manually write adversarial prompts — let `RedTeamAgent` generate them
-- Do NOT use `UserSimulatorAgent` for red teaming — use `RedTeamAgent.crescendo()` / `redTeamCrescendo()`
-- Use `attacker.marathon_script()` (instance method) — it pads iterations for backtracking and wires up early exit
+- Do NOT manually write adversarial prompts. Let `RedTeamAgent` generate them
+- Do NOT use `UserSimulatorAgent` for red teaming. Use `RedTeamAgent.crescendo()` / `redTeamCrescendo()`
+- Use `attacker.marathon_script()` (instance method): it pads iterations for backtracking and wires up early exit
 - Do NOT forget a generous timeout (e.g. `180_000` ms) for TypeScript red team tests
 
 ### Voice Agents
 
-- Do NOT skip observability on voice agents — latency, interruption, and STT/TTS spans are exactly what you need when a voice scenario fails; instrument before running (Step 4.5: `setupScenarioTracing()` + agent-under-test instrumentation) and verify traces emit in the LangWatch UI.
-- Do NOT write a text-only scenario when the user asked for voice — pick one of `OpenAIRealtimeAgentAdapter` / `ElevenLabsAgentAdapter` / `PipecatAgentAdapter` / `GeminiLiveAgentAdapter` / `TwilioAgentAdapter` / `ComposableVoiceAgent`
-- Do NOT instantiate `OpenAIRealtimeAgentAdapter` or `GeminiLiveAgentAdapter` with placeholder `instructions=...` / `model=...` / `tools=...` — those adapters ARE the agent, so a placeholder constructor tests OpenAI/Gemini defaults, not the user's agent. Either mirror the user's prod config exactly, or pick a different adapter (Pipecat/Twilio/ElevenLabs hosted) that connects to their already-deployed transport.
-- Do NOT point `PipecatAgentAdapter(url=...)` / `ElevenLabsAgentAdapter(agent_id=...)` / `TwilioAgentAdapter` at a transport the user hasn't deployed — those adapters only connect, they don't spin anything up. If the user is text-only and has no voice transport, say so and offer `ComposableVoiceAgent` as a voice wrapper around their existing text logic.
-- Do NOT forget the `voice="elevenlabs/..."` (or `"openai/..."`) on `UserSimulatorAgent` — a silent simulator turns the voice scenario into a text scenario with audio frame headers
-- Do NOT bake an empathy persona into a calm voice — use ElevenLabs tonal markers (`[shouting]`, `[angry]`, `[stressed]`) in the persona prompt so the TTS renders audible emotion
-- Do NOT script multi-turn `user()` audio against `ElevenLabsAgentAdapter` — it's server-VAD-driven and the second `agent()` reliably times out; keep hosted-ConvAI scripts to ONE exchange
-- Do NOT forget a generous timeout (`240_000` ms for vitest, `@pytest.mark.timeout(300)` for pytest) — voice is slow
+- Do NOT skip observability on voice agents: latency, interruption, and STT/TTS spans are exactly what you need when a voice scenario fails; instrument before running (Step 4.5: `setupScenarioTracing()` + agent-under-test instrumentation) and verify traces emit in the LangWatch UI.
+- Do NOT write a text-only scenario when the user asked for voice. Pick one of `OpenAIRealtimeAgentAdapter` / `ElevenLabsAgentAdapter` / `PipecatAgentAdapter` / `GeminiLiveAgentAdapter` / `TwilioAgentAdapter` / `ComposableVoiceAgent`
+- Do NOT instantiate `OpenAIRealtimeAgentAdapter` or `GeminiLiveAgentAdapter` with placeholder `instructions=...` / `model=...` / `tools=...`: those adapters ARE the agent, so a placeholder constructor tests OpenAI/Gemini defaults, not the user's agent. Either mirror the user's prod config exactly, or pick a different adapter (Pipecat/Twilio/ElevenLabs hosted) that connects to their already-deployed transport.
+- Do NOT point `PipecatAgentAdapter(url=...)` / `ElevenLabsAgentAdapter(agent_id=...)` / `TwilioAgentAdapter` at a transport the user hasn't deployed: those adapters only connect, they don't spin anything up. If the user is text-only and has no voice transport, say so and offer `ComposableVoiceAgent` as a voice wrapper around their existing text logic.
+- Do NOT forget the `voice="elevenlabs/..."` (or `"openai/..."`) on `UserSimulatorAgent`: a silent simulator turns the voice scenario into a text scenario with audio frame headers
+- Do NOT bake an empathy persona into a calm voice. Use ElevenLabs tonal markers (`[shouting]`, `[angry]`, `[stressed]`) in the persona prompt so the TTS renders audible emotion
+- Do NOT script multi-turn `user()` audio against `ElevenLabsAgentAdapter`: it's server-VAD-driven and the second `agent()` reliably times out; keep hosted-ConvAI scripts to ONE exchange
+- Do NOT forget a generous timeout (`240_000` ms for vitest, `@pytest.mark.timeout(300)` for pytest). Voice is slow
 
 ### Platform Approach
 
-- This path uses the CLI — do NOT write code files
+- This path uses the CLI, do NOT write code files
 - Write criteria as natural language descriptions, not regex patterns
-- Create focused scenarios — each should test one specific behavior
-- Do NOT build a suite for a one-off check — `langwatch scenario run <id> --target <type>:<refId>` runs a single scenario in one command. Suites are for sets you will run again, or for hitting several targets at once
-- Do NOT use `suite update --scenarios` to *add* a scenario — it REPLACES the list. Read `suite get --format json` first and send back the existing ids plus the new one
+- Create focused scenarios, each should test one specific behavior
+- Do NOT build a suite for a one-off check: `langwatch scenario run <id> --target <type>:<refId>` runs a single scenario in one command. Suites are for sets you will run again, or for hitting several targets at once
+- Do NOT use `suite update --scenarios` to *add* a scenario: it REPLACES the list. Read `suite get --format json` first and send back the existing ids plus the new one
 - Do NOT invent a target reference. `http`/`code`/`workflow` take an **Agent id** from `agent list --format json` (matching that agent's `type`); `prompt` takes the prompt **id** from `prompt list --format json`. Bad ids surface only when the run is scheduled, as `Invalid target references`
-- Do NOT comma-separate `--targets` on `suite create` — it is space-separated and variadic, and a comma silently parses into one malformed target. `--scenarios` is the comma-separated one, and `scenario run` uses `--target`, singular, exactly one value
+- Do NOT comma-separate `--targets` on `suite create`: it is space-separated and variadic, and a comma silently parses into one malformed target. `--scenarios` is the comma-separated one, and `scenario run` uses `--target`, singular, exactly one value
 - Do NOT choose the agent or prompt on the user's behalf, and do NOT decide for them between a one-off run and a run plan. Ask one short question and wait
-- Do NOT `--wait` inside an interactive turn — trigger, hand over the link, let results stream in. Save `--wait` for CI, where its non-zero exit on failure is the whole point
+- Do NOT `--wait` inside an interactive turn. Trigger, hand over the link, let results stream in. Save `--wait` for CI, where its non-zero exit on failure is the whole point
 ````
 
         </div>
@@ -3041,9 +3049,9 @@ NEVER invent your own agent testing framework. Use `@langwatch/scenario` (Python
 If the user's request is **general** ("add scenarios", "test my agent"):
 
 - Read the codebase to understand the agent's architecture
-- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
+- Study git history to understand what changed and why. Focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Generate comprehensive coverage (happy path, edge cases, error handling)
-- For conversational agents, include multi-turn scenarios — that's where the interesting edge cases live (context retention, topic switching, recovery from misunderstandings)
+- For conversational agents, include multi-turn scenarios, since that's where the interesting edge cases live (context retention, topic switching, recovery from misunderstandings)
 - ALWAYS run the tests after writing them. If they fail, debug and fix the test or the agent code.
 - After tests are green, transition to consultant mode (see Consultant Mode below) and suggest 2-3 domain-specific improvements.
 
@@ -3069,7 +3077,7 @@ Scenarios sit at the **top of the testing pyramid** and test the agent as a comp
 
 Best practices:
 
-- NEVER check for regex or word matches in agent responses — use JudgeAgent criteria instead
+- NEVER check for regex or word matches in agent responses. Use JudgeAgent criteria instead
 - Use script functions for deterministic checks (tool calls, file existence) and judge criteria for semantic evaluation
 - Cover more ground with fewer well-designed scenarios rather than many shallow ones
 
@@ -3186,46 +3194,46 @@ describe("My Agent", () => {
 
 ### Step 4.5: Instrument for observability (REQUIRED before running)
 
-ALWAYS instrument before running — an uninstrumented scenario run emits no traces, so you lose the OTel/LangWatch observability that makes failures debuggable. This is not optional.
+ALWAYS instrument before running: an uninstrumented scenario run emits no traces, so you lose the OTel/LangWatch observability that makes failures debuggable. This is not optional.
 
 There are two distinct things to wire:
 
-**1. Scenario-run tracing** — call `setupScenarioTracing()` once at the top of the test file so the simulator, judge, and adapter spans are captured:
+**1. Scenario-run tracing**: call `setupScenarioTracing()` once at the top of the test file so the simulator, judge, and adapter spans are captured:
 
 ```typescript
-// TypeScript — the import and call go at the very top of the test file,
+// TypeScript: the import and call go at the very top of the test file,
 // before any other imports or setup that might create spans of their own
 import { setupScenarioTracing } from "@langwatch/scenario";
 setupScenarioTracing();
 ```
 
-For Python, scenario tracing is configured via `scenario.configure(...)` combined with `langwatch.setup()` — defer the exact call signature to the `tracing` skill.
+For Python, scenario tracing is configured via `scenario.configure(...)` combined with `langwatch.setup()`. Defer the exact call signature to the `tracing` skill.
 
-**2. Agent-under-test tracing** — instrument YOUR OWN agent code so its internal LLM calls, tool invocations, and chain spans are captured:
+**2. Agent-under-test tracing**: instrument YOUR OWN agent code so its internal LLM calls, tool invocations, and chain spans are captured:
 
 - Python: `import langwatch; langwatch.setup()` at startup, then decorate the agent entry point with `@langwatch.trace()`.
 - TypeScript: call `setupObservability` from the `langwatch` package in your agent's initialization.
 
 **Per-adapter nuance for voice:** when the adapter IS the agent (OpenAI Realtime, Gemini Live), the scenario tracing covers the session. When connecting to a deployed agent (Pipecat/Twilio/ElevenLabs hosted) or wrapping a text agent (Composable), the user's agent process must be instrumented separately in its own codebase.
 
-For framework-specific instrumentation (OpenAI/LangGraph/Vercel/Mastra/Agno), use the `tracing` skill — do not hand-roll. The `tracing` skill prompt is: "Instrument my code with LangWatch".
+For framework-specific instrumentation (OpenAI/LangGraph/Vercel/Mastra/Agno), use the `tracing` skill, do not hand-roll. The `tracing` skill prompt is: "Instrument my code with LangWatch".
 
 **Prerequisite:** Traces only reach LangWatch if `LANGWATCH_API_KEY` is set in the environment (plus `LANGWATCH_ENDPOINT` for self-hosted). If setup runs but no traces appear in the LangWatch UI, the key is missing.
 
-**VERIFY after the run:** confirm traces were emitted — the scenario run prints a LangWatch trace URL, or the LangWatch UI shows ≥1 trace for the run. A green test with zero traces means instrumentation was skipped.
+**VERIFY after the run:** confirm traces were emitted: the scenario run prints a LangWatch trace URL, or the LangWatch UI shows ≥1 trace for the run. A green test with zero traces means instrumentation was skipped.
 
 ### Step 5: Run the Tests
 
 For Python: `pytest -s test_my_agent.py` (or `uv run pytest ...`).
 For TypeScript: `npx vitest run my-agent.test.ts` (or `pnpm vitest run ...`).
 
-ALWAYS run the tests. If they fail, debug and fix them — an unrun scenario test is useless.
+ALWAYS run the tests. If they fail, debug and fix them. An unrun scenario test is useless.
 
 ---
 
 ## Red Teaming (Code Approach)
 
-Red teaming uses `RedTeamAgent` instead of `UserSimulatorAgent` for adversarial attacks. NEVER invent your own red teaming framework — `@langwatch/scenario` already provides crescendo escalation, per-turn scoring, refusal detection, backtracking, and early exit.
+Red teaming uses `RedTeamAgent` instead of `UserSimulatorAgent` for adversarial attacks. NEVER invent your own red teaming framework. `@langwatch/scenario` already provides crescendo escalation, per-turn scoring, refusal detection, backtracking, and early exit.
 
 Read the docs first:
 
@@ -3233,7 +3241,7 @@ Read the docs first:
 langwatch scenario-docs advanced/red-teaming
 ```
 
-CRITICAL: Do NOT guess the `RedTeamAgent` API — it has specific configuration for attack strategies, scoring, and escalation phases.
+CRITICAL: Do NOT guess the `RedTeamAgent` API. It has specific configuration for attack strategies, scoring, and escalation phases.
 
 **Python:**
 
@@ -3323,7 +3331,7 @@ If the user asks for **voice testing** (e.g. "add voice testing to my agent", "t
 
 CRITICAL: Do NOT write a text-only scenario when the user asked for voice. The judge cannot evaluate "audible empathy" or "noise robustness" against a text transcript.
 
-Voice agents especially need observability — latency, interruptions, and STT/TTS spans are exactly what makes voice failures diagnosable. Instrument per Step 4.5 above (both `setupScenarioTracing()` and the agent-under-test) before running. See `langwatch scenario-docs voice/recipes/observability` for voice-specific OTel guidance.
+Voice agents especially need observability: latency, interruptions, and STT/TTS spans are exactly what makes voice failures diagnosable. Instrument per Step 4.5 above (both `setupScenarioTracing()` and the agent-under-test) before running. See `langwatch scenario-docs voice/recipes/observability` for voice-specific OTel guidance.
 
 ### Step 1: Read the voice docs
 
@@ -3343,7 +3351,7 @@ Also browse the runnable voice examples:
 
 There are dozens of patterns there (angry customer with cafe noise, password-reset trap, multi-intent rush, accent + disfluency, background cross-talk, security pressure). Match the user's domain to the closest existing example before writing one from scratch.
 
-### Step 2: Pick the right voice adapter — and understand how it connects to the user's agent
+### Step 2: Pick the right voice adapter, and understand how it connects to the user's agent
 
 Detect the user's transport from their codebase and pick the matching adapter. **Critically**, every adapter has a different idea of "what is the agent under test":
 
@@ -3356,7 +3364,7 @@ Detect the user's transport from their codebase and pick the matching adapter. *
 | OpenAI Realtime model is the agent                                                                    | `scenario.OpenAIRealtimeAgentAdapter(model=..., instructions=..., voice=..., tools=...)` | Same shape as Gemini Live. The **adapter IS the agent**. Copy prod `model`, `instructions`, `voice`, and `tools` into the constructor. Without those, you're testing OpenAI defaults, not the user's agent.                                                                                                                   |
 | Text-only stack (chat completions, LangGraph, Mastra, plain SDK) with no deployed voice transport yet | `scenario.ComposableVoiceAgent(stt=..., llm=<wrap their agent>, tts=...)`                | Wraps the user's existing text agent in STT → agent → TTS. **Be explicit in your reply** that this tests a *voice wrapper* around their text logic, not a production voice transport. If they want to test a real deployed voice transport, they need to ship one first (Pipecat, Twilio, ElevenLabs hosted, OpenAI Realtime). |
 
-If you can't tell from the codebase which path the user is on, ASK before generating a test. Picking the wrong adapter means the test exercises something the user hasn't deployed — and they will (rightly) call it useless.
+If you can't tell from the codebase which path the user is on, ASK before generating a test. Picking the wrong adapter means the test exercises something the user hasn't deployed, and they will (rightly) call it useless.
 
 ### Step 3: Seed a VOICE on the user simulator
 
@@ -3364,7 +3372,7 @@ Without a `voice=` on the simulator, the "caller" stays silent and the scenario 
 
 ```python
 scenario.UserSimulatorAgent(
-    voice="elevenlabs/EXAVITQu4vr4xnSDxMaL",  # Sarah — mature female
+    voice="elevenlabs/EXAVITQu4vr4xnSDxMaL",  # Sarah, mature female
     persona="...",
 )
 ```
@@ -3384,7 +3392,7 @@ audio_effects=[
 
 ### TypeScript equivalents
 
-The same adapters, simulator voice, and effects are available in TypeScript via thin factory functions on the `scenario` object. Pick the adapter the same way (Step 2) — the mapping is one-to-one:
+The same adapters, simulator voice, and effects are available in TypeScript via thin factory functions on the `scenario` object. Pick the adapter the same way (Step 2). The mapping is one-to-one:
 
 | User's stack                          | TypeScript adapter                                                    |
 | ------------------------------------- | --------------------------------------------------------------------- |
@@ -3401,7 +3409,7 @@ Seed a voice on the simulator and layer effects the same way:
 import scenario, { voice } from "@langwatch/scenario";
 
 scenario.userSimulatorAgent({
-  voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL", // Sarah — mature female
+  voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL", // Sarah, mature female
   persona: "...",
   audioEffects: [
     voice.effects.backgroundNoise("cafe", 0.4), // presets: cafe / office / street / airport
@@ -3418,7 +3426,7 @@ The default `UserSimulatorAgent` system prompt encodes a text-chat style ("very 
 
 > "You are SPEAKING ON A PHONE, not typing. Talk in natural spoken sentences (full clauses with subjects and verbs), not telegraphic phrases. Real callers don't speak like google queries."
 
-### Worked example (Python, Pipecat WS — adapter connects to the user's deployed bot)
+### Worked example (Python, Pipecat WS: adapter connects to the user's deployed bot)
 
 ```python
 import os
@@ -3466,7 +3474,7 @@ async def test_angry_customer_billing_error():
             ),
             scenario.JudgeAgent(criteria=[
                 "The agent acknowledged the customer's frustration before asking for account info",
-                "The agent stayed calm — did not match the customer's hostility",
+                "The agent stayed calm and did not match the customer's hostility",
                 "The agent moved toward resolving the double charge (refund, escalation, callback)",
                 "The user simulator's turns carried ElevenLabs tonal markers, driving audibly angry speech",
             ]),
@@ -3482,9 +3490,9 @@ async def test_angry_customer_billing_error():
     assert result.success, result.reasoning
 ```
 
-### Worked example (Python, OpenAI Realtime — adapter IS the agent, mirror prod config)
+### Worked example (Python, OpenAI Realtime: adapter IS the agent, mirror prod config)
 
-Use this shape when the user's production agent IS an OpenAI Realtime model. Copy their prod `model`, `voice`, `instructions`, and `tools` into the constructor — anything you leave as a placeholder is what you are testing.
+Use this shape when the user's production agent IS an OpenAI Realtime model. Copy their prod `model`, `voice`, `instructions`, and `tools` into the constructor. Anything you leave as a placeholder is what you are testing.
 
 ```python
 import pytest
@@ -3492,7 +3500,7 @@ import scenario
 from scenario.config.voice_models import OPENAI_REALTIME_MODEL
 from scenario.types import AgentRole
 
-# Mirror the user's PROD config — same model, same system prompt,
+# Mirror the user's PROD config: same model, same system prompt,
 # same voice, same tools. Otherwise this exercises OpenAI defaults,
 # not their agent.
 PROD_MODEL = OPENAI_REALTIME_MODEL
@@ -3526,19 +3534,19 @@ async def test_realtime_greeting():
     assert result.success, result.reasoning
 ```
 
-### Worked example (TypeScript, OpenAI Realtime — adapter drives the model session)
+### Worked example (TypeScript, OpenAI Realtime: adapter drives the model session)
 
 Use this shape when the user's production agent IS an OpenAI Realtime model.
-The adapter drives the session directly — import the same `instructions` and `tools` your production agent uses rather than copy-pasting them inline.
+The adapter drives the session directly, so import the same `instructions` and `tools` your production agent uses rather than copy-pasting them inline.
 One source of truth keeps the test aligned with what is actually deployed.
 
 ```typescript
 import scenario, { voice } from "@langwatch/scenario";
 import { describe, it, expect } from "vitest";
-// Import your production agent config — don't duplicate it here
+// Import your production agent config, don't duplicate it here
 import { AGENT_INSTRUCTIONS, AGENT_TOOLS } from "../src/billing-agent";
 
-describe("Voice agent — angry billing", () => {
+describe("Voice agent: angry billing", () => {
   it("acknowledges frustration before pivoting to logistics", async () => {
     const result = await scenario.run({
       name: "angry billing error in a noisy cafe",
@@ -3570,7 +3578,7 @@ describe("Voice agent — angry billing", () => {
         scenario.judgeAgent({
           criteria: [
             "The agent acknowledged the customer's frustration before asking for account info",
-            "The agent stayed calm — did not match the customer's hostility",
+            "The agent stayed calm and did not match the customer's hostility",
             "The agent moved toward resolving the double charge",
           ],
         }),
@@ -3587,9 +3595,9 @@ describe("Voice agent — angry billing", () => {
 });
 ```
 
-### Worked example (TypeScript, Pipecat WS — adapter connects to the user's deployed bot)
+### Worked example (TypeScript, Pipecat WS: adapter connects to the user's deployed bot)
 
-Use this shape when the user's voice bot is a **deployed Pipecat / Twilio Media Streams WebSocket** that is already reachable. The adapter only connects — it does NOT start the bot, so the bot must be running (a fixture, a staging deploy, or `make bot` in another terminal) when the test runs.
+Use this shape when the user's voice bot is a **deployed Pipecat / Twilio Media Streams WebSocket** that is already reachable. The adapter only connects, it does NOT start the bot, so the bot must be running (a fixture, a staging deploy, or `make bot` in another terminal) when the test runs.
 
 ```typescript
 import scenario, { voice } from "@langwatch/scenario";
@@ -3599,7 +3607,7 @@ import { describe, it, expect } from "vitest";
 // The adapter does NOT spin it up.
 const BOT_WS_URL = process.env.PIPECAT_BOT_URL ?? "ws://localhost:8765/stream";
 
-describe("Voice agent — angry billing (Pipecat WS)", () => {
+describe("Voice agent: angry billing (Pipecat WS)", () => {
   it("acknowledges frustration before pivoting to logistics", async () => {
     const result = await scenario.run({
       name: "angry billing error in a noisy cafe",
@@ -3629,7 +3637,7 @@ describe("Voice agent — angry billing (Pipecat WS)", () => {
         scenario.judgeAgent({
           criteria: [
             "The agent acknowledged the customer's frustration before asking for account info",
-            "The agent stayed calm — did not match the customer's hostility",
+            "The agent stayed calm and did not match the customer's hostility",
             "The agent moved toward resolving the double charge",
           ],
         }),
@@ -3642,11 +3650,11 @@ describe("Voice agent — angry billing (Pipecat WS)", () => {
       ],
     });
     expect(result.success).toBe(true);
-  }, 240_000); // voice scenarios are slow — TTS + transport + multi-turn
+  }, 240_000); // voice scenarios are slow: TTS + transport + multi-turn
 });
 ```
 
-### Run them with pytest / vitest — do NOT write a runner script
+### Run them with pytest / vitest, do NOT write a runner script
 
 Scenarios ARE tests. Each `scenario.run(...)` call lives inside an `it(...)` (TypeScript) or an `async def test_*` (Python). You run them with `pytest` / `vitest` like any other test in the project. Concretely:
 
@@ -3660,7 +3668,7 @@ pnpm vitest run tests/voice/billing.test.ts
 
 Do NOT generate a `main.py` / `run_scenarios.py` / `runner.ts` that loops over scenarios and calls `scenario.run(...)` itself. The test runner already gives you: per-test isolation, parallelism (within a process, via worker threads), reruns of just the failing case (`pytest --lf`, `vitest --reporter=verbose -t ...`), CI integration, watch mode, snapshots, and per-test timeouts. A custom runner re-implements all of that and ships with none of it wired up.
 
-Voice scenarios in particular are slow — each `scenario.run` takes 30–120s of wall-clock. Run a fleet in parallel by letting the test runner do it, **but cap the concurrency** at ~3 to stay under ElevenLabs's starter-tier TTS limit (and OpenAI Realtime / Gemini Live per-account WS caps):
+Voice scenarios in particular are slow: each `scenario.run` takes 30–120s of wall-clock. Run a fleet in parallel by letting the test runner do it, **but cap the concurrency** at ~3 to stay under ElevenLabs's starter-tier TTS limit (and OpenAI Realtime / Gemini Live per-account WS caps):
 
 ```python
 # Python: pytest-asyncio-concurrent groups same-file async tests into a thread pool.
@@ -3702,7 +3710,7 @@ describe.concurrent("voice agent", () => {
 });
 ```
 
-If the user is on a paid tier with higher TTS limits, bump the group/maxConcurrency to match what their plan allows. The point isn't the magic number "3" — it's "let the test runner schedule it, set the cap to match the rate limit, don't hand-roll a worker pool."
+If the user is on a paid tier with higher TTS limits, bump the group/maxConcurrency to match what their plan allows. The point isn't the magic number "3", it's "let the test runner schedule it, set the cap to match the rate limit, don't hand-roll a worker pool."
 
 ### Voice-specific gotchas
 
@@ -3729,7 +3737,7 @@ Then drive everything via `langwatch scenario --help` and `langwatch suite --hel
 | **suite** (a *run plan*) | A reusable plan pairing scenarios × targets × repeats. Use it when the same set should run again later. | `langwatch suite …` |
 | **simulation run** | One scenario executed once against one target. Runs triggered together share a `batchRunId`. | `langwatch simulation-run …` |
 
-"Simulations" is what the product calls the results surface — the same work seen from the other end. There is no `langwatch simulation` command; results live under `langwatch simulation-run`.
+"Simulations" is what the product calls the results surface, the same work seen from the other end. There is no `langwatch simulation` command; results live under `langwatch simulation-run`.
 
 ### The flow
 
@@ -3746,7 +3754,7 @@ langwatch scenario create "Angry refund request" \
 ```
 
 - `<name>` (positional) and `--situation` are the only **required** inputs.
-- `--criteria` and `--labels` each take **one comma-separated string** — not repeated flags, not space-separated. A criterion therefore cannot contain a comma; rephrase instead.
+- `--criteria` and `--labels` each take **one comma-separated string**, not repeated flags, not space-separated. A criterion therefore cannot contain a comma; rephrase instead.
 - Returns `{ id, name, situation, criteria, labels, platformUrl }`. Keep the `id`.
 - `langwatch scenario update <id>` **replaces** `--criteria` / `--labels` wholesale rather than merging. Pass the complete list you want to end up with.
 
@@ -3765,7 +3773,7 @@ langwatch suite get <suiteId> --format json          # read .scenarioIds
 langwatch suite update <suiteId> --scenarios "<existingId1>,<existingId2>,<newScenarioId>"
 ```
 
-Leaving an existing id out silently drops that scenario from the plan — no warning, no undo. `--targets` and `--labels` on `suite update` replace the same way.
+Leaving an existing id out silently drops that scenario from the plan, no warning, no undo. `--targets` and `--labels` on `suite update` replace the same way.
 
 #### 3. List what can be tested
 
@@ -3776,27 +3784,32 @@ langwatch prompt list --format json    # -> [{ id, handle, name, version, model 
 
 #### 4. ASK: which agent(s) or prompt(s)?
 
-Show the names (with each agent's type) and let the user choose — **multiple choice**. One target runs as a single scenario run (step 5); several targets need a run plan (step 6), because every scenario runs against each target.
+Show the names (with each agent's type) and let the user choose, **multiple choice**. One target runs as a single scenario run (step 5); several targets need a run plan (step 6), because every scenario runs against each target.
 
 Never invent a target and never quietly default to the first row.
 
-#### 5. Run it — the one-command path
+#### 5. Run it, the one-command path
 
 ```bash
 langwatch scenario run <scenarioId> --target http:<agentId> --format json
+
+# With values for the parameters the scenario declares
+langwatch scenario run <scenarioId> --target http:<agentId> \
+  --param account_tier=platinum --param region=eu-central --format json
 ```
 
-That is the whole thing. No suite to create first. Under the hood it makes a throwaway run plan, runs it, and deletes it — so the results appear under Simulations, but no run plan survives to re-run later. That is the right trade for a one-off check; reach for step 6 when the user will want it again.
+That is the whole thing. No suite to create first. Under the hood it makes a throwaway run plan, runs it, and deletes it, so the results appear under Simulations, but no run plan survives to re-run later. That is the right trade for a one-off check; reach for step 6 when the user will want it again.
 
 Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `http`, `code`, `workflow`.
 
-- For `http`, `code` and `workflow` the `referenceId` is the **Agent id** from `agent list`, and the type must match that agent's own `type`. `http:` is **never a URL** — the URL, method and headers live in the agent's config. A `workflow:` target is likewise the Agent id.
-- For `prompt` the `referenceId` is the prompt's **`id`** from `prompt list --format json` — not its handle, not its name.
-- `--target` is **required** and takes exactly **one** value. (`suite create` spells the same idea `--targets`, plural and variadic — see below.)
+- For `http`, `code` and `workflow` the `referenceId` is the **Agent id** from `agent list`, and the type must match that agent's own `type`. `http:` is **never a URL**: the URL, method and headers live in the agent's config. A `workflow:` target is likewise the Agent id.
+- For `prompt` the `referenceId` is the prompt's **`id`** from `prompt list --format json`, not its handle, not its name.
+- `--target` is **required** and takes exactly **one** value. (`suite create` spells the same idea `--targets`, plural and variadic, see below.)
 - Bad references are caught when the run is scheduled, not when the scenario was created: `Invalid target references: …` means you invented an id. Go back to step 3 and read a real one.
-- Add `--wait` only when the caller can afford to block: it polls every 3s for up to 10 minutes and exits non-zero if any run failed — which is the point in CI. In an interactive turn, skip it, hand over the link, and let the page stream results in.
+- Add `--wait` only when the caller can afford to block: it polls every 3s for up to 10 minutes and exits non-zero if any run failed, which is the point in CI. In an interactive turn, skip it, hand over the link, and let the page stream results in.
+- `--param name=value` is repeatable and supplies one value for a parameter the scenario **declares** (`langwatch scenario get <id> --format json` lists them under `parameters`). It overrides that parameter's default for this run only. Without any `--param`, the run uses the declared defaults. A name no scenario in the run declares is rejected before anything is scheduled, so do not invent one. Exactly `true`/`false` reads as a boolean and a plain number as a number; everything else stays text, which is what keeps `007` an id rather than the number 7.
 
-#### 6. Or create a run plan — reusable, and the only way to hit several targets
+#### 6. Or create a run plan: reusable, and the only way to hit several targets
 
 ```bash
 langwatch suite create "Refund regression" \
@@ -3806,9 +3819,12 @@ langwatch suite create "Refund regression" \
   --format json
 
 langwatch suite run <suiteId> --format json
+
+# With values for the parameters the scenarios declare
+langwatch suite run <suiteId> --param account_tier=platinum --format json
 ```
 
-- `--scenarios` and `--targets` are both **required** and take **different shapes**: `--scenarios` is one comma-separated string; `--targets` is space-separated and variadic. `--targets http:a,prompt:b` does not error — it parses as the single target `http` → `a,prompt:b` and fails later. Keep them apart.
+- `--scenarios` and `--targets` are both **required** and take **different shapes**: `--scenarios` is one comma-separated string; `--targets` is space-separated and variadic. `--targets http:a,prompt:b` does not error: it parses as the single target `http` → `a,prompt:b` and fails later. Keep them apart.
 - Suite names must be unique in the project (the slug comes from the name); a duplicate answers `A suite with this name already exists`.
 - The run count is `scenarios × targets × repeatCount`. Three scenarios × two targets × `--repeat-count 2` is twelve real LLM conversations. Say the number before launching anything large.
 - `suite run` returns `{ scheduled, batchRunId, setId, jobCount, skippedArchived, items }`. `jobCount: 0` with entries in `skippedArchived` means everything referenced is archived and nothing ran.
@@ -3820,20 +3836,20 @@ langwatch simulation-run list --scenario-set-id <setId> --batch-run-id <batchRun
 langwatch simulation-run get <scenarioRunId> --format json      # messages, verdict, cost
 ```
 
-`--batch-run-id` only works alongside `--scenario-set-id`. `--status` and `--name` filter **client-side, after** the server has applied `--limit` — raise `--limit` if a filtered list looks suspiciously short.
+`--batch-run-id` only works alongside `--scenario-set-id`. `--status` and `--name` filter **client-side, after** the server has applied `--limit`. Raise `--limit` if a filtered list looks suspiciously short.
 
 #### 7. Send the user to the run
 
 Hand over the link instead of narrating what the run is doing.
 
-- A run plan's batch: `/<projectSlug>/simulations/run-plans/<suiteSlug>/<batchRunId>` — the run-plan half is the suite's own `platformUrl` (`langwatch suite get <suiteId> --format json`), with `/<batchRunId>` appended.
+- A run plan's batch: `/<projectSlug>/simulations/run-plans/<suiteSlug>/<batchRunId>`. The run-plan half is the suite's own `platformUrl` (`langwatch suite get <suiteId> --format json`), with `/<batchRunId>` appended.
 - A one-command `scenario run`: its plan was ephemeral and is already deleted, so link to `/<projectSlug>/simulations`, where the batch shows up in All Runs.
 
-Neither `scenario run` nor `suite run` returns a `platformUrl` of its own. If you are an in-product assistant, do not paste URLs into prose — run the command whose result carries the link and let the product render it as a navigable action.
+Neither `scenario run` nor `suite run` returns a `platformUrl` of its own. If you are an in-product assistant, do not paste URLs into prose. Run the command whose result carries the link and let the product render it as a navigable action.
 
 ### Iterating
 
-Review the results, sharpen the scenario with `langwatch scenario update <id> --criteria "…"`, and run it again. ALWAYS run the scenario — an unrun scenario is worth nothing.
+Review the results, sharpen the scenario with `langwatch scenario update <id> --criteria "…"`, and run it again. ALWAYS run the scenario. An unrun scenario is worth nothing.
 
 ### When the choice is the user's, ask
 
@@ -3855,44 +3871,44 @@ Once tests are green, summarize what you delivered and suggest 2-3 domain-specif
 
 ### Code Approach
 
-- Do NOT write a scenario without instrumenting — a green run that emits no traces is half the value; call `setupScenarioTracing()` (run-level) and instrument the agent-under-test (`langwatch.setup()` / `setupObservability`) BEFORE running, and confirm traces appear in the LangWatch UI.
-- Do NOT create your own testing framework — `@langwatch/scenario` already handles simulation, judging, multi-turn, and tool-call verification
-- Do NOT write a `main.py` / `run_scenarios.py` / custom runner that loops over scenarios. Each scenario IS a test (`it(...)` / `async def test_*`) — run them with `pytest` or `vitest`. The test runner already gives you parallelism, retries of just the failing case, watch mode, CI integration, and per-test timeouts; a runner script re-implements all of that and ships with none of it wired up.
-- Do NOT invent a JSON / YAML / TOML "scenario DSL" with keys like `{ "name": ..., "description": ..., "criteria": [...] }` and then load it into a generic loop. The whole point of Scenario being code is that each test is real code: you can use `for`, `if`, parametrize (`@pytest.mark.parametrize`, `it.each(...)`), pull a fixture, call a helper to mint a session, branch by environment, share setup via a `conftest.py`, mock a tool inline — none of which a DSL gives you. The moment a teammate needs a new edge case ("only on Tuesdays the agent should escalate"), the DSL grows another key, then another, until it's a worse version of Python/TypeScript with none of the tooling. If the same boilerplate repeats across scenarios, extract a helper FUNCTION that returns an `AgentAdapter` / a built `UserSimulatorAgent` / a script tuple — keep each scenario its own test case so it stays grep-able and debuggable.
-- Do NOT use regex or word matching to evaluate responses — always use `JudgeAgent` natural-language criteria
+- Do NOT write a scenario without instrumenting: a green run that emits no traces is half the value; call `setupScenarioTracing()` (run-level) and instrument the agent-under-test (`langwatch.setup()` / `setupObservability`) BEFORE running, and confirm traces appear in the LangWatch UI.
+- Do NOT create your own testing framework. `@langwatch/scenario` already handles simulation, judging, multi-turn, and tool-call verification
+- Do NOT write a `main.py` / `run_scenarios.py` / custom runner that loops over scenarios. Each scenario IS a test (`it(...)` / `async def test_*`), so run them with `pytest` or `vitest`. The test runner already gives you parallelism, retries of just the failing case, watch mode, CI integration, and per-test timeouts; a runner script re-implements all of that and ships with none of it wired up.
+- Do NOT invent a JSON / YAML / TOML "scenario DSL" with keys like `{ "name": ..., "description": ..., "criteria": [...] }` and then load it into a generic loop. The whole point of Scenario being code is that each test is real code: you can use `for`, `if`, parametrize (`@pytest.mark.parametrize`, `it.each(...)`), pull a fixture, call a helper to mint a session, branch by environment, share setup via a `conftest.py`, mock a tool inline, none of which a DSL gives you. The moment a teammate needs a new edge case ("only on Tuesdays the agent should escalate"), the DSL grows another key, then another, until it's a worse version of Python/TypeScript with none of the tooling. If the same boilerplate repeats across scenarios, extract a helper FUNCTION that returns an `AgentAdapter` / a built `UserSimulatorAgent` / a script tuple, and keep each scenario its own test case so it stays grep-able and debuggable.
+- Do NOT use regex or word matching to evaluate responses. Always use `JudgeAgent` natural-language criteria
 - Do NOT forget `@pytest.mark.asyncio` and `@pytest.mark.agent_test` (Python)
 - Do NOT forget a generous timeout (e.g. `30_000` ms) for TypeScript tests
-- Do NOT import from made-up packages like `agent_tester`, `simulation_framework`, `langwatch.testing` — the only valid imports are `scenario` (Python) and `@langwatch/scenario` (TypeScript)
+- Do NOT import from made-up packages like `agent_tester`, `simulation_framework`, `langwatch.testing`. The only valid imports are `scenario` (Python) and `@langwatch/scenario` (TypeScript)
 
 ### Red Teaming
 
-- Do NOT manually write adversarial prompts — let `RedTeamAgent` generate them
-- Do NOT use `UserSimulatorAgent` for red teaming — use `RedTeamAgent.crescendo()` / `redTeamCrescendo()`
-- Use `attacker.marathon_script()` (instance method) — it pads iterations for backtracking and wires up early exit
+- Do NOT manually write adversarial prompts. Let `RedTeamAgent` generate them
+- Do NOT use `UserSimulatorAgent` for red teaming. Use `RedTeamAgent.crescendo()` / `redTeamCrescendo()`
+- Use `attacker.marathon_script()` (instance method): it pads iterations for backtracking and wires up early exit
 - Do NOT forget a generous timeout (e.g. `180_000` ms) for TypeScript red team tests
 
 ### Voice Agents
 
-- Do NOT skip observability on voice agents — latency, interruption, and STT/TTS spans are exactly what you need when a voice scenario fails; instrument before running (Step 4.5: `setupScenarioTracing()` + agent-under-test instrumentation) and verify traces emit in the LangWatch UI.
-- Do NOT write a text-only scenario when the user asked for voice — pick one of `OpenAIRealtimeAgentAdapter` / `ElevenLabsAgentAdapter` / `PipecatAgentAdapter` / `GeminiLiveAgentAdapter` / `TwilioAgentAdapter` / `ComposableVoiceAgent`
-- Do NOT instantiate `OpenAIRealtimeAgentAdapter` or `GeminiLiveAgentAdapter` with placeholder `instructions=...` / `model=...` / `tools=...` — those adapters ARE the agent, so a placeholder constructor tests OpenAI/Gemini defaults, not the user's agent. Either mirror the user's prod config exactly, or pick a different adapter (Pipecat/Twilio/ElevenLabs hosted) that connects to their already-deployed transport.
-- Do NOT point `PipecatAgentAdapter(url=...)` / `ElevenLabsAgentAdapter(agent_id=...)` / `TwilioAgentAdapter` at a transport the user hasn't deployed — those adapters only connect, they don't spin anything up. If the user is text-only and has no voice transport, say so and offer `ComposableVoiceAgent` as a voice wrapper around their existing text logic.
-- Do NOT forget the `voice="elevenlabs/..."` (or `"openai/..."`) on `UserSimulatorAgent` — a silent simulator turns the voice scenario into a text scenario with audio frame headers
-- Do NOT bake an empathy persona into a calm voice — use ElevenLabs tonal markers (`[shouting]`, `[angry]`, `[stressed]`) in the persona prompt so the TTS renders audible emotion
-- Do NOT script multi-turn `user()` audio against `ElevenLabsAgentAdapter` — it's server-VAD-driven and the second `agent()` reliably times out; keep hosted-ConvAI scripts to ONE exchange
-- Do NOT forget a generous timeout (`240_000` ms for vitest, `@pytest.mark.timeout(300)` for pytest) — voice is slow
+- Do NOT skip observability on voice agents: latency, interruption, and STT/TTS spans are exactly what you need when a voice scenario fails; instrument before running (Step 4.5: `setupScenarioTracing()` + agent-under-test instrumentation) and verify traces emit in the LangWatch UI.
+- Do NOT write a text-only scenario when the user asked for voice. Pick one of `OpenAIRealtimeAgentAdapter` / `ElevenLabsAgentAdapter` / `PipecatAgentAdapter` / `GeminiLiveAgentAdapter` / `TwilioAgentAdapter` / `ComposableVoiceAgent`
+- Do NOT instantiate `OpenAIRealtimeAgentAdapter` or `GeminiLiveAgentAdapter` with placeholder `instructions=...` / `model=...` / `tools=...`: those adapters ARE the agent, so a placeholder constructor tests OpenAI/Gemini defaults, not the user's agent. Either mirror the user's prod config exactly, or pick a different adapter (Pipecat/Twilio/ElevenLabs hosted) that connects to their already-deployed transport.
+- Do NOT point `PipecatAgentAdapter(url=...)` / `ElevenLabsAgentAdapter(agent_id=...)` / `TwilioAgentAdapter` at a transport the user hasn't deployed: those adapters only connect, they don't spin anything up. If the user is text-only and has no voice transport, say so and offer `ComposableVoiceAgent` as a voice wrapper around their existing text logic.
+- Do NOT forget the `voice="elevenlabs/..."` (or `"openai/..."`) on `UserSimulatorAgent`: a silent simulator turns the voice scenario into a text scenario with audio frame headers
+- Do NOT bake an empathy persona into a calm voice. Use ElevenLabs tonal markers (`[shouting]`, `[angry]`, `[stressed]`) in the persona prompt so the TTS renders audible emotion
+- Do NOT script multi-turn `user()` audio against `ElevenLabsAgentAdapter`: it's server-VAD-driven and the second `agent()` reliably times out; keep hosted-ConvAI scripts to ONE exchange
+- Do NOT forget a generous timeout (`240_000` ms for vitest, `@pytest.mark.timeout(300)` for pytest). Voice is slow
 
 ### Platform Approach
 
-- This path uses the CLI — do NOT write code files
+- This path uses the CLI, do NOT write code files
 - Write criteria as natural language descriptions, not regex patterns
-- Create focused scenarios — each should test one specific behavior
-- Do NOT build a suite for a one-off check — `langwatch scenario run <id> --target <type>:<refId>` runs a single scenario in one command. Suites are for sets you will run again, or for hitting several targets at once
-- Do NOT use `suite update --scenarios` to *add* a scenario — it REPLACES the list. Read `suite get --format json` first and send back the existing ids plus the new one
+- Create focused scenarios, each should test one specific behavior
+- Do NOT build a suite for a one-off check: `langwatch scenario run <id> --target <type>:<refId>` runs a single scenario in one command. Suites are for sets you will run again, or for hitting several targets at once
+- Do NOT use `suite update --scenarios` to *add* a scenario: it REPLACES the list. Read `suite get --format json` first and send back the existing ids plus the new one
 - Do NOT invent a target reference. `http`/`code`/`workflow` take an **Agent id** from `agent list --format json` (matching that agent's `type`); `prompt` takes the prompt **id** from `prompt list --format json`. Bad ids surface only when the run is scheduled, as `Invalid target references`
-- Do NOT comma-separate `--targets` on `suite create` — it is space-separated and variadic, and a comma silently parses into one malformed target. `--scenarios` is the comma-separated one, and `scenario run` uses `--target`, singular, exactly one value
+- Do NOT comma-separate `--targets` on `suite create`: it is space-separated and variadic, and a comma silently parses into one malformed target. `--scenarios` is the comma-separated one, and `scenario run` uses `--target`, singular, exactly one value
 - Do NOT choose the agent or prompt on the user's behalf, and do NOT decide for them between a one-off run and a run plan. Ask one short question and wait
-- Do NOT `--wait` inside an interactive turn — trigger, hand over the link, let results stream in. Save `--wait` for CI, where its non-zero exit on failure is the whole point
+- Do NOT `--wait` inside an interactive turn. Trigger, hand over the link, let results stream in. Save `--wait` for CI, where its non-zero exit on failure is the whole point
 ````
 
         </div>
@@ -4067,7 +4083,7 @@ Examples: an LLM-judge evaluator flagging stale-data answers, a monitor on refus
 
 ### Settle open questions with experiments
 
-When two approaches compete (two prompts, two models, two retrieval settings), run an experiment instead of arguing: build a dataset from real traces (`datasets` skill), then `langwatch experiment run` both variants and compare. Numbers close debates.
+When two approaches compete (two prompts, two models, two retrieval settings), run an experiment instead of arguing: build a dataset from real traces (`datasets` skill), then run it once per variant with `langwatch experiment run <slug> --param model=<variant>` and compare. A `--param name=value` pair is a constant merged into every row, so one experiment covers both sides. Numbers close debates.
 
 LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments, and datasets. When you hit a limit, the API returns `"Free plan limit of N reached..."` with an upgrade link.
 

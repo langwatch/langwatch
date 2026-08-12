@@ -361,7 +361,38 @@ describe("runSuiteCommand()", () => {
 
       await runSuiteCommand("suite_abc123", {});
 
-      expect(mockRun).toHaveBeenCalledWith("suite_abc123");
+      expect(mockRun).toHaveBeenCalledWith("suite_abc123", {
+        parameters: undefined,
+      });
+    });
+  });
+
+  describe("when --param pairs are given", () => {
+    it("hands the run the values those names resolve to", async () => {
+      mockRun.mockResolvedValue(makeRunResult());
+
+      await runSuiteCommand("suite_abc123", {
+        param: ["account_tier=gold", "seats=12", "beta=false", "order=007"],
+      });
+
+      expect(mockRun).toHaveBeenCalledWith("suite_abc123", {
+        parameters: {
+          account_tier: "gold",
+          seats: 12,
+          beta: false,
+          order: "007",
+        },
+      });
+    });
+  });
+
+  describe("when a --param pair has no equals sign", () => {
+    it("refuses the command instead of scheduling a run", async () => {
+      await expect(
+        runSuiteCommand("suite_abc123", { param: ["account_tier"] }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(mockRun).not.toHaveBeenCalled();
     });
   });
 
@@ -386,7 +417,9 @@ describe("runSuiteCommand()", () => {
 
       await runSuiteCommand("suite_abc123", {});
 
-      expect(mockRun).toHaveBeenCalledWith("suite_abc123");
+      expect(mockRun).toHaveBeenCalledWith("suite_abc123", {
+        parameters: undefined,
+      });
     });
   });
 

@@ -1,20 +1,33 @@
-import { Field, Input, Text, Textarea, VStack } from "@chakra-ui/react";
+import { Field, HStack, Input, Text, Textarea, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useRef } from "react";
-import { Controller, type UseFormReturn, useForm } from "react-hook-form";
+import {
+  type Control,
+  Controller,
+  type FieldErrors,
+  type UseFormReturn,
+  useForm,
+} from "react-hook-form";
 import { z } from "zod";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
+import { scenarioParameterDefinitionsSchema } from "~/server/scenarios/parameters";
 import { CriteriaInput } from "./ui/CriteriaInput";
+import { ParameterDefinitionsInput } from "./ui/ParameterDefinitionsInput";
 import { SectionHeader } from "./ui/SectionHeader";
 
 /**
  * Zod schema for scenario form validation.
  * Colocated with the form component it validates.
+ *
+ * Parameters reuse the server's schema rather than restating its caps, so the
+ * form rejects exactly what the save would.
  */
 export const scenarioFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
   situation: z.string(),
   criteria: z.array(z.string()),
   labels: z.array(z.string()),
+  parameters: scenarioParameterDefinitionsSchema,
 });
 
 export type ScenarioFormData = z.infer<typeof scenarioFormSchema>;
@@ -44,6 +57,7 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
       situation: "",
       criteria: [],
       labels: [],
+      parameters: [],
       ...defaultValues,
     },
     resolver: zodResolver(scenarioFormSchema),
@@ -56,35 +70,14 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
     formState: { errors },
   } = form;
 
+  const { parametersError, parameterRowErrors } = readParameterErrors(errors);
+
   // Expose form to parent
   useEffect(() => {
     formRef?.(form);
   }, [form, formRef]);
 
-  // Reset form when defaultValues change (using ref to track previous serialized values)
-  const prevDefaultsRef = useRef<string | null>(null);
-  useEffect(() => {
-    const currentDefaults = defaultValues
-      ? JSON.stringify([
-          defaultValues.name,
-          defaultValues.situation,
-          defaultValues.criteria,
-          defaultValues.labels,
-        ])
-      : null;
-    if (currentDefaults !== prevDefaultsRef.current) {
-      prevDefaultsRef.current = currentDefaults;
-      if (defaultValues) {
-        reset({
-          name: "",
-          situation: "",
-          criteria: [],
-          labels: [],
-          ...defaultValues,
-        });
-      }
-    }
-  }, [defaultValues, reset]);
+  useResetOnDefaultsChange({ reset, defaultValues });
 
   return (
     <VStack align="stretch" gap={6}>
@@ -142,6 +135,124 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
           )}
         />
       </VStack>
+
+      <ParametersSection
+        control={control}
+        error={parametersError}
+        rowErrors={parameterRowErrors}
+      />
     </VStack>
   );
+}
+
+/**
+ * Re-seeds the form when the scenario being edited changes.
+ *
+ * The previous defaults are tracked by value rather than by object identity: a
+ * parent that rebuilds the object on every render would otherwise reset the
+ * form under the user mid-edit.
+ */
+function useResetOnDefaultsChange({
+  reset,
+  defaultValues,
+}: {
+  reset: UseFormReturn<ScenarioFormData>["reset"];
+  defaultValues?: Partial<ScenarioFormData>;
+}) {
+  const prevDefaultsRef = useRef<string | null>(null);
+  useEffect(() => {
+    const currentDefaults = defaultValues
+      ? JSON.stringify([
+          defaultValues.name,
+          defaultValues.situation,
+          defaultValues.criteria,
+          defaultValues.labels,
+          defaultValues.parameters,
+        ])
+      : null;
+    if (currentDefaults !== prevDefaultsRef.current) {
+      prevDefaultsRef.current = currentDefaults;
+      if (defaultValues) {
+        reset({
+          name: "",
+          situation: "",
+          criteria: [],
+          labels: [],
+          parameters: [],
+          ...defaultValues,
+        });
+      }
+    }
+  }, [defaultValues, reset]);
+}
+
+function ParametersSection({
+  control,
+  error,
+  rowErrors,
+}: {
+  control: Control<ScenarioFormData>;
+  error: string | undefined;
+  rowErrors: (string | undefined)[];
+}) {
+  return (
+    <VStack align="stretch" gap={3}>
+      <HStack gap={0}>
+        <SectionHeader>Parameters</SectionHeader>
+        <FieldInfoTooltip
+          description='Named values a run supplies, so the same scenario can run against another account, tenant or region. The situation, the criteria and the target read them as "params.NAME", and whoever starts the run can override any default.'
+          testId="scenario-parameters-info"
+        />
+      </HStack>
+      <Field.Root invalid={!!error}>
+        <Controller
+          name="parameters"
+          control={control}
+          render={({ field }) => (
+            <ParameterDefinitionsInput
+              value={field.value}
+              onChange={field.onChange}
+              rowErrors={rowErrors}
+            />
+          )}
+        />
+        <Field.ErrorText>{error}</Field.ErrorText>
+      </Field.Root>
+    </VStack>
+  );
+}
+
+/**
+ * Validation messages for the parameters field.
+ *
+ * The schema reports a bad name or a duplicate against the row that carries it
+ * and the twenty-parameter cap against the array itself, so both are read back
+ * separately: a row message sits under its row, the array message under the
+ * section.
+ */
+function readParameterErrors(errors: FieldErrors<ScenarioFormData>): {
+  parametersError: string | undefined;
+  parameterRowErrors: (string | undefined)[];
+} {
+  const parameters: unknown = errors.parameters;
+  const rows = Array.isArray(parameters) ? (parameters as unknown[]) : [];
+  return {
+    parametersError:
+      messageOf(parameters) ??
+      messageOf((parameters as { root?: unknown } | undefined)?.root),
+    parameterRowErrors: rows.map((row) => {
+      const fields = (row ?? {}) as Record<string, unknown>;
+      return (
+        messageOf(fields.name) ??
+        messageOf(fields.description) ??
+        messageOf(fields.defaultValue)
+      );
+    }),
+  };
+}
+
+function messageOf(error: unknown): string | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  const message = (error as { message?: unknown }).message;
+  return typeof message === "string" ? message : undefined;
 }

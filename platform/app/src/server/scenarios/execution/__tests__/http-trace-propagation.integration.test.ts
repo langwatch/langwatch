@@ -81,6 +81,7 @@ describe("HTTP trace context propagation", () => {
       url: echoServer.url,
       method: "POST",
       headers: [],
+      secrets: {},
       outputPath: "$.choices[0].message.content",
       ...overrides,
     };

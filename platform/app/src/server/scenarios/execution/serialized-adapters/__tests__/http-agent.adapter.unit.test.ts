@@ -35,6 +35,7 @@ describe("SerializedHttpAgentAdapter", () => {
     url: "https://api.example.com/chat",
     method: "POST",
     headers: [],
+    secrets: {},
     outputPath: "$.response",
   };
 

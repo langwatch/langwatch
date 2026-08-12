@@ -10,6 +10,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { ProjectRepository } from "~/server/projects/project.repository";
+import { runParameterValuesSchema } from "~/server/scenarios/parameters";
 import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
 import { SuiteService } from "~/server/suites/suite.service";
 import { extractSuiteId } from "~/server/suites/suite-set-id";
@@ -134,6 +135,11 @@ export const suiteRouter = createTRPCRouter({
         idempotencyKey: z.string(),
         /** Optional client-generated batch run ID for immediate placeholder feedback */
         batchRunId: z.string().optional(),
+        /**
+         * Constant values applied to every scenario in the run. A value
+         * supplied here overrides the scenario's own default for that name.
+         */
+        parameters: runParameterValuesSchema.optional(),
       }),
     )
     .use(checkProjectPermission("scenarios:manage"))
@@ -169,6 +175,7 @@ export const suiteRouter = createTRPCRouter({
         organizationId,
         idempotencyKey: input.idempotencyKey,
         batchRunId: input.batchRunId,
+        parameters: input.parameters,
       });
 
       return {

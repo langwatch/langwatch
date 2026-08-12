@@ -168,6 +168,7 @@ function makeConfig(
     url,
     method: "POST",
     headers: [],
+    secrets: {},
     outputPath: "$.message",
     ...overrides,
   };
