@@ -2730,13 +2730,15 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     triggerCmd
       .command("create <name>")
       .description("Create a new trigger (automation)")
-      .requiredOption("--action <action>", "Trigger action: SEND_EMAIL, ADD_TO_DATASET, ADD_TO_ANNOTATION_QUEUE, SEND_SLACK_MESSAGE")
+      .requiredOption("--action <action>", "Trigger action: SEND_EMAIL, ADD_TO_DATASET, ADD_TO_ANNOTATION_QUEUE, SEND_SLACK_MESSAGE, SEND_WEBHOOK")
+      .option("--action-params <json>", "Delivery configuration for the chosen action, as JSON")
       .option("--filters <json>", "Trigger filter conditions as JSON")
+      .option("--filter-query <query>", "Trace query in the syntax the traces view uses, e.g. status:error")
       .option("--message <text>", "Custom alert message")
       .option("--alert-type <type>", "Alert severity: CRITICAL, WARNING, INFO")
       .option("--slack-webhook <url>", "Slack webhook URL (for SEND_SLACK_MESSAGE action)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { action: string; filters?: string; message?: string; alertType?: string; slackWebhook?: string }) => {
+    async (name: string, options: { action: string; actionParams?: string; filters?: string; filterQuery?: string; message?: string; alertType?: string; slackWebhook?: string }) => {
       const { createTriggerCommand: impl } = await import("./commands/triggers/create.js");
       return impl(name, options);
     },
@@ -2750,9 +2752,57 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--active <boolean>", "Enable or disable the trigger (true/false)")
       .option("--message <text>", "New alert message")
       .option("--alert-type <type>", "New alert severity")
+      .option("--filters <json>", "Trigger filter conditions as JSON")
+      .option("--filter-query <query>", "Trace query in the syntax the traces view uses")
+      .option("--action-params <json>", "The delivery configuration this trigger should have from now on, as JSON. Replaces the stored one; send [redacted] back for a credential to keep it")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { name?: string; active?: string; message?: string; alertType?: string }) => {
+    async (id: string, options: { name?: string; active?: string; message?: string; alertType?: string; filters?: string; filterQuery?: string; actionParams?: string }) => {
       const { updateTriggerCommand: impl } = await import("./commands/triggers/update.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    triggerCmd
+      .command("enable <id>")
+      .description("Resume a paused trigger")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
+      const { setTriggerActiveCommand: impl } = await import("./commands/triggers/setActive.js");
+      return impl(id, { active: true });
+    },
+  );
+
+  emitsResult(
+    triggerCmd
+      .command("disable <id>")
+      .description("Pause a trigger")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
+      const { setTriggerActiveCommand: impl } = await import("./commands/triggers/setActive.js");
+      return impl(id, { active: false });
+    },
+  );
+
+  emitsResult(
+    triggerCmd
+      .command("test-fire <id>")
+      .description("Send the trigger's message to the destination it is configured with")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
+      const { testFireTriggerCommand: impl } = await import("./commands/triggers/testFire.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    triggerCmd
+      .command("fires <id>")
+      .description("What the trigger has done, newest first")
+      .option("--limit <n>", "How many fires to read")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { limit?: string }) => {
+      const { triggerFiresCommand: impl } = await import("./commands/triggers/fires.js");
       return impl(id, options);
     },
   );

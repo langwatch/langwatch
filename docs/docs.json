@@ -1130,7 +1130,11 @@
               "api-reference/triggers/create-a-slack-alert-trigger",
               "api-reference/triggers/create-triggers",
               "api-reference/triggers/get-triggers",
+              "api-reference/triggers/get-fires",
               "api-reference/triggers/update-triggers",
+              "api-reference/triggers/action-disable",
+              "api-reference/triggers/action-enable",
+              "api-reference/triggers/action-test-fire",
               "api-reference/triggers/delete-triggers"
             ]
           },
