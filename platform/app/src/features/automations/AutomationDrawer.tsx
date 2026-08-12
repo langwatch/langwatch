@@ -235,7 +235,7 @@ export function AutomationDrawer({
   initialFilterQuery?: string;
 }) {
   const { project, organization, team } = useOrganizationTeamProject();
-  const { closeDrawer } = useDrawer();
+  const { closeDrawer, openDrawer } = useDrawer();
   const queryClient = api.useContext();
   const { filterParams } = useFilterParams();
   const projectId = project?.id ?? "";
@@ -897,13 +897,31 @@ export function AutomationDrawer({
         traceDebounceMs: draft.traceDebounceMs,
       },
       {
-        onSuccess: () => {
+        onSuccess: (saved) => {
           toaster.create({
             title: automationId ? labels.updatedToast : labels.createdToast,
             type: "success",
             meta: { closable: true },
+            // Saving closes the drawer and leaves the author wherever they
+            // started, which is usually not the automations list. This is the
+            // one moment the app knows exactly which row was written, so it
+            // carries the way back to it.
+            ...(automationId
+              ? {}
+              : {
+                  action: {
+                    label: `View ${labels.noun}`,
+                    onClick: () =>
+                      openDrawer("viewAutomation", { automationId: saved.id }),
+                  },
+                }),
           });
           void queryClient.automation.getTriggers.invalidate();
+          // Edit hydration reads this query ONCE per open and ignores every
+          // later read (so a background refetch can't overwrite keystrokes).
+          // Without this the next open hydrates from the pre-save copy and
+          // shows the value the author just replaced.
+          void queryClient.automation.getTriggerById.invalidate();
           // The dashboard chart card reads its alert state off the graph, not
           // off the trigger list: without these the card still offers "Add
           // alert" after one was just created, and clicking it re-enters CREATE
@@ -927,6 +945,8 @@ export function AutomationDrawer({
     canSave,
     closeDrawer,
     draft,
+    labels,
+    openDrawer,
     projectId,
     queryClient,
     upsert,
