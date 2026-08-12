@@ -292,20 +292,20 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
     And no device flow runs
 
   # ─────────────────────────────────────────────────────────────────────
-  # No-paste convergence — both modes mint via device-code-poll
-  # (sergey f9fcc3927 backend + alexis bfef4ebab project-picker)
+  # No-paste convergence: both modes deliver the credential over the
+  # device-code poll
   # ─────────────────────────────────────────────────────────────────────
 
   @bdd @cli @login @no-paste @api-key
-  Scenario: Interactive login (project mode) mints API key via device-code-poll, no copy-paste
+  Scenario: Interactive login (project mode) delivers the project API key via device-code-poll, no copy-paste
     Given the user is in an interactive terminal and selected
       "Project / SDK API key" in the unified prompt
     When the CLI calls `POST /api/auth/cli/device-code` with body
       `{ credential_type: "project_api_key" }`
-    And the user clicks "Generate API key" on the /cli/auth page
+    And the user clicks "Send API key" on the /cli/auth page
       after picking a project
     Then the server records the picked `project_id` on the device-code
-      record + stamps the freshly-minted `Project.apiKey`
+      record + stamps the picked project's existing `Project.apiKey`
     And the CLI's `POST /api/auth/cli/exchange` poll returns:
       | field    | value                                              |
       | kind     | "api_key"                                          |
