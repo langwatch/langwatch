@@ -143,7 +143,8 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     // Path A codex traffic flows through the gateway as gen_ai.*
     // spans; GenAIExtractor handles that side and emits canonical
     // attributes. This branch covers Path B native spans from the
-    // Rust CLI (scope `codex_cli_rs`), where the per-turn
+    // Rust CLI (scope `codex_cli_rs` / `codex_exec` / `codex-app-server`
+    // — see CODEX_SCOPE_NAMES), where the per-turn
     // `session_task.turn` span carries codex-namespaced attributes
     // that won't match GenAIExtractor's gen_ai.* gates.
     //
