@@ -35,6 +35,10 @@ export const createSubscriptionRouterFactory = ({
           upgradeTraces: z.boolean(),
           totalMembers: z.number(),
           totalTraces: z.number(),
+          // Echoed back from `previewProration` so the charge prices the same
+          // instant the customer was quoted. Optional: callers that never
+          // showed a quote are priced at the moment they run.
+          quotedAt: z.number().int().positive().optional(),
         }),
       )
       .use(checkOrganizationPermission("organization:manage"))
@@ -46,6 +50,7 @@ export const createSubscriptionRouterFactory = ({
           upgradeTraces: input.upgradeTraces,
           totalMembers: input.totalMembers,
           totalTraces: input.totalTraces,
+          quotedAt: input.quotedAt,
         });
       }),
 
