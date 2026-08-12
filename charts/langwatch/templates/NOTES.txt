@@ -106,6 +106,10 @@ dev's Personal Workspace at https://<your-host>/me .
        the render every lookup returns empty. ./tests/restricted-rbac.sh does. */}}
     To see whether this cluster already offers one:
       kubectl get runtimeclass
+    If that is denied, nothing is broken: it is a cluster-scoped read, which
+    is exactly what a namespace-scoped operator does not have. Langy keeps
+    running as it is — ask whoever administers the cluster whether a class
+    exists to pin.
     gVisor reports a handler of runsc; Kata ships under several, such as
     kata-qemu or kata-mshv-vm-isolation. Handler names are runtime- and
     platform-specific, so confirm against your platform's documentation
