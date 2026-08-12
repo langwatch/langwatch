@@ -24,7 +24,7 @@ Use it when you want to:
 - **Choose a winner among finalists.** Compare a baseline prompt against a proposed rewrite, a current model against a cheaper one, or several agent configurations against each other in one pass.
 - **Evaluate subjective quality.** Tone, helpfulness, concision, formatting, and reasoning quality often have no single golden answer, but one output can still be clearly better than the rest.
 - **Review row-level tradeoffs.** Results show which variant won each row, and where the judge sees no meaningful difference.
-- **Reduce position bias.** Candidate order is shuffled deterministically per row before being shown to the judge, so the same row re-evaluated gives a comparable verdict without depending on which candidate happened to appear first.
+- **Reduce position bias.** Candidate order is shuffled deterministically per row by default before being shown to the judge, so the same row re-evaluated gives a comparable verdict without depending on which candidate happened to appear first.
 - **Factor in operational metrics.** Include candidate cost or duration in the judge context when you want the better answer to also account for latency or spend.
 
 ## When to use it
@@ -58,9 +58,9 @@ You can compare variants even when they have the same display name. LangWatch nu
 
 ## How the verdict works
 
-Comparison shuffles candidate order deterministically (seeded per row) and asks the judge to pick the best candidate, weighing every variant in one comparison:
+By default Comparison shuffles candidate order deterministically (seeded per row) and asks the judge to pick the best candidate, weighing every variant in one comparison:
 
-1. Candidates are presented to the judge in a shuffled order that's stable for that row — re-evaluating the same row produces the same order and a comparable verdict.
+1. Candidates are presented to the judge in a shuffled order that's stable for that row, so re-evaluating the same row produces the same order and a comparable verdict. `randomize_order` governs the shuffle: turn it off and the judge sees the candidates in the order their targets were registered.
 2. The judge picks the single best candidate, or a tie if none is clearly better and ties are allowed.
 3. The verdict is mapped back to the winning candidate's real identifier before it's shown to you — never the shuffled slot position.
 
@@ -78,11 +78,11 @@ Use a golden answer when correctness is the primary question. Use direct prefere
 
 Comparison is designed so the result column contains the information you need to review the judgment without opening a separate panel:
 
-- **Who won:** each row shows the winning variant's name, or a tie when no candidate is clearly better.
+- **Who won:** each row shows the winning variant's name, a tie when no candidate is clearly better, or no winner at all when the two passes disagreed. No winner is a third outcome, not a tie: a tie says the candidates are equally good, an unsettled row says this row did not separate them.
 - **What won:** the cell shows the winning variant's actual output so you can immediately inspect the answer the judge preferred.
 - **Why it won:** the judge reasoning appears below the output.
 
-The results page also includes a win-rate chart alongside the cost and latency charts, with one bar per variant plus a bar for ties — every variant is counted, including ones that never won a single row.
+The results page also includes a win-rate chart alongside the cost and latency charts, with one bar per variant plus a bar for ties. Every variant is counted, including ones that never won a single row. An unsettled row is on none of those bars: it is not a win for any variant, and it is not a tie.
 
 In the workbench, the Comparison column header names the overall winner across the current run. Hover the header to see the full win tally broken down per variant, including ties.
 
@@ -92,6 +92,7 @@ Review the aggregate result and the row-level explanations together:
 
 - A large win margin usually indicates a clear preference.
 - A high tie count often means the variants are equivalent for the dataset, or the judge instructions are not specific enough.
+- Many unsettled rows mean the judge keeps changing its answer when the candidate order changes. Running more rows will not fix that: change the judge model, or make the instructions more specific.
 - Split wins are useful signal: inspect the rows each variant wins to understand which use cases improved or regressed.
 
 ## Settings

@@ -17,7 +17,7 @@ from langwatch.experiment.experiment import Experiment, _current_trace_id
 
 pytestmark = pytest.mark.unit
 
-# A trace id whose first eleven bytes are zero, the case an unpadded hex
+# A trace id whose first twelve bytes are zero, the case an unpadded hex
 # encoding silently shortens.
 LEADING_ZEROS_TRACE_ID = 0x0000000000000000000000004AF2B31D
 LEADING_ZEROS_TRACE_ID_HEX = "0000000000000000000000004af2b31d"

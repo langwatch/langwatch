@@ -293,8 +293,8 @@ class TestGivenEveryTargetRecordedAnOutput:
 
     def test_forgets_rows_the_run_has_moved_far_past(self, experiment, judge):
         """The bound lives entirely in _record_row_output, so the rows are fed
-        to it directly. Driving them through target() would open two real
-        spans per row, four thousand of them, to prove one eviction rule."""
+        to it directly. Driving them through target() would open a real span
+        per target per row to prove one eviction rule."""
         from langwatch.experiment.experiment import _MAX_TRACKED_OUTPUT_ROWS
 
         for index in range(_MAX_TRACKED_OUTPUT_ROWS + 5):

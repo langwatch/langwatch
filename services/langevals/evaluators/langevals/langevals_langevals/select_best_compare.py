@@ -5,9 +5,9 @@ Given 2+ candidate outputs (from different EvaluationsV3 target columns) and
 an optional golden reference, asks an LLM judge to pick the single best
 candidate, with deterministic candidate-order shuffling (seeded by
 `row_index`) for position-bias mitigation. By default (`swap_and_reconcile`),
-each row is judged twice — once in that shuffled order, once with the order
-fully reversed — and a disagreement between the two verdicts is treated as a
-tie rather than trusting either individual call.
+each row is judged twice, once in that shuffled order and once with the order
+fully reversed. A disagreement between the two verdicts leaves the row with no
+winner, which is neither a tie nor either individual call taken on trust.
 
 Two candidates is not a special case. This evaluator is the only comparison
 judge offered, superseding the two-slot `langevals/pairwise_compare` (#5100),
@@ -297,11 +297,12 @@ class SelectBestCompareEvaluator(
             else None
         )
 
-        # No winner at all — reconciliation found the verdict was order-
-        # dependent and ties are disabled, so there is nothing to report. This
-        # is skipped rather than scored: `score=1.0` would read as a win for
-        # `label=None`, and `score=0.5` would be the tie the settings ruled
-        # out. An absent verdict must contribute no evidence either way.
+        # No winner at all: reconciliation found the verdict was order-
+        # dependent, whatever `allow_tie` says, so there is nothing to report.
+        # This is skipped rather than scored: `score=1.0` would read as a win
+        # for `label=None`, and `score=0.5` would claim a tie the run never
+        # established. An absent verdict must contribute no evidence either
+        # way.
         #
         # The judge calls were still made and still billed, so the cost rides
         # along: an inconclusive row is the most expensive kind there is (two

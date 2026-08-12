@@ -5,31 +5,19 @@
  * Spec: specs/experiments/comparison-sdk.feature
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
+  type ComparisonHarness,
   THREE_OUTPUTS,
   createExperiment,
-  createHarness,
-  originalFetch,
   runComparison,
+  useComparisonHarness,
 } from "./comparison-harness";
 
 describe("Experiment.compare", () => {
-  let harness: ReturnType<typeof createHarness>;
-  const previousApiKey = process.env.LANGWATCH_API_KEY;
-
-  beforeEach(() => {
-    // Left unset so ensureSetup() stays a no-op; the key is passed explicitly.
-    delete process.env.LANGWATCH_API_KEY;
-    vi.spyOn(console, "log").mockImplementation(() => undefined);
-    harness = createHarness();
-  });
-
-  afterEach(() => {
-    globalThis.fetch = originalFetch;
-    vi.restoreAllMocks();
-    if (previousApiKey === undefined) delete process.env.LANGWATCH_API_KEY;
-    else process.env.LANGWATCH_API_KEY = previousApiKey;
+  let harness: ComparisonHarness;
+  useComparisonHarness((created) => {
+    harness = created;
   });
 
   describe("given three targets recorded an output for the row", () => {

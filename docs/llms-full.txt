@@ -39157,7 +39157,7 @@ Scoring each target on its own leaves you calibrating numbers: is `0.78` better 
 
 ### Comparing a row
 
-Every target that recorded an output for the row is a candidate, and one comparison weighs all of them together rather than a round of one-against-one matchups. Behind it the judge is called twice per row by default, the second time with the candidate order reversed, which is what [`swap_and_reconcile`](#options) does; turn that off and one comparison is one judge call. There is no candidate list to assemble and no judge prompt to choose:
+Every target that produced a non-empty output for the row is a candidate, and one comparison weighs all of them together rather than a round of one-against-one matchups. Behind it the judge is called twice per row by default, the second time with the candidate order reversed, which is what [`swap_and_reconcile`](#options) does; turn that off and one comparison is one judge call. There is no candidate list to assemble, and no judge prompt you have to choose, since the shipped one runs unless you [write your own](#customizing-the-judge-prompt):
 
 
   ### Python
@@ -39204,7 +39204,7 @@ The candidates are whatever each `withTarget()` callback returned.
 
 
 
-The winner comes back named with the target name you registered. Two candidates is not a different call from five: `compare()` judges however many the row has, and a target that produced nothing for the row is simply not a candidate.
+The winner comes back named with the target name you registered. Two candidates is not a different call from five: `compare()` judges however many the row has, and a target that produced nothing for the row, or only an empty output, is simply not a candidate.
 
 <Info>
   Compare a row once its targets have finished. In Python that is after the row's last `target()` block has closed, and in TypeScript after its `withTarget()` calls have settled, which under the usual `Promise.all` is right after the `await`.
@@ -39316,7 +39316,7 @@ Every option is optional, because the judge already has a default for each one. 
 
 | Option | Default | What it does |
 |--------|---------|--------------|
-| `targets` | Every target that recorded an output for the row | Restricts the comparison to the targets you name |
+| `targets` | Every target that produced a non-empty output for the row | Restricts the comparison to the targets you name |
 | `input` | No task context | The task the candidates were answering, for the judge to weigh them against |
 | `golden` | No reference answer, so candidates are judged on their own merits | A reference answer to judge each candidate against, and the switch that turns reference judging on |
 | `prompt` | The shipped prompt matching what the row carries | Your own judge prompt, used exactly as written |
@@ -39337,7 +39337,7 @@ A verdict carries four things: the `status`, the `winner`, the judge's `reasonin
 | `decided` | The judge picked a winner, named in `winner` |
 | `tie` | The judge compared the candidates and found none better than the rest, so there is no winner |
 | `inconclusive` | The judge established no winner. Under swap and reconcile that is its two passes disagreeing, so this row does not separate these candidates. That is a finding about them, and it is deliberately not a tie, which would claim they are equally good |
-| `skipped` | Fewer than two targets recorded an output, so no judge ran. `reasoning` names the targets that produced nothing |
+| `skipped` | Fewer than two targets produced a non-empty output, so no judge ran. `reasoning` names the targets that produced nothing |
 | `error` | The judge failed or could not be reached, so nothing was measured about the candidates at all |
 
 <Note>
@@ -39686,7 +39686,7 @@ A comparison grades the row as a whole rather than one target, so it gets its ow
 
 | Column Pattern | Description | Example |
 |----------------|-------------|---------|
-| `{comparison}_winner` | Name of the winning target, `tie`, or empty | `comparison_winner` → `gpt-5-mini` |
+| `{comparison}_winner` | Name of the winning target, `tie`, `unresolved`, or empty | `comparison_winner` → `gpt-5-mini` |
 | `{comparison}_candidates` | The targets compared on this row, comma separated | `comparison_candidates` → `gpt-5-mini, claude-sonnet-5` |
 | `{comparison}_reasoning` | The judge's explanation for the verdict | `comparison_reasoning` → `"gpt-5-mini gives the exact reset link"` |
 
@@ -40025,7 +40025,7 @@ Use it when you want to:
 - **Choose a winner among finalists.** Compare a baseline prompt against a proposed rewrite, a current model against a cheaper one, or several agent configurations against each other in one pass.
 - **Evaluate subjective quality.** Tone, helpfulness, concision, formatting, and reasoning quality often have no single golden answer, but one output can still be clearly better than the rest.
 - **Review row-level tradeoffs.** Results show which variant won each row, and where the judge sees no meaningful difference.
-- **Reduce position bias.** Candidate order is shuffled deterministically per row before being shown to the judge, so the same row re-evaluated gives a comparable verdict without depending on which candidate happened to appear first.
+- **Reduce position bias.** Candidate order is shuffled deterministically per row by default before being shown to the judge, so the same row re-evaluated gives a comparable verdict without depending on which candidate happened to appear first.
 - **Factor in operational metrics.** Include candidate cost or duration in the judge context when you want the better answer to also account for latency or spend.
 
 ## When to use it
@@ -40059,9 +40059,9 @@ You can compare variants even when they have the same display name. LangWatch nu
 
 ## How the verdict works
 
-Comparison shuffles candidate order deterministically (seeded per row) and asks the judge to pick the best candidate, weighing every variant in one comparison:
+By default Comparison shuffles candidate order deterministically (seeded per row) and asks the judge to pick the best candidate, weighing every variant in one comparison:
 
-1. Candidates are presented to the judge in a shuffled order that's stable for that row — re-evaluating the same row produces the same order and a comparable verdict.
+1. Candidates are presented to the judge in a shuffled order that's stable for that row, so re-evaluating the same row produces the same order and a comparable verdict. `randomize_order` governs the shuffle: turn it off and the judge sees the candidates in the order their targets were registered.
 2. The judge picks the single best candidate, or a tie if none is clearly better and ties are allowed.
 3. The verdict is mapped back to the winning candidate's real identifier before it's shown to you — never the shuffled slot position.
 
@@ -40079,11 +40079,11 @@ Use a golden answer when correctness is the primary question. Use direct prefere
 
 Comparison is designed so the result column contains the information you need to review the judgment without opening a separate panel:
 
-- **Who won:** each row shows the winning variant's name, or a tie when no candidate is clearly better.
+- **Who won:** each row shows the winning variant's name, a tie when no candidate is clearly better, or no winner at all when the two passes disagreed. No winner is a third outcome, not a tie: a tie says the candidates are equally good, an unsettled row says this row did not separate them.
 - **What won:** the cell shows the winning variant's actual output so you can immediately inspect the answer the judge preferred.
 - **Why it won:** the judge reasoning appears below the output.
 
-The results page also includes a win-rate chart alongside the cost and latency charts, with one bar per variant plus a bar for ties — every variant is counted, including ones that never won a single row.
+The results page also includes a win-rate chart alongside the cost and latency charts, with one bar per variant plus a bar for ties. Every variant is counted, including ones that never won a single row. An unsettled row is on none of those bars: it is not a win for any variant, and it is not a tie.
 
 In the workbench, the Comparison column header names the overall winner across the current run. Hover the header to see the full win tally broken down per variant, including ties.
 
@@ -40093,6 +40093,7 @@ Review the aggregate result and the row-level explanations together:
 
 - A large win margin usually indicates a clear preference.
 - A high tie count often means the variants are equivalent for the dataset, or the judge instructions are not specific enough.
+- Many unsettled rows mean the judge keeps changing its answer when the candidate order changes. Running more rows will not fix that: change the judge model, or make the instructions more specific.
 - Split wins are useful signal: inspect the rows each variant wins to understand which use cases improved or regressed.
 
 ## Settings
@@ -45752,7 +45753,7 @@ Instrument my code with LangWatch
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Add LangWatch Tracing to Your Code
@@ -45916,7 +45917,7 @@ Set up experiments for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Run Experiments for Your Agent
@@ -46205,7 +46206,7 @@ Set up online evaluations for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Set Up Online Evaluations and Guardrails
@@ -46433,7 +46434,7 @@ Help me evaluate my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Route an Evaluation Request
@@ -46540,7 +46541,7 @@ Add scenario tests for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Test Your Agent with Scenarios
@@ -47499,7 +47500,7 @@ Version my prompts with LangWatch
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Version Your Prompts with LangWatch Prompts CLI
@@ -47733,7 +47734,7 @@ Run `langwatch prompt list` to confirm everything synced, or open the Prompts se
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Generate Evaluation Datasets
@@ -48218,7 +48219,7 @@ Take my agent to the next level
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Add LangWatch Tracing to Your Code
@@ -49766,7 +49767,7 @@ What should I do next to improve my agent?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Improve Your Agent, Hypothesis by Hypothesis
@@ -49948,7 +49949,7 @@ How is my agent performing?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Diagnose Your Agent's Production Behavior
@@ -50122,7 +50123,7 @@ Where can I improve our agent development best practices?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Improve Your Agent Development Best Practices
@@ -50258,7 +50259,7 @@ After each improvement:
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Debug Your LangWatch Instrumentation
@@ -50408,14 +50409,14 @@ langwatch trace export --format jsonl --limit 50 -o traces.jsonl
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Debug Production Issues with LangWatch
 
 A structured diagnostic workflow: errored traces → span inspection → monitor/evaluator scores → root cause. Work the steps in order; each narrows the search space for the next.
 
-If traces themselves look broken (empty inputs/outputs, disconnected spans), switch to the `debug-instrumentation` recipe instead — that is an instrumentation problem, not an application problem.
+If traces themselves look broken (empty inputs/outputs, disconnected spans), switch to the `debug-instrumentation` recipe instead. That is an instrumentation problem, not an application problem.
 
 ## Prerequisites
 
@@ -50441,7 +50442,7 @@ If anything fails or confuses you while following this skill (broken commands, d
 langwatch status
 ```
 
-A fast sanity check that the API key, endpoint, and project are the ones you mean to debug. Fix auth first (see the `setup-lw` recipe) — every later step reads from this project.
+A fast sanity check that the API key, endpoint, and project are the ones you mean to debug. Fix auth first (see the `setup-lw` recipe): every later step reads from this project.
 
 ## Step 1: Find the Errored Traces
 
@@ -50451,7 +50452,7 @@ langwatch trace search -q "timeout" --start-date 2026-01-01 -o json
 ```
 
 - `--start-date`/`--end-date` bound the window (ISO strings or epoch ms; default is the last 24h).
-- `-q` does a text search — the error message, a user id, a thread id.
+- `-q` does a text search: the error message, a user id, a thread id.
 - The result is `{ "traces": [...], "pagination": { "totalHits": N } }`. Pull fields out with `--jq` instead of reading the whole payload:
 
 ```bash
@@ -50470,7 +50471,7 @@ langwatch trace get <traceId> -o json    # full span hierarchy
 
 Read the span tree top-down:
 
-- **Which span failed?** The error is usually in one span (an LLM call, a tool call), not the whole trace. Note its input — a bad input upstream often explains a failure downstream.
+- **Which span failed?** The error is usually in one span (an LLM call, a tool call), not the whole trace. Note its input: a bad input upstream often explains a failure downstream.
 - **What did the model see?** Check the prompt/messages on the failing LLM span. Missing context, truncated history, and stale retrieved documents are the usual suspects.
 - **Retries and timeouts:** repeated identical spans suggest retry loops; a long-running span before the failure suggests a timeout.
 
@@ -50484,7 +50485,7 @@ langwatch monitor get <id> -o json       # one monitor's config and recent state
 langwatch evaluator list -o json         # the evaluators the monitors run
 ```
 
-- A firing monitor names the failure mode (toxicity, hallucination, PII) — corroborate it against the spans from Step 2.
+- A firing monitor names the failure mode (toxicity, hallucination, PII). Corroborate it against the spans from Step 2.
 - No monitor for the failure mode you found? That is a gap worth closing once the root cause is fixed (`langwatch monitor create`).
 
 For a quantitative view of the blast radius:
@@ -50498,7 +50499,7 @@ langwatch analytics query -m trace-count -a sum --group-by metadata.model -o jso
 1. Form a hypothesis from the failing span's input + the monitor's failure mode: prompt change, model change, bad retrieval, code regression. `git log` on the agent's code and prompts tells you what changed when the failures started.
 2. Apply the fix (prompt, code, or configuration).
 3. Generate fresh traffic, then re-run Step 1: the errored traces should stop appearing.
-4. If the failure was a regression, add a scenario so it stays fixed — the `scenarios` skill covers this.
+4. If the failure was a regression, add a scenario so it stays fixed. The `scenarios` skill covers this.
 
 ## Discovery
 
@@ -50563,12 +50564,12 @@ Pass `--agent` to any command for compact single-line JSON with colour and spinn
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Triage Failing Experiments and Evaluations
 
-From "the run failed" to the specific rows, evaluators, and inputs responsible — then to a root cause. Work the steps in order.
+From "the run failed" to the specific rows, evaluators, and inputs responsible, then to a root cause. Work the steps in order.
 
 ## Prerequisites
 
@@ -50599,8 +50600,8 @@ langwatch experiment status <slug> --run-id <id> -o json
 
 A run can fail two ways, and they triage differently:
 
-- **Execution failure** — the run errored out or stalled. `status` shows the error; jump to Step 4.
-- **Score regression** — the run completed but evaluator scores dropped or rows failed. Continue to Step 2.
+- **Execution failure**: the run errored out or stalled. `status` shows the error; jump to Step 4.
+- **Score regression**: the run completed but evaluator scores dropped or rows failed. Continue to Step 2.
 
 ## Step 2: Isolate the Failing Rows
 
@@ -50610,7 +50611,7 @@ langwatch experiment results <slug> --filter failed --evaluator <name> -o json
 langwatch experiment results <slug> --run-id <id> --limit 50 -o json
 ```
 
-- `--filter failed` keeps only the rows that failed at least one evaluator — start there, not with the full result set.
+- `--filter failed` keeps only the rows that failed at least one evaluator. Start there, not with the full result set.
 - `--evaluator <name>` shows one evaluator's column when several ran: is the regression concentrated in one evaluator (a scoring problem) or spread across all of them (a real behavior regression)?
 
 For each failing row, note the input, the expected output (from the dataset), and the actual output. Rows that fail the SAME way point at one root cause; rows that fail differently suggest flakiness or a noisy evaluator.
@@ -50624,15 +50625,15 @@ langwatch evaluator get <idOrSlug> -o json
 
 Before blaming the agent, rule out the scorer:
 
-- **LLM-judge evaluators** — check the model in `settings`. A judge model that changed, is rate-limited, or is too weak for the rubric produces score swings that have nothing to do with the agent.
-- **Thresholds** — a score of 0.49 vs a pass threshold of 0.5 is a borderline judge, not a regression. Look at the score distribution across rows, not just pass/fail.
-- **Deterministic evaluators** (exact match, JSON validity) — these don't drift; failures here are real.
+- **LLM-judge evaluators**: check the model in `settings`. A judge model that changed, is rate-limited, or is too weak for the rubric produces score swings that have nothing to do with the agent.
+- **Thresholds**: a score of 0.49 vs a pass threshold of 0.5 is a borderline judge, not a regression. Look at the score distribution across rows, not just pass/fail.
+- **Deterministic evaluators** (exact match, JSON validity): these don't drift; failures here are real.
 
 ## Step 4: Root Cause
 
-1. Compare the failing run against the last passing one: what changed — prompt version, model, dataset, code? `git log` on prompts and agent code usually answers this directly.
-2. If rows fail on retrieval or context: inspect a production trace of the same path (`langwatch trace search` / `langwatch trace get` — see the `debug-with-langwatch` recipe).
-3. If the dataset itself looks wrong (stale expected outputs, bad rows), fix the dataset — `langwatch dataset get <slugOrId>` to inspect it.
+1. Compare the failing run against the last passing one: what changed (prompt version, model, dataset, code)? `git log` on prompts and agent code usually answers this directly.
+2. If rows fail on retrieval or context: inspect a production trace of the same path (`langwatch trace search` / `langwatch trace get`; see the `debug-with-langwatch` recipe).
+3. If the dataset itself looks wrong (stale expected outputs, bad rows), fix the dataset. Use `langwatch dataset get <slugOrId>` to inspect it.
 4. Apply the fix and re-run:
 
 ```bash
@@ -50696,7 +50697,7 @@ langwatch experiment status <slug> -o json
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Evaluate Your Multimodal Agent
@@ -50863,7 +50864,7 @@ Run the evaluation, review results, fix issues, re-run until quality is acceptab
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Generate a RAG Evaluation Dataset
@@ -51032,7 +51033,7 @@ Before using the dataset:
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Set Up the LangWatch CLI
@@ -51041,7 +51042,7 @@ Get the CLI authenticated and talking to the right LangWatch project, then verif
 
 ## Step 1: Credentials
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 
 For CI and agents, configure non-interactively, and never block on a browser. Have the runner inject the key from your secret store into `LANGWATCH_API_KEY`, which is what the CLI reads:
 
@@ -51052,11 +51053,13 @@ env:
   LANGWATCH_ENDPOINT: https://lw.acme.internal   # self-hosted only; omit for cloud
 ```
 
-Keep the key off the command line: an argument is readable by every process on the machine, and a key typed at a prompt lands in the shell history file.
+Keep the key off the command line: an argument is readable by every other process on the machine, and in a shell it lands in your history file.
 
-Locally, `langwatch login --api-key <key>` is the quick way in. It writes `LANGWATCH_API_KEY` to `.env`, so keep `.env` out of version control. Add `--endpoint https://lw.acme.internal` for a self-hosted instance.
+Locally, run plain `langwatch login`. It asks where you are logging in (cloud or self-hosted) and how you will use LangWatch (AI tools, project SDK key, or both), then finishes in the browser. No credential is ever typed or pasted into the terminal: you pick the project on the approval page and its key comes back to the CLI over the same channel, so none of it reaches your shell history. A project SDK key lands as `LANGWATCH_API_KEY` in `.env` in the current directory, so keep `.env` out of version control; an AI-tools login lands in `~/.langwatch/config.json`. `langwatch login --device` skips the questions and goes straight to that RFC 8628 device flow via company SSO.
 
-For humans at a terminal, plain `langwatch login` asks interactively (cloud vs self-hosted, AI tools vs project SDK), and `langwatch login --device` runs the RFC 8628 device flow via company SSO.
+`langwatch login --api-key <key>` writes a key you already hold straight to `.env`, with no browser and no prompts. It is for automation that needs the key on disk and already has it from a secret store (`--api-key "$LANGWATCH_API_KEY"`). It does put the key in argv, so it is the wrong way to move a fresh secret you would paste in by hand.
+
+`--endpoint https://lw.acme.internal` combines with any of these to pin a self-hosted instance. It pins the CLI; your instrumented app reads `LANGWATCH_ENDPOINT` from the environment, so a self-hosted setup needs both.
 
 ## Step 2: Endpoint and Project
 
@@ -51074,7 +51077,7 @@ A personal access token (PAT) instead of a project key also needs `LANGWATCH_PRO
 
 ```bash
 langwatch whoami          # device-session identity (governance plane)
-langwatch status          # resource counts — proves auth + endpoint + project in one shot
+langwatch status          # resource counts: proves auth + endpoint + project in one shot
 ```
 
 `langwatch status` printing resource counts means the setup is done. Everything else (traces, evaluations, scenarios) builds on this.
@@ -51101,12 +51104,12 @@ If anything fails or confuses you while following this skill (broken commands, d
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
-| `401` / `unauthorized` on every command | Wrong, revoked, or missing API key | Re-run `langwatch login --api-key <key>`; check `LANGWATCH_API_KEY` in `.env` and the shell (shell wins) |
+| `401` / `unauthorized` on every command | Wrong, revoked, or missing API key | Re-run `langwatch login`; check `LANGWATCH_API_KEY` in `.env` and the shell (shell wins) |
 | `401` with a PAT | Missing project id | `export LANGWATCH_PROJECT_ID=<your-project-id>` |
 | Connection refused / DNS errors | Self-hosted endpoint wrong or unreachable | Check `langwatch config get endpoint` and `LANGWATCH_ENDPOINT`; verify the instance URL loads in a browser from this machine |
-| Right credentials, wrong data | Talking to the wrong project or instance | `langwatch projects list` — re-login with a key from the intended project |
+| Right credentials, wrong data | Talking to the wrong project or instance | `langwatch projects list`; re-login with a key from the intended project |
 | Old shell ignores new `.env` | Env vars already exported | Start a new shell, or `unset LANGWATCH_API_KEY LANGWATCH_ENDPOINT` so `.env` is re-read |
-| A command hangs waiting for input | Interactive prompt in a non-interactive context | Re-run with the non-interactive flags (`--api-key`, `-y`, `-o json`) — the CLI never prompts when it detects an agent |
+| A command hangs waiting for input | Interactive prompt in a non-interactive context | Re-run with the non-interactive flags (`--api-key`, `-y`, `-o json`): the CLI never prompts when it detects an agent |
 ````
 
         </div>
@@ -51159,7 +51162,7 @@ If anything fails or confuses you while following this skill (broken commands, d
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Test Your Agent's Compliance Boundaries
@@ -51365,7 +51368,7 @@ Create reusable criteria for your domain:
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Test Your CLI's Agent Usability
@@ -51536,7 +51539,7 @@ How is my agent performing?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Diagnose Your Agent's Production Behavior
@@ -51685,7 +51688,7 @@ Add scenario tests for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Test Your Agent with Scenarios
@@ -52619,7 +52622,7 @@ Help me evaluate my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Route an Evaluation Request

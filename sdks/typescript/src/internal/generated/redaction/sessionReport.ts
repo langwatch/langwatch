@@ -18,7 +18,9 @@
  *     `+`-prefixed or punctuated formats), credit card numbers (Luhn-checked),
  *     public IPv4 addresses. Loopback, private-range, and link-local addresses
  *     are kept: they identify nobody and are essential to debug local setups.
- *     IPv6 is not scanned, so an IPv6 address is sent as written.
+ *     There is no IPv6 pattern, so a native IPv6 address is sent as written.
+ *     An IPv4-mapped one loses its dotted-quad tail to the IPv4 pattern, which
+ *     is a side effect rather than IPv6 coverage.
  *
  * Deliberate limits, so reports stay debuggable:
  *  - Bare unformatted digit runs only count as card numbers at lengths 14-16;

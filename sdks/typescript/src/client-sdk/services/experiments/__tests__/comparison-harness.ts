@@ -9,7 +9,7 @@
  * judge's own defaults apply, and the shape of what lands in the batch.
  */
 
-import { vi } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
 import { LangWatch } from "@/client-sdk";
 import type { Experiment } from "../experiment";
 import type { ComparisonOptions, ComparisonVerdict } from "../types";
@@ -50,7 +50,12 @@ export type LoggedEvaluation = {
   score?: number | null;
   label?: string | null;
   details?: string | null;
-  index?: number | string | null;
+  /**
+   * Numeric to match the wire contract: the server validates
+   * `evaluations[].index` with `z.number()` and parses the batch before
+   * dispatch, so a string here would be a payload it rejects outright.
+   */
+  index?: number | null;
   cost?: number | null;
   duration?: number | null;
   target_id?: string | null;
@@ -130,6 +135,43 @@ export const createHarness = () => {
 
   return harness;
 };
+
+/**
+ * Register the lifecycle every comparison suite needs: a fresh harness and
+ * stubbed transport per test, a quiet console, and an environment left exactly
+ * as it was found.
+ *
+ * The harness arrives through a callback rather than a return value because
+ * the stubbed fetch closes over the instance it was built with. Handing back a
+ * long-lived object and refilling it each test would leave that closure
+ * pointing at the previous one, so a `respond` a test installed would never be
+ * the one called.
+ *
+ * `LANGWATCH_API_KEY` is unset for the duration so `ensureSetup()` stays a
+ * no-op and every suite passes its key explicitly, which is what keeps a real
+ * key in the developer's environment from changing what a test exercises.
+ */
+export const useComparisonHarness = (
+  assign: (harness: ComparisonHarness) => void,
+): void => {
+  const previousApiKey = process.env.LANGWATCH_API_KEY;
+
+  beforeEach(() => {
+    delete process.env.LANGWATCH_API_KEY;
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    assign(createHarness());
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+    if (previousApiKey === undefined) delete process.env.LANGWATCH_API_KEY;
+    else process.env.LANGWATCH_API_KEY = previousApiKey;
+  });
+};
+
+/** The stubbed transport and the recordings a suite asserts against. */
+export type ComparisonHarness = ReturnType<typeof createHarness>;
 
 export const createExperiment = (): Promise<Experiment> => {
   const langwatch = new LangWatch({
