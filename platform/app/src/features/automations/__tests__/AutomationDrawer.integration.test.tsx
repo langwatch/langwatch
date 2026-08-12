@@ -131,7 +131,15 @@ vi.mock("~/utils/api", () => ({
       getDailyCap: { useQuery: () => ({ data: undefined }) },
     },
     graphs: {
-      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
+      // A non-empty fixture — an empty list now renders the "no custom
+      // graphs yet" empty state instead of the picker (B6), which the
+      // `initialSource: "customGraph"` tests below need to be a picker.
+      getAll: {
+        useQuery: () => ({
+          data: [{ id: "graph-1", name: "Latency", trigger: null }],
+          isLoading: false,
+        }),
+      },
       getById: {
         useQuery: () => ({ data: null, isLoading: false }),
       },
