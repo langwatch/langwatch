@@ -103,6 +103,13 @@ Feature: Automations list pages, providers, and shared copy
       Then the drawer names the delivery as the Slack app
       And shows the destination channel
 
+    @integration
+    Scenario: The Notifies cell names a bot-delivery Slack automation
+      Given the Automations table has a bot-delivery Slack automation row
+      When the table renders
+      Then the Notifies cell names the Slack app and its destination channel
+      And it does not read as "Webhook"
+
   Rule: Estimated tokens is a qualifier on tokens, not a second field
 
     @unit
