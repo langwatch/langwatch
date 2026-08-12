@@ -181,7 +181,11 @@ export const triggerSchema = z
     id: z.string(),
     name: z.string(),
     action: z.string(),
+    /** Where it delivers. The rule it fires by is stated separately, below,
+     *  the same way a write states it. */
     actionParams: z.record(z.string(), z.unknown()).default({}),
+    graphAlert: graphAlertSchema.nullable().optional(),
+    report: z.record(z.string(), z.unknown()).nullable().optional(),
     filters: z.record(z.string(), z.unknown()).default({}),
     filterQuery: z.string().nullable().optional(),
     kind: z.string().optional(),

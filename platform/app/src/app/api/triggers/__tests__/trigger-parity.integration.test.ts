@@ -319,6 +319,228 @@ describe("Feature: automations over the public API express what the dashboard ex
     });
   });
 
+  describe("when a delivery configuration names a field the channel has not", () => {
+    /** @scenario "A field the channel does not have is refused, not dropped" */
+    it("refuses the create and names both what it sent and what fits", async () => {
+      const name = `Misspelt field ${ns}`;
+      const response = await createTrigger({
+        name,
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+        actionParams: {
+          slackDelivery: "bot",
+          slackChannelID: "C123",
+        },
+        filters: CONDITION,
+      });
+
+      expect(response.status).toBe(422);
+      const body = (await response.json()) as {
+        error: string;
+        fields?: string[];
+        accepted?: string[];
+      };
+      expect(body.error).toBe("trigger_action_params_unknown_fields");
+      expect(body.fields).toEqual(["slackChannelID"]);
+      expect(body.accepted).toContain("slackChannelId");
+      expect(
+        await prisma.trigger.count({
+          where: { projectId: projectId(), name },
+        }),
+      ).toBe(0);
+    });
+
+    /** @scenario "Another channel's field cannot be parked on this one" */
+    it("refuses an update carrying a field from a different channel", async () => {
+      const created = await emailAutomation(`No parked headers ${ns}`);
+
+      const response = await patch(`/api/triggers/${created.id}`, {
+        actionParams: {
+          members: ["someone@example.com"],
+          headers: { Authorization: HEADER_VALUE },
+        },
+      });
+
+      expect(response.status).toBe(422);
+      expect((await response.json()).error).toBe(
+        "trigger_action_params_unknown_fields",
+      );
+      expect(await storedRow(created.id)).toMatchObject({
+        actionParams: { members: ["someone@example.com"] },
+      });
+    });
+  });
+
+  describe("when an alert's rule is sent inside its delivery configuration", () => {
+    /** @scenario "A rule sent in the delivery configuration is refused" */
+    it("says where the rule belongs rather than ignoring it", async () => {
+      const graph = await prisma.customGraph.create({
+        data: {
+          projectId: projectId(),
+          name: `Latency ${ns}`,
+          graph: {},
+        },
+      });
+      const alert = await created(
+        await createTrigger({
+          name: `Rule in the wrong place ${ns}`,
+          action: TriggerAction.SEND_EMAIL,
+          actionParams: { members: ["oncall@example.com"] },
+          alertType: "WARNING",
+          customGraphId: graph.id,
+          graphAlert: {
+            seriesName: "latency",
+            operator: "gt",
+            threshold: 10,
+            timePeriod: 15,
+          },
+        }),
+      );
+
+      const response = await patch(`/api/triggers/${alert.id}`, {
+        actionParams: {
+          members: ["oncall@example.com"],
+          threshold: 99,
+        },
+      });
+
+      expect(response.status).toBe(422);
+      const body = (await response.json()) as {
+        error: string;
+        expectedField?: string;
+      };
+      expect(body.error).toBe("trigger_rule_fields_misplaced");
+      expect(body.expectedField).toBe("graphAlert");
+      expect((await storedRow(alert.id)).actionParams).toMatchObject({
+        threshold: 10,
+      });
+    });
+
+    /** @scenario "The read states the rule where a write states it" */
+    it("hands the rule back in its own field, not in the delivery configuration", async () => {
+      const graph = await prisma.customGraph.create({
+        data: {
+          projectId: projectId(),
+          name: `Read the rule ${ns}`,
+          graph: {},
+        },
+      });
+      const alert = await created(
+        await createTrigger({
+          name: `Readable rule ${ns}`,
+          action: TriggerAction.SEND_EMAIL,
+          actionParams: { members: ["oncall@example.com"] },
+          alertType: "INFO",
+          customGraphId: graph.id,
+          graphAlert: {
+            seriesName: "latency",
+            operator: "lt",
+            threshold: 3,
+            timePeriod: 30,
+          },
+        }),
+      );
+
+      const read = (await (
+        await app.request(`/api/triggers/${alert.id}`, { headers: headers() })
+      ).json()) as {
+        actionParams: Record<string, unknown>;
+        graphAlert: Record<string, unknown> | null;
+      };
+
+      expect(read.graphAlert).toMatchObject({
+        seriesName: "latency",
+        operator: "lt",
+        threshold: 3,
+        timePeriod: 30,
+      });
+      expect(read.actionParams).toEqual({ members: ["oncall@example.com"] });
+    });
+  });
+
+  // The cap counts per project, so these run in a project of their own: a
+  // shared one would make the count depend on what every other test in this
+  // file had already sent.
+  describe("when a project test-fires more often than a minute allows", () => {
+    let capped: Project | undefined;
+
+    const cappedHeaders = () => ({
+      "X-Auth-Token": capped!.apiKey,
+      "Content-Type": "application/json",
+    });
+
+    const cappedAutomation = async (body: Record<string, unknown>) => {
+      const response = await app.request("/api/triggers", {
+        method: "POST",
+        headers: cappedHeaders(),
+        body: JSON.stringify({ filters: CONDITION, ...body }),
+      });
+      return created(response);
+    };
+
+    const cappedTestFire = (id: string) =>
+      app.request(`/api/triggers/${id}/test-fire`, {
+        method: "POST",
+        headers: cappedHeaders(),
+      });
+
+    beforeAll(async () => {
+      capped = await prisma.project.create({
+        data: {
+          name: "Triggers Cap Project",
+          slug: `--test-cap-project-${ns}`,
+          teamId: team!.id,
+          language: "other",
+          framework: "other",
+          apiKey: `test-cap-api-key-${ns}`,
+        },
+      });
+    });
+
+    afterAll(async () => {
+      if (!capped) return;
+      await prisma.trigger.deleteMany({ where: { projectId: capped.id } });
+      await prisma.project.delete({ where: { id: capped.id } });
+    });
+
+    /** @scenario "Test fires are capped per project" */
+    it("declines the eleventh in the window", async () => {
+      const automation = await cappedAutomation({
+        name: `Capped ${ns}`,
+        action: TriggerAction.SEND_EMAIL,
+        actionParams: { members: ["someone@example.com"] },
+      });
+
+      for (let attempt = 0; attempt < 10; attempt++) {
+        expect((await cappedTestFire(automation.id)).status).toBe(200);
+      }
+
+      const declined = await cappedTestFire(automation.id);
+
+      expect(declined.status).toBe(429);
+      expect((await declined.json()).error).toBe(
+        "trigger_test_fire_rate_limited",
+      );
+      expect(testFire).toHaveBeenCalledTimes(10);
+    });
+
+    /** @scenario "A Slack test fire is not capped" */
+    it("keeps sending to a destination pinned to Slack", async () => {
+      const automation = await cappedAutomation({
+        name: `Slack uncapped ${ns}`,
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+        actionParams: {
+          slackDelivery: "webhook",
+          slackWebhook: "https://hooks.slack.com/services/T/B/x",
+        },
+      });
+
+      for (let attempt = 0; attempt < 12; attempt++) {
+        expect((await cappedTestFire(automation.id)).status).toBe(200);
+      }
+      expect(testFire).toHaveBeenCalledTimes(12);
+    });
+  });
+
   describe("when an automation is test-fired over the API", () => {
     /** @scenario "API test-fire delivers to the automation's own destination" */
     it("sends to the destination the automation is saved with", async () => {

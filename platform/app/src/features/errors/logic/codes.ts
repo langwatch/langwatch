@@ -250,12 +250,15 @@ export const APP_ERROR_CODES = [
   "trace_project_required",
   "trace_sharing_disabled",
   "trigger_action_immutable",
+  "trigger_action_params_unknown_fields",
   "trigger_channel_not_enabled",
   "trigger_filter_query_invalid",
   "trigger_filters_required",
   "trigger_filters_unsupported",
   "trigger_kind_immutable",
   "trigger_not_found",
+  "trigger_rule_fields_misplaced",
+  "trigger_test_fire_rate_limited",
   // Also a Go code, with copy already written under the shared/transport
   // heading — an app-level subclass raises it too (`ee/admin/routes/admin.ts`),
   // and the scan is right to insist it be listed here as well.

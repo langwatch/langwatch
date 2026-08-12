@@ -235,6 +235,82 @@ Feature: Automations over the public API
       When the integrator writes it back with a threshold rule
       Then the save is refused as a kind that cannot be changed
 
+  Rule: A delivery configuration is read against the channel it belongs to
+
+    Which channel an automation delivers on is known before its configuration
+    is read — named on a create, taken from the stored row on an update — so
+    the shape is never inferred from what the payload resembles. A field that
+    channel does not have is refused rather than dropped: dropped, it saves an
+    automation that delivers nowhere, and on an update, where the payload
+    replaces the stored configuration whole, it saves one that stops
+    delivering at all.
+
+    @integration
+    Scenario: A field the channel does not have is refused, not dropped
+      When an automation is created over the API with a misspelt destination field
+      Then the save is refused, naming the field it sent and the fields the channel reads
+      And no automation is created
+
+    @integration
+    Scenario: Another channel's field cannot be parked on this one
+      Given an automation that emails on matching traces
+      When the integrator updates it with a field belonging to another channel
+      Then the save is refused as a field this channel does not have
+      And the automation still delivers to the recipients it had
+
+    @unit
+    Scenario: Another channel's field never survives as part of the rule
+      When a delivery configuration carrying another channel's field is saved
+      Then that field is not stored as part of the rule the automation fires by
+
+    @unit
+    Scenario: The rule an automation fires by still survives a save
+      When a delivery configuration carrying a threshold rule is saved
+      Then the rule is stored alongside the delivery configuration
+
+  Rule: The rule an automation fires by is stated in its own field
+
+    At rest the rule and the delivery configuration share one column; on the
+    wire they are separate fields. A rule sent inside the delivery
+    configuration used to be overwritten by the stored one on the way to
+    storage, so the save answered success and changed nothing.
+
+    @integration
+    Scenario: A rule sent in the delivery configuration is refused
+      Given a graph alert that notifies when a series crosses a threshold
+      When the integrator sends a new threshold inside the delivery configuration
+      Then the save is refused, saying where the rule belongs
+      And the alert still fires on the threshold it had
+
+    @integration
+    Scenario: The read states the rule where a write states it
+      Given a graph alert that notifies when a series crosses a threshold
+      When it is read over the API
+      Then the rule comes back in its own field
+      And the delivery configuration carries only where the message goes
+
+  Rule: A project can only make LangWatch send so often
+
+    A test fire is the one verb here that sends on the caller's say-so, to an
+    address the same caller chose — an email through the shared provider, or a
+    request from our workers at an arbitrary destination. Uncapped, either is a
+    flood primitive driven from an API key, so both are capped per project, the
+    same window the dashboard uses. Slack is exempt: its destination is pinned
+    to Slack's own hosts.
+
+    @integration
+    Scenario: Test fires are capped per project
+      Given an automation that emails on matching traces
+      When the project test-fires more often than a minute allows
+      Then the next test fire is declined as too many
+      And nothing further is sent
+
+    @integration
+    Scenario: A Slack test fire is not capped
+      Given an automation that delivers to a Slack incoming webhook
+      When the project test-fires it many times in a minute
+      Then every one of them is sent
+
   Rule: Header values travel with the destination they authenticate against
 
     A header value is issued for one endpoint, so it does not follow that

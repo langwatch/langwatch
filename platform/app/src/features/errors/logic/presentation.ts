@@ -60,6 +60,14 @@ const str = (
   return typeof value === "string" && value.length > 0 ? value : fallback;
 };
 
+/** Reads a list of strings out of `meta` without trusting it. */
+const list = (error: HandledErrorShape, key: string): string[] => {
+  const value = error.meta[key];
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
+};
+
 type MissingModelRequestType =
   | "chat"
   | "messages"
@@ -1355,6 +1363,40 @@ const presentations = {
       "An automation keeps the channel it was created with, because the " +
       "credentials it holds belong to that channel. Create a new automation " +
       "on the channel you want.",
+  },
+
+  trigger_action_params_unknown_fields: {
+    title: "Some of those fields are not part of this channel",
+    // Both lists are the caller's own vocabulary: what it sent, and what this
+    // channel has. Naming them is the whole remediation — a misspelt field is
+    // invisible otherwise.
+    describe: (error) => {
+      const fields = list(error, "fields");
+      const accepted = list(error, "accepted");
+      const named = fields.length > 0 ? `${fields.join(", ")}. ` : "";
+      return accepted.length > 0
+        ? `${named}This channel reads: ${accepted.join(", ")}.`
+        : `${named}Check the fields against the channel you are configuring.`;
+    },
+  },
+
+  trigger_rule_fields_misplaced: {
+    title: "The rule belongs in its own field",
+    describe: (error) => {
+      const where = str(error, "expectedField", "");
+      return where
+        ? `State it in "${where}" rather than inside the delivery ` +
+            "configuration, which is only about where the message goes."
+        : "State it in its own field rather than inside the delivery " +
+            "configuration, which is only about where the message goes.";
+    },
+  },
+
+  trigger_test_fire_rate_limited: {
+    title: "That is a lot of test fires",
+    describe: () =>
+      "This project has sent as many as a minute allows. Wait for the minute " +
+      "to pass and try again.",
   },
 
   trigger_kind_immutable: {
