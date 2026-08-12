@@ -104,8 +104,9 @@ export function attributeFieldRoundTrips(condition: Condition): boolean {
   const serialized = serializeConditions([condition]);
   if (!serialized) return true; // unreachable given isConditionComplete above
   const reparsed = queryToConditions(serialized);
-  if (!reparsed || reparsed.length !== 1) return false;
+  if (reparsed?.length !== 1) return false;
   const [only] = reparsed;
+  if (!only) return false;
   return (
     only.field === condition.field &&
     only.operator === condition.operator &&

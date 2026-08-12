@@ -32,8 +32,8 @@ import {
 import { PrismaGraphTriggerSentRepository } from "~/server/app-layer/automations/repositories/trigger.prisma.repository";
 import { defaultRunawayContainmentDeps } from "~/server/app-layer/automations/runaway-containment.deps";
 import { handlePersistCapBreach } from "~/server/app-layer/automations/runaway-containment.service";
-import { TriggerLatestEvaluationService } from "~/server/app-layer/automations/trigger-latest-evaluation.service";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
+import { TriggerLatestEvaluationService } from "~/server/app-layer/automations/trigger-latest-evaluation.service";
 import { WebhookDeliveryService } from "~/server/app-layer/automations/webhook-delivery.service";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";

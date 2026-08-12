@@ -19,7 +19,10 @@ import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
 import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
-import { ProjectNotFoundError } from "~/server/app-layer/automations/errors";
+import {
+  ProjectNotFoundError,
+  TriggerNotFoundError,
+} from "~/server/app-layer/automations/errors";
 import { graphAlertActionParamsSchema } from "~/server/app-layer/automations/graph-alert.builder";
 import { PublicApiTriggerService } from "~/server/app-layer/automations/public-api-trigger.service";
 import { reportActionParamsSchema } from "~/server/app-layer/automations/report.builder";
@@ -776,7 +779,10 @@ type TriggerRouteContext = Context<
 const setActiveHandler =
   (active: boolean) => async (c: TriggerRouteContext) => {
     const project = c.get("project");
+    // Detached from its route registration, so `param()` types `id` as
+    // possibly absent; a request without one names no trigger.
     const { id } = c.req.param();
+    if (!id) throw new TriggerNotFoundError();
     logger.info(
       { projectId: project.id, triggerId: id, active },
       "Setting trigger active state",
