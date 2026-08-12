@@ -326,6 +326,59 @@ describe("evaluateGraphTrigger", () => {
     });
   });
 
+  describe("given a series the query builder refuses to express as a percentage", () => {
+    // #6718 added a handled refusal for "percentage of a per-entity
+    // measurement", which the composer still lets an author save. The builder
+    // raises it on EVERY evaluation of such a trigger, and a rethrow here is a
+    // redelivery — the same poison-pill shape the row ceiling above documents.
+    function percentageUnsupported() {
+      const error = new Error("analytics_series_percentage_unsupported");
+      (error as Error & { code?: string }).code =
+        "analytics_series_percentage_unsupported";
+      return error;
+    }
+
+    // @scenario "An alert on a series the query refuses is skipped, not retried forever"
+    it("skips that trigger instead of failing the evaluation", async () => {
+      harness.getTimeseries.mockRejectedValue(percentageUnsupported());
+
+      const result = await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(result.status).toBe("skipped");
+    });
+
+    it("does not throw, so one bad series cannot quarantine the tenant's lane", async () => {
+      harness.getTimeseries.mockRejectedValue(percentageUnsupported());
+
+      await expect(
+        evaluateGraphTrigger({
+          deps: harness.deps,
+          triggerId: TRIGGER_ID,
+          projectId: PROJECT_ID,
+          reason: "real-time",
+        }),
+      ).resolves.toMatchObject({ status: "skipped" });
+    });
+
+    it("never fires an alert on a result it could not read", async () => {
+      harness.getTimeseries.mockRejectedValue(percentageUnsupported());
+
+      await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(harness.dispatch).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given the timeseries read fails for any other reason", () => {
     // Only the row ceiling is a configuration fault. A real outage must still
     // reach the queue's retry, or a transient ClickHouse blip would silently
