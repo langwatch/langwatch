@@ -18,7 +18,8 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest",
+    "test:unit": "vitest run"
   },
   "dependencies": {
     "ioredis": "5.10.1"
