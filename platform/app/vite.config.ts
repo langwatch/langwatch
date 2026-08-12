@@ -381,6 +381,14 @@ export default defineConfig(async (): Promise<UserConfig> => {
         changeOrigin: true,
         secure: false,
       },
+      // Probed by MCP clients during discovery. The API answers a JSON 404;
+      // without this entry dev would answer the SPA's HTML instead, which is
+      // the failure mode this route exists to avoid.
+      "/.well-known/openid-configuration": {
+        target: API_TARGET,
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
   };

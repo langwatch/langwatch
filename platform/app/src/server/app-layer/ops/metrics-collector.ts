@@ -293,6 +293,10 @@ export class OpsMetricsCollector {
   >();
   private currentJobNameMetrics: JobNameMetrics[] = [];
   private currentPausedKeys: string[] = [];
+  /**
+   * Last drift figure read back from the shared publication, not the one this
+   * instance measured. See {@link reconcilePending}.
+   */
   private latestPendingDrift = 0;
   private knownPipelinePaths: string[] = [];
   private isCollecting = false;
@@ -426,15 +430,29 @@ export class OpsMetricsCollector {
 
   private async reconcilePending(): Promise<void> {
     try {
-      let totalDrift = 0;
+      let measuredDrift = 0;
+      let measuredAny = false;
       for (const queueName of this.groupQueueNames) {
         const result = await this.queueRepo.reconcileTotalPending(queueName);
-        if (result) totalDrift += Math.abs(result.drift);
+        if (result) {
+          measuredDrift += Math.abs(result.drift);
+          measuredAny = true;
+        }
       }
-      this.latestPendingDrift = totalDrift;
-      if (totalDrift !== 0) {
+
+      // Read back what every instance published rather than keeping what this
+      // one measured. The reconcile is single-flighted, so an instance that won
+      // no marker measured nothing and would otherwise report 0 drift for a
+      // queue that has plenty, and an instance that won some of the queues would
+      // report a partial total. Reading the shared figures is what makes every
+      // instance agree, and agree on the whole.
+      this.latestPendingDrift = await this.queueRepo.readPublishedPendingDrift(
+        this.groupQueueNames,
+      );
+
+      if (measuredAny && measuredDrift !== 0) {
         logger.info(
-          { pendingDrift: totalDrift },
+          { pendingDrift: measuredDrift },
           "Reconciled GroupQueue pending counter to ground truth",
         );
       }

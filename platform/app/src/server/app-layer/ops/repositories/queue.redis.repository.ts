@@ -17,6 +17,7 @@ import {
   GROUP_QUEUE_REGISTRY_KEY,
   PARK_HELPER_LUA,
   PENDING_INDEX_HELPER_LUA,
+  pendingDriftKey,
   pendingGroupsKey,
   TTL_HELPER_LUA,
 } from "~/server/event-sourcing/queues/groupQueue/scripts";
@@ -280,14 +281,23 @@ return redis.call("PEXPIRE", markerKey, ttlMs)
 // a fresher value; a late write from the old pass would put a stale count back.
 // The check and the write have to be one step, so a marker lost between them
 // cannot leave the stale write to land anyway.
-const RECONCILE_WRITE_LUA = `
+/**
+ * Exported so the fence can be tested against the real script and a real Redis.
+ * The reconcile unit suite runs against a fake that models these semantics, and
+ * a model cannot fail when the thing it models changes.
+ */
+export const RECONCILE_WRITE_LUA = `
 local markerKey  = KEYS[1]
 local counterKey = KEYS[2]
+local driftKey   = KEYS[3]
 local holderToken = ARGV[1]
 local groundTruth = ARGV[2]
+local drift       = ARGV[3]
+local driftTtlMs  = ARGV[4]
 
 if redis.call("GET", markerKey) ~= holderToken then return 0 end
 redis.call("SET", counterKey, groundTruth)
+redis.call("SET", driftKey, drift, "PX", driftTtlMs)
 return 1
 `;
 
@@ -349,6 +359,18 @@ const PENDING_RECONCILE_ZCARD_BATCH = 1000;
  * another instance may take over.
  */
 const PENDING_RECONCILE_LEASE_MS = 30_000;
+
+/**
+ * How long a published drift figure stays readable.
+ *
+ * Three reconcile cycles (the collector runs one per minute). The value has to
+ * outlive the gap between passes or every instance would read null for most of
+ * the minute, and it has to expire or a queue whose reconcile has stopped
+ * entirely would pin its last drift on the dashboard forever. Expiring is the
+ * safer end of that trade: a missing figure reads as "unknown" and drops out of
+ * the aggregate, where a stale one reads as a live measurement.
+ */
+const PENDING_DRIFT_TTL_MS = 180_000;
 
 /**
  * How long the keyspace sweep waits once it has nothing left to adopt.
@@ -1763,13 +1785,20 @@ export class QueueRedisRepository implements QueueRepository {
       // Fenced write: a pass that lost the marker must not put its count back
       // over a newer pass's. `0` means the marker moved on, so this pass reports
       // nothing rather than a result it did not manage to publish.
+      //
+      // The drift goes out under the same fence as the counter it describes.
+      // Publishing it separately would let a pass write the counter, lose the
+      // marker, and still announce a drift for a count it did not land.
       const wrote = await reconcileWriteScript.run(
         this.redis,
-        2,
+        3,
         markerKey,
         counterKey,
+        pendingDriftKey(prefix),
         holderToken,
         String(groundTruth),
+        String(drift),
+        String(PENDING_DRIFT_TTL_MS),
       );
       if (Number(wrote) !== 1) {
         logger.warn(
@@ -1793,6 +1822,34 @@ export class QueueRedisRepository implements QueueRepository {
         ttlMs: singleFlightWindowMs - (Date.now() - startedAtMs),
       });
     }
+  }
+
+  async readPublishedPendingDrift(queueNames: string[]): Promise<number> {
+    if (queueNames.length === 0) return 0;
+
+    const raw = await this.redis.mget(
+      ...queueNames.map((queueName) => pendingDriftKey(`${queueName}:gq:`)),
+    );
+
+    let total = 0;
+    for (const value of raw) {
+      // A key that is absent or unparseable is a queue with no live figure. It
+      // contributes nothing either way, so this is hygiene rather than a
+      // behaviour: no sum can tell "no drift" apart from "no measurement".
+      // Surfacing that difference needs a signal beside the total, which the
+      // dashboard does not have a place for yet.
+      if (value === null) continue;
+      // Whole value or nothing. A lenient parse stops at the first character it
+      // cannot use, so "7oops" reads as 7 and "1.5" as 1, and the result lands
+      // in the total looking exactly like a real measurement. A value that is
+      // only partly a number is not a measurement, so it is skipped like any
+      // other unusable one rather than half-believed.
+      if (!/^-?\d+$/.test(value)) continue;
+      const drift = Number(value);
+      if (!Number.isSafeInteger(drift)) continue;
+      total += Math.abs(drift);
+    }
+    return total;
   }
 
   /**

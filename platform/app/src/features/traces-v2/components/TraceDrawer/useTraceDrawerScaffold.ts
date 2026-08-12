@@ -70,7 +70,11 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
   // own: how many of the trace's spans a correction removes, which is what
   // keeps the header's span count agreeing with the waterfall below it. Both
   // readings come from one read, so the live delta poll keeps a single observer.
-  const { captured: capturedSpanTree, corrected: spanTreeQuery } =
+  // The tree the drawer draws keeps the rows a correction removes, struck
+  // through, so the reader can see what went away rather than having to spot an
+  // absence. What the corrected trace actually contains is `corrected`, which is
+  // what the header counts.
+  const { captured: capturedSpanTree, display: spanTreeQuery } =
     useSpanTreeWithCaptured();
   const headerQuery = useTraceHeader({ spans: capturedSpanTree.data });
   // `useTraceHeader` uses React Query's `keepPreviousData`, so the
