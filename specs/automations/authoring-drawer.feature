@@ -272,6 +272,13 @@ Feature: Staged automation authoring drawer
       When the author enters the channel themselves
       Then it is accepted as the destination
 
+    @integration
+    Scenario: A channel-list failure names its cause in the form
+      Given the user is configuring a Slack notification with a bot connection
+      And the channel listing request fails
+      Then the failure is named in the hint under the channel field
+      And the author is told they can still type the channel themselves
+
   Rule: Cadence and debounce apply per trigger
 
     Scenario: The cadence section is hidden for action triggers
@@ -338,6 +345,28 @@ Feature: Staged automation authoring drawer
       When the preview renders
       Then the default Slack notification is previewed instead
       And the operator is warned that the template fell back to the default
+
+    @unit
+    Scenario: A bot-token delivery posts Block Kit
+      Given a Slack notification delivers over a bot connection
+      And the author has not customised the Slack message
+      When the notification is delivered
+      Then it is posted as Block Kit blocks, not the plain-text default
+
+    @integration
+    Scenario: Cross-cadence layout picking keeps list order
+      Given the user has expanded the "more layouts" disclosure in the template gallery
+      When the user picks a layout built for the other cadence
+      Then the automation's cadence switches to match the picked layout
+      And the gallery's list order is unchanged
+
+    @integration
+    Scenario: An external cadence change regroups the gallery; an in-picker pick still does not
+      Given the template gallery is showing layouts for the automation's current cadence
+      When the user changes the cadence from the separate Cadence section
+      Then the gallery regroups its primary layouts to match the new cadence
+      When the user then picks a layout built for the other cadence from the gallery
+      Then the gallery's list order is unchanged by that pick
 
     Scenario: Test fire sends a banner-marked notification before saving
       Given the user has configured a notification with a destination

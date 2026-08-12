@@ -23,16 +23,20 @@ describe("renderWebhookBody", () => {
       const parsed = JSON.parse(rendered.body) as {
         event: string;
         trigger: { id: string; name: string };
-        matches: { traceId: string; input: string }[];
+        matches: { traceId: string; input: string; output: string }[];
       };
       expect(parsed.event).toBe("trigger.matched");
       expect(parsed.trigger).toMatchObject({
         id: "trg_1",
         name: "High latency",
       });
+      // #6716 P0: the envelope carries the trace's input AND output, not just
+      // its id — a receiver (or an author reading a test-fire payload) needs
+      // to see what happened, not just an identifier to look up.
       expect(parsed.matches[0]).toMatchObject({
         traceId: "trace_1",
         input: "what is the weather",
+        output: "it is sunny",
       });
     });
 

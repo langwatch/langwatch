@@ -17,6 +17,24 @@ describe("Slack app manifest", () => {
         expect(featuresIndex).toBeGreaterThan(-1);
         expect(featuresIndex).toBeLessThan(oauthIndex);
       });
+
+      // The two Slack Web API calls the delivery layer actually makes
+      // (`server/app-layer/automations/delivery/slackWebApi.ts`):
+      // `chat.postMessage` (chat:write, chat:write.public for channels the
+      // bot hasn't been invited to) and `conversations.list`
+      // (channels:read for public channels, groups:read for private ones).
+      // A scope missing here is a setup step the copy-paste manifest silently
+      // fails to grant.
+      it("grants every scope chat.postMessage and conversations.list need", () => {
+        for (const scope of [
+          "chat:write",
+          "chat:write.public",
+          "channels:read",
+          "groups:read",
+        ]) {
+          expect(SLACK_APP_MANIFEST).toContain(scope);
+        }
+      });
     });
   });
 });

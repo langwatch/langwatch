@@ -353,7 +353,6 @@ const LEGACY_INERT: string[] = [
   "specs/auth/sso-orphan-user-linking.feature",
   "specs/auth/sso-wrong-provider-recovery.feature",
   "specs/automations/dispatch-timing.feature",
-  "specs/automations/notification-templates.feature",
   "specs/automations/spam-prevention.feature",
   "specs/automations/webhook-http-action.feature",
   "specs/batch-evaluation-results/experiment-cost-folding.feature",

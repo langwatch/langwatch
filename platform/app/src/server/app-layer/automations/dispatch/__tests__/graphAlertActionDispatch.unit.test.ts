@@ -603,6 +603,32 @@ describe("dispatchGraphAlertAction", () => {
       expect(call.token).toBe("xoxb-1");
       expect(call.channel).toBe("C123");
     });
+
+    /** @scenario "A bot-token delivery posts Block Kit" */
+    it("renders the payload as Block Kit blocks when no template type is configured", async () => {
+      const { deps, sendSlackBot } = makeDeps();
+      // `makeTrigger`'s default `slackTemplateType` is null — the author never
+      // customised the message. A bot connection must still resolve to the
+      // Block Kit default (ADR-041), never the legacy plain-text builder.
+      await dispatchGraphAlertAction({
+        deps,
+        input: {
+          trigger: makeTrigger({
+            action: TriggerAction.SEND_SLACK_MESSAGE,
+            slackTemplateType: null,
+          }),
+          project: makeProject(),
+          context: makeContext(),
+          recipients: [],
+          slackWebhook: null,
+          botDestination: { token: "xoxb-1", channel: "C123" },
+          fireDigest: FIRE_DIGEST,
+        },
+      });
+
+      const call = sendSlackBot.mock.calls[0]?.[0] as { payload: unknown };
+      expect(call.payload).toHaveProperty("blocks");
+    });
   });
 
   // Regression (dispatch5015-P1, Finding 4): the graph-alert incident row is
