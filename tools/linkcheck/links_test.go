@@ -227,6 +227,23 @@ func TestExtractDoesNotTreatADeeplyIndentedRunAsAFence(t *testing.T) {
 	}
 }
 
+// An info string makes a line an opening fence, so it cannot also close the
+// block it sits inside.
+func TestExtractDoesNotCloseAFenceOnALineCarryingAnInfoString(t *testing.T) {
+	document := "" +
+		"```\n" +
+		"```bash\n" +
+		"[inside](https://langwatch.ai/inside)\n" +
+		"```\n" +
+		"[outside](https://langwatch.ai/outside)\n"
+
+	links := linkcheck.Extract(document)
+
+	if len(links) != 1 || links[0].Target != "https://langwatch.ai/outside" {
+		t.Fatalf("got %v, want only the link after the real closing fence", targetsOf(links))
+	}
+}
+
 func targetsOf(links []linkcheck.Link) []string {
 	found := make([]string, 0, len(links))
 	for _, link := range links {

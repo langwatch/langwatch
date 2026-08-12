@@ -96,12 +96,20 @@ func (f *fences) crossed(line string) bool {
 	case !f.inside():
 		f.marker, f.length = marker, length
 		return true
-	case marker == f.marker && length >= f.length:
+	case marker == f.marker && length >= f.length && closesBlock(line, length):
 		f.marker, f.length = 0, 0
 		return true
 	default:
 		return false
 	}
+}
+
+// closesBlock reports whether nothing but whitespace follows the marker run.
+// An info string makes the line an opening fence, so "```bash" inside a block
+// is content and must not end it.
+func closesBlock(line string, length int) bool {
+	trimmed := strings.TrimLeft(line, " ")
+	return strings.Trim(trimmed[length:], " \t") == ""
 }
 
 // fenceDelimiter reports a line's fence marker and run length. CommonMark
