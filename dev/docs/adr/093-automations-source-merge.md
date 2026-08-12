@@ -273,20 +273,22 @@ Templates always create a **new** graph rather than binding an existing one: `cu
 
 Phase-2 structure per the bug-bash plan: **one reference PR first, no fan-out until it lands.**
 
-### R0 — the reference PR (one PR, feature-flagged)
+### R0 — the reference PR (one PR, not flagged)
 
-Everything behind a `release_automations_source_merge` feature flag; flag off is byte-identical behaviour. (The name sits loose against ADR-005's `{type}_{area}_{feature}_{descriptor}` grammar — deliberate, with ADR-044's `release_scheduled_reports` as the precedent for a three-token automations release flag.)
+**No feature flag** (decision by Alex, 2026-08-12: "yes, but no flag"). The merged surfaces replace the old ones outright — the wizard replaces the composer's section list, and the unified table replaces the Automations and Alerts tabs — so there is no second surface to keep alive and no flag to remove later. What an earlier draft of this section bought with a flag (a byte-identical off state to fall back to) is bought instead by the bar below.
 
-**Scope:** the merged three-step wizard for create and edit (subject-first Watch step, both subjects, Review-as-home), the vocabulary change everywhere the flow speaks (no type card, no source label), and the unified list as a **read-only view** (one table, Watches + Delivery columns; Schedules tab untouched).
+**The bar:** every bound scenario green. Because the old surfaces die at merge, the bound scenarios that pinned their copy or seating must be rebound in the same change rather than deferred behind a flag — so the UI half of F6 (delete-noun and Overview-menu rebinding) and F7's R0-shaped bindings are **executed in R0**, and F6 keeps only what needs new interaction or new data.
+
+**Scope:** the merged three-step wizard for create and edit (subject-first Watch step, both subjects, Review-as-home), the vocabulary change everywhere the flow speaks (no type card, no source label, one noun for both subjects), and the unified list (one table, Watches + Delivery columns; Schedules tab untouched; Overview retained with its create menu down to two items).
 
 **Files (owned):**
 - `platform/app/src/features/automations/components/AutomationTypePicker.tsx` → retired into the Watch step; the subject choice absorbs the picker
 - `platform/app/src/features/automations/AutomationDrawer.tsx` + new `features/automations/components/wizard/**` (step shell, rail, review screen — reusing `FacetSection` and the secondary drawers as step content)
-- `platform/app/src/features/automations/logic/draftReducer.ts` (step state only; `ConditionSource` values unchanged)
-- `platform/app/src/pages/[project]/automations.tsx` (flag-gated merged table, read-only slice)
-- feature-flag registry entry; `specs/automations/source-merge.feature` scenarios for the wizard + list view upgraded from `@unimplemented` to bound tags with `@scenario` annotations on the covering tests
+- `platform/app/src/features/automations/logic/draftReducer.ts` (the merged noun set) + new `logic/wizardSteps.ts`, `logic/watchSummary.ts` (step state and summaries; `ConditionSource` values unchanged)
+- `platform/app/src/pages/[project]/automations.tsx` (the merged table; the Alerts tab and its route mapping retire into it)
+- `specs/automations/source-merge.feature` scenarios for the wizard, edit-on-overview, the cap-advice seats and the unified list upgraded from `@unimplemented` to bound tags with `@scenario` annotations on the covering tests; `specs/automations/list-pages.feature` and `specs/automations/authoring-drawer.feature` rebound to the merged world
 
-**Explicitly NOT in R0:** any Prisma migration; any public-API change; the Slack integration; template-ships-graph; list filter chips and row-action changes; View-drawer changes; presentation-registry additions; any change visible with the flag off.
+**Explicitly NOT in R0:** any Prisma migration; any public-API change; the Slack integration; template-ships-graph; list filter chips; View-drawer changes; presentation-registry additions.
 
 ### Fan-out units (after R0 lands; strict file ownership, two agents never share a file)
 
@@ -297,10 +299,10 @@ Everything behind a `release_automations_source_merge` feature flag; flag off is
 | F3 | Dispatch + composer consume the integration: resolution order, `slack_integration_missing`, channel discovery via the resolved token, Slack step drops the token field; retire/rewrite the token-asking scenarios in `platform/app/specs/monitors/slack-bot-delivery.feature` | `server/app-layer/automations/providers/slack/server.ts`, `server/app-layer/automations/delivery/**` (Slack sites), `features/automations/providers/slack/**`, `platform/app/specs/monitors/slack-bot-delivery.feature` | F2 |
 | F4 | Legacy-token migration affordances: "Use the project integration" per automation + bulk from settings, kept-sentinel `null`-clears path over the API | slack-integration router/service (owned by the F2 seam), settings card components, the composer's legacy-token notice inside `providers/slack/**` (sequence with F3 — same directory, so F4 starts after F3 merges) | F3 |
 | F5 | Templates ship their graph: graph spec in prefill, create-graph-and-bind service seam, orphan cleanup on refusal | `features/automations/components/page/AutomationsEducation.tsx`, `server/api/routers/automations.ts` (upsert seam) + graph service touchpoint | R0 |
-| F6 | Unified list interactivity: filter/graph + delivery filter chips, row-action coherence with the View drawer, the legacy-token row nudge, flag removal at the end | `pages/[project]/automations.tsx`, `features/automations/components/page/**` | R0 (+#6899 landed; the nudge's data needs F2) |
-| F7 | Spec binding: upgrade the remaining `@unimplemented` scenarios as each unit lands (one PR per unit's scenarios, riding that unit) | the unit's own test files | each unit |
+| F6 | Unified list interactivity: filter/graph + delivery filter chips, row-action coherence with the View drawer, the legacy-token row nudge. (The delete-noun and Overview-menu rebinding this unit used to own ships in R0 — with no flag, the old copy dies at merge and its scenarios cannot wait) | `pages/[project]/automations.tsx`, `features/automations/components/page/**` | R0 (+#6899 landed; the nudge's data needs F2) |
+| F7 | Spec binding: upgrade the remaining `@unimplemented` scenarios as each unit lands (one PR per unit's scenarios, riding that unit). R0 binds its own — the wizard, edit-on-overview, the cap-advice seats and the unified list | the unit's own test files | each unit |
 
-Sequencing: R0 → F1 ∥ F2 ∥ F5 ∥ F6 → F3 → F4. The flag comes out in F6, last, once the merged surface is the only surface.
+Sequencing: R0 → F1 ∥ F2 ∥ F5 ∥ F6 → F3 → F4.
 
 ## References
 

@@ -12,9 +12,12 @@ Feature: One automation flow with a subject choice
   derived alias beside the unchanged kind discriminator; no screen shows
   the word.
 
-  Every scenario here is @unimplemented: this file ships with the design
-  (ADR-093) and enforces nothing until the reference implementation binds
-  it, unit by unit, per the plan in the ADR's final section.
+  The reference implementation (R0) binds the wizard, the edit-on-overview
+  rule, the cap-advice seats and the unified list. What is still
+  @unimplemented is what the later units own: the list's filter chips (F6),
+  the Slack project integration and the legacy-token migration (F2-F4), the
+  template that ships its graph (F5), and the wire `source` alias (F1). Each
+  binds as its unit lands, per the plan in the ADR's final section.
 
   See dev/docs/adr/093-automations-source-merge.md.
 
@@ -29,21 +32,21 @@ Feature: One automation flow with a subject choice
     changes, because the graph slot and the report calendar make the
     conversion a create plus a delete.
 
-    @integration @unimplemented
+    @integration
     Scenario: The wizard opens by asking what to watch
       When the user starts creating an automation
       Then the first step asks what the automation should watch
       And it offers a trace filter and a graph
       And no type or source picker is shown
 
-    @integration @unimplemented
+    @integration
     Scenario: Creating an automation that watches a trace filter
       When the user chooses to watch a trace filter
       And sets a condition, a delivery channel, and a name
       Then the review step shows what it watches, the rule, the delivery, and the name together
       And saving creates one automation that acts on matching traces
 
-    @integration @unimplemented
+    @integration
     Scenario: Creating an automation that watches a graph
       When the user chooses to watch a graph
       And picks a graph, a series, and a threshold rule
@@ -53,7 +56,7 @@ Feature: One automation flow with a subject choice
     # Absorbs the untagged authoring-drawer.feature scenario "A completed
     # section collapses to a one-line summary" (reopen-any-section), which
     # is deleted when R0 lands.
-    @integration @unimplemented
+    @integration
     Scenario: The wizard keeps completed steps in view
       Given the user has completed the watch step
       When the user is on the delivery step
@@ -65,6 +68,12 @@ Feature: One automation flow with a subject choice
     # with no custom graphs offers to create one": the draft-preservation
     # clause (new tab, draft not lost) carries over, and the merged flow
     # adds the template affordance.
+    #
+    # R0 ships the first two clauses inside the Watch step, and that half
+    # stays bound where it already is — the authoring-drawer scenario keeps
+    # its binding until F5 adds the template that ships its own graph, which
+    # is the clause this scenario is waiting on. Consolidating earlier would
+    # trade one bound scenario for one that cannot pass yet.
     @integration @unimplemented
     Scenario: Watching a graph with no graphs offers a way forward
       Given the project has no custom graphs
@@ -76,7 +85,7 @@ Feature: One automation flow with a subject choice
     # The API half of this rule is already bound: public-api.feature's
     # "An automation cannot become an alert over the API" pins the refusal
     # and its code, and the ADR preserves both. Not restated here.
-    @integration @unimplemented
+    @integration
     Scenario: What a saved automation watches cannot change
       Given a saved automation that watches a trace filter
       When the user edits it
@@ -90,13 +99,13 @@ Feature: One automation flow with a subject choice
     while editing was the annoying part. Editing is hub-and-spoke — the
     review screen is home, and each section is edited alone.
 
-    @integration @unimplemented
+    @integration
     Scenario: Editing an automation opens the review overview
       Given a saved automation
       When the user edits it
       Then the review overview opens with every section summarised
 
-    @integration @unimplemented
+    @integration
     Scenario: Editing one section returns to the overview
       Given the user is editing a saved automation
       When the user opens the delivery section, changes the channel configuration, and finishes
@@ -108,13 +117,13 @@ Feature: One automation flow with a subject choice
     Supersedes the untagged authoring-drawer.feature scenario "Abandoning
     the drawer persists nothing", which is deleted when R0 lands.
 
-    @integration @unimplemented
+    @integration
     Scenario: Abandoning a create persists nothing
       Given the user has partially configured a new automation
       When the user closes the wizard without saving
       Then no automation is created
 
-    @integration @unimplemented
+    @integration
     Scenario: Abandoning an edit persists nothing
       Given the user is editing a saved automation
       When the user closes the wizard without saving
@@ -130,13 +139,13 @@ Feature: One automation flow with a subject choice
     the action class. The advice's own rules are unchanged and stay bound
     in their own file; these scenarios pin only the new seats.
 
-    @integration @unimplemented
+    @integration
     Scenario: The ceiling advice renders on the review step at create
       Given the user drafted a persist action whose condition is over the plan's ceiling
       When the user reaches the review step
       Then the daily-limit advice is shown with its numbers
 
-    @integration @unimplemented
+    @integration
     Scenario: The ceiling advice renders in the watch step on edit
       Given a saved over-ceiling automation with a persist action
       When the user edits it and opens the watch step
@@ -148,7 +157,7 @@ Feature: One automation flow with a subject choice
     table whose columns say what each row watches and where it delivers.
     Schedules keep their own tab.
 
-    @integration @unimplemented
+    @integration
     Scenario: The unified table lists automations watching filters and graphs together
       Given the project has an automation watching a trace filter and one watching a graph
       When the user opens the automations list
@@ -161,7 +170,7 @@ Feature: One automation flow with a subject choice
       When the user filters the list to graph
       Then only graph-watching automations are shown
 
-    @integration @unimplemented
+    @integration
     Scenario: Schedules stay on their own tab
       Given the project has a schedule
       When the user opens the automations list
@@ -169,9 +178,9 @@ Feature: One automation flow with a subject choice
       And the schedules tab lists it
 
     # Inverts the bound list-pages.feature delete-noun scenarios (in flight
-    # via #6884), which assert the dialog and toast say "alert". F6 rebinds
-    # them to this merged-world copy.
-    @integration @unimplemented
+    # via #6884), which asserted the dialog and toast say "alert". R0 removed
+    # them: this scenario carries the merged-world copy and its binding.
+    @integration
     Scenario: Deleting names the row an automation, whatever it watches
       Given the unified table has a row that watches a graph
       When the user deletes it and confirms
@@ -179,8 +188,9 @@ Feature: One automation flow with a subject choice
       And deleting a schedule still names it a schedule
 
     # Supersedes list-pages.feature's "The Overview offers creating an
-    # automation, alert, or schedule" (in flight via #6884).
-    @integration @unimplemented
+    # automation, alert, or schedule" (in flight via #6884), which R0 removed
+    # along with the third menu item it asserted.
+    @integration
     Scenario: The Overview offers creating an automation or a schedule
       Given the user is on the Overview tab
       When the user opens the create menu

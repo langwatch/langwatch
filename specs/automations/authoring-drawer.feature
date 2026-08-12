@@ -32,12 +32,6 @@ Feature: Staged automation authoring drawer
       Then the picker offers Slack and email under Notification
       And the picker offers add-to-dataset and add-to-annotation-queue under Action
 
-    Scenario: A completed section collapses to a one-line summary
-      Given the user has chosen a type and configured a destination
-      When the user returns to the main drawer pane
-      Then earlier sections show a one-line summary of their state
-      And the user can reopen any section to change it
-
     Scenario: Changing the type clears configuration that no longer applies
       Given the user has configured an email notification
       When the user changes the type to Slack
@@ -375,7 +369,7 @@ Feature: Staged automation authoring drawer
     @integration
     Scenario: An external cadence change regroups the gallery; an in-picker pick still does not
       Given the template gallery is showing layouts for the automation's current cadence
-      When the user changes the cadence from the separate Cadence section
+      When the user changes the cadence from the wizard's Delivery step
       Then the gallery regroups its primary layouts to match the new cadence
       When the user then picks a layout built for the other cadence from the gallery
       Then the gallery's list order is unchanged by that pick
@@ -411,11 +405,6 @@ Feature: Staged automation authoring drawer
       When the user tries to save
       Then the name field shows that a name is required
       And saving is blocked
-
-    Scenario: Abandoning the drawer persists nothing
-      Given the user has partially configured a new automation
-      When the user closes the drawer without saving
-      Then no automation is created
 
   Rule: Editing reuses the same staged drawer
 

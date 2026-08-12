@@ -286,6 +286,7 @@ describe("AutomationDrawer", () => {
 
   describe("given a fresh create flow", () => {
     describe("when the drawer opens", () => {
+      /** @scenario "The wizard opens by asking what to watch" */
       it("asks what the automation should watch, with no type picker", async () => {
         renderDrawer();
 
@@ -337,6 +338,153 @@ describe("AutomationDrawer", () => {
         });
       });
     });
+
+    describe("when the author fills in every step for a trace filter", () => {
+      /** @scenario "Creating an automation that watches a trace filter" */
+      it("shows the whole automation on the review step and saves one that acts on matching traces", async () => {
+        const user = userEvent.setup();
+        renderDrawer();
+
+        // Watch: the conditions themselves are the subject.
+        await user.click(await screen.findByRole("button", { name: "Code" }));
+        fireEvent.change(await screen.findByPlaceholderText(/status:error/i), {
+          target: { value: "status:error" },
+        });
+        await user.click(screen.getByRole("button", { name: "Continue" }));
+
+        // Delivery: one channel and its configuration.
+        await user.click(await screen.findByText("Email"));
+        useAutomationStore.getState().dispatch({
+          type: "SET_SLICE",
+          action: TriggerAction.SEND_EMAIL,
+          slice: {
+            ...useAutomationStore.getState().draft.slices[
+              TriggerAction.SEND_EMAIL
+            ],
+            members: ["ops@acme.com"],
+          },
+        });
+        useAutomationStore.getState().setSection(null);
+        await user.click(
+          await screen.findByRole("button", { name: "Continue" }),
+        );
+
+        // Review: what it watches, the rule, the delivery and the name, all on
+        // one screen.
+        fireEvent.change(screen.getByPlaceholderText("Flag failing traces"), {
+          target: { value: "Flag failures" },
+        });
+        expect(screen.getByText("Watches")).toBeInTheDocument();
+        expect(
+          screen.getAllByText("Trace filter · status:error").length,
+        ).toBeGreaterThan(0);
+        expect(
+          screen.getAllByText(/email to 1 recipient/).length,
+        ).toBeGreaterThan(0);
+
+        const createButton = screen.getByRole("button", {
+          name: "Create automation",
+        });
+        await waitFor(() => expect(createButton).toBeEnabled());
+        await user.click(createButton);
+
+        expect(mockUpsertMutate).toHaveBeenCalledTimes(1);
+        expect(mockUpsertMutate.mock.calls[0]?.[0]).toMatchObject({
+          name: "Flag failures",
+          action: TriggerAction.SEND_EMAIL,
+          filterQuery: "status:error",
+          customGraphId: null,
+          graphAlert: undefined,
+        });
+      });
+    });
+
+    describe("when the author chooses to watch a graph", () => {
+      /** @scenario "Creating an automation that watches a graph" */
+      it("saves one that fires when the metric crosses the threshold", async () => {
+        const user = userEvent.setup();
+        renderDrawer();
+
+        await user.click(screen.getByRole("button", { name: /A graph/ }));
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.source).toBe(
+            "customGraph",
+          );
+        });
+        // The graph, the series and the threshold rule all live in this one
+        // step — what it watches and when it fires.
+        useAutomationStore.getState().dispatch({
+          type: "SET_CUSTOM_GRAPH_ID",
+          value: "graph-1",
+        });
+        useAutomationStore.getState().dispatch({
+          type: "SET_GRAPH_ALERT",
+          value: {
+            seriesName: "0/latency/p95",
+            operator: "gt",
+            threshold: 250,
+            timePeriod: 60,
+          },
+        });
+        useAutomationStore.getState().dispatch({
+          type: "SET_ACTION",
+          value: TriggerAction.SEND_EMAIL,
+        });
+        useAutomationStore.getState().dispatch({
+          type: "SET_SLICE",
+          action: TriggerAction.SEND_EMAIL,
+          slice: {
+            ...useAutomationStore.getState().draft.slices[
+              TriggerAction.SEND_EMAIL
+            ],
+            members: ["ops@acme.com"],
+          },
+        });
+        useAutomationStore.getState().dispatch({
+          type: "SET_NAME",
+          value: "Latency watch",
+        });
+        useAutomationStore.getState().setStep("review");
+
+        const createButton = await screen.findByRole("button", {
+          name: "Create automation",
+        });
+        await waitFor(() => expect(createButton).toBeEnabled());
+        await user.click(createButton);
+
+        expect(mockUpsertMutate.mock.calls[0]?.[0]).toMatchObject({
+          name: "Latency watch",
+          customGraphId: "graph-1",
+          graphAlert: {
+            seriesName: "0/latency/p95",
+            operator: "gt",
+            threshold: 250,
+            timePeriod: 60,
+          },
+        });
+      });
+    });
+
+    describe("when the author closes the wizard part-way through", () => {
+      /** @scenario "Abandoning a create persists nothing" */
+      it("creates no automation", async () => {
+        const user = userEvent.setup();
+        renderDrawer();
+
+        await user.click(await screen.findByRole("button", { name: "Code" }));
+        fireEvent.change(await screen.findByPlaceholderText(/status:error/i), {
+          target: { value: "status:error" },
+        });
+        await user.click(screen.getByRole("button", { name: "Continue" }));
+        await user.click(await screen.findByRole("button", { name: /close/i }));
+        await user.click(
+          await screen.findByRole("button", { name: "Discard" }),
+        );
+
+        expect(mockUpsertMutate).not.toHaveBeenCalled();
+        expect(mockCloseDrawer).toHaveBeenCalled();
+      });
+    });
   });
 
   describe("given an existing automation in edit mode", () => {
@@ -351,6 +499,74 @@ describe("AutomationDrawer", () => {
           );
         });
         expect(screen.getByText("Edit automation")).toBeInTheDocument();
+      });
+    });
+
+    describe("when the author edits one section and finishes", () => {
+      /** @scenario "Editing one section returns to the overview" */
+      it("comes back to the review overview with the other sections unchanged", async () => {
+        const user = userEvent.setup();
+        mockTriggerRow = savedRow();
+        renderDrawer({ automationId: "trigger-1" });
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.name).toBe(
+            "Saved automation",
+          );
+        });
+        const filtersBefore = useAutomationStore.getState().draft.filters;
+
+        // Editing is hub-and-spoke: this enters the delivery step alone.
+        await user.click(
+          await screen.findByRole("button", { name: "Edit delivery" }),
+        );
+        useAutomationStore.getState().dispatch({
+          type: "SET_SLICE",
+          action: TriggerAction.SEND_EMAIL,
+          slice: {
+            ...useAutomationStore.getState().draft.slices[
+              TriggerAction.SEND_EMAIL
+            ],
+            members: ["ops@acme.com"],
+          },
+        });
+        useAutomationStore.getState().setSection(null);
+        await user.click(await screen.findByRole("button", { name: "Done" }));
+
+        expect(await screen.findByText("Watches")).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "Save changes" }),
+        ).toBeInTheDocument();
+        expect(useAutomationStore.getState().draft.filters).toEqual(
+          filtersBefore,
+        );
+        expect(useAutomationStore.getState().draft.name).toBe(
+          "Saved automation",
+        );
+      });
+    });
+
+    describe("when the author closes the wizard without saving", () => {
+      /** @scenario "Abandoning an edit persists nothing" */
+      it("leaves the stored automation untouched", async () => {
+        const user = userEvent.setup();
+        mockTriggerRow = savedRow();
+        renderDrawer({ automationId: "trigger-1" });
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.name).toBe(
+            "Saved automation",
+          );
+        });
+
+        fireEvent.change(screen.getByDisplayValue("Saved automation"), {
+          target: { value: "Renamed but never saved" },
+        });
+        await user.click(await screen.findByRole("button", { name: /close/i }));
+        await user.click(
+          await screen.findByRole("button", { name: "Discard" }),
+        );
+
+        expect(mockUpsertMutate).not.toHaveBeenCalled();
+        expect(mockCloseDrawer).toHaveBeenCalled();
       });
     });
 
@@ -765,7 +981,8 @@ describe("AutomationDrawer", () => {
 
   describe("given the author moves back to an earlier step", () => {
     describe("when the watch step is reopened from the rail", () => {
-      it("still holds the answers given on the later steps", async () => {
+      /** @scenario "The wizard keeps completed steps in view" */
+      it("summarises the completed step, reopens it, and keeps the later answers", async () => {
         const user = userEvent.setup();
         renderDrawer();
 
@@ -778,7 +995,17 @@ describe("AutomationDrawer", () => {
             "status:error",
           );
         });
-        await continueToReview(user);
+        await user.click(screen.getByRole("button", { name: "Continue" }));
+
+        // The step behind the author collapses to a one-line summary that
+        // stays on screen while they work on the next one.
+        expect(
+          await screen.findByRole("button", {
+            name: /Watch.*Trace filter · status:error/,
+          }),
+        ).toBeInTheDocument();
+
+        await user.click(screen.getByRole("button", { name: "Continue" }));
         const nameInput = screen.getByPlaceholderText("Flag failing traces");
         fireEvent.change(nameInput, { target: { value: "Flag failures" } });
 

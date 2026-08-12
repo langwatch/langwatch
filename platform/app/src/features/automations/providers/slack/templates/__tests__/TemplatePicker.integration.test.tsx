@@ -262,8 +262,8 @@ describe("SlackBlockKitTemplatePicker", () => {
         }),
       ).not.toBeInTheDocument();
 
-      // The author switches cadence from the separate Cadence section, not
-      // from anything in this picker.
+      // The author switches cadence from the Delivery step's own cadence
+      // control, not from anything in this picker.
       await user.click(
         screen.getByRole("button", {
           name: /change cadence in the cadence section/i,
