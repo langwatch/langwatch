@@ -173,48 +173,57 @@ function DeliveryAttemptRow({
         </Text>
       </HStack>
       {open && hasDetail ? (
-        <VStack align="stretch" gap={2} paddingX={3} paddingBottom={3}>
-          {attempt.error ? (
-            <Code
-              fontSize="xs"
-              width="full"
-              whiteSpace="pre-wrap"
-              wordBreak="break-word"
-            >
-              {attempt.error}
-            </Code>
-          ) : null}
-          {attempt.response?.body ? (
-            <Code
-              fontSize="xs"
-              width="full"
-              whiteSpace="pre-wrap"
-              wordBreak="break-word"
-            >
-              {attempt.response.body}
-            </Code>
-          ) : null}
-          {attempt.response?.headers ? (
-            <VStack align="stretch" gap={0.5}>
-              {Object.entries(attempt.response.headers).map(([name, value]) => (
-                <Code
-                  key={name}
-                  fontSize="xs"
-                  width="full"
-                  whiteSpace="pre-wrap"
-                >
-                  {name}: {value}
-                </Code>
-              ))}
-            </VStack>
-          ) : null}
-          {guidance ? (
-            <Text textStyle="xs" color="fg.muted">
-              {guidance}
-            </Text>
-          ) : null}
-        </VStack>
+        <DeliveryAttemptDetail attempt={attempt} guidance={guidance} />
       ) : null}
     </Box>
+  );
+}
+
+/** The expanded body of a failed attempt: the stored error, the endpoint's
+ *  response, and what the operator can do about it. */
+function DeliveryAttemptDetail({
+  attempt,
+  guidance,
+}: {
+  attempt: WebhookDelivery;
+  guidance: string | undefined;
+}) {
+  return (
+    <VStack align="stretch" gap={2} paddingX={3} paddingBottom={3}>
+      {attempt.error ? (
+        <Code
+          fontSize="xs"
+          width="full"
+          whiteSpace="pre-wrap"
+          wordBreak="break-word"
+        >
+          {attempt.error}
+        </Code>
+      ) : null}
+      {attempt.response?.body ? (
+        <Code
+          fontSize="xs"
+          width="full"
+          whiteSpace="pre-wrap"
+          wordBreak="break-word"
+        >
+          {attempt.response.body}
+        </Code>
+      ) : null}
+      {attempt.response?.headers ? (
+        <VStack align="stretch" gap={0.5}>
+          {Object.entries(attempt.response.headers).map(([name, value]) => (
+            <Code key={name} fontSize="xs" width="full" whiteSpace="pre-wrap">
+              {name}: {value}
+            </Code>
+          ))}
+        </VStack>
+      ) : null}
+      {guidance ? (
+        <Text textStyle="xs" color="fg.muted">
+          {guidance}
+        </Text>
+      ) : null}
+    </VStack>
   );
 }

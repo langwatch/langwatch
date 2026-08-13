@@ -56,15 +56,19 @@ function subjectSummary(draft: AutomationDraft): string {
       : "Pick a graph and series";
   }
   if (draft.source === "report") {
-    return draft.report.sourceKind === "traceQuery"
-      ? "Top matching traces"
-      : draft.report.sourceKind === "customGraph"
-        ? "A custom graph"
-        : "A dashboard";
+    return reportSummary(draft.report.sourceKind);
   }
   if (filterQueryIsSet(draft.filterQuery)) return draft.filterQuery!.trim();
   if (filtersAreSet(draft.filters)) return "Structured filters";
   return "No conditions yet";
+}
+
+function reportSummary(
+  sourceKind: AutomationDraft["report"]["sourceKind"],
+): string {
+  if (sourceKind === "traceQuery") return "Top matching traces";
+  if (sourceKind === "customGraph") return "A custom graph";
+  return "A dashboard";
 }
 
 const SUBJECT_HELP = {

@@ -218,19 +218,7 @@ export function ConditionBuilder({
     <VStack align="stretch" gap={2}>
       {conditions.map((condition, index) => (
         <VStack key={condition.id} align="stretch" gap={2}>
-          {index > 0 ? (
-            <HStack gap={2} align="center">
-              <Text
-                textStyle="2xs"
-                fontWeight="bold"
-                letterSpacing="0.08em"
-                color="fg.muted"
-              >
-                AND
-              </Text>
-              <Box flex={1} height="1px" bg="border.subtle" />
-            </HStack>
-          ) : null}
+          {index > 0 ? <AndSeparator /> : null}
           <ConditionRow
             condition={condition}
             onField={(field) => setField(condition.id, field)}
@@ -252,6 +240,23 @@ export function ConditionBuilder({
         {conditions.length === 0 ? "Add a condition" : "Add AND condition"}
       </Button>
     </VStack>
+  );
+}
+
+/** The rule between rows: every condition must hold. */
+function AndSeparator() {
+  return (
+    <HStack gap={2} align="center">
+      <Text
+        textStyle="2xs"
+        fontWeight="bold"
+        letterSpacing="0.08em"
+        color="fg.muted"
+      >
+        AND
+      </Text>
+      <Box flex={1} height="1px" bg="border.subtle" />
+    </HStack>
   );
 }
 
@@ -299,31 +304,10 @@ function ConditionRow({
   return (
     <VStack align="stretch" gap={1}>
       <HStack gap={2} align="center" flexWrap="wrap" rowGap={2}>
-        <Box width="190px" flexShrink={0}>
-          <Select.Root
-            size="sm"
-            collection={FIELD_COLLECTION}
-            value={
-              attributePrefix
-                ? [attributePrefix.value]
-                : condition.field
-                  ? [condition.field]
-                  : []
-            }
-            onValueChange={({ value }) => value[0] && onField(value[0])}
-          >
-            <Select.Trigger>
-              <Select.ValueText placeholder="Field…" />
-            </Select.Trigger>
-            <Select.Content>
-              {FIELD_OPTIONS.map((item) => (
-                <Select.Item key={item.value} item={item}>
-                  <Text>{item.label}</Text>
-                </Select.Item>
-              ))}
-            </Select.Content>
-          </Select.Root>
-        </Box>
+        <FieldSelect
+          value={attributePrefix ? attributePrefix.value : condition.field}
+          onField={onField}
+        />
 
         {attributePrefix ? (
           <Box width="130px" flexShrink={0}>
@@ -392,6 +376,38 @@ function ConditionRow({
         </Text>
       ) : null}
     </VStack>
+  );
+}
+
+/** The field picker at the head of a row. For custom-attribute fields the
+ *  selected value is the prefix; the key is edited in its own input. */
+function FieldSelect({
+  value,
+  onField,
+}: {
+  value: string;
+  onField: (field: string) => void;
+}) {
+  return (
+    <Box width="190px" flexShrink={0}>
+      <Select.Root
+        size="sm"
+        collection={FIELD_COLLECTION}
+        value={value ? [value] : []}
+        onValueChange={({ value: next }) => next[0] && onField(next[0])}
+      >
+        <Select.Trigger>
+          <Select.ValueText placeholder="Field…" />
+        </Select.Trigger>
+        <Select.Content>
+          {FIELD_OPTIONS.map((item) => (
+            <Select.Item key={item.value} item={item}>
+              <Text>{item.label}</Text>
+            </Select.Item>
+          ))}
+        </Select.Content>
+      </Select.Root>
+    </Box>
   );
 }
 
