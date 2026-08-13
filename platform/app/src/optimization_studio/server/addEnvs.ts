@@ -6,9 +6,9 @@ import {
 import { prisma } from "../../server/db";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import { decrypt } from "../../utils/encryption";
-import { normalizeToSnakeCase } from "../components/properties/llm-configs/normalizeToSnakeCase";
 import type { LLMConfig, ServerWorkflow, Workflow } from "../types/dsl";
 import type { StudioClientEvent } from "../types/events";
+import { normalizeToSnakeCase } from "../utils/normalizeToSnakeCase";
 
 /**
  * An llm parameter reached dispatch without a model. Persisted DSLs are

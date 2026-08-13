@@ -15,11 +15,11 @@ import { describe, expect, it } from "vitest";
 import {
   CAPABILITY_CATALOG,
   CAPABILITY_SURFACES,
-} from "../components/capabilities/capabilityCatalog";
+} from "../logic/capabilities/capabilityCatalog";
 import {
   SURFACE_LABEL,
   SURFACE_PATH,
-} from "../components/capabilities/capabilityRegistry";
+} from "../logic/capabilities/capabilityRegistry";
 
 const CLI_PROGRAM_PATH = fileURLToPath(
   new URL(

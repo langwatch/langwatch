@@ -6,14 +6,14 @@
  * summary — and links into Simulations. Read-only.
  */
 import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
-import { extractPlatformUrl } from "~/utils/platformHref";
 import {
   type CapabilityCardInput,
   extractPrimaryId,
   extractResourceName,
   extractToolText,
   summaryLines,
-} from "./capabilityRegistry";
+} from "~/features/langy/logic/capabilities/capabilityRegistry";
+import { extractPlatformUrl } from "~/utils/platformHref";
 import { LangyCapabilityCard } from "./LangyCapabilityCard";
 
 function parseVerdict(output: unknown): string | null {

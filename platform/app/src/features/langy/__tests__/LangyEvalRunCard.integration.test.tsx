@@ -30,8 +30,8 @@ vi.mock("../hooks/useCapabilityData", () => ({
   }),
 }));
 
-import { resolveCapability } from "../components/capabilities/capabilityRegistry";
 import { LangyEvalRunCard } from "../components/capabilities/LangyEvalRunCard";
+import { resolveCapability } from "../logic/capabilities/capabilityRegistry";
 
 const descriptor = resolveCapability("langwatch.simulation-run.get")!;
 

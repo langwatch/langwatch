@@ -49,12 +49,11 @@ import {
 import type { ValueType } from "recharts/types/component/DefaultTooltipContent";
 
 import { toaster } from "~/components/ui/toaster";
+import type { CapabilityCardInput } from "~/features/langy/logic/capabilities/capabilityRegistry";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-
 import { formatMoneyShort, Money } from "../Money";
-import type { CapabilityCardInput } from "./capabilityRegistry";
 import { LangyCapabilityCard } from "./LangyCapabilityCard";
 
 interface TimeseriesPoint {

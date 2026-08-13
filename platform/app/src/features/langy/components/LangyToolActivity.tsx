@@ -42,6 +42,12 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useLangyDevMode } from "../hooks/useLangyDevMode";
 import {
+  type CapabilityProgress,
+  isProposalOutput,
+  resolveCapability,
+  resolveCapabilityProgress,
+} from "../logic/capabilities/capabilityRegistry";
+import {
   type CapabilityCommand,
   commandOfToolCall,
 } from "../logic/langyCapabilityDigest";
@@ -56,12 +62,6 @@ import {
 } from "../logic/langyToolFailure";
 import { describeToolCall, effectiveToolName } from "../logic/langyToolLabel";
 import { useLangyStore } from "../stores/langyStore";
-import {
-  type CapabilityProgress,
-  isProposalOutput,
-  resolveCapability,
-  resolveCapabilityProgress,
-} from "./capabilities/capabilityRegistry";
 import { LangyCapabilityPendingCard } from "./capabilities/LangyCapabilityPendingCard";
 import {
   type CapabilityToolCall,

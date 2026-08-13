@@ -38,17 +38,18 @@
  *
  * @see specs/langy/langy-followup-suggestions.feature
  */
+
+import {
+  buildSurfaceHref,
+  SURFACE_BY_FEATURE,
+  SURFACE_LABEL,
+} from "~/features/langy/logic/capabilities/capabilityRegistry";
 import {
   buildAutomationHref,
   readTraceSearchQuery,
   type TraceSearchQuery,
   type UnstatedWindow,
 } from "../../logic/traceExplorerLink";
-import {
-  buildSurfaceHref,
-  SURFACE_BY_FEATURE,
-  SURFACE_LABEL,
-} from "./capabilityRegistry";
 import { followUpsForResult } from "./cliFollowUps";
 
 /**

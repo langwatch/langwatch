@@ -9,9 +9,9 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { CliResultDigest } from "@langwatch/langy";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { resolveCapability } from "../components/capabilities/capabilityRegistry";
 import { LangyTraceSampleCard } from "../components/capabilities/LangyTraceSampleCard";
 import type { CapabilityData } from "../hooks/useCapabilityData";
+import { resolveCapability } from "../logic/capabilities/capabilityRegistry";
 
 // The hydration seam is mocked: these tests pin the card's RENDERING of each
 // hydration state (fresh rows, skeletons, gone, fallback), not the fetching —

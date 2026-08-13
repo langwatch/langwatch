@@ -20,6 +20,7 @@
  */
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
+import type { CapabilitySurface } from "~/features/langy/logic/capabilities/capabilityCatalog";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useCapabilityData } from "../../hooks/useCapabilityData";
 import {
@@ -30,7 +31,6 @@ import type { CapabilityCommand } from "../../logic/langyCapabilityDigest";
 import type { LangyProgressSample } from "../../stores/langyStore";
 import { langyThinkingShimmerStyles } from "../langyShimmer";
 import { useProjectedProgress } from "../StreamingStatusLine";
-import type { CapabilitySurface } from "./capabilityCatalog";
 import { CapabilityRow, LangyCapabilityCard } from "./LangyCapabilityCard";
 
 const rowAppear = keyframes`
