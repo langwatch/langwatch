@@ -8,9 +8,9 @@
  * on the field once the rest of the setup is otherwise done.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { TriggerAction } from "@prisma/client";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { TriggerAction } from "~/generated/prisma/client";
 import { INITIAL_DRAFT } from "../../logic/draftReducer";
 import { useAutomationStore } from "../../state/automationStore";
 import { NameField } from "../NameField";

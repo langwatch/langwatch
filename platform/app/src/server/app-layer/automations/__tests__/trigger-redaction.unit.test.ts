@@ -1,5 +1,5 @@
-import { TriggerAction } from "@prisma/client";
 import { describe, expect, it } from "vitest";
+import { TriggerAction } from "~/generated/prisma/client";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { decryptWebhookHeaders } from "../providers/webhook/server";
 import {

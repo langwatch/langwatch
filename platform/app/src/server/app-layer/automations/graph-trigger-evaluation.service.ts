@@ -30,8 +30,8 @@ import {
 import { buildGraphAlertTemplateContext } from "@langwatch/automations/templating/templateContext";
 import { createLogger } from "@langwatch/observability";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
-import { isSeriesPercentageUnsupported } from "~/server/analytics/errors";
 import type { CustomGraph, Project, Trigger } from "~/generated/prisma/client";
+import { isSeriesPercentageUnsupported } from "~/server/analytics/errors";
 import type {
   SeriesInputType,
   TimeseriesInputType,

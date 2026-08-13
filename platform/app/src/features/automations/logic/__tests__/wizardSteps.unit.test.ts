@@ -1,7 +1,7 @@
-import { TriggerAction } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import type { EmailSlice } from "~/features/automations/providers/email/client";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
+import { TriggerAction } from "~/generated/prisma/client";
 import { type AutomationDraft, INITIAL_DRAFT } from "../draftReducer";
 import {
   nextStep,

@@ -9,15 +9,16 @@
  * surgical edit inside a JSON column, and "the other fields survived" is only
  * true if the stored row says so.
  */
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   type Organization,
   type Project,
   type Team,
   TriggerAction,
   TriggerKind,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+} from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { PrismaSlackIntegrationRepository } from "../repositories/slack-integration.prisma.repository";
 
