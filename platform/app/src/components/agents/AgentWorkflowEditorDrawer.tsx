@@ -29,11 +29,11 @@ import type {
   Workflow,
 } from "~/optimization_studio/types/dsl";
 import { getMappingSurfaceInputs } from "~/optimization_studio/utils/nodeUtils";
+import type { AgentComponentConfig } from "~/server/agents/agent.repository";
 import {
   type AgentWithFields,
   linkedWorkflowId,
 } from "~/server/agents/agent-fields";
-import type { AgentComponentConfig } from "~/server/agents/agent.repository";
 import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 import { api } from "~/utils/api";
 

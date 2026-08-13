@@ -277,9 +277,9 @@ describe("executeWorkflowCell", () => {
             e.type === "evaluator_result" && e.evaluatorId === "eval-grading",
         );
         expect(graded).toMatchObject({ rowIndex: 0, targetId: "wf-target" });
-        expect(graded?.type === "evaluator_result" && graded.result).toMatchObject(
-          { status: "processed", score: 1, passed: true },
-        );
+        expect(
+          graded?.type === "evaluator_result" && graded.result,
+        ).toMatchObject({ status: "processed", score: 1, passed: true });
       });
 
       /** @scenario "An evaluator can read a result other than the first one" */
@@ -359,15 +359,17 @@ describe("executeWorkflowCell", () => {
           output: "yes",
           chunks: { a: 1 },
         });
-        expect(target?.type === "target_result" && target.error).toBeUndefined();
+        expect(
+          target?.type === "target_result" && target.error,
+        ).toBeUndefined();
 
         const graded = events.find(
           (e) =>
             e.type === "evaluator_result" && e.evaluatorId === "eval-grading",
         );
-        expect(graded?.type === "evaluator_result" && graded.result).toMatchObject(
-          { status: "error", error_type: "EvaluatorError" },
-        );
+        expect(
+          graded?.type === "evaluator_result" && graded.result,
+        ).toMatchObject({ status: "error", error_type: "EvaluatorError" });
       });
     });
   });
