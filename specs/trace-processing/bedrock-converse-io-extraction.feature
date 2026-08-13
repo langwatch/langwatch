@@ -14,7 +14,7 @@ Feature: Bedrock Converse span I/O extraction
   # asymmetric and easy to miss: input fell back to the root span's name,
   # output to the HTTP status or nothing.
   #
-  # Note: this gap did NOT cause the Healify empty traces in #1040 — those
+  # Note: this gap did NOT cause the customer empty traces in #1040 — those
   # spans carry no payload attributes at all (producer-side omission).
 
   Background:

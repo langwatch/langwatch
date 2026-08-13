@@ -1,5 +1,5 @@
 /**
- * Branch 1 of langwatch-saas#1040 — and the Healify-independent reproduction
+ * Branch 1 of langwatch-saas#1040 — and the customer-independent reproduction
  * (AC4). Does an AWS Bedrock **Converse** span survive the two-stage I/O
  * pipeline, or does it land in `trace_summaries` with empty ComputedInput /
  * ComputedOutput?
@@ -23,12 +23,12 @@
  *              carries a numeric `http.status_code`.
  *
  * These tests run the REAL canonicaliser and the REAL extraction service. They
- * make no assertion about what Healify actually emits — they establish what
+ * make no assertion about what the customer integration actually emits — they establish what
  * this pipeline does with each candidate Bedrock shape, so the observed
  * signature in production can be matched against a named shape.
  *
  * OUTCOME (production data hydrated 2026-08-13, issue #1040): none of these
- * rows describes Healify. Their empty Bedrock spans carry NO payload attribute
+ * rows describes the affected customer. Their empty Bedrock spans carry NO payload attribute
  * under any key — mapped or unmapped — so there is nothing for stage 2 to read
  * and no mapping change would populate them. The content is never emitted;
  * AWS's botocore instrumentation omits message content unless
