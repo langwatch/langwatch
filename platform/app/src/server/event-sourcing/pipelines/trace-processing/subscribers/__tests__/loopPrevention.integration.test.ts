@@ -7,7 +7,7 @@
  *     real TraceSummaryFoldProjection, real CH writes.
  *   - Reads fold state back from REAL ClickHouse.
  *   - Invokes the REAL evaluationTrigger reactor's handle() with a
- *     constructed event + foldState (read from CH) to assert on the
+ *     constructed event + state (read from CH) to assert on the
  *     loop-prevention behaviour.
  *
  *   The reactor's queue worker is NOT exercised in this test.
@@ -22,10 +22,10 @@
  *
  * What this test proves:
  *   1. recordSpan + the trace-processing pipeline + CH persistence
- *      survive a depth=0 span and produce a foldState with
+ *      survive a depth=0 span and produce a state with
  *      langwatch.origin resolved.
- *   2. The REAL evaluationTrigger reactor (createEvaluationTriggerReactor)
- *      against that REAL foldState DISPATCHES one executeEvaluation
+ *   2. The REAL evaluationTrigger reactor (createEvaluationTriggerSubscriber)
+ *      against that REAL state DISPATCHES one executeEvaluation
  *      per enabled ON_MESSAGE monitor.
  *   3. The same reactor with a depth=1 span event BLOCKS dispatch
  *      and increments the `langwatch_evaluator_loop_blocked_total`
@@ -73,7 +73,7 @@ import { TraceSummaryFoldProjection } from "../../projections/traceSummary.foldP
 import { TraceSummaryStore } from "../../projections/traceSummary.store";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import type { OtlpSpan } from "../../schemas/otlp";
-import { createEvaluationTriggerReactor } from "../evaluationTrigger.reactor";
+import { createEvaluationTriggerSubscriber } from "../evaluationTrigger.subscriber";
 
 const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
@@ -146,7 +146,14 @@ function makeCapturingEvaluationDispatcher() {
   };
 }
 
-const noopReactor = { name: "noop", options: {}, handle: async () => {} };
+const noopFoldSubscriber = () => ({
+  fold: "traceSummary",
+  handler: async () => {},
+});
+const noopMapSubscriber = () => ({
+  map: "spanStorage",
+  handler: async () => {},
+});
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -263,21 +270,18 @@ describe.skipIf(!hasTestcontainers)(
         ).repository,
       );
 
-      // Build the REAL evaluationTrigger reactor with a capturing
+      // Build the REAL evaluationTrigger subscriber with a capturing
       // dispatcher and wire it into the pipeline so the
       // GroupQueueProcessor actually fires it when spans land.
       // Override `delay` to 0 — production default is 30s, which is
       // a deliberate dedup window but unhelpful for tests.
       const monitorService = new MonitorService(makeFakeMonitorRepository());
       dispatcher = makeCapturingEvaluationDispatcher();
-      const realReactor = createEvaluationTriggerReactor({
+      const realSubscriber = createEvaluationTriggerSubscriber({
         monitors: monitorService,
         evaluation: dispatcher.dispatch,
       });
-      const fastReactor = {
-        ...realReactor,
-        options: { ...realReactor.options, delay: 0 },
-      };
+      const fastSpec = { ...realSubscriber.spec, delay: 0 };
 
       const pipelineName = `trace_loop_prevention_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const pipelineDef = definePipeline<TraceProcessingEvent>()
@@ -291,16 +295,12 @@ describe.skipIf(!hasTestcontainers)(
           "spanStorage",
           new SpanStorageMapProjection({ store: spanAppendStore }) as any,
         )
-        .withReactor("traceSummary", "evaluationTrigger", fastReactor as any)
-        .withReactor("traceSummary", "customEvaluationSync", noopReactor as any)
-        .withReactor("traceSummary", "traceUpdateBroadcast", noopReactor as any)
-        .withReactor(
-          "traceSummary",
-          "simulationMetricsSync",
-          noopReactor as any,
-        )
-        .withReactor("traceSummary", "projectMetadata", noopReactor as any)
-        .withReactor("spanStorage", "spanStorageBroadcast", noopReactor as any)
+        .withSubscriber("evaluationTrigger", fastSpec as any)
+        .withSubscriber("customEvaluationSync", noopFoldSubscriber() as any)
+        .withSubscriber("traceUpdateBroadcast", noopFoldSubscriber() as any)
+        .withSubscriber("simulationMetricsSync", noopFoldSubscriber() as any)
+        .withSubscriber("projectMetadata", noopFoldSubscriber() as any)
+        .withSubscriber("spanStorageBroadcast", noopMapSubscriber() as any)
         .withCommand("recordSpan", TestRecordSpanCommand as any)
         .withCommand("assignTopic", AssignTopicCommand as any)
         .build();

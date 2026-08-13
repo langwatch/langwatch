@@ -9,19 +9,21 @@ import {
   type TrackEventRESTParamsValidator,
   trackEventRESTParamsValidatorSchema,
 } from "~/server/tracer/types";
-import type {
-  ReactorContext,
-  ReactorDefinition,
-} from "../../../reactors/reactor.types";
+import type { TriggerContext } from "../../../pipeline/processManagerDefinition";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import { STALE_TRACE_THRESHOLD_MS } from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
 import { isSpanReceivedEvent } from "../schemas/events";
 import type { OtlpAnyValue, OtlpSpan } from "../schemas/otlp";
 
-const logger = createLogger(
-  "langwatch:trace-processing:tracked-event-sync-reactor",
-);
+const logger = createLogger("langwatch:trace-processing:tracked-event-sync");
+
+export const TRACKED_EVENT_SYNC_DELAY_MS = 5_000;
+export const TRACKED_EVENT_SYNC_DEDUP_TTL_MS = 30_000;
+
+export function trackedEventSyncDedupId(event: TraceProcessingEvent): string {
+  return `${event.tenantId}:${event.aggregateId}:${event.id}`;
+}
 
 /**
  * Span event name the SDKs emit when a developer records live feedback (a
@@ -70,7 +72,7 @@ function isRecordableEventType(value: unknown): value is string {
   );
 }
 
-export interface TrackedEventSyncReactorDeps {
+export interface TrackedEventSyncSubscriberDeps {
   /**
    * Records a tracked event through the same path as the REST
    * `POST /api/events/track` handler (see `recordTrackedEventSpan`). Wired in
@@ -290,7 +292,7 @@ function spanHasFeedbackEvents(span: OtlpSpan): boolean {
  * Pure relevance guard shared by shouldReact (pre-enqueue) and handle: only
  * recent span events carrying `langwatch.event` feedback need this reactor.
  */
-function hasSyncableFeedback(event: TraceProcessingEvent): boolean {
+export function hasSyncableFeedback(event: TraceProcessingEvent): boolean {
   if (!isSpanReceivedEvent(event)) return false;
   if (event.occurredAt < Date.now() - STALE_TRACE_THRESHOLD_MS) return false;
   return spanHasFeedbackEvents(event.data.span);
@@ -353,7 +355,7 @@ async function recordReconstructedEvent({
   spanId,
   timestamp,
 }: {
-  deps: TrackedEventSyncReactorDeps;
+  deps: TrackedEventSyncSubscriberDeps;
   trackedEvent: ReconstructedTrackedEvent;
   tenantId: string;
   traceId: string;
@@ -415,8 +417,8 @@ async function syncTrackedEventsFromSpan({
   deps,
 }: {
   event: TraceProcessingEvent;
-  context: ReactorContext<TraceSummaryData>;
-  deps: TrackedEventSyncReactorDeps;
+  context: TriggerContext<TraceSummaryData>;
+  deps: TrackedEventSyncSubscriberDeps;
 }): Promise<void> {
   if (!isSpanReceivedEvent(event)) return;
   if (!hasSyncableFeedback(event)) return;
@@ -447,7 +449,7 @@ async function syncTrackedEventsFromSpan({
 }
 
 /**
- * Reactor that turns live span feedback into tracked events.
+ * Subscriber handler that turns live span feedback into tracked events.
  *
  * Reads `langwatch.event` events directly from each SpanReceivedEvent's OTLP
  * span, reconstructs the `{ event_type, metrics, event_details }` payload, and
@@ -457,22 +459,11 @@ async function syncTrackedEventsFromSpan({
  * validation the REST handler applies are logged and skipped (mirrors
  * customEvaluationSync's parse-failure path).
  */
-export function createTrackedEventSyncReactor(
-  deps: TrackedEventSyncReactorDeps,
-): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
-  return {
-    name: "trackedEventSync",
-    shouldReact: (event) => hasSyncableFeedback(event),
-    options: {
-      makeJobId: (payload) =>
-        `tracked-event-sync:${payload.event.tenantId}:${payload.event.aggregateId}:${payload.event.id}`,
-      ttl: 30_000,
-      delay: 5_000,
-    },
-
-    handle: (
-      event: TraceProcessingEvent,
-      context: ReactorContext<TraceSummaryData>,
-    ): Promise<void> => syncTrackedEventsFromSpan({ event, context, deps }),
-  };
+export function createTrackedEventSyncHandler(
+  deps: TrackedEventSyncSubscriberDeps,
+): (
+  event: TraceProcessingEvent,
+  context: TriggerContext<TraceSummaryData>,
+) => Promise<void> {
+  return (event, context) => syncTrackedEventsFromSpan({ event, context, deps });
 }

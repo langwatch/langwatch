@@ -20,13 +20,13 @@ vi.mock("~/server/posthog", () => ({
 }));
 
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { ReactorContext } from "../../../../reactors/reactor.types";
+import type { TriggerContext } from "../../../../pipeline/processManagerDefinition";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
-  createProjectMetadataReactor,
-  PROJECT_METADATA_WINDOW_MS,
-  type ProjectMetadataReactorDeps,
-} from "../projectMetadata.reactor";
+  createProjectMetadataHandler,
+  isRealFirstIngest,
+  type ProjectMetadataSubscriberDeps,
+} from "../projectMetadata.subscriber";
 
 function createFoldState(
   overrides: Partial<TraceSummaryData> = {},
@@ -99,12 +99,12 @@ function createEvent(tenantId: string): TraceProcessingEvent {
 
 function createContext(
   tenantId: string,
-  foldState: TraceSummaryData,
-): ReactorContext<TraceSummaryData> {
+  state: TraceSummaryData,
+): TriggerContext<TraceSummaryData> {
   return {
     tenantId,
     aggregateId: "trace-1",
-    foldState,
+    state,
   };
 }
 
@@ -123,8 +123,8 @@ function createMockProjectService() {
   };
 }
 
-describe("createProjectMetadataReactor()", () => {
-  let deps: ProjectMetadataReactorDeps;
+describe("createProjectMetadataHandler()", () => {
+  let deps: ProjectMetadataSubscriberDeps;
   let mockProjects: ReturnType<typeof createMockProjectService>;
   const tenantId = "project-123";
 
@@ -150,11 +150,11 @@ describe("createProjectMetadataReactor()", () => {
 
     /** @scenario "Project marks as integrated after first trace ingestion" */
     it("sets firstMessage to true", async () => {
-      const reactor = createProjectMetadataReactor(deps);
+      const reactor = createProjectMetadataHandler(deps);
       const event = createEvent(tenantId);
       const context = createContext(tenantId, createFoldState());
 
-      await reactor.handle(event, context);
+      await reactor(event, context);
 
       expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
         id: tenantId,
@@ -163,11 +163,11 @@ describe("createProjectMetadataReactor()", () => {
     });
 
     it("sets integrated to true for non-optimization-studio traces", async () => {
-      const reactor = createProjectMetadataReactor(deps);
+      const reactor = createProjectMetadataHandler(deps);
       const event = createEvent(tenantId);
       const context = createContext(tenantId, createFoldState());
 
-      await reactor.handle(event, context);
+      await reactor(event, context);
 
       expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
         id: tenantId,
@@ -177,16 +177,16 @@ describe("createProjectMetadataReactor()", () => {
 
     /** @scenario First trace tracks the PostHog integration milestone against the org admin */
     it("tracks first_trace_integrated against the org admin", async () => {
-      const reactor = createProjectMetadataReactor(deps);
+      const reactor = createProjectMetadataHandler(deps);
       const event = createEvent(tenantId);
-      const foldState = createFoldState({
+      const state = createFoldState({
         attributes: {
           "sdk.language": "python",
           "langwatch.sdk.framework": "openai",
         },
       });
 
-      await reactor.handle(event, createContext(tenantId, foldState));
+      await reactor(event, createContext(tenantId, state));
 
       expect(mockTrackServerEvent).toHaveBeenCalledTimes(1);
       expect(mockTrackServerEvent).toHaveBeenCalledWith({
@@ -202,10 +202,10 @@ describe("createProjectMetadataReactor()", () => {
 
     /** @scenario PostHog integration milestone reports unknown when SDK attributes are absent */
     it("falls back to unknown sdk properties when attributes are absent", async () => {
-      const reactor = createProjectMetadataReactor(deps);
+      const reactor = createProjectMetadataHandler(deps);
       const event = createEvent(tenantId);
 
-      await reactor.handle(event, createContext(tenantId, createFoldState()));
+      await reactor(event, createContext(tenantId, createFoldState()));
 
       expect(mockTrackServerEvent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -224,10 +224,10 @@ describe("createProjectMetadataReactor()", () => {
         organizationId: null,
         firstMessage: false,
       });
-      const reactor = createProjectMetadataReactor(deps);
+      const reactor = createProjectMetadataHandler(deps);
       const event = createEvent(tenantId);
 
-      await reactor.handle(event, createContext(tenantId, createFoldState()));
+      await reactor(event, createContext(tenantId, createFoldState()));
 
       expect(mockTrackServerEvent).not.toHaveBeenCalled();
     });
@@ -243,15 +243,15 @@ describe("createProjectMetadataReactor()", () => {
       mockProjects.updateMetadata.mockResolvedValue(undefined);
     });
 
-    it("detects language as python from foldState attributes", async () => {
-      const reactor = createProjectMetadataReactor(deps);
+    it("detects language as python from state attributes", async () => {
+      const reactor = createProjectMetadataHandler(deps);
       const event = createEvent(tenantId);
-      const foldState = createFoldState({
+      const state = createFoldState({
         attributes: { "sdk.language": "python" },
       });
-      const context = createContext(tenantId, foldState);
+      const context = createContext(tenantId, state);
 
-      await reactor.handle(event, context);
+      await reactor(event, context);
 
       expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
         id: tenantId,
@@ -270,15 +270,15 @@ describe("createProjectMetadataReactor()", () => {
       mockProjects.updateMetadata.mockResolvedValue(undefined);
     });
 
-    it("detects language as typescript from foldState attributes", async () => {
-      const reactor = createProjectMetadataReactor(deps);
+    it("detects language as typescript from state attributes", async () => {
+      const reactor = createProjectMetadataHandler(deps);
       const event = createEvent(tenantId);
-      const foldState = createFoldState({
+      const state = createFoldState({
         attributes: { "sdk.language": "typescript" },
       });
-      const context = createContext(tenantId, foldState);
+      const context = createContext(tenantId, state);
 
-      await reactor.handle(event, context);
+      await reactor(event, context);
 
       expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
         id: tenantId,
@@ -298,14 +298,14 @@ describe("createProjectMetadataReactor()", () => {
     });
 
     it("falls back to 'other'", async () => {
-      const reactor = createProjectMetadataReactor(deps);
+      const reactor = createProjectMetadataHandler(deps);
       const event = createEvent(tenantId);
-      const foldState = createFoldState({
+      const state = createFoldState({
         attributes: { "sdk.language": "java" },
       });
-      const context = createContext(tenantId, foldState);
+      const context = createContext(tenantId, state);
 
-      await reactor.handle(event, context);
+      await reactor(event, context);
 
       expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
         id: tenantId,
@@ -324,22 +324,22 @@ describe("createProjectMetadataReactor()", () => {
     });
 
     it("does not update the project", async () => {
-      const reactor = createProjectMetadataReactor(deps);
+      const reactor = createProjectMetadataHandler(deps);
       const event = createEvent(tenantId);
       const context = createContext(tenantId, createFoldState());
 
-      await reactor.handle(event, context);
+      await reactor(event, context);
 
       expect(mockProjects.updateMetadata).not.toHaveBeenCalled();
     });
 
     /** @scenario PostHog integration milestone fires only on the firstMessage transition */
     it("does not track first_trace_integrated again", async () => {
-      const reactor = createProjectMetadataReactor(deps);
+      const reactor = createProjectMetadataHandler(deps);
       const event = createEvent(tenantId);
       const context = createContext(tenantId, createFoldState());
 
-      await reactor.handle(event, context);
+      await reactor(event, context);
 
       expect(mockTrackServerEvent).not.toHaveBeenCalled();
     });
@@ -351,11 +351,11 @@ describe("createProjectMetadataReactor()", () => {
     });
 
     it("does not update the project", async () => {
-      const reactor = createProjectMetadataReactor(deps);
+      const reactor = createProjectMetadataHandler(deps);
       const event = createEvent(tenantId);
       const context = createContext(tenantId, createFoldState());
 
-      await reactor.handle(event, context);
+      await reactor(event, context);
 
       expect(mockProjects.updateMetadata).not.toHaveBeenCalled();
     });
@@ -372,14 +372,14 @@ describe("createProjectMetadataReactor()", () => {
     });
 
     it("does not set integrated to true", async () => {
-      const reactor = createProjectMetadataReactor(deps);
+      const reactor = createProjectMetadataHandler(deps);
       const event = createEvent(tenantId);
-      const foldState = createFoldState({
+      const state = createFoldState({
         attributes: { "langwatch.platform": "optimization_studio" },
       });
-      const context = createContext(tenantId, foldState);
+      const context = createContext(tenantId, state);
 
-      await reactor.handle(event, context);
+      await reactor(event, context);
 
       expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
         id: tenantId,
@@ -388,14 +388,14 @@ describe("createProjectMetadataReactor()", () => {
     });
 
     it("sets language to 'other'", async () => {
-      const reactor = createProjectMetadataReactor(deps);
+      const reactor = createProjectMetadataHandler(deps);
       const event = createEvent(tenantId);
-      const foldState = createFoldState({
+      const state = createFoldState({
         attributes: { "langwatch.platform": "optimization_studio" },
       });
-      const context = createContext(tenantId, foldState);
+      const context = createContext(tenantId, state);
 
-      await reactor.handle(event, context);
+      await reactor(event, context);
 
       expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
         id: tenantId,
@@ -417,22 +417,22 @@ describe("createProjectMetadataReactor()", () => {
     });
 
     it("swallows the error (non-fatal)", async () => {
-      const reactor = createProjectMetadataReactor(deps);
+      const reactor = createProjectMetadataHandler(deps);
       const event = createEvent(tenantId);
       const context = createContext(tenantId, createFoldState());
 
       // Must not throw
-      await expect(reactor.handle(event, context)).resolves.toBeUndefined();
+      await expect(reactor(event, context)).resolves.toBeUndefined();
     });
 
     /** @scenario PostHog integration milestone is not tracked when the metadata write fails */
     it("does not track first_trace_integrated for a failed write", async () => {
       // The next trace retries the write and fires the event then.
-      const reactor = createProjectMetadataReactor(deps);
+      const reactor = createProjectMetadataHandler(deps);
       const event = createEvent(tenantId);
       const context = createContext(tenantId, createFoldState());
 
-      await reactor.handle(event, context);
+      await reactor(event, context);
 
       expect(mockTrackServerEvent).not.toHaveBeenCalled();
     });
@@ -457,9 +457,9 @@ describe("createProjectMetadataReactor()", () => {
 
     describe("when a topic clustering bootstrap is wired", () => {
       it("bootstraps the project's clustering schedule exactly once", async () => {
-        const reactor = createProjectMetadataReactor(deps);
+        const reactor = createProjectMetadataHandler(deps);
 
-        await reactor.handle(
+        await reactor(
           createEvent(tenantId),
           createContext(tenantId, createFoldState()),
         );
@@ -474,9 +474,9 @@ describe("createProjectMetadataReactor()", () => {
         // own try/catch, not its position, is what keeps a bootstrap failure
         // from being reported as a metadata failure.
         mockProjects.updateMetadata.mockRejectedValue(new Error("pg down"));
-        const reactor = createProjectMetadataReactor(deps);
+        const reactor = createProjectMetadataHandler(deps);
 
-        await reactor.handle(
+        await reactor(
           createEvent(tenantId),
           createContext(tenantId, createFoldState()),
         );
@@ -496,9 +496,9 @@ describe("createProjectMetadataReactor()", () => {
           firstMessage: true,
           integrated: true,
         });
-        const reactor = createProjectMetadataReactor(deps);
+        const reactor = createProjectMetadataHandler(deps);
 
-        await reactor.handle(
+        await reactor(
           createEvent(tenantId),
           createContext(tenantId, createFoldState()),
         );
@@ -517,10 +517,10 @@ describe("createProjectMetadataReactor()", () => {
       });
 
       it("swallows the failure (non-fatal)", async () => {
-        const reactor = createProjectMetadataReactor(deps);
+        const reactor = createProjectMetadataHandler(deps);
 
         await expect(
-          reactor.handle(
+          reactor(
             createEvent(tenantId),
             createContext(tenantId, createFoldState()),
           ),
@@ -528,9 +528,9 @@ describe("createProjectMetadataReactor()", () => {
       });
 
       it("does not report the committed metadata write as failed", async () => {
-        const reactor = createProjectMetadataReactor(deps);
+        const reactor = createProjectMetadataHandler(deps);
 
-        await reactor.handle(
+        await reactor(
           createEvent(tenantId),
           createContext(tenantId, createFoldState()),
         );
@@ -545,12 +545,12 @@ describe("createProjectMetadataReactor()", () => {
 
     describe("when no bootstrap is wired", () => {
       it("completes the metadata write without error", async () => {
-        const reactor = createProjectMetadataReactor({
+        const reactor = createProjectMetadataHandler({
           projects: mockProjects as any,
         });
 
         await expect(
-          reactor.handle(
+          reactor(
             createEvent(tenantId),
             createContext(tenantId, createFoldState()),
           ),
@@ -586,9 +586,9 @@ describe("createProjectMetadataReactor()", () => {
         // bootstrap-trigger request cannot move the wake or start a run) and
         // rate-limited at the injected implementation, so the reconciliation
         // costs at most one commit per project per claim window.
-        const reactor = createProjectMetadataReactor(deps);
+        const reactor = createProjectMetadataHandler(deps);
 
-        await reactor.handle(
+        await reactor(
           createEvent(tenantId),
           createContext(tenantId, createFoldState()),
         );
@@ -600,9 +600,9 @@ describe("createProjectMetadataReactor()", () => {
       it("does not track first_trace_integrated for the repeat write", async () => {
         // The event is gated on the firstMessage transition, not on the
         // metadata write: an integrated-flag repair must not re-fire it.
-        const reactor = createProjectMetadataReactor(deps);
+        const reactor = createProjectMetadataHandler(deps);
 
-        await reactor.handle(
+        await reactor(
           createEvent(tenantId),
           createContext(tenantId, createFoldState()),
         );
@@ -618,12 +618,12 @@ describe("createProjectMetadataReactor()", () => {
       it("does not bootstrap clustering", async () => {
         const bootstrapTopicClustering = vi.fn().mockResolvedValue(undefined);
         mockProjects.getById.mockResolvedValue(null);
-        const reactor = createProjectMetadataReactor({
+        const reactor = createProjectMetadataHandler({
           projects: mockProjects as any,
           bootstrapTopicClustering: bootstrapTopicClustering as any,
         });
 
-        await reactor.handle(
+        await reactor(
           createEvent(tenantId),
           createContext(tenantId, createFoldState()),
         );
@@ -633,63 +633,27 @@ describe("createProjectMetadataReactor()", () => {
     });
   });
 
-  it("uses dedup makeJobId based on tenantId", () => {
-    const reactor = createProjectMetadataReactor(deps);
-    const event = createEvent(tenantId);
+  // The window / dedup / lane wiring lives on the pipeline registration now —
+  // see subscriberWiring.unit.test.ts for those assertions.
 
-    const jobId = reactor.options!.makeJobId!({
-      event: event as any,
-      foldState: {} as any,
-    });
-
-    expect(jobId).toBe(`project-meta:${tenantId}`);
-  });
-
-  it("configures a window and dedup ttl of one onboarding poll", () => {
-    const reactor = createProjectMetadataReactor(deps);
-
-    expect(reactor.options!.delay).toBe(PROJECT_METADATA_WINDOW_MS);
-    expect(reactor.options!.deduplication?.ttlMs).toBe(
-      PROJECT_METADATA_WINDOW_MS,
-    );
-  });
-
-  it("runs only in worker", () => {
-    const reactor = createProjectMetadataReactor(deps);
-
-    expect(reactor.options!.runIn).toEqual(["worker"]);
-  });
-
-  describe("when deciding whether to react", () => {
+  describe("when deciding whether the ingest is real", () => {
     describe("when the trace is a real ingest", () => {
       it("returns true", () => {
-        const reactor = createProjectMetadataReactor(deps);
-        const foldState = createFoldState({
+        const state = createFoldState({
           attributes: { "langwatch.origin": "application" },
         });
 
-        expect(
-          reactor.shouldReact!(
-            createEvent("tenant-1"),
-            createContext("tenant-1", foldState),
-          ),
-        ).toBe(true);
+        expect(isRealFirstIngest(state)).toBe(true);
       });
     });
 
     describe("when the trace is a seeded sample", () => {
       it("returns false", () => {
-        const reactor = createProjectMetadataReactor(deps);
-        const foldState = createFoldState({
+        const state = createFoldState({
           attributes: { "langwatch.origin": "sample" },
         });
 
-        expect(
-          reactor.shouldReact!(
-            createEvent("tenant-1"),
-            createContext("tenant-1", foldState),
-          ),
-        ).toBe(false);
+        expect(isRealFirstIngest(state)).toBe(false);
       });
     });
   });

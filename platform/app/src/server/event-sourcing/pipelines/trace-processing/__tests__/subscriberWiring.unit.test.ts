@@ -4,7 +4,6 @@ import {
   createTraceProcessingPipeline,
   type TraceProcessingPipelineDeps,
 } from "../pipeline";
-import { createTrackedEventSyncReactor } from "../reactors/trackedEventSync.reactor";
 import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
@@ -21,7 +20,7 @@ import type { TraceProcessingEvent } from "../schemas/events";
  * `build()` only stores references, so no store / reactor is ever invoked.
  */
 
-const reactorStub = (name: string) => ({ name, handle: async () => {} }) as any;
+const handlerStub = () => vi.fn().mockResolvedValue(undefined);
 
 function buildTraceDeps(
   overrides: Partial<TraceProcessingPipelineDeps> = {},
@@ -32,19 +31,22 @@ function buildTraceDeps(
     traceSummaryStore: store,
     traceAnalyticsStore: store,
     traceAnalyticsRollupAppendStore: store,
-    originGateReactor: reactorStub("originGate"),
-    evaluationTriggerReactor: reactorStub("evaluationTrigger"),
-    customEvaluationSyncHandler: vi.fn().mockResolvedValue(undefined),
-    trackedEventSyncReactor: reactorStub("trackedEventSync"),
-    traceUpdateBroadcastReactor: reactorStub("traceUpdateBroadcast"),
-    projectMetadataReactor: reactorStub("projectMetadata"),
-    simulationMetricsSyncReactor: reactorStub("simulationMetricsSync"),
-    experimentMetricsSyncReactor: reactorStub("experimentMetricsSync"),
+    originGateHandler: handlerStub(),
+    evaluationTrigger: {
+      name: "evaluationTrigger",
+      spec: { fold: "traceSummary", handler: handlerStub() },
+    },
+    customEvaluationSyncHandler: handlerStub(),
+    trackedEventSyncHandler: handlerStub(),
+    traceUpdateBroadcastHandler: handlerStub(),
+    projectMetadataHandler: handlerStub(),
+    simulationMetricsSyncHandler: handlerStub(),
+    experimentMetricsSyncHandler: handlerStub(),
     automations: {
       triggerMatchHandler: vi.fn().mockResolvedValue(undefined),
       graphActivityHandler: vi.fn().mockResolvedValue(undefined),
     },
-    spanStorageBroadcastReactor: reactorStub("spanStorageBroadcast"),
+    spanStorageBroadcastHandler: handlerStub(),
     ...overrides,
   };
 }
@@ -171,36 +173,33 @@ describe("trace-processing pipeline subscriber wiring", () => {
     });
   });
 
-  describe("given the trackedEventSync reactor", () => {
-    const trackedEventSyncReactor = createTrackedEventSyncReactor({
-      recordTrackedEvent: vi.fn().mockResolvedValue(undefined),
-    });
-    const definition = createTraceProcessingPipeline(
-      buildTraceDeps({ trackedEventSyncReactor }),
-    );
+  describe("given the trackedEventSync subscriber", () => {
+    const definition = createTraceProcessingPipeline(buildTraceDeps());
     const trackedEventSync = definition.foldReactors.get("trackedEventSync");
 
     it("attaches to the traceSummary fold", () => {
       expect(trackedEventSync).toBeDefined();
       expect(trackedEventSync!.projectionName).toBe("traceSummary");
-      expect(trackedEventSync!.definition).toBe(trackedEventSyncReactor);
     });
 
     it("carries the 5s delay and 30s dedup ttl through the registration", () => {
       expect(trackedEventSync!.definition.options?.delay).toBe(5_000);
-      expect(trackedEventSync!.definition.options?.ttl).toBe(30_000);
+      expect(
+        trackedEventSync!.definition.options?.deduplication?.ttlMs,
+      ).toBe(30_000);
     });
 
-    it("derives the job id from tenant + aggregate + event id", () => {
-      const makeJobId = trackedEventSync!.definition.options?.makeJobId;
-      expect(makeJobId).toBeDefined();
+    it("derives the dedup id from tenant + aggregate + event id, scoped to this subscriber", () => {
+      const makeId =
+        trackedEventSync!.definition.options?.deduplication?.makeId;
+      expect(makeId).toBeDefined();
       const event = fakeEvent({
         id: "ev-9",
         tenantId: "project-9",
         aggregateId: "t-9",
       });
-      expect(makeJobId!({ event, foldState: undefined } as never)).toBe(
-        "tracked-event-sync:project-9:t-9:ev-9",
+      expect(makeId!({ event, foldState: undefined })).toBe(
+        "subscriber:trackedEventSync:project-9:t-9:ev-9",
       );
     });
   });

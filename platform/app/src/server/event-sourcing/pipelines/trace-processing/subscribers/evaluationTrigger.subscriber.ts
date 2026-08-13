@@ -6,7 +6,6 @@ import { KSUID_RESOURCES } from "../../../../../utils/constants";
 import { featureFlagService } from "../../../../featureFlag";
 import { evaluatorLoopBlockedCounter } from "../../../../metrics";
 import type { QueueSendOptions } from "../../../queues";
-import type { ReactorDefinition } from "../../../reactors/reactor.types";
 import { ExecuteEvaluationCommand } from "../../evaluation-processing/commands/executeEvaluation.command";
 import type { ExecuteEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
 import {
@@ -17,17 +16,18 @@ import {
   isSpanReceivedEvent,
   type TraceProcessingEvent,
 } from "../schemas/events";
-import { defineOriginGuardedTraceReactor } from "./_originGuardedReactor";
-import { DEFERRED_CHECK_DELAY_MS } from "./originGate.reactor";
+import {
+  defineOriginGuardedTraceSubscriber,
+  type TraceSummarySubscriber,
+} from "./_originGuardedSubscriber";
+import { DEFERRED_CHECK_DELAY_MS } from "./originGate.subscriber";
 
 const CAUSALITY_LOOP_GUARD_DISABLED_FLAG =
   "ops_es_causality_loop_guard_disabled";
 
-const logger = createLogger(
-  "langwatch:trace-processing:evaluation-trigger-reactor",
-);
+const logger = createLogger("langwatch:trace-processing:evaluation-trigger");
 
-export interface EvaluationTriggerReactorDeps {
+export interface EvaluationTriggerSubscriberDeps {
   monitors: MonitorService;
   evaluation: (
     data: ExecuteEvaluationCommandData,
@@ -36,16 +36,16 @@ export interface EvaluationTriggerReactorDeps {
 }
 
 /**
- * Pure relevance guard, evaluated pre-enqueue via `shouldReact` (and again in
- * `handle`, the fail-open path). Reads only the payload the handler receives, so
- * hoisting it out of `handle` changes nothing but where the work is skipped —
- * before the queue serializes, gzips and blobs a payload it would immediately
- * dedup away, rather than after.
+ * Pure relevance guard, evaluated pre-enqueue via `when` (and again in the
+ * handler, the fail-open path). Reads only the payload the handler receives,
+ * so hoisting it out of the handler changes nothing but where the work is
+ * skipped — before the queue serializes, gzips and blobs a payload it would
+ * immediately dedup away, rather than after.
  *
- * Side-effect free, per the `ExtraGuard` contract: `shouldReact` is evaluated
- * once per event of a coalesced batch, so anything logged here is multiplied by
- * the batch size. The oversized-trace guard lives in `handle` for exactly that
- * reason — see below.
+ * Side-effect free, per the `ExtraGuard` contract: `when` is evaluated once
+ * per event of a coalesced batch, so anything logged here is multiplied by
+ * the batch size. The oversized-trace guard lives in the handler for exactly
+ * that reason — see below.
  */
 function isDispatchableEvaluationEvent(event: TraceProcessingEvent): boolean {
   // Bug 2 / #3875: synthetic event spans (e.g. thumbs-up/down feedback via /api/track_event)
@@ -61,19 +61,18 @@ function isDispatchableEvaluationEvent(event: TraceProcessingEvent): boolean {
  * Dispatches evaluation commands for traces that have a resolved origin.
  *
  * Fires on every trace event (via traceSummary fold). If origin is absent,
- * returns early — the originGate reactor handles deferred resolution.
+ * returns early — the originGate subscriber handles deferred resolution.
  * Once origin is present, iterates all enabled ON_MESSAGE monitors and
  * sends an executeEvaluation command per monitor.
  */
-export function createEvaluationTriggerReactor(
-  deps: EvaluationTriggerReactorDeps,
-): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
-  return defineOriginGuardedTraceReactor({
+export function createEvaluationTriggerSubscriber(
+  deps: EvaluationTriggerSubscriberDeps,
+): TraceSummarySubscriber {
+  return defineOriginGuardedTraceSubscriber({
     name: "evaluationTrigger",
-    jobIdPrefix: "eval-trigger",
     isRelevant: isDispatchableEvaluationEvent,
-    async handle(event, context) {
-      const { tenantId, aggregateId: traceId, foldState } = context;
+    async handler(event, context) {
+      const { tenantId, aggregateId: traceId, state: foldState } = context;
 
       // Oversized-trace guard (2026-05-28 incident follow-up). Past the same
       // processing cap the fold uses to stop deriving the summary
@@ -83,9 +82,9 @@ export function createEvaluationTriggerReactor(
       // eval dispatch (lighter processing). The span itself is still stored and
       // the trace stays fully queryable: we drop the WORK, never the DATA.
       //
-      // This stays in `handle`, not in the pre-enqueue `shouldReact`, so the
-      // once-per-crossing warn below fires once: `shouldReact` runs per event of
-      // a coalesced batch, and would multiply the log by the batch size. The
+      // This stays in the handler, not in the pre-enqueue `when`, so the
+      // once-per-crossing warn below fires once: `when` runs per event of a
+      // coalesced batch, and would multiply the log by the batch size. The
       // enqueue it no longer skips is already collapsed to one job per batch by
       // the router's dedup-id collapse, so there is nothing left to save.
       if (foldState.spanCount >= MAX_PROCESSED_SPANS) {
@@ -110,7 +109,7 @@ export function createEvaluationTriggerReactor(
       // specs/monitors/online-evaluator-loop-prevention.feature.
       //
       // Depth-only per-span check (origin remains a user-configurable
-      // precondition, not a hardcoded reactor rule): if the inbound
+      // precondition, not a hardcoded subscriber rule): if the inbound
       // span's own `langwatch.reserved.causality_depth` attribute is
       // >= 1, it was emitted by an evaluator workflow (or downstream
       // of one). Skip dispatch.
@@ -228,7 +227,7 @@ async function dispatchEvaluations({
   foldState,
   occurredAt,
 }: {
-  deps: EvaluationTriggerReactorDeps;
+  deps: EvaluationTriggerSubscriberDeps;
   tenantId: string;
   traceId: string;
   foldState: TraceSummaryData;
@@ -308,7 +307,7 @@ async function dispatchEvaluations({
             deduplication: {
               makeId: ExecuteEvaluationCommand.makeJobId,
               // 6 min — outlasts the 5-min deferred origin resolution window
-              // so that if the reactor fires twice (once from a late span,
+              // so that if the subscriber fires twice (once from a late span,
               // once from the deferred OriginResolvedEvent), the second
               // dispatch is squashed by the dedup key.
               ttlMs: DEFERRED_CHECK_DELAY_MS + 60_000,

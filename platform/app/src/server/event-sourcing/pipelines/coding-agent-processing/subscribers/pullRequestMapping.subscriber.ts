@@ -1,23 +1,19 @@
 import { createLogger } from "@langwatch/observability";
 
 import { isMappableGithubHost } from "~/server/app-layer/github/githubHost";
-import type {
-  ReactorContext,
-  ReactorDefinition,
-} from "../../../reactors/reactor.types";
-import { throttledPerWindow } from "../../../reactors/throttleWindow";
+import type { TriggerContext } from "../../../pipeline/processManagerDefinition";
 import type { CodingAgentSessionState } from "../projections/codingAgentSession.foldProjection";
 import type { CodingAgentProcessingEvent } from "../schemas/events";
 
 const logger = createLogger(
-  "langwatch:coding-agent-processing:pull-request-mapping-reactor",
+  "langwatch:coding-agent-processing:pull-request-mapping",
 );
 
 /**
  * The window one branch's mapping job collapses into.
  *
  * Thirty seconds is a deliberate trade. The window has to be non-zero to
- * deduplicate at all (see `throttledPerWindow`: the dedup key only collapses
+ * deduplicate at all (see `throttledWindow`: the dedup key only collapses
  * events while the job is still waiting to dispatch), and every second of it is
  * lag a person sees when they open a pull request, run a session, and wait for
  * the row to appear. Thirty seconds is long enough to collapse a session's
@@ -31,10 +27,10 @@ const logger = createLogger(
  * fifteen minutes and backs an empty one off for up to a day. This window only
  * has to stop one session's own event stream from queueing a job per event.
  */
-const MAPPING_WINDOW_MS = 30 * 1000;
+export const PULL_REQUEST_MAPPING_WINDOW_MS = 30 * 1000;
 
-/** What the reactor needs from the mapping service. */
-export interface PullRequestMappingReactorDeps {
+/** What the subscriber needs from the mapping service. */
+export interface PullRequestMappingSubscriberDeps {
   requestBranchMapping(params: {
     tenantId: string;
     repositoryHost: string;
@@ -130,8 +126,8 @@ export function pullRequestMappingJobId({
  *     one group per session for one per (repository, branch) — fewer, longer
  *     lived lanes carrying rare jobs, rather than a lane per session carrying
  *     one.
- *   - THE FOLD'S OWN SERIALIZATION. Untouched. A reactor's lane is its own
- *     (`<tenant>/fold/<fold>/reactor/<reactor>/…`); the session fold keeps
+ *   - THE FOLD'S OWN SERIALIZATION. Untouched. A subscriber's lane is its own
+ *     (`<tenant>/fold/<fold>/reactor/<subscriber>/…`); the session fold keeps
  *     grouping on the session, so one session's contributions still apply in
  *     order.
  */
@@ -149,8 +145,8 @@ export function pullRequestMappingGroupKey({
 }
 
 /**
- * Reactor that asks the organization's GitHub connection which pull requests a
- * folded session's branch has hosted.
+ * Subscriber handler that asks the organization's GitHub connection which pull
+ * requests a folded session's branch has hosted.
  *
  * Every error is logged and swallowed. Mapping is enrichment: the session row,
  * its counters and its cost are already committed, and rethrowing would put the
@@ -159,72 +155,35 @@ export function pullRequestMappingGroupKey({
  *
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
-export function createPullRequestMappingReactor(
-  deps: PullRequestMappingReactorDeps,
-): ReactorDefinition<CodingAgentProcessingEvent, CodingAgentSessionState> {
-  return {
-    name: "pullRequestMapping",
-    shouldReact: (_event, context) => shouldMapPullRequests(context.foldState),
-    options: {
-      runIn: ["worker"],
-      groupKeyFn: (payload) =>
-        pullRequestMappingGroupKey({
-          tenantId: payload.event.tenantId,
-          state: payload.foldState as CodingAgentSessionState,
-        }),
-      ...throttledPerWindow({
-        makeJobId: (payload) =>
-          pullRequestMappingJobId({
-            tenantId: payload.event.tenantId,
-            state: payload.foldState as CodingAgentSessionState,
-          }),
-        windowMs: MAPPING_WINDOW_MS,
-        // The window is the collapse for a live burst; the TTL is the throttle
-        // for everything else. A reactor's ready score is the event's own
-        // `createdAt`, so a group draining a backlog stages jobs whose
-        // `createdAt + delay` deadline has already passed: they dispatch
-        // immediately and the window collapses nothing. Honoring the still-live
-        // TTL past dispatch is what keeps that case to one GitHub call.
-        //
-        // Safe against the level-triggered objection, which is why
-        // `shouldSurviveDispatch` defaults to false: what it discards is a
-        // re-trigger arriving within THIRTY SECONDS of a call that asked
-        // GitHub the identical question about the identical branch. Nothing a
-        // reader could act on changes inside that window, and the durable
-        // bookkeeping refuses to re-ask about a freshly mapped branch for
-        // fifteen minutes anyway, so the dropped trigger would have been
-        // skipped by the service one layer down.
-        shouldSurviveDispatch: true,
-      }),
-    },
+export function createPullRequestMappingHandler(
+  deps: PullRequestMappingSubscriberDeps,
+): (
+  event: CodingAgentProcessingEvent,
+  context: TriggerContext<CodingAgentSessionState>,
+) => Promise<void> {
+  return async (_event, context) => {
+    const { tenantId, state: foldState } = context;
+    if (!shouldMapPullRequests(foldState)) return;
 
-    async handle(
-      _event: CodingAgentProcessingEvent,
-      context: ReactorContext<CodingAgentSessionState>,
-    ): Promise<void> {
-      const { tenantId, foldState } = context;
-      if (!shouldMapPullRequests(foldState)) return;
-
-      try {
-        await deps.requestBranchMapping({
+    try {
+      await deps.requestBranchMapping({
+        tenantId,
+        repositoryHost: foldState.repositoryHost ?? "",
+        repositoryOwner: foldState.repositoryOwner!,
+        repositoryName: foldState.repositoryName!,
+        headBranch: foldState.gitBranch!,
+      });
+    } catch (error) {
+      logger.warn(
+        {
+          error,
           tenantId,
-          repositoryHost: foldState.repositoryHost ?? "",
-          repositoryOwner: foldState.repositoryOwner!,
-          repositoryName: foldState.repositoryName!,
-          headBranch: foldState.gitBranch!,
-        });
-      } catch (error) {
-        logger.warn(
-          {
-            error,
-            tenantId,
-            repositoryOwner: foldState.repositoryOwner,
-            repositoryName: foldState.repositoryName,
-            gitBranch: foldState.gitBranch,
-          },
-          "pull-request mapping failed, non-fatal, the next fold retries it",
-        );
-      }
-    },
+          repositoryOwner: foldState.repositoryOwner,
+          repositoryName: foldState.repositoryName,
+          gitBranch: foldState.gitBranch,
+        },
+        "pull-request mapping failed, non-fatal, the next fold retries it",
+      );
+    }
   };
 }

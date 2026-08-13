@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
-import type { ReactorContext } from "../../../../reactors/reactor.types";
+import type { TriggerContext } from "../../../../pipeline/processManagerDefinition";
 import { MAX_PROCESSED_SPANS } from "../../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
-  createEvaluationTriggerReactor,
+  createEvaluationTriggerSubscriber,
   detectCausalityLoop,
-  type EvaluationTriggerReactorDeps,
-} from "../evaluationTrigger.reactor";
-import { DEFERRED_CHECK_DELAY_MS } from "../originGate.reactor";
+  type EvaluationTriggerSubscriberDeps,
+} from "../evaluationTrigger.subscriber";
+import { DEFERRED_CHECK_DELAY_MS } from "../originGate.subscriber";
 
 function createFoldState(
   overrides: Partial<TraceSummaryData> = {},
@@ -120,18 +120,18 @@ function createOriginEvent(origin = "application"): TraceProcessingEvent {
 }
 
 function createContext(
-  foldState: TraceSummaryData,
-): ReactorContext<TraceSummaryData> {
+  state: TraceSummaryData,
+): TriggerContext<TraceSummaryData> {
   return {
     tenantId: "tenant-1",
     aggregateId: "trace-1",
-    foldState,
+    state,
   };
 }
 
 function createDeps(
-  overrides: Partial<EvaluationTriggerReactorDeps> = {},
-): EvaluationTriggerReactorDeps {
+  overrides: Partial<EvaluationTriggerSubscriberDeps> = {},
+): EvaluationTriggerSubscriberDeps {
   return {
     monitors: {
       getEnabledOnMessageMonitors: vi.fn().mockResolvedValue([
@@ -142,7 +142,7 @@ function createDeps(
           evaluator: null,
         },
       ]),
-    } as unknown as EvaluationTriggerReactorDeps["monitors"],
+    } as unknown as EvaluationTriggerSubscriberDeps["monitors"],
     evaluation: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
@@ -217,12 +217,12 @@ describe("evaluationTrigger reactor", () => {
     /** @scenario "Evaluation trigger runs on traces with explicit application origin" */
     it("dispatches evaluation commands", async () => {
       const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
       });
 
-      await reactor.handle(createOriginEvent(), createContext(state));
+      await subscriber.spec.handler(createOriginEvent(), createContext(state));
 
       expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith(
         "tenant-1",
@@ -235,12 +235,12 @@ describe("evaluationTrigger reactor", () => {
     /** @scenario a topic assignment does not re-run evaluations */
     it("does not dispatch evaluations", async () => {
       const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
       });
 
-      await reactor.handle(createTopicAssignedEvent(), createContext(state));
+      await subscriber.spec.handler(createTopicAssignedEvent(), createContext(state));
 
       expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
       expect(deps.evaluation).not.toHaveBeenCalled();
@@ -251,13 +251,13 @@ describe("evaluationTrigger reactor", () => {
     /** @scenario evaluations do not re-run for a trace older than the cutoff */
     it("does not dispatch even on a genuine new span", async () => {
       const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
         occurredAt: Date.now() - 8 * 24 * 60 * 60 * 1000,
       });
 
-      await reactor.handle(createSpanEvent(), createContext(state));
+      await subscriber.spec.handler(createSpanEvent(), createContext(state));
 
       expect(deps.evaluation).not.toHaveBeenCalled();
     });
@@ -265,13 +265,13 @@ describe("evaluationTrigger reactor", () => {
     /** @scenario a new span on a recent trace re-runs evaluations */
     it("dispatches for a recent trace", async () => {
       const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
         occurredAt: Date.now(),
       });
 
-      await reactor.handle(createSpanEvent(), createContext(state));
+      await subscriber.spec.handler(createSpanEvent(), createContext(state));
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
@@ -281,14 +281,14 @@ describe("evaluationTrigger reactor", () => {
     /** @scenario Evaluations run for a trace under the processing cap */
     it("dispatches evaluations for a trace just under the cap", async () => {
       const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
         spanCount: MAX_PROCESSED_SPANS - 1,
         occurredAt: Date.now(),
       });
 
-      await reactor.handle(createSpanEvent(), createContext(state));
+      await subscriber.spec.handler(createSpanEvent(), createContext(state));
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
@@ -296,14 +296,14 @@ describe("evaluationTrigger reactor", () => {
     /** @scenario Evaluations are skipped for a trace over the processing cap */
     it("skips evaluation dispatch once the trace passes the cap (span still stored elsewhere)", async () => {
       const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
         spanCount: MAX_PROCESSED_SPANS,
         occurredAt: Date.now(),
       });
 
-      await reactor.handle(createSpanEvent(), createContext(state));
+      await subscriber.spec.handler(createSpanEvent(), createContext(state));
 
       expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
       expect(deps.evaluation).not.toHaveBeenCalled();
@@ -317,12 +317,12 @@ describe("evaluationTrigger reactor", () => {
       // user-configurable precondition, not a hardcoded reactor guard.
       // The depth signal (per-span) is the sole hard rule.
       const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "evaluation" },
       });
 
-      await reactor.handle(
+      await subscriber.spec.handler(
         createOriginEvent("evaluation"),
         createContext(state),
       );
@@ -335,7 +335,7 @@ describe("evaluationTrigger reactor", () => {
     /** @scenario Incoming span with causality_depth=1 does not trigger evaluations */
     it("blocks dispatch when inbound span has causality_depth=1", async () => {
       const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
       });
@@ -345,7 +345,7 @@ describe("evaluationTrigger reactor", () => {
         ],
       });
 
-      await reactor.handle(event, createContext(state));
+      await subscriber.spec.handler(event, createContext(state));
 
       expect(deps.evaluation).not.toHaveBeenCalled();
     });
@@ -353,7 +353,7 @@ describe("evaluationTrigger reactor", () => {
     /** @scenario Incoming span with causality_depth=0 still triggers evaluations */
     it("dispatches when inbound span has causality_depth=0", async () => {
       const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
       });
@@ -363,7 +363,7 @@ describe("evaluationTrigger reactor", () => {
         ],
       });
 
-      await reactor.handle(event, createContext(state));
+      await subscriber.spec.handler(event, createContext(state));
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
@@ -372,7 +372,7 @@ describe("evaluationTrigger reactor", () => {
     it("env kill-switch bypasses the depth check", async () => {
       process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD = "1";
       const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
       });
@@ -383,7 +383,7 @@ describe("evaluationTrigger reactor", () => {
         ],
       });
 
-      await reactor.handle(event, createContext(state));
+      await subscriber.spec.handler(event, createContext(state));
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
@@ -393,10 +393,10 @@ describe("evaluationTrigger reactor", () => {
     /** @scenario "Evaluation trigger skips traces with empty origin and no SDK info" */
     it("returns early without dispatching evaluations", async () => {
       const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const state = createFoldState({ attributes: {} });
 
-      await reactor.handle(createOriginEvent(""), createContext(state));
+      await subscriber.spec.handler(createOriginEvent(""), createContext(state));
 
       expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
       expect(deps.evaluation).not.toHaveBeenCalled();
@@ -406,12 +406,12 @@ describe("evaluationTrigger reactor", () => {
   describe("when trace-level eval is dispatched", () => {
     it("uses 6-minute dedup TTL to outlast deferred origin window", async () => {
       const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
       });
 
-      await reactor.handle(createOriginEvent(), createContext(state));
+      await subscriber.spec.handler(createOriginEvent(), createContext(state));
 
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
       expect(options).toBeDefined();
@@ -424,12 +424,12 @@ describe("evaluationTrigger reactor", () => {
 
     it("marks the dedup as surviving dispatch so a re-trigger after dispatch is squashed (#3912)", async () => {
       const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
       });
 
-      await reactor.handle(createOriginEvent(), createContext(state));
+      await subscriber.spec.handler(createOriginEvent(), createContext(state));
 
       // The reactor can fire a second time after the command was already
       // dispatched (a late span, then the deferred OriginResolvedEvent). The
@@ -453,9 +453,9 @@ describe("evaluationTrigger reactor", () => {
               threadIdleTimeout: 300,
             },
           ]),
-        } as unknown as EvaluationTriggerReactorDeps["monitors"],
+        } as unknown as EvaluationTriggerSubscriberDeps["monitors"],
       });
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const state = createFoldState({
         attributes: {
           "langwatch.origin": "application",
@@ -463,7 +463,7 @@ describe("evaluationTrigger reactor", () => {
         },
       });
 
-      await reactor.handle(createOriginEvent(), createContext(state));
+      await subscriber.spec.handler(createOriginEvent(), createContext(state));
 
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
       // delay == threadIdleTimeout * 1000 confirms the thread-level branch was taken.
@@ -475,14 +475,14 @@ describe("evaluationTrigger reactor", () => {
   describe("when trace is blocked by guardrail with no output", () => {
     it("skips without dispatching", async () => {
       const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
         blockedByGuardrail: true,
         computedOutput: null,
       });
 
-      await reactor.handle(createOriginEvent(), createContext(state));
+      await subscriber.spec.handler(createOriginEvent(), createContext(state));
 
       expect(deps.evaluation).not.toHaveBeenCalled();
     });
@@ -491,26 +491,26 @@ describe("evaluationTrigger reactor", () => {
   describe("when inbound event is a synthetic span (langwatch.track_event)", () => {
     it("does NOT invoke monitor service", async () => {
       const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
       });
       const event = createSpanEvent({ spanName: TRACK_EVENT_SPAN_NAME });
 
-      await reactor.handle(event, createContext(state));
+      await subscriber.spec.handler(event, createContext(state));
 
       expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
     });
 
     it("does NOT dispatch evaluation commands", async () => {
       const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
       });
       const event = createSpanEvent({ spanName: TRACK_EVENT_SPAN_NAME });
 
-      await reactor.handle(event, createContext(state));
+      await subscriber.spec.handler(event, createContext(state));
 
       expect(deps.evaluation).not.toHaveBeenCalled();
     });
@@ -519,13 +519,13 @@ describe("evaluationTrigger reactor", () => {
   describe("when inbound event is a normal (non-synthetic) span", () => {
     it("dispatches evaluation commands", async () => {
       const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
       });
       const event = createSpanEvent({ spanName: "openai.chat" });
 
-      await reactor.handle(event, createContext(state));
+      await subscriber.spec.handler(event, createContext(state));
 
       expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith(
         "tenant-1",
@@ -537,12 +537,12 @@ describe("evaluationTrigger reactor", () => {
   describe("when inbound event has no span data field", () => {
     it("dispatches evaluation commands (non-span events bypass span-only guards)", async () => {
       const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
       });
 
-      await reactor.handle(createOriginEvent(), createContext(state));
+      await subscriber.spec.handler(createOriginEvent(), createContext(state));
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
@@ -567,9 +567,9 @@ describe("evaluationTrigger relevance check", () => {
     event: TraceProcessingEvent,
     state: TraceSummaryData,
   ): boolean => {
-    const reactor = createEvaluationTriggerReactor(createDeps());
+    const subscriber = createEvaluationTriggerSubscriber(createDeps());
     // The reactor always declares one.
-    return reactor.shouldReact!(event, createContext(state));
+    return subscriber.spec.when!(event, createContext(state));
   };
 
   describe("given a trace with a resolved origin", () => {
@@ -598,22 +598,22 @@ describe("evaluationTrigger relevance check", () => {
       expect(shouldReact(createSpanEvent(), atCap)).toBe(true);
 
       const deps = createDeps();
-      const reactor = createEvaluationTriggerReactor(deps);
-      await reactor.handle(createSpanEvent(), createContext(atCap));
+      const subscriber = createEvaluationTriggerSubscriber(deps);
+      await subscriber.spec.handler(createSpanEvent(), createContext(atCap));
       expect(deps.evaluation).not.toHaveBeenCalled();
 
       // A coalesced batch can jump the span count clean past the cap without
       // ever landing on it, so the guard is `>=`, not `===`.
       const pastCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS + 1 });
       const depsPast = createDeps();
-      const reactorPast = createEvaluationTriggerReactor(depsPast);
-      await reactorPast.handle(createSpanEvent(), createContext(pastCap));
+      const subscriberPast = createEvaluationTriggerSubscriber(depsPast);
+      await subscriberPast.spec.handler(createSpanEvent(), createContext(pastCap));
       expect(depsPast.evaluation).not.toHaveBeenCalled();
 
       const belowCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS - 1 });
       const depsBelow = createDeps();
-      const reactorBelow = createEvaluationTriggerReactor(depsBelow);
-      await reactorBelow.handle(createSpanEvent(), createContext(belowCap));
+      const subscriberBelow = createEvaluationTriggerSubscriber(depsBelow);
+      await subscriberBelow.spec.handler(createSpanEvent(), createContext(belowCap));
       expect(depsBelow.evaluation).toHaveBeenCalledTimes(1);
     });
   });

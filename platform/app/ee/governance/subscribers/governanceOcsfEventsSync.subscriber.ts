@@ -7,38 +7,32 @@ import {
   OCSF_SEVERITY,
 } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";
+import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import type {
-  ReactorContext,
-  ReactorDefinition,
-} from "~/server/event-sourcing/reactors/reactor.types";
-import { throttledPerWindow } from "~/server/event-sourcing/reactors/throttleWindow";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
+import {
+  GOVERNANCE_ATTR,
+  isGovernanceOriginTrace,
+} from "../services/governanceAttributeKeys";
 
 const logger = createLogger(
-  "langwatch:trace-processing:governance-ocsf-events-sync-reactor",
+  "langwatch:trace-processing:governance-ocsf-events-sync",
 );
 
 /**
- * Dedup window for the same trace's reactor firings. Within this
+ * Dedup window for the same trace's subscriber firings. Within this
  * window, replays for the same (tenant, trace) are suppressed by the
- * BullMQ job-id contract. Outside the window, structural idempotency
+ * queue's dedup contract. Outside the window, structural idempotency
  * comes from the ReplacingMergeTree(LastUpdatedAt) ORDER BY
  * (TenantId, EventId) — replays collapse to the latest version of
  * the same row.
- */
-/**
+ *
  * OCSF rows are pulled by cursor-paginated SIEM consumers that keep their own
  * watermark, so a row landing half a minute later is picked up by the next
  * pull rather than missed.
  */
 export const GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS = 30_000;
-
-import {
-  GOVERNANCE_ATTR,
-  isGovernanceOriginTrace,
-} from "../services/governanceAttributeKeys";
 
 const ATTR_INGESTION_SOURCE_ID = GOVERNANCE_ATTR.INGESTION_SOURCE_ID;
 const ATTR_INGESTION_SOURCE_TYPE = GOVERNANCE_ATTR.INGESTION_SOURCE_TYPE;
@@ -49,7 +43,7 @@ const ATTR_GEN_AI_REQUEST_MODEL = "gen_ai.request.model";
 const ATTR_TOOL_NAME = "tool.name";
 const ATTR_ANOMALY_ALERT_ID = GOVERNANCE_ATTR.ANOMALY_ALERT_ID;
 
-export interface GovernanceOcsfEventsSyncReactorDeps {
+export interface GovernanceOcsfEventsSyncSubscriberDeps {
   governanceOcsfEventsRepository: GovernanceOcsfEventsClickHouseRepository;
 }
 
@@ -136,6 +130,20 @@ function buildOcsfEventRow({
 }
 
 /**
+ * Pre-enqueue relevance guard (ADR-026 via ADR-094). See
+ * governanceKpisSync for the reasoning: the origin check is pure, reads the
+ * committed fold state, and rejects the bulk of trace traffic before a job
+ * is packed. Kept in the handler too — inline mode, fail-open dispatch, and
+ * jobs queued before this gate existed all still reach the handler.
+ */
+export function isGovernanceOcsfTrace(
+  _event: TraceProcessingEvent,
+  context: TriggerContext<TraceSummaryData>,
+): boolean {
+  return isGovernanceOriginTrace(context.state.attributes);
+}
+
+/**
  * Folds completed governance-origin traces into per-event OCSF v1.1
  * rows in ClickHouse. Each trace produces ONE row keyed by
  * (TenantId, EventId) where EventId = traceId (we use traceId as
@@ -149,83 +157,63 @@ function buildOcsfEventRow({
  * `langwatch.origin.kind = "ingestion_source"` are not governance
  * traffic and are declined before a job is enqueued.
  *
+ * NOTE: the handler swallows repository failures by design (see its catch,
+ * and the test pinning it). The throttle window makes that cheaper to get
+ * wrong: a burst leaves ONE job, so a failed write is retried by the NEXT
+ * window rather than by the next span, and a failure in a trace's final
+ * window is not retried at all. Whether these should rethrow is an open
+ * question. Level-triggered: the envelope is rebuilt from the fold's current
+ * state, so the LAST event of a trace must always land.
+ *
  * The row itself is built by `buildOcsfEventRow`.
  *
  * Spec: specs/ai-gateway/governance/folds.feature §"governance_ocsf_events"
  */
-export function createGovernanceOcsfEventsSyncReactor(
-  deps: GovernanceOcsfEventsSyncReactorDeps,
-): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
-  return {
-    name: "governanceOcsfEventsSync",
-    // Pre-enqueue (ADR-026). See governanceKpisSync for the reasoning: the
-    // origin check is pure, reads the payload the handler would receive, and
-    // rejects the bulk of trace traffic before a job is packed. Kept in
-    // `handle` too — inline mode, fail-open dispatch, and jobs queued before
-    // this gate existed all still reach the handler.
-    shouldReact: (_event, context) =>
-      isGovernanceOriginTrace(context.foldState.attributes),
-    options: {
-      // NOTE: the handler swallows repository failures by design (see its
-      // catch, and the test pinning it). The window makes that cheaper to get
-      // wrong: a burst now leaves ONE job, so a failed write is retried by
-      // the NEXT window rather than by the next span, and a failure in a
-      // trace's final window is not retried at all. Whether these should
-      // rethrow is an open question — rethrowing retries the job under Redis,
-      // but on the in-memory queue `send` awaits completion, so it would
-      // surface as fold redelivery instead.
-      // Level-triggered: the envelope is rebuilt from the fold's current
-      // state, so the LAST event of a trace must always land.
-      ...throttledPerWindow({
-        makeJobId: (payload) =>
-          `governance-ocsf-events-sync-${payload.event.tenantId}-${payload.event.aggregateId}`,
-        windowMs: GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS,
-      }),
-    },
+export function createGovernanceOcsfEventsSyncHandler(
+  deps: GovernanceOcsfEventsSyncSubscriberDeps,
+): (
+  event: TraceProcessingEvent,
+  context: TriggerContext<TraceSummaryData>,
+) => Promise<void> {
+  return async (_event, context) => {
+    const { tenantId, state: foldState } = context;
 
-    async handle(
-      _event: TraceProcessingEvent,
-      context: ReactorContext<TraceSummaryData>,
-    ): Promise<void> {
-      const { tenantId, foldState } = context;
+    if (!isGovernanceOriginTrace(foldState.attributes)) {
+      return;
+    }
 
-      if (!isGovernanceOriginTrace(foldState.attributes)) {
-        return;
-      }
+    const sourceId = foldState.attributes[ATTR_INGESTION_SOURCE_ID];
+    if (!sourceId) {
+      logger.warn(
+        {
+          tenantId,
+          traceId: foldState.traceId,
+        },
+        "governance trace missing langwatch.ingestion_source.id — skipping OCSF fold",
+      );
+      return;
+    }
 
-      const sourceId = foldState.attributes[ATTR_INGESTION_SOURCE_ID];
-      if (!sourceId) {
-        logger.warn(
-          {
-            tenantId,
-            traceId: foldState.traceId,
-          },
-          "governance trace missing langwatch.ingestion_source.id — skipping OCSF fold",
-        );
-        return;
-      }
+    const occurredAtMs = foldState.occurredAt;
+    if (!occurredAtMs || occurredAtMs <= 0) {
+      return;
+    }
 
-      const occurredAtMs = foldState.occurredAt;
-      if (!occurredAtMs || occurredAtMs <= 0) {
-        return;
-      }
-
-      try {
-        await deps.governanceOcsfEventsRepository.insertEvent(
-          buildOcsfEventRow({ tenantId, foldState, sourceId, occurredAtMs }),
-        );
-      } catch (error) {
-        logger.error(
-          {
-            tenantId,
-            sourceId,
-            traceId: foldState.traceId,
-            error,
-          },
-          "failed to fold governance trace into governance_ocsf_events",
-        );
-        captureException(toError(error));
-      }
-    },
+    try {
+      await deps.governanceOcsfEventsRepository.insertEvent(
+        buildOcsfEventRow({ tenantId, foldState, sourceId, occurredAtMs }),
+      );
+    } catch (error) {
+      logger.error(
+        {
+          tenantId,
+          sourceId,
+          traceId: foldState.traceId,
+          error,
+        },
+        "failed to fold governance trace into governance_ocsf_events",
+      );
+      captureException(toError(error));
+    }
   };
 }

@@ -9,11 +9,9 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import type { ProjectMetadataReactorDeps } from "../projectMetadata.reactor";
-import {
-  createProjectMetadataReactor,
-  projectMetadataGroupKey,
-} from "../projectMetadata.reactor";
+import { buildTraceDeps } from "../../__tests__/support/traceProcessingFixtures";
+import { createTraceProcessingPipeline } from "../../pipeline";
+import { projectMetadataGroupKey } from "../projectMetadata.subscriber";
 
 /**
  * The lane and the dedup id must describe the same unit of work. The queue
@@ -48,10 +46,9 @@ describe("projectMetadataGroupKey", () => {
   });
 });
 
-describe("createProjectMetadataReactor lane wiring", () => {
-  const reactor = createProjectMetadataReactor({
-    projects: {},
-  } as unknown as ProjectMetadataReactorDeps);
+describe("projectMetadata lane wiring", () => {
+  const pipeline = createTraceProcessingPipeline(buildTraceDeps());
+  const registration = pipeline.foldReactors.get("projectMetadata")!.definition;
 
   function payloadFor({
     tenantId,
@@ -64,14 +61,14 @@ describe("createProjectMetadataReactor lane wiring", () => {
       event: { tenantId, aggregateId, aggregateType: "trace" },
       foldState: {},
     } as unknown as Parameters<
-      NonNullable<NonNullable<typeof reactor.options>["groupKeyFn"]>
+      NonNullable<NonNullable<typeof registration.options>["groupKeyFn"]>
     >[0];
   }
 
   describe("given a project ingesting several traces at once", () => {
-    describe("when each trace dispatches the reactor", () => {
+    describe("when each trace dispatches the subscriber", () => {
       it("assigns every dispatch the same lane", () => {
-        const groupKeyFn = reactor.options?.groupKeyFn;
+        const groupKeyFn = registration.options?.groupKeyFn;
         expect(groupKeyFn).toBeDefined();
 
         const lanes = ["trace_1", "trace_2", "trace_3"].map((aggregateId) =>
@@ -82,7 +79,7 @@ describe("createProjectMetadataReactor lane wiring", () => {
       });
 
       it("assigns every dispatch the same dedup id", () => {
-        const makeJobId = reactor.options?.makeJobId;
+        const makeJobId = registration.options?.makeJobId;
         expect(makeJobId).toBeDefined();
 
         const jobIds = ["trace_1", "trace_2", "trace_3"].map((aggregateId) =>
@@ -96,7 +93,7 @@ describe("createProjectMetadataReactor lane wiring", () => {
 
   describe("given two projects ingesting concurrently", () => {
     it("keeps their lanes separate so one project cannot serialize behind another", () => {
-      const groupKeyFn = reactor.options!.groupKeyFn!;
+      const groupKeyFn = registration.options!.groupKeyFn!;
 
       expect(
         groupKeyFn(payloadFor({ tenantId: "project_x", aggregateId: "t1" })),
@@ -108,8 +105,8 @@ describe("createProjectMetadataReactor lane wiring", () => {
 
   describe("given the lane and the dedup id are both derived from a payload", () => {
     it("varies them over exactly the same inputs", () => {
-      const groupKeyFn = reactor.options!.groupKeyFn!;
-      const makeJobId = reactor.options!.makeJobId!;
+      const groupKeyFn = registration.options!.groupKeyFn!;
+      const makeJobId = registration.options!.makeJobId!;
 
       const sameProjectDifferentTrace = [
         payloadFor({ tenantId: "project_x", aggregateId: "trace_1" }),

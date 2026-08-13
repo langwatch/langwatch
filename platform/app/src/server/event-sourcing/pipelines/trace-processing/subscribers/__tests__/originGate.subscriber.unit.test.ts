@@ -1,14 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { ReactorContext } from "../../../../reactors/reactor.types";
+import type { TriggerContext } from "../../../../pipeline/processManagerDefinition";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
   createDeferredOriginHandler,
-  createOriginGateReactor,
+  createOriginGateHandler,
   type DeferredOriginPayload,
   makeDeferredJobId,
-  type OriginGateReactorDeps,
-} from "../originGate.reactor";
+  needsOriginResolution,
+  type OriginGateSubscriberDeps,
+} from "../originGate.subscriber";
 
 function createFoldState(
   overrides: Partial<TraceSummaryData> = {},
@@ -78,27 +79,27 @@ function createEvent(
 }
 
 function createContext(
-  foldState: TraceSummaryData,
-  overrides: Partial<ReactorContext<TraceSummaryData>> = {},
-): ReactorContext<TraceSummaryData> {
+  state: TraceSummaryData,
+  overrides: Partial<TriggerContext<TraceSummaryData>> = {},
+): TriggerContext<TraceSummaryData> {
   return {
     tenantId: "tenant-1",
     aggregateId: "trace-1",
-    foldState,
+    state,
     ...overrides,
   };
 }
 
 function createDeps(
-  overrides: Partial<OriginGateReactorDeps> = {},
-): OriginGateReactorDeps {
+  overrides: Partial<OriginGateSubscriberDeps> = {},
+): OriginGateSubscriberDeps {
   return {
     scheduleDeferred: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
 
-describe("originGate reactor", () => {
+describe("originGate subscriber", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(Date.now());
@@ -108,36 +109,15 @@ describe("originGate reactor", () => {
     vi.useRealTimers();
   });
 
-  describe("reactor options", () => {
-    it("uses 5s debounce and dedup to settle initial span burst", () => {
-      const deps = createDeps();
-      const reactor = createOriginGateReactor(deps);
-
-      expect(reactor.options?.delay).toBe(5_000);
-      expect(reactor.options?.ttl).toBe(15_000);
-    });
-
-    it("generates dedup key from tenant and trace", () => {
-      const deps = createDeps();
-      const reactor = createOriginGateReactor(deps);
-
-      const jobId = reactor.options?.makeJobId?.({
-        event: { tenantId: "t1", aggregateId: "tr1" } as any,
-        foldState: {} as any,
-      });
-      expect(jobId).toBe("origin-gate:t1:tr1");
-    });
-  });
-
   describe("when origin is already resolved", () => {
     it("does not schedule deferred resolution", async () => {
       const deps = createDeps();
-      const reactor = createOriginGateReactor(deps);
+      const handler = createOriginGateHandler(deps);
       const state = createFoldState({
         attributes: { "langwatch.origin": "application" },
       });
 
-      await reactor.handle(createEvent(), createContext(state));
+      await handler(createEvent(), createContext(state));
 
       expect(deps.scheduleDeferred).not.toHaveBeenCalled();
     });
@@ -150,12 +130,12 @@ describe("originGate reactor", () => {
         "workflow",
       ]) {
         const deps = createDeps();
-        const reactor = createOriginGateReactor(deps);
+        const handler = createOriginGateHandler(deps);
         const state = createFoldState({
           attributes: { "langwatch.origin": origin },
         });
 
-        await reactor.handle(createEvent(), createContext(state));
+        await handler(createEvent(), createContext(state));
 
         expect(deps.scheduleDeferred).not.toHaveBeenCalled();
       }
@@ -166,10 +146,10 @@ describe("originGate reactor", () => {
     /** @scenario "Deferred check deduplicates per trace" */
     it("schedules deferred origin resolution with traceId as id", async () => {
       const deps = createDeps();
-      const reactor = createOriginGateReactor(deps);
+      const handler = createOriginGateHandler(deps);
       const state = createFoldState({ attributes: {} });
 
-      await reactor.handle(createEvent(), createContext(state));
+      await handler(createEvent(), createContext(state));
 
       expect(deps.scheduleDeferred).toHaveBeenCalledWith({
         id: "trace-1",
@@ -182,10 +162,10 @@ describe("originGate reactor", () => {
   describe("when the trace aggregate has an empty id", () => {
     it("skips without scheduling", async () => {
       const deps = createDeps();
-      const reactor = createOriginGateReactor(deps);
+      const handler = createOriginGateHandler(deps);
       const state = createFoldState({ attributes: {} });
 
-      await reactor.handle(
+      await handler(
         createEvent({ aggregateId: "" }),
         createContext(state, { aggregateId: "" }),
       );
@@ -197,54 +177,45 @@ describe("originGate reactor", () => {
   describe("when trace is old (resyncing)", () => {
     it("skips without scheduling", async () => {
       const deps = createDeps();
-      const reactor = createOriginGateReactor(deps);
+      const handler = createOriginGateHandler(deps);
       const state = createFoldState({ attributes: {} });
       const oldEvent = createEvent({
         occurredAt: Date.now() - 2 * 60 * 60 * 1000, // 2 hours ago
       });
 
-      await reactor.handle(oldEvent, createContext(state));
+      await handler(oldEvent, createContext(state));
 
       expect(deps.scheduleDeferred).not.toHaveBeenCalled();
     });
   });
 
-  describe("when deciding whether to react", () => {
+  describe("when deciding whether the trace needs origin resolution", () => {
     describe("when origin is absent on a recent trace", () => {
       it("returns true", () => {
-        const reactor = createOriginGateReactor(createDeps());
         const state = createFoldState({ attributes: {} });
 
-        expect(reactor.shouldReact!(createEvent(), createContext(state))).toBe(
-          true,
-        );
+        expect(needsOriginResolution(createEvent(), state)).toBe(true);
       });
     });
 
     describe("when origin is already resolved", () => {
       it("returns false", () => {
-        const reactor = createOriginGateReactor(createDeps());
         const state = createFoldState({
           attributes: { "langwatch.origin": "application" },
         });
 
-        expect(reactor.shouldReact!(createEvent(), createContext(state))).toBe(
-          false,
-        );
+        expect(needsOriginResolution(createEvent(), state)).toBe(false);
       });
     });
 
     describe("when the trace is old (resyncing)", () => {
       it("returns false", () => {
-        const reactor = createOriginGateReactor(createDeps());
         const state = createFoldState({ attributes: {} });
         const oldEvent = createEvent({
           occurredAt: Date.now() - 2 * 60 * 60 * 1000,
         });
 
-        expect(reactor.shouldReact!(oldEvent, createContext(state))).toBe(
-          false,
-        );
+        expect(needsOriginResolution(oldEvent, state)).toBe(false);
       });
     });
   });

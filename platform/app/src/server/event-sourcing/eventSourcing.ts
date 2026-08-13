@@ -24,7 +24,7 @@ import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/p
 import { ProcessRuntime } from "./process-manager/processRuntime";
 import { InMemoryProcessStore } from "./process-manager/stores/inMemoryProcessStore";
 import type { ProcessStore } from "./process-manager/stores/processStore.types";
-import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
+import { createBillingMeterDispatchSubscriber } from "./projections/global/billingMeterDispatch.subscriber";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
 import { ProjectionRegistry } from "./projections/projectionRegistry";
 import { RedisReplayMarkerChecker } from "./projections/replayMarkerCheck";
@@ -135,7 +135,7 @@ export class EventSourcing {
       );
       this.projectionRegistry.registerMapReactor(
         "orgBillableEventsMeter",
-        createBillingMeterDispatchReactor({
+        createBillingMeterDispatchSubscriber({
           getDispatch: () => {
             const pipeline = this.getPipeline(BILLING_REPORTING_PIPELINE_NAME);
             return (data) => pipeline.commands.reportUsageForMonth.send(data);

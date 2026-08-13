@@ -7,13 +7,14 @@ import {
 } from "../../schemas/constants";
 import type { SpanReceivedEvent } from "../../schemas/events";
 import {
-  createExperimentMetricsSyncReactor,
-  type ExperimentMetricsSyncReactorDeps,
-} from "../experimentMetricsSync.reactor";
+  createExperimentMetricsSyncHandler,
+  hasExperimentCostMetrics,
+  type ExperimentMetricsSyncSubscriberDeps,
+} from "../experimentMetricsSync.subscriber";
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
 
-function createDeps(): ExperimentMetricsSyncReactorDeps & {
+function createDeps(): ExperimentMetricsSyncSubscriberDeps & {
   computeExperimentRunMetrics: ReturnType<typeof vi.fn>;
   lookupExperimentId: ReturnType<typeof vi.fn>;
 } {
@@ -95,35 +96,26 @@ function createSpanReceivedEvent(): SpanReceivedEvent {
   };
 }
 
-describe("experimentMetricsSync reactor (trace-side ECST publisher)", () => {
-  describe("when reactor is created", () => {
-    it("has dedup options with makeJobId, ttl, and delay", () => {
-      const deps = createDeps();
-      const reactor = createExperimentMetricsSyncReactor(deps);
-
-      expect(reactor.options).toBeDefined();
-      expect(reactor.options?.makeJobId).toBeTypeOf("function");
-      expect(reactor.options?.ttl).toBe(60_000);
-      expect(reactor.options?.delay).toBe(60_000);
-    });
-  });
+describe("experimentMetricsSync subscriber (trace-side ECST publisher)", () => {
+  // The 60s window / dedup wiring lives on the pipeline registration now —
+  // see subscriberWiring.unit.test.ts.
 
   describe("when trace has evaluation.run_id attribute", () => {
     /** @scenario Trace metrics are published to experiment pipeline after stabilisation */
     /** @scenario evaluation.run_id is hoisted to trace-level attributes */
     it("dispatches computeExperimentRunMetrics with cost payload", async () => {
       const deps = createDeps();
-      const reactor = createExperimentMetricsSyncReactor(deps);
+      const reactor = createExperimentMetricsSyncHandler(deps);
 
-      const foldState = createTraceSummaryState({
+      const state = createTraceSummaryState({
         attributes: { "evaluation.run_id": "run-1" },
         totalCost: 0.003,
       });
 
-      await reactor.handle(createSpanReceivedEvent(), {
+      await reactor(createSpanReceivedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "trace-1",
-        foldState,
+        state,
       });
 
       expect(deps.lookupExperimentId).toHaveBeenCalledWith(
@@ -145,16 +137,16 @@ describe("experimentMetricsSync reactor (trace-side ECST publisher)", () => {
     /** @scenario Reactor does not fire for traces without evaluation.run_id */
     it("skips without dispatching", async () => {
       const deps = createDeps();
-      const reactor = createExperimentMetricsSyncReactor(deps);
+      const reactor = createExperimentMetricsSyncHandler(deps);
 
-      const foldState = createTraceSummaryState({
+      const state = createTraceSummaryState({
         attributes: { "langwatch.origin": "sdk" },
       });
 
-      await reactor.handle(createSpanReceivedEvent(), {
+      await reactor(createSpanReceivedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "trace-1",
-        foldState,
+        state,
       });
 
       expect(deps.computeExperimentRunMetrics).not.toHaveBeenCalled();
@@ -165,17 +157,17 @@ describe("experimentMetricsSync reactor (trace-side ECST publisher)", () => {
     /** @scenario Reactor does not fire when trace has no cost data */
     it("skips without dispatching when totalCost is null", async () => {
       const deps = createDeps();
-      const reactor = createExperimentMetricsSyncReactor(deps);
+      const reactor = createExperimentMetricsSyncHandler(deps);
 
-      const foldState = createTraceSummaryState({
+      const state = createTraceSummaryState({
         attributes: { "evaluation.run_id": "run-1" },
         totalCost: null,
       });
 
-      await reactor.handle(createSpanReceivedEvent(), {
+      await reactor(createSpanReceivedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "trace-1",
-        foldState,
+        state,
       });
 
       expect(deps.computeExperimentRunMetrics).not.toHaveBeenCalled();
@@ -183,17 +175,17 @@ describe("experimentMetricsSync reactor (trace-side ECST publisher)", () => {
 
     it("skips without dispatching when totalCost is zero", async () => {
       const deps = createDeps();
-      const reactor = createExperimentMetricsSyncReactor(deps);
+      const reactor = createExperimentMetricsSyncHandler(deps);
 
-      const foldState = createTraceSummaryState({
+      const state = createTraceSummaryState({
         attributes: { "evaluation.run_id": "run-1" },
         totalCost: 0,
       });
 
-      await reactor.handle(createSpanReceivedEvent(), {
+      await reactor(createSpanReceivedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "trace-1",
-        foldState,
+        state,
       });
 
       expect(deps.computeExperimentRunMetrics).not.toHaveBeenCalled();
@@ -204,17 +196,17 @@ describe("experimentMetricsSync reactor (trace-side ECST publisher)", () => {
     it("skips without dispatching", async () => {
       const deps = createDeps();
       deps.lookupExperimentId.mockResolvedValue(null);
-      const reactor = createExperimentMetricsSyncReactor(deps);
+      const reactor = createExperimentMetricsSyncHandler(deps);
 
-      const foldState = createTraceSummaryState({
+      const state = createTraceSummaryState({
         attributes: { "evaluation.run_id": "run-1" },
         totalCost: 0.003,
       });
 
-      await reactor.handle(createSpanReceivedEvent(), {
+      await reactor(createSpanReceivedEvent(), {
         tenantId: TEST_TENANT_ID,
         aggregateId: "trace-1",
-        foldState,
+        state,
       });
 
       expect(deps.computeExperimentRunMetrics).not.toHaveBeenCalled();
@@ -227,90 +219,62 @@ describe("experimentMetricsSync reactor (trace-side ECST publisher)", () => {
       deps.computeExperimentRunMetrics.mockRejectedValue(
         new Error("Dispatch error"),
       );
-      const reactor = createExperimentMetricsSyncReactor(deps);
+      const reactor = createExperimentMetricsSyncHandler(deps);
 
-      const foldState = createTraceSummaryState({
+      const state = createTraceSummaryState({
         attributes: { "evaluation.run_id": "run-1" },
         totalCost: 0.003,
       });
 
       await expect(
-        reactor.handle(createSpanReceivedEvent(), {
+        reactor(createSpanReceivedEvent(), {
           tenantId: TEST_TENANT_ID,
           aggregateId: "trace-1",
-          foldState,
+          state,
         }),
       ).resolves.toBeUndefined();
     });
   });
 
-  describe("when deciding whether to react", () => {
+  describe("when deciding whether the trace has experiment cost metrics", () => {
     describe("when trace has evaluation.run_id and cost data", () => {
       it("returns true", () => {
-        const reactor = createExperimentMetricsSyncReactor(createDeps());
-        const foldState = createTraceSummaryState({
+        const state = createTraceSummaryState({
           attributes: { "evaluation.run_id": "run-1" },
           totalCost: 0.003,
         });
 
-        expect(
-          reactor.shouldReact!(createSpanReceivedEvent(), {
-            tenantId: TEST_TENANT_ID,
-            aggregateId: "trace-1",
-            foldState,
-          }),
-        ).toBe(true);
+        expect(hasExperimentCostMetrics(state)).toBe(true);
       });
     });
 
     describe("when trace has no evaluation.run_id", () => {
       it("returns false", () => {
-        const reactor = createExperimentMetricsSyncReactor(createDeps());
-        const foldState = createTraceSummaryState({ attributes: {} });
+        const state = createTraceSummaryState({ attributes: {} });
 
-        expect(
-          reactor.shouldReact!(createSpanReceivedEvent(), {
-            tenantId: TEST_TENANT_ID,
-            aggregateId: "trace-1",
-            foldState,
-          }),
-        ).toBe(false);
+        expect(hasExperimentCostMetrics(state)).toBe(false);
       });
     });
 
     describe("when trace has no cost data", () => {
       it("returns false", () => {
-        const reactor = createExperimentMetricsSyncReactor(createDeps());
-        const foldState = createTraceSummaryState({
+        const state = createTraceSummaryState({
           attributes: { "evaluation.run_id": "run-1" },
           totalCost: null,
         });
 
-        expect(
-          reactor.shouldReact!(createSpanReceivedEvent(), {
-            tenantId: TEST_TENANT_ID,
-            aggregateId: "trace-1",
-            foldState,
-          }),
-        ).toBe(false);
+        expect(hasExperimentCostMetrics(state)).toBe(false);
       });
     });
 
     describe("when trace has exactly zero cost", () => {
       it("returns false", () => {
-        const reactor = createExperimentMetricsSyncReactor(createDeps());
-        const foldState = createTraceSummaryState({
+        const state = createTraceSummaryState({
           attributes: { "evaluation.run_id": "run-1" },
           totalCost: 0,
         });
 
-        expect(
-          reactor.shouldReact!(createSpanReceivedEvent(), {
-            tenantId: TEST_TENANT_ID,
-            aggregateId: "trace-1",
-            foldState,
-          }),
-        ).toBe(false);
+        expect(hasExperimentCostMetrics(state)).toBe(false);
       });
     });
   });

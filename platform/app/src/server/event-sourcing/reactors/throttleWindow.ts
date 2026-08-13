@@ -37,6 +37,47 @@ export type ReactorJobPayload = { event: Event; foldState: unknown };
  * it had already removed. Taking one function and using it for both makes them
  * impossible to drift apart.
  */
+/**
+ * The subscriber-spec variant of `throttledPerWindow`: the same
+ * fire-at-most-once-per-window semantics, expressed as `TriggerOptions`
+ * fields (`delay` + a full dedup strategy) for `.withSubscriber(...)`. The
+ * builder derives the router-level batch-collapse key from the dedup id, so
+ * the two layers cannot drift here either.
+ */
+export function throttledWindow<E extends Event>({
+  makeId,
+  windowMs,
+  dedupTtlMs = windowMs,
+  shouldSurviveDispatch = false,
+}: {
+  makeId: (event: E, state?: unknown) => string;
+  /** How long to hold events before firing, and the default dedup TTL. */
+  windowMs: number;
+  /** Override when the suppression window must outlast the firing delay. */
+  dedupTtlMs?: number;
+  shouldSurviveDispatch?: boolean;
+}): {
+  delay: number;
+  dedup: {
+    makeId: (event: E) => string;
+    ttlMs: number;
+    extend: false;
+    replace: true;
+    shouldSurviveDispatch: boolean;
+  };
+} {
+  return {
+    delay: windowMs,
+    dedup: {
+      makeId,
+      ttlMs: dedupTtlMs,
+      extend: false,
+      replace: true,
+      shouldSurviveDispatch,
+    },
+  };
+}
+
 export function throttledPerWindow({
   makeJobId,
   windowMs,

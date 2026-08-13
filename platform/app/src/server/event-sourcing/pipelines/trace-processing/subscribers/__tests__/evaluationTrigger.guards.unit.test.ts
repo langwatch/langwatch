@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import type { MonitorSummary } from "~/server/app-layer/monitors/repositories/monitor.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { ReactorContext } from "../../../../reactors/reactor.types";
+import type { TriggerContext } from "../../../../pipeline/processManagerDefinition";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
-  createEvaluationTriggerReactor,
-  type EvaluationTriggerReactorDeps,
-} from "../evaluationTrigger.reactor";
-import { DEFERRED_CHECK_DELAY_MS } from "../originGate.reactor";
+  createEvaluationTriggerSubscriber,
+  type EvaluationTriggerSubscriberDeps,
+} from "../evaluationTrigger.subscriber";
+import { DEFERRED_CHECK_DELAY_MS } from "../originGate.subscriber";
 
 function makeEvent(
   overrides: Partial<TraceProcessingEvent> = {},
@@ -35,15 +35,15 @@ function makeEvent(
 }
 
 function makeContext(
-  overrides: Partial<ReactorContext<TraceSummaryData>> = {},
+  overrides: Partial<TriggerContext<TraceSummaryData>> = {},
   attributeOverrides: Record<string, string> = {
     "langwatch.origin": "application",
   },
-): ReactorContext<TraceSummaryData> {
+): TriggerContext<TraceSummaryData> {
   return {
     tenantId: "project-1",
     aggregateId: "trace-1",
-    foldState: {
+    state: {
       traceId: "trace-1",
       traceName: "",
       spanCount: 1,
@@ -84,8 +84,8 @@ function makeMonitor(overrides: Partial<MonitorSummary> = {}): MonitorSummary {
 }
 
 function createDeps(
-  overrides: Partial<EvaluationTriggerReactorDeps> = {},
-): EvaluationTriggerReactorDeps {
+  overrides: Partial<EvaluationTriggerSubscriberDeps> = {},
+): EvaluationTriggerSubscriberDeps {
   return {
     monitors: {
       getEnabledOnMessageMonitors: vi.fn().mockResolvedValue([]),
@@ -104,11 +104,11 @@ describe("evaluationTrigger reactor", () => {
         monitor,
       ]);
 
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const event = makeEvent();
       const context = makeContext();
 
-      await reactor.handle(event, context);
+      await subscriber.spec.handler(event, context);
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
@@ -129,7 +129,7 @@ describe("evaluationTrigger reactor", () => {
         monitor,
       ]);
 
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const event = makeEvent();
       const context = makeContext(
         {},
@@ -139,7 +139,7 @@ describe("evaluationTrigger reactor", () => {
         },
       );
 
-      await reactor.handle(event, context);
+      await subscriber.spec.handler(event, context);
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
       const [payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
@@ -164,11 +164,11 @@ describe("evaluationTrigger reactor", () => {
         monitor,
       ]);
 
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const event = makeEvent();
       const context = makeContext(); // no threadId in attributes
 
-      await reactor.handle(event, context);
+      await subscriber.spec.handler(event, context);
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
@@ -188,7 +188,7 @@ describe("evaluationTrigger reactor", () => {
         monitor,
       ]);
 
-      const reactor = createEvaluationTriggerReactor(deps);
+      const subscriber = createEvaluationTriggerSubscriber(deps);
       const event = makeEvent();
       const context = makeContext(
         {},
@@ -198,7 +198,7 @@ describe("evaluationTrigger reactor", () => {
         },
       );
 
-      await reactor.handle(event, context);
+      await subscriber.spec.handler(event, context);
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
@@ -221,8 +221,8 @@ describe("evaluationTrigger reactor", () => {
         monitor,
       ]);
 
-      const reactor = createEvaluationTriggerReactor(deps);
-      await reactor.handle(makeEvent(), makeContext());
+      const subscriber = createEvaluationTriggerSubscriber(deps);
+      await subscriber.spec.handler(makeEvent(), makeContext());
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
       const [payload] = vi.mocked(deps.evaluation).mock.calls[0]!;
@@ -241,8 +241,8 @@ describe("evaluationTrigger reactor", () => {
         monitor,
       ]);
 
-      const reactor = createEvaluationTriggerReactor(deps);
-      await reactor.handle(makeEvent(), makeContext());
+      const subscriber = createEvaluationTriggerSubscriber(deps);
+      await subscriber.spec.handler(makeEvent(), makeContext());
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
       const [payload] = vi.mocked(deps.evaluation).mock.calls[0]!;

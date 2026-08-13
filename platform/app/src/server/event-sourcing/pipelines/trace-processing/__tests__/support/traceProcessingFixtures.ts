@@ -6,11 +6,11 @@ import type {
   RecordSpanCommandData,
 } from "../../schemas/commands";
 
-const reactorStub = (name: string) => ({ name, handle: async () => {} }) as any;
+const handlerStub = () => async () => {};
 
 /**
  * Deps for building the REAL trace-processing pipeline in a wiring test.
- * `build()` only stores references, so no store or reactor is ever invoked.
+ * `build()` only stores references, so no store or subscriber is ever invoked.
  */
 export function buildTraceDeps(
   overrides: Partial<TraceProcessingPipelineDeps> = {},
@@ -21,19 +21,22 @@ export function buildTraceDeps(
     traceSummaryStore: store,
     traceAnalyticsStore: store,
     traceAnalyticsRollupAppendStore: store,
-    originGateReactor: reactorStub("originGate"),
-    evaluationTriggerReactor: reactorStub("evaluationTrigger"),
-    customEvaluationSyncHandler: async () => {},
-    trackedEventSyncReactor: reactorStub("trackedEventSync"),
-    traceUpdateBroadcastReactor: reactorStub("traceUpdateBroadcast"),
-    projectMetadataReactor: reactorStub("projectMetadata"),
-    simulationMetricsSyncReactor: reactorStub("simulationMetricsSync"),
-    experimentMetricsSyncReactor: reactorStub("experimentMetricsSync"),
+    originGateHandler: handlerStub(),
+    evaluationTrigger: {
+      name: "evaluationTrigger",
+      spec: { fold: "traceSummary", handler: handlerStub() },
+    },
+    customEvaluationSyncHandler: handlerStub(),
+    trackedEventSyncHandler: handlerStub(),
+    traceUpdateBroadcastHandler: handlerStub(),
+    projectMetadataHandler: handlerStub(),
+    simulationMetricsSyncHandler: handlerStub(),
+    experimentMetricsSyncHandler: handlerStub(),
     automations: {
       triggerMatchHandler: vi.fn().mockResolvedValue(undefined),
       graphActivityHandler: vi.fn().mockResolvedValue(undefined),
     },
-    spanStorageBroadcastReactor: reactorStub("spanStorageBroadcast"),
+    spanStorageBroadcastHandler: handlerStub(),
     ...overrides,
   };
 }

@@ -20,7 +20,7 @@ const GRACE_PERIOD_DAYS = 3;
 export const BILLING_METER_DISPATCH_SUPPRESS_MS = 300_000;
 
 /**
- * One queue lane per project, matching this reactor's per-project dedup id.
+ * One queue lane per project, matching this subscriber's per-project dedup id.
  *
  * The queue's dedup key is global to the queue, but the check that decides
  * whether a duplicate is still squashable looks the existing job up in the
@@ -44,13 +44,13 @@ export function billingMeterDispatchGroupKey(event: {
 }
 
 /**
- * Reactor that dispatches billing usage reporting commands after
+ * Subscriber that dispatches billing usage reporting commands after
  * the orgBillableEventsMeter map projection succeeds.
  *
  * Two dedup layers:
- * - Reactor-level per-project: makeJobId creates one reactor job per project,
+ * - Subscriber-level per-project: makeJobId creates one job per project,
  *   collapsed into one pending job by the per-project lane above.
- *   An org with N active projects creates N reactor jobs but each project
+ *   An org with N active projects creates N jobs but each project
  *   only triggers one within the TTL window.
  * - Framework per-org: command dedup via makeId `${orgId}:${billingMonth}`, 310s TTL
  *   ensures only one reporting command per org per month is pending.
@@ -58,7 +58,7 @@ export function billingMeterDispatchGroupKey(event: {
  * Grace period: during the first 3 days of a month, dispatches for both
  * current and previous billing month to catch late-arriving events.
  */
-export function createBillingMeterDispatchReactor(deps: {
+export function createBillingMeterDispatchSubscriber(deps: {
   getDispatch: () => (data: ReportUsageForMonthCommandData) => Promise<void>;
 }): ReactorDefinition<Event> {
   return {
@@ -66,8 +66,7 @@ export function createBillingMeterDispatchReactor(deps: {
     options: {
       runIn: ["worker"],
       groupKeyFn: (payload) => billingMeterDispatchGroupKey(payload.event),
-      // Deliberately fires immediately, unlike the other level-triggered
-      // reactors. `handle` decides which billing months to report by reading
+      // Deliberately fires immediately, unlike the other level-triggered      // reactors. `handle` decides which billing months to report by reading
       // the WALL CLOCK at the moment it runs, not the event it was given, so
       // holding a trigger moves the decision as well as the work. A trigger
       // arriving in the last seconds of the third grace day would run on the
@@ -76,7 +75,7 @@ export function createBillingMeterDispatchReactor(deps: {
       // different month.
       //
       // A window here is safe once the month and grace decision come from the
-      // triggering event instead of the clock. Until then this reactor relies
+      // triggering event instead of the clock. Until then this subscriber relies
       // on the per-project lane above, which collapses a project's concurrent
       // traces without deferring anything.
       makeJobId: (payload) => `billing_dispatch_${payload.event.tenantId}`,

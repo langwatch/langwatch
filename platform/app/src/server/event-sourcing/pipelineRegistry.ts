@@ -4,13 +4,17 @@ import {
 } from "@ee/event-sourcing/pipelineSet";
 import type { GatewayDebitsProcessDeps } from "@ee/governance/process-manager/gatewayDebits.process";
 import {
-  createGovernanceKpisSyncReactor,
-  type GovernanceKpisSyncReactorDeps,
-} from "@ee/governance/reactors/governanceKpisSync.reactor";
+  createGovernanceKpisSyncHandler,
+  GOVERNANCE_KPIS_SYNC_WINDOW_MS,
+  type GovernanceKpisSyncSubscriberDeps,
+  isGovernanceKpiTrace,
+} from "@ee/governance/subscribers/governanceKpisSync.subscriber";
 import {
-  createGovernanceOcsfEventsSyncReactor,
-  type GovernanceOcsfEventsSyncReactorDeps,
-} from "@ee/governance/reactors/governanceOcsfEventsSync.reactor";
+  createGovernanceOcsfEventsSyncHandler,
+  GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS,
+  type GovernanceOcsfEventsSyncSubscriberDeps,
+  isGovernanceOcsfTrace,
+} from "@ee/governance/subscribers/governanceOcsfEventsSync.subscriber";
 import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
 import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
 import type {
@@ -110,9 +114,9 @@ import {
   SessionMetricSeriesAppendStore,
 } from "./pipelines/coding-agent-processing/projections/stores";
 import {
-  createPullRequestMappingReactor,
-  type PullRequestMappingReactorDeps,
-} from "./pipelines/coding-agent-processing/reactors/pullRequestMapping.reactor";
+  createPullRequestMappingHandler,
+  type PullRequestMappingSubscriberDeps,
+} from "./pipelines/coding-agent-processing/subscribers/pullRequestMapping.subscriber";
 import { createCodingAgentLogFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentLogFactsDispatch.subscriber";
 import { createCodingAgentMetricFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentMetricFactsDispatch.subscriber";
 import { createCodingAgentSpanFactsDispatchSubscriber } from "./pipelines/coding-agent-processing/subscribers/codingAgentSpanFactsDispatch.subscriber";
@@ -184,22 +188,24 @@ import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/tr
 import { TraceAnalyticsRollupAppendStore } from "./pipelines/trace-processing/projections/traceAnalyticsRollup.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
 import { createCustomEvaluationSyncHandler } from "./pipelines/trace-processing/subscribers/customEvaluationSync.subscriber";
-import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
-import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing/reactors/experimentMetricsSync.reactor";
+import { createEvaluationTriggerSubscriber } from "./pipelines/trace-processing/subscribers/evaluationTrigger.subscriber";
+import { createExperimentMetricsSyncHandler } from "./pipelines/trace-processing/subscribers/experimentMetricsSync.subscriber";
 import {
   createDeferredOriginHandler,
-  createOriginGateReactor,
+  createOriginGateHandler,
   DEFERRED_CHECK_DELAY_MS,
   type DeferredOriginPayload,
   makeDeferredJobId,
-} from "./pipelines/trace-processing/reactors/originGate.reactor";
-import { createProjectMetadataReactor } from "./pipelines/trace-processing/reactors/projectMetadata.reactor";
-import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing/reactors/simulationMetricsSync.reactor";
-import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
-import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
-import { createTrackedEventSyncReactor } from "./pipelines/trace-processing/reactors/trackedEventSync.reactor";
+} from "./pipelines/trace-processing/subscribers/originGate.subscriber";
+import { createProjectMetadataHandler } from "./pipelines/trace-processing/subscribers/projectMetadata.subscriber";
+import { createSimulationMetricsSyncHandler } from "./pipelines/trace-processing/subscribers/simulationMetricsSync.subscriber";
+import { createSpanStorageBroadcastHandler } from "./pipelines/trace-processing/subscribers/spanStorageBroadcast.subscriber";
+import { createTraceUpdateBroadcastHandler } from "./pipelines/trace-processing/subscribers/traceUpdateBroadcast.subscriber";
+import { createTrackedEventSyncHandler } from "./pipelines/trace-processing/subscribers/trackedEventSync.subscriber";
 import type { ResolveOriginCommandData } from "./pipelines/trace-processing/schemas/commands";
+import type { TraceProcessingEvent } from "./pipelines/trace-processing/schemas/events";
 import type { ProcessStore } from "./process-manager";
+import { throttledWindow } from "./reactors/throttleWindow";
 import type { FoldProjectionStore } from "./projections/foldProjection.types";
 import type { AppendStore } from "./projections/mapProjection.types";
 import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
@@ -381,8 +387,8 @@ export interface PipelineRegistryDeps {
    * best-effort DELETEd after event_log INSERT succeeds.
    */
   blobStore?: BlobStore;
-  governanceKpisSync?: GovernanceKpisSyncReactorDeps;
-  governanceOcsfEventsSync?: GovernanceOcsfEventsSyncReactorDeps;
+  governanceKpisSync?: GovernanceKpisSyncSubscriberDeps;
+  governanceOcsfEventsSync?: GovernanceOcsfEventsSyncSubscriberDeps;
   retentionPolicyResolver?: RetentionPolicyResolver;
   codingAgent?: {
     /**
@@ -391,7 +397,7 @@ export interface PipelineRegistryDeps {
      * connection), so presets passes a `Deferred`'s callable proxy here.
      * Omitted where there is no GitHub connection to ask.
      */
-    pullRequestMapping: PullRequestMappingReactorDeps;
+    pullRequestMapping: PullRequestMappingSubscriberDeps;
   };
   /**
    * The fleet-wide GitHub linkage maintenance the scheduled process manager
@@ -937,7 +943,7 @@ export class PipelineRegistry {
           ),
         ...(this.deps.codingAgent
           ? {
-              pullRequestMappingReactor: createPullRequestMappingReactor(
+              pullRequestMappingHandler: createPullRequestMappingHandler(
                 this.deps.codingAgent.pullRequestMapping,
               ),
             }
@@ -1086,11 +1092,11 @@ export class PipelineRegistry {
       CommandDispatcher<ComputeRunMetricsCommandData>
     >("simComputeRunMetrics");
 
-    const originGateReactor = createOriginGateReactor({
+    const originGateHandler = createOriginGateHandler({
       scheduleDeferred: scheduleDeferred.fn,
     });
 
-    const evaluationTriggerReactor = createEvaluationTriggerReactor({
+    const evaluationTrigger = createEvaluationTriggerSubscriber({
       monitors: this.deps.monitors,
       evaluation: evalCommands.executeEvaluation,
     });
@@ -1102,28 +1108,30 @@ export class PipelineRegistry {
     // Live span feedback (langwatch.event) → tracked event. Routes through the
     // same recordTrackedEventSpan path as REST POST /api/events/track so an
     // SDK-emitted thumbs_up_down lands identically to a REST call.
-    const trackedEventSyncReactor = createTrackedEventSyncReactor({
+    const trackedEventSyncHandler = createTrackedEventSyncHandler({
       recordTrackedEvent: ({ tenantId, body, eventId }) =>
         recordTrackedEventSpan({ project: { id: tenantId }, body, eventId }),
     });
 
-    const traceUpdateBroadcastReactor = createTraceUpdateBroadcastReactor({
+    // Without Redis, the worker-to-web pub/sub bridge is unavailable, so both
+    // broadcast subscribers register inert.
+    const broadcastDisabled = !this.deps.eventSourcing.redisConnection;
+
+    const traceUpdateBroadcastHandler = createTraceUpdateBroadcastHandler({
       broadcast: this.deps.broadcast,
-      hasRedis: !!this.deps.eventSourcing.redisConnection,
     });
 
-    const spanStorageBroadcastReactor = createSpanStorageBroadcastReactor({
+    const spanStorageBroadcastHandler = createSpanStorageBroadcastHandler({
       broadcast: this.deps.broadcast,
-      hasRedis: !!this.deps.eventSourcing.redisConnection,
     });
 
-    const projectMetadataReactor = createProjectMetadataReactor({
+    const projectMetadataHandler = createProjectMetadataHandler({
       projects: this.deps.projects,
       bootstrapTopicClustering: (projectId) =>
         this.bootstrapTopicClustering.fn(projectId),
     });
 
-    const simulationMetricsSyncReactor = createSimulationMetricsSyncReactor({
+    const simulationMetricsSyncHandler = createSimulationMetricsSyncHandler({
       computeRunMetrics: simComputeRunMetrics.fn,
     });
 
@@ -1137,7 +1145,7 @@ export class PipelineRegistry {
       | ((tenantId: string, runId: string) => Promise<string | null>)
       | null = null;
 
-    const experimentMetricsSyncReactor = createExperimentMetricsSyncReactor({
+    const experimentMetricsSyncHandler = createExperimentMetricsSyncHandler({
       computeExperimentRunMetrics: async (data) => {
         if (!expComputeRunMetrics) {
           logger.warn(
@@ -1158,14 +1166,32 @@ export class PipelineRegistry {
       },
     });
 
-    const governanceKpisSyncReactor = this.deps.governanceKpisSync
-      ? createGovernanceKpisSyncReactor(this.deps.governanceKpisSync)
+    // EE governance rollups, composed here as full subscriber specs so the
+    // OSS pipeline definition stays free of `@ee` imports.
+    const governanceKpisSync = this.deps.governanceKpisSync
+      ? {
+          fold: "traceSummary",
+          when: isGovernanceKpiTrace,
+          ...throttledWindow<TraceProcessingEvent>({
+            makeId: (event) => `${event.tenantId}:${event.aggregateId}`,
+            windowMs: GOVERNANCE_KPIS_SYNC_WINDOW_MS,
+          }),
+          handler: createGovernanceKpisSyncHandler(this.deps.governanceKpisSync),
+        }
       : undefined;
 
-    const governanceOcsfEventsSyncReactor = this.deps.governanceOcsfEventsSync
-      ? createGovernanceOcsfEventsSyncReactor(
-          this.deps.governanceOcsfEventsSync,
-        )
+    const governanceOcsfEventsSync = this.deps.governanceOcsfEventsSync
+      ? {
+          fold: "traceSummary",
+          when: isGovernanceOcsfTrace,
+          ...throttledWindow<TraceProcessingEvent>({
+            makeId: (event) => `${event.tenantId}:${event.aggregateId}`,
+            windowMs: GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS,
+          }),
+          handler: createGovernanceOcsfEventsSyncHandler(
+            this.deps.governanceOcsfEventsSync,
+          ),
+        }
       : undefined;
 
     const tracePipeline = this.deps.eventSourcing.register(
@@ -1183,16 +1209,17 @@ export class PipelineRegistry {
           "trace_analytics",
         ),
         traceSummaryStore,
-        originGateReactor,
-        evaluationTriggerReactor,
+        originGateHandler,
+        evaluationTrigger,
         automations,
         customEvaluationSyncHandler,
-        trackedEventSyncReactor,
-        traceUpdateBroadcastReactor,
-        projectMetadataReactor,
-        simulationMetricsSyncReactor,
-        experimentMetricsSyncReactor,
-        spanStorageBroadcastReactor,
+        trackedEventSyncHandler,
+        traceUpdateBroadcastHandler,
+        projectMetadataHandler,
+        simulationMetricsSyncHandler,
+        experimentMetricsSyncHandler,
+        spanStorageBroadcastHandler,
+        broadcastDisabled,
         // ADR-022: Wire BlobStore so RecordSpanCommand can reconstitute
         // oversized commands and best-effort delete the transient S3 spool.
         blobStore: this.deps.blobStore,
@@ -1202,8 +1229,8 @@ export class PipelineRegistry {
         spanCommandShardCount: resolveSpanCommandShardCount(
           process.env.TRACE_SPAN_PROCESSING_SHARDS,
         ),
-        governanceKpisSyncReactor,
-        governanceOcsfEventsSyncReactor,
+        governanceKpisSync,
+        governanceOcsfEventsSync,
         subscribers: codingAgentSubscribers,
       }),
     );
