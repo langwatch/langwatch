@@ -4,9 +4,9 @@ import {
   DuplicateBindingError,
   type RoleBindingWrite,
 } from "@langwatch/authz-server";
-import type { PrismaClient } from "@prisma/client";
-import { Prisma } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { Prisma } from "~/generated/prisma/client";
 import { PrismaAuthzGrantsRepository } from "../authz-grants.prisma.repository";
 import { PrismaAuthzReadRepository } from "../authz-read.prisma.repository";
 

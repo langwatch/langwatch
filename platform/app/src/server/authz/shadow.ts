@@ -27,7 +27,7 @@ import {
   AuthzCollectorService,
   AuthzShadowService,
 } from "@langwatch/authz-server";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { PrismaAuthzReadRepository } from "./repositories/authz-read.prisma.repository";
 
 /**

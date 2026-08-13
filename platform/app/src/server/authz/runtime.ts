@@ -22,7 +22,7 @@ import {
   GrantsService,
 } from "@langwatch/authz-server";
 import { generate } from "@langwatch/ksuid";
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { prisma } from "../db";
 import { bumpAuthzEpoch, getAuthzEpoch } from "./epoch";

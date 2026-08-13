@@ -5,12 +5,12 @@
  * set, applying the same hierarchy the engine does, and it FAILS CLOSED
  * whenever it has no set to answer from.
  *
- * The loading half is the trap. React Query v4 reports a DISABLED query as
- * `isLoading` forever, and this query is disabled until there is an
- * organization or a project to ask about — so the hook reports
- * `isInitialLoading`, which means "a fetch this hook actually started has not
- * answered yet". The test renders the hook and reads its answers; it does not
- * assert on source text.
+ * The loading half is the trap. This query is disabled until there is an
+ * organization or a project to ask about, and a disabled query has no answer
+ * (`isPending`) without being in flight — so the hook reports TanStack Query
+ * v5's `isLoading` (`isPending && isFetching`), which means "a fetch this
+ * hook actually started has not answered yet". The test renders the hook and
+ * reads its answers; it does not assert on source text.
  */
 import { cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -36,19 +36,19 @@ vi.mock("../useOrganizationTeamProject", () => ({
 
 const { useCan } = await import("../useCan");
 
-/** A React Query v4 result, only the fields this hook reads. */
+/** A TanStack Query v5 result, only the fields this hook reads. */
 const queryResult = ({
   permissions,
-  isInitialLoading = false,
+  isLoading = false,
 }: {
   permissions?: string[];
-  isInitialLoading?: boolean;
+  isLoading?: boolean;
 }) => ({
   data: permissions ? { permissions } : undefined,
-  // Deliberately opposite to isInitialLoading in the loaded cases: a hook
-  // reading this field instead would report the disabled-query answer.
-  isLoading: permissions === undefined,
-  isInitialLoading,
+  // Deliberately independent of isLoading: a query with no answer is
+  // `isPending` whether or not a fetch is in flight.
+  isPending: permissions === undefined,
+  isLoading,
 });
 
 beforeEach(() => {
@@ -90,7 +90,7 @@ describe("useCan", () => {
   describe("given the query has not answered yet", () => {
     it("refuses everything, unlike the legacy guard that rendered during load", () => {
       mockEffectivePermissionsQuery.mockReturnValue(
-        queryResult({ isInitialLoading: true }),
+        queryResult({ isLoading: true }),
       );
 
       const { result } = renderHook(() => useCan());
@@ -103,12 +103,12 @@ describe("useCan", () => {
 
   describe("given a query that is disabled rather than in flight", () => {
     it("does not report loading, so a gated screen still renders", () => {
-      // React Query v4's isLoading is true for a disabled query forever;
-      // isInitialLoading is false, which is the honest answer.
+      // A disabled query is pending forever without fetching; isLoading is
+      // false, which is the honest answer.
       mockEffectivePermissionsQuery.mockReturnValue({
         data: undefined,
-        isLoading: true,
-        isInitialLoading: false,
+        isPending: true,
+        isLoading: false,
       });
 
       const { result } = renderHook(() => useCan());

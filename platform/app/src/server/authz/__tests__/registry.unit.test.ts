@@ -3,8 +3,8 @@ import {
   isRegistryPermission,
   permissionIndex,
 } from "@langwatch/authz";
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { describe, expect, it } from "vitest";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import {
   getValidActionsForResource,
   orderedResources,

@@ -20,7 +20,7 @@ import type {
   OrganizationRole,
   ShareLinkRow,
 } from "@langwatch/authz-server";
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "~/generated/prisma/client";
 import { CUSTOM_ROLE_KIND } from "../../role/role-kind";
 
 export class PrismaAuthzReadRepository implements AuthzReadRepository {

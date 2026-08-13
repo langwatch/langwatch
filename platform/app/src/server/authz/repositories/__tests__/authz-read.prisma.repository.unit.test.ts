@@ -1,5 +1,5 @@
-import type { Prisma } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+import type { Prisma } from "~/generated/prisma/client";
 import { PrismaAuthzReadRepository } from "../authz-read.prisma.repository";
 
 /**

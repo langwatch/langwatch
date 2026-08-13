@@ -45,12 +45,12 @@ export function useCan() {
 
   return {
     can,
-    // React Query v4 reports a DISABLED query as loading forever, and this
-    // query is disabled until there is an org or a project to ask about. A
-    // consumer gating its render on `isLoading` would never render at all on
-    // those screens; `isInitialLoading` is the flag that means "a fetch this
-    // hook actually started has not answered yet".
-    isLoading: effective.isInitialLoading,
+    // TanStack Query v5's `isLoading` is `isPending && isFetching`: false for
+    // a DISABLED query, and this query is disabled until there is an org or a
+    // project to ask about. That is the flag that means "a fetch this hook
+    // actually started has not answered yet" — a consumer gating its render
+    // on it still renders on screens where the query never starts.
+    isLoading: effective.isLoading,
     permissions: effective.data?.permissions ?? [],
   };
 }

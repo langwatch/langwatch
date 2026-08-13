@@ -18,8 +18,8 @@ import {
   BindingMissingError,
   DuplicateBindingError,
 } from "@langwatch/authz-server";
-import type { PrismaClient } from "@prisma/client";
-import { Prisma } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { Prisma } from "~/generated/prisma/client";
 import { PrismaAuthzReadRepository } from "./authz-read.prisma.repository";
 
 /**

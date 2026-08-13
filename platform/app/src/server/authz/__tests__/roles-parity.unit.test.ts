@@ -13,8 +13,8 @@ import {
   permissionSatisfiedBy,
   roleKeyForTeamRole,
 } from "@langwatch/authz";
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { afterEach, describe, expect, it } from "vitest";
+import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import {
   bindingScopeCanGrant,
   EXTERNAL_MEMBER_PERMISSIONS,
