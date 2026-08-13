@@ -9,14 +9,14 @@ import type { SlackActionParams } from "@langwatch/automations/providers/slack";
 import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automations/providers/webhook";
 import { HandledError } from "@langwatch/handled-error";
 import { generate as ksuid } from "@langwatch/ksuid";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 import {
   AlertType,
   type Prisma,
   TriggerAction,
   TriggerKind,
-} from "@prisma/client";
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
+} from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
 import { listSlackChannels } from "~/server/app-layer/automations/delivery/slackWebApi";

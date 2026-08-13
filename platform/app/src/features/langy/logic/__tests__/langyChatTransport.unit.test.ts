@@ -19,24 +19,25 @@ const subscription = vi.fn<
   (path: string, input: unknown, opts: unknown) => Unsubscribable
 >(() => ({ unsubscribe: vi.fn() }));
 
-// The mock mirrors tRPC's real `TRPCUntypedClient`, whose `mutation`/`subscription`
-// run `this.requestAsPromise(...)` internally (see @trpc/client dist). Modelling
-// that `this` dependency is load-bearing: a transport that DETACHES the method
-// (`const m = trpcClient.mutation; m(...)`) loses `this` and throws
-// "Cannot read properties of undefined (reading 'requestAsPromise')" — the exact
-// crash that shipped. A bare `vi.fn()` (no `this`) would silently hide it, which
-// is how it slipped through before. Each method touches `this.requestAsPromise`
-// the way the real client does, then delegates to the spy for assertions.
+// The mock mirrors the v11 PROXY client the transport now calls: procedures
+// are addressed as `trpcClient.langy.<proc>.mutate/subscribe`. The spies keep
+// receiving the dotted path so the assertions still name the procedure. (The
+// v10-era detached-`this` hazard died with the dotted-path client — every
+// proxy access mints a bound call.)
 vi.mock("~/utils/api", () => ({
   trpcClient: {
-    requestAsPromise: true,
-    mutation(path: string, input: unknown) {
-      void (this as { requestAsPromise: unknown }).requestAsPromise;
-      return mutation(path, input);
-    },
-    subscription(path: string, input: unknown, opts: unknown) {
-      void (this as { requestAsPromise: unknown }).requestAsPromise;
-      return subscription(path, input, opts);
+    langy: {
+      createConversation: {
+        mutate: (input: unknown) => mutation("langy.createConversation", input),
+      },
+      continueConversation: {
+        mutate: (input: unknown) =>
+          mutation("langy.continueConversation", input),
+      },
+      onTurnStream: {
+        subscribe: (input: unknown, opts: unknown) =>
+          subscription("langy.onTurnStream", input, opts),
+      },
     },
   },
 }));
@@ -157,17 +158,10 @@ describe("createLangyChatTransport", () => {
     });
   });
 
-  describe("given the tRPC client method depends on its `this` binding", () => {
-    it("keeps the mutation call attached to trpcClient so a send never throws the detached-`this` TypeError", async () => {
-      // Regression: the transport shipped `const mutate = trpcClient.mutation`,
-      // which drops `this`. The first send then threw synchronously with
-      // "Cannot read properties of undefined (reading 'requestAsPromise')" —
-      // before any request left the browser (no network, generic error card).
-      // Reverting the transport to a detached reference makes this (and every
-      // other send test) throw against the `this`-faithful mock above.
+  describe("given a full send round-trip", () => {
+    it("resolves the send, adopts the ids and opens the live stream", async () => {
       const { transport, onIds } = makeTransport({ conversationId: null });
 
-      // Must RESOLVE. A detached call rejects with the TypeError instead.
       await expect(transport.sendMessages(options())).resolves.toBeDefined();
       expect(mutation).toHaveBeenCalledTimes(1);
       expect(onIds).toHaveBeenCalledWith({

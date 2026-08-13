@@ -6640,6 +6640,11 @@ export interface operations {
                         status: "skipped";
                         /** @description Why the evaluator declined to score this input */
                         details?: string;
+                        /** @description What the attempt cost, when the evaluator spent money before declining to score */
+                        cost?: {
+                            currency: string;
+                            amount: number;
+                        };
                         /** @description Always true in guardrail mode, so a skip does not block */
                         passed?: boolean;
                     } | {
@@ -6791,6 +6796,11 @@ export interface operations {
                         status: "skipped";
                         /** @description Why the evaluator declined to score this input */
                         details?: string;
+                        /** @description What the attempt cost, when the evaluator spent money before declining to score */
+                        cost?: {
+                            currency: string;
+                            amount: number;
+                        };
                         /** @description Always true in guardrail mode, so a skip does not block */
                         passed?: boolean;
                     } | {
@@ -6940,6 +6950,11 @@ export interface operations {
                         status: "skipped";
                         /** @description Why the evaluator declined to score this input */
                         details?: string;
+                        /** @description What the attempt cost, when the evaluator spent money before declining to score */
+                        cost?: {
+                            currency: string;
+                            amount: number;
+                        };
                         /** @description Always true in guardrail mode, so a skip does not block */
                         passed?: boolean;
                     } | {
@@ -7085,6 +7100,11 @@ export interface operations {
                         status: "skipped";
                         /** @description Why the evaluator declined to score this input */
                         details?: string;
+                        /** @description What the attempt cost, when the evaluator spent money before declining to score */
+                        cost?: {
+                            currency: string;
+                            amount: number;
+                        };
                         /** @description Always true in guardrail mode, so a skip does not block */
                         passed?: boolean;
                     } | {

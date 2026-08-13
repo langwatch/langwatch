@@ -4,13 +4,17 @@ import {
   NOTIFICATION_CADENCES,
 } from "@langwatch/automations/cadences";
 import { createLogger } from "@langwatch/observability";
-import type { AlertType, Trigger, TriggerAction } from "@prisma/client";
 import type { Context } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import type { AuthMiddlewareVariables } from "~/app/api/middleware/auth";
 import { badRequestSchema } from "~/app/api/shared/schemas";
+import type {
+  AlertType,
+  Trigger,
+  TriggerAction,
+} from "~/generated/prisma/client";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
@@ -764,7 +768,10 @@ secured.access(requires("triggers:update")).patch(
 // rather than having to read it back. Written out one at a time rather than
 // generated from a pair: the route inventory these two appear in is read off
 // the source, and a generated registration is invisible to it.
-type TriggerRouteContext = Context<{ Variables: AuthMiddlewareVariables }>;
+type TriggerRouteContext = Context<
+  { Variables: AuthMiddlewareVariables },
+  "/:id"
+>;
 
 const setActiveHandler =
   (active: boolean) => async (c: TriggerRouteContext) => {

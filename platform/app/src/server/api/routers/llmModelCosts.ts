@@ -1,7 +1,7 @@
-import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import { previewCostRuleMatchingSpans } from "~/server/app-layer/traces/model-cost-span-preview.service";
 import { prisma } from "~/server/db";

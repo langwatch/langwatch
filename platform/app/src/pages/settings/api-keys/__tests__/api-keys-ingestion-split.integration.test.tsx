@@ -45,7 +45,7 @@ const mockApiKeyList = vi.fn();
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       apiKey: { list: { invalidate: vi.fn() } },
     }),
     apiKey: {

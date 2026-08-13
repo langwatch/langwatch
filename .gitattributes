@@ -15,3 +15,4 @@ sdks/typescript/src/internal/generated/redaction/*.ts linguist-generated=true
 docs/llms.txt                           linguist-generated=true
 docs/llms-full.txt                      linguist-generated=true
 docs/api-reference/openapi-evals.json   linguist-generated=true
+platform/app/src/generated/**           linguist-generated=true

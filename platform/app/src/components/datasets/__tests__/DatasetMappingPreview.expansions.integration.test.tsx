@@ -9,12 +9,12 @@
  * See specs/datasets/add-to-dataset-span-mapping.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { Dataset } from "@prisma/client";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
+import type { Dataset } from "~/generated/prisma/client";
 import type { DatasetColumns } from "~/server/datasets/types";
 import type { Trace } from "~/server/tracer/types";
 
@@ -47,7 +47,7 @@ vi.mock("~/hooks/useFilterParams", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({ dataset: { getAll: { invalidate: vi.fn() } } }),
+    useUtils: () => ({ dataset: { getAll: { invalidate: vi.fn() } } }),
     annotationScore: { getAllActive: { useQuery: () => ({ data: [] }) } },
     dataset: { updateMapping: { useMutation: () => ({ mutate: vi.fn() }) } },
     traces: {

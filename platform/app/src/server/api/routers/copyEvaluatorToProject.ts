@@ -1,6 +1,6 @@
-import { Prisma, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
 import { EvaluatorService } from "../../evaluators/evaluator.service";
 import {

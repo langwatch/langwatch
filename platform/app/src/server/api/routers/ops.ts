@@ -144,7 +144,6 @@ export const opsRouter = createTRPCRouter({
       yield collector.getDashboardData();
 
       for await (const [data] of on(collector.getEmitter(), DASHBOARD_EVENT, {
-        // @ts-expect-error - signal is not typed
         signal: opts.signal,
       })) {
         yield data as DashboardData;

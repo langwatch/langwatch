@@ -7924,6 +7924,22 @@
                           "type": "string",
                           "description": "Why the evaluator declined to score this input"
                         },
+                        "cost": {
+                          "type": "object",
+                          "properties": {
+                            "currency": {
+                              "type": "string"
+                            },
+                            "amount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "currency",
+                            "amount"
+                          ],
+                          "description": "What the attempt cost, when the evaluator spent money before declining to score"
+                        },
                         "passed": {
                           "type": "boolean",
                           "description": "Always true in guardrail mode, so a skip does not block"
@@ -8213,6 +8229,22 @@
                         "details": {
                           "type": "string",
                           "description": "Why the evaluator declined to score this input"
+                        },
+                        "cost": {
+                          "type": "object",
+                          "properties": {
+                            "currency": {
+                              "type": "string"
+                            },
+                            "amount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "currency",
+                            "amount"
+                          ],
+                          "description": "What the attempt cost, when the evaluator spent money before declining to score"
                         },
                         "passed": {
                           "type": "boolean",
@@ -8513,6 +8545,22 @@
                           "type": "string",
                           "description": "Why the evaluator declined to score this input"
                         },
+                        "cost": {
+                          "type": "object",
+                          "properties": {
+                            "currency": {
+                              "type": "string"
+                            },
+                            "amount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "currency",
+                            "amount"
+                          ],
+                          "description": "What the attempt cost, when the evaluator spent money before declining to score"
+                        },
                         "passed": {
                           "type": "boolean",
                           "description": "Always true in guardrail mode, so a skip does not block"
@@ -8802,6 +8850,22 @@
                         "details": {
                           "type": "string",
                           "description": "Why the evaluator declined to score this input"
+                        },
+                        "cost": {
+                          "type": "object",
+                          "properties": {
+                            "currency": {
+                              "type": "string"
+                            },
+                            "amount": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "currency",
+                            "amount"
+                          ],
+                          "description": "What the attempt cost, when the evaluator spent money before declining to score"
                         },
                         "passed": {
                           "type": "boolean",

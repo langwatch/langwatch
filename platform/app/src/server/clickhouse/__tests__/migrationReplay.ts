@@ -17,6 +17,7 @@ import { link, open, readFile, rename, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { acquireClickHouseSchemaLock } from "./schemaLock";
 
 const MIGRATIONS_DIR = join(__dirname, "..", "migrations");
 
@@ -47,6 +48,21 @@ export async function replayRollupRebuild(
 }
 
 export async function replayGooseMigrationUp({
+  client,
+  fileName,
+}: {
+  client: ClickHouseClient;
+  fileName: string;
+}): Promise<void> {
+  const release = await acquireClickHouseSchemaLock();
+  try {
+    await runMigrationStatements({ client, fileName });
+  } finally {
+    release();
+  }
+}
+
+async function runMigrationStatements({
   client,
   fileName,
 }: {

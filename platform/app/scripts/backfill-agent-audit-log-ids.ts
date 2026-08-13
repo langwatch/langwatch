@@ -15,12 +15,15 @@
  *   DATABASE_URL=... npx tsx scripts/backfill-agent-audit-log-ids.ts --dry-run
  */
 
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../src/generated/prisma/client";
+import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 
 const DRY_RUN = process.argv.includes("--dry-run");
 const WINDOW_MS = 60_000;
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+});
 
 async function backfillCreate() {
   const logs = await prisma.auditLog.findMany({

@@ -5,14 +5,14 @@
  * the real database, because the rules being asserted are the ones that decide
  * what reaches storage.
  */
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   type Organization,
   type Project,
   type Team,
   TriggerAction,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
 import { PrismaTriggerRepository } from "~/server/app-layer/automations/repositories/trigger.prisma.repository";
 import { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import { prisma } from "~/server/db";
@@ -53,7 +53,7 @@ describe("Feature: the API saves what the dashboard would accept", () => {
 
   const withWebhookChannel = async <T>(
     on: boolean,
-    run: () => Promise<T>,
+    run: () => T | Promise<T>,
   ): Promise<T> => {
     const previous = process.env.FEATURE_FLAG_FORCE_ENABLE;
     if (on)

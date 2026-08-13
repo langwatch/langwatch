@@ -18,7 +18,6 @@ type DeltaQueryCall = {
   options: {
     enabled: boolean;
     refetchInterval: unknown;
-    onSuccess: (delta: SpanTreeNode[]) => void;
   };
 };
 
@@ -46,6 +45,7 @@ const setQueryData = vi.fn();
 const deltaInvalidate = vi.fn();
 
 let treeData: SpanTreeNode[] | undefined;
+let deltaData: SpanTreeNode[] | undefined;
 let treeIsPreviousData = false;
 let treeIsFetching = false;
 let sseConnectionState = "connected";
@@ -56,13 +56,14 @@ let traceQueryArgs = {
 };
 
 vi.mock("@tanstack/react-query", () => ({
+  keepPreviousData: (previousData: unknown) => previousData,
   useQuery: (options: TreeQueryOptions) => {
     capturedTreeOptions.push(options);
     return {
       data: treeData,
       isLoading: false,
       isFetching: treeIsFetching,
-      isPreviousData: treeIsPreviousData,
+      isPlaceholderData: treeIsPreviousData,
     };
   },
   useQueryClient: () => ({ getQueryData, setQueryData }),
@@ -80,7 +81,9 @@ vi.mock("~/utils/api", () => ({
           options: DeltaQueryCall["options"],
         ) => {
           capturedDeltaCalls.push({ input, options });
-          return {};
+          // The merge effect keys on `dataUpdatedAt` (the RQ5 replacement for
+          // onSuccess), so a delivered delta must carry a non-zero timestamp.
+          return { data: deltaData, dataUpdatedAt: deltaData ? 1 : 0 };
         },
       },
     },
@@ -140,6 +143,7 @@ describe("useSpanTree", () => {
     setQueryData.mockReset();
     deltaInvalidate.mockReset();
     treeData = [node("a", 100)];
+    deltaData = undefined;
     treeIsPreviousData = false;
     treeIsFetching = false;
     sseConnectionState = "connected";
@@ -254,9 +258,9 @@ describe("useSpanTree", () => {
     it("merges delta spans into the shared cache entry", () => {
       const existing = [node("a", 100)];
       getQueryData.mockReturnValue(existing);
+      deltaData = [node("b", 200)];
 
       renderHook(() => useSpanTree());
-      lastDeltaCall().options.onSuccess([node("b", 200)]);
 
       expect(setQueryData).toHaveBeenCalledWith(
         ["spanTree", { projectId: "p1", traceId: "t1" }],
@@ -267,9 +271,9 @@ describe("useSpanTree", () => {
     it("leaves the cache untouched when the delta carries nothing new", () => {
       const existing = [node("a", 100)];
       getQueryData.mockReturnValue(existing);
+      deltaData = [];
 
       renderHook(() => useSpanTree());
-      lastDeltaCall().options.onSuccess([]);
 
       expect(setQueryData).not.toHaveBeenCalled();
     });

@@ -49,7 +49,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 const mockAgentFetch = vi.fn();
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       agents: {
         getById: {
           fetch: mockAgentFetch,

@@ -155,7 +155,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     )
     .option(
       "--project [slug]",
-      "Project login: mint a project SDK key via the browser and write it to .env (for the SDK, `langwatch eval`, prompts). Prefer this one if user is working on an agent project rather than trying to instrument their coding assistant.",
+      "Project login: write a project's SDK key to .env (for the SDK, `langwatch eval`, prompts). With a slug it uses your existing device login, no browser and no prompts; without one you pick the project in the browser, which needs an interactive terminal and exits 1 in a non-TTY. Prefer this one if user is working on an agent project rather than trying to instrument their coding assistant.",
     )
     .option(
       "--token <token>",
@@ -438,8 +438,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         "Send an issue report to the LangWatch team: what you were doing, what " +
           "went wrong, optionally the whole session transcript. Works with no " +
           "login and no API key. Ask the user for permission first, then pass " +
-          "--user-approved. Secrets and personal data are redacted locally " +
-          "before anything is sent.",
+          "--user-approved. The title, summary and transcript are scrubbed " +
+          "locally by pattern before anything is sent; whatever no pattern " +
+          "matches is sent as written. Use --dry-run to print the payload.",
       )
       .option("--user-approved", "confirm the user approved sending this report")
       .option(
@@ -480,8 +481,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
           "  had to figure out by trial and error.",
           "",
           "Privacy, so you can send the whole session with confidence:",
-          "  Everything is redacted locally, before upload:",
+          "  The title, summary and transcript are redacted locally by pattern,",
+          "  before upload. What the patterns catch:",
           ...SESSION_REDACTION_SUMMARY.map((line) => `    - ${line}`),
+          "  Anything no pattern matches is sent as written, including a contact",
+          "  address passed with --email.",
           "  Audit the exact rules (short, readable regexes):",
           `    ${REDACTION_AUDIT_URL}`,
           "  Preview precisely what would be sent with --dry-run: it sends nothing,",

@@ -40,7 +40,7 @@ const mockInvalidateSuiteRunData = vi.fn();
 
 vi.mock("../../utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       scenarios: {
         getScenarioSetBatchHistory: {
           invalidate: mockInvalidateBatchHistory,

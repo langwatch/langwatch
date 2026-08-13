@@ -67,7 +67,7 @@ const regenerateImpl = vi.hoisted(() => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       apiKey: { list: { invalidate: vi.fn() } },
       organization: { getAll: { invalidate: vi.fn() } },
     }),
