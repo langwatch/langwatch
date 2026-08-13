@@ -1422,6 +1422,39 @@ const presentations = {
     describe: () =>
       "Langy can't be reached right now. Your message is safe, so send it again in a moment.",
   },
+  // The `/api/langy` key-authed surface. These reach an API caller reading a
+  // JSON envelope, not a person reading a toast, so the copy names the
+  // credential and the fix rather than reassuring anyone about their message.
+  langy_api_credential_missing: {
+    title: "No auth token",
+    describe: () =>
+      "This request carried no project API key. Send one as X-Auth-Token or an Authorization header.",
+  },
+  langy_api_credential_invalid: {
+    title: "Auth token not accepted",
+    describe: () =>
+      "The token did not resolve to a project. Check it was copied whole and has not been revoked.",
+  },
+  langy_api_key_unowned: {
+    title: "Key has no owner",
+    describe: () =>
+      "A Langy turn acts as a user, and this key has no owning user to act as. Use a personal API key instead.",
+  },
+  langy_api_key_no_langy_access: {
+    title: "No Langy access",
+    describe: () =>
+      "The user who owns this key cannot use Langy in this project. A workspace admin can grant that access.",
+  },
+  langy_api_actor_missing: {
+    title: "Key owner is gone",
+    describe: () =>
+      "The user who owns this key no longer exists, so the turn has no one to act as. Mint a new key under a current user.",
+  },
+  langy_api_request_invalid: {
+    title: "Invalid request body",
+    describe: () =>
+      "The request body did not match the turn schema. The `issues` list in the error meta names each field that failed.",
+  },
   langy_agent_errored: {
     title: "Langy's reply failed",
     // When the provider's own sentence was captured, Langy's card replaces
