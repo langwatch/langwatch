@@ -150,9 +150,8 @@ const windowed = [
     // the identical question inside thirty seconds, which the mapping
     // service's own bookkeeping would have refused one layer down.
     survivesDispatch: true,
-    reactor: codingAgentPipeline.foldReactors.get(
-      "pullRequestMapping",
-    )!.definition as AnyReactor,
+    reactor: codingAgentPipeline.foldReactors.get("pullRequestMapping")!
+      .definition as AnyReactor,
   },
 ] as const satisfies readonly {
   name: string;

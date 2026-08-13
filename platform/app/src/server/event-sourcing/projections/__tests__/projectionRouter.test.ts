@@ -313,6 +313,7 @@ describe("ProjectionRouter", () => {
     });
 
     describe("when a fold projection throws", () => {
+      /** @scenario A projection failure prevents the side effect */
       it("does not dispatch to reactors registered on that fold", async () => {
         const queueManager = createMockQueueManager();
         const router = new ProjectionRouter(
@@ -466,6 +467,7 @@ describe("ProjectionRouter", () => {
       };
 
       describe("when the predicate returns false", () => {
+        /** @scenario An irrelevant event is rejected before any job is queued */
         it("does not enqueue a job for that reactor", async () => {
           const mockSend = vi.fn().mockResolvedValue(undefined);
           const queueManager = createMockQueueManager({
@@ -524,6 +526,7 @@ describe("ProjectionRouter", () => {
       });
 
       describe("when the predicate returns true", () => {
+        /** @scenario A subscriber fires only after its projection commits */
         it("enqueues the job with the event and fold state", async () => {
           const mockSend = vi.fn().mockResolvedValue(undefined);
           const queueManager = createMockQueueManager({
@@ -564,6 +567,7 @@ describe("ProjectionRouter", () => {
       });
 
       describe("when the predicate throws", () => {
+        /** @scenario A failing relevance guard never drops a side effect */
         it("fails open and enqueues the job anyway", async () => {
           const mockSend = vi.fn().mockResolvedValue(undefined);
           const queueManager = createMockQueueManager({
@@ -729,6 +733,7 @@ describe("ProjectionRouter", () => {
 
   describe("map reactors", () => {
     describe("when a map reactor is registered on a map projection", () => {
+      /** @scenario A subscriber without a relevance guard fires for every event */
       it("fires after map projection succeeds inline", async () => {
         const queueManager = createMockQueueManager();
         const router = new ProjectionRouter(

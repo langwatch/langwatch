@@ -300,10 +300,7 @@ describe("trackedEventSync reactor", () => {
     it("records no tracked event", async () => {
       const reactor = createTrackedEventSyncHandler(deps);
 
-      await reactor(
-        createNonSpanEvent(),
-        createContext(createFoldState()),
-      );
+      await reactor(createNonSpanEvent(), createContext(createFoldState()));
 
       expect(deps.recordTrackedEvent).not.toHaveBeenCalled();
     });
@@ -525,9 +522,7 @@ describe("trackedEventSync reactor", () => {
       it("declines to react", () => {
         const span = makeRecordedTrackEventSpan("langwatch.event");
 
-        expect(
-          hasSyncableFeedback(createSpanReceivedEvent(span)),
-        ).toBe(false);
+        expect(hasSyncableFeedback(createSpanReceivedEvent(span))).toBe(false);
       });
     });
 
@@ -585,9 +580,7 @@ describe("trackedEventSync reactor", () => {
           { type: "thumbs_up_down", metrics: { vote: 1 } },
         ]);
 
-        expect(
-          hasSyncableFeedback(createSpanReceivedEvent(span)),
-        ).toBe(true);
+        expect(hasSyncableFeedback(createSpanReceivedEvent(span))).toBe(true);
       });
     });
 
@@ -595,9 +588,7 @@ describe("trackedEventSync reactor", () => {
       it("returns false", () => {
         const span = makeOtlpSpan([]);
 
-        expect(
-          hasSyncableFeedback(createSpanReceivedEvent(span)),
-        ).toBe(false);
+        expect(hasSyncableFeedback(createSpanReceivedEvent(span))).toBe(false);
       });
     });
 

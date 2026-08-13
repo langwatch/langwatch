@@ -465,5 +465,6 @@ export function createTrackedEventSyncHandler(
   event: TraceProcessingEvent,
   context: TriggerContext<TraceSummaryData>,
 ) => Promise<void> {
-  return (event, context) => syncTrackedEventsFromSpan({ event, context, deps });
+  return (event, context) =>
+    syncTrackedEventsFromSpan({ event, context, deps });
 }

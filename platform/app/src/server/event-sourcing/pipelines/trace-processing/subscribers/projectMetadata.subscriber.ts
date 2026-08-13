@@ -122,7 +122,10 @@ export function createProjectMetadataHandler(
       const project = await deps.projects.getById(tenantId);
 
       if (!project) {
-        logger.warn({ tenantId }, "Project not found — skipping metadata update");
+        logger.warn(
+          { tenantId },
+          "Project not found — skipping metadata update",
+        );
         return;
       }
 

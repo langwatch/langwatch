@@ -34,7 +34,7 @@ export interface TriggerOptions<E extends Event = Event> {
    * Fold/map-bound subscribers receive the committed projection state in
    * `context.state`; raw subscribers receive `undefined` there. A throwing
    * guard is logged and treated as relevant — fail open, never drop a side
-   * effect (the ADR-026 contract, carried over by ADR-094).
+   * effect (the ADR-026 contract, carried over by ADR-095).
    */
   when?: (event: E, context: TriggerContext<any>) => boolean;
   /** Process roles where this subscriber runs. Omit to run everywhere. */

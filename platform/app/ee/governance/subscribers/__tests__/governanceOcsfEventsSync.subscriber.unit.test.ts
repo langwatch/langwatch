@@ -37,12 +37,12 @@ import {
 } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import {
   createGovernanceOcsfEventsSyncHandler,
-  isGovernanceOcsfTrace,
   type GovernanceOcsfEventsSyncSubscriberDeps,
+  isGovernanceOcsfTrace,
 } from "../governanceOcsfEventsSync.subscriber";
 
 vi.mock("@langwatch/observability", () => ({

@@ -240,7 +240,10 @@ describe("evaluationTrigger reactor", () => {
         attributes: { "langwatch.origin": "application" },
       });
 
-      await subscriber.spec.handler(createTopicAssignedEvent(), createContext(state));
+      await subscriber.spec.handler(
+        createTopicAssignedEvent(),
+        createContext(state),
+      );
 
       expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
       expect(deps.evaluation).not.toHaveBeenCalled();
@@ -396,7 +399,10 @@ describe("evaluationTrigger reactor", () => {
       const subscriber = createEvaluationTriggerSubscriber(deps);
       const state = createFoldState({ attributes: {} });
 
-      await subscriber.spec.handler(createOriginEvent(""), createContext(state));
+      await subscriber.spec.handler(
+        createOriginEvent(""),
+        createContext(state),
+      );
 
       expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
       expect(deps.evaluation).not.toHaveBeenCalled();
@@ -607,13 +613,19 @@ describe("evaluationTrigger relevance check", () => {
       const pastCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS + 1 });
       const depsPast = createDeps();
       const subscriberPast = createEvaluationTriggerSubscriber(depsPast);
-      await subscriberPast.spec.handler(createSpanEvent(), createContext(pastCap));
+      await subscriberPast.spec.handler(
+        createSpanEvent(),
+        createContext(pastCap),
+      );
       expect(depsPast.evaluation).not.toHaveBeenCalled();
 
       const belowCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS - 1 });
       const depsBelow = createDeps();
       const subscriberBelow = createEvaluationTriggerSubscriber(depsBelow);
-      await subscriberBelow.spec.handler(createSpanEvent(), createContext(belowCap));
+      await subscriberBelow.spec.handler(
+        createSpanEvent(),
+        createContext(belowCap),
+      );
       expect(depsBelow.evaluation).toHaveBeenCalledTimes(1);
     });
   });

@@ -130,7 +130,7 @@ function buildOcsfEventRow({
 }
 
 /**
- * Pre-enqueue relevance guard (ADR-026 via ADR-094). See
+ * Pre-enqueue relevance guard (ADR-026 via ADR-095). See
  * governanceKpisSync for the reasoning: the origin check is pure, reads the
  * committed fold state, and rejects the bulk of trace traffic before a job
  * is packed. Kept in the handler too — inline mode, fail-open dispatch, and

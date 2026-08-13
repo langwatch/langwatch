@@ -14,9 +14,7 @@ import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-p
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 
-const logger = createLogger(
-  "langwatch:trace-processing:governance-kpis-sync",
-);
+const logger = createLogger("langwatch:trace-processing:governance-kpis-sync");
 
 /**
  * Dedup window for the same trace's subscriber firings. Within this
@@ -40,7 +38,7 @@ export interface GovernanceKpisSyncSubscriberDeps {
 }
 
 /**
- * Pre-enqueue relevance guard (ADR-026 via ADR-094): the origin check is a
+ * Pre-enqueue relevance guard (ADR-026 via ADR-095): the origin check is a
  * pure read of the committed fold state, so deciding at `when` is equivalent
  * to the early-return in the handler — except a non-governance trace never
  * pays a serialize + queue round-trip for a job that would immediately no-op.

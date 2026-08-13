@@ -1,4 +1,4 @@
-# ADR-094: Post-event work is subscribers and process managers; the reactor vocabulary is retired
+# ADR-095: Post-event work is subscribers and process managers; the reactor vocabulary is retired
 
 **Date:** 2026-08-13
 

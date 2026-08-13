@@ -1,4 +1,4 @@
-# Supersedes reactors.feature. See dev/docs/adr/094-post-event-work-subscribers-and-process-managers.md:
+# Supersedes reactors.feature. See dev/docs/adr/095-post-event-work-subscribers-and-process-managers.md:
 # post-event work is subscribers (best-effort) and process managers
 # (stake-sensitive); the reactor vocabulary is retired. The shouldReact
 # contract from ADR-026 carries over as the subscriber `when` guard.
@@ -52,7 +52,8 @@ Feature: Post-event work
     When the fold projection successfully applies and stores the event
     Then the subscriber is dispatched for every event
 
-  @unit
+  # Only config presence is asserted today; the runtime gating has no test.
+  @unimplemented
   Scenario: A subscriber restricted to a process role stays inert elsewhere
     Given a subscriber configured to run only in the worker role
     And the current process role is "web"

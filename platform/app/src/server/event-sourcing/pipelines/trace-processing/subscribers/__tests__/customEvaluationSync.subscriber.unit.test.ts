@@ -463,7 +463,10 @@ describe("customEvaluationSync subscriber", () => {
       ]);
 
       await expect(
-        handler(createSpanReceivedEvent(span), createContext(createFoldState())),
+        handler(
+          createSpanReceivedEvent(span),
+          createContext(createFoldState()),
+        ),
       ).rejects.toThrow("network error");
 
       expect(deps.reportEvaluation).toHaveBeenCalledTimes(2);

@@ -4,7 +4,10 @@ import type { KillSwitchOptions } from "../pipeline/staticBuilder.types";
 import type { DeduplicationConfig } from "../queues/queue.types";
 
 /**
- * Context passed to a reactor's handle function.
+ * INTERNAL dispatch-plane context for a subscriber registration's handle
+ * function. Authoring code uses `TriggerContext` via `.withSubscriber` /
+ * `.withProcessManager` (ADR-095); this shape is what the router and queue
+ * pass beneath that sugar.
  */
 export interface ReactorContext<FoldState = unknown> {
   tenantId: string;
@@ -12,11 +15,9 @@ export interface ReactorContext<FoldState = unknown> {
   foldState: FoldState;
   /**
    * True when the event was produced by a stream replay rather than live
-   * ingestion. `.withReactor` handlers receive the flag and may inspect it
-   * directly if they need replay-specific behavior; most best-effort
-   * reactors can ignore it. Optional today so existing handlers and
-   * test mocks don't need updating; framework call sites always pass
-   * a defined value (live events get `false`).
+   * ingestion. Framework call sites always pass a defined value (live events
+   * get `false`); the replay service never dispatches subscribers, so today
+   * this is always `false` where a handler sees it.
    */
   isReplay?: boolean;
 }

@@ -34,6 +34,7 @@ describe("QueueManager.initializeReactorQueues with hierarchical group keys", ()
   });
 
   describe("when reactor has fold parent", () => {
+    /** @scenario A registration keeps its queue identity across the vocabulary change */
     it("includes parent fold name in hierarchical group key", () => {
       const mockQueueProcessor = createMockSharedQueue();
       const globalJobRegistry = new Map<string, JobRegistryEntry>();

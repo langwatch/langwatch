@@ -38,7 +38,11 @@ export function createSpanStorageBroadcastHandler(
         traceId,
       });
 
-      await deps.broadcast.broadcastToTenant(tenantId, payload, "trace_updated");
+      await deps.broadcast.broadcastToTenant(
+        tenantId,
+        payload,
+        "trace_updated",
+      );
 
       logger.debug(
         { tenantId, traceId },

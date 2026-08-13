@@ -104,7 +104,7 @@ type ExtraGuard = (event: TraceProcessingEvent) => boolean;
  * just no-op until the gate has fired.
  *
  * The full guard chain — fold-state guards included — rejects pre-enqueue via
- * `when`, which receives the committed fold state (ADR-094): a filtered event
+ * `when`, which receives the committed fold state (ADR-095): a filtered event
  * never pays a serialize + gzip + blob write that the queue's dedup would then
  * discard. A 10k-span trace fans a subscriber out once per span; the guards
  * reject nearly all of it. The handler re-checks, staying safe for any caller

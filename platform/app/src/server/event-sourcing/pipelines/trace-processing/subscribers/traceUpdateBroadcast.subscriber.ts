@@ -44,7 +44,11 @@ export function createTraceUpdateBroadcastHandler(
         traceId,
       });
 
-      await deps.broadcast.broadcastToTenant(tenantId, payload, "trace_updated");
+      await deps.broadcast.broadcastToTenant(
+        tenantId,
+        payload,
+        "trace_updated",
+      );
 
       logger.debug({ tenantId, traceId }, "Broadcasted trace update");
     } catch (error) {

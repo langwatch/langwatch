@@ -227,7 +227,8 @@ export class StaticPipelineBuilderWithNameAndType<
    * Register the default operational state projection.
    *
    * It runs as one direct repository load/apply/store cycle under the queue's
-   * per-key lock. It is intentionally not a valid parent for `.withReactor()`.
+   * per-key lock. It is intentionally not a valid parent for
+   * `.withSubscriber()`.
    */
   withProjection(
     name: string,

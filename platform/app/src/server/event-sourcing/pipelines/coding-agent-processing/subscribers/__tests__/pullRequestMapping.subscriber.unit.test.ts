@@ -138,7 +138,9 @@ describe("pullRequestMapping subscriber", () => {
           .mockRejectedValue(new Error("GitHub rate limit reached")),
       });
 
-      await expect(handler(event, contextFor(foldState()))).resolves.toBeUndefined();
+      await expect(
+        handler(event, contextFor(foldState())),
+      ).resolves.toBeUndefined();
     });
   });
 

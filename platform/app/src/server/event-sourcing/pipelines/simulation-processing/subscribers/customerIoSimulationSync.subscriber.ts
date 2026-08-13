@@ -12,17 +12,11 @@ import type {
   SimulationRunFinishedEvent,
 } from "../schemas/events";
 import { isSimulationRunFinishedEvent } from "../schemas/events";
+import { CIO_SYNC_DEBOUNCE_TTL_MS } from "../../trace-processing/subscribers/customerIoTraceSync.subscriber";
 
 const logger = createLogger(
   "langwatch:simulation-processing:customer-io-simulation-sync-subscriber",
 );
-
-/**
- * Debounce for per-org CRM milestone updates. Lived on the trace-processing
- * Customer.io reactor until the reactor retirement (ADR-094) deleted it; the
- * five-minute window is the CRM contract, not a queue tunable.
- */
-export const CIO_SYNC_DEBOUNCE_TTL_MS = 300_000;
 
 export interface CustomerIoSimulationSyncSubscriberDeps {
   projects: ProjectService;

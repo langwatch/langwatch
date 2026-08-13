@@ -33,6 +33,7 @@ describe("throttledPerWindow", () => {
   });
 
   describe("given a queue score pinned to the event's own timestamp", () => {
+    /** @scenario A throttled subscriber fires at most once per window */
     it("pins the deadline to the event that opened the window", () => {
       // Extending would re-arm the deadline against each newer event, so an
       // aggregate receiving a continuous stream would defer its own job for

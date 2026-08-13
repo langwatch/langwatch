@@ -184,9 +184,9 @@ describe("trace-processing pipeline subscriber wiring", () => {
 
     it("carries the 5s delay and 30s dedup ttl through the registration", () => {
       expect(trackedEventSync!.definition.options?.delay).toBe(5_000);
-      expect(
-        trackedEventSync!.definition.options?.deduplication?.ttlMs,
-      ).toBe(30_000);
+      expect(trackedEventSync!.definition.options?.deduplication?.ttlMs).toBe(
+        30_000,
+      );
     });
 
     it("derives the dedup id from tenant + aggregate + event id, scoped to this subscriber", () => {

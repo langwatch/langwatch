@@ -27,6 +27,10 @@ import {
   EVALUATION_REPORTED_EVENT_TYPE,
 } from "./schemas/constants";
 import type { EvaluationProcessingEvent } from "./schemas/events";
+import {
+  createCustomerIoEvaluationSyncSubscriber,
+  type CustomerIoEvaluationSyncSubscriberDeps,
+} from "./subscribers/customerIoEvaluationSync.subscriber";
 
 export interface EvaluationProcessingPipelineDeps {
   evalRunStore: FoldProjectionStore<EvaluationRunData>;
@@ -47,6 +51,8 @@ export interface EvaluationProcessingPipelineDeps {
       context: { tenantId: string },
     ) => Promise<void>;
   };
+  /** CRM nurturing sync; absent until the counting strategy is finalised. */
+  customerIoEvaluationSync?: CustomerIoEvaluationSyncSubscriberDeps;
 }
 
 /**
@@ -64,7 +70,7 @@ export interface EvaluationProcessingPipelineDeps {
 export function createEvaluationProcessingPipeline(
   deps: EvaluationProcessingPipelineDeps,
 ) {
-  return definePipeline<EvaluationProcessingEvent>()
+  let builder = definePipeline<EvaluationProcessingEvent>()
     .withName("evaluation_processing")
     .withAggregateType("evaluation")
     .withFoldProjection(
@@ -109,7 +115,16 @@ export function createEvaluationProcessingPipeline(
       groupKeyFn: graphTriggerActivityGroupKey,
       handler: (event, context) =>
         deps.automations.graphActivityHandler(event, context),
-    })
+    });
+
+  if (deps.customerIoEvaluationSync) {
+    builder = builder.withSubscriber(
+      "customerIoEvaluationSync",
+      createCustomerIoEvaluationSyncSubscriber(deps.customerIoEvaluationSync),
+    );
+  }
+
+  return builder
     .withCommandInstance(
       "executeEvaluation",
       ExecuteEvaluationCommand,

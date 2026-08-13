@@ -5,8 +5,8 @@ import type { TriggerService } from "~/server/app-layer/automations/trigger.serv
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { RecordTriggerMatchPort } from "~/server/event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
-import { passesTraceOriginGuards } from "~/server/event-sourcing/pipelines/trace-processing/subscribers/_originGuardedSubscriber";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+import { passesTraceOriginGuards } from "~/server/event-sourcing/pipelines/trace-processing/subscribers/_originGuardedSubscriber";
 import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import { incrementAutomationMatchRecordsTotal } from "~/server/metrics";
 

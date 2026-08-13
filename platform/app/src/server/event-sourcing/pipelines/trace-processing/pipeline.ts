@@ -58,9 +58,13 @@ import {
   hasSyncableEvaluations,
 } from "./subscribers/customEvaluationSync.subscriber";
 import {
-  hasExperimentCostMetrics,
+  createCustomerIoTraceSyncSubscriber,
+  type CustomerIoTraceSyncSubscriberDeps,
+} from "./subscribers/customerIoTraceSync.subscriber";
+import {
   EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
   EXPERIMENT_METRICS_SYNC_DELAY_MS,
+  hasExperimentCostMetrics,
 } from "./subscribers/experimentMetricsSync.subscriber";
 import {
   needsOriginResolution,
@@ -145,6 +149,8 @@ export interface TraceProcessingPipelineDeps {
    *  registry so this OSS pipeline stays free of `@ee` imports. */
   governanceKpisSync?: SubscriberSpec<TraceProcessingEvent>;
   governanceOcsfEventsSync?: SubscriberSpec<TraceProcessingEvent>;
+  /** CRM nurturing sync; absent until the counting strategy is finalised. */
+  customerIoTraceSync?: CustomerIoTraceSyncSubscriberDeps;
   /** Cross-pipeline dispatchers (e.g. coding-agent span-facts, ADR-056). */
   subscribers?: EventSubscriberDefinition<TraceProcessingEvent>[];
 }
@@ -221,8 +227,7 @@ export function createTraceProcessingPipeline(
       delay: TRACKED_EVENT_SYNC_DELAY_MS,
       ttl: TRACKED_EVENT_SYNC_DEDUP_TTL_MS,
       dedupId: trackedEventSyncDedupId,
-      handler: (event, context) =>
-        deps.trackedEventSyncHandler(event, context),
+      handler: (event, context) => deps.trackedEventSyncHandler(event, context),
     })
     // SSE notification, throttled to the listener's own debounce; lossy by
     // contract and disabled entirely without the Redis pub/sub bridge.
@@ -248,8 +253,7 @@ export function createTraceProcessingPipeline(
         makeId: (event) => event.tenantId,
         windowMs: PROJECT_METADATA_WINDOW_MS,
       }),
-      handler: (event, context) =>
-        deps.projectMetadataHandler(event, context),
+      handler: (event, context) => deps.projectMetadataHandler(event, context),
     })
     // Trace-side ECST publishers: fire once per trace after a quiet minute.
     .withSubscriber("simulationMetricsSync", {
@@ -315,6 +319,13 @@ export function createTraceProcessingPipeline(
     builder = builder.withSubscriber(
       "governanceOcsfEventsSync",
       deps.governanceOcsfEventsSync,
+    );
+  }
+
+  if (deps.customerIoTraceSync) {
+    builder = builder.withSubscriber(
+      "customerIoTraceSync",
+      createCustomerIoTraceSyncSubscriber(deps.customerIoTraceSync),
     );
   }
 
