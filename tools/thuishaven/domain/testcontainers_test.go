@@ -92,6 +92,22 @@ func TestLeakedTestContainers(t *testing.T) {
 		}
 	})
 
+	t.Run("given paused and restarting containers older than the stopped cutoff", func(t *testing.T) {
+		containers := []TestContainer{
+			// Transient states may belong to a live run mid-transition, so the
+			// short stopped cutoff applies only to terminal states.
+			{ID: "paused", State: "paused", CreatedAt: now.Add(-time.Hour)},
+			{ID: "mid-restart", State: "restarting", CreatedAt: now.Add(-time.Hour)},
+			{ID: "long-dead", State: "dead", CreatedAt: now.Add(-time.Hour)},
+		}
+
+		leaked := LeakedTestContainers(containers, stoppedCutoff, runningCutoff)
+
+		if len(leaked) != 1 || leaked[0].ID != "long-dead" {
+			t.Fatalf("expected only the terminal-state container, got %+v", leaked)
+		}
+	})
+
 	t.Run("given the Ryuk reaper older than every cutoff", func(t *testing.T) {
 		containers := []TestContainer{
 			{ID: "ryuk", State: "running", CreatedAt: now.Add(-30 * 24 * time.Hour), IsRyuk: true},

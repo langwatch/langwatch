@@ -35,7 +35,7 @@ Feature: Leaked test containers are reaped
     And its creation time predates the short grace period
     When the daemon runs its background hygiene
     Then it is only removed once it is older than the running grace period
-    And a live test run never loses its server to a birthday rule
+    And the running grace period, not the short grace period, controls removal
 
   @unit
   Scenario: The test library's own reaper container is never touched

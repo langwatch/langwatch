@@ -244,14 +244,15 @@ registry, and dashboard stay the same.
   `haven db url clickhouse` reach it with no stack up) — the next `up`
   restarts it over the same data in seconds.
 - **Leaked test containers are reaped.** An interrupted integration-test run
-  leaves its testcontainers (a stray ClickHouse, a Redis) running in the shared
+  leaves its Testcontainers (a stray ClickHouse, a Redis) running in the shared
   VM forever — the library's own reaper (Ryuk) dies with the run, and reused
   containers are skipped by it entirely. The daemon removes
-  testcontainers-labelled containers: stopped ones older than
-  `HAVEN_TESTCONTAINER_TTL` (default 10m; 0 disables the sweep), still-running
-  ones only past `HAVEN_TESTCONTAINER_RUNNING_TTL` (default 2h) since a running
-  container may still be serving a live run whatever its age. Ryuk itself is
-  never touched, and the sweep never boots the VM just to clean it. See
+  Testcontainers-labelled containers: exited ones older than
+  `HAVEN_TESTCONTAINER_TTL` (default 10m; 0 disables the sweep), every other
+  state only past the greater of that and `HAVEN_TESTCONTAINER_RUNNING_TTL`
+  (default 2h) since a running (or paused, or mid-restart) container may still
+  be serving a live run whatever its age. Ryuk itself is never touched, and the
+  sweep never boots the VM just to clean it. See
   `specs/setup/haven-testcontainer-reaper.feature`.
 - **Always migrate + seed, fully static identity.** Every `up` migrates *and*
   seeds idempotently. Nothing about the local dev identity is ever randomly

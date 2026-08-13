@@ -7,8 +7,8 @@ import (
 
 // TestContainersLabel is the label every testcontainers library stamps on the
 // containers it creates. It is the whole selection rule: haven's managed
-// containers never carry it, so a sweep filtered on this label can never touch
-// anything haven — or a human — started by hand.
+// containers never carry it, so the sweep only ever selects containers
+// carrying a test library's own mark.
 const TestContainersLabel = "org.testcontainers=true"
 
 // RyukLabel marks the test library's own reaper container. Ryuk carries the
@@ -79,23 +79,32 @@ func ParseTestContainerListing(out string) (containers []TestContainer, unparsea
 }
 
 // LeakedTestContainers filters a labeled listing down to the containers old
-// enough to reap. Stopped containers are judged against stoppedCutoff; running
-// ones against the (later-born, i.e. more lenient) runningCutoff, because a
-// running container may still be serving a live test run whatever its age.
-// Ryuk is never a candidate.
+// enough to reap. Only containers in a terminal state are judged against
+// stoppedCutoff; every other state gets the (later-born, i.e. more lenient)
+// runningCutoff, because a container that is running — or paused, restarting,
+// or otherwise mid-transition — may still belong to a live test run whatever
+// its age. Ryuk is never a candidate.
 func LeakedTestContainers(containers []TestContainer, stoppedCutoff, runningCutoff time.Time) []TestContainer {
 	var leaked []TestContainer
 	for _, c := range containers {
 		if c.IsRyuk {
 			continue
 		}
-		cutoff := stoppedCutoff
-		if c.State == "running" {
-			cutoff = runningCutoff
+		cutoff := runningCutoff
+		if isTerminalContainerState(c.State) {
+			cutoff = stoppedCutoff
 		}
 		if c.CreatedAt.Before(cutoff) {
 			leaked = append(leaked, c)
 		}
 	}
 	return leaked
+}
+
+// isTerminalContainerState reports whether a docker state means the
+// container's process is gone for good. Everything else — running, paused,
+// restarting, created, removing — may still belong to a live run
+// mid-transition and must not be judged by the short stopped cutoff.
+func isTerminalContainerState(state string) bool {
+	return state == "exited" || state == "dead"
 }
