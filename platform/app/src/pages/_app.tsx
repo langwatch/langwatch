@@ -907,6 +907,12 @@ const appConfig = defineConfig({
             textTransform: "uppercase",
             color: "fg.muted",
             letterSpacing: "wider",
+            // The root carries borderRadius lg, but a collapsed <table> cannot
+            // clip its children — square header-cell backgrounds (bg.subtle)
+            // poke past the rounded corner and read as a clipping artifact.
+            // Round the outer header cells to match the root.
+            "&:first-of-type": { borderTopLeftRadius: "lg" },
+            "&:last-of-type": { borderTopRightRadius: "lg" },
           },
         },
         variants: {
@@ -929,6 +935,13 @@ const appConfig = defineConfig({
             line: {
               root: {
                 background: "bg.panel",
+              },
+              // Chakra's stock line variant paints every row bg="bg" (the PAGE
+              // background) — darker than the root's bg.panel in dark mode, so
+              // the whole body rendered as a mismatched slab with square
+              // corners. Rows are transparent; the root's panel shows through.
+              row: {
+                background: "transparent",
               },
               columnHeader: {
                 borderColor: "border",

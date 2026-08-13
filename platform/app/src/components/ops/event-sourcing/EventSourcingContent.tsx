@@ -1,24 +1,33 @@
-import { Box, Heading, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
+import { RotateCcw } from "lucide-react";
 import { ProcessesContent } from "~/components/ops/processes/ProcessesContent";
 import { SubscribersCard } from "~/components/ops/processes/SubscribersCard";
 import { SchedulerContent } from "~/components/ops/scheduler/SchedulerContent";
+import { useDrawer } from "~/hooks/useDrawer";
 import { ProjectionsCard } from "./ProjectionsCard";
 
 function Section({
   title,
   description,
+  action,
   children,
 }: {
   title: string;
   description: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <Box>
-      <Heading size="sm">{title}</Heading>
-      <Text textStyle="xs" color="fg.muted" marginBottom={3}>
-        {description}
-      </Text>
+      <HStack justify="space-between" align="start">
+        <Box>
+          <Heading size="sm">{title}</Heading>
+          <Text textStyle="xs" color="fg.muted" marginBottom={3}>
+            {description}
+          </Text>
+        </Box>
+        {action}
+      </HStack>
       {children}
     </Box>
   );
@@ -32,11 +41,22 @@ function Section({
  * no live jobs is still on the page.
  */
 export function EventSourcingContent() {
+  const { openDrawer } = useDrawer();
   return (
     <VStack align="stretch" gap={8}>
       <Section
         title="Projections"
-        description="Read models built from events. Rebuild tooling lives on Projection Replay."
+        description="Read models built from events. Rebuild any of them with a replay."
+        action={
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => openDrawer("opsReplay", {})}
+          >
+            <RotateCcw size={12} />
+            Replay projections
+          </Button>
+        }
       >
         <ProjectionsCard />
       </Section>

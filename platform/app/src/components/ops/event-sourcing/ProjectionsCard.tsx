@@ -1,16 +1,6 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Card,
-  HStack,
-  Spacer,
-  Table,
-  Text,
-} from "@chakra-ui/react";
+import { Badge, Box, Card, HStack, Table, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { api } from "~/utils/api";
-import NextLink from "~/utils/compat/next-link";
 import {
   joinProjectionHealth,
   type ProjectionHealthRow,
@@ -102,10 +92,6 @@ export function ProjectionsCard() {
           <Text textStyle="sm" fontWeight="medium">
             Projections
           </Text>
-          <Spacer />
-          <Button size="2xs" variant="outline" asChild>
-            <NextLink href="/ops/projections">Open Projection Replay</NextLink>
-          </Button>
         </HStack>
         {rows.length === 0 ? (
           <Box padding={4}>
