@@ -81,7 +81,7 @@ describe("ClickHouseQueryClient", () => {
 
         const started: string[] = [];
         let attempts = 0;
-        let sleepEntered = false;
+        let isRetrySleepEntered = false;
         let releaseRetrySleep: (() => void) | undefined;
         const retrySleepReleased = new Promise<void>((resolve) => {
           releaseRetrySleep = resolve;
@@ -101,7 +101,7 @@ describe("ClickHouseQueryClient", () => {
           limiter,
           retries: new RetryPolicy({
             sleep: async () => {
-              sleepEntered = true;
+              isRetrySleepEntered = true;
               await retrySleepReleased;
             },
             random: () => 0,
@@ -114,7 +114,7 @@ describe("ClickHouseQueryClient", () => {
 
         const first = client.query(request({ sql: FIRST }));
         // The first attempt has failed and the policy is now backing off.
-        await vi.waitFor(() => expect(sleepEntered).toBe(true));
+        await vi.waitFor(() => expect(isRetrySleepEntered).toBe(true));
 
         const second = client.query(request({ sql: SECOND }));
         await vi.waitFor(() => expect(limiter.stats().queued).toBe(1));
