@@ -57,7 +57,7 @@ passed it. Two things went wrong at once:
 - Squash is this repository's only merge method, and `squash_merge_commit_message`
   is `COMMIT_MESSAGES`, so seventeen commits became one whose body is all of theirs
   concatenated — two competing `Release-As:` footers at lines 353 and 372 of a
-  402-line message. The platform's did not apply. It released 4.0.0 rather than
+  402-line message. The platform pin did not apply. It released 4.0.0 rather than
   the 3.13.0 it asked for, release PR #6787 stalled on a major nobody wanted, and
   the #6842 Helm chart fix waited behind it.
 
@@ -89,7 +89,7 @@ component a file to touch.
 **One pin per pull request.** Squash is the only merge method here, so several pin
 commits on one branch become a single commit whose body is all of theirs
 concatenated, and one message cannot carry one pin per component. #4998 came out
-of the squash with two competing footers and the platform's did not apply. To pin
+of the squash with two competing footers and the platform pin did not apply. To pin
 several components, open one PR per component. #3627 pinned six at once from a
 single branch and predates that being understood; do not copy it.
 

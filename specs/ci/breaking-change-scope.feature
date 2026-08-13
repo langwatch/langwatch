@@ -54,7 +54,8 @@ Feature: A breaking change belongs to one release component
     Then the check fails naming both the platform and the Go SDK
 
   @unit
-  Scenario: A spec file alone puts the platform back in scope
-    Given the breaking commits touch the Go SDK and one file under specs
+  Scenario: One incidental file is enough to widen the scope
+    Given the breaking commits describe the Go SDK
+    And a single incidental file belongs to another release component
     When the scope guard runs
-    Then the check fails naming the platform
+    Then the check fails naming that other component

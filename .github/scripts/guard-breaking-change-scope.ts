@@ -250,7 +250,7 @@ const reportHalfDonePins = ({
  * commits the old procedure asked for collapse into one commit whose body is
  * every branch commit's body concatenated. #4998 came out of that with two
  * competing `Release-As:` footers at lines 353 and 372 of a 402-line body, and
- * the platform's did not apply — it released 4.0.0, not the 3.13.0 it asked
+ * the platform pin did not apply — it released 4.0.0, not the 3.13.0 it asked
  * for. One message cannot carry one pin per component, however the parser
  * resolves the collision, so splitting is what actually scopes a break.
  */

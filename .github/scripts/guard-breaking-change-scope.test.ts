@@ -685,7 +685,7 @@ describe("breaking-change scope guard", () => {
     // pinned the platform to 3.13.0 the documented way and the guard passed it.
     // Squash then merged seventeen commits into one whose body is all of theirs
     // concatenated, leaving two competing pins in a single 402-line message.
-    // The platform's did not apply: it went to 4.0.0 with the Go SDK's breaks
+    // The platform pin did not apply: it went to 4.0.0 with the Go SDK's breaks
     // filed under its changelog, release PR #6787 stalled on that major, and
     // the #6842 Helm chart fix waited behind it.
     const files = [
@@ -756,7 +756,7 @@ describe("breaking-change scope guard", () => {
     // that documents the Go SDK's own behaviour is enough on its own to charge
     // the platform and put it back in scope. Worth knowing before splitting:
     // the spec has to travel in the non-breaking pull request.
-    /** @scenario "A spec file alone puts the platform back in scope" */
+    /** @scenario "One incidental file is enough to widen the scope" */
     it("still refuses it when only the spec file rides along", () => {
       const result = runGuard(
         checkout({
