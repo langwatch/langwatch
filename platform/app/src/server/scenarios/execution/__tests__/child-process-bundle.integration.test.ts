@@ -91,6 +91,41 @@ describe("Pre-compiled Scenario Child Process", () => {
       expect(content).not.toContain('require("@langwatch/scenario")');
     });
 
+    /** @scenario 'The child starts its log transport when logging is configured' */
+    it.each([
+      ["pretty console logs", { LOG_FORMAT: "pretty" }],
+      ["the telemetry log transport", { PINO_OTEL_ENABLED: "true" }],
+    ])(
+      "starts with %s configured, without losing its transport worker",
+      (_label, logEnv) => {
+        // EXECUTES the path rather than asserting on the bundle text: the logger
+        // resolves its worker script next to its own package, so inlining it
+        // moved the lookup and the worker rethrew on nextTick — uncaught, past
+        // the transport's try/catch, killing the child. Only running it shows
+        // that. Empty stdin makes the child fail on job parsing AFTERWARDS, so
+        // any transport error here is the real thing.
+        const boot = spawnSync("node", [BUNDLE_PATH], {
+          cwd: path.dirname(BUNDLE_PATH),
+          input: "",
+          stdio: "pipe",
+          env: {
+            ...process.env,
+            NODE_ENV: "production",
+            SKIP_ENV_VALIDATION: "1",
+            LANGWATCH_API_KEY: "test-key",
+            LANGWATCH_ENDPOINT: "http://localhost:9999",
+            ...logEnv,
+          },
+          timeout: 30000,
+        });
+
+        const stderr = boot.stderr?.toString() ?? "";
+        expect(stderr).not.toContain("worker.js");
+        expect(stderr).not.toContain("Cannot find module");
+      },
+      35000,
+    );
+
     /** @scenario 'Pre-compiled child process is ready for job data promptly' */
     it("starts and reads from stdin within 5 seconds", async () => {
       const startTime = Date.now();
@@ -167,10 +202,11 @@ describe("Pre-compiled Scenario Child Process", () => {
       );
 
       // Sanity: if nothing is emitted the filters below pass vacuously, so pin
-      // a package that is external BY DESIGN. This entry inlines its graph, so
-      // OpenTelemetry — held out deliberately to keep one API instance in the
-      // child — is the dependable sentinel. (pino filled this role while the
-      // entry externalized everything; it is inlined now.)
+      // packages that are external BY DESIGN. Both are in NEVER_INLINED — the
+      // logger because it loads its worker script by directory, OpenTelemetry
+      // to keep one API instance in the child — so neither can quietly stop
+      // being emitted while this entry inlines the rest of its graph.
+      expect(externalPkgs).toContain("pino");
       expect(externalPkgs).toContain("@opentelemetry/api");
 
       // PRIMARY — EXECUTE the affected code path (coding guideline: runtime

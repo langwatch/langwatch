@@ -55,6 +55,21 @@ Feature: Pre-compiled Scenario Child Process
     Then the bundle requires "@opentelemetry/api" from node_modules
     And no copy of the OpenTelemetry API is inlined into the bundle
 
+  @regression
+  Scenario: The child starts its log transport when logging is configured
+    A package that locates a FILE relative to its own directory cannot be
+    inlined, because inlining is what moves that directory. The logger is one:
+    it runs its transport on a worker thread whose script it finds next to
+    itself. Inlined, that lookup missed and the worker rethrew on nextTick —
+    an uncaught error, so the transport's own try/catch never saw it and the
+    child died instead of degrading. Both ordinary configurations reach it:
+    pretty console logs and the telemetry log transport.
+
+    Given a pre-compiled child process bundle
+    And the child is configured to write pretty console logs
+    When the child process starts
+    Then it does not die failing to load its log transport worker
+
   @integration
   Scenario: Every externalized require resolves from the bundle directory
     Given a pre-compiled child process bundle
