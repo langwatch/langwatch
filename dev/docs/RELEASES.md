@@ -54,11 +54,12 @@ passed it. Two things went wrong at once:
 - `Release-As:` overrides the **version and nothing else**. Even a pin that applies
   leaves the other component's `BREAKING CHANGE:` note in the pinned component's
   changelog. A Go SDK break was filed under the platform's release.
-- Squash is this repository's only merge method. The per-component pin commits the
-  old procedure asked for collapsed into one commit carrying every footer and
-  touching every path, so only the `sdks/go` pin applied at all. The platform went
-  to 4.0.0, release PR #6787 stalled on a major nobody wanted, and the #6842 Helm
-  chart fix waited behind it.
+- Squash is this repository's only merge method, and `squash_merge_commit_message`
+  is `COMMIT_MESSAGES`, so seventeen commits became one whose body is all of theirs
+  concatenated — two competing `Release-As:` footers at lines 353 and 372 of a
+  402-line message. The platform's did not apply. It released 4.0.0 rather than
+  the 3.13.0 it asked for, release PR #6787 stalled on a major nobody wanted, and
+  the #6842 Helm chart fix waited behind it.
 
 It reads the title and the commits because a squash merge builds the commit from
 exactly those two. It deliberately does not read the PR description, which never
@@ -86,10 +87,11 @@ component a file to touch.
 5. Confirm the release PR regenerated to the version you asked for. Do not assume it.
 
 **One pin per pull request.** Squash is the only merge method here, so several pin
-commits on one branch become a single commit carrying every footer and touching
-every shim, and at most one of them survives. To pin several components, open one
-PR per component. #3627 pinned six at once from a single branch and predates that
-being understood; do not copy it.
+commits on one branch become a single commit whose body is all of theirs
+concatenated, and one message cannot carry one pin per component. #4998 came out
+of the squash with two competing footers and the platform's did not apply. To pin
+several components, open one PR per component. #3627 pinned six at once from a
+single branch and predates that being understood; do not copy it.
 
 A pin fixes a version release-please got wrong. It does **not** scope a breaking
 change — see the previous section — so `release-scope-guard` reads pins only to

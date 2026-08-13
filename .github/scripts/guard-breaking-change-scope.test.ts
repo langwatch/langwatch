@@ -683,10 +683,11 @@ describe("breaking-change scope guard", () => {
     // #4998. Two breaking footers, both describing the Go SDK, on a pull
     // request that also carried ~1,700 lines of ordinary platform code. It
     // pinned the platform to 3.13.0 the documented way and the guard passed it.
-    // Squash then merged seventeen commits into one carrying both footers, only
-    // the sdks/go pin applied, and the platform went to 4.0.0 with the Go SDK's
-    // breaks filed under its changelog. Release PR #6787 stalled on that major
-    // and took the #6842 Helm chart fix down with it.
+    // Squash then merged seventeen commits into one whose body is all of theirs
+    // concatenated, leaving two competing pins in a single 402-line message.
+    // The platform's did not apply: it went to 4.0.0 with the Go SDK's breaks
+    // filed under its changelog, release PR #6787 stalled on that major, and
+    // the #6842 Helm chart fix waited behind it.
     const files = [
       ".release-please-shim",
       "platform/app/src/server/app-layer/traces/canonicalisation/extractors/genAi.ts",

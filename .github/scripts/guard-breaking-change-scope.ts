@@ -247,9 +247,12 @@ const reportHalfDonePins = ({
  * two breaks were still filed under the platform's release.
  *
  * Squash is this repository's only merge method, so the per-component pin
- * commits the old procedure asked for collapse into one commit carrying every
- * footer and touching every path — at which point at most one pin survives at
- * all. Splitting is what actually scopes a break.
+ * commits the old procedure asked for collapse into one commit whose body is
+ * every branch commit's body concatenated. #4998 came out of that with two
+ * competing `Release-As:` footers at lines 353 and 372 of a 402-line body, and
+ * the platform's did not apply — it released 4.0.0, not the 3.13.0 it asked
+ * for. One message cannot carry one pin per component, however the parser
+ * resolves the collision, so splitting is what actually scopes a break.
  */
 const reportPinsDoNotExempt = (pins: ComponentPin[]): void => {
   const pinned = pins.filter((pin) => pin.pinned !== undefined);
