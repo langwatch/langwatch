@@ -38,7 +38,10 @@ import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDom
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { getApp } from "~/server/app-layer/app";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
-import type { RecordTargetResultCommandData } from "~/server/event-sourcing/pipelines/experiment-run-processing/schemas/commands";
+import type {
+  RecordEvaluatorResultCommandData,
+  RecordTargetResultCommandData,
+} from "~/server/event-sourcing/pipelines/experiment-run-processing/schemas/commands";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import {
@@ -1850,6 +1853,66 @@ export const buildTargetResultDispatch = ({
 };
 
 /**
+ * Build the recordEvaluatorResult dispatch payload for an `evaluator_result`
+ * event.
+ *
+ * Exported for unit testing, because what a non-processed result may carry is
+ * regression-prone: a score, a label, a verdict and a pass/fail all belong to
+ * an evaluation that actually scored, but the money does not. An evaluation
+ * that declines to score can still have spent it, and the comparison judge
+ * pays for both of its passes before finding they disagree, which makes a row
+ * with no winner the most expensive kind of row there is.
+ */
+export const buildEvaluatorResultDispatch = ({
+  tenantId,
+  runId,
+  experimentId,
+  event,
+  result,
+  evaluatorName,
+  occurredAt,
+}: {
+  tenantId: string;
+  runId: string;
+  experimentId: string;
+  event: {
+    rowIndex: number;
+    targetId: string;
+    evaluatorId: string;
+    duration?: number | null;
+    inputs?: Record<string, unknown> | null;
+  };
+  result: SingleEvaluationResult;
+  evaluatorName: string | null;
+  occurredAt: number;
+}): RecordEvaluatorResultCommandData => {
+  // Only an evaluation that actually scored has a verdict to report.
+  const scored = result.status === "processed" ? result : null;
+  // An error measured nothing and spent nothing; the other two statuses may
+  // have spent without scoring.
+  const billed = result.status === "error" ? null : result;
+
+  return {
+    tenantId,
+    runId,
+    experimentId,
+    index: event.rowIndex,
+    targetId: event.targetId,
+    evaluatorId: event.evaluatorId,
+    evaluatorName,
+    status: result.status,
+    score: scored?.score ?? null,
+    label: scored?.label ?? null,
+    passed: scored?.passed ?? null,
+    details: result.status === "skipped" ? null : (result.details ?? null),
+    cost: billed?.cost?.amount ?? null,
+    inputs: event.inputs ?? null,
+    duration: event.duration ?? null,
+    occurredAt,
+  };
+};
+
+/**
  * Main orchestrator - executes all cells and yields SSE events.
  * Uses parallel execution with semaphore-based rate limiting.
  */
@@ -2127,34 +2190,19 @@ export async function* runOrchestrator(
           : null;
         chDispatchTotal++;
         await commands
-          .recordEvaluatorResult({
-            tenantId: projectId,
-            runId,
-            experimentId,
-            index: event.rowIndex,
-            targetId: event.targetId,
-            evaluatorId: event.evaluatorId,
-            // Workflow evaluator nodes have no DB record, so fall back to the
-            // name the event carries from the DSL node.
-            evaluatorName: dbEvaluator?.name ?? event.evaluatorName ?? null,
-            status: result.status,
-            score: result.status === "processed" ? result.score : null,
-            label: result.status === "processed" ? result.label : null,
-            passed: result.status === "processed" ? result.passed : null,
-            details:
-              result.status === "error"
-                ? result.details
-                : result.status === "processed"
-                  ? result.details
-                  : null,
-            occurredAt: Date.now(),
-            cost:
-              result.status === "processed" && result.cost
-                ? result.cost.amount
-                : null,
-            duration: event.duration ?? null,
-            inputs: event.inputs ?? null,
-          })
+          .recordEvaluatorResult(
+            buildEvaluatorResultDispatch({
+              tenantId: projectId,
+              runId,
+              experimentId,
+              event,
+              result,
+              // Workflow evaluator nodes have no DB record, so fall back to
+              // the name the event carries from the DSL node.
+              evaluatorName: dbEvaluator?.name ?? event.evaluatorName ?? null,
+              occurredAt: Date.now(),
+            }),
+          )
           .catch((err) => {
             chDispatchFailures++;
             logger.warn(

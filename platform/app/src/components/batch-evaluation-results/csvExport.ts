@@ -6,12 +6,18 @@
  * - Target output columns (one per target)
  * - Cost and duration per target
  * - Evaluator results per target (score, passed, details)
+ * - Comparison verdicts per comparison evaluator (winner, candidates, reasoning)
  */
 
 import numeral from "numeral";
 import Parse from "papaparse";
 
-import type { BatchEvaluationData, BatchResultRow } from "./types";
+import type {
+  BatchComparisonColumn,
+  BatchComparisonVerdict,
+  BatchEvaluationData,
+  BatchResultRow,
+} from "./types";
 
 /**
  * Stringify a value for CSV output
@@ -37,6 +43,59 @@ const formatBoolean = (value: boolean | null | undefined): string => {
   if (value === null || value === undefined) return "";
   return value ? "true" : "false";
 };
+
+/**
+ * Written to a comparison's winner column when the judge called the row a tie.
+ */
+const TIE_WINNER = "tie";
+
+/**
+ * Written when the judge answered but named a candidate this run does not
+ * know. Kept apart from a tie on purpose: a tie is evidence shared between the
+ * candidates, an unplaceable answer is no evidence at all, and reporting it as
+ * a tie hands the reader a result nobody produced.
+ */
+const UNRESOLVED_WINNER = "unresolved";
+
+/**
+ * Name of one comparison candidate, resolved the way the results page resolves
+ * it: the variant's display name, falling back to the raw identifier for a
+ * candidate the run has dropped since it was judged.
+ */
+const comparisonVariantName = (
+  column: BatchComparisonColumn,
+  variantId: string,
+): string =>
+  column.variants.find((variant) => variant.id === variantId)?.name ??
+  variantId;
+
+/**
+ * The winning candidate for one row, by name.
+ */
+const formatComparisonWinner = (
+  column: BatchComparisonColumn,
+  verdict: BatchComparisonVerdict,
+): string => {
+  if (verdict.winnerId === null) {
+    return verdict.isUnresolved ? UNRESOLVED_WINNER : TIE_WINNER;
+  }
+  return comparisonVariantName(column, verdict.winnerId);
+};
+
+/**
+ * The candidates the judge actually compared on this row, which can be a
+ * strict subset of the comparison's variants when a target produced no output
+ * for the row. Empty when the verdict carries no candidates: naming the
+ * column-wide variant list instead would assert a matchup that may never have
+ * happened.
+ */
+const formatComparisonCandidates = (
+  column: BatchComparisonColumn,
+  verdict: BatchComparisonVerdict,
+): string =>
+  (verdict.candidateIds ?? [])
+    .map((candidateId) => comparisonVariantName(column, candidateId))
+    .join(", ");
 
 /**
  * Build CSV headers for the new layout
@@ -109,6 +168,17 @@ export const buildCsvHeaders = (data: BatchEvaluationData): string[] => {
       headers.push(`${target.name}_${evalName}_cost`);
       headers.push(`${target.name}_${evalName}_duration_ms`);
     }
+  }
+
+  // Comparison verdicts, after every target block so the existing column order
+  // is untouched for anything reading the export by position. A comparison
+  // grades the row as a whole rather than any single target, so it gets a block
+  // of its own instead of living inside one target's columns. Named from the
+  // comparison so a run with several of them keeps them apart.
+  for (const comparison of data.comparisonColumns ?? []) {
+    headers.push(`${comparison.name}_winner`);
+    headers.push(`${comparison.name}_candidates`);
+    headers.push(`${comparison.name}_reasoning`);
   }
 
   // Normalize headers: lowercase, replace spaces with underscores
@@ -213,6 +283,23 @@ const buildCsvRow = (
       values.push(formatNumber(evalResult.cost));
       values.push(formatNumber(evalResult.duration));
     }
+  }
+
+  // Comparison verdicts (must match header order)
+  for (const comparison of data.comparisonColumns ?? []) {
+    const verdict = comparison.verdictsByRow[row.index];
+
+    // No verdict at all: the judge either never ran on this row or declined to
+    // call it. Leaving the block empty says that, where any winner value would
+    // claim a comparison happened.
+    if (!verdict) {
+      values.push("", "", "");
+      continue;
+    }
+
+    values.push(formatComparisonWinner(comparison, verdict));
+    values.push(formatComparisonCandidates(comparison, verdict));
+    values.push(verdict.reasoning ?? "");
   }
 
   return values;

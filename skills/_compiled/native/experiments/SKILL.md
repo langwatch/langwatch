@@ -34,7 +34,7 @@ For a general request such as "test my agent":
 1. Read the agent code, system prompt, tools, and relevant git history.
 2. Identify the behavior most likely to regress.
 3. Create a domain-specific dataset.
-4. Select evaluators that measure the intended behavior.
+4. Select evaluators that measure the intended behavior, or a comparison when the goal is picking a winner between candidates.
 5. Create and run a real experiment.
 6. Interpret the results and recommend concrete improvements.
 
@@ -67,7 +67,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -154,6 +154,54 @@ await experiment.run(dataset, async ({ item, index }) => {
 
 Read `langwatch docs evaluations/evaluators/list` before choosing an evaluator, and take the type slug from `langwatch evaluator types --format json` — never from memory. If an evaluation fails with a `validation_error` naming the slug and an `expected` list, correct it from that list and retry once. Reuse project evaluators when appropriate. A scoring function is part of the experiment, not the experiment itself.
 
+## Compare Targets to Pick a Winner
+
+An evaluator answers "does this output pass?". A comparison answers "which of these is better?". For subjective quality, a judge ranking candidates side by side is usually more informative than each one getting an absolute score on its own.
+
+Register one target per candidate inside the loop, then compare the row once. Every target that recorded an output for the row is a candidate, so the candidates are never named twice, and the verdict is recorded against the row, so the results page renders it with no extra logging.
+
+### Python
+
+```python
+for index, row in experiment.loop(dataset.iterrows()):
+    with experiment.target("gpt-5-mini"):
+        experiment.log_response(call_gpt(row["input"]))
+
+    with experiment.target("claude-sonnet-5"):
+        experiment.log_response(call_claude(row["input"]))
+
+    verdict = experiment.compare(index, input=row["input"])
+```
+
+Inside an async loop, await `experiment.acompare(...)`, which takes the same options.
+
+### TypeScript
+
+```typescript
+await experiment.run(dataset, async ({ item, index }) => {
+  await Promise.all([
+    experiment.withTarget("gpt-5-mini", () => callGpt(item.input)),
+    experiment.withTarget("claude-sonnet-5", () => callClaude(item.input)),
+  ]);
+
+  const verdict = await experiment.compare({ index, input: item.input });
+});
+```
+
+Pass `golden` with a known-good answer to judge every candidate against it. Leave it out, which is the default, and the candidates are judged on their own merits.
+
+Read `verdict.status`, and keep its five answers apart:
+
+- `decided`: the judge picked a winner, named in `verdict.winner`.
+- `tie`: the judge compared the candidates and found none better than the rest.
+- `inconclusive`: no winner was established, which with the default second pass over the reversed candidate order means the two passes disagreed.
+- `skipped`: the row had fewer than two outputs, so no judge ran.
+- `error`: the judge failed, so nothing was measured about the candidates at all.
+
+A tie, an inconclusive row and an errored row are three different answers. Reporting any of them as one of the others claims a measurement the run never made.
+
+`prompt` replaces the judge prompt verbatim, with `{input}`, `{golden}` and `{candidates}` placeholders. Leave it unset unless the user asks for their own, because unset is what lets the judge use the prompt matching what each row carries. The remaining judge options are in `langwatch docs evaluations/experiments/sdk`.
+
 ## Run and Verify
 
 Always execute the experiment. An unrun experiment is incomplete.
@@ -187,5 +235,6 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
 - Do not configure production monitoring or guardrails from this skill.
 - Do not call a batch run an online evaluation.
 - Do not use placeholder datasets.
+- Do not report an inconclusive or errored comparison as a tie.
 - Do not guess SDK APIs when the installed documentation is available.
 - Do not stop after writing the experiment. Run it and inspect the real result.
