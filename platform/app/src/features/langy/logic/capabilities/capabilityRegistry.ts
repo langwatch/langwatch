@@ -619,32 +619,42 @@ export function resolveCapability(
  * arbitrary structured value. Falls back to pretty JSON so a card always has
  * something to show without leaking `[object Object]`.
  */
+/**
+ * The text parts of an MCP `{ content: [{ type, text }] }` envelope, joined in
+ * order, or `null` when `content` is not that shape or carries no text. `null`
+ * rather than `""` so the caller can tell "not an envelope" from "an envelope
+ * that said nothing" and fall through to the JSON rendering either way.
+ */
+function mcpContentText(content: unknown): string | null {
+  if (!Array.isArray(content)) return null;
+  const parts = content
+    .map((c) =>
+      c &&
+      typeof c === "object" &&
+      typeof (c as { text?: unknown }).text === "string"
+        ? (c as { text: string }).text
+        : "",
+    )
+    .filter(Boolean);
+  return parts.length > 0 ? parts.join("\n") : null;
+}
+
 export function extractToolText(output: unknown): string {
   if (output == null) return "";
   if (typeof output === "string") return output;
-  if (typeof output === "object") {
-    const obj = output as Record<string, unknown>;
-    if (typeof obj.text === "string") return obj.text;
-    const content = obj.content;
-    if (Array.isArray(content)) {
-      const parts = content
-        .map((c) =>
-          c &&
-          typeof c === "object" &&
-          typeof (c as { text?: unknown }).text === "string"
-            ? (c as { text: string }).text
-            : "",
-        )
-        .filter(Boolean);
-      if (parts.length > 0) return parts.join("\n");
-    }
-    try {
-      return JSON.stringify(output, null, 2);
-    } catch {
-      return "";
-    }
+  if (typeof output !== "object") return String(output);
+
+  const obj = output as Record<string, unknown>;
+  if (typeof obj.text === "string") return obj.text;
+
+  const fromContent = mcpContentText(obj.content);
+  if (fromContent !== null) return fromContent;
+
+  try {
+    return JSON.stringify(output, null, 2);
+  } catch {
+    return "";
   }
-  return String(output);
 }
 
 // Common id-bearing keys across MCP tool inputs/outputs, checked in priority
