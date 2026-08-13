@@ -16,6 +16,14 @@ import { cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { Toaster, toaster } from "../toaster";
 
+// Chakra types every recipe layer as optional; the guard keeps the
+// assertions honest — a Chakra upgrade that drops the layer fails loudly
+// here instead of comparing against undefined.
+const toastRootRecipe = toastSlotRecipe.base?.root;
+if (!toastRootRecipe) {
+  throw new Error("Chakra's toast slot recipe no longer carries base.root");
+}
+
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
@@ -45,10 +53,10 @@ describe("given a rendered toast", () => {
       // `ps` token (not the recipe's un-fixed `pe`, and not merely "some
       // truthy value").
       expect(style.paddingInlineEnd).toBe(
-        `var(--chakra-spacing-${toastSlotRecipe.base.root.ps})`,
+        `var(--chakra-spacing-${toastRootRecipe.ps})`,
       );
       expect(style.paddingInlineEnd).not.toBe(
-        `var(--chakra-spacing-${toastSlotRecipe.base.root.pe})`,
+        `var(--chakra-spacing-${toastRootRecipe.pe})`,
       );
     });
   });
