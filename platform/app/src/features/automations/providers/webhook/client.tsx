@@ -437,7 +437,7 @@ function WebhookConfigForm({
       <VStack align="stretch" gap={2}>
         <Text textStyle="xs" color="fg.muted">
           Write the JSON your endpoint receives. Values in braces fill in from
-          your trace or alert when the request sends.
+          your trace or metric when the request sends.
         </Text>
         <Box data-testid="webhook-body-editor">
           <LiquidEditor

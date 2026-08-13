@@ -90,7 +90,7 @@ const def: SharedDef = {
   category: "notify",
   label: "Slack",
   description: "Post a message to a Slack webhook when a trace matches.",
-  alertDescription: "Post a message to a Slack webhook when the alert fires.",
+  alertDescription: "Post a message to a Slack webhook when it fires.",
   actionParamsSchema: slackActionParamsSchema,
 };
 

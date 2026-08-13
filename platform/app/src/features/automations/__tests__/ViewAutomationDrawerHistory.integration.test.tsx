@@ -199,7 +199,7 @@ describe("ViewAutomationDrawer in-depth view", () => {
       it("says when it was checked, what it observed, and that it did not fire", () => {
         renderDrawer();
 
-        expect(screen.getByText(/The alert did not fire/)).toBeDefined();
+        expect(screen.getByText(/The automation did not fire/)).toBeDefined();
         expect(screen.getByText(/5 minutes ago/)).toBeDefined();
         expect(
           screen.getByText(
@@ -212,8 +212,8 @@ describe("ViewAutomationDrawer in-depth view", () => {
 
   describe("given an alert whose last check crossed its threshold", () => {
     describe("when the drawer renders", () => {
-      /** @scenario An alert that crossed its threshold reads as fired */
-      it("says the alert fired on that check", () => {
+      /** @scenario An automation that crossed its threshold reads as fired */
+      it("says the automation fired on that check", () => {
         mockTriggerRow = graphAlert;
         mockLatestEvaluation = {
           evaluatedAt: new Date(Date.now() - MINUTE_MS),
@@ -227,7 +227,7 @@ describe("ViewAutomationDrawer in-depth view", () => {
 
         renderDrawer();
 
-        expect(screen.getByText(/The alert fired/)).toBeDefined();
+        expect(screen.getByText(/The automation fired/)).toBeDefined();
         expect(screen.getByText(/observed 250/)).toBeDefined();
       });
     });
@@ -260,7 +260,7 @@ describe("ViewAutomationDrawer in-depth view", () => {
 
   describe("given an alert that has never been evaluated", () => {
     describe("when the drawer renders", () => {
-      /** @scenario An alert that has never been evaluated says so */
+      /** @scenario An automation that has never been evaluated says so */
       it("says it has not been checked yet", () => {
         mockTriggerRow = graphAlert;
         mockLatestEvaluation = null;
@@ -415,7 +415,7 @@ describe("ViewAutomationDrawer in-depth view", () => {
 
   describe("given an alert with no calendar entry of its own", () => {
     describe("when the drawer renders", () => {
-      /** @scenario An alert says how often it is checked */
+      /** @scenario A graph-watching automation says how often it is checked */
       it("says the alert is checked as data arrives", () => {
         mockTriggerRow = graphAlert;
         mockNextFiring = { kind: "alert", sweepIntervalMs: 30_000 };
@@ -482,7 +482,7 @@ describe("ViewAutomationDrawer in-depth view", () => {
 
   describe("given an alert that watches a graph metric", () => {
     describe("when the drawer renders", () => {
-      /** @scenario An alert offers no trace run because it watches a graph */
+      /** @scenario A graph-watching automation offers no trace run */
       it("offers no run-against-traces control", () => {
         mockTriggerRow = graphAlert;
 

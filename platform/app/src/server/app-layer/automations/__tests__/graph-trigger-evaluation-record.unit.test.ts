@@ -206,7 +206,7 @@ describe("graph alert evaluation recording", () => {
 
   describe("given an alert with no series selected", () => {
     describe("when the evaluator checks it", () => {
-      /** @scenario A misconfigured alert records the configuration that is missing */
+      /** @scenario A misconfigured automation records the configuration that is missing */
       it("records the skip as incomplete configuration", async () => {
         const recorded: RecordEvaluationInput[] = [];
         const deps = makeDeps({
@@ -242,7 +242,7 @@ describe("graph alert evaluation recording", () => {
 
   describe("given recording the evaluation fails", () => {
     describe("when the evaluator checks an alert that crossed its threshold", () => {
-      /** @scenario A failure to record an evaluation never fails the alert */
+      /** @scenario A failure to record an evaluation never fails the automation */
       it("still fires the alert", async () => {
         const recordEvaluation = vi.fn(async () => {
           throw new Error("the recording table is unreachable");

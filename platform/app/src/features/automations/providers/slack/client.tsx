@@ -240,7 +240,7 @@ function UpgradeToBotBanner({ onUpgrade }: { onUpgrade: () => void }) {
       <HStack justify="space-between" gap={3} align="center">
         <VStack align="start" gap={0}>
           <Text textStyle="xs" fontWeight="medium" color="fg">
-            Get charts, tables, and alert banners
+            Get charts, tables, and status banners
           </Text>
           <Text textStyle="xs" color="fg.muted">
             Move this automation to a Slack app to unlock the richer templates.
@@ -713,8 +713,8 @@ function SlackConfigForm({
           />
           <Field.HelperText>
             {slice.deliveryMethod === "webhook"
-              ? "This automation uses a webhook. Move it to a Slack app for charts, tables, and alert banners."
-              : "Renders charts, tables, and alert banners."}
+              ? "This automation uses a webhook. Move it to a Slack app for charts, tables, and status banners."
+              : "Renders charts, tables, and status banners."}
           </Field.HelperText>
         </Field.Root>
       ) : null}
@@ -816,7 +816,7 @@ function SlackConfigForm({
             <VStack align="stretch" gap={2}>
               <Text textStyle="xs" color="fg.muted">
                 Write the layout yourself in Block Kit. Values in braces fill in
-                from your trace or alert when the message sends.
+                from your trace or metric when the message sends.
               </Text>
               <Box data-testid="slack-code-editor">
                 <LiquidEditor

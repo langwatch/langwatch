@@ -110,9 +110,10 @@ const sectionFromPath = (pathname: string): AutomationSection => {
   // it was pointing at rather than on a dead route.
   if (pathname.includes("/automations/alerts")) return "automations";
   // A report is what the third concept is called; "/schedules" is the path it
-  // shipped under and keeps answering on, so no existing link breaks.
+  // shipped under and keeps answering on, so no existing link breaks. There is
+  // deliberately no "/reports" path yet — renaming the route is its own change,
+  // and a branch here for a path no route file serves would only ever 404.
   if (pathname.includes("/automations/schedules")) return "reports";
-  if (pathname.includes("/automations/reports")) return "reports";
   return "overview";
 };
 
@@ -562,6 +563,9 @@ function AutomationsPage() {
         {
           label: "Automations",
           href: `${basePath}/automations`,
+          // The retired alerts path renders this same table, so it highlights
+          // this tab rather than leaving the reader on a page no tab claims.
+          includePath: `${basePath}/alerts`,
           icon: <Zap size={14} />,
         },
         {

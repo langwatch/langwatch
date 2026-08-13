@@ -222,7 +222,7 @@ export function AutomationDrawer({
    *  undefined) renders the drawer normally. */
   source?: string;
   /** When set, the drawer opens in graph-alert mode with the graph
-   *  pre-filled and locked. Used by the dashboard "Add alert" entry
+   *  pre-filled and locked. Used by the dashboard "Add automation" entry
    *  point (Phase 5.2). */
   prefilledGraphId?: string;
   prefilledSeriesName?: string;
@@ -316,7 +316,7 @@ export function AutomationDrawer({
   }, []);
 
   // Pre-fill graph-alert mode from drawer params on a fresh create. Used
-  // by the dashboard "Add alert" entry (Phase 5.2). When set, the drawer
+  // by the dashboard "Add automation" entry (Phase 5.2). When set, the drawer
   // opens with source = customGraph and the graph / series already
   // selected and locked, so the author lands on the threshold rule.
   const prefilledFromGraph = useRef(false);
@@ -341,8 +341,8 @@ export function AutomationDrawer({
   }, []);
 
   // Pre-fill identity + kind from drawer params on a fresh create. Set by
-  // the Alerts & automations page ("New alert" opens straight into alert
-  // mode; use-case cards seed a name and action too). Ordering matters:
+  // the automations page (a graph-watching use-case card opens straight into
+  // graph mode, seeding a name and action too). Ordering matters:
   // SET_SOURCE runs first because switching to customGraph resets any
   // action that alerts don't support.
   const prefilledFromParams = useRef(false);
@@ -633,7 +633,7 @@ export function AutomationDrawer({
           slug: project?.slug ?? "project",
         },
         trigger: {
-          name: draft.name || "Example alert",
+          name: draft.name || "Example automation",
           alertType: draft.alertType,
         },
         graph: graphName ? { name: graphName } : undefined,
@@ -1048,6 +1048,40 @@ export function AutomationDrawer({
     ],
   );
 
+  /**
+   * Reopening this drawer for a DIFFERENT automation does not remount it.
+   *
+   * `openDrawer` replaces the URL params in place when the drawer type is
+   * already open (`useDrawer`), and the drawer host renders the component
+   * without a key — so the instance, the singleton store, and every latch in
+   * this file survive the transition. The unmount `reset()` and the mount-time
+   * "editing opens on Review" effect are both dead in that path.
+   *
+   * Left alone, "New automation" from a saved automation's locked Watch step
+   * carried the whole edited draft into the create: the heading flipped, the
+   * store still held the saved name, query and action, and Save wrote a second
+   * row from it (or hit the one-automation-per-graph constraint, wearing an
+   * error that named nothing the author had done). The close-guard was equally
+   * blind, diffing against the previous automation's baseline.
+   *
+   * So the identity change does by hand exactly what unmounting would have
+   * done. Keyed on the id rather than only on set→absent, because edit-A →
+   * edit-B is the same transition with the same consequence.
+   */
+  const openedForRef = useRef<string | undefined>(automationId);
+  useEffect(() => {
+    if (openedForRef.current === automationId) return;
+    openedForRef.current = automationId;
+    reset();
+    hydratedFromServerFor.current = null;
+    baselineRef.current = null;
+    prefilledFromTraces.current = false;
+    prefilledFromGraph.current = false;
+    prefilledFromParams.current = false;
+    seededNameFromGraph.current = false;
+    setStep(automationId ? "review" : "watch");
+  }, [automationId, reset, setStep]);
+
   // Dirty when the live draft no longer matches the baseline captured at
   // hydrate/create time. Guards an accidental close from silently dropping an
   // in-progress multi-stage draft. Until the baseline lands we treat the
@@ -1294,7 +1328,7 @@ function EmailLinkLandingBanner() {
         </Box>
         <Text textStyle="sm" color="fg">
           Opened from an email notification. You're editing the automation that
-          produced that alert.
+          sent it.
         </Text>
       </HStack>
     </Box>

@@ -489,7 +489,8 @@ describe("AutomationDrawer", () => {
 
   describe("given an existing automation in edit mode", () => {
     describe("when the saved row first resolves", () => {
-      it("hydrates the form from the saved row", async () => {
+      /** @scenario "Editing an automation opens the review overview" */
+      it("hydrates the form from the saved row and opens on the review overview", async () => {
         mockTriggerRow = savedRow();
         renderDrawer({ automationId: "trigger-1" });
 
@@ -499,6 +500,79 @@ describe("AutomationDrawer", () => {
           );
         });
         expect(screen.getByText("Edit automation")).toBeInTheDocument();
+        // Editing lands on the overview, never on the first step — and the
+        // drawer itself puts it there, without anyone setting the step.
+        expect(useAutomationStore.getState().step).toBe("review");
+        expect(await screen.findByText("Watches")).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "Edit delivery" }),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "Save changes" }),
+        ).toBeInTheDocument();
+      });
+    });
+
+    describe("when the author starts a new automation from the locked watch step", () => {
+      it("opens a pristine create instead of carrying the edited draft into it", async () => {
+        mockTriggerRow = savedRow({
+          filterQuery: "status:error",
+          filters: JSON.stringify({}),
+        });
+        const opened = renderDrawer({ automationId: "trigger-1" });
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.name).toBe(
+            "Saved automation",
+          );
+        });
+
+        // "New automation" opens the same drawer type, which replaces the URL
+        // params in place rather than remounting — so the component instance,
+        // the store and every hydration latch survive the transition. Re-render
+        // without the id to reproduce exactly that.
+        mockTriggerRow = null;
+        opened.rerender(<AutomationDrawer />);
+
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft).toEqual(INITIAL_DRAFT);
+        });
+        const draft = useAutomationStore.getState().draft;
+        // The specific leaks that produced a duplicate row on Save.
+        expect(draft.name).toBe("");
+        expect(draft.filterQuery).toBeNull();
+        expect(draft.action).toBeNull();
+        // And the create starts where a create starts.
+        expect(useAutomationStore.getState().step).toBe("watch");
+        expect(
+          await screen.findByText("What should this automation watch?"),
+        ).toBeInTheDocument();
+        expect(screen.getByText("Add automation")).toBeInTheDocument();
+      });
+
+      it("re-arms the close guard against the fresh draft, not the edited one", async () => {
+        const user = userEvent.setup();
+        mockTriggerRow = savedRow();
+        const opened = renderDrawer({ automationId: "trigger-1" });
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.name).toBe(
+            "Saved automation",
+          );
+        });
+
+        mockTriggerRow = null;
+        opened.rerender(<AutomationDrawer />);
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft).toEqual(INITIAL_DRAFT);
+        });
+
+        // A pristine create has nothing to discard, so closing it goes
+        // straight through instead of prompting about the previous draft.
+        await user.click(await screen.findByRole("button", { name: /close/i }));
+
+        expect(mockCloseDrawer).toHaveBeenCalled();
+        expect(
+          screen.queryByText("Discard unsaved changes?"),
+        ).not.toBeInTheDocument();
       });
     });
 

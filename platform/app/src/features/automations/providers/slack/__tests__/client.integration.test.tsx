@@ -184,7 +184,7 @@ describe("SlackConfigForm authoring tiers", () => {
         renderForm();
 
         expect(
-          screen.getByRole("button", { name: /use compact alert template/i }),
+          screen.getByRole("button", { name: /use compact notice template/i }),
         ).toBeInTheDocument();
       });
 
@@ -294,7 +294,7 @@ describe("SlackConfigForm authoring tiers", () => {
 
       expect(screen.getByTestId("slack-text-editor")).toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: /use compact alert template/i }),
+        screen.queryByRole("button", { name: /use compact notice template/i }),
       ).not.toBeInTheDocument();
     });
   });
