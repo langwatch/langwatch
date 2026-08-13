@@ -156,6 +156,12 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // asserts it, so scenarios under specs/ci/ can only bind from this root.
   // Without it those feature files report "all bound" while binding nothing.
   "tools/ciguard",
+  // The README link checker, for the same reason: specs/ci/readme-link-check.feature
+  // describes what CI asserts about the README, and only these Go tests assert it.
+  "tools/linkcheck",
+  // The CLI half of the same tool: the verdict-to-exit-code step is the part
+  // CI gates on, so the "check fails" / "check passes" scenarios bind here.
+  "cmd/linkcheck",
 ];
 
 /**
