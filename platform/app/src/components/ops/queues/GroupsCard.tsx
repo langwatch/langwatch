@@ -11,18 +11,26 @@ import {
   Table,
   Text,
 } from "@chakra-ui/react";
-import { Search } from "lucide-react";
+import { MoreVertical, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "~/components/ops/shared/ConfirmDialog";
 import { formatTimeAgo } from "~/components/ops/shared/formatters";
 import { VirtualizedTableRows } from "~/components/ops/shared/VirtualizedTableRows";
+import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import type { GroupInfo } from "~/server/app-layer/ops/types";
 import { api } from "~/utils/api";
 import { GroupDetailDialog } from "./GroupDetailDialog";
-import { isOverdue, matchesStatusFilter } from "./pipelineUtils";
+import { GroupStateBadge } from "./GroupStateBadge";
+import {
+  classifyGroup,
+  describeNextRun,
+  isOverdue,
+  matchesStatusFilter,
+  sortGroupsBySeverity,
+} from "./pipelineUtils";
 import type { StatusFilter } from "./types";
 
 const GROUPS_VIEWPORT_HEIGHT = 480;
@@ -53,10 +61,15 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
     return groups;
   }, [groupsQuery.data, primaryQueue]);
 
+  // Classification compares dispatch-eligibility scores against "now"; pinning
+  // now to the fetch instant keeps the rows stable between refreshes instead of
+  // reclassifying on every unrelated render.
+  const now = groupsQuery.dataUpdatedAt || Date.now();
+
   const filteredGroups = useMemo(() => {
     let groups = allGroups;
     if (statusFilter !== "all")
-      groups = groups.filter((g) => matchesStatusFilter(g, statusFilter));
+      groups = groups.filter((g) => matchesStatusFilter(g, statusFilter, now));
     if (search.trim()) {
       const lower = search.toLowerCase();
       groups = groups.filter(
@@ -66,22 +79,21 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
           g.errorMessage?.toLowerCase().includes(lower),
       );
     }
-    return groups;
-  }, [allGroups, statusFilter, search]);
+    return sortGroupsBySeverity(groups, now);
+  }, [allGroups, statusFilter, search, now]);
 
   const counts = useMemo(() => {
-    let ok = 0,
-      blocked = 0,
-      stale = 0,
-      active = 0;
-    for (const g of allGroups) {
-      if (g.isStaleBlock) stale++;
-      else if (g.isBlocked) blocked++;
-      else ok++;
-      if (g.hasActiveJob && !g.isBlocked) active++;
-    }
-    return { all: allGroups.length, ok, blocked, stale, active };
-  }, [allGroups]);
+    const countMatching = (filter: StatusFilter) =>
+      allGroups.filter((g) => matchesStatusFilter(g, filter, now)).length;
+    return {
+      all: allGroups.length,
+      ok: countMatching("ok"),
+      blocked: countMatching("blocked"),
+      stale: countMatching("stale"),
+      active: countMatching("active"),
+      retrying: countMatching("retrying"),
+    };
+  }, [allGroups, now]);
 
   // Filter changes shrink the visible row count without re-mounting the
   // scroll container, so the virtualizer's total height drops while
@@ -124,6 +136,32 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
     onError: (error) =>
       showErrorToast({ error, fallbackTitle: "Couldn't unblock the group" }),
   });
+  const [dlqTarget, setDlqTarget] = useState<{
+    queueName: string;
+    groupId: string;
+  } | null>(null);
+  const moveToDlqMutation = api.ops.moveToDlq.useMutation({
+    onSuccess: (data) => {
+      toaster.create({
+        title: `Moved ${data.jobsMoved} jobs to the dead-letter queue`,
+        type: "success",
+      });
+      setDlqTarget(null);
+      void utils.ops.invalidate();
+    },
+    onError: (error) =>
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't move the group to the dead-letter queue",
+      }),
+  });
+  const copyGroupId = (groupId: string) => {
+    navigator.clipboard.writeText(groupId).then(
+      () => toaster.create({ title: "Group ID copied", type: "success" }),
+      () =>
+        toaster.create({ title: "Couldn't copy the group ID", type: "error" }),
+    );
+  };
 
   // Tenant-scoped controls. Activated when the search box is a single
   // tenant prefix (no slash) — typically `project_…`. Reuses the same
@@ -192,6 +230,12 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
     { value: "all", label: "All", count: counts.all, color: "gray" },
     { value: "ok", label: "OK", count: counts.ok, color: "green" },
     { value: "blocked", label: "Blocked", count: counts.blocked, color: "red" },
+    {
+      value: "retrying",
+      label: "Retrying",
+      count: counts.retrying,
+      color: "orange",
+    },
     { value: "stale", label: "Stale", count: counts.stale, color: "orange" },
     { value: "active", label: "Active", count: counts.active, color: "blue" },
   ];
@@ -397,17 +441,22 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                     <Table.ColumnHeader width="140px">
                       Pipeline
                     </Table.ColumnHeader>
-                    <Table.ColumnHeader textAlign="end" width="50px">
-                      Pend.
+                    <Table.ColumnHeader textAlign="end" width="60px">
+                      Pending
                     </Table.ColumnHeader>
-                    <Table.ColumnHeader textAlign="end" width="45px">
-                      Retry
+                    <Table.ColumnHeader textAlign="end" width="65px">
+                      Attempts
                     </Table.ColumnHeader>
-                    <Table.ColumnHeader width="75px">Oldest</Table.ColumnHeader>
-                    <Table.ColumnHeader width="65px">Status</Table.ColumnHeader>
+                    <Table.ColumnHeader width="80px">
+                      Next run
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader width="85px">
+                      Oldest wait
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader width="70px">Status</Table.ColumnHeader>
                     {hasAccess && (
-                      <Table.ColumnHeader width="100px">
-                        Actions
+                      <Table.ColumnHeader width="44px">
+                        <Text srOnly>Actions</Text>
                       </Table.ColumnHeader>
                     )}
                   </Table.Row>
@@ -416,7 +465,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                   <VirtualizedTableRows
                     count={filteredGroups.length}
                     rowHeight={GROUPS_ROW_HEIGHT}
-                    columnCount={hasAccess ? 7 : 6}
+                    columnCount={hasAccess ? 8 : 7}
                     scrollContainerRef={scrollContainerRef}
                     getItemKey={(i) => {
                       const g = filteredGroups[i]!;
@@ -424,13 +473,24 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                     }}
                     renderRow={(i) => {
                       const group = filteredGroups[i]!;
+                      const c = classifyGroup(group, now);
                       const overdue =
                         !group.isBlocked && isOverdue(group.oldestJobMs);
+                      // The tint answers "what is wrong RIGHT NOW" at a glance:
+                      // red for groups an operator must act on, orange for
+                      // groups still failing on their own.
+                      const tint =
+                        c.state === "blocked" || c.state === "stale"
+                          ? "red.subtle"
+                          : c.isFailing
+                            ? "orange.subtle"
+                            : undefined;
                       return (
                         <Table.Row
                           key={`${group.queueName}:${group.groupId}`}
                           cursor="pointer"
-                          _hover={{ bg: "bg.subtle" }}
+                          bg={tint}
+                          _hover={{ bg: tint ?? "bg.subtle" }}
                           onClick={() =>
                             setSelectedGroup({
                               queueName: group.queueName,
@@ -459,23 +519,25 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                             </Text>
                           </Table.Cell>
                           <Table.Cell textAlign="end">
-                            {(group.retryCount ?? 0) > 0 ? (
-                              <Text
-                                textStyle="xs"
-                                fontFamily="mono"
-                                color="orange.500"
-                              >
-                                {group.retryCount}
-                              </Text>
-                            ) : (
-                              <Text
-                                textStyle="xs"
-                                fontFamily="mono"
-                                color="fg.muted"
-                              >
-                                {"—"}
-                              </Text>
-                            )}
+                            <Text
+                              textStyle="xs"
+                              fontFamily="mono"
+                              color={c.attempt > 0 ? "orange.500" : "fg.muted"}
+                            >
+                              {c.attempt > 0 ? c.attempt : "—"}
+                            </Text>
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Text
+                              textStyle="xs"
+                              color={
+                                c.state === "retrying"
+                                  ? "orange.500"
+                                  : "fg.muted"
+                              }
+                            >
+                              {describeNextRun(c, now)}
+                            </Text>
                           </Table.Cell>
                           <Table.Cell>
                             <Text
@@ -487,74 +549,79 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                               {overdue ? " ⚠" : ""}
                             </Text>
                           </Table.Cell>
-                          <Table.Cell>
-                            {group.isStaleBlock ? (
-                              <Badge
-                                size="xs"
-                                colorPalette="orange"
-                                variant="subtle"
-                              >
-                                Stale
-                              </Badge>
-                            ) : group.isBlocked ? (
-                              <Badge
-                                size="xs"
-                                colorPalette="red"
-                                variant="subtle"
-                              >
-                                Blocked
-                              </Badge>
-                            ) : group.hasActiveJob ? (
-                              <Badge
-                                size="xs"
-                                colorPalette="green"
-                                variant="subtle"
-                              >
-                                Active
-                              </Badge>
-                            ) : (
-                              <Badge
-                                size="xs"
-                                colorPalette="gray"
-                                variant="subtle"
-                              >
-                                OK
-                              </Badge>
-                            )}
+                          <Table.Cell
+                            title={
+                              c.isFailing
+                                ? (group.errorMessage ?? undefined)
+                                : undefined
+                            }
+                          >
+                            <GroupStateBadge c={c} />
                           </Table.Cell>
                           {hasAccess && (
                             <Table.Cell onClick={(e) => e.stopPropagation()}>
-                              <HStack gap={1}>
-                                {group.isBlocked && (
+                              <Menu.Root>
+                                <Menu.Trigger asChild>
                                   <Button
-                                    variant="outline"
                                     size="2xs"
-                                    colorPalette="green"
-                                    onClick={() =>
-                                      unblockMutation.mutate({
+                                    variant="ghost"
+                                    aria-label={`Actions for ${group.groupId}`}
+                                  >
+                                    <MoreVertical size={14} />
+                                  </Button>
+                                </Menu.Trigger>
+                                <Menu.Content>
+                                  {(c.state === "blocked" ||
+                                    c.state === "stale") && (
+                                    <Menu.Item
+                                      value="retry"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        unblockMutation.mutate({
+                                          queueName: group.queueName,
+                                          groupId: group.groupId,
+                                        });
+                                      }}
+                                    >
+                                      Retry now
+                                    </Menu.Item>
+                                  )}
+                                  <Menu.Item
+                                    value="copy-id"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      copyGroupId(group.groupId);
+                                    }}
+                                  >
+                                    Copy group ID
+                                  </Menu.Item>
+                                  <Menu.Item
+                                    value="move-to-dlq"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDlqTarget({
                                         queueName: group.queueName,
                                         groupId: group.groupId,
-                                      })
-                                    }
-                                    loading={unblockMutation.isPending}
+                                      });
+                                    }}
                                   >
-                                    Retry
-                                  </Button>
-                                )}
-                                <Button
-                                  variant="outline"
-                                  size="2xs"
-                                  colorPalette="red"
-                                  onClick={() =>
-                                    setDrainTarget({
-                                      queueName: group.queueName,
-                                      groupId: group.groupId,
-                                    })
-                                  }
-                                >
-                                  Drain
-                                </Button>
-                              </HStack>
+                                    Move to dead-letter queue
+                                  </Menu.Item>
+                                  <Menu.Item
+                                    value="drain"
+                                    color="red.500"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDrainTarget({
+                                        queueName: group.queueName,
+                                        groupId: group.groupId,
+                                      });
+                                    }}
+                                  >
+                                    Drain
+                                  </Menu.Item>
+                                </Menu.Content>
+                              </Menu.Root>
                             </Table.Cell>
                           )}
                         </Table.Row>
@@ -571,6 +638,11 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
       <GroupDetailDialog
         group={selectedGroup}
         onClose={() => setSelectedGroup(null)}
+        onRetry={
+          hasAccess ? (target) => unblockMutation.mutate(target) : undefined
+        }
+        retryLoading={unblockMutation.isPending}
+        onDrain={hasAccess ? (target) => setDrainTarget(target) : undefined}
       />
 
       <ConfirmDialog
@@ -582,6 +654,17 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
         title="Drain Group"
         description={`Permanently remove all jobs from "${drainTarget?.groupId}". Cannot be undone.`}
         isLoading={drainGroupMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={!!dlqTarget}
+        onClose={() => setDlqTarget(null)}
+        onConfirm={() => {
+          if (dlqTarget) moveToDlqMutation.mutate(dlqTarget);
+        }}
+        title="Move Group to Dead-Letter Queue"
+        description={`Move all jobs from "${dlqTarget?.groupId}" to the dead-letter queue. They stop processing until replayed from the Dead Letter Queue card.`}
+        isLoading={moveToDlqMutation.isPending}
       />
 
       <ConfirmDialog

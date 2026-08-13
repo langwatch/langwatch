@@ -5,8 +5,17 @@ import {
   formatRate,
 } from "~/components/ops/shared/formatters";
 import type { DashboardData } from "~/server/app-layer/ops/types";
+import { LATENCY_SAMPLE_SIZE } from "~/shared/ops/latency";
 import { LinkedStat } from "./LinkedStat";
 import { RedisStatTile } from "./RedisStatTile";
+
+/**
+ * What the percentile tiles are measured over. A sample count, deliberately
+ * not a time window: at high throughput the sample spans under a second, on a
+ * quiet queue it can span hours, and pretending either is "the last 5 minutes"
+ * would be wrong in both directions.
+ */
+const LATENCY_BASIS = `Processing time across each queue's last ${LATENCY_SAMPLE_SIZE} completed jobs — a rolling sample, not a time window.`;
 
 /**
  * The headline figures, on ONE row.
@@ -74,12 +83,14 @@ export function StatStrip({ data }: { data: DashboardData }) {
       <LinkedStat
         label="P50"
         value={formatMs(data.latencyP50Ms)}
-        sublabel={`peak ${formatMs(data.peakLatencyP50Ms)}`}
+        sublabel={`peak ${formatMs(data.peakLatencyP50Ms)} · last ${LATENCY_SAMPLE_SIZE} jobs`}
+        hint={LATENCY_BASIS}
       />
       <LinkedStat
         label="P99"
         value={formatMs(data.latencyP99Ms)}
-        sublabel={`peak ${formatMs(data.peakLatencyP99Ms)}`}
+        sublabel={`peak ${formatMs(data.peakLatencyP99Ms)} · last ${LATENCY_SAMPLE_SIZE} jobs`}
+        hint={LATENCY_BASIS}
       />
       <LinkedStat
         label="Dead-letter queue"
