@@ -4,6 +4,7 @@ import type {
 } from "../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { parseJsonStringValues } from "../../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import {
+  BedrockExtractor,
   ClaudeCodeExtractor,
   CodexExtractor,
   CopilotExtractor,
@@ -38,6 +39,10 @@ export class CanonicalizeSpanAttributesService {
     // Priority is determined by the order of registration.
     new LangWatchExtractor(),
     new GenAIExtractor(),
+    // Bedrock: after GenAIExtractor — canonical/legacy gen_ai.* keys are
+    // GenAI's job; BedrockExtractor lifts only the aws.bedrock.* payload
+    // keys the AWS SDK instrumentation ships (langwatch-saas#1040 Branch 1).
+    new BedrockExtractor(),
     new VertexAdkExtractor(),
     new MastraExtractor(),
     new OpenInferenceExtractor(),
