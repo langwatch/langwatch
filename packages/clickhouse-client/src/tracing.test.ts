@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import type { QueryRequest } from "./pipeline";
+import type { QueryRequest } from "./query";
 import {
   SPAN_ATTRIBUTES,
   type SpanPort,
   type TracerPort,
-  trace,
+  QueryTracer,
 } from "./tracing";
 
 const recordingTracer = () => {

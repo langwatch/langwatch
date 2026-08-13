@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { QueryRequest } from "./pipeline";
-import { retry, runWithRetry } from "./retry";
+import type { QueryRequest } from "./query";
+import { RetryPolicy, runWithRetry } from "./retry";
 
 const request: QueryRequest = {
   tenantId: "project_1",
@@ -50,9 +50,7 @@ describe("retry", () => {
           .mockRejectedValueOnce(transient())
           .mockResolvedValue({ rows: ["ok"] });
 
-        const result = await retry({ sleep, random: () => 0 })(next as never)(
-          request,
-        );
+        const result = await new RetryPolicy({ sleep, random: () => 0 }).run(() => next as never(request,), { request: request, });
 
         expect(result.rows).toEqual(["ok"]);
         expect(next).toHaveBeenCalledTimes(2);
@@ -68,7 +66,7 @@ describe("retry", () => {
         const { sleep } = fakeSleep();
         const next = vi.fn().mockRejectedValue(permanent());
 
-        await expect(retry({ sleep })(next as never)(request)).rejects.toThrow(
+        await expect(new RetryPolicy({ sleep }).run(() => next as never(request), { request: request })).rejects.toThrow(
           /Syntax error/,
         );
         expect(next).toHaveBeenCalledTimes(1);
@@ -83,7 +81,7 @@ describe("retry", () => {
         const next = vi.fn().mockRejectedValue(transient());
 
         await expect(
-          retry({ maxAttempts: 3, sleep })(next as never)(request),
+          new RetryPolicy({ maxAttempts: 3, sleep }).run(() => next as never(request), { request: request }),
         ).rejects.toThrow("socket");
         expect(next).toHaveBeenCalledTimes(3);
       });
@@ -93,13 +91,13 @@ describe("retry", () => {
         const next = vi.fn().mockRejectedValue(transient());
 
         await expect(
-          retry({
+          new RetryPolicy({
             maxAttempts: 4,
             baseDelayMs: 100,
             maxDelayMs: 10_000,
             sleep,
             random: () => 0,
-          })(next as never)(request),
+          }).run(() => next as never(request), { request: request }),
         ).rejects.toThrow();
 
         expect(delays).toEqual([100, 200, 400]);
@@ -118,10 +116,13 @@ describe("retry", () => {
         });
 
         await expect(
-          retry({ maxAttempts: 5, sleep })(next as never)({
+          new RetryPolicy({ maxAttempts: 5, sleep }).run(() => next as never({
             ...request,
             signal: controller.signal,
-          }),
+          }), { request: {
+            ...request,
+            signal: controller.signal,
+          } }),
         ).rejects.toThrow("socket");
         expect(next).toHaveBeenCalledTimes(1);
       });
@@ -139,10 +140,13 @@ describe("retry", () => {
         };
 
         await expect(
-          retry({ maxAttempts: 5, sleep })(next as never)({
+          new RetryPolicy({ maxAttempts: 5, sleep }).run(() => next as never({
             ...request,
             signal: controller.signal,
-          }),
+          }), { request: {
+            ...request,
+            signal: controller.signal,
+          } }),
         ).rejects.toThrow("socket");
         expect(next).toHaveBeenCalledTimes(1);
       });
@@ -158,11 +162,11 @@ describe("retry", () => {
         const next = vi.fn().mockRejectedValue(transient());
 
         await expect(
-          retry({
+          new RetryPolicy({
             maxAttempts: 5,
             sleep,
             onRetry: (notice) => notices.push(notice.level),
-          })(next as never)(request),
+          }).run(() => next as never(request), { request: request }),
         ).rejects.toThrow();
 
         expect(notices.filter((level) => level === "warn")).toHaveLength(1);
@@ -175,7 +179,7 @@ describe("retry", () => {
         const next = vi.fn().mockRejectedValue(transient());
 
         await expect(
-          retry({ maxAttempts: 2, sleep, onRetry })(next as never)(request),
+          new RetryPolicy({ maxAttempts: 2, sleep, onRetry }).run(() => next as never(request), { request: request }),
         ).rejects.toThrow();
 
         expect(onRetry).toHaveBeenCalledWith(
@@ -195,13 +199,13 @@ describe("retry", () => {
         const next = vi.fn().mockRejectedValue(transient());
 
         await expect(
-          retry({
+          new RetryPolicy({
             maxAttempts: 3,
             sleep,
             onRetry: () => {
               throw new Error("the metrics registry is misconfigured");
             },
-          })(next as never)(request),
+          }).run(() => next as never(request), { request: request }),
         ).rejects.toThrow("socket");
       });
 
@@ -210,13 +214,13 @@ describe("retry", () => {
         const next = vi.fn().mockRejectedValue(transient());
 
         await expect(
-          retry({
+          new RetryPolicy({
             maxAttempts: 3,
             sleep,
             onRetry: () => {
               throw new Error("the metrics registry is misconfigured");
             },
-          })(next as never)(request),
+          }).run(() => next as never(request), { request: request }),
         ).rejects.toThrow();
 
         expect(next).toHaveBeenCalledTimes(3);
@@ -241,10 +245,10 @@ describe("retry", () => {
           )
           .mockResolvedValue({ rows: [] });
 
-        await retry({
+        await new RetryPolicy({
           sleep,
           transientMessageFragments: ["Too many simultaneous queries"],
-        })(next as never)(request);
+        }).run(() => next as never(request), { request: request });
 
         expect(next).toHaveBeenCalledTimes(2);
       });

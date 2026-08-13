@@ -1,23 +1,10 @@
 /**
- * The composition core.
+ * The data a statement is described by, and the port the driver implements.
  *
- * Everything this package does to a query - tenant checks, rate limiting,
- * retries, tracing, logging - is a middleware over one function type. There is
- * no base class and nothing to extend: behaviour is added by wrapping, and the
- * order of the wrapping is the order of the behaviour, visible at the call site
- * rather than buried in an inheritance chain.
- *
- *     const execute = compose([
- *       tenantGuard({ ... }),   // outermost: refuse before spending anything
- *       trace({ ... }),
- *       rateLimit({ ... }),     // hold the slot across retries, not per attempt
- *       retry({ ... }),
- *     ])(driver);
- *
- * A middleware may inspect the request, refuse it, alter it, call `next` zero,
- * one or many times, and inspect or replace the result. That is the whole
- * contract, and it is why retry (calls `next` many times) and rate limiting
- * (calls it once, holding a slot) compose without knowing about each other.
+ * These types used to live in `pipeline.ts` alongside a middleware `compose()`.
+ * The composition is now a class — see `client.ts` — and what remains here is
+ * only the vocabulary every layer shares, which is why the module is named for
+ * the query rather than for the mechanism that runs it.
  */
 
 /** Whether a statement reads or writes, which several policies branch on. */
@@ -54,7 +41,7 @@ export interface QueryRequest {
   kind?: QueryKind | undefined;
   /** Per-query ClickHouse settings, e.g. a `max_memory_usage` cap. */
   settings?: Record<string, string> | undefined;
-  /** Cooperative cancellation. Middleware should stop retrying when aborted. */
+  /** Cooperative cancellation. Policies should stop retrying when aborted. */
   signal?: AbortSignalLike | undefined;
   /**
    * Declares a statement that genuinely has no tenant predicate - DDL, a
@@ -81,24 +68,13 @@ export interface QueryResult<Row> {
     | undefined;
 }
 
-/** The one function type every layer of this package speaks. */
-export type QueryExecutor = <Row>(
-  request: QueryRequest,
-) => Promise<QueryResult<Row>>;
-
-/** Wraps an executor to add one behaviour. */
-export type QueryMiddleware = (next: QueryExecutor) => QueryExecutor;
-
 /**
- * Compose middleware into a single wrapper, applied left to right: the first
- * entry is the outermost layer and sees the request first.
+ * The port a real ClickHouse connection implements.
  *
- * An empty list composes to the identity, so a caller can build a pipeline from
- * a filtered array without special-casing the empty case.
+ * One method, so a test double is an object literal and the class under test
+ * needs no network. This is the only thing in the package that actually talks
+ * to a server; everything else decides whether, when, and how loudly.
  */
-export function compose(
-  middleware: readonly QueryMiddleware[],
-): QueryMiddleware {
-  return (executor) =>
-    middleware.reduceRight((next, wrap) => wrap(next), executor);
+export interface QueryDriver {
+  execute<Row>(request: QueryRequest): Promise<QueryResult<Row>>;
 }

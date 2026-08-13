@@ -1,15 +1,16 @@
 /**
- * Retry middleware.
+ * Retrying a statement that failed for a reason worth trying again.
  *
  * Composes the policies in ./resilience.ts rather than restating them, so the
  * classifier this uses is the same one the outer job queue uses and the two
  * cannot drift into disagreeing about what "transient" means.
  *
- * Compose this *inside* the rate limiter, so a retrying statement keeps its
- * slot instead of rejoining the queue behind fresh work.
+ * {@link ClickHouseQueryClient} runs this *inside* the concurrency limiter, so
+ * a retrying statement keeps its slot instead of rejoining the queue behind
+ * fresh work.
  */
 
-import type { QueryMiddleware, QueryRequest } from "./pipeline";
+import type { AbortSignalLike, QueryRequest } from "./query";
 import {
   isTransientClickHouseError,
   jitteredBackoffMs,
@@ -160,17 +161,46 @@ export async function runWithRetry<T>(
   throw lastError;
 }
 
-export function retry({
-  onRetry,
-  ...options
-}: RetryOptions = {}): QueryMiddleware {
-  return (next) =>
-    <Row>(request: QueryRequest) =>
-      runWithRetry(() => next<Row>(request), {
-        ...options,
-        isAborted: () => request.signal?.aborted === true,
-        ...(onRetry === undefined
-          ? {}
-          : { onRetry: (notice) => onRetry({ ...notice, request }) }),
-      });
+/**
+ * A configured retry policy, reusable across statements.
+ *
+ * Holds its options once instead of threading them through every call, which
+ * is what lets the client hold one policy rather than rebuilding the argument
+ * object per query.
+ */
+export class RetryPolicy {
+  private readonly onRetry: ((notice: RetryNotice) => void) | undefined;
+  private readonly options: Omit<RetryOptions, "onRetry">;
+
+  constructor({ onRetry, ...options }: RetryOptions = {}) {
+    this.onRetry = onRetry;
+    this.options = options;
+  }
+
+  /**
+   * Run `task`, retrying transient failures until the budget is spent.
+   *
+   * `request` is optional and only decorates the retry notice: a caller that
+   * has one gets it echoed back for logging, and a caller retrying something
+   * that is not a statement still gets the same backoff.
+   */
+  run<T>(
+    task: () => Promise<T>,
+    {
+      signal,
+      request,
+    }: { signal?: AbortSignalLike | undefined; request?: QueryRequest | undefined } = {},
+  ): Promise<T> {
+    const onRetry = this.onRetry;
+    return runWithRetry(task, {
+      ...this.options,
+      isAborted: () => signal?.aborted === true,
+      ...(onRetry === undefined
+        ? {}
+        : {
+            onRetry: (notice: Omit<RetryNotice, "request">) =>
+              onRetry({ ...notice, request } as RetryNotice),
+          }),
+    });
+  }
 }

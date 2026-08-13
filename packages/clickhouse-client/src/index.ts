@@ -14,13 +14,13 @@ export {
 } from "./logging";
 export type {
   AbortSignalLike,
-  QueryExecutor,
+  QueryDriver,
   QueryKind,
-  QueryMiddleware,
   QueryRequest,
   QueryResult,
-} from "./pipeline";
-export { compose } from "./pipeline";
+} from "./query";
+export type { ClickHouseQueryClientOptions } from "./client";
+export { ClickHouseQueryClient } from "./client";
 export type {
   PoolSizeSource,
   PoolSizingDecision,
@@ -37,16 +37,11 @@ export {
   poolSizingFromEnv,
   resolvePoolSize,
 } from "./pool";
-export type {
-  ConcurrencyLimiter,
-  ConcurrencyLimiterOptions,
-  LimiterStats,
-} from "./rateLimit";
+export type { ConcurrencyLimiterOptions, LimiterStats } from "./rateLimit";
 export {
   AcquireAbortedError,
-  createConcurrencyLimiter,
+  ConcurrencyLimiter,
   QueueFullError,
-  rateLimit,
 } from "./rateLimit";
 export type {
   BackoffInput,
@@ -67,7 +62,7 @@ export type {
   RetryOptions,
   RunWithRetryOptions,
 } from "./retry";
-export { retry, runWithRetry } from "./retry";
+export { RetryPolicy, runWithRetry } from "./retry";
 export type {
   RoutingTable,
   TenantDirectory,
@@ -83,7 +78,11 @@ export {
   UnknownTenantError,
 } from "./tenancy";
 export type { TenantGuardOptions, TenantScopeViolation } from "./tenantGuard";
-export { checkTenantScope, TenantScopeError, tenantGuard } from "./tenantGuard";
+export {
+  checkTenantScope,
+  TenantGuard,
+  TenantScopeError,
+} from "./tenantGuard";
 export type {
   QueryErrorDescriptor,
   QueryOutcome,
@@ -91,4 +90,8 @@ export type {
   TraceOptions,
   TracerPort,
 } from "./tracing";
-export { describeQueryError, SPAN_ATTRIBUTES, trace } from "./tracing";
+export {
+  describeQueryError,
+  QueryTracer,
+  SPAN_ATTRIBUTES,
+} from "./tracing";
