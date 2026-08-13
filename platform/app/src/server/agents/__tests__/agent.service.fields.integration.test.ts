@@ -218,7 +218,10 @@ describe("AgentService field derivation", () => {
     });
   });
 
-  describe("given the linked workflow was archived", () => {
+  // Deleting a workflow archives it: the delete endpoint sets archivedAt and
+  // the row stays, so this is the shape a deleted workflow really leaves
+  // behind. A workflow id matching no row at all is covered separately below.
+  describe("given the linked workflow was deleted", () => {
     describe("when the agent is read", () => {
       /** @scenario "A workflow agent whose workflow was deleted reports no fields" */
       it("still returns the agent, with no fields", async () => {
@@ -249,6 +252,34 @@ describe("AgentService field derivation", () => {
 
         const read = await service.getById({ id: agent.id, projectId });
 
+        expect(read?.fieldsResolved).toBe(false);
+      });
+    });
+  });
+
+  describe("given the agent points at a workflow that has no row", () => {
+    describe("when the agent is read", () => {
+      /** @scenario "A workflow agent pointing at no workflow at all reports no fields" */
+      it("reports no fields and says it could not resolve them", async () => {
+        const service = AgentService.create(prisma);
+        const agent = await service.create({
+          id: `test_agent_${nanoid(8)}`,
+          projectId,
+          name: "wf agent",
+          type: "workflow",
+          config: {
+            name: "wf agent",
+            isCustom: true,
+            workflow_id: "test_wf_missing",
+          },
+          workflowId: "test_wf_missing",
+        });
+        cleanupAgentIds.push(agent.id);
+
+        const read = await service.getById({ id: agent.id, projectId });
+
+        expect(read?.id).toBe(agent.id);
+        expect(read?.outputFields).toEqual([]);
         expect(read?.fieldsResolved).toBe(false);
       });
     });

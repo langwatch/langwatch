@@ -49,12 +49,22 @@ Feature: A workflow agent exposes its real fields as an evaluations target
     And no field named "output" is invented for it
     And the agent reports that it resolved those fields
 
+  # Deleting a workflow archives it: the delete endpoint sets archivedAt and
+  # the row stays. A workflow id matching no row at all is the rarer case, an
+  # agent copied into a project its workflow was never copied to.
   @integration
   Scenario: A workflow agent whose workflow was deleted reports no fields
-    Given the linked workflow no longer exists
+    Given the linked workflow was deleted, which archives it
     When I read the agent
     Then its output fields are empty
     And reading the agent still succeeds
+    And the agent reports that it could not resolve them
+
+  @integration
+  Scenario: A workflow agent pointing at no workflow at all reports no fields
+    Given the agent's workflow id matches no workflow in the project
+    When I read the agent
+    Then its output fields are empty
     And the agent reports that it could not resolve them
 
   # "Declares nothing" and "could not be read" are both an empty list, and a
