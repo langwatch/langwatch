@@ -549,7 +549,7 @@ describe("AutomationDrawer", () => {
         expect(screen.getByText("Add automation")).toBeInTheDocument();
       });
 
-      it("re-arms the close guard against the fresh draft, not the edited one", async () => {
+      it("re-arms the close guard, so work done in the new one is not dropped silently", async () => {
         const user = userEvent.setup();
         mockTriggerRow = savedRow();
         const opened = renderDrawer({ automationId: "trigger-1" });
@@ -565,14 +565,52 @@ describe("AutomationDrawer", () => {
           expect(useAutomationStore.getState().draft).toEqual(INITIAL_DRAFT);
         });
 
-        // A pristine create has nothing to discard, so closing it goes
-        // straight through instead of prompting about the previous draft.
+        // The baseline the guard diffs against is captured on mount, and this
+        // transition is not a mount. Left unarmed, the new automation reads as
+        // clean however much of it the author fills in, and closing throws it
+        // away without a word.
+        fireEvent.change(
+          await screen.findByPlaceholderText("Flag failing traces"),
+          { target: { value: "A new automation" } },
+        );
         await user.click(await screen.findByRole("button", { name: /close/i }));
 
-        expect(mockCloseDrawer).toHaveBeenCalled();
         expect(
-          screen.queryByText("Discard unsaved changes?"),
-        ).not.toBeInTheDocument();
+          await screen.findByText("Discard unsaved changes?"),
+        ).toBeInTheDocument();
+        expect(mockCloseDrawer).not.toHaveBeenCalled();
+
+        // And discarding still closes it, so the guard is a prompt, not a trap.
+        await user.click(screen.getByRole("button", { name: "Discard" }));
+        expect(mockCloseDrawer).toHaveBeenCalled();
+      });
+
+      it("hydrates the next automation when the drawer moves straight from one to another", async () => {
+        mockTriggerRow = savedRow({ name: "First automation" });
+        const opened = renderDrawer({ automationId: "trigger-1" });
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.name).toBe(
+            "First automation",
+          );
+        });
+
+        // The row for the next one is already cached, so hydration runs in the
+        // same commit as the reset. Whichever effect is declared first wins:
+        // with hydration first it sees a draft still holding the previous
+        // automation, takes its "already editing" branch, latches, and never
+        // runs again — leaving the second automation blank on Review.
+        mockTriggerRow = savedRow({
+          id: "trigger-2",
+          name: "Second automation",
+        });
+        opened.rerender(<AutomationDrawer automationId="trigger-2" />);
+
+        await waitFor(() => {
+          expect(useAutomationStore.getState().draft.name).toBe(
+            "Second automation",
+          );
+        });
+        expect(useAutomationStore.getState().step).toBe("review");
       });
     });
 

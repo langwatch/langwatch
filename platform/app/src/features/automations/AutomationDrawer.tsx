@@ -423,6 +423,54 @@ export function AutomationDrawer({
   // re-fire this effect mid-session and overwrite unsaved edits with the
   // last-saved row.
   const hydratedFromServerFor = useRef<string | null>(null);
+  /** Latched once the name has been seeded from the watched graph's own name;
+   *  declared here so the identity-reset effect below can unlatch it. */
+  const seededNameFromGraph = useRef(false);
+
+  /**
+   * Reopening this drawer for a DIFFERENT automation does not remount it.
+   *
+   * `openDrawer` replaces the URL params in place when the drawer type is
+   * already open (`useDrawer`), and the drawer host renders the component
+   * without a key — so the instance, the singleton store, and every latch in
+   * this file survive the transition. The unmount `reset()` and the mount-time
+   * "editing opens on Review" effect are both dead in that path.
+   *
+   * Left alone, "New automation" from a saved automation's locked Watch step
+   * carried the whole edited draft into the create: the heading flipped, the
+   * store still held the saved name, query and action, and Save wrote a second
+   * row from it (or hit the one-automation-per-graph constraint, wearing an
+   * error that named nothing the author had done). The close-guard was equally
+   * blind, diffing against the previous automation's baseline.
+   *
+   * So the identity change does by hand exactly what unmounting would have
+   * done. Keyed on the id rather than only on set→absent, because edit-A →
+   * edit-B is the same transition with the same consequence.
+   *
+   * It is declared ABOVE the hydration effect on purpose: effects run in
+   * declaration order, and hydration reading a draft this one has not blanked
+   * yet takes its "the author already started editing" branch, latches, and
+   * never runs again — which would open the next automation on an empty Review.
+   *
+   * The baseline is re-armed rather than cleared, because the effect that
+   * captures a create's baseline runs on mount only. Left null, `isDirty`
+   * would be false forever and closing a fully configured new automation would
+   * discard it without a word.
+   */
+  const openedForRef = useRef<string | undefined>(automationId);
+  useEffect(() => {
+    if (openedForRef.current === automationId) return;
+    openedForRef.current = automationId;
+    reset();
+    hydratedFromServerFor.current = null;
+    baselineRef.current = JSON.stringify(useAutomationStore.getState().draft);
+    prefilledFromTraces.current = false;
+    prefilledFromGraph.current = false;
+    prefilledFromParams.current = false;
+    seededNameFromGraph.current = false;
+    setStep(automationId ? "review" : "watch");
+  }, [automationId, reset, setStep]);
+
   useEffect(() => {
     if (!automationId) return;
     const row = triggerQuery.data;
@@ -588,7 +636,6 @@ export function AutomationDrawer({
   // Seed the name from the watched graph once its row loads — "Latency
   // p95 alert" beats an empty field on the golden Add-alert path. Only
   // when the author hasn't typed anything, and only once.
-  const seededNameFromGraph = useRef(false);
   useEffect(() => {
     if (automationId || seededNameFromGraph.current) return;
     if (!prefilledGraphId || !graphName) return;
@@ -1043,40 +1090,6 @@ export function AutomationDrawer({
       testHistory,
     ],
   );
-
-  /**
-   * Reopening this drawer for a DIFFERENT automation does not remount it.
-   *
-   * `openDrawer` replaces the URL params in place when the drawer type is
-   * already open (`useDrawer`), and the drawer host renders the component
-   * without a key — so the instance, the singleton store, and every latch in
-   * this file survive the transition. The unmount `reset()` and the mount-time
-   * "editing opens on Review" effect are both dead in that path.
-   *
-   * Left alone, "New automation" from a saved automation's locked Watch step
-   * carried the whole edited draft into the create: the heading flipped, the
-   * store still held the saved name, query and action, and Save wrote a second
-   * row from it (or hit the one-automation-per-graph constraint, wearing an
-   * error that named nothing the author had done). The close-guard was equally
-   * blind, diffing against the previous automation's baseline.
-   *
-   * So the identity change does by hand exactly what unmounting would have
-   * done. Keyed on the id rather than only on set→absent, because edit-A →
-   * edit-B is the same transition with the same consequence.
-   */
-  const openedForRef = useRef<string | undefined>(automationId);
-  useEffect(() => {
-    if (openedForRef.current === automationId) return;
-    openedForRef.current = automationId;
-    reset();
-    hydratedFromServerFor.current = null;
-    baselineRef.current = null;
-    prefilledFromTraces.current = false;
-    prefilledFromGraph.current = false;
-    prefilledFromParams.current = false;
-    seededNameFromGraph.current = false;
-    setStep(automationId ? "review" : "watch");
-  }, [automationId, reset, setStep]);
 
   // Dirty when the live draft no longer matches the baseline captured at
   // hydrate/create time. Guards an accidental close from silently dropping an
