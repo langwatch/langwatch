@@ -946,41 +946,17 @@ function AutomationsPage() {
                                         />
                                       </VStack>
                                     ) : (
-                                      <VStack gap={2} align="stretch">
-                                        <Text
-                                          textStyle="sm"
-                                          fontWeight="medium"
-                                          lineClamp={1}
-                                        >
-                                          Trace filter
-                                        </Text>
-                                        {applyChecks(
+                                      <TraceFilterCell
+                                        checks={
                                           trigger.checks?.filter(
                                             (check): check is Monitor =>
                                               !!check,
-                                          ) ?? [],
-                                        )}
-
-                                        {trigger.filterQuery ? (
-                                          // ADR-043: a trace-subject automation
-                                          // shows its search query.
-                                          <Code
-                                            size="sm"
-                                            variant="surface"
-                                            whiteSpace="pre-wrap"
-                                            wordBreak="break-word"
-                                          >
-                                            {trigger.filterQuery}
-                                          </Code>
-                                        ) : trigger.filters &&
-                                          typeof trigger.filters === "string" &&
-                                          trigger.filters !== "{}" ? (
-                                          <FilterDisplay
-                                            filters={trigger.filters}
-                                            hasBorder={true}
-                                          />
-                                        ) : null}
-                                      </VStack>
+                                          ) ?? []
+                                        }
+                                        filterQuery={trigger.filterQuery}
+                                        filters={trigger.filters}
+                                        applyChecks={applyChecks}
+                                      />
                                     )}
                                   </Table.Cell>
                                   <Table.Cell>
@@ -1087,6 +1063,42 @@ function AutomationsPage() {
  * branch there) purely to keep that switch's own complexity down — each
  * case stays a single expression.
  */
+/** The subject cell of a trace-filter automation's row: which monitors apply
+ *  and the saved search query (or the legacy structured filters). */
+function TraceFilterCell({
+  checks,
+  filterQuery,
+  filters,
+  applyChecks,
+}: {
+  checks: Monitor[];
+  filterQuery: string | null;
+  filters: unknown;
+  applyChecks: (checks: Monitor[]) => React.ReactNode;
+}) {
+  return (
+    <VStack gap={2} align="stretch">
+      <Text textStyle="sm" fontWeight="medium" lineClamp={1}>
+        Trace filter
+      </Text>
+      {applyChecks(checks)}
+      {filterQuery ? (
+        // ADR-043: a trace-subject automation shows its search query.
+        <Code
+          size="sm"
+          variant="surface"
+          whiteSpace="pre-wrap"
+          wordBreak="break-word"
+        >
+          {filterQuery}
+        </Code>
+      ) : filters && typeof filters === "string" && filters !== "{}" ? (
+        <FilterDisplay filters={filters} hasBorder={true} />
+      ) : null}
+    </VStack>
+  );
+}
+
 function SlackNotifyCell({
   actionParams,
 }: {

@@ -679,6 +679,22 @@ export class PublicApiTriggerService {
   /** A Slack automation reaches Slack the way it is configured to: as the bot
    *  in its channel where a token resolves — its own first, then the project's
    *  Slack integration (ADR-093 §5) — otherwise through its incoming webhook. */
+  /** ADR-093 §5 resolution: the shared resolver when the composition root
+   *  wired one, the row's own token alone otherwise. */
+  private async resolveSlackTokenFor({
+    params,
+    projectId,
+  }: {
+    params: SlackActionParams;
+    projectId: string;
+  }): Promise<ResolvedSlackToken | null> {
+    if (this.deps.resolveSlackToken) {
+      return this.deps.resolveSlackToken({ projectId, actionParams: params });
+    }
+    const ownToken = decryptSlackBotToken(params);
+    return ownToken ? { token: ownToken, source: "automation" } : null;
+  }
+
   private async savedSlackDestination({
     params,
     projectId,
@@ -697,15 +713,10 @@ export class PublicApiTriggerService {
     // every row, a token now resolves for a WEBHOOK automation too, and a test
     // fire would have posted through a surface the automation does not use.
     if (slackDeliveryMethodOf(params as SlackActionParams) === "bot") {
-      const ownToken = decryptSlackBotToken(params as SlackActionParams);
-      const resolved = this.deps.resolveSlackToken
-        ? await this.deps.resolveSlackToken({
-            projectId,
-            actionParams: params as SlackActionParams,
-          })
-        : ownToken
-          ? ({ token: ownToken, source: "automation" } as ResolvedSlackToken)
-          : null;
+      const resolved = await this.resolveSlackTokenFor({
+        params: params as SlackActionParams,
+        projectId,
+      });
       const botToken = resolved?.token ?? null;
       const channelId = (params.slackChannelId ?? "") as string;
       if (botToken && channelId) {
