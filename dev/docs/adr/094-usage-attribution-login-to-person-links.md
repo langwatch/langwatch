@@ -138,49 +138,6 @@ Attributed + unattributed + unattributable always equals the ledger total; nothi
 | Erasure blanking | **no** — destroys identifiers | large | human review, always + count-first dry run printed before execution |
 | Package boundary (never-authorizes) | yes | large | automated: dependency test in CI, fails the build on violation |
 
-## Schema
-
-```prisma
-// Add-only list: which provider login belongs to which person, when, per connection.
-// Reporting only — never read by any permission check (ADR-094 Decision 10).
-model ProviderIdentityLink {
-  id                   String   @id @default(nanoid())
-  seq                  BigInt   @default(autoincrement()) // tie-break only (precedent: GatewayChangeEvent.revision, schema.prisma:3410)
-  organizationId       String   // registered in ORG_SCOPED_MODELS
-  provider             String
-  providerConnectionId String   // in the key: two connections to one provider are legitimate
-  externalKind         String   // which id namespace this value lives in (see ADR-094 Constants)
-  externalId           String   // the provider's login id (kept on erasure; email-kind values swapped for a consistent opaque token)
-  userId               String?  // null = unlink row (blanked on erasure)
-  effectiveFrom        DateTime // backdatable; resolution orders by this
-  recordedAt           DateTime @default(now())
-  source               String   // manual | external_id | email_suggestion_accepted | offboarding
-  actorUserId          String?  // who made the change (from session, never request body)
-
-  @@index([organizationId, provider, providerConnectionId, externalKind, externalId, effectiveFrom(sort: Desc)])
-}
-
-// On OrganizationUser (mirrors Group, schema.prisma:2235ff):
-//   externalId  String?  // the DIRECTORY's id for this member (unlike VirtualKey/GatewayBudget.externalId,
-//                        // which mean "customer-supplied id" — different concept, same word)
-//   scimSource  String?  // "scim" when directory-managed — the ownership discriminator shipped code keys on
-//   @@unique([organizationId, externalId])
-
-// Inventory of bots/agents seen in providers. Our id is the reference; the
-// provider-label combination is the recognition rule (Decision 8).
-model DiscoveredAgent {
-  id                   String   @id @default(nanoid())
-  organizationId       String
-  providerConnectionId String
-  providerAgentKey     String   // provider labels joined per adapter, e.g. "environmentId/botId"
-  // snapshot payload (name, ownerUserId?, quarantined, …) — inventory data, never our status
-
-  @@unique([organizationId, providerConnectionId, providerAgentKey])
-}
-```
-
-ClickHouse: no new tables. Populate `ActorUserId` (today `""`, `pullerWorker.ts:324`) and add a bloom-filter index beside `idx_actor_email` (migration 00026).
-
 ## Rejected alternatives
 
 - **Stamp the person at ingest** — every late/corrected link forces restating stored rows; the v4/v8 failure class.
@@ -227,3 +184,91 @@ ClickHouse: no new tables. Populate `ActorUserId` (today `""`, `pullerWorker.ts:
   - *Second-order:* read sites of the global flag are in scope, not just write sites — `auth-cli.ts:458` would regress (SCIM-removed user keeps CLI access in that org). Decision 4 narrowed: read-site fixes + two-org 403 test ship with the write flip.
   - *Reversibility:* **Decision 9 (erasure) died as specified** — blanking login ids mid-timeline resurrects superseded links, and blanking only one person's rows shifts the same bug to the previous owner. Fork reopened and re-asked, not silently re-decided. Migration gate rewritten to match this repo's forward-only rollback reality.
 - **v3 — 2026-08-14 — erasure fork re-locked; captain: Sergio Esteban.** New answer: **erase the person, keep the row.** `userId` blanked, directory anchor deleted, email-kind login ids swapped for one consistent opaque token; rows, non-email login ids, and dates all stay. No timeline row ever disappears, so no superseded link can come back into force. Replaces the v1 blank-everything lock.
+
+## Final ER model
+
+Solid lines are database relations; dashed lines are resolved at report time, not stored.
+
+```mermaid
+erDiagram
+  Organization ||--o{ OrganizationUser : "members"
+  User ||--o{ OrganizationUser : "memberships"
+  Organization ||--o{ ProviderConnection : "connected providers"
+  ProviderConnection ||--o{ ProviderIdentityLink : "login ids scoped to"
+  User |o..o{ ProviderIdentityLink : "person (null = unlinked or erased)"
+  ProviderConnection ||--o{ DiscoveredAgent : "bot inventory"
+  ProviderIdentityLink }o..o{ LedgerEventRow : "matched at report time by kind + login id + period"
+
+  ProviderIdentityLink {
+    String id PK
+    BigInt seq "tie-break only"
+    String organizationId "ORG_SCOPED_MODELS"
+    String provider
+    String providerConnectionId
+    String externalKind "id namespace (Constants)"
+    String externalId "provider login id"
+    String userId "nullable; blanked on erasure"
+    DateTime effectiveFrom "backdatable"
+    DateTime recordedAt
+    String source "manual | external_id | email_suggestion_accepted | offboarding"
+    String actorUserId "nullable; from session"
+  }
+
+  OrganizationUser {
+    String externalId "nullable; directory anchor"
+    String scimSource "nullable; ownership discriminator"
+  }
+
+  DiscoveredAgent {
+    String id PK "our stable reference"
+    String organizationId
+    String providerConnectionId
+    String providerAgentKey "provider labels, e.g. environmentId/botId"
+  }
+
+  LedgerEventRow {
+    String TenantId "ClickHouse, not Prisma"
+    String ActorUserId "today empty; this ADR populates it"
+  }
+```
+
+```prisma
+// Add-only list: which provider login belongs to which person, when, per connection.
+// Reporting only — never read by any permission check (ADR-094 Decision 10).
+model ProviderIdentityLink {
+  id                   String   @id @default(nanoid())
+  seq                  BigInt   @default(autoincrement()) // tie-break only (precedent: GatewayChangeEvent.revision, schema.prisma:3410)
+  organizationId       String   // registered in ORG_SCOPED_MODELS
+  provider             String
+  providerConnectionId String   // in the key: two connections to one provider are legitimate
+  externalKind         String   // which id namespace this value lives in (see ADR-094 Constants)
+  externalId           String   // the provider's login id (kept on erasure; email-kind values swapped for a consistent opaque token)
+  userId               String?  // null = unlink row (blanked on erasure)
+  effectiveFrom        DateTime // backdatable; resolution orders by this
+  recordedAt           DateTime @default(now())
+  source               String   // manual | external_id | email_suggestion_accepted | offboarding
+  actorUserId          String?  // who made the change (from session, never request body)
+
+  @@index([organizationId, provider, providerConnectionId, externalKind, externalId, effectiveFrom(sort: Desc)])
+}
+
+// On OrganizationUser (mirrors Group, schema.prisma:2235ff):
+//   externalId  String?  // the DIRECTORY's id for this member (unlike VirtualKey/GatewayBudget.externalId,
+//                        // which mean "customer-supplied id" — different concept, same word)
+//   scimSource  String?  // "scim" when directory-managed — the ownership discriminator shipped code keys on
+//   @@unique([organizationId, externalId])
+
+// Inventory of bots/agents seen in providers. Our id is the reference; the
+// provider-label combination is the recognition rule (Decision 8).
+model DiscoveredAgent {
+  id                   String   @id @default(nanoid())
+  organizationId       String
+  providerConnectionId String
+  providerAgentKey     String   // provider labels joined per adapter, e.g. "environmentId/botId"
+  // snapshot payload (name, ownerUserId?, quarantined, …) — inventory data, never our status
+
+  @@unique([organizationId, providerConnectionId, providerAgentKey])
+}
+```
+
+ClickHouse: no new tables. Populate `ActorUserId` (today `""`, `pullerWorker.ts:324`) and add a bloom-filter index beside `idx_actor_email` (migration 00026).
