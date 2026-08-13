@@ -47,10 +47,8 @@ import {
   DEFAULT_CODE,
   getCodeFromConfig,
 } from "~/optimization_studio/utils/codeAgentConfig";
-import type {
-  AgentComponentConfig,
-  TypedAgent,
-} from "~/server/agents/agent.repository";
+import type { AgentWithFields } from "~/server/agents/agent-fields";
+import type { AgentComponentConfig } from "~/server/agents/agent.repository";
 import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 import { api } from "~/utils/api";
 
@@ -76,7 +74,7 @@ const getOutputsFromConfig = (config: AgentComponentConfig): DSLField[] => {
 export type AgentCodeEditorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
-  onSave?: (agent: TypedAgent) => void;
+  onSave?: (agent: AgentWithFields) => void;
   /** If provided, loads an existing agent for editing */
   agentId?: string;
   /** Available sources for variable mapping (from Evaluations V3) */

@@ -35,7 +35,7 @@ import type {
   Field,
   HttpComponentConfig,
 } from "~/optimization_studio/types/dsl";
-import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { AgentWithFields } from "~/server/agents/agent-fields";
 import type { DatasetColumnType } from "~/server/datasets/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
@@ -51,6 +51,7 @@ import {
   useOpenTargetEditor,
 } from "../hooks/useOpenTargetEditor";
 import { useDatasetSelectionLoader } from "../hooks/useSavedDatasetLoader";
+import { useSyncWorkflowTargetFields } from "../hooks/useSyncWorkflowTargetFields";
 import type {
   ComparisonEvaluatorConfig,
   DatasetColumn,
@@ -213,6 +214,10 @@ export function EvaluationsV3Table({
 
   // Sync saved dataset changes to DB
   useDatasetSync();
+
+  // Re-read what each workflow agent target reads and produces from its
+  // workflow, which owns those fields and can change without the workbench.
+  useSyncWorkflowTargetFields();
 
   const {
     datasets,
@@ -416,7 +421,7 @@ export function EvaluationsV3Table({
 
   // Handler for when a saved agent is selected from the drawer
   const handleSelectSavedAgent = useCallback(
-    (savedAgent: TypedAgent) => {
+    (savedAgent: AgentWithFields) => {
       const config = savedAgent.config as Record<string, unknown>;
 
       // Check if this is an HTTP agent by looking at savedAgent.type or config structure
@@ -424,7 +429,7 @@ export function EvaluationsV3Table({
         savedAgent.type === "http" ||
         (config.url !== undefined && config.bodyTemplate !== undefined);
 
-      // Convert TypedAgent to TargetConfig format (agent type)
+      // Convert the saved agent to TargetConfig format (agent type)
       // For HTTP agents, extract inputs from bodyTemplate and store httpConfig
       // For code/workflow agents, use config.inputs directly
       let targetInputs: Field[];
@@ -449,6 +454,14 @@ export function EvaluationsV3Table({
         ];
       }
 
+      // A workflow agent keeps no inputs or outputs on its own config — its
+      // Studio graph does. The API derives them from that graph, so prefer
+      // them over the config read above and over the "one field called
+      // output" fallback, which is what used to hide every result but the
+      // first from the evaluator's variable picker.
+      const derivedInputs = savedAgent.inputFields;
+      const derivedOutputs = savedAgent.outputFields;
+
       const targetConfig: TargetConfig = {
         id: `target_${Date.now()}`, // Generate unique ID for the workbench
         type: "agent", // This is a target of type "agent" (code/workflow/http)
@@ -456,10 +469,16 @@ export function EvaluationsV3Table({
           ? "http"
           : (savedAgent.type as TargetConfig["agentType"]),
         dbAgentId: savedAgent.id, // Reference to the database agent
-        inputs: targetInputs,
-        outputs: (config.outputs as TargetConfig["outputs"]) ?? [
-          { identifier: "output", type: "str" },
-        ],
+        inputs:
+          derivedInputs && derivedInputs.length > 0
+            ? derivedInputs
+            : targetInputs,
+        outputs:
+          derivedOutputs && derivedOutputs.length > 0
+            ? derivedOutputs
+            : ((config.outputs as TargetConfig["outputs"]) ?? [
+                { identifier: "output", type: "str" },
+              ]),
         mappings: {},
         httpConfig, // Only set for HTTP agents
       };

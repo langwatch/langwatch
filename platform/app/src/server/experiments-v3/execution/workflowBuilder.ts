@@ -124,6 +124,75 @@ export const buildCellWorkflow = (
   };
 };
 
+/**
+ * Builds a mini-workflow holding only the cell's evaluators.
+ *
+ * A workflow target runs its whole Studio graph through execute_flow rather
+ * than as one component, so there is no single target node to hang the
+ * evaluators off. They are dispatched one at a time with explicit inputs, so
+ * what they need from a workflow is the entry row and their own nodes; the
+ * edges that would have carried the target's output stand for a node that is
+ * not in this graph and are left out.
+ */
+export const buildEvaluatorCellWorkflow = (
+  input: WorkflowBuilderInput,
+  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>,
+): Omit<WorkflowBuilderOutput, "targetNodeId"> => {
+  const { cell, datasetColumns } = input;
+  const { targetConfig, evaluatorConfigs, datasetEntry, rowIndex } = cell;
+
+  const entryNode = buildEntryNode(datasetColumns, datasetEntry);
+  const { evaluatorNodes, evaluatorNodeIds } = buildEvaluatorNodes(
+    evaluatorConfigs,
+    targetConfig.id,
+    cell,
+    loadedEvaluators,
+  );
+
+  const datasetId = cell.datasetEntry._datasetId as string | undefined;
+  const edges: Edge[] = evaluatorConfigs.flatMap((evaluator) => {
+    const evaluatorNodeId = evaluatorNodeIds[evaluator.id];
+    if (!evaluatorNodeId) return [];
+    const mappings = datasetId
+      ? (evaluator.mappings[datasetId]?.[targetConfig.id] ?? {})
+      : {};
+
+    return Object.entries(mappings).flatMap(([inputField, mapping]) => {
+      if (mapping.type !== "source" || mapping.source !== "dataset") return [];
+      const columnId =
+        datasetColumns.find((c) => c.name === mapping.sourceField)?.id ??
+        mapping.sourceField;
+      return [
+        {
+          id: `${entryNode.id}->${evaluatorNodeId}.${inputField}`,
+          source: entryNode.id,
+          sourceHandle: `outputs.${columnId}`,
+          target: evaluatorNodeId,
+          targetHandle: `inputs.${inputField}`,
+          type: "default",
+        },
+      ];
+    });
+  });
+
+  return {
+    workflow: {
+      spec_version: LATEST_SPEC_VERSION,
+      workflow_id: `eval_v3_${nanoid(8)}`,
+      name: `Evaluation V3 - Row ${rowIndex}`,
+      icon: "🧪",
+      description: `Evaluators for row ${rowIndex}`,
+      version: "1.0",
+      template_adapter: "default",
+      enable_tracing: true,
+      nodes: [entryNode, ...evaluatorNodes] as Workflow["nodes"],
+      edges,
+      state: {},
+    },
+    evaluatorNodeIds,
+  };
+};
+
 // ============================================================================
 // Entry Node Builder
 // ============================================================================
