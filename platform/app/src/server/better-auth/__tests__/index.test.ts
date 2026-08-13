@@ -230,7 +230,7 @@ describe("better-auth config", () => {
   // ==========================================================================
 
   describe("when Redis is unavailable", () => {
-    /** @scenario Rate limiting falls back to in-memory when Redis is unavailable */
+    /** @scenario Rate limiting falls back to in-memory when Redis is not configured */
     it("sets secondaryStorage to undefined and rate limiting to memory", async () => {
       const { auth } = await import("../index");
       const options = (auth as any).options;
@@ -255,7 +255,7 @@ describe("better-auth config", () => {
   });
 
   describe("when Redis is available", () => {
-    /** @scenario Rate limiting uses Redis secondary storage when available */
+    /** @scenario Rate limiting uses Redis secondary storage when configured */
     it("builds secondaryStorage with get, set, and delete operations", async () => {
       const { buildSecondaryStorage } = await import("../index");
       const fakeRedis = {
