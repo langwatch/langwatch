@@ -204,6 +204,7 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
   });
 
   describe("when the assistant turn is a Converse toolUse block", () => {
+    /** @scenario Converse toolUse block survives extraction */
     it("extracts the tool call's input as the output text", () => {
       const { output } = computeTraceIO(
         makeSpan({
@@ -232,6 +233,7 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
   });
 
   describe("when the user turn is a Converse toolResult block", () => {
+    /** @scenario Converse toolResult block survives extraction */
     it("extracts the tool result's inner text as the input", () => {
       const { input } = computeTraceIO(
         makeSpan({
@@ -261,6 +263,7 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
 
 describe("given a Bedrock span whose messages sit under aws.bedrock.* keys", () => {
   describe("when the span carries the Converse request/response bodies verbatim", () => {
+    /** @scenario "aws.bedrock.* payload keys are mapped to canonical keys" */
     it("maps the payloads to canonical keys and extracts both sides", () => {
       const span = makeSpan({
         spanAttributes: {
@@ -299,6 +302,7 @@ describe("given a Bedrock span whose messages sit under aws.bedrock.* keys", () 
   });
 
   describe("when such a span is the root of an HTTP-instrumented trace", () => {
+    /** @scenario Mapped messages beat the HTTP fallback */
     it("prefers the mapped request messages over the HTTP fallback", () => {
       const { input, output } = computeTraceIO(
         makeSpan({
