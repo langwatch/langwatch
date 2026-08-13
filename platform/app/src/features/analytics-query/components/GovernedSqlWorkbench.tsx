@@ -328,6 +328,49 @@ function useSpecDraft(wiring: ReturnType<typeof useSavedChartWiring>) {
   return { shownSpecText, setEditedSpecText };
 }
 
+/** The result card: every pixel the query card leaves, behind one border. */
+function ResultCard({
+  query,
+  insertExample,
+  wiring,
+  shownSpecText,
+  setEditedSpecText,
+}: {
+  query: ReturnType<typeof useGovernedSqlQuery>;
+  insertExample: (() => void) | undefined;
+  wiring: ReturnType<typeof useSavedChartWiring>;
+  shownSpecText: string | null;
+  setEditedSpecText: (text: string | null) => void;
+}) {
+  return (
+    <Box
+      background="bg.panel"
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="10px"
+      boxShadow="xs"
+      overflow="hidden"
+      flex="1"
+      minHeight={0}
+      display="flex"
+      flexDirection="column"
+    >
+      <GovernedSqlResultPane
+        state={query.state}
+        onRun={query.runQuery}
+        {...(insertExample ? { onInsertExample: insertExample } : {})}
+        renderChartArea={chartArea({
+          state: query.state,
+          registerSpecReader: wiring.registerSpecReader,
+          openedRevision: wiring.openedRevision,
+          editedSpecText: shownSpecText,
+          onEditedSpecTextChange: setEditedSpecText,
+        })}
+      />
+    </Box>
+  );
+}
+
 export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
   const schema = useGovernedSqlSchema({ projectId });
   const query = useGovernedSqlQuery({ projectId });
@@ -381,31 +424,13 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
           parametersSendable={parametersSendable}
         />
 
-        <Box
-          background="bg.panel"
-          borderWidth="1px"
-          borderColor="border"
-          borderRadius="10px"
-          boxShadow="xs"
-          overflow="hidden"
-          flex="1"
-          minHeight={0}
-          display="flex"
-          flexDirection="column"
-        >
-          <GovernedSqlResultPane
-            state={query.state}
-            onRun={query.runQuery}
-            {...(insertExample ? { onInsertExample: insertExample } : {})}
-            renderChartArea={chartArea({
-              state: query.state,
-              registerSpecReader: wiring.registerSpecReader,
-              openedRevision: wiring.openedRevision,
-              editedSpecText: shownSpecText,
-              onEditedSpecTextChange: setEditedSpecText,
-            })}
-          />
-        </Box>
+        <ResultCard
+          query={query}
+          insertExample={insertExample}
+          wiring={wiring}
+          shownSpecText={shownSpecText}
+          setEditedSpecText={setEditedSpecText}
+        />
       </Box>
     </HStack>
   );
