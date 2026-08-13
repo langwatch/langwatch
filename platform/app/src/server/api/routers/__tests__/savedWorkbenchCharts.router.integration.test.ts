@@ -218,7 +218,8 @@ describe("the saved workbench chart router", () => {
       `DELETE FROM "CustomGraph" WHERE "projectId" IN (${ids([PROJECT, OTHER_PROJECT])})`,
     );
     await prisma.$executeRawUnsafe(
-      `DELETE FROM "Project" WHERE id IN (${ids([PROJECT, OTHER_PROJECT])})`,
+      `-- @tenancy: deleting this suite's own Project rows by their exact ids
+      DELETE FROM "Project" WHERE id IN (${ids([PROJECT, OTHER_PROJECT])})`,
     );
     await prisma.$executeRawUnsafe(
       `DELETE FROM "RoleBinding" WHERE "organizationId" IN (${ids([ORG, OTHER_ORG])})`,
@@ -230,13 +231,16 @@ describe("the saved workbench chart router", () => {
       `DELETE FROM "OrganizationUser" WHERE "organizationId" IN (${ids([ORG, OTHER_ORG])})`,
     );
     await prisma.$executeRawUnsafe(
-      `DELETE FROM "User" WHERE id LIKE 'usr-${ns}%'`,
+      `-- @tenancy: deleting this suite's own User rows by its unique namespace prefix
+      DELETE FROM "User" WHERE id LIKE 'usr-${ns}%'`,
     );
     await prisma.$executeRawUnsafe(
-      `DELETE FROM "Team" WHERE id IN (${ids([TEAM, OTHER_TEAM])})`,
+      `-- @tenancy: deleting this suite's own Team rows by their exact ids
+      DELETE FROM "Team" WHERE id IN (${ids([TEAM, OTHER_TEAM])})`,
     );
     await prisma.$executeRawUnsafe(
-      `DELETE FROM "Organization" WHERE id IN (${ids([ORG, OTHER_ORG])})`,
+      `-- @tenancy: deleting this suite's own Organization rows by their exact ids
+      DELETE FROM "Organization" WHERE id IN (${ids([ORG, OTHER_ORG])})`,
     );
   });
 
