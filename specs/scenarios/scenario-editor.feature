@@ -51,7 +51,7 @@ Feature: Scenario Editor
   # Turn Configuration (ADR-015)
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Advanced section shows maxTurns and minTurns fields
     Given I am on the scenario editor
     Then I see a collapsible "Advanced" section
@@ -59,9 +59,9 @@ Feature: Scenario Editor
     Then I see the following fields:
       | field     | type         | placeholder  |
       | Max Turns | number input | Default: 10  |
-      | Min Turns | number input | empty        |
+      | Min Turns | number input | Default: none |
 
-  @integration
+  @integration @unimplemented
   Scenario: Save scenario with maxTurns set
     Given I am on the scenario editor
     And I have filled in the required fields
@@ -70,7 +70,7 @@ Feature: Scenario Editor
     And I save the scenario
     Then the scenario is saved with maxTurns = 5
 
-  @integration
+  @integration @unimplemented
   Scenario: Save scenario with minTurns set
     Given I am on the scenario editor
     And I have filled in the required fields
@@ -79,7 +79,7 @@ Feature: Scenario Editor
     And I save the scenario
     Then the scenario is saved with minTurns = 3
 
-  @integration
+  @integration @unimplemented
   Scenario: Clear turn config resets to SDK defaults
     Given I am editing scenario "Refund Flow" with maxTurns = 5
     When I expand the "Advanced" section
@@ -87,7 +87,7 @@ Feature: Scenario Editor
     And I save the scenario
     Then the scenario is saved with maxTurns = null
 
-  @integration
+  @integration @unimplemented
   Scenario: Switching scenarios resets turn config fields
     Given I am editing scenario "Refund Flow" with maxTurns = 5
     When I switch to editing scenario "Billing Check" with maxTurns = 3

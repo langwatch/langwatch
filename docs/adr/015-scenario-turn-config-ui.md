@@ -34,7 +34,7 @@ Constraints (locked in Phase 1):
    
    Note: unlike `situation` → SDK `description` rename at `scenario-child-process.ts:176`, `maxTurns`/`minTurns` pass through as-is (names match the SDK interface). Rejects: a separate config channel (adds fields to ChildProcessJobData outside the scenario object).
 
-4. **Minimal platform validation: type only.** `maxTurns`: positive integer (≥ 1). `minTurns`: non-negative integer (≥ 0). No upper cap, no cross-validation of `minTurns ≤ maxTurns` — the SDK validates at startup and returns a clear error. Rejects: duplicating SDK validation on the platform (the SDK is the authority; platform validation would drift).
+4. **Minimal platform validation: type and bounds.** `maxTurns`: positive integer (≥ 1, ≤ 100). `minTurns`: non-negative integer (≥ 0, ≤ 100). No cross-validation of `minTurns ≤ maxTurns` — the SDK validates at startup and returns a clear error. Rejects: duplicating SDK cross-validation on the platform (the SDK is the authority; platform validation would drift).
 
 5. **Collapsible "Advanced" section in the scenario form**, below the criteria/labels fields. Contains `maxTurns` and `minTurns` inputs. Rejects: config popover in footer (more complex, less discoverable); inline fields (clutters the primary form).
 
@@ -99,7 +99,7 @@ ALTER TABLE "Scenario" ADD COLUMN "minTurns" INTEGER;
 - **Config popover in drawer footer** — more complex implementation, less discoverable than an inline section.
 - **Inline form fields** — clutters the primary form with secondary config.
 - **Cascade resolution like simulatorModel** — unnecessary complexity; no suite-level override in scope.
-- **Platform-side cap at 100** — arbitrary; SDK is the authority on valid ranges.
+- **No upper cap** — a runaway maxTurns could burn tokens; the 100 cap is a reasonable guardrail the SDK doesn't enforce.
 - **Platform-side cross-validation (minTurns ≤ maxTurns)** — duplicates SDK logic; would drift.
 - **Separate re-vendor PR** — extra review cycle for no benefit.
 - **JSON config blob instead of columns** — breaks typed Prisma threading.

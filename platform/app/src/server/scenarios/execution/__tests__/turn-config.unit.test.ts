@@ -2,14 +2,14 @@
  * @vitest-environment node
  *
  * Turn configuration (maxTurns / minTurns) threading tests.
- * Verifies the full path: Zod schema → data-prefetcher → child process.
+ * Verifies schema parsing and data-prefetcher mapping.
  *
  * @see specs/scenarios/scenario-editor.feature   (Turn Configuration ADR-015)
  * @see specs/scenarios/scenario-execution.feature (Turn Config Threading ADR-015)
  * @see docs/adr/015-scenario-turn-config-ui.md
  */
 import { describe, expect, it, vi } from "vitest";
-import { ScenarioConfigSchema, ChildProcessJobDataSchema } from "../types";
+import { ChildProcessJobDataSchema, ScenarioConfigSchema } from "../types";
 
 // ============================================================================
 // Layer 1: ScenarioConfigSchema accepts turn fields
@@ -24,6 +24,7 @@ describe("ScenarioConfigSchema turn config", () => {
     labels: [],
   };
 
+  /** @scenario "Run with maxTurns limits conversation length" */
   it("accepts maxTurns as an optional integer", () => {
     const result = ScenarioConfigSchema.safeParse({ ...base, maxTurns: 5 });
     expect(result.success).toBe(true);
@@ -32,6 +33,7 @@ describe("ScenarioConfigSchema turn config", () => {
     }
   });
 
+  /** @scenario "Run with minTurns guarantees minimum conversation length" */
   it("accepts minTurns as an optional integer", () => {
     const result = ScenarioConfigSchema.safeParse({ ...base, minTurns: 2 });
     expect(result.success).toBe(true);
@@ -40,6 +42,7 @@ describe("ScenarioConfigSchema turn config", () => {
     }
   });
 
+  /** @scenario "Run with both turn fields applies both constraints" */
   it("accepts both maxTurns and minTurns together", () => {
     const result = ScenarioConfigSchema.safeParse({
       ...base,
@@ -53,6 +56,7 @@ describe("ScenarioConfigSchema turn config", () => {
     }
   });
 
+  /** @scenario "Run with no turn config uses SDK defaults" */
   it("parses without turn fields (backward compat)", () => {
     const result = ScenarioConfigSchema.safeParse(base);
     expect(result.success).toBe(true);
@@ -124,6 +128,7 @@ describe("ChildProcessJobDataSchema turn config threading", () => {
     }
   });
 
+  /** @scenario "In-flight job without turn config still parses" */
   it("still parses without turn fields (in-flight job compat)", () => {
     const result = ChildProcessJobDataSchema.safeParse(basePayload);
     expect(result.success).toBe(true);

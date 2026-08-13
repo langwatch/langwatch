@@ -33,16 +33,19 @@ describe("scenarioFormSchema turn config", () => {
     }
   });
 
+  /** @scenario "maxTurns rejects non-positive values" */
   it("rejects maxTurns = 0", () => {
     const result = scenarioFormSchema.safeParse({ ...base, maxTurns: 0 });
     expect(result.success).toBe(false);
   });
 
+  /** @scenario "minTurns rejects negative values" */
   it("rejects negative minTurns", () => {
     const result = scenarioFormSchema.safeParse({ ...base, minTurns: -1 });
     expect(result.success).toBe(false);
   });
 
+  /** @scenario "maxTurns rejects decimal values" */
   it("rejects decimal maxTurns", () => {
     const result = scenarioFormSchema.safeParse({ ...base, maxTurns: 2.5 });
     expect(result.success).toBe(false);
