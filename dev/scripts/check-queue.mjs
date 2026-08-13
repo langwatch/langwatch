@@ -345,6 +345,45 @@ async function waitForTurn({
 }
 
 /**
+ * On a machine with haven installed, the queue's decisions are Go code inside
+ * haven: the run is handed to `haven slot run`, which takes a slot from the
+ * same flock semaphore `haven typecheck` holds — one counter for everything
+ * that saturates the cores — then runs the command with CHECK_SLOTS=0 and
+ * GOMEMLIMIT set, exactly as runCommand below would. Resolves to the child's
+ * exit code, or null when there is no haven to delegate to (the JS queue
+ * below then takes over — the fallback for machines without haven).
+ * CHECK_QUEUE_IMPL=js forces the JS queue, which is how its tests pin it.
+ */
+function delegateToHaven(commandArgv, env) {
+  if ((env.CHECK_QUEUE_IMPL ?? "").trim().toLowerCase() === "js") {
+    return Promise.resolve(null);
+  }
+  const bin = env.HAVEN_BIN || "haven";
+  const argv = [
+    "slot",
+    "run",
+    "--label",
+    resolveLabel(env, commandArgv),
+    "--",
+    ...commandArgv,
+  ];
+  return new Promise((resolve) => {
+    const child = spawn(bin, argv, { stdio: "inherit" });
+    // Only a spawn that never happened (no haven on PATH) may fall back to
+    // the JS queue: once the child ran, falling back would run the command a
+    // second time.
+    let spawned = false;
+    child.on("spawn", () => {
+      spawned = true;
+    });
+    child.on("error", () => resolve(spawned ? 126 : null));
+    child.on("exit", (code, signal) => {
+      resolve(signal ? 128 + (os.constants.signals[signal] ?? 0) : (code ?? 0));
+    });
+  });
+}
+
+/**
  * Soft memory cap for the Go-runtime tools this queue wraps (tsgo is a Go
  * binary): GOMEMLIMIT makes the runtime collect harder to stay under the
  * limit instead of ballooning — a whole-tree typecheck degrades to "slower",
@@ -441,6 +480,9 @@ async function main(argv, env) {
 
   const { slots } = resolveSlots(env);
   if (slots <= 0) return runCommand(commandArgv);
+
+  const delegated = await delegateToHaven(commandArgv, env);
+  if (delegated !== null) return delegated;
 
   const dir = resolveQueueDir(env);
   const arrivedAt = Date.now();

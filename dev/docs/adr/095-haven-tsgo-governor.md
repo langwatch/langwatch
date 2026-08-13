@@ -118,9 +118,14 @@ hunch.
   something less regenerable.
 - A genuinely-larger future typecheck (live heap above the soft cap) gets
   slower before it gets killed; raising the knobs is a one-line env change.
-- The queue's JS implementation and its split ledger remain (tracked
-  separately): this ADR makes the machine safe regardless of which admission
-  path a run took, which is what removes the urgency from consolidating them.
+- The queue's decisions have since moved into haven: `haven slot run` gates
+  whole-repo checks on the same flock semaphore `haven typecheck` holds, and
+  `check-queue.mjs` delegates to it whenever the haven binary is installed —
+  one counter, one implementation, with the JS queue kept only as the
+  fallback for machines without haven (see
+  `specs/setup/check-slots.feature`, "The queue lives inside haven"). The
+  watchdog remains the guarantee either way: it makes the machine safe
+  regardless of which admission path a run took.
 
 ## Related
 

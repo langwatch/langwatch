@@ -109,13 +109,17 @@ var envHelpText = `Environment variables.
     HAVEN_TYPECHECK_MAX_RSS_MB   Kill a typecheck run over this RSS (default 6144
                                  = 6 GiB) or over 10 minutes wall-clock — a
                                  runaway tsgo shouldn't sit on a slot forever.
-    CHECK_SLOTS=N                The sibling knob outside haven: caps concurrent
-                                 "pnpm typecheck" and "pnpm lint" runs machine
-                                 wide (0 disables). "haven typecheck" and
-                                 "haven run" set it to 0 for the run they spawn,
-                                 holding their own slot instead, so a run is
-                                 never counted twice and cannot queue behind
-                                 itself.
+    CHECK_SLOTS=N                Caps concurrent whole-repo checks ("pnpm
+                                 typecheck", "pnpm lint") machine wide (0
+                                 disables). With haven installed those runs are
+                                 delegated to "haven slot run", which gates on
+                                 the same flock semaphore "haven typecheck"
+                                 holds — one counter for everything that
+                                 saturates the cores. Both set CHECK_SLOTS=0
+                                 for the run they spawn, so a run is never
+                                 counted twice and cannot queue behind itself.
+                                 CHECK_QUEUE_IMPL=js forces the JavaScript
+                                 queue in dev/scripts/check-queue.mjs.
     HAVEN_SLOT_HELD=1            Set by "haven run" inside the command it spawns:
                                  this run is already admitted, do not admit again.
     HAVEN_IDLE_TTL=4h            Reap a stack whose heartbeat is older than this.

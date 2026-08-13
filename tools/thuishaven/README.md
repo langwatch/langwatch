@@ -103,6 +103,11 @@ haven switch     print a worktree's dir by name; with `eval "$(haven shell-init)
                  it becomes a real cd, tab-completed
 haven shell-init emit that shell function + completion
 haven hmr        AI-gated HMR: `on [--ttl 30s]` defers Vite reloads, `off` resumes
+haven slot       run any command under the machine-wide check slot:
+                 `slot run [--label <l>] -- <cmd> [args…]` waits for a slot,
+                 runs with stdio passed through, releases; `slot explain`
+                 prints the resolved limit. check-queue.mjs delegates every
+                 whole-repo check here when haven is installed
 haven typecheck  pnpm typecheck under a machine-wide RAM slot
 haven upgrade    reinstall the haven binary from this checkout
 haven help       exhaustive, copy-pasteable reference
