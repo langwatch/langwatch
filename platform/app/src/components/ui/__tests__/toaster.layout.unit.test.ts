@@ -21,14 +21,22 @@ import { LIGHT_MODE_ELEVATION, SYMMETRIC_PADDING_END } from "../toaster";
  *    tuned for a panel that's expected to sit there, not a card that has to
  *    separate itself from the page in the half-second before anyone looks.
  */
+// Chakra types every recipe layer as optional; the guard keeps the
+// assertions honest — a Chakra upgrade that drops the layer fails loudly
+// here instead of comparing against undefined.
+const toastRootRecipe = toastSlotRecipe.base?.root;
+if (!toastRootRecipe) {
+  throw new Error("Chakra's toast slot recipe no longer carries base.root");
+}
+
 describe("given the toast card's material", () => {
   describe("when there is no close button to reserve space for", () => {
     it("pads symmetrically, matching the recipe's own start padding, not its end padding", () => {
       // The override must equal the recipe's `ps` (what a close-button-free
       // toast should look like) and must NOT equal the recipe's own `pe` —
       // otherwise this "fix" would just be re-asserting the broken default.
-      expect(SYMMETRIC_PADDING_END).toBe(toastSlotRecipe.base!.root!.ps);
-      expect(SYMMETRIC_PADDING_END).not.toBe(toastSlotRecipe.base!.root!.pe);
+      expect(SYMMETRIC_PADDING_END).toBe(toastRootRecipe.ps);
+      expect(SYMMETRIC_PADDING_END).not.toBe(toastRootRecipe.pe);
     });
   });
 
