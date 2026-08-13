@@ -362,9 +362,8 @@ func TestControlPlaneVerdictDecidesEachWitnessCombination(t *testing.T) {
 			want:    controlPlaneOK,
 		},
 		{
-			// Either witness alone is enough to run: a split checkout that
-			// carries the app but not the workspace file still has a control
-			// plane to compare against.
+			// A valid package manifest is sufficient to run without the
+			// workspace manifest; a workspace-only checkout is fatal.
 			name:    "the control plane is present without the workspace manifest",
 			fixture: controlPlaneFixture{hasControlPlaneDir: true, manifest: validManifest},
 			want:    controlPlaneOK,
@@ -470,7 +469,7 @@ type controlPlaneFixture struct {
 	hasUnreadableWorkspaceManifest bool   // pnpm-workspace.yaml exists but will not stat
 	hasControlPlaneDir             bool   // platform/app exists, possibly empty
 	manifest                       string // written to platform/app/package.json when set
-	isManifestDirectory            bool   // platform/app/package.json exists but will not open
+	isManifestDirectory            bool   // platform/app/package.json exists but cannot be read
 }
 
 // build materializes the fixture under t.TempDir() and returns the repo root.
