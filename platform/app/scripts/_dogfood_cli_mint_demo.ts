@@ -14,6 +14,7 @@ import {
   PersonalVirtualKeyAlreadyExistsError,
   PersonalVirtualKeyService,
 } from "@ee/governance/services/personalVirtualKey.service";
+import { RedisConnectionService } from "@langwatch/redis-client";
 import { prisma } from "~/server/db";
 import { approveDeviceCode } from "~/server/routes/auth-cli";
 
@@ -89,11 +90,20 @@ async function main() {
   // that lookup by hitting Redis directly via the server's auth-cli
   // helpers — easier than re-implementing the magic-link auth + CSRF
   // dance the browser approve UI requires.
-  const { default: Redis } = await import("ioredis");
-  const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
-  const redis = new Redis(redisUrl);
-  // Mirror userCodeKey() in src/server/routes/auth-cli.ts (line 213).
-  const deviceCode = await redis.get(`lwcli:device:usercode:${userCode}`);
+  // This script boots no App, so it owns the connection it needs — built
+  // through the sanctioned service rather than by constructing ioredis here
+  // (ADR-093), and closed as soon as the lookup is done.
+  const redis = new RedisConnectionService().connectStandalone({
+    url: process.env.REDIS_URL ?? "redis://localhost:6379",
+  });
+  if (!redis) throw new Error("REDIS_URL did not resolve to a connection");
+  let deviceCode: string | null = null;
+  try {
+    // Mirror userCodeKey() in src/server/routes/auth-cli.ts (line 213).
+    deviceCode = await redis.get(`lwcli:device:usercode:${userCode}`);
+  } finally {
+    redis.disconnect();
+  }
   if (!deviceCode) {
     child.kill("SIGTERM");
     throw new Error(`no device_code mapped for user_code ${userCode}`);
