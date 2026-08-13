@@ -75,8 +75,9 @@ func TestObservabilityEnvMutesTheConsoleOnlyWhenAskedTo(t *testing.T) {
 }
 
 // The Grafana base URL is published only once the stack is up, so the app can turn
-// a trace/span id into a clickable deep link. Loopback, for the developer's own
-// browser on this machine.
+// a trace/span id into a clickable deep link. The proxied hostname wins when the
+// portless proxy carries the route; loopback is the fallback. Either way the link
+// is for the developer's own browser on this machine.
 func TestObservabilityEnvPublishesTheGrafanaLink(t *testing.T) {
 	st := Stack{Slug: "portless", ObservabilityOTLPPort: 4318}
 	if got := valueOf(st.OverlayEnv(), "GRAFANA_BASE_URL"); got != "" {
@@ -86,6 +87,11 @@ func TestObservabilityEnvPublishesTheGrafanaLink(t *testing.T) {
 	st.ObservabilityGrafanaPort = 3000
 	if got, want := valueOf(st.OverlayEnv(), "GRAFANA_BASE_URL"), "http://127.0.0.1:3000"; got != want {
 		t.Errorf("GRAFANA_BASE_URL = %q, want %q", got, want)
+	}
+
+	st.ObservabilityGrafanaURL = "https://observability.langwatch.localhost"
+	if got, want := valueOf(st.OverlayEnv(), "GRAFANA_BASE_URL"), "https://observability.langwatch.localhost"; got != want {
+		t.Errorf("with the proxied route up, GRAFANA_BASE_URL = %q, want %q", got, want)
 	}
 }
 

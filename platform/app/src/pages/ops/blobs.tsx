@@ -1,19 +1,11 @@
-import { DashboardLayout } from "~/components/DashboardLayout";
-import { BlobStoreContent } from "~/components/ops/blobs";
-import { OpsPageShell } from "~/components/ops/shared/OpsPageShell";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { useEffect } from "react";
+import { useRouter } from "~/utils/compat/next-router";
 
+/** The payload store is a drawer on the ops dashboard now; old links follow. */
 export default function OpsBlobsPage() {
-  return (
-    <OpsPageShell>
-      <DashboardLayout>
-        <PageLayout.Header>
-          <PageLayout.Heading>Payload store</PageLayout.Heading>
-        </PageLayout.Header>
-        <PageLayout.Container>
-          <BlobStoreContent />
-        </PageLayout.Container>
-      </DashboardLayout>
-    </OpsPageShell>
-  );
+  const router = useRouter();
+  useEffect(() => {
+    void router.replace("/ops?drawer.open=opsBlobs");
+  }, [router]);
+  return null;
 }

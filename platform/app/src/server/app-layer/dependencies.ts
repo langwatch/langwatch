@@ -63,6 +63,7 @@ import type { OpsMetricsCollector } from "./ops/metrics-collector";
 import type { QueueService } from "./ops/queue.service";
 import type { ReplayService } from "./ops/replay.service";
 import type { SchedulerOpsService } from "./ops/scheduler-ops.service";
+import type { OpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import type { OrganizationService } from "./organizations/organization.service";
 import type { PresenceService } from "./presence/presence.service";
 import type { ProjectService } from "./projects/project.service";
@@ -103,7 +104,13 @@ export interface OpsDependencies {
   managerExplorer: ManagerExplorerService;
   replay: ReplayService;
   blobStore: BlobStoreService;
+  /**
+   * The lease-elected snapshot writer. Present on every pod that can reach
+   * Redis, but only scans on the pod currently holding the lease (ADR-090).
+   */
   metricsCollector: OpsMetricsCollector | null;
+  /** Serves the shared snapshot to this pod's dashboard subscribers. */
+  snapshotReader: OpsSnapshotReader | null;
 }
 
 export interface AppDependencies {
