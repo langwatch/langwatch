@@ -8,6 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { keepPreviousData } from "@tanstack/react-query";
 import { LuExternalLink, LuMoveRight } from "react-icons/lu";
 import { ProviderIcon } from "~/features/traces-v2/components/TraceTable/registry/cells/trace/ModelCell";
 import {
@@ -104,7 +105,7 @@ export function LLMModelCostMatchingSpans({
     },
     {
       enabled: !!project?.id && regexValid,
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
       staleTime: 30_000,
     },
   );

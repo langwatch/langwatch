@@ -54,7 +54,7 @@ vi.mock("~/hooks/useDrawer", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       annotation: {
         getByTraceId: { invalidate: mocks.invalidateAnnotations },
         getByTraceIds: { invalidate: mocks.invalidateAnnotationFeed },

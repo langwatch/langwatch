@@ -17,10 +17,15 @@
  * a confident $0.00 spent. Any future drift fails here instead of in a
  * customer's gateway.
  */
-import type { GatewayBudget, GatewayBudgetWindow } from "@prisma/client";
-import { Prisma } from "@prisma/client";
+
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type {
+  GatewayBudget,
+  GatewayBudgetWindow,
+} from "~/generated/prisma/client";
+import { Prisma } from "~/generated/prisma/client";
+import { holdClickHouseSchemaLockForFile } from "~/server/clickhouse/__tests__/holdSchemaLock";
 import {
   replayGooseMigrationUp,
   replayRollupRebuild,
@@ -75,6 +80,11 @@ function budgetFor(window: GatewayBudgetWindow): GatewayBudget {
     createdById: `usr-${suffix}`,
   } as GatewayBudget;
 }
+
+// Held for the whole file. The rollup this suite writes to and reads back is
+// database-wide, so a neighbouring suite rebuilding it drops the materialised
+// view out from under these fixtures.
+holdClickHouseSchemaLockForFile();
 
 describe("given a debit recorded against a budget in ClickHouse", () => {
   const budgets = ALL_WINDOWS.map(budgetFor);

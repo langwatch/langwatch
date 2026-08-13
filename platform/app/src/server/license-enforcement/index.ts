@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "../app-layer/app";
 import { LicenseEnforcementRepository } from "./license-enforcement.repository";
 import { LicenseEnforcementService } from "./license-enforcement.service";

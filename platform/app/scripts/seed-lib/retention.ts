@@ -9,7 +9,7 @@
  * would be written pre-expired, so the seeder pins this first and waits out the
  * resolver's cache window before backdated events flow.
  */
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "../../src/generated/prisma/client";
 
 /** Weekly partition key (toYearWeek): retention must be a whole number of weeks. */
 export const RETENTION_WEEK_DAYS = 7;

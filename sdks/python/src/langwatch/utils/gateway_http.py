@@ -52,11 +52,14 @@ def raise_for_status(response: httpx.Response, *, operation: str = "") -> None:
         body = response.text or ""
         detail = body
     label = f"{operation}: " if operation else ""
+    # A 403 is not an authentication failure: the credential was read and
+    # accepted, and the answer is that this call is not allowed with it. The
+    # 401 wording would send the reader to rotate a key that is fine.
     summary = {
         400: "bad request",
         422: "bad request",
         401: "authentication failed",
-        403: "authentication failed",
+        403: "not permitted",
         402: "plan does not include this surface",
         404: "not found",
         409: "conflicts with existing state",

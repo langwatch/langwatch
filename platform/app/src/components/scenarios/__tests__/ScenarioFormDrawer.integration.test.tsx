@@ -186,7 +186,7 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       scenarios: {
         getAll: { invalidate: vi.fn() },
         getById: { invalidate: vi.fn() },

@@ -57,6 +57,36 @@ export const VARIANT_COLORS = [
 ];
 const TIE_COLOR = "#94A3B8";
 
+/** Font size of the win count printed above each bar. */
+export const COUNT_LABEL_FONT_SIZE = 11;
+
+/**
+ * Gap between a count and the top of the bar it belongs to. Passed explicitly
+ * rather than left to recharts' default, so the room reserved below is
+ * computed from the gap actually used.
+ */
+export const COUNT_LABEL_OFFSET = 5;
+
+/**
+ * Vertical room the plot area gives up so the count above the TALLEST bar has
+ * somewhere to be drawn.
+ *
+ * The axis maximum is the tallest bar's own value, so that bar reaches the top
+ * of the plot area exactly. Its count is then drawn a further
+ * COUNT_LABEL_OFFSET above that, growing upward, and the chart clips whatever
+ * lands outside its box: the leading candidate's tally, the one number the
+ * chart exists to communicate, goes missing while every shorter bar keeps its
+ * own.
+ *
+ * Reserved in pixels rather than by padding the axis maximum, because headroom
+ * measured in wins shrinks on screen as the tally grows: padding the axis by
+ * one win buys a whole plot height divided by the tally, so it is generous at
+ * 4 wins and worth a few pixels at 30, and the label would go missing again on
+ * any run long enough to care about. A pixel reserve is the same size at every
+ * tally, and it leaves the axis topping out at a number somebody actually won.
+ */
+const COUNT_LABEL_HEADROOM = COUNT_LABEL_FONT_SIZE + COUNT_LABEL_OFFSET;
+
 export type WinRateChartProps = {
   column: BatchComparisonColumn;
   /** Matched to the sibling cost/latency charts in ComparisonCharts. */
@@ -161,12 +191,15 @@ export function WinRateChart({
         fontWeight="medium"
         marginBottom={2}
         lineClamp={1}
-        title={`${column.name} — win rate`}
+        title={`${column.name} win rate`}
       >
-        {column.name} — win rate
+        {column.name} win rate
       </Text>
       <ResponsiveContainer width="100%" height={chartHeight}>
-        <BarChart data={chartData} margin={{ left: 10, right: 10 }}>
+        <BarChart
+          data={chartData}
+          margin={{ top: COUNT_LABEL_HEADROOM, left: 10, right: 10 }}
+        >
           <CartesianGrid
             horizontal={true}
             vertical={false}
@@ -216,8 +249,9 @@ export function WinRateChart({
             <LabelList
               dataKey="wins"
               position="top"
+              offset={COUNT_LABEL_OFFSET}
               style={{
-                fontSize: 11,
+                fontSize: COUNT_LABEL_FONT_SIZE,
                 fill: "var(--chakra-colors-fg)",
               }}
             />

@@ -21,7 +21,7 @@ const BLOCKED_ROW_HEIGHT = 36;
 
 export function BlockedCard({ queueNames }: { queueNames: string[] }) {
   const { hasAccess } = useOpsPermission();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const blockedQuery = api.ops.getBlockedSummary.useQuery();
   const queuesQuery = api.ops.listQueues.useQuery();

@@ -1,7 +1,7 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
 import type { ReactNode } from "react";
 import { useState } from "react";
+import type { Project } from "~/generated/prisma/client";
 import type { ElasticSearchEvaluation } from "~/server/tracer/types";
 import { evaluationPassed } from "../checks/EvaluationStatus";
 import { Link } from "../ui/link";
@@ -214,8 +214,11 @@ export const Blocked = (trace: TraceEval) => {
   const guardrails = trace.evaluations?.filter((x) => x.is_guardrail);
   const groups = groupEvaluationsByEvaluator(guardrails);
 
+  // Status-aware: only a guardrail that ran to completion can have blocked —
+  // an errored guardrail's stray `passed: false` is not a block (#6833).
   const totalBlocked = groups.filter(
-    (group) => group.latest.passed === false,
+    (group) =>
+      group.latest.status === "processed" && group.latest.passed === false,
   ).length;
 
   if (totalBlocked === 0) return null;

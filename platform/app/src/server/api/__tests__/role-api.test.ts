@@ -1,5 +1,5 @@
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { RoleService } from "../../role";
 import {
   RoleDuplicateNameError,
@@ -41,6 +41,9 @@ const mockPrisma = {
   $transaction: vi
     .fn()
     .mockImplementation((fn: (tx: any) => Promise<any>) => fn(mockPrisma)),
+  // `isRootPrismaClient` discriminates on `$connect` (Prisma 7 transaction
+  // clients carry `$transaction` too), so a root-client stand-in must have it.
+  $connect: vi.fn(),
   // The delete carries its own in-use condition, so it is one raw statement
   // rather than a read followed by `customRole.delete`. It answers the number
   // of rows it removed, which is how the caller tells "deleted" from "somebody

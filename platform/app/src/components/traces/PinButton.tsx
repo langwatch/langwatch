@@ -1,9 +1,9 @@
 import { Button } from "@chakra-ui/react";
-import { PinSource } from "@prisma/client";
 import { Pin, PinOff } from "lucide-react";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { showErrorToast } from "~/features/errors";
+import { PinSource } from "~/generated/prisma/client";
 import { api } from "~/utils/api";
 
 export function PinButton({
@@ -40,7 +40,7 @@ export function PinButton({
       showErrorToast({ error, fallbackTitle: "Couldn't unpin trace" }),
   });
 
-  const isLoading = pinMutation.isLoading || unpinMutation.isLoading;
+  const isLoading = pinMutation.isPending || unpinMutation.isPending;
 
   const tooltipContent = isSharePin
     ? "Auto-pinned because this trace is shared. Disable the share to unpin."

@@ -81,7 +81,6 @@ function exportProgressSubscription(permission: Permission) {
 
       try {
         for await (const eventArgs of on(emitter, "export_progress", {
-          // @ts-expect-error - signal is not typed
           signal: opts.signal,
         })) {
           const event = eventArgs[0] as { event: string; timestamp: number };

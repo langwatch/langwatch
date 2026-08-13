@@ -1,6 +1,6 @@
 ---
 name: debug-with-langwatch
-description: Root-cause production errors and misbehaving agent runs with LangWatch. Finds errored traces, inspects spans, checks monitor and evaluator scores, then narrows to a root cause. Use when something is failing or misbehaving in production — errors, bad answers, latency spikes.
+description: Root-cause production errors and misbehaving agent runs with LangWatch. Finds errored traces, inspects spans, checks monitor and evaluator scores, then narrows to a root cause. Use when something is failing or misbehaving in production (errors, bad answers, latency spikes).
 license: MIT
 compatibility: Requires the `langwatch` CLI with a valid `LANGWATCH_API_KEY`. Works with any coding agent.
 metadata:
@@ -11,7 +11,7 @@ metadata:
 
 A structured diagnostic workflow: errored traces → span inspection → monitor/evaluator scores → root cause. Work the steps in order; each narrows the search space for the next.
 
-If traces themselves look broken (empty inputs/outputs, disconnected spans), switch to the `debug-instrumentation` recipe instead — that is an instrumentation problem, not an application problem.
+If traces themselves look broken (empty inputs/outputs, disconnected spans), switch to the `debug-instrumentation` recipe instead. That is an instrumentation problem, not an application problem.
 
 ## Prerequisites
 
@@ -29,7 +29,7 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`, so preview with `--dry-run` when the session touched sensitive data. `npx langwatch report --help` explains the options.
 
 ## Step 0: Point the CLI at the Right Project
 
@@ -37,7 +37,7 @@ If anything fails or confuses you while following this skill (broken commands, d
 langwatch status
 ```
 
-A fast sanity check that the API key, endpoint, and project are the ones you mean to debug. Fix auth first (see the `setup-lw` recipe) — every later step reads from this project.
+A fast sanity check that the API key, endpoint, and project are the ones you mean to debug. Fix auth first (see the `setup-lw` recipe): every later step reads from this project.
 
 ## Step 1: Find the Errored Traces
 
@@ -47,7 +47,7 @@ langwatch trace search -q "timeout" --start-date 2026-01-01 -o json
 ```
 
 - `--start-date`/`--end-date` bound the window (ISO strings or epoch ms; default is the last 24h).
-- `-q` does a text search — the error message, a user id, a thread id.
+- `-q` does a text search: the error message, a user id, a thread id.
 - The result is `{ "traces": [...], "pagination": { "totalHits": N } }`. Pull fields out with `--jq` instead of reading the whole payload:
 
 ```bash
@@ -66,7 +66,7 @@ langwatch trace get <traceId> -o json    # full span hierarchy
 
 Read the span tree top-down:
 
-- **Which span failed?** The error is usually in one span (an LLM call, a tool call), not the whole trace. Note its input — a bad input upstream often explains a failure downstream.
+- **Which span failed?** The error is usually in one span (an LLM call, a tool call), not the whole trace. Note its input: a bad input upstream often explains a failure downstream.
 - **What did the model see?** Check the prompt/messages on the failing LLM span. Missing context, truncated history, and stale retrieved documents are the usual suspects.
 - **Retries and timeouts:** repeated identical spans suggest retry loops; a long-running span before the failure suggests a timeout.
 
@@ -80,7 +80,7 @@ langwatch monitor get <id> -o json       # one monitor's config and recent state
 langwatch evaluator list -o json         # the evaluators the monitors run
 ```
 
-- A firing monitor names the failure mode (toxicity, hallucination, PII) — corroborate it against the spans from Step 2.
+- A firing monitor names the failure mode (toxicity, hallucination, PII). Corroborate it against the spans from Step 2.
 - No monitor for the failure mode you found? That is a gap worth closing once the root cause is fixed (`langwatch monitor create`).
 
 For a quantitative view of the blast radius:
@@ -94,7 +94,7 @@ langwatch analytics query -m trace-count -a sum --group-by metadata.model -o jso
 1. Form a hypothesis from the failing span's input + the monitor's failure mode: prompt change, model change, bad retrieval, code regression. `git log` on the agent's code and prompts tells you what changed when the failures started.
 2. Apply the fix (prompt, code, or configuration).
 3. Generate fresh traffic, then re-run Step 1: the errored traces should stop appearing.
-4. If the failure was a regression, add a scenario so it stays fixed — the `scenarios` skill covers this.
+4. If the failure was a regression, add a scenario so it stays fixed. The `scenarios` skill covers this.
 
 ## Discovery
 

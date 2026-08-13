@@ -44,7 +44,7 @@ const {
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       user: {
         getLinkedAccounts: { invalidate: vi.fn().mockResolvedValue(undefined) },
       },

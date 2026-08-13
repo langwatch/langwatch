@@ -132,7 +132,7 @@ vi.mock("~/utils/api", () => ({
         }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       agent: {
         getBySlug: {
           invalidate: vi.fn(),

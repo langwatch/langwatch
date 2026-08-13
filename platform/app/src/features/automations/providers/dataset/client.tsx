@@ -1,11 +1,11 @@
 import { Text, useDisclosure, VStack } from "@chakra-ui/react";
 import type { DatasetActionParams } from "@langwatch/automations/providers/dataset";
 import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
-import type { Dataset } from "@prisma/client";
 import { Database } from "lucide-react";
 import { useEffect } from "react";
 import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
 import { DatasetSelector } from "~/components/datasets/DatasetSelector";
+import type { Dataset } from "~/generated/prisma/client";
 import {
   type DatasetColumns,
   datasetColumnsSchema,

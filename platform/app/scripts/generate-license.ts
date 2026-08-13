@@ -40,9 +40,10 @@
  * Organization.license. Treat the private key like any other prod
  * secret — pair it with the public key declared in env-create.mjs.
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { prisma as defaultPrisma } from "~/server/db";
 import { generateLicenseKey } from "../ee/licensing/licenseGenerationService";
+import type { PrismaClient } from "../src/generated/prisma/client";
 
 interface ApplyLicenseInput {
   prisma: PrismaClient;

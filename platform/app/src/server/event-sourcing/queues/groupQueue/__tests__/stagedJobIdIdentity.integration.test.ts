@@ -31,16 +31,14 @@ import {
   withJobAttempt,
 } from "../jobEnvelope";
 import { gqJobsDroppedTotal } from "../metrics";
-import {
-  DEFAULT_CLAIM_STRIKE_THRESHOLD,
-  GroupStagingScripts,
-} from "../scripts";
+import { GroupStagingScripts } from "../scripts";
 import { TieredBlobStore } from "../tieredBlobStore";
 import {
   InMemoryJobBlobStore,
   InMemoryObjectStore,
   incompressible,
 } from "./blobTestDoubles";
+import { seedDeadOwner as sharedSeedDeadOwner } from "./poisonGuardFixtures";
 
 // Skip outside testcontainers (e.g. plain unit runs) — mirrors the other
 // groupQueue integration suites (groupQueue.poisonGuard/decodeDrop).
@@ -153,8 +151,8 @@ describe.skipIf(!hasTestcontainers)(
       `${name}:gq:group:${groupId}:attempt`;
     const failStreakKey = (name: string, groupId: string) =>
       `${name}:gq:group:${groupId}:failstreak`;
-    const strikesKey = (name: string, groupId: string) =>
-      `${name}:gq:group:${groupId}:strikes`;
+    const seedDeadOwner = (name: string, groupId: string) =>
+      sharedSeedDeadOwner({ redis, queueName: name, groupId });
     const activeKey = (name: string, groupId: string) =>
       `${name}:gq:group:${groupId}:active`;
 
@@ -510,12 +508,9 @@ describe.skipIf(!hasTestcontainers)(
           });
           await queue.waitUntilReady();
 
-          // Strikes left by prior claims whose process died — the crash-loop
+          // The marker left by a prior claim whose process died — the crash-loop
           // signature the claim-side guard parks on.
-          await redis.set(
-            strikesKey(name, groupId),
-            String(DEFAULT_CLAIM_STRIKE_THRESHOLD),
-          );
+          await seedDeadOwner(name, groupId);
 
           const payload: TestPayload = {
             id: "event_parked",
@@ -1530,15 +1525,12 @@ describe.skipIf(!hasTestcontainers)(
           );
           expect(await stagedIds(name, groupId)).toEqual([LEGACY_ID]);
 
-          // Step 3 — a poison park. Stop the consumer first so the strikes are
-          // in place before any claim can race them.
+          // Step 3 — a poison park. Stop the consumer first so the marker is
+          // in place before any claim can race it.
           await consumer.close();
           const ops = new QueueRedisRepository(redis);
           await ops.unblockGroup({ queueName: name, groupId });
-          await redis.set(
-            strikesKey(name, groupId),
-            String(DEFAULT_CLAIM_STRIKE_THRESHOLD),
-          );
+          await seedDeadOwner(name, groupId);
 
           const parker = newQueue({
             name,

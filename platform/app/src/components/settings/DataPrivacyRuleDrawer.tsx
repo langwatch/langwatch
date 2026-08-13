@@ -56,7 +56,7 @@ export function DataPrivacyRuleDrawer({
       projectId={projectId}
       currentTeamId={project?.teamId ?? null}
       currentOrganizationId={organization?.id ?? null}
-      isSaving={setForScope.isLoading}
+      isSaving={setForScope.isPending}
       onSave={async (scopes, config) => {
         try {
           await Promise.all(

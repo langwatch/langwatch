@@ -116,6 +116,20 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
     Then I see "variant_2" named as the winner
     And I do not see the losing variants listed alongside it
 
+  # A verdict too long for its cell expands over the table behind a
+  # full-viewport backdrop. An overlay that only closes on an outside click
+  # leaves the reader stranded: the backdrop keeps swallowing pointer events,
+  # so the toolbar above the table stops responding until they happen to click
+  # the backdrop itself.
+  @integration
+  Scenario: Dismissing an expanded verdict
+    Given a Comparison verdict too long to fit its cell
+    When I click the cell to read all of it
+    Then the verdict expands over the table
+    And it tells me it closes on an outside click or on Escape
+    When I press Escape
+    Then the expanded verdict closes and the table is clickable again
+
   Scenario: Clicking the winner highlights its source column
     Given a Comparison verdict names "variant_2" as the winner
     When I click on the winner's name
@@ -160,6 +174,19 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
     When I view the run on the results page
     Then "variant_3" is still shown, with zero wins
 
+  # Dogfood, on a run of 4, 0 and 3 wins: the "3" showed above its bar and the
+  # winner's "4" showed nowhere. The leading bar is as tall as the chart allows,
+  # so its count was drawn past the top edge and cut off, leaving the one tally
+  # the reader came for as the only one missing. The room for it is reserved as
+  # a fixed strip of the chart rather than by stretching the axis, which would
+  # give back less and less room as the counts climb.
+  @integration
+  Scenario: The leading candidate's win count stays legible
+    Given 30 rows have been evaluated where variant_1 wins 14, variant_2 wins 10, variant_3 wins 4, and 2 ties
+    When I view the win-rate chart on the results page
+    Then I can read "14" above variant_1's bar
+    And I can read it just as well on a run ten times longer
+
   # Customer feedback, 2026-07-08 call: reusing the same prompt as two
   # variants (e.g. re-testing gpt-4.1 vs gpt-5-mini) made them
   # indistinguishable in the scoreboard and per-row verdicts. What differs
@@ -201,6 +228,17 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
     And the prompt has not been customized by the user
     When a row is evaluated
     Then the judge picks a winning candidate based on how well it matches the golden answer
+
+  # The config form decides whether a prompt is still a shipped default by
+  # comparing it against its own copies of the four templates. If those
+  # copies drift from the judge's, the form stops recognizing an untouched
+  # prompt, silently turns off the adaptation above, and a golden-free
+  # comparison ships a prompt framed around a reference answer that isn't
+  # there. Nothing about that failure is visible, so the copies are pinned.
+  @unit
+  Scenario: The shipped judge prompts are identical wherever they are written down
+    Then every default judge prompt the config form knows is byte-identical
+      to the judge's own
 
   # The judge also adapts to whether the row itself carries task context: a
   # row that hands the judge a task is framed around it, while a row with no
@@ -286,3 +324,90 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
     Given a saved pairwise experiment where "variantA" is narrowed to output field "answer"
     When a row is re-run
     Then the judge sees only the "answer" field for that variant, not its whole structured output
+
+  # The judge is shown anonymized slot labels so a candidate's name cannot
+  # sway it, which leaves it arguing about "A", "B" and "C". A verdict reading
+  # "Winner: variant_2" above a paragraph about "Candidate C" puts the most
+  # useful half of a comparison in a code the reader has no key for, so the
+  # reasoning is translated with the same mapping the winner is.
+  #
+  # Two things make that work, and the first one carries most of the weight.
+  # The judge is asked to write "Candidate A" rather than a bare "A", because
+  # a bare "A" is also the English article and nothing downstream can tell the
+  # two apart with certainty. What arrives with the noun in front is
+  # translated unconditionally; a bare letter is translated only where the
+  # surrounding words rule the article out, so some bare letters survive into
+  # the text a customer reads. That is the deliberate trade: prose a
+  # substitution would corrupt is worse than a letter left standing.
+  @unit
+  Scenario: The judge is asked to name candidates rather than write bare letters
+    Given a Comparison evaluator judges a row
+    When the judge is briefed
+    Then it is told to write each slot as "Candidate A" and never as a bare letter
+    And the instruction holds even when the judge prompt has been customized
+    And the winning slot it records is still the bare label
+    # Asking twice, once more on the field the judge fills, raised compliance
+    # slightly and made the judge enumerate every candidate: a third more
+    # words for no reliable drop in bare letters. Reasoning a customer reads
+    # is worth more brief than exhaustive, so it is asked once.
+    And the reasoning it writes stays as brief as it was before the instruction
+
+  @unit
+  Scenario: The verdict reasoning names candidates, not slot letters
+    Given a Comparison evaluator has judged a row with three variants
+    When the judge explains its pick as "Candidate C", or as "candidate c"
+    Then the reasoning I read names that variant in place of the letter
+
+  # The reasoning is customer-facing prose, so a substitution that corrupts a
+  # sentence is worse than a slot letter left standing. Three collisions
+  # matter: the English article, a quoted letter, which is usually a
+  # multiple-choice answer the candidate gave, and a letter that is part of a
+  # longer name, which is what "C++" is to a reader.
+  @unit
+  Scenario: Reasoning prose survives the slot translation
+    Given the judge's explanation opens with "A concise answer is better"
+    When I read the reasoning
+    Then that sentence is untouched
+    And a letter that was never one of this row's slots is untouched
+    And an explanation that mentions no slot at all is untouched
+    And a letter in quotes, or in backticks, is untouched
+    And a letter glued into a longer name such as "C++" is untouched
+
+  @unit
+  Scenario: A bare slot letter is translated only where it cannot be an article
+    Given the judge's explanation says "C is more complete than A"
+    When I read the reasoning
+    Then both letters name their variants
+    And letters written as a list item or in parentheses name their variants too
+    And a letter introduced by a comparison word such as "compared with" names its variant
+    And a capitalized article in title case, such as "compared with A Concise Answer", is untouched
+    # The honest limit of the fallback, and why the judge is asked not to
+    # produce this shape: the verb after a bare "A" comes from an open
+    # vocabulary, so no list of words can decide between a slot and an
+    # article. The letter stays rather than risk rewriting real prose.
+    And a bare "A" in front of an everyday verb, as in "A strikes the best balance", is left standing
+
+  # An inconclusive row is the most expensive kind there is: both judge passes
+  # were made and both were billed before they were found to disagree. The row
+  # scores nothing, which is the point, but reporting it as free understates
+  # exactly the rows a reader would want to know cost them the most. The money
+  # travels whether the row was judged from the SDK or from the workbench.
+  @integration
+  Scenario: An inconclusive row still reports what it cost
+    Given a row whose two judge passes disagreed
+    When I read what the run spent
+    Then that row reports the cost of both judge calls
+    And it still reports no winner, no score and no verdict
+    And a row that declined before calling the judge reports no cost at all
+
+  # The two passes are shown the candidates in opposite orders, so slot A of
+  # the second pass is a different variant from slot A of the first. Reading
+  # one pass with the other's key would attribute the words to the wrong
+  # variant, which is worse than leaving the letters in.
+  @unit
+  Scenario: Each judge pass is translated with the slot order it actually saw
+    Given a row is checked twice, the second time with the candidate order reversed
+    And the two passes pick different variants
+    When I read why the row was inconclusive
+    Then each pass's explanation names the variants that pass was shown
+    And no words are attributed to the variant that held that slot in the other pass
