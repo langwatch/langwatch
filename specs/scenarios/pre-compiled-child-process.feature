@@ -1,17 +1,26 @@
 Feature: Pre-compiled Scenario Child Process
 
-  Scenario child processes are spawned via `pnpm exec tsx`, which compiles
-  TypeScript at runtime on every invocation. Cold starts take ~4.5 minutes and
-  warm starts ~53 seconds, nearly exhausting the 5-minute timeout before actual
-  scenario execution begins.
+  Scenario child processes are spawned fresh per run, so whatever the child
+  loads at module scope is paid on every simulation. Spawning via
+  `pnpm exec tsx` compiled TypeScript at runtime on every invocation; the
+  pre-compiled bundle removed that.
 
-  Pre-compiling the child process entry point into a single bundled JavaScript
-  file eliminates tsx compilation, pnpm resolution, and corepack overhead,
-  reducing startup to low single-digit seconds.
+  Pre-compiling alone did not remove the dominant cost. The bundle kept the
+  scenario SDK external, so the child still resolved that package's entire
+  dependency graph from disk at boot — thousands of file reads before it could
+  read a single byte of job data. Inlining the SDK into the bundle turns that
+  graph into one file read.
 
   Key design decisions:
-  - Shared singleton dependencies (OTEL, scenario SDK) are kept external
-    to preserve runtime semantics and avoid double-bundling
+  - The scenario SDK is INLINED into the bundle. It is the single largest
+    startup cost when left external, and the child is a fresh process per run
+    so it pays that cost every time.
+  - OpenTelemetry stays EXTERNAL, and this is load-bearing rather than
+    incidental. The child reaches for the globally registered tracer provider
+    to flush spans before exit. Inlining the OTEL API would give the child two
+    copies of it — the SDK registering its provider into one, the flush code
+    reading the other and finding a no-op proxy — and every span would be
+    dropped silently.
   - In development, tsx is used for fast iteration; in production, the
     pre-compiled bundle is required — packaged deployments carry no tsx
   - Bundle output lives at dist/server/scenario-child-process.cjs relative to
@@ -29,7 +38,28 @@ Feature: Pre-compiled Scenario Child Process
   Scenario: Build step produces a runnable JavaScript bundle
     When the child process build step runs
     Then it produces a single JavaScript file at dist/server/scenario-child-process.cjs
-    And shared singleton dependencies are excluded from the bundle
+
+  @integration
+  Scenario: The scenario SDK is inlined rather than required at runtime
+    When the child process build step runs
+    Then the bundle does not require the scenario SDK from node_modules
+    And the SDK's own module graph is not resolved from disk at child startup
+
+  @integration
+  Scenario: OpenTelemetry stays external so the child holds one tracer provider
+    A second copy of the OTEL API inside the bundle would take the provider
+    registration and the span flush to different global registries, and the
+    child would report no spans at all while still exiting successfully.
+
+    When the child process build step runs
+    Then the bundle requires "@opentelemetry/api" from node_modules
+    And no copy of the OpenTelemetry API is inlined into the bundle
+
+  @integration
+  Scenario: Every externalized require resolves from the bundle directory
+    Given a pre-compiled child process bundle
+    When the bundle is loaded from a production-shaped directory layout
+    Then no module fails to resolve
 
   # ---------------------------------------------------------------------------
   # Spawning — processor uses the compiled bundle
@@ -49,7 +79,7 @@ Feature: Pre-compiled Scenario Child Process
     When the scenario processor spawns a child process
     Then it invokes "pnpm exec tsx" with the TypeScript source file
 
-  @unit
+  @integration
   Scenario: Child process receives job data via stdin
     Given a child process spawned from the pre-compiled bundle
     When the processor writes job data to stdin
@@ -67,10 +97,19 @@ Feature: Pre-compiled Scenario Child Process
   # ---------------------------------------------------------------------------
 
   @integration
-  Scenario: Pre-compiled child process starts within seconds
+  Scenario: Pre-compiled child process is ready for job data promptly
     Given a pre-compiled child process bundle
     When a child process is spawned and begins reading from stdin
-    Then it is ready to receive job data in under 5 seconds
+    Then it is ready to receive job data well inside the startup budget
+
+  @unit
+  Scenario: The spawned child is given a compile cache directory
+    Re-compiling the bundle's JavaScript on every spawn is wasted work, since
+    the bundle only changes when the app is rebuilt.
+
+    Given the scenario processor builds the child environment
+    Then the child environment names a compile cache directory
+    And a caller-provided cache directory is preserved
 
   # ---------------------------------------------------------------------------
   # Error Handling
