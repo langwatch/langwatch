@@ -55,11 +55,10 @@ export const SERIALIZED_ADAPTER_FACTORIES: Record<string, AdapterFactory> = {
     });
   },
   http: ({ data, parameters }) =>
-    new SerializedHttpAgentAdapter(
-      data as HttpAgentData,
-      undefined,
+    new SerializedHttpAgentAdapter({
+      config: data as HttpAgentData,
       parameters,
-    ),
+    }),
   code: ({ data, nlpServiceUrl, projectApiKey, parameters }) => {
     if (!projectApiKey) {
       throw new Error("Code adapter requires projectApiKey");

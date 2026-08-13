@@ -88,9 +88,13 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
    * Without scenarioMappings: first input gets the last user message, rest get "".
    */
   private resolveInputValues(agentInput: AgentInput): Record<string, string> {
+    // A declared input wins over a parameter of the same name. Spread the other
+    // way round and a parameter called `input` would quietly replace the
+    // conversation turn the target is supposed to answer, and the run would
+    // read as an agent that ignored the user.
     return {
-      ...this.resolveMappedInputValues(agentInput),
       ...this.parametersAsEntryInputs(),
+      ...this.resolveMappedInputValues(agentInput),
     };
   }
 

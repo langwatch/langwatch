@@ -15,4 +15,9 @@
 ALTER TABLE "Scenario" ADD COLUMN "parameters" JSONB;
 
 -- Down (manual): reverses this migration; run only to roll back.
+--
+-- WARNING: the drop discards every parameter any scenario declares, with its
+-- name, description and default value. Those are authored by hand and nothing
+-- else stores them, so the only way back is a database restore. Export the
+-- column before running it.
 --   ALTER TABLE "Scenario" DROP COLUMN "parameters";

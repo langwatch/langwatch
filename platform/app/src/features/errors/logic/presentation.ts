@@ -1138,11 +1138,15 @@ const presentations = {
     title: "This run is missing a parameter value",
     describe: (error) => {
       const missing = strList(error, "names");
+      const plural = missing.length > 1;
       const subject =
         missing.length > 0
-          ? `${listLabels(missing)} ${missing.length === 1 ? "has" : "have"} no value.`
+          ? `${listLabels(missing)} ${plural ? "have no values" : "has no value"}.`
           : "A parameter the scenario reads has no value.";
-      return `${subject} ${scenarioFieldLabel(error)} reads it. Set a value for this run, or give the parameter a default on the scenario.`;
+      const remedy = plural
+        ? "Set values for this run, or give each parameter a default on the scenario."
+        : "Set a value for this run, or give the parameter a default on the scenario.";
+      return `${subject} ${scenarioFieldLabel(error)} reads ${plural ? "them" : "it"}. ${remedy}`;
     },
   },
   scenario_parameter_template_invalid: {

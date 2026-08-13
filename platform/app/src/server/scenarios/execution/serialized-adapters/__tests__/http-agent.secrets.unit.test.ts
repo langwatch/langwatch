@@ -82,11 +82,11 @@ describe("SerializedHttpAgentAdapter secret references", () => {
   describe("given a url that references a project secret", () => {
     /** @scenario "A secret reference in the url resolves to the project secret value" */
     it("sends the request to the url with the secret's value in place", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        config({
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
           url: "https://api.example.com/{{ secrets.AGENT_TOKEN }}/chat",
         }),
-      );
+      });
 
       await adapter.call(input);
 
@@ -97,13 +97,12 @@ describe("SerializedHttpAgentAdapter secret references", () => {
 
     /** @scenario "A secret reference in the url resolves to the project secret value" */
     it("renders run parameters in the same url alongside the secret", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        config({
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
           url: "https://api.example.com/{{ params.region }}?key={{ secrets.AGENT_TOKEN }}",
         }),
-        undefined,
-        { region: "eu-central" },
-      );
+        parameters: { region: "eu-central" },
+      });
 
       await adapter.call(input);
 
@@ -113,14 +112,55 @@ describe("SerializedHttpAgentAdapter secret references", () => {
     });
   });
 
+  describe("given a secret value that is itself Liquid template syntax", () => {
+    /** @scenario "A resolved secret value is never read as template source" */
+    it("sends the value verbatim without letting it close a fence", async () => {
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
+          url: "https://api.example.com/{{ secrets.AGENT_TOKEN }}/{{ params.region }}",
+          secrets: { AGENT_TOKEN: "x{% endraw %}{{ params.region }}{% raw %}" },
+        }),
+        parameters: { region: "eu-central" },
+      });
+
+      await adapter.call(input);
+
+      // The secret's own `{{ params.region }}` must survive as text. Rendered,
+      // it would read the same value the neighbouring expression renders, and
+      // the two would be indistinguishable in the result.
+      expect(requestedUrl()).toBe(
+        "https://api.example.com/x{% endraw %}{{ params.region }}{% raw %}/eu-central",
+      );
+    });
+  });
+
+  describe("given one secret value that contains another", () => {
+    /** @scenario "A failure message shows no resolved secret value" */
+    it("redacts the longer value whole rather than leaving its tail", async () => {
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
+          url: "https://api.example.com/{{ secrets.LONG }}",
+          secrets: { SHORT: "abc", LONG: "abcdef" },
+        }),
+      });
+      mockSsrfSafeFetch.mockRejectedValue(
+        new Error("connect failed for https://api.example.com/abcdef"),
+      );
+
+      await expect(adapter.call(input)).rejects.toMatchObject({
+        message: "connect failed for https://api.example.com/[redacted]",
+      });
+    });
+  });
+
   describe("given headers and auth fields that reference a project secret", () => {
     /** @scenario "Secret references resolve in header values and auth token, value, username, and password" */
     it("carries the secret's value in the header value", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        config({
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
           headers: [{ key: "X-Agent-Key", value: "{{ secrets.AGENT_TOKEN }}" }],
         }),
-      );
+      });
 
       await adapter.call(input);
 
@@ -129,11 +169,11 @@ describe("SerializedHttpAgentAdapter secret references", () => {
 
     /** @scenario "Secret references resolve in header values and auth token, value, username, and password" */
     it("carries the secret's value in a bearer auth token", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        config({
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
           auth: { type: "bearer", token: "{{ secrets.AGENT_TOKEN }}" },
         }),
-      );
+      });
 
       await adapter.call(input);
 
@@ -142,15 +182,15 @@ describe("SerializedHttpAgentAdapter secret references", () => {
 
     /** @scenario "Secret references resolve in header values and auth token, value, username, and password" */
     it("carries the secret's value in an api key auth value", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        config({
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
           auth: {
             type: "api_key",
             header: "X-Api-Key",
             value: "{{ secrets.AGENT_TOKEN }}",
           },
         }),
-      );
+      });
 
       await adapter.call(input);
 
@@ -159,15 +199,15 @@ describe("SerializedHttpAgentAdapter secret references", () => {
 
     /** @scenario "Secret references resolve in header values and auth token, value, username, and password" */
     it("carries the secret's value in basic auth username and password", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        config({
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
           auth: {
             type: "basic",
             username: "{{ secrets.AGENT_TOKEN }}",
             password: "{{ secrets.AGENT_TOKEN }}",
           },
         }),
-      );
+      });
 
       await adapter.call(input);
 
@@ -182,7 +222,7 @@ describe("SerializedHttpAgentAdapter secret references", () => {
       const agentConfig = config({
         auth: { type: "bearer", token: "{{ secrets.AGENT_TOKEN }}" },
       });
-      const adapter = new SerializedHttpAgentAdapter(agentConfig);
+      const adapter = new SerializedHttpAgentAdapter({ config: agentConfig });
 
       await adapter.call(input);
 
@@ -196,11 +236,11 @@ describe("SerializedHttpAgentAdapter secret references", () => {
   describe("given a body template that references a project secret", () => {
     /** @scenario "A secret reference in the body template is left untouched" */
     it("sends the reference exactly as written", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        config({
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
           bodyTemplate: '{"token": "{{ secrets.AGENT_TOKEN }}"}',
         }),
-      );
+      });
 
       await adapter.call(input);
 
@@ -212,12 +252,12 @@ describe("SerializedHttpAgentAdapter secret references", () => {
   describe("given a reference to a name the project does not have", () => {
     /** @scenario "A reference to a missing secret name stays verbatim in the request" */
     it("carries the reference exactly as written in the url", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        config({
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
           url: "https://api.example.com/{{ secrets.NOT_A_SECRET }}",
           secrets: {},
         }),
-      );
+      });
 
       await adapter.call(input);
 
@@ -228,13 +268,13 @@ describe("SerializedHttpAgentAdapter secret references", () => {
 
     /** @scenario "A reference to a missing secret name stays verbatim in the request" */
     it("carries the reference exactly as written in a header value", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        config({
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
           headers: [
             { key: "X-Agent-Key", value: "{{ secrets.NOT_A_SECRET }}" },
           ],
         }),
-      );
+      });
 
       await adapter.call(input);
 
@@ -258,9 +298,11 @@ describe("SerializedHttpAgentAdapter secret references", () => {
         json: vi.fn(),
       } as unknown as Awaited<ReturnType<typeof ssrfSafeFetch>>);
 
-      const adapter = new SerializedHttpAgentAdapter(
-        config({ url: "https://api.example.com/{{ secrets.AGENT_TOKEN }}" }),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
+          url: "https://api.example.com/{{ secrets.AGENT_TOKEN }}",
+        }),
+      });
 
       await expect(adapter.call(input)).rejects.toThrow(/HTTP 401/);
       await expect(adapter.call(input)).rejects.not.toThrow(
@@ -277,9 +319,11 @@ describe("SerializedHttpAgentAdapter secret references", () => {
         new TypeError("fetch failed", { cause }),
       );
 
-      const adapter = new SerializedHttpAgentAdapter(
-        config({ url: "https://api.example.com/{{ secrets.AGENT_TOKEN }}" }),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
+          url: "https://api.example.com/{{ secrets.AGENT_TOKEN }}",
+        }),
+      });
 
       await expect(adapter.call(input)).rejects.toThrow("fetch failed");
       expect(cause.message).toBe(
@@ -291,13 +335,13 @@ describe("SerializedHttpAgentAdapter secret references", () => {
   describe("given auth fields typed in directly, with no references", () => {
     /** @scenario "Plaintext auth without secret references behaves unchanged" */
     it("carries exactly what was typed in", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        config({
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
           secrets: {},
           headers: [{ key: "X-Plain", value: "plain-header-value" }],
           auth: { type: "bearer", token: "plain-token" },
         }),
-      );
+      });
 
       await adapter.call(input);
 
@@ -313,9 +357,12 @@ describe("SerializedHttpAgentAdapter secret references", () => {
       const thrown = new Error("fetch failed");
       mockSsrfSafeFetch.mockRejectedValue(thrown);
 
-      const adapter = new SerializedHttpAgentAdapter(
-        config({ secrets: {}, auth: { type: "bearer", token: "plain-token" } }),
-      );
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
+          secrets: {},
+          auth: { type: "bearer", token: "plain-token" },
+        }),
+      });
 
       await expect(adapter.call(input)).rejects.toBe(thrown);
       expect(thrown.message).toBe("fetch failed");
@@ -338,15 +385,14 @@ describe("SerializedHttpAgentAdapter run parameters", () => {
   describe("given a url and body template that read a parameter", () => {
     /** @scenario "An http target reads params in its url and body templates" */
     it("carries the resolved value in both", async () => {
-      const adapter = new SerializedHttpAgentAdapter(
-        config({
+      const adapter = new SerializedHttpAgentAdapter({
+        config: config({
           url: "https://api.example.com/tiers/{{ params.account_tier }}",
           bodyTemplate: '{"tier": "{{ params.account_tier }}"}',
           secrets: {},
         }),
-        undefined,
-        { account_tier: "platinum" },
-      );
+        parameters: { account_tier: "platinum" },
+      });
 
       await adapter.call(input);
 

@@ -38025,7 +38025,7 @@ await langwatch.experiments.runWithResults("my-experiment", { parameters: { mode
 
 
 
-Scenario suite runs accept the same field, where the values apply to every scenario in the run instead of every dataset row. See [Scenario run parameters](/agent-simulations/scenario-parameters).
+Scenario suite runs accept the same `parameters` field, where the values apply to every scenario in the run instead of every dataset row. See [Scenario run parameters](/agent-simulations/scenario-parameters).
 
 ---
 

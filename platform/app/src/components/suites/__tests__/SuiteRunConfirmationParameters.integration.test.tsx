@@ -129,10 +129,19 @@ describe("suite run confirmation parameters", () => {
       });
 
       it("offers one input per declared name, unioned across the scenarios", async () => {
+        // The description matters: it renders a second element for the same
+        // parameter, so the count below only stays honest while the tooltip
+        // sits outside the `suite-run-parameter-` namespace.
         mocks.scenarios = [
           {
             id: "scenario_1",
-            parameters: [{ name: "region", defaultValue: "eu-central" }],
+            parameters: [
+              {
+                name: "region",
+                description: "Which region the run targets",
+                defaultValue: "eu-central",
+              },
+            ],
           },
           {
             id: "scenario_2",

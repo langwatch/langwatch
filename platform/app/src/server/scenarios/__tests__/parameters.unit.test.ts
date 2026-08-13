@@ -228,6 +228,61 @@ describe("scenario run parameters", () => {
     });
   });
 
+  describe("given a name JavaScript treats as more than a key", () => {
+    describe("when a scenario declares it", () => {
+      it("refuses the declaration, naming what is not allowed", () => {
+        for (const name of ["__proto__", "constructor", "prototype"]) {
+          const parsed = scenarioParameterDefinitionsSchema.safeParse([
+            definition(name, "gold"),
+          ]);
+
+          expect(parsed.success).toBe(false);
+        }
+      });
+    });
+
+    describe("when a run supplies a value for it", () => {
+      // Parsed from JSON, the way a REST body arrives: that is what makes the
+      // name an OWN key. Written as an object literal, __proto__ would reach
+      // the prototype setter and never be a key at all.
+      const fromJson = (name: string) =>
+        JSON.parse(`{"${name}": "gold"}`) as Record<string, string>;
+
+      it("refuses constructor and prototype by name", () => {
+        for (const name of ["constructor", "prototype"]) {
+          expect(
+            runParameterValuesSchema.safeParse(fromJson(name)).success,
+          ).toBe(false);
+        }
+      });
+
+      it("never lets __proto__ through as a value at all", () => {
+        const parsed = runParameterValuesSchema.safeParse(
+          fromJson("__proto__"),
+        );
+
+        // zod strips this one itself, before any refinement runs, so it cannot
+        // reach the merge whatever the refinement says.
+        expect(parsed.success).toBe(true);
+        expect(Object.keys(parsed.success ? parsed.data : {})).toEqual([]);
+      });
+    });
+
+    describe("when a scenario stored before the guard still carries it", () => {
+      it("leaves it out of the resolved record instead of touching a prototype", () => {
+        const resolved = mergeRunParameters({
+          definitions: [
+            definition("__proto__", "gold"),
+            definition("region", "eu-central"),
+          ],
+        });
+
+        expect(Object.keys(resolved)).toEqual(["region"]);
+        expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+      });
+    });
+  });
+
   describe("given values supplied for a run", () => {
     describe("when a name no scenario in the run declares is among them", () => {
       it("reports that name and only that name", () => {

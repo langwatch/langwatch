@@ -55,5 +55,31 @@ export function displayValue(v: unknown): string {
       return v;
     }
   }
-  return JSON.stringify(v);
+  // `JSON.stringify` answers with the value `undefined`, not with text, for
+  // undefined, a function and a symbol. A parameter declared without a default
+  // arrives here as undefined, and handing that back to an input's `value`
+  // flips the field to uncontrolled on the next render.
+  return JSON.stringify(v) ?? "";
+}
+
+/**
+ * Parse an OPTIONAL value input: an empty box means the value is absent.
+ *
+ * The empty-string sentinel is the whole point. A scenario parameter with no
+ * default and a run that leaves a name at its default are the same shape on
+ * screen, an empty box, and both have to come back as `undefined` rather than
+ * as the empty string, which is a value a run could legitimately supply.
+ */
+export function serializeOptionalScalarValue(
+  raw: string,
+): string | number | boolean | undefined {
+  return raw === "" ? undefined : serializeScalarValue(raw);
+}
+
+/**
+ * Render an optional stored value as editable text. Inverse of
+ * {@link serializeOptionalScalarValue}: absent shows as an empty box.
+ */
+export function displayOptionalValue(v: unknown): string {
+  return v === undefined ? "" : displayValue(v);
 }

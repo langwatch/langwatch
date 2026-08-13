@@ -185,7 +185,7 @@ function RunParameterFields({
             {parameter.description && (
               <FieldInfoTooltip
                 description={parameter.description}
-                testId={`suite-run-parameter-info-${parameter.name}`}
+                testId={`suite-run-param-info-${parameter.name}`}
               />
             )}
           </HStack>

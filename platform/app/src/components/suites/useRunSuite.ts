@@ -19,7 +19,10 @@ import {
 import { parseSuiteTargets } from "~/server/suites/types";
 import { api } from "~/utils/api";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { displayValue, serializeScalarValue } from "~/utils/jsonValueText";
+import {
+  displayOptionalValue,
+  serializeOptionalScalarValue,
+} from "~/utils/jsonValueText";
 import { toaster } from "../ui/toaster";
 import { showSuiteRunError } from "./showSuiteRunError";
 
@@ -84,9 +87,9 @@ function toRunParameters({
 }): RunParameterValues | undefined {
   const parameters: RunParameterValues = {};
   for (const definition of definitions) {
-    const text = values[definition.name] ?? "";
-    if (text === "") continue;
-    parameters[definition.name] = serializeScalarValue(text);
+    const value = serializeOptionalScalarValue(values[definition.name] ?? "");
+    if (value === undefined) continue;
+    parameters[definition.name] = value;
   }
   return Object.keys(parameters).length > 0 ? parameters : undefined;
 }
@@ -203,9 +206,7 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
     for (const definition of parameterDefinitions) {
       values[definition.name] =
         parameterOverrides[definition.name] ??
-        (definition.defaultValue === undefined
-          ? ""
-          : displayValue(definition.defaultValue));
+        displayOptionalValue(definition.defaultValue);
     }
     return values;
   }, [parameterDefinitions, parameterOverrides]);

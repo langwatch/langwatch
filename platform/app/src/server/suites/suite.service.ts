@@ -477,13 +477,10 @@ export class SuiteService {
     // One read for everything the scheduler needs off each scenario: the name
     // shown on the queued job row, and the parameters and text the run has to
     // resolve before it schedules anything.
-    const scenarioConfigs =
-      scenarioResolution.active.length > 0
-        ? await this.scenarioRepository.findRunConfigByIds({
-            ids: scenarioResolution.active,
-            projectId,
-          })
-        : [];
+    const scenarioConfigs = await this.scenarioRepository.findRunConfigByIds({
+      ids: scenarioResolution.active,
+      projectId,
+    });
     const scenarioNameMap = new Map(
       scenarioConfigs.map((scenario) => [scenario.id, scenario.name]),
     );

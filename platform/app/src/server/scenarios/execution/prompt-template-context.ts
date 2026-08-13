@@ -109,7 +109,7 @@ function lastUserMessageText(messages: AgentInput["messages"]): string {
  *   These win; every declared input they leave out is matched by name.
  * @param parameters - The values the run resolved, bound as `params` so the
  *   template reads `{{ params.account_tier }}`. Bound before the declared
- *   inputs, so an input a customer already named `params` still wins.
+ *   inputs, so a prompt input named `params` still wins.
  */
 export function buildPromptTemplateContext({
   input,

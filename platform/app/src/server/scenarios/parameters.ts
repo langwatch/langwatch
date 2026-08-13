@@ -45,8 +45,33 @@ export const MAX_PARAMETER_DESCRIPTION_LENGTH = 500;
  */
 export const SCENARIO_PARAMETER_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
+/**
+ * Names the grammar allows but a JavaScript object treats as something other
+ * than an ordinary key.
+ *
+ * The resolved values are a plain record, so `__proto__` reaches the prototype
+ * setter rather than becoming an own key, and whether a value survives would
+ * otherwise depend on which side of the merge it arrived from. Refusing the
+ * three names keeps one behavior for every name a caller can write.
+ */
+const RESERVED_PARAMETER_NAMES = new Set([
+  "__proto__",
+  "constructor",
+  "prototype",
+]);
+
 const PARAMETER_NAME_MESSAGE =
   "Parameter names start with a letter or underscore and may contain only letters, digits and underscores";
+
+const RESERVED_NAME_MESSAGE = `Parameter names cannot be ${[...RESERVED_PARAMETER_NAMES].join(", ")}`;
+
+/** Whether `name` is a name a run may address. */
+function isUsableParameterName(name: string): boolean {
+  return (
+    SCENARIO_PARAMETER_NAME_PATTERN.test(name) &&
+    !RESERVED_PARAMETER_NAMES.has(name)
+  );
+}
 
 const parameterValueSchema = z.union([
   z.string().max(MAX_PARAMETER_VALUE_LENGTH),
@@ -60,7 +85,10 @@ export const scenarioParameterDefinitionSchema = z.object({
     .string()
     .min(1)
     .max(MAX_PARAMETER_NAME_LENGTH)
-    .regex(SCENARIO_PARAMETER_NAME_PATTERN, PARAMETER_NAME_MESSAGE),
+    .regex(SCENARIO_PARAMETER_NAME_PATTERN, PARAMETER_NAME_MESSAGE)
+    .refine((name) => !RESERVED_PARAMETER_NAMES.has(name), {
+      message: RESERVED_NAME_MESSAGE,
+    }),
   description: z.string().max(MAX_PARAMETER_DESCRIPTION_LENGTH).optional(),
   defaultValue: parameterValueSchema.optional(),
 });
@@ -111,6 +139,14 @@ export const runParameterValuesSchema = z
           code: z.ZodIssueCode.custom,
           path: [name],
           message: PARAMETER_NAME_MESSAGE,
+        });
+        continue;
+      }
+      if (RESERVED_PARAMETER_NAMES.has(name)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [name],
+          message: RESERVED_NAME_MESSAGE,
         });
       }
     }
@@ -164,13 +200,23 @@ export function mergeRunParameters({
   definitions: readonly ScenarioParameterDefinition[];
   values?: RunParameterValues;
 }): RunParameterValues {
-  const resolved: RunParameterValues = {};
+  // Built through a Map rather than by assigning onto an object literal. The
+  // schema refuses the names that would not become own keys, but a scenario
+  // stored before that guard can still hold one, and assignment would send it
+  // to the prototype setter instead of dropping it where it can be seen.
+  const resolved = new Map<string, ScenarioParameterValue>();
   for (const definition of definitions) {
-    if (definition.defaultValue !== undefined) {
-      resolved[definition.name] = definition.defaultValue;
+    if (
+      definition.defaultValue !== undefined &&
+      isUsableParameterName(definition.name)
+    ) {
+      resolved.set(definition.name, definition.defaultValue);
     }
   }
-  return { ...resolved, ...(values ?? {}) };
+  for (const [name, value] of Object.entries(values ?? {})) {
+    if (isUsableParameterName(name)) resolved.set(name, value);
+  }
+  return Object.fromEntries(resolved);
 }
 
 /**

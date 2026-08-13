@@ -5,11 +5,11 @@
 import { describe, expect, it } from "vitest";
 import type { AuthConfig } from "../../adapters/auth.strategies";
 import {
+  fenceSecretRefs,
   preserveSecretRefs,
   redactSecrets,
   resolveAuthSecrets,
   resolveSecretRefs,
-  resolveSecretRefsInTemplate,
   resolveSecretsInMap,
 } from "../secret-references";
 
@@ -19,22 +19,28 @@ describe("secret references", () => {
   describe("given a reference to a name the project has", () => {
     it("substitutes the value", () => {
       expect(
-        resolveSecretRefs("Bearer {{ secrets.AGENT_TOKEN }}", SECRETS),
+        resolveSecretRefs({
+          value: "Bearer {{ secrets.AGENT_TOKEN }}",
+          secrets: SECRETS,
+        }),
       ).toBe("Bearer tok-live-123");
     });
 
     it("accepts the reference without inner spacing", () => {
-      expect(resolveSecretRefs("{{secrets.AGENT_TOKEN}}", SECRETS)).toBe(
-        "tok-live-123",
-      );
+      expect(
+        resolveSecretRefs({
+          value: "{{secrets.AGENT_TOKEN}}",
+          secrets: SECRETS,
+        }),
+      ).toBe("tok-live-123");
     });
 
     it("substitutes every occurrence", () => {
       expect(
-        resolveSecretRefs(
-          "{{ secrets.AGENT_TOKEN }}/{{ secrets.OTHER }}",
-          SECRETS,
-        ),
+        resolveSecretRefs({
+          value: "{{ secrets.AGENT_TOKEN }}/{{ secrets.OTHER }}",
+          secrets: SECRETS,
+        }),
       ).toBe("tok-live-123/other-value");
     });
   });
@@ -42,48 +48,93 @@ describe("secret references", () => {
   describe("given a reference to a name the project does not have", () => {
     /** @scenario "A reference to a missing secret name stays verbatim in the request" */
     it("leaves the reference exactly as written", () => {
-      expect(resolveSecretRefs("{{ secrets.NOT_A_SECRET }}", SECRETS)).toBe(
-        "{{ secrets.NOT_A_SECRET }}",
-      );
+      expect(
+        resolveSecretRefs({
+          value: "{{ secrets.NOT_A_SECRET }}",
+          secrets: SECRETS,
+        }),
+      ).toBe("{{ secrets.NOT_A_SECRET }}");
     });
 
     it("leaves it as written when the project has no secrets at all", () => {
-      expect(resolveSecretRefs("{{ secrets.AGENT_TOKEN }}", {})).toBe(
-        "{{ secrets.AGENT_TOKEN }}",
-      );
+      expect(
+        resolveSecretRefs({ value: "{{ secrets.AGENT_TOKEN }}", secrets: {} }),
+      ).toBe("{{ secrets.AGENT_TOKEN }}");
     });
   });
 
   describe("given a string a template engine renders afterwards", () => {
-    it("fences a resolved value off from the render", () => {
-      expect(
-        resolveSecretRefsInTemplate(
-          "https://api.test/{{ secrets.AGENT_TOKEN }}",
-          SECRETS,
-        ),
-      ).toBe("https://api.test/{% raw %}tok-live-123{% endraw %}");
-    });
+    /** Render stands in for the engine: it never sees a secret value. */
+    const roundTrip = ({
+      template,
+      secrets,
+    }: {
+      template: string;
+      secrets: Record<string, string>;
+    }) => {
+      const fenced = fenceSecretRefs({ template, secrets });
+      return fenced.restore(fenced.template);
+    };
 
-    it("fences an unresolved reference off so it survives the render", () => {
-      expect(
-        resolveSecretRefsInTemplate("https://api.test/{{ secrets.NOPE }}", {}),
-      ).toBe("https://api.test/{% raw %}{{ secrets.NOPE }}{% endraw %}");
-    });
+    it("keeps the resolved value out of what gets rendered", () => {
+      const fenced = fenceSecretRefs({
+        template: "https://api.test/{{ secrets.AGENT_TOKEN }}",
+        secrets: SECRETS,
+      });
 
-    it("fences without resolving when nothing may be substituted", () => {
-      expect(preserveSecretRefs("body {{ secrets.AGENT_TOKEN }} end")).toBe(
-        "body {% raw %}{{ secrets.AGENT_TOKEN }}{% endraw %} end",
+      expect(fenced.template).not.toContain("tok-live-123");
+      expect(fenced.restore(fenced.template)).toBe(
+        "https://api.test/tok-live-123",
       );
+    });
+
+    it("puts an unresolved reference back exactly as written", () => {
+      expect(
+        roundTrip({
+          template: "https://api.test/{{ secrets.NOPE }}",
+          secrets: {},
+        }),
+      ).toBe("https://api.test/{{ secrets.NOPE }}");
+    });
+
+    it("holds a reference out without resolving it when nothing may be substituted", () => {
+      const fenced = preserveSecretRefs("body {{ secrets.AGENT_TOKEN }} end");
+
+      expect(fenced.template).not.toContain("secrets.AGENT_TOKEN");
+      expect(fenced.restore(fenced.template)).toBe(
+        "body {{ secrets.AGENT_TOKEN }} end",
+      );
+    });
+
+    it("leaves a template with no reference in it byte for byte", () => {
+      const fenced = fenceSecretRefs({
+        template: "https://api.test/{{ params.region }}",
+        secrets: SECRETS,
+      });
+
+      expect(fenced.template).toBe("https://api.test/{{ params.region }}");
+    });
+
+    it("survives a secret value that is itself a fence-closing tag", () => {
+      expect(
+        roundTrip({
+          template: "{{ secrets.TRICKY }}",
+          secrets: { TRICKY: "a{% endraw %}b" },
+        }),
+      ).toBe("a{% endraw %}b");
     });
   });
 
   describe("given a record of header values", () => {
     it("resolves the values and leaves the keys alone", () => {
       expect(
-        resolveSecretsInMap(
-          { "X-Api-Key": "{{ secrets.AGENT_TOKEN }}", Accept: "text/plain" },
-          SECRETS,
-        ),
+        resolveSecretsInMap({
+          values: {
+            "X-Api-Key": "{{ secrets.AGENT_TOKEN }}",
+            Accept: "text/plain",
+          },
+          secrets: SECRETS,
+        }),
       ).toEqual({ "X-Api-Key": "tok-live-123", Accept: "text/plain" });
     });
   });
@@ -91,23 +142,23 @@ describe("secret references", () => {
   describe("given an auth config", () => {
     it("resolves a bearer token", () => {
       expect(
-        resolveAuthSecrets(
-          { type: "bearer", token: "{{ secrets.AGENT_TOKEN }}" },
-          SECRETS,
-        ),
+        resolveAuthSecrets({
+          auth: { type: "bearer", token: "{{ secrets.AGENT_TOKEN }}" },
+          secrets: SECRETS,
+        }),
       ).toEqual({ type: "bearer", token: "tok-live-123" });
     });
 
     it("resolves an api key value and leaves the header name alone", () => {
       expect(
-        resolveAuthSecrets(
-          {
+        resolveAuthSecrets({
+          auth: {
             type: "api_key",
             header: "X-{{ secrets.AGENT_TOKEN }}",
             value: "{{ secrets.AGENT_TOKEN }}",
           },
-          SECRETS,
-        ),
+          secrets: SECRETS,
+        }),
       ).toEqual({
         type: "api_key",
         header: "X-{{ secrets.AGENT_TOKEN }}",
@@ -117,14 +168,14 @@ describe("secret references", () => {
 
     it("resolves a basic username and password", () => {
       expect(
-        resolveAuthSecrets(
-          {
+        resolveAuthSecrets({
+          auth: {
             type: "basic",
             username: "{{ secrets.OTHER }}",
             password: "{{ secrets.AGENT_TOKEN }}",
           },
-          SECRETS,
-        ),
+          secrets: SECRETS,
+        }),
       ).toEqual({
         type: "basic",
         username: "other-value",
@@ -138,7 +189,7 @@ describe("secret references", () => {
         token: "{{ secrets.AGENT_TOKEN }}",
       };
 
-      resolveAuthSecrets(auth, SECRETS);
+      resolveAuthSecrets({ auth, secrets: SECRETS });
 
       expect(auth.token).toBe("{{ secrets.AGENT_TOKEN }}");
     });
@@ -147,25 +198,29 @@ describe("secret references", () => {
   describe("given a message that carries a resolved secret value", () => {
     it("replaces every occurrence with the placeholder", () => {
       expect(
-        redactSecrets(
-          'Get "https://api.test?token=tok-live-123": dial tcp, sent tok-live-123',
-          SECRETS,
-        ),
+        redactSecrets({
+          message:
+            'Get "https://api.test?token=tok-live-123": dial tcp, sent tok-live-123',
+          secrets: SECRETS,
+        }),
       ).toBe(
         'Get "https://api.test?token=[redacted]": dial tcp, sent [redacted]',
       );
     });
 
     it("leaves a message that carries none unchanged", () => {
-      expect(redactSecrets("HTTP 500: upstream is down", SECRETS)).toBe(
-        "HTTP 500: upstream is down",
-      );
+      expect(
+        redactSecrets({
+          message: "HTTP 500: upstream is down",
+          secrets: SECRETS,
+        }),
+      ).toBe("HTTP 500: upstream is down");
     });
 
     it("ignores an empty secret value rather than replacing everything", () => {
-      expect(redactSecrets("anything at all", { EMPTY: "" })).toBe(
-        "anything at all",
-      );
+      expect(
+        redactSecrets({ message: "anything at all", secrets: { EMPTY: "" } }),
+      ).toBe("anything at all");
     });
   });
 });

@@ -11,10 +11,13 @@ import type { CommandResult } from "../../utils/output";
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags";
 
-export const runWorkflowCommand = async (
-  id: string,
-  options: { input?: string; param?: string[] },
-): Promise<CommandResult | void> => {
+export const runWorkflowCommand = async ({
+  id,
+  options,
+}: {
+  id: string;
+  options: { input?: string; param?: string[] };
+}): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   // Parsed before the request, and outside its try: `await response.json()`

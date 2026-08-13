@@ -108,7 +108,9 @@ describe("HTTP trace context propagation", () => {
 
         try {
           await context.with(ctx, async () => {
-            const adapter = new SerializedHttpAgentAdapter(createConfig());
+            const adapter = new SerializedHttpAgentAdapter({
+              config: createConfig(),
+            });
             await adapter.call(createInput());
           });
         } finally {
@@ -133,7 +135,9 @@ describe("HTTP trace context propagation", () => {
 
         try {
           await context.with(ctx, async () => {
-            const adapter = new SerializedHttpAgentAdapter(createConfig());
+            const adapter = new SerializedHttpAgentAdapter({
+              config: createConfig(),
+            });
             await adapter.call(createInput());
             capturedTraceId = adapter.getTraceId();
           });
@@ -156,7 +160,9 @@ describe("HTTP trace context propagation", () => {
 
         try {
           await context.with(ctx, async () => {
-            const adapter = new SerializedHttpAgentAdapter(createConfig());
+            const adapter = new SerializedHttpAgentAdapter({
+              config: createConfig(),
+            });
 
             // Simulate 3 turns
             await adapter.call(
@@ -220,14 +226,14 @@ describe("HTTP trace context propagation", () => {
 
         try {
           await context.with(ctx, async () => {
-            const adapter = new SerializedHttpAgentAdapter(
-              createConfig({
+            const adapter = new SerializedHttpAgentAdapter({
+              config: createConfig({
                 headers: [
                   { key: "X-Custom-Auth", value: "token-abc" },
                   { key: "X-Request-Source", value: "test-suite" },
                 ],
               }),
-            );
+            });
             await adapter.call(createInput());
           });
         } finally {

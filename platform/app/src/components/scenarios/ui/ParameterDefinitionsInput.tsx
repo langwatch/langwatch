@@ -1,11 +1,11 @@
 import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Plus, X } from "lucide-react";
 import { Tooltip } from "~/components/ui/tooltip";
-import type {
-  ScenarioParameterDefinition,
-  ScenarioParameterValue,
-} from "~/server/scenarios/parameters";
-import { displayValue, serializeScalarValue } from "~/utils/jsonValueText";
+import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
+import {
+  displayOptionalValue,
+  serializeOptionalScalarValue,
+} from "~/utils/jsonValueText";
 
 type ParameterDefinitionsInputProps = {
   value: ScenarioParameterDefinition[];
@@ -14,21 +14,6 @@ type ParameterDefinitionsInputProps = {
   rowErrors?: (string | undefined)[];
   disabled?: boolean;
 };
-
-/**
- * The default value a run falls back to, read from what was typed.
- *
- * Defaults are also written over REST/tRPC/SDK as real JSON, so "42" is the
- * number and "true" the boolean. An empty box means the parameter has no
- * default.
- */
-function toDefaultValue(raw: string): ScenarioParameterValue | undefined {
-  return raw === "" ? undefined : serializeScalarValue(raw);
-}
-
-function toDefaultText(value: ScenarioParameterValue | undefined): string {
-  return value === undefined ? "" : displayValue(value);
-}
 
 /**
  * Editor for the parameters a scenario declares: a name, an optional
@@ -150,9 +135,11 @@ function ParameterRow({
           data-testid={`scenario-parameter-description-${index}`}
         />
         <Input
-          value={toDefaultText(definition.defaultValue)}
+          value={displayOptionalValue(definition.defaultValue)}
           onChange={(e) =>
-            onUpdate(index, { defaultValue: toDefaultValue(e.target.value) })
+            onUpdate(index, {
+              defaultValue: serializeOptionalScalarValue(e.target.value),
+            })
           }
           placeholder="gold"
           size="sm"

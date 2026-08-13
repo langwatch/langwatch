@@ -163,11 +163,17 @@ paths = ['''platform/app/src/server/stored-objects/__tests__/azure-secret-hygien
 # other high-entropy string in these files is still caught, and the same fixture
 # stays covered wherever else it is used. Scoped to `generic-api-key` on top, so
 # every provider-specific rule still applies to these values too.
+#
+# ANCHORED, because a gitleaks allowlist regex is a substring match against the
+# matched secret. Unanchored, `sk-live-abc123` would also allow a real
+# `sk-live-abc123<rest-of-a-live-key>`, which is the one string an attacker
+# could pick on purpose. `^...$` allows the fixture and nothing that merely
+# starts with it.
 [[allowlists]]
 description = "Synthetic credential fixtures in the secret-redaction tests; issued by nobody, revocable nowhere"
 targetRules = ["generic-api-key"]
 regexes = [
-  '''sk-live-abc123''',
-  '''hunter2-signing''',
-  '''tok-live-abc123''',
+  '''^sk-live-abc123$''',
+  '''^hunter2-signing$''',
+  '''^tok-live-abc123$''',
 ]

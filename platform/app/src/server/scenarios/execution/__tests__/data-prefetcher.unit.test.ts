@@ -1839,7 +1839,7 @@ describe("prefetchScenarioData", () => {
     });
   });
 
-  describe("run parameters", () => {
+  describe("given a run that resolved parameter values", () => {
     const promptTarget: TargetConfig = {
       type: "prompt",
       referenceId: "prompt_123",
@@ -1968,7 +1968,7 @@ describe("prefetchScenarioData", () => {
     });
   });
 
-  describe("http target secrets", () => {
+  describe("given an http target and a project holding secrets", () => {
     /** @scenario "The http prefetch loads project secrets for the run" */
     it("loads the project's secrets so the target can reference them", async () => {
       const deps = createMockDeps({

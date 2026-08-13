@@ -541,6 +541,16 @@ describe("SerializedWorkflowAgentAdapter", () => {
       expect(sentPayload().inputs[0].input).toBe("Hello");
     });
 
+    it("leaves a declared input alone when a parameter shares its name", async () => {
+      // Precedence matters here rather than reading as a tie: the workflow's
+      // own  carries the conversation turn, and a parameter that
+      // replaced it would leave the target answering the wrong question while
+      // looking like an agent that ignored the user.
+      await callWithParameters({ input: "not the conversation" });
+
+      expect(sentPayload().inputs[0].input).toBe("Hello");
+    });
+
     /** @scenario "A code target reads params.NAME the same way it reads secrets.NAME" */
     it("carries them on the workflow with their native types, beside its secrets", async () => {
       await callWithParameters({ region: "eu-central", seats: 12 });

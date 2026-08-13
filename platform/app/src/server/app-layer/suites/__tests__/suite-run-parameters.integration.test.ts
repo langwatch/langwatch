@@ -21,12 +21,8 @@ import {
   SimulationRunStateFoldProjection,
 } from "~/server/event-sourcing/pipelines/simulation-processing/projections/simulationRunState.foldProjection";
 import { SimulationRunStateRepositoryClickHouse } from "~/server/event-sourcing/pipelines/simulation-processing/repositories/simulationRunState.clickhouse.repository";
+import { QueueRunCommand } from "~/server/event-sourcing/pipelines/simulation-processing/commands";
 import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
-import {
-  SIMULATION_EVENT_VERSIONS,
-  SIMULATION_RUN_EVENT_TYPES,
-} from "~/server/event-sourcing/pipelines/simulation-processing/schemas/constants";
-import type { SimulationRunQueuedEvent } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/events";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 import { createResilientClickHouseClient } from "../../clients/clickhouse";
 import { SimulationClickHouseRepository } from "../../simulations/repositories/simulation.clickhouse.repository";
@@ -105,25 +101,17 @@ async function queuedCommandFor(params: {
 
 /** Folds the queued command into stored state, the way the pipeline does. */
 async function recordQueuedRun(command: QueueRunCommandData): Promise<void> {
-  const event: SimulationRunQueuedEvent = {
-    id: `event-${nanoid()}`,
-    aggregateId: command.scenarioRunId,
-    aggregateType: "simulation_run",
-    tenantId: createTenantId(tenantId),
-    createdAt: command.occurredAt,
-    occurredAt: command.occurredAt,
-    type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
-    version: SIMULATION_EVENT_VERSIONS.QUEUED,
-    data: {
-      scenarioRunId: command.scenarioRunId,
-      scenarioId: command.scenarioId,
-      batchRunId: command.batchRunId,
-      scenarioSetId: command.scenarioSetId,
-      ...(command.name !== undefined && { name: command.name }),
-      ...(command.metadata !== undefined && { metadata: command.metadata }),
-      ...(command.target !== undefined && { target: command.target }),
-    },
-  } as SimulationRunQueuedEvent;
+  // Through the real command handler, not a hand-built event. The command data
+  // and the event data share one schema, so copying the fields here by hand
+  // would keep passing on the day the handler stopped carrying metadata, which
+  // is exactly the hop this file exists to cover.
+  const events = await new QueueRunCommand().handle({
+    type: "lw.simulation_run.queue",
+    tenantId,
+    data: command,
+  } as Parameters<InstanceType<typeof QueueRunCommand>["handle"]>[0]);
+  const event = events[0];
+  if (!event) throw new Error("QueueRunCommand produced no event");
 
   const foldProjection = new SimulationRunStateFoldProjection({
     store: noopStore,

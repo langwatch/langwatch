@@ -150,5 +150,18 @@ describe("scenarioExecution reactor", () => {
       expect(submit).toHaveBeenCalledTimes(1);
       expect(submitted().parameters).toBeUndefined();
     });
+
+    it("drops the whole record when only one name is unreadable", async () => {
+      // All or nothing on purpose. Half a record is the worse failure: the run
+      // would go ahead against a value the caller never chose, and read as an
+      // agent that answered the wrong question. Nothing at all surfaces as the
+      // missing-value error the scenario's own text raises.
+      const { submit, submitted } = await handleQueued({
+        parameters: { region: "eu-central", "not a name": "value" },
+      });
+
+      expect(submit).toHaveBeenCalledTimes(1);
+      expect(submitted().parameters).toBeUndefined();
+    });
   });
 });

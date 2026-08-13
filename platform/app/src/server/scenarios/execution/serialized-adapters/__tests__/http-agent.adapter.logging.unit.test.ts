@@ -90,12 +90,12 @@ describe("SerializedHttpAgentAdapter — logging (lw#3593)", () => {
           text: vi.fn().mockResolvedValue("ok"),
         } as unknown as Awaited<ReturnType<typeof ssrfSafeFetch>>);
 
-        const adapter = new SerializedHttpAgentAdapter(
-          defaultConfig,
-          logger as unknown as ConstructorParameters<
-            typeof SerializedHttpAgentAdapter
-          >[1],
-        );
+        const adapter = new SerializedHttpAgentAdapter({
+          config: defaultConfig,
+          logger: logger as unknown as NonNullable<
+            ConstructorParameters<typeof SerializedHttpAgentAdapter>[0]["logger"]
+          >,
+        });
 
         await adapter.call(defaultInput);
 
@@ -125,12 +125,12 @@ describe("SerializedHttpAgentAdapter — logging (lw#3593)", () => {
           text: vi.fn().mockResolvedValue("upstream busy"),
         } as unknown as Awaited<ReturnType<typeof ssrfSafeFetch>>);
 
-        const adapter = new SerializedHttpAgentAdapter(
-          defaultConfig,
-          logger as unknown as ConstructorParameters<
-            typeof SerializedHttpAgentAdapter
-          >[1],
-        );
+        const adapter = new SerializedHttpAgentAdapter({
+          config: defaultConfig,
+          logger: logger as unknown as NonNullable<
+            ConstructorParameters<typeof SerializedHttpAgentAdapter>[0]["logger"]
+          >,
+        });
 
         await expect(adapter.call(defaultInput)).rejects.toThrow(/HTTP 503/);
 
@@ -154,12 +154,12 @@ describe("SerializedHttpAgentAdapter — logging (lw#3593)", () => {
       it("emits an error entry with errorClass and message", async () => {
         mockSsrfSafeFetch.mockRejectedValue(new Error("ECONNREFUSED"));
 
-        const adapter = new SerializedHttpAgentAdapter(
-          defaultConfig,
-          logger as unknown as ConstructorParameters<
-            typeof SerializedHttpAgentAdapter
-          >[1],
-        );
+        const adapter = new SerializedHttpAgentAdapter({
+          config: defaultConfig,
+          logger: logger as unknown as NonNullable<
+            ConstructorParameters<typeof SerializedHttpAgentAdapter>[0]["logger"]
+          >,
+        });
 
         await expect(adapter.call(defaultInput)).rejects.toThrow(
           "ECONNREFUSED",

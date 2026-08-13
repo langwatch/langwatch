@@ -23,7 +23,7 @@ import {
   preserveSecretRefs,
   redactSecrets,
   resolveAuthSecrets,
-  resolveSecretRefsInTemplate,
+  fenceSecretRefs,
   resolveSecretsInMap,
 } from "../secret-references";
 import type { HttpAgentData } from "../types";
@@ -108,12 +108,16 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
   private readonly parameters: RunParameterValues;
   private capturedTraceId: string | undefined;
 
-  constructor(
-    config: HttpAgentData,
-    logger?: Logger,
+  constructor({
+    config,
+    logger,
+    parameters,
+  }: {
+    config: HttpAgentData;
+    logger?: Logger;
     /** The run's resolved values, read from url and body as `params.NAME`. */
-    parameters?: RunParameterValues,
-  ) {
+    parameters?: RunParameterValues;
+  }) {
     super();
     this.name = "SerializedHttpAgentAdapter";
     this.config = config;
@@ -151,7 +155,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
 
   /** A message with every resolved secret value replaced by the placeholder. */
   private scrub(message: string): string {
-    return redactSecrets(message, this.secrets);
+    return redactSecrets({ message, secrets: this.secrets });
   }
 
   /**
@@ -190,9 +194,9 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     }
 
     const resolved = {
-      ...resolveSecretsInMap(headers, this.secrets),
+      ...resolveSecretsInMap({ values: headers, secrets: this.secrets }),
       ...applyAuthentication(
-        resolveAuthSecrets(this.config.auth, this.secrets),
+        resolveAuthSecrets({ auth: this.config.auth, secrets: this.secrets }),
       ),
     };
 
@@ -208,15 +212,17 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
    * Order matters: `secrets` is not a name the url engine binds, so rendering
    * first would turn `{{ secrets.AGENT_TOKEN }}` into an empty string and send
    * an unauthenticated request. Resolution therefore runs first, and what it
-   * substitutes is fenced off from the render that follows, so a resolved
-   * value reaches the wire byte for byte, and a reference to a name the
-   * project does not have stays exactly as written.
+   * resolved is held out of the render entirely and put back afterwards, so a
+   * resolved value reaches the wire byte for byte without ever being read as
+   * template source, and a reference to a name the project does not have stays
+   * exactly as written.
    */
   private buildUrl(context: Record<string, unknown>): string {
-    return renderUrlTemplate({
-      template: resolveSecretRefsInTemplate(this.config.url, this.secrets),
-      context,
+    const { template, restore } = fenceSecretRefs({
+      template: this.config.url,
+      secrets: this.secrets,
     });
+    return restore(renderUrlTemplate({ template, context }));
   }
 
   private async executeHttpRequest(
@@ -330,9 +336,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
       return JSON.stringify({ messages: input.messages });
     }
 
-    return renderBodyTemplate({
-      template: preserveSecretRefs(this.config.bodyTemplate),
-      context,
-    });
+    const { template, restore } = preserveSecretRefs(this.config.bodyTemplate);
+    return restore(renderBodyTemplate({ template, context }));
   }
 }

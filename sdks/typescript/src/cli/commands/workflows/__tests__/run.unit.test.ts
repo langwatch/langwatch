@@ -63,7 +63,7 @@ describe("runWorkflowCommand()", () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch");
 
       await expect(
-        runWorkflowCommand("wf_1", { input: "{not json" }),
+        runWorkflowCommand({ id: "wf_1", options: { input: "{not json" } }),
       ).rejects.toThrow(ProcessExitError);
 
       expect(fetchSpy).not.toHaveBeenCalled();
@@ -83,7 +83,7 @@ describe("runWorkflowCommand()", () => {
       );
 
       await expect(
-        runWorkflowCommand("wf_1", { input: '{"valid":true}' }),
+        runWorkflowCommand({ id: "wf_1", options: { input: '{"valid":true}' } }),
       ).rejects.toThrow(ProcessExitError);
 
       expect(reportCommandError).not.toHaveBeenCalled();
@@ -112,8 +112,11 @@ describe("runWorkflowCommand()", () => {
         .spyOn(globalThis, "fetch")
         .mockResolvedValue(okResponse());
 
-      await runWorkflowCommand("wf_1", {
-        param: ["region=eu-central", "seats=12", "beta=true"],
+      await runWorkflowCommand({
+        id: "wf_1",
+        options: {
+          param: ["region=eu-central", "seats=12", "beta=true"],
+        },
       });
 
       expect(sentBody(fetchSpy)).toEqual({
@@ -128,9 +131,12 @@ describe("runWorkflowCommand()", () => {
         .spyOn(globalThis, "fetch")
         .mockResolvedValue(okResponse());
 
-      await runWorkflowCommand("wf_1", {
-        input: '{"region":"us-east","question":"what is 2 + 2?"}',
-        param: ["region=eu-central"],
+      await runWorkflowCommand({
+        id: "wf_1",
+        options: {
+          input: '{"region":"us-east","question":"what is 2 + 2?"}',
+          param: ["region=eu-central"],
+        },
       });
 
       expect(sentBody(fetchSpy)).toEqual({
@@ -146,8 +152,11 @@ describe("runWorkflowCommand()", () => {
         .spyOn(globalThis, "fetch")
         .mockResolvedValue(okResponse());
 
-      await runWorkflowCommand("wf_1", {
-        input: '{"region":"us-east","seats":3}',
+      await runWorkflowCommand({
+        id: "wf_1",
+        options: {
+          input: '{"region":"us-east","seats":3}',
+        },
       });
 
       expect(sentBody(fetchSpy)).toEqual({ region: "us-east", seats: 3 });

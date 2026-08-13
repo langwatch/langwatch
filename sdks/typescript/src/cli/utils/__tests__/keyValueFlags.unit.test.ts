@@ -97,6 +97,18 @@ describe("parseRunParameterFlags()", () => {
     });
   });
 
+  describe("given __proto__ as the name", () => {
+    it("supplies it as an ordinary key rather than dropping it", () => {
+      // Assigned onto an object literal this reaches the prototype setter,
+      // which ignores a string, so the pair would vanish without a word
+      // instead of reaching the server that rejects the name by hand.
+      const parsed = parseRunParameterFlags({ pairs: ["__proto__=gold"] });
+
+      expect(parsed?.__proto__).toBe("gold");
+      expect(Object.keys(parsed ?? {})).toEqual(["__proto__"]);
+    });
+  });
+
   describe("given the same name twice", () => {
     it("keeps the last value, so an appended override wins", () => {
       expect(
@@ -147,6 +159,18 @@ describe("parseKeyValueFlags()", () => {
       expect(() =>
         parseKeyValueFlags({ pairs: ["tier="], flag: "--metadata" }),
       ).toThrow(ProcessExitError);
+    });
+  });
+
+  describe("given __proto__ as the key", () => {
+    it("collects it as an ordinary key", () => {
+      const parsed = parseKeyValueFlags({
+        pairs: ["__proto__=gold", "__proto__=silver"],
+        flag: "--metadata",
+      });
+
+      expect(parsed?.__proto__).toEqual(["gold", "silver"]);
+      expect(Object.keys({}).length).toBe(0);
     });
   });
 });

@@ -60,7 +60,11 @@ export const parseKeyValueFlags = ({
   flag: string;
 }): Record<string, string[]> | undefined => {
   if (pairs === undefined || pairs.length === 0) return undefined;
-  const parsed: Record<string, string[]> = {};
+  // A Map, not an object literal: `parsed["__proto__"]` on a literal reads back
+  // Object.prototype, so the `??=` would never assign and the push would land
+  // on the prototype as a TypeError rather than as this command's own clean
+  // validation error.
+  const parsed = new Map<string, string[]>();
   for (const pair of pairs) {
     const { key, value } = splitPair({ pair, flag });
     if (key.includes(":")) {
@@ -71,9 +75,11 @@ export const parseKeyValueFlags = ({
         `Invalid ${flag} value: ${pair} (an empty value would match every request that lacks the key)`,
       );
     }
-    (parsed[key] ??= []).push(value);
+    const existing = parsed.get(key);
+    if (existing) existing.push(value);
+    else parsed.set(key, [value]);
   }
-  return parsed;
+  return Object.fromEntries(parsed);
 };
 
 /**
@@ -106,10 +112,14 @@ export const parseRunParameterFlags = ({
   pairs: string[] | undefined;
 }): Record<string, RunParameterValue> | undefined => {
   if (pairs === undefined || pairs.length === 0) return undefined;
-  const parsed: Record<string, RunParameterValue> = {};
+  // A Map for the same reason as above: assigning `__proto__` on an object
+  // literal runs the prototype setter, which ignores a string, so the pair
+  // would be dropped without a word rather than reaching the server that
+  // rejects it by name.
+  const parsed = new Map<string, RunParameterValue>();
   for (const pair of pairs) {
     const { key, value } = splitPair({ pair, flag: PARAM_FLAG });
-    parsed[key] = coerceParameterValue(value);
+    parsed.set(key, coerceParameterValue(value));
   }
-  return parsed;
+  return Object.fromEntries(parsed);
 };

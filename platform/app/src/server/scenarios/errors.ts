@@ -28,14 +28,16 @@ export class ScenarioNotFoundError extends Error {
  * exhaustive over what this domain can raise.
  */
 export class ScenarioParameterError extends HandledError {
-  constructor(
-    message: string,
-    options: HandledErrorOptions & {
-      code: AppErrorCode;
-      httpStatus: number;
-    },
-  ) {
-    const { code, httpStatus, ...rest } = options;
+  constructor({
+    message,
+    code,
+    httpStatus,
+    ...rest
+  }: HandledErrorOptions & {
+    message: string;
+    code: AppErrorCode;
+    httpStatus: number;
+  }) {
     super(code, message, { ...rest, httpStatus });
     this.name = "ScenarioParameterError";
   }
@@ -58,16 +60,14 @@ export class ScenarioParameterUnknownError extends ScenarioParameterError {
     unknownKeys: string[];
     declaredNames: string[];
   }) {
-    super(
-      `Unknown scenario parameters: ${unknownKeys.join(", ")}. Declared: ${
+    super({
+      message: `Unknown scenario parameters: ${unknownKeys.join(", ")}. Declared: ${
         declaredNames.length > 0 ? declaredNames.join(", ") : "none"
       }`,
-      {
-        code: "scenario_parameter_unknown",
-        httpStatus: 422,
-        meta: { unknownKeys, declaredNames },
-      },
-    );
+      code: "scenario_parameter_unknown",
+      httpStatus: 422,
+      meta: { unknownKeys, declaredNames },
+    });
     this.name = "ScenarioParameterUnknownError";
   }
 }
@@ -90,14 +90,12 @@ export class ScenarioParameterMissingError extends ScenarioParameterError {
     names: string[];
     field: ScenarioContentField;
   }) {
-    super(
-      `No value for scenario parameters referenced in ${field}: ${names.join(", ")}`,
-      {
-        code: "scenario_parameter_missing",
-        httpStatus: 422,
-        meta: { names, field },
-      },
-    );
+    super({
+      message: `No value for scenario parameters referenced in ${field}: ${names.join(", ")}`,
+      code: "scenario_parameter_missing",
+      httpStatus: 422,
+      meta: { names, field },
+    });
     this.name = "ScenarioParameterMissingError";
   }
 }
@@ -114,7 +112,8 @@ export class ScenarioParameterTemplateInvalidError extends ScenarioParameterErro
   declare readonly code: "scenario_parameter_template_invalid";
 
   constructor({ field }: { field: ScenarioContentField }) {
-    super(`Scenario ${field} could not be rendered`, {
+    super({
+      message: `Scenario ${field} could not be rendered`,
       code: "scenario_parameter_template_invalid",
       httpStatus: 422,
       meta: { field },
