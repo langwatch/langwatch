@@ -54,6 +54,12 @@ import { TraceIOExtractionService } from "../trace-io-extraction.service";
 const canonicaliser = new CanonicalizeSpanAttributesService();
 const ioService = new TraceIOExtractionService();
 
+/**
+ * Only ever used to CONSTRUCT the span. The assertions below hardcode the
+ * literal instead of reusing this, so renaming the span turns them red — if
+ * both sides shared one constant the falsification would move together and
+ * prove nothing.
+ */
 const SPAN_NAME = "bedrock.converse";
 
 function makeSpan(
@@ -229,7 +235,7 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
         }),
       );
 
-      expect(input).toBe(SPAN_NAME);
+      expect(input).toBe("bedrock.converse");
     });
   });
 });
@@ -267,7 +273,7 @@ describe("given a Bedrock span whose messages sit under keys no extractor maps",
       // This pair IS the production signature. It is identifiable in stored
       // data with no access to the customer's account: input equal to the span
       // name, output empty, on a trace whose spans hold real content.
-      expect(input).toBe(SPAN_NAME);
+      expect(input).toBe("bedrock.converse");
       expect(output).toBe(null);
 
       // And the content is demonstrably still in the span — the trace is not
