@@ -54,6 +54,19 @@ Feature: Seed presets — a database that is ready to look at
     Then the identity is seeded past onboarding
     And the command fails explaining the stack must be up for the sample traces
 
+  # The demo content includes a prompt and an HTTP agent pointed at a public
+  # echo service (httpbin.org), so prompt management and HTTP-agent scenario
+  # targets both have something real to open — the agent completes a live
+  # round-trip with no API key. Both configs are seeded as raw JSON, and the
+  # app re-validates that JSON on every read, so the seed must stay parseable
+  # by the same validators the app enforces.
+  @unit
+  Scenario: The demo preset's prompt and HTTP agent pass the app's own validators
+    Given the demo platform's seeded prompt and HTTP-agent configurations
+    When they are checked against the validators the app applies at read time
+    Then both configurations parse cleanly
+    And the HTTP agent targets the public echo service over HTTPS
+
   # Cheap variants composed from switches the seed scripts already understand:
   #   traces          — sample traces on top of the identity, no demo content
   #   onboarding      — first-trace flag cleared: land on the onboarding journey

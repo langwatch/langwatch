@@ -354,7 +354,12 @@ async function main(): Promise<void> {
     adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
   });
   try {
-    await seedDemoPlatform({ prisma, projectId: PROJECT_ID, userId: USER_ID });
+    await seedDemoPlatform({
+      prisma,
+      projectId: PROJECT_ID,
+      organizationId: ORG_ID,
+      userId: USER_ID,
+    });
     const now = Date.now();
     const timeline = buildMassTimeline({ months: MONTHS, now });
     const metrics = buildMassMetrics({ months: MONTHS, now });

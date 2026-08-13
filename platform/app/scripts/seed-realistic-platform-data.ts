@@ -33,6 +33,7 @@ import {
 
 const PROJECT_ID = "local-dev-project";
 const USER_ID = "local-dev-admin-user";
+const ORG_ID = "local-dev-organization";
 const target: CollectorTarget = {
   endpoint: process.env.HAVEN_SEED_ENDPOINT ?? "http://localhost:5560",
   apiKey:
@@ -451,7 +452,12 @@ async function main(): Promise<void> {
     adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
   });
   try {
-    await seedDemoPlatform({ prisma, projectId: PROJECT_ID, userId: USER_ID });
+    await seedDemoPlatform({
+      prisma,
+      projectId: PROJECT_ID,
+      organizationId: ORG_ID,
+      userId: USER_ID,
+    });
     const historicalRuns = buildHistoricalScenarioRuns();
     const traces = buildTraceFixtures(historicalRuns);
     for (const [index, trace] of traces.entries()) {
