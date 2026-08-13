@@ -1,4 +1,4 @@
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 
 export type ProcessControlAction =
   | "process_wake_now"
@@ -66,7 +66,7 @@ export class ProcessAuditRepository implements ProcessAuditSink {
         action: entry.action,
         targetKind: TARGET_KIND,
         targetId: `${entry.processName}/${entry.projectId}/${entry.processKey}`,
-        metadata: entry.metadata ?? {},
+        metadata: (entry.metadata ?? {}) as Prisma.InputJsonValue,
       },
     });
   }

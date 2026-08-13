@@ -49,7 +49,7 @@ const CACHE_TTL_MS = 10_000;
 async function readCounts(): Promise<ProcessFleetMetricsRow[]> {
   if (!readFleet) return [];
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.rows;
-  if (inFlight) return inFlight;
+  if (inFlight !== null) return inFlight;
   inFlight = readFleet()
     .then((rows) => {
       cached = { at: Date.now(), rows };

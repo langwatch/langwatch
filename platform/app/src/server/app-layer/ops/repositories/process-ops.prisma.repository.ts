@@ -5,6 +5,7 @@ import type {
   ProcessNameCounts,
   ProcessOpsRepository,
   ProcessOutboxMessageView,
+  ProcessWakeRow,
 } from "./process-ops.repository";
 
 /** `00-<32 hex trace id>-<16 hex span id>-<flags>` per W3C traceparent. */
