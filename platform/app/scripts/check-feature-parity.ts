@@ -66,6 +66,10 @@ const DEFAULT_TEST_ROOTS: string[] = [
   "platform/app/src",
   "platform/app/ee",
   "platform/app/scripts",
+  // The seed is behavior every developer and every CI job depends on, and its
+  // tests live beside it rather than under src/. Without this root, a scenario
+  // describing what the seed does could only ever be @unimplemented.
+  "platform/app/prisma",
   "packages",
   "mcp/typescript/src",
   "sdks/typescript/src",

@@ -24,7 +24,7 @@ Feature: In-process workers for local development
   # The topology is selected by the WORKERS_IN_PROCESS env flag, read in four
   # places (all gated on NODE_ENV=development):
   #   - scripts/start.sh        — skips the standalone `workers` concurrently
-  #                               lane and lets start:app inherit the flag
+  #                               lane and lets start:app:dev inherit the flag
   #   - scripts/check-ports.sh  — doesn't reserve the worker-metrics port
   #                               (no separate metrics listener in this mode),
   #                               only when NODE_ENV=development too
@@ -67,7 +67,7 @@ Feature: In-process workers for local development
   Scenario: pnpm dev:concurrent runs the app and workers as two processes
     Given WORKERS_IN_PROCESS is not set
     When I run "pnpm dev:concurrent"
-    Then start.sh adds a separate "workers" lane running "pnpm run start:workers"
+    Then start.sh adds a separate "workers" lane running "pnpm run start:workers:dev"
     And the app process boots with the web role (no in-process workers)
 
   @unimplemented
@@ -81,7 +81,7 @@ Feature: In-process workers for local development
   @unimplemented
   Scenario: pnpm dev:worker runs the worker stack on its own
     When I run "pnpm dev:worker"
-    Then it prepares the generated files and runs "pnpm run start:workers"
+    Then it prepares the generated files and runs "pnpm run start:workers:dev"
     And no web server is started
 
   # --- Haven: in-process is the DEFAULT ---
@@ -98,7 +98,7 @@ Feature: In-process workers for local development
   Scenario: haven up +workers opts into a separate workers lane
     Given the worktree's sticky selection includes workers
     When I run "haven up" (or "haven up +workers")
-    Then haven adds a separate "workers" child running "pnpm run start:workers"
+    Then haven adds a separate "workers" child running "pnpm run start:workers:dev"
     And the app child boots without hosting workers in-process
 
   @unimplemented

@@ -39,6 +39,25 @@ Feature: Seed presets — a database that is ready to look at
     Then the command fails before touching anything
     And the error lists the presets I can pick from
 
+  # The seed runs as a child of whatever started it, and a launcher's shell
+  # carries none of the secrets the app's env schema validates — they live in
+  # platform/app/.env. The seed therefore loads its own env files, and has to do
+  # it before the module graph evaluates: it imports the encryption helpers,
+  # which validate the whole schema on import.
+  @unit
+  Scenario: The seed reads its own environment files
+    Given the secrets the environment schema requires live in .env, not in the shell
+    When haven runs the seed as part of "haven up"
+    Then the seed reads them before anything validates the environment
+    And it seeds instead of failing on a missing secret
+
+  @unit
+  Scenario: The seed keeps the database it was handed
+    Given haven points the seed at this worktree's own database
+    And .env names a different database
+    When the seed loads its environment files
+    Then it still seeds the database haven pointed it at
+
   @e2e @unimplemented
   Scenario: Seeding a project that has already received traffic
     Given this worktree's stack is running

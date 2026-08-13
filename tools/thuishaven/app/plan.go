@@ -20,6 +20,20 @@ func goServiceShell(repoRoot, svc string, shouldWatch bool) string {
 	return fmt.Sprintf("make -C %q %s svc=%s", repoRoot, target, svc)
 }
 
+// nodeEntry names the DEV entry point for a Node lane. `start:app` and
+// `start:workers` run the pre-built bundle (node dist/server/{server,workers}.cjs)
+// — the production image's entry points, and nothing in a worktree builds them,
+// so a haven lane pointed at one crashlooped on MODULE_NOT_FOUND until someone
+// ran `pnpm build`. Their `:dev` siblings run the same entry from source under
+// tsx, which is what plain `pnpm dev` selects: scripts/start.sh branches on
+// NODE_ENV and picks `start:app:dev` in development. haven owns its own process
+// set (it never goes through start.sh, which would also start vite, the Go
+// services and the migrations haven already runs), so it makes that same choice
+// here rather than inheriting it.
+func nodeEntry(script string) string {
+	return "pnpm -s run " + script + ":dev"
+}
+
 // planChildren turns a resolved stack into the supervised process set, layering
 // the overlay env (hostname URLs + ports) onto each child and giving each Go
 // service its SERVER_ADDR.
@@ -67,7 +81,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 		// until the stack can actually handle a request.
 		ReadyProbeURL: fmt.Sprintf("http://127.0.0.1:%d/api/health", st.APIPort),
 	})
-	// In-process worker mode (the default): the app process (start:app ->
+	// In-process worker mode (the default): the app process (start:app:dev ->
 	// start.ts) hosts the worker stack itself, so there is no separate
 	// `workers` lane below — one Node process instead of two, saving its RAM.
 	// `haven up +workers` selects the standalone lane instead.
@@ -77,7 +91,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 	}
 	out = append(out, Child{
 		Name: "api", Dir: lwDir, Color: palette[3], LogPath: logPath("api"),
-		Shell: "pnpm -s run start:app",
+		Shell: nodeEntry("start:app"),
 		Env:   apiEnv,
 	})
 	if opts.Selection.Gateway {
@@ -106,7 +120,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 			// is reserved for genuine failures, so no lane label uses it —
 			// TestNoLaneIsRed pins that.
 			Name: "workers", Dir: lwDir, Color: palette[0], LogPath: logPath("workers"),
-			Shell: "pnpm -s run start:workers",
+			Shell: nodeEntry("start:workers"),
 			Env:   append(nodeEnv(), "START_WORKERS=true"),
 		})
 	}

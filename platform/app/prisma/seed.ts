@@ -63,6 +63,11 @@
  * because hashing and verifying both read that same local pepper.
  */
 
+// The env files load as this import's side effect, before every other import
+// here — several of them validate process.env while they evaluate. See
+// prisma/seed-env.ts.
+import "./seed-env";
+
 import { hash as hashPassword } from "bcrypt";
 import { parse as parseDotenv } from "dotenv";
 import fs from "fs";

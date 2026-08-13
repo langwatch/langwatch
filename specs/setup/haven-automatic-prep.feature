@@ -17,6 +17,12 @@ Feature: haven automatic preparation
     When the developer runs "haven up"
     Then dependencies are installed before any service starts
 
+  Scenario: A fresh checkout needs no build before its lanes start
+    Given this worktree has never produced a production build
+    When the developer runs "haven up"
+    Then every Node lane runs its entry point from source
+    And no lane is left waiting on a bundle a worktree never builds
+
   @integration @unimplemented
   Scenario: A missing database is created, migrated, and seeded
     Given this worktree has no databases yet

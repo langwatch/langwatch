@@ -1,6 +1,10 @@
 package app
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -33,6 +37,65 @@ func TestNoLaneIsRed(t *testing.T) {
 	if !sawWorkers {
 		t.Fatal("expected a workers lane in the plan")
 	}
+}
+
+// Every Node lane has to run its entry point FROM SOURCE. The bundle entries
+// (`start:app`, `start:workers` -> node dist/server/*.cjs) belong to the
+// production image; nothing in a worktree builds dist/, so a lane pointed at one
+// crashlooped on MODULE_NOT_FOUND from the first `haven up` on a fresh checkout.
+//
+// This reads the real package.json rather than comparing the shell string to a
+// copy of itself: the failure it guards is a lane naming a script that does not
+// exist, or one that resolves to a build artifact. Renaming `start:app:dev`
+// without updating haven fails here.
+//
+// @scenario "A fresh checkout needs no build before its lanes start"
+func TestNodeLanesRunFromSource(t *testing.T) {
+	scripts := appPackageScripts(t)
+	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
+	children := o.planChildren(
+		domain.Stack{Slug: "test"},
+		PlanOptions{Selection: domain.Selection{Workers: true, Gateway: true, NLP: true}},
+		t.TempDir(),
+		"",
+	)
+
+	var checked int
+	for _, c := range children {
+		script, ok := strings.CutPrefix(c.Shell, "pnpm -s run ")
+		if !ok {
+			continue // a Go lane (make service ...) or the langy container lane
+		}
+		checked++
+		body, defined := scripts[script]
+		if !defined {
+			t.Errorf("lane %q runs %q, which platform/app/package.json does not define", c.Name, script)
+			continue
+		}
+		if strings.Contains(body, "dist/") {
+			t.Errorf("lane %q runs %q = %q, a pre-built bundle; a worktree never builds dist/, so the lane crashloops on MODULE_NOT_FOUND", c.Name, script, body)
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no Node lane was planned, so this pinned nothing")
+	}
+}
+
+// appPackageScripts reads the app's package.json scripts map. The test binary
+// runs in its own package directory, so the path is relative to that.
+func appPackageScripts(t *testing.T) map[string]string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "platform", "app", "package.json"))
+	if err != nil {
+		t.Fatalf("reading the app package.json: %v", err)
+	}
+	var pkg struct {
+		Scripts map[string]string `json:"scripts"`
+	}
+	if err := json.Unmarshal(raw, &pkg); err != nil {
+		t.Fatalf("parsing the app package.json: %v", err)
+	}
+	return pkg.Scripts
 }
 
 // stubProxy satisfies app.Proxy for planChildren, which reads only CACertPath().
