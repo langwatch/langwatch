@@ -35862,7 +35862,9 @@ An endpoint belongs to your **organization** and carries:
 
 | Field | Meaning |
 |---|---|
-| `url` | Where batches are POSTed. See [what a receiver URL must look like](#what-a-receiver-url-must-look-like). |
+| `destination_kind` | Where batches go: `http` (the default) or `sqs`. See [Delivering to an Amazon SQS queue](#delivering-to-an-amazon-sqs-queue). Set at creation and fixed for the endpoint's life. |
+| `url` | Where batches are POSTed, on an `http` endpoint. Null on the others. See [what a receiver URL must look like](#what-a-receiver-url-must-look-like). |
+| `sqs` | The queue, on an `sqs` endpoint. Null on the others. |
 | `enabled_events` | The subscription: exact types (`gateway.request.completed`), a family wildcard (`gateway.*`), or `*` for everything. An endpoint receives only what it subscribed to. |
 | `status` | `active` or `disabled`. Disabled endpoints receive nothing; sources keep accruing. |
 | Signing secret | Shown **once** at creation. Roll it to get a new one. Every delivery is signed with it. |
@@ -36151,6 +36153,74 @@ stateDiagram-v2
     Retrying --> Disabled: 72h of consecutive failures
     Disabled --> Pending: re-enable, then replay the gap
 ```
+
+## Delivering to an Amazon SQS queue
+
+An endpoint can put each batch on your own Amazon SQS queue instead of POSTing it to a URL. Everything above the last hop is the same machinery: the same batching, the same retry ladder, the same delivery log, the same signature over the same bytes.
+
+<Warning>
+**`ReceiveMessage` returns no message attributes unless you ask for them by name.** Pass `MessageAttributeNames: ["All"]`. Without it your consumer sees a body with no signature beside it and rejects every delivery it is sent, while the body in front of you looks perfectly fine. This is the single most common mistake when moving a receiver onto a queue.
+</Warning>
+
+**The body is byte-identical to the HTTP body.** `MessageBody` is the exact same `{"batch": [...]}` JSON an HTTPS receiver would be POSTed. There is no outer wrapper. The signature, the delivery id and the attempt ride as **message attributes** under the same names they use as HTTP headers:
+
+| Message attribute | Same as the HTTP header |
+|---|---|
+| `X-LangWatch-Signature` | `t=<unix>,v1=<hmac>`, one `v1` per valid secret |
+| `X-LangWatch-Delivery-Id` | Groups the retries of one delivery; never the dedup key |
+| `X-LangWatch-Delivery-Attempt` | 1-based attempt number |
+
+So verification is the same call over the same bytes, and moving an integration from HTTP to a queue does not change your verification code.
+
+```bash
+curl -X POST https://app.langwatch.ai/api/webhooks/v1/endpoints \
+  -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "destination_kind": "sqs",
+    "sqs": {
+      "queue_url": "https://sqs.eu-central-1.amazonaws.com/123456789012/billing-events",
+      "role_arn": "arn:aws:iam::123456789012:role/langwatch-webhook-producer"
+    },
+    "enabled_events": ["gateway.request.completed"]
+  }'
+```
+
+**Granting access.** Three modes, in the order to prefer them:
+
+| Mode | How | When |
+|---|---|---|
+| `assume_role` | Give `sqs.role_arn`. The response carries a generated `external_id`; put it in that role's trust policy as `sts:ExternalId`, and allow `sqs:SendMessage` on the queue. | The recommended mode. Nothing long-lived is stored, and you revoke us by editing your own trust policy. |
+| `static` | Give `sqs.access_key_id` and `sqs.secret_access_key`. The secret is encrypted at rest and never returned by any read. | When you cannot create a cross-account role. |
+| `ambient` | Give neither, so LangWatch's own AWS identity writes to the queue. Refused unless the operator set `WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS=1`. | Self-hosted, single-tenant installs only. |
+
+The trust policy on your role, with the `external_id` the create response returned:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": { "AWS": "<the LangWatch principal for your deployment>" },
+    "Action": "sts:AssumeRole",
+    "Condition": { "StringEquals": { "sts:ExternalId": "lw-<the external id from the response>" } }
+  }]
+}
+```
+
+<Note>
+On LangWatch Cloud, ask support for the principal to trust; it is a property of the deployment, not of your endpoint. On a self-hosted install it is whatever identity your workers run as.
+</Note>
+
+**Rules the queue itself must satisfy:**
+
+- **Standard queues only.** A `.fifo` queue is refused at save time. Delivery is at-least-once with dedup on the envelope `id`, which is what a standard queue provides; ordering was never promised, and FIFO caps at 300 messages a second.
+- **A canonical Amazon SQS queue URL**, `https://sqs.<region>.amazonaws.com/<account id>/<queue name>`. The region and the owning account are read from it, so they can never disagree with the queue. Anything else is refused.
+- **One batch is one message, capped at 256 KiB** including the attributes. A batch over the cap fails terminally and says so; lower `max_batch_size` so each delivery carries fewer events.
+
+**How to say "retry".** Delete the message only after the batch is durably ingested. Leaving it alone is the retry: it reappears after the visibility timeout, and after your queue's `maxReceiveCount` it lands in your dead letter queue. Set a redrive policy; a message your consumer can never accept belongs somewhere you can look at it.
+
+**Changing where an endpoint delivers** is not an update. `destination_kind` is fixed once created, because batches already planned against the old transport are in flight. Create a second endpoint, let the first drain, then archive it.
 
 ## Delivery controls
 
@@ -60152,6 +60222,24 @@ WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1
 ```
 
 With the flag set, endpoint URLs may use `http://` and resolve to private or loopback addresses. **Only** the local-address fence is relaxed: size caps, timeouts, no-redirects, and signing all stay in force. Leave this unset in production unless your receivers are deliberately internal; it is the difference between "our workers can only call out" and "our workers can reach anything on the pod network".
+
+## Amazon SQS destinations and whose credentials they use
+
+An endpoint can deliver to an Amazon SQS queue instead of an HTTPS receiver ([how it works](/features/webhooks#delivering-to-an-amazon-sqs-queue)). A queue endpoint normally carries credentials of its own: a role LangWatch assumes with a generated ExternalId, or an encrypted static key pair.
+
+It can also run on **this deployment's own AWS identity** (an instance role, IRSA, or a developer's SSO session), which needs an explicit opt-in:
+
+```
+WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS=1
+```
+
+With the flag set, an endpoint may name a queue and supply no credentials, and deliveries are written with whatever AWS identity the workers run as.
+
+<Warning>
+Leave this unset on any deployment serving more than one organization. With it on, anyone who can create a webhook endpoint can name **any queue this deployment's role is allowed to write to**, including another tenant's, and the platform will happily write to it. It is safe only on a single-tenant install whose queues are its own, and in local development.
+</Warning>
+
+The queue URL never passes through the SSRF fence above, because the AWS SDK dials it rather than the platform. It is pinned instead to the canonical Amazon SQS shape, and the region and owning account are read from the URL so they cannot be configured into disagreeing with the queue.
 
 ## Authentication model
 
