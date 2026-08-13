@@ -10,6 +10,7 @@ import fs from "fs";
 import { isBuiltin } from "module";
 import path from "path";
 import { beforeAll, describe, expect, it } from "vitest";
+import { OPTIONAL_EXTERNALS } from "../../../../../scripts/bundle-optional-externals.mjs";
 
 const PACKAGE_ROOT = path.resolve(__dirname, "../../../../..");
 const BUNDLE_PATH = path.join(
@@ -36,6 +37,7 @@ describe("Pre-compiled Scenario Child Process", () => {
     // points rebuilt, the scenario bundle gone — which is the state that sends
     // production scenario spawns down the tsx fallback.
 
+    /** @scenario 'Build step produces a runnable JavaScript bundle' */
     it("produces a single JavaScript file at dist/server/scenario-child-process.cjs", () => {
       expect(fs.existsSync(BUNDLE_PATH)).toBe(true);
 
@@ -64,14 +66,32 @@ describe("Pre-compiled Scenario Child Process", () => {
       expect(stderr).not.toContain("Cannot find module");
     });
 
-    it("excludes shared singleton dependencies from the bundle", () => {
+    /** @scenario 'OpenTelemetry stays external so the child holds one tracer provider' */
+    it("keeps OpenTelemetry external so exactly one API instance exists", () => {
       const content = fs.readFileSync(BUNDLE_PATH, "utf8");
 
-      // External deps should appear as require() calls, not inlined code
+      // The child flushes spans at exit through the globally registered
+      // provider. A second, inlined copy of the API would take registration
+      // and flush to different registries and silently drop every span, so
+      // this must stay a require and no copy may be inlined alongside it.
       expect(content).toContain('require("@opentelemetry/api")');
-      expect(content).toContain('require("@langwatch/scenario")');
+
+      // `createNoopMeter` is defined only inside @opentelemetry/api's own
+      // source, so its presence would mean a copy got inlined.
+      expect(content).not.toContain("createNoopMeter");
     });
 
+    /** @scenario 'The scenario SDK is inlined rather than required at runtime' */
+    it("inlines the scenario SDK instead of resolving it from node_modules", () => {
+      const content = fs.readFileSync(BUNDLE_PATH, "utf8");
+
+      // Left external, requiring it walked the SDK's whole dependency graph
+      // across the pnpm tree on every spawn — and the child is a fresh process
+      // per scenario run, so that cost was paid every time.
+      expect(content).not.toContain('require("@langwatch/scenario")');
+    });
+
+    /** @scenario 'Pre-compiled child process is ready for job data promptly' */
     it("starts and reads from stdin within 5 seconds", async () => {
       const startTime = Date.now();
 
@@ -116,14 +136,18 @@ describe("Pre-compiled Scenario Child Process", () => {
       expect(result.exitCode).toBe(1);
     }, 8000);
 
-    // Regression guard for #5855: the bundle keeps every dependency external
-    // (scripts/build-server.mjs bundles first-party code only), so it emits
-    // runtime require("x") calls that MUST resolve from the bundle's own
-    // directory — the exact resolution root prod uses. An external that is only
-    // a transitive dep of a workspace package (e.g. pino via
+    // Regression guard for #5855. Whatever this entry does NOT inline is
+    // emitted as a runtime require("x") that MUST resolve from the bundle's
+    // own directory — the exact resolution root prod uses. A package that is
+    // only a transitive dep of a workspace package (e.g. pino via
     // @langwatch/observability) is NOT top-linked into platform/app/node_modules by
     // pnpm, so its require throws MODULE_NOT_FOUND at prod boot. #2404 caused
     // exactly this by moving the pino family out of the app manifest.
+    //
+    // This entry now inlines its graph, which shrinks the exposure to the
+    // OpenTelemetry packages held out on purpose — but it does not remove it,
+    // and the check stays as the thing that proves it.
+    /** @scenario 'Every externalized require resolves from the bundle directory' */
     it("boots without MODULE_NOT_FOUND — every externalized require() resolves in a prod-shaped layout", () => {
       const content = fs.readFileSync(BUNDLE_PATH, "utf8");
       const distDir = path.dirname(BUNDLE_PATH);
@@ -142,9 +166,12 @@ describe("Pre-compiled Scenario Child Process", () => {
         (name) => !name.startsWith(".") && !isBuiltin(name),
       );
 
-      // Sanity: the logger dep whose absence broke prod must be one of them —
-      // if it ever stops being emitted, this guard would silently pass empty.
-      expect(externalPkgs).toContain("pino");
+      // Sanity: if nothing is emitted the filters below pass vacuously, so pin
+      // a package that is external BY DESIGN. This entry inlines its graph, so
+      // OpenTelemetry — held out deliberately to keep one API instance in the
+      // child — is the dependable sentinel. (pino filled this role while the
+      // entry externalized everything; it is inlined now.)
+      expect(externalPkgs).toContain("@opentelemetry/api");
 
       // PRIMARY — EXECUTE the affected code path (coding guideline: runtime
       // regression tests must run the code and observe the crash, not just assert
@@ -173,7 +200,12 @@ describe("Pre-compiled Scenario Child Process", () => {
       // SUPPLEMENTARY — resolve each external from the prod-shaped root so a
       // failure NAMES the exact unresolved module (the runtime check above only
       // reports that *something* failed). Execute-the-path + precise attribution.
+      // Optional peers are require'd behind a runtime guard, so being
+      // unresolvable is their designed state, not a regression. Same list the
+      // build's dependency check uses, so the two cannot drift apart.
+      const optional = new Set<string>(OPTIONAL_EXTERNALS);
       const unresolved = externalPkgs.filter((name) => {
+        if (optional.has(name)) return false;
         try {
           require.resolve(name, { paths: [distDir] });
           return false;

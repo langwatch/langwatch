@@ -15,6 +15,8 @@
 
 import { createLogger } from "@langwatch/observability";
 import { type ChildProcess, spawn } from "child_process";
+import os from "os";
+import path from "path";
 import { env } from "~/env.mjs";
 import { tryGetApp } from "../app-layer/app";
 import { resolveAppPackageRoot } from "../appPackageRoot";
@@ -245,6 +247,16 @@ export function buildOtelResourceAttributes(labels: string[]): string {
  * Build minimal env for child process - whitelist only what's needed.
  * @internal Exported for testing
  */
+/**
+ * Where the scenario child keeps its V8 compile cache. Under the OS temp dir
+ * because that is writable in every deployment shape we ship, including a
+ * read-only application root.
+ */
+const SCENARIO_CHILD_COMPILE_CACHE_DIR = path.join(
+  os.tmpdir(),
+  "langwatch-scenario-compile-cache",
+);
+
 export function buildChildProcessEnv(
   scenarioVars: Record<string, string | undefined>,
 ): NodeJS.ProcessEnv {
@@ -259,6 +271,13 @@ export function buildChildProcessEnv(
     NODE_ENV: process.env.NODE_ENV,
     NODE_OPTIONS: process.env.NODE_OPTIONS,
     SKIP_ENV_VALIDATION: "1",
+    // The child is a fresh process per run, so without this it re-compiles the
+    // same bundle every time. Node keys each entry by a hash of the source, so
+    // a rebuilt bundle can never be served a stale compilation — the entries
+    // for the old one are simply never read again. An unwritable directory
+    // degrades to no caching rather than failing the spawn.
+    NODE_COMPILE_CACHE:
+      process.env.NODE_COMPILE_CACHE ?? SCENARIO_CHILD_COMPILE_CACHE_DIR,
     COREPACK_ENABLE_DOWNLOAD_PROMPT:
       process.env.COREPACK_ENABLE_DOWNLOAD_PROMPT,
     ...scenarioVars,
