@@ -448,13 +448,16 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
     And its reasoning column carries the judge's account of the disagreement
     And a row the judge never ran still exports three empty cells
 
-  # A forced tool call is not a guarantee: a provider can answer with no tool
-  # call, or with one whose arguments omit the winner. Two of roughly 200 live
-  # calls did. Erroring the row throws away both the money and the reason,
-  # when the honest report is that the judge did not answer.
+  # Asking the judge for a winner is a request, not a guarantee: two of roughly
+  # 200 live calls came back with nothing usable in them. Erroring the row
+  # throws away both the money and the reason, when the honest report is that
+  # the judge did not answer. An answer naming nobody is one of these, not a
+  # win for whichever candidate happened to be listed first.
   @unit
-  Scenario: A judge answer with no winner in it is reported, not raised
-    Given the judge returns a tool call whose arguments omit the winner
+  Scenario: A judge answer that names no winner is reported, not raised
+    Given the judge answers without naming any candidate as the winner
     When the row is evaluated
     Then the row reports no verdict rather than an error
+    And no candidate is recorded as having won it
     And it still reports the cost of the calls that were made
+    And an answer that names a winner but gives no reason still counts as a verdict

@@ -654,14 +654,23 @@ class SelectBestCompareEvaluator(
             return _unanswered("returned no answer to read", call_cost)
 
         try:
-            arguments = json.loads(tool_calls[0].function.arguments)
+            raw_arguments = tool_calls[0].function.arguments
+        except AttributeError:
+            return _unanswered("returned no answer to read", call_cost)
+
+        try:
+            arguments = json.loads(raw_arguments)
         except (TypeError, ValueError):
             return _unanswered("returned an answer that could not be read", call_cost)
 
-        if not isinstance(arguments, dict) or "winner" not in arguments:
+        # A present-but-empty `winner` is the same non-answer as an absent one:
+        # `{"winner": null}` names nobody. It is checked here rather than left
+        # to the slot lookup below, whose fallback deliberately degrades an
+        # unrecognised slot LETTER to a real candidate — a fallback that would
+        # otherwise turn "the judge named no one" into "candidate A won".
+        displayed = arguments.get("winner") if isinstance(arguments, dict) else None
+        if not isinstance(displayed, str) or not displayed.strip():
             return _unanswered("answered without naming a winner", call_cost)
-
-        displayed = arguments["winner"]
         if displayed == "tie":
             winner_id = "tie"
         elif displayed in slot_to_candidate:

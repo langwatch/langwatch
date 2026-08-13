@@ -1588,7 +1588,17 @@ def _mock_completion_response_without_tool_call():
     return SimpleNamespace(choices=[choice])
 
 
-# @scenario "A judge answer with no winner in it is reported, not raised"
+def _mock_completion_response_with_null_winner():
+    """A tool call carrying the `winner` key with nothing in it. Shaped like an
+    answer, so the key-presence check passes and only the value gives it
+    away."""
+    arguments_json = json.dumps({"winner": None, "reasoning": "hard to say"})
+    tool_call = SimpleNamespace(function=SimpleNamespace(arguments=arguments_json))
+    message = SimpleNamespace(tool_calls=[tool_call])
+    return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+
+# @scenario "A judge answer that names no winner is reported, not raised"
 def test_answer_without_a_winner_is_reported_as_no_verdict():
     """A forced tool call is a request, not a guarantee. The row the provider
     fumbled should read like a row with no verdict, not like a broken
@@ -1616,7 +1626,7 @@ def test_answer_without_a_winner_is_reported_as_no_verdict():
     assert result.cost.amount == 0.0002
 
 
-# @scenario "A judge answer with no winner in it is reported, not raised"
+# @scenario "A judge answer that names no winner is reported, not raised"
 def test_answer_with_no_tool_call_at_all_is_reported_as_no_verdict():
     evaluator = SelectBestCompareEvaluator(
         settings=SelectBestCompareSettings(swap_and_reconcile=False)
@@ -1639,7 +1649,7 @@ def test_answer_with_no_tool_call_at_all_is_reported_as_no_verdict():
     assert result.cost.amount == 0.0002
 
 
-# @scenario "A judge answer with no winner in it is reported, not raised"
+# @scenario "A judge answer that names no winner is reported, not raised"
 def test_unreadable_tool_arguments_are_reported_as_no_verdict():
     evaluator = SelectBestCompareEvaluator(
         settings=SelectBestCompareSettings(swap_and_reconcile=False)
@@ -1662,9 +1672,68 @@ def test_unreadable_tool_arguments_are_reported_as_no_verdict():
     assert result.status == "skipped"
     assert result.details is not None
     assert "no verdict" in result.details
+    assert result.cost is not None
+    assert result.cost.amount == 0.0002
 
 
-# @scenario "A judge answer with no winner in it is reported, not raised"
+# @scenario "A judge answer that names no winner is reported, not raised"
+def test_a_present_but_empty_winner_names_nobody():
+    """The nastiest shape of the three, because it looks like an answer. The
+    slot lookup below the check degrades an unrecognised slot LETTER to the
+    first candidate on purpose, so a `winner` of `None` reaching it would be
+    read as candidate A winning: a row nobody judged, reported as decided."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(swap_and_reconcile=False)
+    )
+    entry = _make_entry(num_candidates=3, row_index=0)
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        return_value=_mock_completion_response_with_null_winner(),
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0002,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert result.status == "skipped"
+    assert getattr(result, "label", None) is None
+    assert result.details is not None
+    assert "no verdict" in result.details
+    assert result.cost is not None
+    assert result.cost.amount == 0.0002
+
+
+# @scenario "A judge answer that names no winner is reported, not raised"
+def test_a_tool_call_with_no_function_on_it_is_reported_as_no_verdict():
+    """The tool call itself can arrive in a shape that carries no arguments to
+    read. Reaching into it blind is the same crash the missing `winner` key
+    used to be, one level further out."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(swap_and_reconcile=False)
+    )
+    entry = _make_entry(num_candidates=3, row_index=0)
+
+    message = SimpleNamespace(tool_calls=[SimpleNamespace()])
+    response = SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        return_value=response,
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0002,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert result.status == "skipped"
+    assert result.details is not None
+    assert "no verdict" in result.details
+    assert result.cost is not None
+    assert result.cost.amount == 0.0002
+
+
+# @scenario "A judge answer that names no winner is reported, not raised"
 def test_one_unusable_pass_is_not_read_as_a_disagreement():
     """Reconciliation compares two answers. When one of them never arrived
     there is nothing to compare, and calling that a disagreement would tell
@@ -1700,7 +1769,7 @@ def test_one_unusable_pass_is_not_read_as_a_disagreement():
     assert result.cost.amount == 0.0004
 
 
-# @scenario "A judge answer with no winner in it is reported, not raised"
+# @scenario "A judge answer that names no winner is reported, not raised"
 def test_two_unusable_passes_do_not_agree_with_each_other():
     """Two `None` winners are equal, so the agreement branch would have
     reported "confirmed under order swap" over a winner nobody named."""
@@ -1728,7 +1797,7 @@ def test_two_unusable_passes_do_not_agree_with_each_other():
     assert "Confirmed" not in result.details
 
 
-# @scenario "A judge answer with no winner in it is reported, not raised"
+# @scenario "A judge answer that names no winner is reported, not raised"
 def test_an_answer_missing_only_its_reasoning_still_names_the_winner():
     """The winner is the part a row cannot do without. A missing explanation
     degrades the row to a verdict without one rather than throwing the verdict

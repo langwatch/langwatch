@@ -249,10 +249,13 @@ describe("given a CSV export of a run with an unsettled row", () => {
     comparisonColumns: [column],
   });
 
-  const exportedRow = (
-    data: BatchEvaluationData,
-    rowIndex: number,
-  ): Record<string, string> => {
+  const exportedRow = ({
+    data,
+    rowIndex,
+  }: {
+    data: BatchEvaluationData;
+    rowIndex: number;
+  }): Record<string, string> => {
     const headers = buildCsvHeaders(data);
     const { rows } = buildCsvData(data);
     const values = rows[rowIndex] ?? [];
@@ -263,10 +266,10 @@ describe("given a CSV export of a run with an unsettled row", () => {
 
   /** @scenario "An unsettled row exports its explanation" */
   it("names the outcome for what it is, and carries the reasoning", () => {
-    const row = exportedRow(
-      dataWith(columnFrom(RUN_WITH_ONE_UNSETTLED_ROW)),
-      1,
-    );
+    const row = exportedRow({
+      data: dataWith(columnFrom(RUN_WITH_ONE_UNSETTLED_ROW)),
+      rowIndex: 1,
+    });
 
     // Not `tie`, and not the SDK's `inconclusive` either: the stored row
     // cannot tell an unreproducible verdict from a row too thin to judge, so
@@ -281,7 +284,10 @@ describe("given a CSV export of a run with an unsettled row", () => {
   /** @scenario "An unsettled row exports its explanation" */
   it("leaves three empty cells for a row the judge never ran", () => {
     const column = columnFrom(RUN_WITH_ONE_UNSETTLED_ROW);
-    const row = exportedRow(dataWith({ ...column, verdictsByRow: {} }), 1);
+    const row = exportedRow({
+      data: dataWith({ ...column, verdictsByRow: {} }),
+      rowIndex: 1,
+    });
 
     expect(row.comparison_winner).toBe("");
     expect(row.comparison_candidates).toBe("");

@@ -684,8 +684,11 @@ const detectComparisonColumns = (
         rawLabel: string;
         reasoning: string | null;
         candidateIds: string[];
-        /** The judge ran and reached no verdict. See `isUnsettled`. */
-        unsettled?: boolean;
+        /**
+         * The judge ran and reached no verdict. Carried straight through to
+         * the verdict's own `isUnsettled`, whose doc names the causes.
+         */
+        isUnsettled?: boolean;
       }>;
     }
   >();
@@ -765,7 +768,7 @@ const detectComparisonColumns = (
         rawLabel: "",
         reasoning: ev.details ?? null,
         candidateIds: rowCandidateIds,
-        unsettled: true,
+        isUnsettled: true,
       });
       continue;
     }
@@ -821,9 +824,9 @@ const detectComparisonColumns = (
       rawLabel,
       reasoning,
       candidateIds,
-      unsettled,
+      isUnsettled,
     } of bucket.verdicts) {
-      if (unsettled) {
+      if (isUnsettled) {
         // Never runs through the label resolution below: there is no label,
         // and the two states it can produce (tie, unresolved) are both claims
         // about an answer this row never got.

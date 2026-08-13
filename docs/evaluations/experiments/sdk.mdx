@@ -1025,7 +1025,7 @@ What each [verdict](#the-verdict) writes into those three cells:
 
 An empty winner is never a tie. The three cells go empty together for `error` and for a row the comparison never ran on, so `tie` in the winner column always means the judge saw the candidates and called the row even.
 
-`no_verdict` covers both `inconclusive` and `skipped` because a recorded row cannot tell them apart: they reach the platform under the same status, and naming either one in the export would be a guess. The reasoning cell says which it was, in the judge's own words. Read `verdict.status` in code when you need the two kept separate.
+`no_verdict` is the shared export token for `inconclusive` and `skipped`. The two are separate in code, on the `verdict.status` your call returns, but they are recorded under one status, so a row read back from a completed run cannot be sorted into one or the other and naming either in the export would be a guess. The reasoning cell explains why no verdict was recorded, either in the judge's own words or, when the judge itself never answered, in the evaluator's account of what came back. Keep the two apart by reading `verdict.status` at the point of comparison.
 
 A row's candidates can be fewer than the comparison's full set of targets, because a target that produced no output for that row is left out of the matchup. The winner reads `unresolved` on the rare row where the judge's answer matches none of the candidates it was shown, and a winner naming a target the run no longer lists is written under its own name.
 
