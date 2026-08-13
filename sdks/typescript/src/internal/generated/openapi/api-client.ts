@@ -24702,7 +24702,7 @@ export interface operations {
                 } | {
                     /** @constant */
                     action: "SEND_WEBHOOK";
-                    /** @description Delivery to a customer endpoint over HTTP. */
+                    /** @description Delivery to a customer endpoint over HTTP, with a body in any media type. */
                     actionParams: {
                         /** @description Where the request goes. https only, and not a private host. */
                         url: string;
@@ -24715,8 +24715,10 @@ export interface operations {
                         headers?: {
                             [key: string]: string;
                         };
-                        /** @description A Liquid template for the JSON body. Absent sends the standard LangWatch envelope. */
+                        /** @description A Liquid template for the body. Absent sends the standard LangWatch envelope for a JSON content type, and an empty body for any other. */
                         bodyTemplate?: string | null;
+                        /** @description The `Content-Type` the delivery announces, which also decides how the body is treated: `application/json` (and any `+json` type) is checked and re-serialised; any other media type sends the rendered template verbatim. Absent means `application/json`. */
+                        contentType?: string;
                         /** @description Signs every delivery so the receiver can verify it came from LangWatch. A credential: it reads back as the placeholder, and sending the placeholder back keeps the stored one. */
                         signingSecret?: string | null;
                     } & {
@@ -25396,8 +25398,10 @@ export interface operations {
                         headers?: {
                             [key: string]: string;
                         };
-                        /** @description A Liquid template for the JSON body. Absent sends the standard LangWatch envelope. */
+                        /** @description A Liquid template for the body. Absent sends the standard LangWatch envelope for a JSON content type, and an empty body for any other. */
                         bodyTemplate?: string | null;
+                        /** @description The `Content-Type` the delivery announces, which also decides how the body is treated: `application/json` (and any `+json` type) is checked and re-serialised; any other media type sends the rendered template verbatim. Absent means `application/json`. */
+                        contentType?: string;
                         /** @description Signs every delivery so the receiver can verify it came from LangWatch. A credential: it reads back as the placeholder, and sending the placeholder back keeps the stored one. */
                         signingSecret?: string | null;
                     } & {
