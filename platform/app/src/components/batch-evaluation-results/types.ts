@@ -149,6 +149,20 @@ export type BatchComparisonVerdict = {
    * unresolved label is no evidence and the row must be skipped entirely.
    */
   isUnresolved?: boolean;
+  /**
+   * True when the row produced no verdict at all: the judge's two
+   * swap-and-reconcile passes named different winners, it answered with no
+   * winner in it, or it declined before calling because the row had fewer
+   * than two candidate outputs. A third reason for `winnerId === null`, and
+   * the one the reader most often paid for: `reasoning` holds the judge's own
+   * account of it, and showing that is the whole point of carrying these rows.
+   *
+   * Every consumer that reads `winnerId === null` as "tie" has to exclude
+   * these first. An unsettled row is not 0.5/0.5 evidence and not half a win;
+   * it is a row the run declined to draw a conclusion from, so it belongs in
+   * neither the win-rate chart's Tie bar nor the ranking.
+   */
+  isUnsettled?: boolean;
 };
 
 /** One candidate participating in a comparison, in the order the judge saw them. */
@@ -670,23 +684,28 @@ const detectComparisonColumns = (
         rawLabel: string;
         reasoning: string | null;
         candidateIds: string[];
+        /** The judge ran and reached no verdict. See `isUnsettled`. */
+        unsettled?: boolean;
       }>;
     }
   >();
 
   for (const ev of evaluations) {
     const isForced = forcedComparisonEvaluatorIds.has(ev.evaluator);
-    if (ev.status !== "processed") {
-      // A comparison the judge RAN and declined to call. Recorded before the
-      // early return discards it, because it is the explanation for a graph
-      // that later fails to connect — see `rowsWithoutVerdict`.
-      if (ev.status === "skipped" && (isComparisonEvaluator(ev) || isForced)) {
-        const skippedKey = ev.name
-          ? `${ev.evaluator}::${ev.name}`
-          : ev.evaluator;
-        skippedByKey.set(skippedKey, (skippedByKey.get(skippedKey) ?? 0) + 1);
-      }
+    const isSkippedComparison =
+      ev.status === "skipped" && (isComparisonEvaluator(ev) || isForced);
+    if (ev.status !== "processed" && !isSkippedComparison) {
       continue;
+    }
+    if (isSkippedComparison) {
+      // A comparison the judge declined to call. Counted for
+      // `rowsWithoutVerdict`, which is the explanation for a win graph that
+      // later fails to connect, AND carried through as a verdict of its own
+      // so the row can say why instead of showing a bare dash. The judge
+      // wrote that explanation and, for a row that disagreed with itself, was
+      // paid twice for it.
+      const skippedKey = ev.name ? `${ev.evaluator}::${ev.name}` : ev.evaluator;
+      skippedByKey.set(skippedKey, (skippedByKey.get(skippedKey) ?? 0) + 1);
     }
     const hasLabel = typeof ev.label === "string" && ev.label.length > 0;
     if (!hasLabel && !isComparisonEvaluator(ev) && !isForced) continue;
@@ -736,6 +755,19 @@ const detectComparisonColumns = (
       if (!bucket.candidateIds.includes(resolved)) {
         bucket.candidateIds.push(resolved);
       }
+    }
+
+    if (isSkippedComparison) {
+      // No label to resolve and none coming: this row's whole content is the
+      // judge's account of why it reached no verdict.
+      bucket.verdicts.push({
+        rowIndex: ev.index,
+        rawLabel: "",
+        reasoning: ev.details ?? null,
+        candidateIds: rowCandidateIds,
+        unsettled: true,
+      });
+      continue;
     }
 
     if (!hasLabel) continue;
@@ -789,7 +821,23 @@ const detectComparisonColumns = (
       rawLabel,
       reasoning,
       candidateIds,
+      unsettled,
     } of bucket.verdicts) {
+      if (unsettled) {
+        // Never runs through the label resolution below: there is no label,
+        // and the two states it can produce (tie, unresolved) are both claims
+        // about an answer this row never got.
+        verdictsByRow[rowIndex] = {
+          rowIndex,
+          winnerId: null,
+          reasoning,
+          winnerOutput: null,
+          candidateIds,
+          isUnsettled: true,
+        };
+        continue;
+      }
+
       let winnerId: string | null;
       // Distinguished from a genuinely unresolved label below — both leave
       // winnerId null for every existing (bar-chart) consumer, but a real

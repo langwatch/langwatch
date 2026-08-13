@@ -411,3 +411,50 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
     When I read why the row was inconclusive
     Then each pass's explanation names the variants that pass was shown
     And no words are attributed to the variant that held that slot in the other pass
+
+  # The row a reader most wants explained was answered with a bare dash, and a
+  # dash reads as missing data rather than as a finding: the first question
+  # dogfooding drew was whether the results had failed to load. The account of
+  # the disagreement was stored and paid for the whole time.
+  @integration
+  Scenario: A row the judge could not settle says so, and why
+    Given a row whose two judge passes disagreed
+    When I view that row on the results page
+    Then the row says the judge reached no verdict
+    And I can read the judge's account of the disagreement on that row
+    And the row is not labelled a tie
+
+  # An unsettled row is not evidence. Counting it as a tie would hand the
+  # chart and the ranking a result nobody produced, which is the same mistake
+  # the judge itself refuses to make when its two passes disagree.
+  @unit
+  Scenario: An unsettled row stays out of the win-rate chart and the ranking
+    Given 10 rows were evaluated, 6 naming a winner and 4 left unsettled
+    When I view the run on the results page
+    Then the win-rate chart counts no ties from the unsettled rows
+    And the ranking takes no evidence from them
+    And the run still reports 4 rows without a verdict
+
+  # Empty cells said the same thing as a row the judge never ran, so a
+  # spreadsheet could not tell "no answer" from "an answer we would not trust".
+  # The winner column names the outcome, and the reasoning column carries the
+  # text rather than dropping it.
+  @unit
+  Scenario: An unsettled row exports its explanation
+    Given a row whose two judge passes disagreed
+    When I export the run to CSV
+    Then that row's winner column reads "no_verdict"
+    And its candidates column names the candidates that were judged
+    And its reasoning column carries the judge's account of the disagreement
+    And a row the judge never ran still exports three empty cells
+
+  # A forced tool call is not a guarantee: a provider can answer with no tool
+  # call, or with one whose arguments omit the winner. Two of roughly 200 live
+  # calls did. Erroring the row throws away both the money and the reason,
+  # when the honest report is that the judge did not answer.
+  @unit
+  Scenario: A judge answer with no winner in it is reported, not raised
+    Given the judge returns a tool call whose arguments omit the winner
+    When the row is evaluated
+    Then the row reports no verdict rather than an error
+    And it still reports the cost of the calls that were made

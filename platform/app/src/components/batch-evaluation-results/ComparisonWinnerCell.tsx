@@ -18,9 +18,11 @@
  * behaviour on click — same pattern BatchTargetCell already uses for
  * long prompt / agent outputs so the table reads as one cohesive design.
  *
- * Rows without a verdict (skipped / error / not-yet-run) render a subtle
- * dash so the column width is preserved and the table doesn't reflow
- * between reruns.
+ * A row the judge never ran renders a subtle dash so the column width is
+ * preserved and the table doesn't reflow between reruns. A row it DID run and
+ * could not settle is not that: it reads "No verdict" and shows the judge's
+ * account of why, which is the most expensive text on the page (an
+ * unsettled row is two judge calls) and was previously thrown away.
  */
 
 import { Badge, Box, HStack, Portal, Text, VStack } from "@chakra-ui/react";
@@ -44,6 +46,12 @@ const resolveWinner = (
   column: BatchComparisonColumn,
   verdict: BatchComparisonVerdict,
 ): WinnerVisual => {
+  // Checked before the tie: an unsettled row also has no winner id, and
+  // calling it a tie would report a result the judge explicitly refused to
+  // reach.
+  if (verdict.isUnsettled) {
+    return { label: "No verdict", colorPalette: "gray" };
+  }
   if (verdict.winnerId === null) {
     return { label: "Tie", colorPalette: "gray" };
   }
@@ -110,7 +118,8 @@ export function ComparisonWinnerCell({
     );
   }
 
-  const isTie = verdict.winnerId === null;
+  const isUnsettled = verdict.isUnsettled === true;
+  const isTie = !isUnsettled && verdict.winnerId === null;
   const winner = resolveWinner(column, verdict);
   const reasoning = verdict.reasoning?.trim();
   const winnerOutput = verdict.winnerOutput?.trim();
@@ -123,7 +132,9 @@ export function ComparisonWinnerCell({
       colorPalette={winner.colorPalette}
       size="sm"
       variant="subtle"
-      data-testid={`comparison-winner-badge-${verdict.winnerId ?? "tie"}`}
+      data-testid={`comparison-winner-badge-${
+        verdict.winnerId ?? (isUnsettled ? "no-verdict" : "tie")
+      }`}
     >
       {/* Same colour square the target column header uses, so the reader can
           trace the winner back to its column and its win-rate bar. */}
@@ -136,7 +147,7 @@ export function ComparisonWinnerCell({
           flexShrink={0}
         />
       )}
-      {isTie ? "Tie" : `Winner: ${winner.label}`}
+      {isTie || isUnsettled ? winner.label : `Winner: ${winner.label}`}
     </Badge>
   );
 

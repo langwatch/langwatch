@@ -1009,7 +1009,7 @@ A comparison grades the row as a whole rather than one target, so it gets its ow
 
 | Column Pattern | Description | Example |
 |----------------|-------------|---------|
-| `{comparison}_winner` | Name of the winning target, `tie`, `unresolved`, or empty | `comparison_winner` → `gpt-5-mini` |
+| `{comparison}_winner` | Name of the winning target, `tie`, `no_verdict`, `unresolved`, or empty | `comparison_winner` → `gpt-5-mini` |
 | `{comparison}_candidates` | The targets compared on this row, comma separated | `comparison_candidates` → `gpt-5-mini, claude-sonnet-5` |
 | `{comparison}_reasoning` | The judge's explanation for the verdict | `comparison_reasoning` → `"gpt-5-mini gives the exact reset link"` |
 
@@ -1019,11 +1019,13 @@ What each [verdict](#the-verdict) writes into those three cells:
 |---------|-----------------------|---------------------------|--------------------------|
 | `decided` | The winning target's name | The targets judged on this row | The judge's explanation |
 | `tie` | `tie` | The targets judged on this row | The judge's explanation |
-| `inconclusive` | Empty | Empty | Empty |
-| `skipped` | Empty | Empty | Empty |
+| `inconclusive` | `no_verdict` | The targets judged on this row | Why the verdict did not hold |
+| `skipped` | `no_verdict` | The candidates the row did have | Why the row could not be compared |
 | `error` | Empty | Empty | Empty |
 
-An empty winner is never a tie. The three cells go empty together for `inconclusive`, `skipped` and `error`, and for a row the comparison never ran on, so `tie` in the winner column always means the judge saw the candidates and called the row even.
+An empty winner is never a tie. The three cells go empty together for `error` and for a row the comparison never ran on, so `tie` in the winner column always means the judge saw the candidates and called the row even.
+
+`no_verdict` covers both `inconclusive` and `skipped` because a recorded row cannot tell them apart: they reach the platform under the same status, and naming either one in the export would be a guess. The reasoning cell says which it was, in the judge's own words. Read `verdict.status` in code when you need the two kept separate.
 
 A row's candidates can be fewer than the comparison's full set of targets, because a target that produced no output for that row is left out of the matchup. The winner reads `unresolved` on the rare row where the judge's answer matches none of the candidates it was shown, and a winner naming a target the run no longer lists is written under its own name.
 

@@ -376,6 +376,20 @@ class SelectBestCompareEvaluator(
             None if cost1 is None and cost2 is None else (cost1 or 0.0) + (cost2 or 0.0)
         )
 
+        # One unusable answer is not a disagreement. Reading it as one would
+        # tell the reader the candidates could not be separated, when what
+        # actually happened is that the judge never answered; and two unusable
+        # answers would agree with each other and report a winner of None as
+        # though it had been confirmed twice.
+        if verdict1.get("unanswered") or verdict2.get("unanswered"):
+            unusable = verdict1 if verdict1.get("unanswered") else verdict2
+            return {
+                "winner": None,
+                "unanswered": True,
+                "reasoning": unusable["reasoning"],
+                "cost": total_cost,
+            }
+
         if winner1 == winner2:
             # Same winner both times (including both "tie") — agreement.
             #
@@ -620,9 +634,32 @@ class SelectBestCompareEvaluator(
 
         response = cast(ModelResponse, response)
         choice = cast(Choices, response.choices[0])
-        arguments = json.loads(
-            cast(Message, choice.message).tool_calls[0].function.arguments  # type: ignore
-        )
+
+        # Read the cost before reading the answer. The call was made and billed
+        # whatever came back inside it, so an answer we cannot use still has to
+        # carry its price to the row.
+        try:
+            call_cost = completion_cost(completion_response=response)
+        except Exception:
+            call_cost = None
+
+        # A forced `tool_choice` is a request, not a guarantee. Providers
+        # occasionally answer with no tool call, or with one whose arguments
+        # are unreadable or carry no `winner`; two of roughly 200 live calls
+        # did while dogfooding. Each of those is the judge failing to answer,
+        # which is a verdict-shaped outcome the reader can act on, so it is
+        # reported as no verdict rather than raised as an evaluator error.
+        tool_calls = getattr(cast(Message, choice.message), "tool_calls", None)
+        if not tool_calls:
+            return _unanswered("returned no answer to read", call_cost)
+
+        try:
+            arguments = json.loads(tool_calls[0].function.arguments)
+        except (TypeError, ValueError):
+            return _unanswered("returned an answer that could not be read", call_cost)
+
+        if not isinstance(arguments, dict) or "winner" not in arguments:
+            return _unanswered("answered without naming a winner", call_cost)
 
         displayed = arguments["winner"]
         if displayed == "tie":
@@ -641,11 +678,6 @@ class SelectBestCompareEvaluator(
             # still yields a processed result naming a real candidate.
             winner_id = slot_to_candidate[_slot_label(0)].id
 
-        try:
-            call_cost = completion_cost(completion_response=response)
-        except Exception:
-            call_cost = None
-
         # The judge argues in terms of the slot labels it was shown, so the
         # reasoning is translated before it leaves `_judge`, with the same
         # mapping the winner above is translated with. Slot order differs per
@@ -655,7 +687,8 @@ class SelectBestCompareEvaluator(
         return {
             "winner": winner_id,
             "reasoning": _translate_slot_references(
-                arguments["reasoning"], slot_to_candidate
+                arguments.get("reasoning") or "The judge gave no explanation.",
+                slot_to_candidate,
             ),
             "cost": call_cost,
         }
@@ -680,6 +713,29 @@ class SelectBestCompareEvaluator(
             suffix = f"  [{', '.join(metric_parts)}]" if metric_parts else ""
             lines.append(f"- {slot}: {cand.output}{suffix}")
         return "\n".join(lines)
+
+
+def _unanswered(what_happened: str, cost: float | None) -> dict:
+    """
+    A judge call that came back without a usable verdict, in the same
+    `{"winner", "reasoning", "cost"}` shape a real verdict has, plus the
+    `unanswered` marker `_reconcile` reads.
+
+    The marker matters because a `None` winner already means "the two passes
+    disagreed", and the two are not the same finding: a disagreement is
+    something the row established about the candidates, an unanswered call is
+    something that went wrong with the provider. Merging them would report a
+    provider slip as evidence the candidates are too close to separate.
+    """
+    return {
+        "winner": None,
+        "unanswered": True,
+        "reasoning": (
+            f"The judge {what_happened}, so this row has no verdict. "
+            "The call was still made and billed."
+        ),
+        "cost": cost,
+    }
 
 
 def _slot_label(index: int) -> str:
