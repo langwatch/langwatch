@@ -6,7 +6,6 @@ import { describe, expect, it, vi } from "vitest";
 // tests pass, causing shard 2 to hang until GitHub Actions cancels it.
 // Established pattern: see fallbackName.test.ts line 17-18.
 vi.mock("~/server/db", () => ({ prisma: {} }));
-vi.mock("~/server/redis", () => ({ connection: undefined }));
 
 describe("better-auth config", () => {
   describe("when imported", () => {

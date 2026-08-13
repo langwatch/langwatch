@@ -9,6 +9,7 @@ import { PersonalUsageClickHouseRepository } from "@ee/governance/services/perso
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";
+import { RedisConnectionService } from "@langwatch/redis-client";
 import { env } from "~/env.mjs";
 import { ClickHouseAnalyticsService } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
@@ -146,7 +147,6 @@ import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.serv
 import { BroadcastService } from "./broadcast/broadcast.service";
 import { NullLangevalsClient } from "./clients/langevals/langevals.client";
 import { LangEvalsHttpClient } from "./clients/langevals/langevals.http.client";
-import { createRedisConnectionFromConfig } from "./clients/redis.factory";
 import { TiktokenClient } from "./clients/tokenizer/tiktoken.client";
 import { NullTokenizerClient } from "./clients/tokenizer/tokenizer.client";
 import { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
@@ -316,6 +316,9 @@ import { TraceSummaryService } from "./traces/trace-summary.service";
 import { traced } from "./tracing";
 import { UsageService } from "./usage/usage.service";
 
+/** Keeps the connection's lifecycle lines under the name they had before ADR-093. */
+const redisLogger = createLogger("langwatch:redis");
+
 /**
  * Late-bound handle for the scenario execution reactor.
  * Stored on globalForApp to survive hot-reload in dev (same as the App instance).
@@ -370,13 +373,19 @@ export function initializeDefaultApp(options?: {
     params,
   ) => clusterTopicsForProject({ ...params, resolveClickHouseClient });
 
-  const redis = config.skipRedis
-    ? null
-    : createRedisConnectionFromConfig({
-        url: config.redisUrl,
-        clusterEndpoints: config.redisClusterEndpoints,
-        db: config.redisDbIndex,
-      });
+  // ADR-093: the composition root owns the App's Redis connection, and nothing
+  // holds one at module scope. Two entry points outside a serving process build
+  // their own and close it themselves — `replayPreset` (which needs a
+  // standalone client, since its multi-key work CROSSSLOT-rejects on a cluster)
+  // and the `migrateObjectStorage` task, which boots no App at all. Both go
+  // through the client package; neither is a second live connection in a
+  // process this one is serving.
+  const redis = new RedisConnectionService({ logger: redisLogger }).connect({
+    url: config.redisUrl,
+    clusterEndpoints: config.redisClusterEndpoints,
+    dbIndex: config.redisDbIndex,
+    skip: config.skipRedis,
+  });
 
   const broadcast = new BroadcastService(redis);
   const projects = traced(
@@ -1570,6 +1579,7 @@ export function initializeDefaultApp(options?: {
       enabled: clickhouseEnabled,
       resolveClient: resolveClickHouseClient,
     },
+    redis,
     billing: {
       events: new BillableEventsMeterClickHouseRepository(
         getClickHouseClientForOrganization,
@@ -1895,6 +1905,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         throw new Error("ClickHouse is not available in the test app");
       },
     },
+    // No Redis in the test preset; a test that needs one passes it as an
+    // override, or injects a double into the unit directly.
+    redis: null,
     billing: {
       events: new BillableEventsMeterClickHouseRepository(async () => null),
     },

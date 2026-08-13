@@ -52,7 +52,7 @@ import {
   requireApiKeyPermission,
   type UnifiedAuthVariables,
 } from "~/server/api-key/auth-middleware";
-import { getApp } from "~/server/app-layer/app";
+import { getApp, tryGetApp } from "~/server/app-layer/app";
 import type { DspyStepData } from "~/server/app-layer/dspy-steps/types";
 import {
   predefinedEventsSchemas,
@@ -81,7 +81,6 @@ import {
 } from "~/server/modelProviders/llmModelCost";
 import { getPostHogInstance } from "~/server/posthog";
 import { rateLimit } from "~/server/rateLimit";
-import { connection as redis } from "~/server/redis";
 import {
   estimateCost,
   matchModelCostWithFallbacks,
@@ -944,6 +943,7 @@ secured
 
     const code = randomUUID();
 
+    const redis = tryGetApp()?.redis ?? null;
     if (!redis) {
       const description = "Authorization is temporarily unavailable";
       return c.json(
