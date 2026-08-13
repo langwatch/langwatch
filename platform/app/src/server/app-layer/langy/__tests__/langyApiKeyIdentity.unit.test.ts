@@ -1,23 +1,27 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ResolvedToken } from "~/server/api-key/token-resolver";
+import type { LangyIdentityToken } from "../langyApiKeyIdentity";
 import { resolveLangyKeyIdentity } from "../langyApiKeyIdentity";
 
 /**
- * A resolved project API key, shaped as `TokenResolver.resolve` returns it.
- * Only the fields the identity bridge reads are meaningful; the rest exist so
- * the fixture type-checks against the real `ResolvedToken`.
+ * A resolved project API key, carrying exactly the fields the identity bridge
+ * reads. No cast: the fixture satisfies `LangyIdentityToken` structurally, so
+ * it stops compiling if the bridge's input contract changes. That a real
+ * `ResolvedToken` still fits that contract is enforced where `langy-api.ts`
+ * passes one in, which is the only place a real one exists.
  */
-function apiKeyToken({ userId }: { userId: string | null }): ResolvedToken {
+function apiKeyToken({
+  userId,
+}: {
+  userId: string | null;
+}): LangyIdentityToken {
   return {
     type: "apiKey",
-    apiKeyId: "key-1",
     userId,
-    organizationId: "org-1",
     project: {
       id: "project-1",
-      team: { id: "team-1", organizationId: "org-1" },
+      team: { organizationId: "org-1" },
     },
-  } as unknown as ResolvedToken;
+  };
 }
 
 describe("resolveLangyKeyIdentity", () => {

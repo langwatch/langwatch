@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { FEATURE_FLAGS } from "~/server/featureFlag/registry";
+import type { LangyActorUserReader } from "../langyApiKeyActorSession";
 import { resolveLangyActorSession } from "../langyApiKeyActorSession";
 
-/** A prisma stand-in exposing only the `user.findUnique` the resolver uses. */
+/**
+ * A prisma stand-in exposing only the `user.findUnique` the resolver uses.
+ * Typed as the reader contract rather than cast to it, so a change to the read
+ * this resolver makes breaks the double instead of silently passing through.
+ */
 const prismaWithUser = (
   user: {
     id: string;
@@ -10,10 +15,9 @@ const prismaWithUser = (
     email: string | null;
     image: string | null;
   } | null,
-) =>
-  ({
-    user: { findUnique: async () => user },
-  }) as never;
+): LangyActorUserReader => ({
+  user: { findUnique: async () => user },
+});
 
 const NOW = new Date("2026-01-01T00:00:00.000Z");
 
@@ -69,7 +73,19 @@ describe("key-authed Langy surface rollback switch", () => {
     // Closed until someone opts in: shipping the route must not, by itself,
     // open a new way into Langy for any existing project.
     expect((surface as { defaultValue: boolean }).defaultValue).toBe(false);
-    // Two distinct keys — turning the surface off leaves browser Langy alone.
-    expect(surface).not.toBe(langy);
+    // Two distinct keys. Comparing the registry entries by identity would pass
+    // unconditionally — `find` returns two different array elements whatever
+    // their keys say — so compare the keys themselves.
+    expect((surface as { key: string }).key).not.toBe(
+      (langy as { key: string }).key,
+    );
+    // The surface is its own lever, not an alias: exactly one registry entry
+    // answers to its key, so opening browser Langy cannot open this route as a
+    // side effect.
+    expect(
+      FEATURE_FLAGS.filter(
+        (f) => "key" in f && f.key === "release_langy_api_key_turns_enabled",
+      ),
+    ).toHaveLength(1);
   });
 });

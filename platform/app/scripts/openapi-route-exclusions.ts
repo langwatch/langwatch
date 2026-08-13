@@ -239,11 +239,11 @@ export const UNPUBLISHED = [
   {
     match: "POST /api/langy/conversations",
     category: "gap",
-    why: "the key-authed Langy turn surface ships dark behind release_langy_api_key_turns_enabled, which defaults off, so publishing it now would document an endpoint that answers 404 to everyone reading the reference. Describe the operation and delete this entry when the flag defaults on (#6821)",
+    why: "the key-authed Langy turn surface ships dark behind release_langy_api_key_turns_enabled, which defaults off. A caller who authenticates correctly gets 404 rather than a turn — the refusals before the flag check (401 on a missing or invalid token, 403 on a key whose owner has no Langy access) are the only other answers it gives — so publishing it now would document an operation nobody reading the reference can successfully call. Describe the operation and delete this entry when the flag defaults on (#6821)",
   },
   {
     match: "POST /api/langy/conversations/{conversationId}/messages",
     category: "gap",
-    why: "the continuation half of the same dark surface, unreachable for the same reason and publishable on the same trigger (#6821)",
+    why: "the continuation half of the same dark surface: an authenticated caller reaches the same flag check and the same 404, and it becomes publishable on the same trigger (#6821)",
   },
 ] as const satisfies readonly Exclusion[];

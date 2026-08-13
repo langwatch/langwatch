@@ -20,36 +20,55 @@
  * The flag is checked AFTER authentication on purpose: an unauthenticated
  * caller learns only that the token is bad, never whether the surface exists.
  *
+ * Every refusal is a THROWN `HandledError`, never a hand-built `c.json({...})`
+ * — `createServiceApp`'s `onError` owns the wire shape, so this family
+ * publishes the same envelope as every other route and a caller keeps the
+ * `code`, `meta` and remediation `tips` a bespoke `{ message }` would have
+ * discarded (ADR-045). The family opts into the `canonical` envelope because
+ * it is new: there is no existing consumer parsing the flat legacy shape.
+ *
  * Create and continue are the same service call — `conversationId` present or
  * absent is the only difference, exactly as the tRPC router does it. This route
  * owns transport concerns only; every domain rule (ownership, idempotency,
  * capacity, model policy) stays in the app layer and arrives here as a
- * HandledError.
+ * HandledError that is re-thrown untouched.
  */
 
-import { HandledError } from "@langwatch/handled-error";
-import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { z } from "zod";
+import { NotFoundError } from "~/app/api/shared/errors";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import {
-  apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
   extractCredentials,
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
+import {
+  LangyApiCredentialInvalidError,
+  LangyApiCredentialMissingError,
+  LangyApiIdentityDeniedError,
+  LangyApiRequestInvalidError,
+} from "~/server/app-layer/langy/errors";
 import type { LangyChatMessageInput } from "~/server/app-layer/langy/langy-turn.service";
 import { resolveLangyActorSession } from "~/server/app-layer/langy/langyApiKeyActorSession";
 import { resolveLangyKeyIdentity } from "~/server/app-layer/langy/langyApiKeyIdentity";
 import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
+import { bodyLimit } from "./_lib/body-limit";
 
-const logger = createLogger("langwatch:langy:api");
 const tokenResolver = TokenResolver.create(prisma);
 
 const AUTH_REASON =
   "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling, then bridged to an owning user by resolveLangyKeyIdentity";
+
+/**
+ * A turn is text plus small structured parts, never an upload. The cap is well
+ * above any real conversation and well below what would let an authenticated
+ * key buffer the process into trouble; `createServiceApp` applies no limit of
+ * its own, so a route that reads a body has to declare one.
+ */
+const MAX_TURN_BODY_BYTES = 1024 * 1024;
 
 /**
  * `langy:create` is the SAME ceiling the browser's turn-start procedure
@@ -62,7 +81,10 @@ const langyTurnAuth = handlerManagedAuth({
   credential: "apiKey",
 });
 
-const secured = createServiceApp({ basePath: "/api" });
+const secured = createServiceApp({
+  basePath: "/api/langy",
+  errorEnvelope: "canonical",
+});
 
 /** One user turn on the wire. Parts stay opaque; the app layer bounds them. */
 const messageSchema = z.object({
@@ -76,46 +98,30 @@ const turnBodySchema = z.object({
   modelOverride: z.string().min(1).optional(),
 });
 
-/** Authenticate, enforce the ceiling, open the flag, and bridge to an actor. */
+/**
+ * Authenticate, enforce the ceiling, open the flag, and bridge to an actor.
+ *
+ * Throws on every refusal. `enforceApiKeyCeiling` already throws a
+ * `HandledError` (`ApiKeyPermissionDeniedError`), so the ceiling denial needs
+ * no translation here at all — catching it only to re-serialise it was how the
+ * code, the permission in `meta` and the tips got dropped.
+ */
 async function authorizeTurn(c: Context) {
   const credentials = extractCredentials((name) => c.req.header(name));
-  if (!credentials) {
-    return {
-      failed: true as const,
-      status: 401 as const,
-      body: {
-        message:
-          "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
-      },
-    };
-  }
+  if (!credentials) throw new LangyApiCredentialMissingError();
 
   const resolved = await tokenResolver.resolve({
     token: credentials.token,
     projectId: credentials.projectId,
   });
-  if (!resolved) {
-    return {
-      failed: true as const,
-      status: 401 as const,
-      body: { message: "Invalid auth token." },
-    };
-  }
+  if (!resolved) throw new LangyApiCredentialInvalidError();
 
-  try {
-    await enforceApiKeyCeiling({
-      prisma,
-      resolved,
-      permission: "langy:create",
-    });
-  } catch (error) {
-    const denial = apiKeyCeilingDenialResponse(error);
-    return { failed: true as const, status: denial.status, body: denial.body };
-  }
+  await enforceApiKeyCeiling({ prisma, resolved, permission: "langy:create" });
 
   // Dark surface ⇒ 404, not 403: rollback should look like the route was never
   // deployed, so a client retries nothing and no one reads a denial as a
-  // permissions bug.
+  // permissions bug. The platform's generic `not_found` on purpose — a
+  // Langy-specific code here would be the leak the 404 exists to prevent.
   const surfaceOpen = await featureFlagService.isEnabled(
     "release_langy_api_key_turns_enabled",
     {
@@ -124,21 +130,16 @@ async function authorizeTurn(c: Context) {
       organizationId: resolved.project.team.organizationId,
     },
   );
-  if (!surfaceOpen) {
-    return {
-      failed: true as const,
-      status: 404 as const,
-      body: { message: "Not found." },
-    };
-  }
+  if (!surfaceOpen) throw new NotFoundError("Not Found");
 
   const identity = await resolveLangyKeyIdentity({ resolved });
   if (!identity.ok) {
-    return {
-      failed: true as const,
-      status: 403 as const,
-      body: { message: identity.message },
-    };
+    throw new LangyApiIdentityDeniedError(
+      identity.reason === "unowned"
+        ? "langy_api_key_unowned"
+        : "langy_api_key_no_langy_access",
+      identity.message,
+    );
   }
 
   const actor = await resolveLangyActorSession({
@@ -147,15 +148,13 @@ async function authorizeTurn(c: Context) {
     now: new Date(),
   });
   if (!actor.ok) {
-    return {
-      failed: true as const,
-      status: 403 as const,
-      body: { message: actor.message },
-    };
+    throw new LangyApiIdentityDeniedError(
+      "langy_api_actor_missing",
+      actor.message,
+    );
   }
 
   return {
-    failed: false as const,
     session: actor.session,
     projectId: resolved.project.id,
     markUsed: () => {
@@ -167,57 +166,52 @@ async function authorizeTurn(c: Context) {
 }
 
 /**
- * Start or continue a turn. Domain errors are mapped from their HandledError
- * status rather than re-classified here — the app layer already decided what a
- * capacity refusal or an idempotency mismatch means.
+ * Start or continue a turn.
+ *
+ * Nothing is caught. A domain `HandledError` already carries the status, code
+ * and fault the app layer decided on, and anything unhandled is a platform
+ * fault the shared handler logs and masks behind a trace id — re-classifying
+ * either one here could only lose information.
  */
 async function startTurn(c: Context, conversationId: string | null) {
   const auth = await authorizeTurn(c);
-  if (auth.failed) return c.json(auth.body, auth.status);
 
   const parsed = turnBodySchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json(
-      { message: "Invalid request body.", issues: parsed.error.issues },
-      400,
-    );
-  }
+  if (!parsed.success)
+    throw new LangyApiRequestInvalidError(parsed.error.issues);
 
-  try {
-    const result = await getApp().langy.turns.startConversationTurn({
-      projectId: auth.projectId,
-      idempotencyKey: parsed.data.idempotencyKey,
-      session: auth.session,
-      requestedConversationId: conversationId,
-      messages: parsed.data.messages as LangyChatMessageInput[],
-      ...(parsed.data.modelOverride
-        ? { modelOverride: parsed.data.modelOverride }
-        : {}),
-      isRetry: false,
-      turnContext: {},
-    });
-    auth.markUsed();
-    // 202, not 200: the turn is accepted and dispatched, and the assistant's
-    // answer does not exist yet. The caller polls or streams for it.
-    return c.json(result, 202);
-  } catch (error) {
-    if (error instanceof HandledError) {
-      const status = error.httpStatus as 400 | 403 | 404 | 409 | 503;
-      return c.json({ message: error.message, code: error.code }, status);
-    }
-    logger.error({ error }, "langy api turn failed");
-    return c.json({ message: "Failed to start turn." }, 500);
-  }
+  const result = await getApp().langy.turns.startConversationTurn({
+    projectId: auth.projectId,
+    idempotencyKey: parsed.data.idempotencyKey,
+    session: auth.session,
+    requestedConversationId: conversationId,
+    messages: parsed.data.messages as LangyChatMessageInput[],
+    ...(parsed.data.modelOverride
+      ? { modelOverride: parsed.data.modelOverride }
+      : {}),
+    isRetry: false,
+    turnContext: {},
+  });
+  auth.markUsed();
+  // 202, not 200: the turn is accepted and dispatched, and the assistant's
+  // answer does not exist yet. The caller polls or streams for it.
+  return c.json(result, 202);
 }
 
 secured
   .access(langyTurnAuth)
-  .post("/langy/conversations", async (c) => startTurn(c, null));
+  .post(
+    "/conversations",
+    bodyLimit({ maxSize: MAX_TURN_BODY_BYTES }),
+    async (c) => startTurn(c, null),
+  );
 
 secured
   .access(langyTurnAuth)
-  .post("/langy/conversations/:conversationId/messages", async (c) =>
-    startTurn(c, c.req.param("conversationId")),
+  .post(
+    "/conversations/:conversationId/messages",
+    bodyLimit({ maxSize: MAX_TURN_BODY_BYTES }),
+    async (c) => startTurn(c, c.req.param("conversationId")),
   );
 
 export const app = secured.hono;

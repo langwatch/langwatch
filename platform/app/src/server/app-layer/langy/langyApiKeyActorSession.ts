@@ -17,11 +17,36 @@
  * would claim a login freshness that never happened.
  */
 
-import type { PrismaClient } from "@prisma/client";
 import type { Session } from "~/server/auth";
 
 /** Why an owning user could not be turned into an acting session. */
 export type LangyActorDenialReason = "actor-missing";
+
+/**
+ * The one read this resolver makes, as a type.
+ *
+ * Narrower than `Pick<PrismaClient, "user">` on purpose: a test double for the
+ * full delegate can only be produced by casting it into place, and a cast is
+ * exactly the thing that stops failing when the contract moves. Declaring the
+ * single call means the double satisfies the parameter honestly, while the real
+ * `PrismaClient` still has to remain assignable where `langy-api.ts` passes the
+ * real client in — that call site is what keeps this honest, and it fails the
+ * typecheck if the delegate's shape moves. So this narrows what the resolver
+ * may use, not what it is checked against.
+ */
+export type LangyActorUserReader = {
+  user: {
+    findUnique(args: {
+      where: { id: string };
+      select: { id: true; name: true; email: true; image: true };
+    }): Promise<{
+      id: string;
+      name: string | null;
+      email: string | null;
+      image: string | null;
+    } | null>;
+  };
+};
 
 export type LangyActorResolution =
   | { ok: true; session: Session }
@@ -39,7 +64,7 @@ export async function resolveLangyActorSession({
   userId,
   now,
 }: {
-  prisma: Pick<PrismaClient, "user">;
+  prisma: LangyActorUserReader;
   userId: string;
   now: Date;
 }): Promise<LangyActorResolution> {

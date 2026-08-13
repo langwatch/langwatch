@@ -1,8 +1,28 @@
-import type { ResolvedToken } from "~/server/api-key/token-resolver";
 import type { featureFlagService } from "~/server/featureFlag";
 import { hasLangyAccess } from "./langyAccessGate";
 
 type LangyFlagEvaluator = Pick<typeof featureFlagService, "isEnabled">;
+
+/**
+ * The parts of a resolved credential this bridge reads, as a type.
+ *
+ * Narrower than `ResolvedToken` on purpose. The full union carries a whole
+ * Prisma `Project`, so a fixture for it can only be cast into place — and a
+ * cast keeps compiling after the contract it claims to honour has moved. Naming
+ * the four fields that are actually read lets a test double satisfy the
+ * parameter honestly, while `langy-api.ts` still passes a real `ResolvedToken`
+ * in: if the credential's shape changes, that call site fails the typecheck.
+ */
+export type LangyIdentityToken =
+  | {
+      type: "legacyProjectKey";
+      project: { id: string; team: { organizationId: string } };
+    }
+  | {
+      type: "apiKey";
+      userId: string | null;
+      project: { id: string; team: { organizationId: string } };
+    };
 
 /**
  * Why a key-authed Langy request was refused, once the key itself is known to
@@ -51,7 +71,7 @@ export async function resolveLangyKeyIdentity({
   resolved,
   flags,
 }: {
-  resolved: ResolvedToken;
+  resolved: LangyIdentityToken;
   flags?: LangyFlagEvaluator;
 }): Promise<LangyKeyIdentity> {
   const userId = resolved.type === "apiKey" ? resolved.userId : null;
