@@ -2,14 +2,14 @@ import { CLI_SUBRESOURCE_VERBS } from "@langwatch/langy";
 import { describe, expect, it } from "vitest";
 import { FEATURES } from "~/shared/langy/featureMap";
 import { extractPlatformUrl } from "~/utils/platformHref";
-import { CAPABILITY_CATALOG } from "../components/capabilities/capabilityCatalog";
+import { CAPABILITY_CATALOG } from "../logic/capabilities/capabilityCatalog";
 import {
   buildResourceHref,
   buildSurfaceHref,
   resolveCapability,
   SURFACE_BY_FEATURE,
   withDecidedCard,
-} from "../components/capabilities/capabilityRegistry";
+} from "../logic/capabilities/capabilityRegistry";
 
 describe("resolveCapability, given a LangWatch CLI tool call", () => {
   describe("when the CLI searched traces", () => {

@@ -6,14 +6,14 @@
  * result reports — and links through to the run. Read-only.
  */
 import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
-import { extractPlatformUrl } from "~/utils/platformHref";
-import { useCapabilityData } from "../../hooks/useCapabilityData";
 import {
   type CapabilityCardInput,
   extractPrimaryId,
   extractToolText,
   summaryLines,
-} from "./capabilityRegistry";
+} from "~/features/langy/logic/capabilities/capabilityRegistry";
+import { extractPlatformUrl } from "~/utils/platformHref";
+import { useCapabilityData } from "../../hooks/useCapabilityData";
 import { LangyCapabilityCard } from "./LangyCapabilityCard";
 
 function parseRun(output: unknown): {

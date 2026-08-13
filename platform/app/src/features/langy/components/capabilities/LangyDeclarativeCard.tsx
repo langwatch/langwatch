@@ -18,13 +18,6 @@
  */
 import { Box, Grid, Text, VStack } from "@chakra-ui/react";
 import { type CliResultDigest, parseCardResult } from "@langwatch/langy";
-import { extractPlatformUrl } from "~/utils/platformHref";
-import {
-  type CapabilityData,
-  useCapabilityData,
-} from "../../hooks/useCapabilityData";
-import type { LangyTurnMetric } from "../../hooks/useLangyTurnSignals";
-import { StreamingStatCard } from "../StreamingStatCard";
 import {
   buildResourceHref,
   buildSurfaceHref,
@@ -35,7 +28,14 @@ import {
   extractToolText,
   SURFACE_LABEL,
   summaryLines,
-} from "./capabilityRegistry";
+} from "~/features/langy/logic/capabilities/capabilityRegistry";
+import { extractPlatformUrl } from "~/utils/platformHref";
+import {
+  type CapabilityData,
+  useCapabilityData,
+} from "../../hooks/useCapabilityData";
+import type { LangyTurnMetric } from "../../hooks/useLangyTurnSignals";
+import { StreamingStatCard } from "../StreamingStatCard";
 import { collectionOf, totalOf } from "./cliResultDocument";
 import {
   CapabilityRow,

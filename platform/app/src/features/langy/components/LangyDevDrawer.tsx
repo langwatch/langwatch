@@ -57,6 +57,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
+import { resolveCliCapability } from "../logic/capabilities/capabilityRegistry";
 import {
   INSPECTOR_TUCK,
   INSPECTOR_WIDTH,
@@ -78,7 +79,6 @@ import {
   useLangyDevLog,
 } from "../stores/langyDevLog";
 import { useLangyStore } from "../stores/langyStore";
-import { resolveCliCapability } from "./capabilities/capabilityRegistry";
 
 const MotionBox = motion.create(Box);
 

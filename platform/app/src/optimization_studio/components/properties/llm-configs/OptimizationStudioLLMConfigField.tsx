@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import type { Output } from "~/components/llmPromptConfigs/LLMConfigPopover";
 import { LLMConfigField } from "~/components/llmPromptConfigs/LlmConfigField";
+import { normalizeToSnakeCase } from "~/optimization_studio/utils/normalizeToSnakeCase";
 import {
   allModelOptions,
   useModelSelectionOptions,
@@ -8,7 +9,6 @@ import {
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { useWorkflowStore } from "../../../hooks/useWorkflowStore";
 import type { LLMConfig } from "../../../types/dsl";
-import { normalizeToSnakeCase } from "./normalizeToSnakeCase";
 
 type OptimizationStudioLLMConfigFieldProps = {
   llmConfig: LLMConfig;

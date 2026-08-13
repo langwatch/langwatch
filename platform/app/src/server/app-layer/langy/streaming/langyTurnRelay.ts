@@ -24,7 +24,7 @@ import {
   cliToolResultPayload,
 } from "@langwatch/langy";
 import { env } from "~/env.mjs";
-import { resolveCapabilityProgress } from "~/features/langy/components/capabilities/capabilityRegistry";
+import { resolveCapabilityProgress } from "~/features/langy/logic/capabilities/capabilityRegistry";
 import {
   extractPlatformUrl,
   isPreciseResourceHref,
