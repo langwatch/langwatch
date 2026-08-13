@@ -5,14 +5,14 @@ import type {
   LatencyWindows,
 } from "~/shared/ops/latency";
 
-const WINDOW_COLUMNS: Array<{ key: keyof LatencyWindows; label: string }> = [
+const WINDOW_ROWS: Array<{ key: keyof LatencyWindows; label: string }> = [
   { key: "hour", label: "Last hour" },
   { key: "day", label: "Last 24 hours" },
   { key: "week", label: "Last 7 days" },
   { key: "allTime", label: "All time" },
 ];
 
-function WindowCell({
+function PercentileCell({
   window,
   pick,
 }: {
@@ -72,43 +72,29 @@ export function LatencyWindowsCard({
         <Table.Root size="sm" variant="line">
           <Table.Header>
             <Table.Row>
-              <Table.ColumnHeader width="60px" />
-              {WINDOW_COLUMNS.map((col) => (
-                <Table.ColumnHeader key={col.key} textAlign="end">
-                  {col.label}
-                </Table.ColumnHeader>
-              ))}
+              <Table.ColumnHeader>Window</Table.ColumnHeader>
+              <Table.ColumnHeader textAlign="end">P50</Table.ColumnHeader>
+              <Table.ColumnHeader textAlign="end">P99</Table.ColumnHeader>
             </Table.Row>
           </Table.Header>
           <Table.Body>
-            <Table.Row>
-              <Table.Cell>
-                <Text textStyle="xs" fontWeight="medium">
-                  P50
-                </Text>
-              </Table.Cell>
-              {WINDOW_COLUMNS.map((col) => (
-                <WindowCell
-                  key={col.key}
-                  window={windows[col.key]}
+            {WINDOW_ROWS.map((row) => (
+              <Table.Row key={row.key}>
+                <Table.Cell>
+                  <Text textStyle="xs" fontWeight="medium">
+                    {row.label}
+                  </Text>
+                </Table.Cell>
+                <PercentileCell
+                  window={windows[row.key]}
                   pick={(w) => w.p50Ms}
                 />
-              ))}
-            </Table.Row>
-            <Table.Row>
-              <Table.Cell>
-                <Text textStyle="xs" fontWeight="medium">
-                  P99
-                </Text>
-              </Table.Cell>
-              {WINDOW_COLUMNS.map((col) => (
-                <WindowCell
-                  key={col.key}
-                  window={windows[col.key]}
+                <PercentileCell
+                  window={windows[row.key]}
                   pick={(w) => w.p99Ms}
                 />
-              ))}
-            </Table.Row>
+              </Table.Row>
+            ))}
           </Table.Body>
         </Table.Root>
       </Card.Body>
