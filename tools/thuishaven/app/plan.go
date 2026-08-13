@@ -61,23 +61,29 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 		Shell: "pnpm -s run dev:vite",
 		Env:   nodeEnv(),
 		// Hold the web (vite) until the API answers /api/health. The app proxies
-		// /api to the API (start:app), which is a bigger process and boots slower;
+		// /api to the API (start:app:dev), which is a bigger process and boots slower;
 		// a browser that loads the web before the API is up gets stuck in an auth
 		// redirect loop. Gating the lane means the hostname simply isn't served
 		// until the stack can actually handle a request.
 		ReadyProbeURL: fmt.Sprintf("http://127.0.0.1:%d/api/health", st.APIPort),
 	})
-	// In-process worker mode (the default): the app process (start:app ->
-	// start.ts) hosts the worker stack itself, so there is no separate
-	// `workers` lane below — one Node process instead of two, saving its RAM.
-	// `haven up +workers` selects the standalone lane instead.
+	// In-process worker mode (the default): the app process hosts the worker
+	// stack itself, so there is no separate `workers` lane below — one Node
+	// process instead of two, saving its RAM. `haven up +workers` selects the
+	// standalone lane instead.
 	apiEnv := nodeEnv()
 	if !opts.Selection.Workers {
 		apiEnv = append(apiEnv, "WORKERS_IN_PROCESS=1")
 	}
 	out = append(out, Child{
 		Name: "api", Dir: lwDir, Color: palette[3], LogPath: logPath("api"),
-		Shell: "pnpm -s run start:app",
+		// `:dev` runs the app from source through tsx. The bare `start:app` is the
+		// PRODUCTION entry (`node dist/server/server.cjs`) and nothing in a dev
+		// worktree builds that bundle, so it crash-loops on MODULE_NOT_FOUND and
+		// the app lane never passes its /api/health gate. scripts/start.sh makes
+		// the same split off NODE_ENV; these lanes bypass start.sh, so they pick
+		// the dev entry point themselves. Pinned by TestNodeLanesUseDevEntryPoints.
+		Shell: "pnpm -s run start:app:dev",
 		Env:   apiEnv,
 	})
 	if opts.Selection.Gateway {
@@ -106,7 +112,9 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 			// is reserved for genuine failures, so no lane label uses it —
 			// TestNoLaneIsRed pins that.
 			Name: "workers", Dir: lwDir, Color: palette[0], LogPath: logPath("workers"),
-			Shell: "pnpm -s run start:workers",
+			// `:dev` for the same reason as the api lane above — the bare
+			// `start:workers` is `node dist/server/workers.cjs`.
+			Shell: "pnpm -s run start:workers:dev",
 			Env:   append(nodeEnv(), "START_WORKERS=true"),
 		})
 	}
