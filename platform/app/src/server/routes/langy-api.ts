@@ -11,26 +11,33 @@
  *
  * The chain, in refusal order:
  *   1. credential resolves            → else 401
- *   2. `langy:create` ceiling         → else 403
- *   3. `release_langy_api_key_turns_enabled` → else 404 (surface is dark)
+ *   2. `release_langy_api_key_turns_enabled` → else 404 (surface is dark)
+ *   3. `langy:create` ceiling         → else 403
  *   4. key owns an actor + has Langy  → else 403
  *   5. actor row still exists         → else 403
  *   6. shared `startConversationTurn` → 202
  *
  * The flag is checked AFTER authentication on purpose: an unauthenticated
  * caller learns only that the token is bad, never whether the surface exists.
+ * It is checked BEFORE the ceiling for the same reason — a key without
+ * `langy:create` must not get a 403 out of a surface that is supposed to be
+ * dark, because no unmounted route can answer 403.
  *
  * Every refusal is THROWN, never a hand-built `c.json({...})` —
  * `createServiceApp`'s `onError` owns the wire shape, so this family publishes
  * the same envelope as every other route. The credential, authorization,
  * identity and validation refusals are `HandledError`s, so a caller keeps the
  * `code`, `meta` and remediation `tips` a bespoke `{ message }` would have
- * discarded (ADR-045). The dark-surface 404 is the deliberate exception: it
- * throws the generic `NotFoundError` (an `HttpError`, not a `HandledError`)
- * precisely so it carries no code and no meta, and is indistinguishable from a
- * route that was never mounted. The family opts into the `canonical` envelope
- * because it is new: there is no existing consumer parsing the flat legacy
- * shape.
+ * discarded (ADR-045). The family opts into the `canonical` envelope because it
+ * is new: there is no existing consumer parsing the flat legacy shape.
+ *
+ * The dark-surface 404 is the one deliberate exception, and it does not throw
+ * at all: the envelope that makes every other refusal legible is itself the
+ * leak here. A thrown 404 comes back as canonical JSON carrying `trace_id` and
+ * `span_id`; an unmounted path comes back as plain-text `404 Not Found` from
+ * Hono's default handler. So the dark refusal returns `c.notFound()` — that
+ * same default handler — and matches an unmounted route in status, body and
+ * Content-Type.
  *
  * Create and continue are the same service call — `conversationId` present or
  * absent is the only difference, exactly as the tRPC router does it. This route
@@ -41,7 +48,6 @@
 
 import type { Context } from "hono";
 import { z } from "zod";
-import { NotFoundError } from "~/app/api/shared/errors";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import {
   enforceApiKeyCeiling,
@@ -104,12 +110,14 @@ const turnBodySchema = z.object({
 });
 
 /**
- * Authenticate, enforce the ceiling, open the flag, and bridge to an actor.
+ * Authenticate, open the flag, enforce the ceiling, and bridge to an actor.
  *
- * Throws on every refusal. `enforceApiKeyCeiling` already throws a
- * `HandledError` (`ApiKeyPermissionDeniedError`), so the ceiling denial needs
- * no translation here at all — catching it only to re-serialise it was how the
- * code, the permission in `meta` and the tips got dropped.
+ * Throws on every refusal EXCEPT the dark surface, which returns `{ dark: true }`
+ * for the caller to answer — see the flag check below for why that one cannot
+ * throw. `enforceApiKeyCeiling` already throws a `HandledError`
+ * (`ApiKeyPermissionDeniedError`), so the ceiling denial needs no translation
+ * here at all — catching it only to re-serialise it was how the code, the
+ * permission in `meta` and the tips got dropped.
  */
 async function authorizeTurn(c: Context) {
   const credentials = extractCredentials((name) => c.req.header(name));
@@ -121,12 +129,22 @@ async function authorizeTurn(c: Context) {
   });
   if (!resolved) throw new LangyApiCredentialInvalidError();
 
-  await enforceApiKeyCeiling({ prisma, resolved, permission: "langy:create" });
-
   // Dark surface ⇒ 404, not 403: rollback should look like the route was never
   // deployed, so a client retries nothing and no one reads a denial as a
-  // permissions bug. The platform's generic `not_found` on purpose — a
-  // Langy-specific code here would be the leak the 404 exists to prevent.
+  // permissions bug.
+  //
+  // This sits BEFORE the ceiling on purpose. Behind it, a key without
+  // `langy:create` got a 403 while the flag was off — a refusal no unmounted
+  // route can produce, which told the caller the surface was there.
+  //
+  // It also cannot THROW, unlike every other refusal in this function. Anything
+  // thrown here reaches `createServiceApp`'s `onError` and comes back as the
+  // canonical JSON envelope, carrying `trace_id` and `span_id`; a path that was
+  // never mounted falls to Hono's default handler and comes back as plain-text
+  // `404 Not Found`. Content-Type and body would differ, and that difference is
+  // the leak this 404 exists to prevent. So the caller answers with
+  // `c.notFound()`, which IS that default handler — no router in the chain
+  // overrides it.
   const surfaceOpen = await featureFlagService.isEnabled(
     "release_langy_api_key_turns_enabled",
     {
@@ -135,7 +153,9 @@ async function authorizeTurn(c: Context) {
       organizationId: resolved.project.team.organizationId,
     },
   );
-  if (!surfaceOpen) throw new NotFoundError("Not Found");
+  if (!surfaceOpen) return { dark: true as const };
+
+  await enforceApiKeyCeiling({ prisma, resolved, permission: "langy:create" });
 
   const identity = await resolveLangyKeyIdentity({ resolved });
   if (!identity.ok) {
@@ -160,6 +180,7 @@ async function authorizeTurn(c: Context) {
   }
 
   return {
+    dark: false as const,
     session: actor.session,
     projectId: resolved.project.id,
     markUsed: () => {
@@ -180,6 +201,8 @@ async function authorizeTurn(c: Context) {
  */
 async function startTurn(c: Context, conversationId: string | null) {
   const auth = await authorizeTurn(c);
+  // Hono's default 404, byte-for-byte what an unmounted path returns.
+  if (auth.dark) return c.notFound();
 
   const parsed = turnBodySchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success)
