@@ -358,7 +358,8 @@ describe("breaking-change scope guard", () => {
   });
 
   describe("when the pull request pins the components it must not major", () => {
-    it("passes once every bumped component is pinned", () => {
+    /** @scenario "A pin does not exempt a component from the scope check" */
+    it("refuses it even with every bumped component pinned", () => {
       const result = runGuard(
         checkout({
           files: [...threeComponents, rootShim, pythonShim, typescriptShim],
@@ -376,24 +377,14 @@ describe("breaking-change scope guard", () => {
         }),
       );
 
-      assert.equal(result.status, 0, result.stderr);
+      assert.equal(result.status, 1, result.stdout);
       assert.ok(
-        result.stdout.includes(
-          `typescript-sdk pinned to 1.5.0 by ${typescriptShim}`,
-        ),
-        result.stdout,
-      );
-      assert.ok(
-        result.stdout.includes(`python-sdk pinned to 1.2.1 by ${pythonShim}`),
-        result.stdout,
-      );
-      assert.ok(
-        result.stdout.includes(`langwatch pinned to 3.11.0 by ${rootShim}`),
-        result.stdout,
+        result.stderr.includes("A pin does not exempt a component"),
+        result.stderr,
       );
     });
 
-    it("passes with one component left unpinned, the one taking the major", () => {
+    it("says a pin leaves the break in the pinned component's changelog", () => {
       const result = runGuard(
         checkout({
           files: [...threeComponents, pythonShim, typescriptShim],
@@ -409,13 +400,24 @@ describe("breaking-change scope guard", () => {
         }),
       );
 
-      assert.equal(result.status, 0, result.stderr);
+      assert.equal(result.status, 1, result.stdout);
       assert.ok(
-        result.stdout.includes("breaking change scoped to langwatch"),
-        result.stdout,
+        result.stderr.includes("- typescript-sdk, pinned to 1.5.0"),
+        result.stderr,
+      );
+      assert.ok(
+        result.stderr.includes("- python-sdk, pinned to 1.2.1"),
+        result.stderr,
+      );
+      assert.ok(
+        result.stderr.includes(
+          "still take the break into their own changelog",
+        ),
+        result.stderr,
       );
     });
 
+    /** @scenario "A break spanning two components fails" */
     it("fails while more than one bumped component is still unpinned", () => {
       const result = runGuard(
         checkout({
@@ -511,6 +513,7 @@ describe("breaking-change scope guard", () => {
       );
     });
 
+    /** @scenario "A break confined to one component passes" */
     it("keeps a breaking change inside one component passing, pins or not", () => {
       const result = runGuard(
         checkout({
@@ -626,7 +629,12 @@ describe("breaking-change scope guard", () => {
     const title =
       "feat(spend): one filter vocabulary on both reads, and a grouping that refuses to lie";
 
-    it("accepts it, with all three components pinned and none going major", () => {
+    // Pin detection used to accept this. #4998 showed why that was wrong twice
+    // over: three pin commits squash into one commit carrying three footers, of
+    // which at most one can apply, and a pin that does apply still leaves the
+    // break in that component's changelog. Splitting is the only thing that
+    // scopes it, so this now fails and says so.
+    it("refuses it, naming the pins that do not exempt it", () => {
       const result = runGuard(
         checkout({
           files,
@@ -635,24 +643,22 @@ describe("breaking-change scope guard", () => {
         }),
       );
 
-      assert.equal(result.status, 0, result.stderr);
+      assert.equal(result.status, 1, result.stdout);
       assert.ok(
-        result.stdout.includes(
-          "typescript-sdk pinned to 1.5.0 by sdks/typescript/.release-please-shim",
-        ),
-        result.stdout,
+        result.stderr.includes("A pin does not exempt a component"),
+        result.stderr,
       );
       assert.ok(
-        result.stdout.includes(
-          "python-sdk pinned to 1.2.1 by sdks/python/.release-please-shim",
-        ),
-        result.stdout,
+        result.stderr.includes("- typescript-sdk, pinned to 1.5.0"),
+        result.stderr,
       );
       assert.ok(
-        result.stdout.includes(
-          "langwatch pinned to 3.11.0 by .release-please-shim",
-        ),
-        result.stdout,
+        result.stderr.includes("- python-sdk, pinned to 1.2.1"),
+        result.stderr,
+      );
+      assert.ok(
+        result.stderr.includes("- langwatch, pinned to 3.11.0"),
+        result.stderr,
       );
     });
 
@@ -670,6 +676,99 @@ describe("breaking-change scope guard", () => {
           result.stderr,
         );
       }
+    });
+  });
+
+  describe("when replaying the Go SDK break that majored the platform", () => {
+    // #4998. Two breaking footers, both describing the Go SDK, on a pull
+    // request that also carried ~1,700 lines of ordinary platform code. It
+    // pinned the platform to 3.13.0 the documented way and the guard passed it.
+    // Squash then merged seventeen commits into one carrying both footers, only
+    // the sdks/go pin applied, and the platform went to 4.0.0 with the Go SDK's
+    // breaks filed under its changelog. Release PR #6787 stalled on that major
+    // and took the #6842 Helm chart fix down with it.
+    const files = [
+      ".release-please-shim",
+      "platform/app/src/server/app-layer/traces/canonicalisation/extractors/genAi.ts",
+      "platform/app/src/server/event-sourcing/pipelines/trace-processing/reactors/trackedEventSync.reactor.ts",
+      "sdks/go/instrumentation/openai/middleware.go",
+      "specs/go-sdk/span-attribute-parity.feature",
+    ];
+
+    const messages = [
+      "feat(sdk-go): native instrumentations, REST client, and gen_ai-first telemetry",
+      "BREAKING CHANGE: the provider middlewares now capture input and output content by default",
+      "chore(release): pin sdk-go at 1.0.0\n\nRelease-As: 1.0.0",
+      "chore(release): pin langwatch at 3.13.0\n\nRelease-As: 3.13.0",
+    ];
+
+    /** @scenario "A Go SDK break never reaches the platform release" */
+    it("refuses it, so the Go SDK break never reaches the platform release", () => {
+      const result = runGuard(
+        checkout({
+          files,
+          messages,
+          shims: { ".release-please-shim": shimSaying("3.13.0") },
+        }),
+      );
+
+      assert.equal(result.status, 1, result.stdout);
+      assert.ok(
+        result.stderr.includes("A pin does not exempt a component"),
+        result.stderr,
+      );
+      assert.ok(
+        result.stderr.includes("- langwatch, pinned to 3.13.0"),
+        result.stderr,
+      );
+    });
+
+    it("names both the platform and the Go SDK as reached by the break", () => {
+      const result = runGuard(
+        checkout({
+          files,
+          messages,
+          shims: { ".release-please-shim": shimSaying("3.13.0") },
+        }),
+      );
+
+      assert.ok(result.stderr.includes("- langwatch (.)"), result.stderr);
+      assert.ok(result.stderr.includes("- sdks/go (sdks/go)"), result.stderr);
+    });
+
+    it("passes once the break touches sdks/go alone", () => {
+      const result = runGuard(
+        checkout({
+          files: files.filter((file) => file.startsWith("sdks/go/")),
+          messages,
+        }),
+      );
+
+      assert.equal(result.status, 0, result.stderr);
+      assert.ok(
+        result.stdout.includes("breaking change scoped to sdks/go"),
+        result.stdout,
+      );
+    });
+
+    // specs/ is not among the root package's exclude-paths, so the feature file
+    // that documents the Go SDK's own behaviour is enough on its own to charge
+    // the platform and put it back in scope. Worth knowing before splitting:
+    // the spec has to travel in the non-breaking pull request.
+    /** @scenario "A spec file alone puts the platform back in scope" */
+    it("still refuses it when only the spec file rides along", () => {
+      const result = runGuard(
+        checkout({
+          files: files.filter(
+            (file) =>
+              file.startsWith("sdks/go/") || file.startsWith("specs/go-sdk/"),
+          ),
+          messages,
+        }),
+      );
+
+      assert.equal(result.status, 1, result.stdout);
+      assert.ok(result.stderr.includes("- langwatch (.)"), result.stderr);
     });
   });
 });

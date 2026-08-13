@@ -189,19 +189,6 @@ const readShimFile = (path: string): string | undefined => {
 const unique = (values: string[]): string[] => [...new Set(values)];
 
 /**
- * Says which components the guard let past and at which version, so a passing
- * run still shows what it accepted.
- */
-const reportAcceptedPins = (pins: ComponentPin[]): void => {
-  for (const pin of pins) {
-    if (pin.pinned === undefined) continue;
-    console.log(
-      `${pin.component.name} pinned to ${pin.pinned} by ${pin.shim}`,
-    );
-  }
-};
-
-/**
  * Names the half of a pin that is missing. A shim edit without its footer is
  * the likeliest way to follow the procedure and still not pin anything, and a
  * footer whose version drifted from the shim looks identical from here.
@@ -252,6 +239,32 @@ const reportHalfDonePins = ({
   }
 };
 
+/**
+ * A pin used to exempt a component here. It no longer does, and #4998 is why:
+ * `Release-As:` overrides the version and nothing else, so a pinned component
+ * still takes the other component's `BREAKING CHANGE:` note into its own
+ * changelog. That pull request pinned the platform to 3.13.0 and the Go SDK's
+ * two breaks were still filed under the platform's release.
+ *
+ * Squash is this repository's only merge method, so the per-component pin
+ * commits the old procedure asked for collapse into one commit carrying every
+ * footer and touching every path — at which point at most one pin survives at
+ * all. Splitting is what actually scopes a break.
+ */
+const reportPinsDoNotExempt = (pins: ComponentPin[]): void => {
+  const pinned = pins.filter((pin) => pin.pinned !== undefined);
+  if (pinned.length === 0) return;
+
+  console.error("A pin does not exempt a component from this check.");
+  console.error("`Release-As:` fixes the version and nothing else, so these");
+  console.error("still take the break into their own changelog:");
+  console.error("");
+  for (const pin of pinned) {
+    console.error(`- ${pin.component.name}, pinned to ${pin.pinned}`);
+  }
+  console.error("");
+};
+
 const report = ({
   pins,
   versions,
@@ -267,8 +280,7 @@ const report = ({
   );
   console.error("one release component. release-please splits commits by path");
   console.error("but applies the whole commit message to every component the");
-  console.error("commit touched, so every one of these that is not pinned");
-  console.error("goes to a major:");
+  console.error("commit touched, so the break reaches every one of these:");
   console.error("");
   for (const pin of pins) {
     const current = versions[pin.component.path] ?? "unknown";
@@ -278,25 +290,15 @@ const report = ({
     );
   }
   console.error("");
+  reportPinsDoNotExempt(pins);
   reportHalfDonePins({ pins, footerVersions });
   console.error("If the break really does apply to all of them, add the");
   console.error(`\`${acknowledgementLabel}\` label and this check passes.`);
   console.error("");
-  console.error("Otherwise pick one:");
-  console.error("");
-  console.error("1. Split the change so the breaking commit touches one");
-  console.error("   component, which is the cheaper fix before merge.");
-  console.error("2. Keep it together and pin the components that must not go");
-  console.error("   major. Add a follow-up commit per component that edits");
-  console.error("   only that component's shim and carries one footer naming");
-  console.error("   the version that shim records. This check passes once at");
-  console.error("   most one bumped component is left unpinned:");
-  console.error("");
-  for (const pin of pins) {
-    if (pin.pinned !== undefined) continue;
-    const version = pin.recorded ?? "<x.y.z>";
-    console.error(`   ${pin.shim}   +   Release-As: ${version}`);
-  }
+  console.error("Otherwise split the change so the breaking commit touches");
+  console.error("one component. Land the incidental part as its own");
+  console.error("non-breaking pull request. That is the only thing that keeps");
+  console.error("one component's break out of another's release entirely.");
   console.error("");
   console.error("See dev/docs/RELEASES.md for the whole procedure.");
 };
@@ -338,22 +340,11 @@ const main = (): number => {
     footerVersions,
     readShim: (path) => readShimFile(resolve(repoRoot, path)),
   });
-  const unpinned = pins.filter((pin) => pin.pinned === undefined);
-  const halfDone = unpinned.filter((pin) => pin.shimChanged);
 
-  // A half-done pin fails even when the count alone would pass: the author meant
-  // to pin that component, and it is going major anyway.
-  if (halfDone.length === 0 && unpinned.length <= 1) {
-    reportAcceptedPins(pins);
-    const scope = unpinned[0]?.component.name;
-    console.log(
-      scope === undefined
-        ? "every bumped component is pinned, so none takes an implicit major"
-        : `breaking change scoped to ${scope}, every other component pinned`,
-    );
-    return 0;
-  }
-
+  // Pins are still read, but only to report them. They stopped being an
+  // exemption: see reportPinsDoNotExempt. More than one bumped component with a
+  // breaking marker fails, and the `multi-component-major` label — checked by
+  // the workflow before this script runs — is the only way past it.
   const versions = readJson<Record<string, string>>(
     resolve(repoRoot, manifestFile),
   );
