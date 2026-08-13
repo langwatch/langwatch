@@ -10,6 +10,7 @@ type DerivedTargetFields = {
   targetId: string;
   inputFields: Field[];
   outputFields: Field[];
+  fieldsResolved: boolean;
 };
 
 const isWorkflowAgentTarget = (target: TargetConfig): boolean =>
@@ -17,7 +18,13 @@ const isWorkflowAgentTarget = (target: TargetConfig): boolean =>
   target.agentType === "workflow" &&
   !!target.dbAgentId;
 
-const sameFields = (recorded: Field[] | undefined, derived: Field[]): boolean =>
+const sameFields = ({
+  recorded,
+  derived,
+}: {
+  recorded: Field[] | undefined;
+  derived: Field[];
+}): boolean =>
   (recorded ?? []).length === derived.length &&
   (recorded ?? []).every(
     (field, index) =>
@@ -29,22 +36,28 @@ const sameFields = (recorded: Field[] | undefined, derived: Field[]): boolean =>
  * The fields a target records that its workflow no longer agrees with, or
  * undefined when the two already match.
  *
- * An empty derivation counts as agreement rather than as a change: the agent
- * reports no fields both for a workflow that genuinely declares none and for
- * one that could not be read, and clearing a column's fields on a failed
- * lookup would take the user's mappings with them.
+ * A derivation the agent could not resolve is not an answer, so nothing is
+ * applied from it: the workflow is archived, deleted, or in another project,
+ * and clearing the column would take the user's mappings with it. A workflow
+ * that resolved and declares nothing is an answer, and an emptied column is
+ * the honest reflection of it.
  */
-const staleFields = (
-  target: TargetConfig,
-  derived: DerivedTargetFields,
-): Partial<Pick<TargetConfig, "inputs" | "outputs">> | undefined => {
-  const updates: Partial<Pick<TargetConfig, "inputs" | "outputs">> = {};
-  const { inputFields, outputFields } = derived;
+const staleFields = ({
+  target,
+  derived,
+}: {
+  target: TargetConfig;
+  derived: DerivedTargetFields;
+}): Partial<Pick<TargetConfig, "inputs" | "outputs">> | undefined => {
+  const { inputFields, outputFields, fieldsResolved } = derived;
+  if (!fieldsResolved) return undefined;
 
-  if (inputFields.length > 0 && !sameFields(target.inputs, inputFields)) {
+  const updates: Partial<Pick<TargetConfig, "inputs" | "outputs">> = {};
+
+  if (!sameFields({ recorded: target.inputs, derived: inputFields })) {
     updates.inputs = inputFields;
   }
-  if (outputFields.length > 0 && !sameFields(target.outputs, outputFields)) {
+  if (!sameFields({ recorded: target.outputs, derived: outputFields })) {
     updates.outputs = outputFields;
   }
 
@@ -102,6 +115,9 @@ export const useSyncWorkflowTargetFields = () => {
         targetId: target.id,
         inputFields: agent?.inputFields ?? [],
         outputFields: agent?.outputFields ?? [],
+        // An agent that is not in the list yet has not answered, which reads
+        // the same as a workflow that could not be read: leave the column be.
+        fieldsResolved: agent?.fieldsResolved ?? false,
       };
     }),
   );
@@ -111,7 +127,9 @@ export const useSyncWorkflowTargetFields = () => {
     const pending = (JSON.parse(derived) as DerivedTargetFields[]).flatMap(
       (fields) => {
         const target = targets.find((t) => t.id === fields.targetId);
-        const updates = target ? staleFields(target, fields) : undefined;
+        const updates = target
+          ? staleFields({ target, derived: fields })
+          : undefined;
         return updates ? [{ targetId: fields.targetId, updates }] : [];
       },
     );

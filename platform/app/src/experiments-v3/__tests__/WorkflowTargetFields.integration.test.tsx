@@ -209,6 +209,7 @@ describe("Workflow agent target fields", () => {
           { identifier: "output", type: "str" },
           { identifier: "chunks", type: "dict" },
         ],
+        fieldsResolved: true,
       },
     ];
     vi.clearAllMocks();
@@ -312,6 +313,7 @@ describe("Workflow agent target fields", () => {
             config: { name: "wf agent", isCustom: true, workflow_id: "wf_1" },
             inputFields: [],
             outputFields: [],
+            fieldsResolved: false,
           },
         ];
         seed(
@@ -334,6 +336,81 @@ describe("Workflow agent target fields", () => {
           { identifier: "output", type: "str" },
           { identifier: "chunks", type: "dict" },
         ]);
+      });
+    });
+  });
+
+  describe("given the workflow no longer declares any result", () => {
+    describe("when the workbench loads", () => {
+      /** @scenario "A target drops a result its workflow no longer declares" */
+      it("drops the results the target still recorded", async () => {
+        agentsOnServer.data = [
+          {
+            id: "agent-1",
+            name: "wf agent",
+            type: "workflow",
+            config: { name: "wf agent", isCustom: true, workflow_id: "wf_1" },
+            inputFields: [{ identifier: "question", type: "str" }],
+            outputFields: [],
+            fieldsResolved: true,
+          },
+        ];
+        seed(
+          workflowTarget({
+            outputs: [
+              { identifier: "output", type: "str" },
+              { identifier: "chunks", type: "dict" },
+            ],
+          }),
+        );
+
+        render(<EvaluationsV3Table disableVirtualization />, {
+          wrapper: Wrapper,
+        });
+
+        await waitFor(() => {
+          expect(targetInStore()?.outputs).toEqual([]);
+        });
+      });
+
+      /** @scenario "A target drops a result its workflow no longer declares" */
+      it("stops offering the removed result to an evaluator", async () => {
+        const user = userEvent.setup();
+        agentsOnServer.data = [
+          {
+            id: "agent-1",
+            name: "wf agent",
+            type: "workflow",
+            config: { name: "wf agent", isCustom: true, workflow_id: "wf_1" },
+            inputFields: [{ identifier: "question", type: "str" }],
+            outputFields: [],
+            fieldsResolved: true,
+          },
+        ];
+        seed(
+          workflowTarget({ outputs: [{ identifier: "output", type: "str" }] }),
+        );
+
+        render(<EvaluationsV3Table disableVirtualization />, {
+          wrapper: Wrapper,
+        });
+
+        await waitFor(() => {
+          expect(targetInStore()?.outputs).toEqual([]);
+        });
+        await waitFor(() => {
+          expect(screen.getAllByText("Exact Match").length).toBeGreaterThan(0);
+        });
+
+        await user.click(screen.getAllByText("Exact Match")[0]!);
+        await waitFor(() => {
+          expect(screen.getByText("Edit Configuration")).toBeInTheDocument();
+        });
+        await user.click(screen.getByText("Edit Configuration"));
+
+        const sources = openedDrawerParams.mappingsConfig
+          ?.availableSources as AvailableSource[];
+        expect(sources[0]?.fields).toEqual([]);
       });
     });
   });

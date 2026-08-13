@@ -61,7 +61,11 @@ describe("resolveAgentFields", () => {
           dsl: undefined,
         });
 
-        expect(fields).toEqual({ inputFields: [], outputFields: [] });
+        expect(fields).toEqual({
+          inputFields: [],
+          outputFields: [],
+          fieldsResolved: false,
+        });
       });
     });
 
@@ -92,7 +96,34 @@ describe("resolveAgentFields", () => {
         expect(resolveAgentFields({ type: "code", config })).toEqual({
           inputFields: [{ identifier: "text", type: "str" }],
           outputFields: [{ identifier: "answer", type: "str" }],
+          fieldsResolved: true,
         });
+      });
+    });
+  });
+
+  describe("given a workflow that declares no results", () => {
+    describe("when its graph was read", () => {
+      /** @scenario "A workflow agent whose workflow declares no results reports none" */
+      it("reports the empty list as an answer, not as a failed lookup", () => {
+        const fields = resolveAgentFields({
+          type: "workflow",
+          config: { name: "wf agent" },
+          dsl: {
+            nodes: [
+              {
+                id: "entry",
+                type: "entry",
+                data: { outputs: [{ identifier: "question", type: "str" }] },
+              },
+              { id: "end", type: "end", data: { inputs: [] } },
+            ],
+            edges: [],
+          } as unknown as Workflow,
+        });
+
+        expect(fields.outputFields).toEqual([]);
+        expect(fields.fieldsResolved).toBe(true);
       });
     });
   });

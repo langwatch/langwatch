@@ -47,7 +47,10 @@ export class AgentService {
   }): Promise<AgentWithFields | null> {
     const agent = await this.repository.findById(input);
     if (!agent) return null;
-    const [enriched] = await this.withFields([agent], input.projectId);
+    const [enriched] = await this.withFields({
+      agents: [agent],
+      projectId: input.projectId,
+    });
     return enriched ?? null;
   }
 
@@ -63,7 +66,7 @@ export class AgentService {
    */
   async getAll(input: { projectId: string }): Promise<AgentWithFields[]> {
     const agents = await this.repository.findAll(input);
-    return this.withFields(agents, input.projectId);
+    return this.withFields({ agents, projectId: input.projectId });
   }
 
   /**
@@ -74,10 +77,13 @@ export class AgentService {
    * once, and a project with fifty workflow agents would otherwise fan out
    * into fifty workflow lookups on every open.
    */
-  private async withFields(
-    agents: TypedAgent[],
-    projectId: string,
-  ): Promise<AgentWithFields[]> {
+  private async withFields({
+    agents,
+    projectId,
+  }: {
+    agents: TypedAgent[];
+    projectId: string;
+  }): Promise<AgentWithFields[]> {
     const workflowIds = agents.flatMap((agent) =>
       agent.type === "workflow" ? [linkedWorkflowId(agent)] : [],
     );
@@ -113,7 +119,10 @@ export class AgentService {
    */
   async create(input: CreateAgentInput): Promise<AgentWithFields> {
     const agent = await this.repository.create(input);
-    const [enriched] = await this.withFields([agent], input.projectId);
+    const [enriched] = await this.withFields({
+      agents: [agent],
+      projectId: input.projectId,
+    });
     return enriched!;
   }
 
@@ -122,7 +131,10 @@ export class AgentService {
    */
   async update(input: UpdateAgentInput): Promise<AgentWithFields> {
     const agent = await this.repository.update(input);
-    const [enriched] = await this.withFields([agent], input.projectId);
+    const [enriched] = await this.withFields({
+      agents: [agent],
+      projectId: input.projectId,
+    });
     return enriched!;
   }
 

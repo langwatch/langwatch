@@ -19,6 +19,16 @@ import type {
 export type AgentFields = {
   inputFields: Field[];
   outputFields: Field[];
+  /**
+   * Whether the two lists above are what the agent actually declares.
+   *
+   * `false` only for a workflow agent whose graph could not be read — archived,
+   * deleted, or in another project. That is not the same as a workflow that
+   * declares no results, and a caller that cannot tell the two apart has to
+   * pick one wrong behaviour for both: either wipe a column's mappings the
+   * first time a lookup fails, or keep offering a result that was removed.
+   */
+  fieldsResolved: boolean;
 };
 
 /**
@@ -55,7 +65,9 @@ export const linkedWorkflowId = (agent: {
 export const workflowAgentFields = (
   dsl: Workflow | undefined | null,
 ): AgentFields => {
-  if (!dsl?.nodes) return { inputFields: [], outputFields: [] };
+  if (!dsl?.nodes) {
+    return { inputFields: [], outputFields: [], fieldsResolved: false };
+  }
 
   const inputFields = getMappingSurfaceInputs(dsl.edges ?? [], dsl.nodes).map(
     (input) => ({
@@ -70,7 +82,7 @@ export const workflowAgentFields = (
     type: output.type as Field["type"],
   }));
 
-  return { inputFields, outputFields };
+  return { inputFields, outputFields, fieldsResolved: true };
 };
 
 /**
@@ -80,10 +92,11 @@ export const workflowAgentFields = (
  * (it lives on a different table), so it arrives as an argument rather than
  * being fetched here.
  *
- * A workflow agent whose graph could not be read reports no fields at all. The
- * alternative — inventing a single field named "output" — is what made a
- * two-result workflow look like it produced one text field, and a caller that
- * cannot tell "unknown" from "one output" has no way to avoid repeating that.
+ * A workflow agent whose graph could not be read reports no fields and
+ * `fieldsResolved: false`. The alternative, inventing a single field named
+ * "output", is what made a two-result workflow look like it produced one text
+ * field, and a caller that cannot tell "unknown" from "one output" has no way
+ * to avoid repeating that.
  */
 export const resolveAgentFields = ({
   type,
@@ -99,5 +112,6 @@ export const resolveAgentFields = ({
   return {
     inputFields: config.inputs ?? [],
     outputFields: config.outputs ?? [],
+    fieldsResolved: true,
   };
 };

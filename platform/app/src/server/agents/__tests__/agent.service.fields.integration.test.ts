@@ -65,7 +65,13 @@ describe("AgentService field derivation", () => {
     ],
   });
 
-  const commitVersion = async (workflowId: string, endResults: EndResult[]) => {
+  const commitVersion = async ({
+    workflowId,
+    endResults,
+  }: {
+    workflowId: string;
+    endResults: EndResult[];
+  }) => {
     const version = await prisma.workflowVersion.create({
       data: {
         id: `test_wfv_${nanoid(8)}`,
@@ -96,7 +102,7 @@ describe("AgentService field derivation", () => {
       },
     });
     cleanupWorkflowIds.push(workflowId);
-    await commitVersion(workflowId, endResults);
+    await commitVersion({ workflowId, endResults });
 
     const service = AgentService.create(prisma);
     const agent = await service.create({
@@ -170,11 +176,14 @@ describe("AgentService field derivation", () => {
         expect(before?.outputFields).toHaveLength(2);
         const updatedAtBefore = before?.updatedAt;
 
-        await commitVersion(workflowId, [
-          { identifier: "output", type: "str" },
-          { identifier: "chunks", type: "dict" },
-          { identifier: "citations", type: "list" },
-        ]);
+        await commitVersion({
+          workflowId,
+          endResults: [
+            { identifier: "output", type: "str" },
+            { identifier: "chunks", type: "dict" },
+            { identifier: "citations", type: "list" },
+          ],
+        });
 
         const after = await service.getById({ id: agent.id, projectId });
         expect(after?.outputFields.map((f) => f.identifier)).toEqual([
@@ -197,6 +206,15 @@ describe("AgentService field derivation", () => {
 
         expect(read?.outputFields).toEqual([]);
       });
+
+      /** @scenario "A workflow agent whose workflow declares no results reports none" */
+      it("marks the fields resolved, so an empty list is an answer", async () => {
+        const { agent, service } = await createWorkflowAgent([]);
+
+        const read = await service.getById({ id: agent.id, projectId });
+
+        expect(read?.fieldsResolved).toBe(true);
+      });
     });
   });
 
@@ -217,6 +235,21 @@ describe("AgentService field derivation", () => {
         expect(read?.id).toBe(agent.id);
         expect(read?.outputFields).toEqual([]);
         expect(read?.inputFields).toEqual([]);
+      });
+
+      /** @scenario "A workflow agent whose workflow was deleted reports no fields" */
+      it("marks the fields unresolved, so no caller mistakes it for an empty workflow", async () => {
+        const { agent, workflowId, service } = await createWorkflowAgent([
+          { identifier: "output", type: "str" },
+        ]);
+        await prisma.workflow.update({
+          where: { id: workflowId, projectId },
+          data: { archivedAt: new Date() },
+        });
+
+        const read = await service.getById({ id: agent.id, projectId });
+
+        expect(read?.fieldsResolved).toBe(false);
       });
     });
   });

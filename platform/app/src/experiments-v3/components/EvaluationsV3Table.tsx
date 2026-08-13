@@ -454,13 +454,16 @@ export function EvaluationsV3Table({
         ];
       }
 
-      // A workflow agent keeps no inputs or outputs on its own config — its
-      // Studio graph does. The API derives them from that graph, so prefer
-      // them over the config read above and over the "one field called
-      // output" fallback, which is what used to hide every result but the
-      // first from the evaluator's variable picker.
-      const derivedInputs = savedAgent.inputFields;
-      const derivedOutputs = savedAgent.outputFields;
+      // A workflow agent keeps no inputs or outputs on its own config, its
+      // Studio graph does, and the API derives them from that graph. Once that
+      // derivation resolves it is the whole answer, empty lists included:
+      // falling back to the "one field called output" below is what used to
+      // hide every result but the first from the evaluator's variable picker.
+      // Every other kind keeps its fields on its own config, so an empty list
+      // there means nothing was saved and the fallbacks still apply.
+      const { inputFields, outputFields, fieldsResolved } = savedAgent;
+      const derivationIsFinal =
+        savedAgent.type === "workflow" && fieldsResolved;
 
       const targetConfig: TargetConfig = {
         id: `target_${Date.now()}`, // Generate unique ID for the workbench
@@ -470,12 +473,12 @@ export function EvaluationsV3Table({
           : (savedAgent.type as TargetConfig["agentType"]),
         dbAgentId: savedAgent.id, // Reference to the database agent
         inputs:
-          derivedInputs && derivedInputs.length > 0
-            ? derivedInputs
+          derivationIsFinal || inputFields.length > 0
+            ? inputFields
             : targetInputs,
         outputs:
-          derivedOutputs && derivedOutputs.length > 0
-            ? derivedOutputs
+          derivationIsFinal || outputFields.length > 0
+            ? outputFields
             : ((config.outputs as TargetConfig["outputs"]) ?? [
                 { identifier: "output", type: "str" },
               ]),

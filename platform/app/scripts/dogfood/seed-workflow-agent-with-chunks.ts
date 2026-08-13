@@ -18,11 +18,13 @@ const CODE = `class Code:
 `;
 
 async function main() {
+  // Named rather than guessed: the oldest project is rarely the one being
+  // dogfooded, and a workflow plus an agent seeded into the wrong one is
+  // invisible until someone goes looking for them in the right one.
   const slug = process.env.PROJECT_SLUG;
-  const project = slug
-    ? await prisma.project.findFirst({ where: { slug } })
-    : await prisma.project.findFirst({ orderBy: { createdAt: "asc" } });
-  if (!project) throw new Error("No project found");
+  if (!slug) throw new Error("PROJECT_SLUG is required");
+  const project = await prisma.project.findFirst({ where: { slug } });
+  if (!project) throw new Error(`No project with slug ${slug}`);
 
   const user = await prisma.user.findUnique({
     where: { email: "dogfood@langwatch.local" },
@@ -119,47 +121,53 @@ async function main() {
     state: {},
   };
 
-  await prisma.workflow.create({
-    data: {
-      id: workflowId,
-      projectId: project.id,
-      name: "wf agent",
-      icon: "🏁",
-      description: "Returns an answer plus the chunks it used",
-    },
-  });
+  // One transaction: the workflow has to exist before its version and the
+  // version before the workflow can point at it, so a failure part-way leaves
+  // a workflow with no current version, which reads in the product as a
+  // workflow agent whose graph cannot be found.
+  const agent = await prisma.$transaction(async (tx) => {
+    await tx.workflow.create({
+      data: {
+        id: workflowId,
+        projectId: project.id,
+        name: "wf agent",
+        icon: "🏁",
+        description: "Returns an answer plus the chunks it used",
+      },
+    });
 
-  const version = await prisma.workflowVersion.create({
-    data: {
-      id: `wfv_${nanoid(10)}`,
-      workflowId,
-      projectId: project.id,
-      version: "1",
-      commitMessage: "seed",
-      authorId: user.id,
-      dsl,
-    },
-  });
+    const version = await tx.workflowVersion.create({
+      data: {
+        id: `wfv_${nanoid(10)}`,
+        workflowId,
+        projectId: project.id,
+        version: "1",
+        commitMessage: "seed",
+        authorId: user.id,
+        dsl,
+      },
+    });
 
-  await prisma.workflow.update({
-    where: { id: workflowId },
-    data: {
-      currentVersionId: version.id,
-      latestVersionId: version.id,
-      publishedId: version.id,
-      publishedById: user.id,
-    },
-  });
+    await tx.workflow.update({
+      where: { id: workflowId },
+      data: {
+        currentVersionId: version.id,
+        latestVersionId: version.id,
+        publishedId: version.id,
+        publishedById: user.id,
+      },
+    });
 
-  const agent = await prisma.agent.create({
-    data: {
-      id: `agent_${nanoid(10)}`,
-      projectId: project.id,
-      name: "wf agent",
-      type: "workflow",
-      config: { name: "wf agent", isCustom: true, workflow_id: workflowId },
-      workflowId,
-    },
+    return tx.agent.create({
+      data: {
+        id: `agent_${nanoid(10)}`,
+        projectId: project.id,
+        name: "wf agent",
+        type: "workflow",
+        config: { name: "wf agent", isCustom: true, workflow_id: workflowId },
+        workflowId,
+      },
+    });
   });
 
   console.log(

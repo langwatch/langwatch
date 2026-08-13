@@ -4,7 +4,7 @@
  * dataset inlining) is mocked and fed a scripted set of server events, so this
  * runs the classification and mapping logic without a live NLP service.
  */
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvaluatorConfig } from "~/experiments-v3/types";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
@@ -192,19 +192,18 @@ const gradingSuccess: StudioServerEvent[] = [
   },
 ] as unknown as StudioServerEvent[];
 
-const resetScript = () => {
+beforeEach(() => {
   scripted.flow = [];
   scripted.component = [];
   scripted.componentThrows = undefined;
   scripted.dispatched = [];
-};
+});
 
 describe("executeWorkflowCell", () => {
   describe("given a workflow run that succeeds with an evaluator node", () => {
     describe("when the cell is executed", () => {
       /** @scenario "A workflow target produces one result per dataset row" */
       it("yields exactly one target_result from the workflow end-node result", async () => {
-        resetScript();
         scripted.flow = succeedingRun;
         const events = await run(makeCell());
 
@@ -220,7 +219,6 @@ describe("executeWorkflowCell", () => {
 
       /** @scenario "The workflow's own evaluator nodes surface as evaluator results" */
       it("surfaces each workflow evaluator node, coercing string score and passed", async () => {
-        resetScript();
         scripted.flow = succeedingRun;
         const events = await run(makeCell());
 
@@ -249,7 +247,6 @@ describe("executeWorkflowCell", () => {
 
       /** @scenario "Cost and duration from the workflow run are captured per row" */
       it("captures summed node cost and the run duration on the target result", async () => {
-        resetScript();
         scripted.flow = succeedingRun;
         const events = await run(makeCell());
 
@@ -264,7 +261,6 @@ describe("executeWorkflowCell", () => {
     describe("when the workflow run succeeds", () => {
       /** @scenario "An evaluator attached to a workflow target runs against its results" */
       it("dispatches the evaluator and yields its score", async () => {
-        resetScript();
         scripted.flow = twoResultRun;
         scripted.component = gradingSuccess;
 
@@ -284,7 +280,6 @@ describe("executeWorkflowCell", () => {
 
       /** @scenario "An evaluator can read a result other than the first one" */
       it("resolves a mapping onto a result other than output", async () => {
-        resetScript();
         scripted.flow = twoResultRun;
         scripted.component = gradingSuccess;
 
@@ -303,7 +298,6 @@ describe("executeWorkflowCell", () => {
 
       /** @scenario "An evaluator can read a result other than the first one" */
       it("runs the evaluator inside the same trace as the workflow", async () => {
-        resetScript();
         scripted.flow = twoResultRun;
         scripted.component = gradingSuccess;
 
@@ -319,7 +313,6 @@ describe("executeWorkflowCell", () => {
     describe("when the workflow run fails", () => {
       /** @scenario "A failing workflow row does not run its evaluators" */
       it("reports the workflow error and dispatches no evaluator", async () => {
-        resetScript();
         scripted.flow = failingRun;
         scripted.component = gradingSuccess;
 
@@ -347,7 +340,6 @@ describe("executeWorkflowCell", () => {
     describe("when the evaluator itself fails", () => {
       /** @scenario "An evaluator that fails does not lose the workflow's own result" */
       it("keeps the workflow result and reports the evaluator error", async () => {
-        resetScript();
         scripted.flow = twoResultRun;
         scripted.componentThrows = new Error("evaluator service unreachable");
 

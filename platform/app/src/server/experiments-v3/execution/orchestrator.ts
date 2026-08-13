@@ -1577,10 +1577,12 @@ export async function* executeWorkflowCell({
       targetOutputRecord &&
       cell.evaluatorConfigs.length > 0
     ) {
-      const { workflow, evaluatorNodeIds } = buildEvaluatorCellWorkflow(
-        { projectId, cell, datasetColumns },
+      const { workflow, evaluatorNodeIds } = buildEvaluatorCellWorkflow({
+        projectId,
+        cell,
+        datasetColumns,
         loadedEvaluators,
-      );
+      });
       yield* runCellEvaluators({
         cell,
         projectId,

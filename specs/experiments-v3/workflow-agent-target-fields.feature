@@ -47,6 +47,7 @@ Feature: A workflow agent exposes its real fields as an evaluations target
     When I read the agent
     Then its output fields are empty
     And no field named "output" is invented for it
+    And the agent reports that it resolved those fields
 
   @integration
   Scenario: A workflow agent whose workflow was deleted reports no fields
@@ -54,6 +55,12 @@ Feature: A workflow agent exposes its real fields as an evaluations target
     When I read the agent
     Then its output fields are empty
     And reading the agent still succeeds
+    And the agent reports that it could not resolve them
+
+  # "Declares nothing" and "could not be read" are both an empty list, and a
+  # caller that cannot tell them apart has to pick one wrong behaviour for
+  # both: clear a column the first time a lookup fails, or keep offering a
+  # result the author removed. So the agent says which of the two it means.
 
   @unit
   Scenario: A code agent keeps reporting the fields saved on its own config
@@ -84,6 +91,14 @@ Feature: A workflow agent exposes its real fields as an evaluations target
     Given a saved workbench whose workflow agent target records "output" and "chunks"
     When I open that workbench and the linked workflow fails to load
     Then the target still records "output" and "chunks"
+
+  @integration
+  Scenario: A target drops a result its workflow no longer declares
+    Given a saved workbench whose workflow agent target records "output" and "chunks"
+    When the workflow's end node no longer declares any result
+    And I open that workbench
+    Then the target records no fields
+    And the evaluator no longer offers "output"
 
   # Auto-inference across several outputs is already specified in
   # mapping-auto-inference.feature; deriving the real results is what lets it
