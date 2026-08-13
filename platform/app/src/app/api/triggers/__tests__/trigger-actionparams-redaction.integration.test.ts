@@ -4,15 +4,16 @@
  * itself: every verb answers through one response mapper, and what a client
  * receives is what that mapper emitted after Hono serialised it.
  */
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   type Organization,
+  type Prisma,
   type Project,
   type Team,
   TriggerAction,
   TriggerKind,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
 import { graphAlertActionParamsSchema } from "~/server/app-layer/automations/graph-alert.builder";
 import {
   decryptWebhookHeaders,
@@ -65,6 +66,7 @@ describe("Feature: delivery credentials are redacted at the REST boundary", () =
         filters: JSON.stringify({ "metadata.labels": ["prod"] }),
         triggerKind: TriggerKind.AUTOMATION,
         ...data,
+        actionParams: data.actionParams as Prisma.InputJsonValue,
       },
     });
 
