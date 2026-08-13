@@ -22,7 +22,6 @@
 
 import { NotFoundError } from "@langwatch/handled-error";
 import { z } from "zod";
-import type { PrismaClient } from "~/generated/prisma/client";
 
 import { getGovernedSqlService } from "~/server/analytics/governed-sql";
 import { GovernedSqlNotEnabledError } from "~/server/analytics/governed-sql/errors";
