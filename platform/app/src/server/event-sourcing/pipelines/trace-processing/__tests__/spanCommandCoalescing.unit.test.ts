@@ -238,14 +238,19 @@ describe("recordSpan append coalescing", () => {
     describe("when the batch is stored", () => {
       it("deletes each span's spool once, after the single append", async () => {
         const order: string[] = [];
-        const deleteSpool = vi.fn(async (ref: string) => {
-          order.push(`delete:${ref}`);
-        });
+        const deleteSpool = vi.fn(
+          async ({ spoolRef }: { spoolRef: string }) => {
+            order.push(`delete:${spoolRef}`);
+          },
+        );
         const blobStore = {
-          getSpool: async (ref: string) =>
+          // The spool locates its object from the command's own trusted
+          // tenant + span ids, so the stub takes the same named shape and
+          // reads `spanId` directly rather than slicing it out of the ref.
+          getSpool: async ({ spanId: id }: { spanId: string }) =>
             Buffer.from(
               JSON.stringify({
-                span: spanPayload({ spanId: ref.slice(-16) }).span,
+                span: spanPayload({ spanId: id }).span,
                 resource: null,
                 instrumentationScope: null,
               }),
@@ -285,8 +290,8 @@ describe("recordSpan append coalescing", () => {
       it("appends nothing and drops no spool, leaving the batch retryable", async () => {
         const deleteSpool = vi.fn().mockResolvedValue(undefined);
         const blobStore = {
-          getSpool: vi.fn(async (ref: string) => {
-            if (ref.endsWith(spanId(1))) {
+          getSpool: vi.fn(async ({ spoolRef }: { spoolRef: string }) => {
+            if (spoolRef.endsWith(spanId(1))) {
               throw new Error("spool fetch failed");
             }
             return Buffer.from(

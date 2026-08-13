@@ -1,9 +1,13 @@
 import { createLogger } from "@langwatch/observability";
-import type { AlertType, Trigger, TriggerAction } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
+import type {
+  AlertType,
+  Trigger,
+  TriggerAction,
+} from "~/generated/prisma/client";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";

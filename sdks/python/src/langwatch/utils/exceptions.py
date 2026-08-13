@@ -41,10 +41,25 @@ def extract_api_error_detail(body: Any) -> str:
     Reads the discriminant as ``code`` -> ``type`` -> ``kind``; the platform
     sets all three to the same value (``type`` is the OpenAI-compatible name
     Go emits), so the order only decides which answers first.
+
+    Two envelope spellings carry the same failure: the gateway families put
+    ``code`` and ``message`` at the top level, while some routes nest that
+    whole object under ``error``. The nested one is read when the top level
+    describes nothing, so the platform's own sentence reaches the caller either
+    way rather than being reduced to a bare status.
     """
     if not isinstance(body, Mapping):
         return ""
 
+    detail = _detail_from_envelope(body)
+    if detail:
+        return detail
+
+    nested = body.get("error")
+    return _detail_from_envelope(nested) if isinstance(nested, Mapping) else ""
+
+
+def _detail_from_envelope(body: Mapping) -> str:
     code = _first_string(body.get("code"), body.get("type"), body.get("kind"))
 
     meta = body.get("meta")

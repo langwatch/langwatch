@@ -1,6 +1,11 @@
-import type { AlertType, Prisma, Trigger } from "@prisma/client";
-import { TriggerAction, TriggerKind } from "@prisma/client";
 import { nanoid } from "nanoid";
+import {
+  type AlertType,
+  type Prisma,
+  type Trigger,
+  TriggerAction,
+  TriggerKind,
+} from "~/generated/prisma/client";
 import { featureFlagService } from "~/server/featureFlag";
 import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import {

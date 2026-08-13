@@ -13,7 +13,7 @@ import type {
   TeamUser,
   TeamUserRole,
   User,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import type { TeamRoleUpdateOrigin } from "../compute-effective-team-role-updates";
 
 export type TeamWithProjects = Team & {

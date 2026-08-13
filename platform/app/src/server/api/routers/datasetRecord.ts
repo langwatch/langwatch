@@ -1,6 +1,6 @@
-import type { Dataset, PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import type { Dataset, PrismaClient } from "~/generated/prisma/client";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { DatasetService } from "../../datasets/dataset.service";
 import {

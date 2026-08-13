@@ -2,7 +2,7 @@ import type {
   Currency,
   OrganizationUserRole,
   Subscription,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 export type BillingInterval = "monthly" | "annual";
 
 /** A Stripe invoice projected for UI display. */
@@ -32,6 +32,11 @@ export interface SubscriptionService {
     upgradeTraces: boolean;
     totalMembers: number;
     totalTraces: number;
+    /**
+     * The instant the quote the customer confirmed was priced, from
+     * `previewProration`. Absent when no quote was shown.
+     */
+    quotedAt?: number;
   }): Promise<{ success: boolean }>;
 
   createOrUpdateSubscription(params: {
@@ -59,9 +64,12 @@ export interface SubscriptionService {
     organizationId: string;
     newTotalSeats: number;
   }): Promise<{
+    amountDueCents: number;
     formattedAmountDue: string;
+    formattedCreditApplied: string | null;
     formattedRecurringTotal: string;
     billingInterval: string;
+    quotedAt: number;
   }>;
 
   notifyProspective(params: {

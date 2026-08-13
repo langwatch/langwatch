@@ -5,8 +5,9 @@ import type {
   ModelDefaultScopeType,
   Prisma,
   PrismaClient,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "../../utils/constants";
+import { isRootPrismaClient } from "../db";
 import { resolveSingleOrganizationForScopes } from "../scopes/resolveOrganizationForScope";
 
 export type ModelDefaultsPrisma = PrismaClient | Prisma.TransactionClient;
@@ -141,12 +142,12 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scopeType}:${scopeId}`}, 
     toAdd: ScopeAttachment[];
     toRemoveIds: string[];
   }): Promise<void> {
-    if (!("$transaction" in this.prisma)) {
+    if (!isRootPrismaClient(this.prisma)) {
       throw new Error(
         "ModelDefaultsRepository.updateConfigScopes requires a root PrismaClient, not a transaction client.",
       );
     }
-    const prisma = this.prisma as PrismaClient;
+    const prisma: PrismaClient = this.prisma;
     // Single-organization invariant (ADR-021): newly attached scopes must
     // resolve to the same org the config is already anchored to. Otherwise this
     // path could attach cross-org or orphaned scopes while organizationId stays

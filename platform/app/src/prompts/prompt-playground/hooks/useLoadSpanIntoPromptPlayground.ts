@@ -236,7 +236,7 @@ async function tryOpenExistingPromptTab({
   promptVersionNumber?: number | null;
   promptTag?: string | null;
   projectId: string;
-  trpc: ReturnType<typeof api.useContext>;
+  trpc: ReturnType<typeof api.useUtils>;
 }): Promise<{
   formValues: PromptConfigFormValues;
   versionNumber: number;
@@ -346,7 +346,7 @@ export function useLoadSpanIntoPromptPlayground() {
   const loadedRef = useRef(false);
   const { project } = useOrganizationTeamProject();
   const { spanId, action, clearParamsFromUrl } = useSpanIdFromUrl();
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
   const { addTab, updateTabData, removeTab } = useDraggableTabsBrowserStore(
     ({ addTab, updateTabData, removeTab }) => ({
       addTab,

@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,6 +19,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/claudesettings"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/clickhousedocker"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/colima"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
@@ -43,8 +45,8 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 	args, hasAgentFlag = stripFlag(args, "--agent")
 	isAgent := hasAgentFlag || resolveAgent()
 
-	if handled := runMetaCommand(args, version); handled {
-		return nil
+	if handled, err := runMetaCommand(args, version); handled {
+		return err
 	}
 
 	d := wire(logger, isAgent)
@@ -67,19 +69,30 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 
 // runMetaCommand answers the subcommands that need no wiring at all, so `haven
 // help` works in a directory where git or the adapters would fail.
-func runMetaCommand(args []string, version string) bool {
+func runMetaCommand(args []string, version string) (handled bool, err error) {
 	if len(args) == 0 {
-		return false
+		return false, nil
 	}
 	switch args[0] {
 	case "help", "-h", "--help":
-		fmt.Print(helpText)
-		return true
+		// `haven help <topic>` drills in; bare help stays short enough to read.
+		topic := ""
+		if len(args) > 1 {
+			topic = args[1]
+		}
+		body, ok := helpTopic(topic)
+		if !ok {
+			// An unknown topic is a failed request, not help. Returning it as an
+			// error puts the list on stderr and the failure in the exit code.
+			return true, errors.New(strings.TrimSpace(body))
+		}
+		fmt.Print(body)
+		return true, nil
 	case "version", "-v", "--version":
 		fmt.Println(version)
-		return true
+		return true, nil
 	}
-	return false
+	return false, nil
 }
 
 // deps is the wired object graph a command runs against.
@@ -179,7 +192,11 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 	}
 
 	return deps{
-		orch: app.New(cfg, proxy, store, sup, sys, ch, pg, rds, obs, hyg, sem, rt, logger),
+		orch: app.New(app.Deps{
+			Cfg: cfg, Proxy: proxy, Store: store, Sup: sup, Sys: sys,
+			CH: ch, PG: pg, RDS: rds, Obs: obs, Hyg: hyg, Sem: sem,
+			Container: rt, Claude: claudesettings.New(), Log: logger,
+		}),
 		dash: dashboard.New(store.Stacks, sharedURL, dashboard.Probes{
 			PortInUse:    sys.PortInUse,
 			ProcessAlive: sys.ProcessAlive,
@@ -627,6 +644,16 @@ func preferredGroup(rest []string) string {
 // decides between the attached log view and plain foreground streaming.
 func stdoutIsTTY() bool {
 	fi, err := os.Stdout.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice != 0
+}
+
+// stdinIsTTY reports whether there is a human at the other end of stdin.
+//
+// Separate from stdoutIsTTY because the two travel apart: a terminal keeps
+// stdout while stdin comes from a pipe that never closes, and anything that
+// reads a line then waits forever with its prompt already on screen.
+func stdinIsTTY() bool {
+	fi, err := os.Stdin.Stat()
 	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }
 

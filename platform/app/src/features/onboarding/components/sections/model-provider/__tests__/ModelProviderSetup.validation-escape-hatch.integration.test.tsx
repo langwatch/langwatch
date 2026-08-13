@@ -106,7 +106,7 @@ vi.mock("../../../../../../utils/api", () => ({
     modelProvider: {
       isManagedProvider: { useQuery: () => ({ data: { managed: false } }) },
     },
-    useContext: () => ({}),
+    useUtils: () => ({}),
   },
 }));
 

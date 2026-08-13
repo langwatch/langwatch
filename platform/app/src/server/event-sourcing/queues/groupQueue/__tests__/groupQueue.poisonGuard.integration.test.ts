@@ -19,9 +19,15 @@ import type { EventSourcedQueueDefinition } from "../../queue.types";
 import { MAX_BLOB_BYTES } from "../blobConstants";
 import { GroupQueueProcessor } from "../groupQueue";
 import {
-  DEFAULT_CLAIM_STRIKE_THRESHOLD,
+  DEFAULT_CONFIRMED_DEATH_THRESHOLD,
   GroupStagingScripts,
 } from "../scripts";
+import {
+  beaconKey,
+  claimKey,
+  confirmedDeaths as sharedConfirmedDeaths,
+  seedDeadOwner as sharedSeedDeadOwner,
+} from "./poisonGuardFixtures";
 
 // Skip when running without testcontainers (unit-only test runs)
 const hasTestcontainers = !!(
@@ -65,6 +71,11 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     afterEach(async () => {
+      // Before anything else: a suite that spies on GroupStagingScripts.prototype
+      // (the beacon and release paths both do) would otherwise leave every later
+      // queue in this file with a broken collaborator, and the failures land in
+      // whichever test happens to run next rather than the one that set it up.
+      vi.restoreAllMocks();
       await Promise.all(queues.map((q) => q.close().catch(() => {})));
       // Scoped to this suite's own namespace, never flushdb(). flushdb empties
       // the whole logical database, so it does not just reset this suite — it
@@ -91,14 +102,17 @@ describe.skipIf(!hasTestcontainers)(
       return { queue, name: definition.name };
     }
 
-    const strikesKey = (name: string, groupId: string) =>
-      `${name}:gq:group:${groupId}:strikes`;
+    const confirmedDeaths = (name: string, groupId: string) =>
+      sharedConfirmedDeaths({ redis, queueName: name, groupId });
     const blockedMembers = (name: string) =>
       redis.smembers(`${name}:gq:blocked`);
     const storedError = (name: string, groupId: string) =>
       redis.hget(`${name}:gq:group:${groupId}:error`, "message");
 
-    describe("given a group at the claim-strike threshold", () => {
+    const seedDeadOwner = (name: string, groupId: string, deaths?: number) =>
+      sharedSeedDeadOwner({ redis, queueName: name, groupId, deaths });
+
+    describe("given a group at the confirmed-death threshold", () => {
       describe("when a worker claims the group again", () => {
         /** @scenario a group whose jobs repeatedly kill the worker is parked at claim */
         it("parks the group into the blocked set before decoding", async () => {
@@ -107,12 +121,9 @@ describe.skipIf(!hasTestcontainers)(
           const { queue, name } = createQueue(processed);
           await queue.waitUntilReady();
 
-          // Strikes left behind by prior claims whose process died before the
-          // clear could run - the crash-loop signature this guard detects.
-          await redis.set(
-            strikesKey(name, "poisoned"),
-            String(DEFAULT_CLAIM_STRIKE_THRESHOLD),
-          );
+          // A marker left by a claim whose process died before it could be
+          // released - the crash-loop signature this guard detects.
+          await seedDeadOwner(name, "poisoned");
 
           await queue.send({ id: "job-1", groupId: "poisoned", value: "x" });
 
@@ -126,7 +137,7 @@ describe.skipIf(!hasTestcontainers)(
           expect(processed).not.toHaveBeenCalled();
           const error = await storedError(name, "poisoned");
           expect(error).toContain("Poison guard");
-          expect(error).toContain("consecutive worker deaths");
+          expect(error).toContain("confirmed worker deaths");
           // The job is re-staged for inspection, not dropped.
           expect(
             await redis.zcard(`${name}:gq:group:poisoned:jobs`),
@@ -140,10 +151,7 @@ describe.skipIf(!hasTestcontainers)(
           const { queue, name } = createQueue(processed);
           await queue.waitUntilReady();
 
-          await redis.set(
-            strikesKey(name, "poisoned"),
-            String(DEFAULT_CLAIM_STRIKE_THRESHOLD),
-          );
+          await seedDeadOwner(name, "poisoned");
 
           await queue.send({ id: "job-1", groupId: "poisoned", value: "x" });
           await queue.send({ id: "job-2", groupId: "healthy", value: "y" });
@@ -173,11 +181,12 @@ describe.skipIf(!hasTestcontainers)(
             const { queue, name } = createQueue(processed);
             await queue.waitUntilReady();
 
-            // Strikes at (and above) the old default threshold that WOULD park
-            // the group if the guard were enabled.
-            await redis.set(
-              strikesKey(name, "poisoned"),
-              String(DEFAULT_CLAIM_STRIKE_THRESHOLD + 5),
+            // A dead owner and a death count well past the old default
+            // threshold, which WOULD park the group if the guard were enabled.
+            await seedDeadOwner(
+              name,
+              "poisoned",
+              DEFAULT_CONFIRMED_DEATH_THRESHOLD + 5,
             );
 
             await queue.send({ id: "job-1", groupId: "poisoned", value: "x" });
@@ -192,11 +201,11 @@ describe.skipIf(!hasTestcontainers)(
             expect(processed.mock.calls[0]![0].groupId).toBe("poisoned");
             // The group is never parked into the blocked set.
             expect(await blockedMembers(name)).not.toContain("poisoned");
-            // Strikes are not enforced: recordClaimStrike is skipped entirely
-            // when the threshold is 0, so the pre-seeded count is left untouched
-            // (never incremented past it, never cleared to a fresh value).
-            expect(await redis.get(strikesKey(name, "poisoned"))).toBe(
-              String(DEFAULT_CLAIM_STRIKE_THRESHOLD + 5),
+            // The marker is not enforced: recordClaim is skipped entirely when
+            // the threshold is 0, so the pre-seeded count is left untouched
+            // (never incremented past it, never released to a fresh value).
+            expect(await confirmedDeaths(name, "poisoned")).toBe(
+              String(DEFAULT_CONFIRMED_DEATH_THRESHOLD + 5),
             );
           } finally {
             if (previous === undefined) {
@@ -211,8 +220,8 @@ describe.skipIf(!hasTestcontainers)(
 
     describe("given a healthy group", () => {
       describe("when its job completes", () => {
-        /** @scenario claim strikes are cleared when processing survives */
-        it("clears the claim strike", async () => {
+        /** @scenario claim markers are released when processing survives */
+        it("releases the claim marker", async () => {
           const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
           processed.mockResolvedValue(undefined);
           const { queue, name } = createQueue(processed);
@@ -229,7 +238,7 @@ describe.skipIf(!hasTestcontainers)(
 
           await vi.waitFor(
             async () => {
-              expect(await redis.get(strikesKey(name, "group-a"))).toBeNull();
+              expect(await redis.exists(claimKey(name, "group-a"))).toBe(0);
             },
             { timeout: 5000, interval: 50 },
           );
@@ -237,10 +246,14 @@ describe.skipIf(!hasTestcontainers)(
       });
     });
 
+    /** The identity a queue stamps onto the claims it takes. */
+    const workerIdOf = (queue: GroupQueueProcessor<TestPayload>) =>
+      (queue as unknown as { workerId: string }).workerId;
+
     describe("given a graceful shutdown with a job in flight", () => {
       describe("when close() begins while the handler is still running", () => {
-        /** @scenario graceful shutdown mid-job does not count as a poison strike */
-        it("sweeps the group's claim strike while the job is still in flight", async () => {
+        /** @scenario graceful shutdown mid-job does not count as a confirmed death */
+        it("publishes the retirement tombstone before the drain begins", async () => {
           let releaseHandler!: () => void;
           const handlerGate = new Promise<void>((resolve) => {
             releaseHandler = resolve;
@@ -254,21 +267,27 @@ describe.skipIf(!hasTestcontainers)(
             await handlerGate;
           });
           await queue.waitUntilReady();
+          const workerId = workerIdOf(queue);
 
           await queue.send({ id: "job-1", groupId: "slow", value: "x" });
           await handlerEntered;
 
-          // The claim recorded its strike before the handler ran — this is
-          // the strike a hard death would leave behind.
-          expect(await redis.get(strikesKey(name, "slow"))).toBe("1");
+          // The claim stamped this worker onto the group, and the worker is
+          // vouching for itself. This is the marker a hard death leaves behind.
+          expect(await redis.hget(claimKey(name, "slow"), "owner")).toBe(
+            workerId,
+          );
+          expect(await redis.get(beaconKey(name, workerId))).toBe("alive");
 
           // Begin the graceful shutdown WITHOUT waiting for the drain: the
-          // sweep must clear the strike while the job is still in flight, so
-          // even a drain the budget abandons leaves nothing behind.
+          // tombstone must land while the job is still in flight, so even a
+          // drain the budget abandons answers for every marker left behind.
           const closing = queue.close();
           await vi.waitFor(
             async () => {
-              expect(await redis.get(strikesKey(name, "slow"))).toBeNull();
+              expect(await redis.get(beaconKey(name, workerId))).toBe(
+                "retired",
+              );
             },
             { timeout: 5000, interval: 50 },
           );
@@ -276,106 +295,402 @@ describe.skipIf(!hasTestcontainers)(
           releaseHandler();
           await closing;
 
-          // The group was never mistaken for poison.
           expect(await blockedMembers(name)).not.toContain("slow");
         });
       });
 
-      describe("when close() takes its sweep snapshot before the claim finishes recording", () => {
-        /** @scenario graceful shutdown mid-job does not count as a poison strike */
-        it("clears the strike via the post-claim recheck even though the sweep missed the group", async () => {
-          let releaseStrike!: () => void;
-          const strikeGate = new Promise<void>((resolve) => {
-            releaseStrike = resolve;
+      describe("when a later worker inherits a retired worker's claim", () => {
+        /** @scenario a claim left behind by a gracefully retired worker is not a death */
+        it("reads the previous owner as retired rather than dead", async () => {
+          const { queue: retiring, name } = createQueue(async () => {});
+          await retiring.waitUntilReady();
+          const retiredWorkerId = workerIdOf(retiring);
+          await retiring.close();
+
+          // A claim the retired worker still owned when it exited, already one
+          // death short of the threshold: if retirement did not answer for it,
+          // the very next claim would park the group.
+          await redis.hset(claimKey(name, "inherited"), {
+            owner: retiredWorkerId,
+            deaths: String(DEFAULT_CONFIRMED_DEATH_THRESHOLD - 1),
+            stagedJobId: "staged-before-the-retirement",
           });
-          let signalStrikeRecorded!: () => void;
-          const strikeRecorded = new Promise<void>((resolve) => {
-            signalStrikeRecorded = resolve;
+
+          const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+          processed.mockResolvedValue(undefined);
+          const successor = new GroupQueueProcessor<TestPayload>(
+            createQueueDefinition({ name, process: processed }),
+            redis,
+          );
+          queues.push(successor);
+          await successor.waitUntilReady();
+
+          await successor.send({
+            id: "job-1",
+            groupId: "inherited",
+            value: "x",
           });
+
+          await vi.waitFor(
+            () => {
+              expect(processed).toHaveBeenCalledTimes(1);
+            },
+            { timeout: 5000, interval: 50 },
+          );
+          expect(await blockedMembers(name)).not.toContain("inherited");
+        });
+      });
+    });
+
+    describe("given a claim that changed hands while the first worker ran on", () => {
+      describe("when the first worker finally releases", () => {
+        // Heartbeat failures are warn-and-continue, so a worker paused or
+        // partitioned past the active-key TTL keeps running while its group is
+        // redispatched. An unconditional release then deletes the NEW owner's
+        // marker, taking the group's accrued deaths with it — a poisoned group
+        // silently loses its progress toward the threshold.
+        /** @scenario a worker releases only a claim it still owns */
+        it("leaves the new owner's claim and death count intact", async () => {
+          const { queue, name } = createQueue(async () => {});
+          await queue.waitUntilReady();
+          const scripts = new GroupStagingScripts(redis, name);
+
+          const staleWorker = "worker-that-outlived-its-lease";
+          const currentWorker = "worker-that-took-over";
+
+          // The stale worker's claim, then the handover to the current one.
+          await redis.set(beaconKey(name, staleWorker), "alive", "EX", 90);
+          await redis.set(beaconKey(name, currentWorker), "alive", "EX", 90);
+          await scripts.recordClaim({
+            groupId: "handed-over",
+            workerId: staleWorker,
+            stagedJobId: "job-1",
+          });
+          await scripts.recordClaim({
+            groupId: "handed-over",
+            workerId: currentWorker,
+            stagedJobId: "job-2",
+          });
+          await redis.hset(
+            claimKey(name, "handed-over"),
+            "deaths",
+            String(DEFAULT_CONFIRMED_DEATH_THRESHOLD - 1),
+          );
+
+          // The stale worker's job returns at last and releases.
+          await scripts.releaseClaim({
+            groupId: "handed-over",
+            workerId: staleWorker,
+          });
+
+          expect(await redis.hget(claimKey(name, "handed-over"), "owner")).toBe(
+            currentWorker,
+          );
+          expect(await confirmedDeaths(name, "handed-over")).toBe(
+            String(DEFAULT_CONFIRMED_DEATH_THRESHOLD - 1),
+          );
+
+          // The count survived, so the current owner's death is still counted.
+          await redis.del(beaconKey(name, currentWorker));
+          const { deaths } = await scripts.recordClaim({
+            groupId: "handed-over",
+            workerId: "worker-after-the-death",
+            stagedJobId: "job-3",
+          });
+          expect(deaths).toBe(DEFAULT_CONFIRMED_DEATH_THRESHOLD);
+        });
+
+        /** @scenario a worker releases only a claim it still owns */
+        it("still releases the marker when the owner has not changed", async () => {
+          const { queue, name } = createQueue(async () => {});
+          await queue.waitUntilReady();
+          const scripts = new GroupStagingScripts(redis, name);
+
+          await redis.set(beaconKey(name, "sole-worker"), "alive", "EX", 90);
+          await scripts.recordClaim({
+            groupId: "sole-owner",
+            workerId: "sole-worker",
+            stagedJobId: "job-1",
+          });
+          await scripts.releaseClaim({
+            groupId: "sole-owner",
+            workerId: "sole-worker",
+          });
+
+          expect(await redis.exists(claimKey(name, "sole-owner"))).toBe(0);
+        });
+      });
+    });
+
+    describe("given a worker whose own beacon write fails", () => {
+      describe("when it claims a group one death short of the threshold", () => {
+        // A worker that cannot publish its beacon cannot be vouched for. If it
+        // stamped markers anyway, every peer inheriting one would read this
+        // live worker as dead — the same false-park class this guard removes,
+        // re-entered through the beacon write instead of the release. It sits
+        // the guard out instead: a real death goes uncounted, which is the
+        // cheap direction to be wrong in.
+        /** @scenario a worker that cannot report itself as running enforces nothing */
+        it("records no claim and parks nothing", async () => {
+          vi.spyOn(
+            GroupStagingScripts.prototype,
+            "recordWorkerAlive",
+          ).mockRejectedValue(new Error("redis unavailable"));
+          const recordClaim = vi.spyOn(
+            GroupStagingScripts.prototype,
+            "recordClaim",
+          );
+
+          const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+          processed.mockResolvedValue(undefined);
+          const { queue, name } = createQueue(processed);
+          await queue.waitUntilReady();
+
+          await seedDeadOwner(name, "beaconless");
+          await queue.send({ id: "job-1", groupId: "beaconless", value: "x" });
+
+          await vi.waitFor(
+            () => {
+              expect(processed).toHaveBeenCalledTimes(1);
+            },
+            { timeout: 5000, interval: 50 },
+          );
+          expect(await blockedMembers(name)).not.toContain("beaconless");
+          expect(recordClaim).not.toHaveBeenCalled();
+          // The seeded marker is untouched: the worker neither took ownership
+          // of it nor counted a death against it.
+          expect(await confirmedDeaths(name, "beaconless")).toBe(
+            String(DEFAULT_CONFIRMED_DEATH_THRESHOLD - 1),
+          );
+        });
+      });
+    });
+
+    describe("given a claim marker whose owner vanished without retiring", () => {
+      describe("when another worker claims the same group", () => {
+        /** @scenario a claim left behind by a worker that vanished without retiring is a death */
+        it("books one death, and accumulates to the threshold", async () => {
+          const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+          processed.mockResolvedValue(undefined);
+          const { queue, name } = createQueue(processed);
+          await queue.waitUntilReady();
+
+          // Well below the threshold, so this claim confirms a death but must
+          // still run the job: the guard counts, it does not park on the first.
+          await seedDeadOwner(name, "dying", 0);
+          await queue.send({ id: "job-1", groupId: "dying", value: "x" });
+
+          await vi.waitFor(
+            () => {
+              expect(processed).toHaveBeenCalledTimes(1);
+            },
+            { timeout: 5000, interval: 50 },
+          );
+          expect(await blockedMembers(name)).not.toContain("dying");
+
+          // One more death on top of a count already at the threshold's edge
+          // tips it over — the accumulation the guard exists to detect.
+          await seedDeadOwner(
+            name,
+            "dying",
+            DEFAULT_CONFIRMED_DEATH_THRESHOLD - 1,
+          );
+          await queue.send({ id: "job-2", groupId: "dying", value: "x" });
+
+          await vi.waitFor(
+            async () => {
+              expect(await blockedMembers(name)).toContain("dying");
+            },
+            { timeout: 5000, interval: 50 },
+          );
+          expect(processed).toHaveBeenCalledTimes(1);
+        });
+      });
+    });
+
+    describe("given a worker that retired while holding a claim", () => {
+      describe("when the claim marker is still within its own lifetime", () => {
+        /** @scenario the retirement tombstone outlives the claim markers it answers for */
+        it("keeps the tombstone alive longer than the marker it answers for", async () => {
+          // Hold the job in flight so its marker is still there to measure —
+          // a completed job releases the marker, which is the whole point of it.
           let releaseHandler!: () => void;
           const handlerGate = new Promise<void>((resolve) => {
             releaseHandler = resolve;
           });
-          let signalHandlerEntered!: () => void;
+          let signalEntered!: () => void;
           const handlerEntered = new Promise<void>((resolve) => {
-            signalHandlerEntered = resolve;
+            signalEntered = resolve;
           });
-
           const { queue, name } = createQueue(async () => {
-            signalHandlerEntered();
+            signalEntered();
             await handlerGate;
           });
+          await queue.waitUntilReady();
+          const workerId = workerIdOf(queue);
+
+          // A real claim marker, written by the real claim path.
+          await queue.send({ id: "job-1", groupId: "outlived", value: "x" });
+          await handlerEntered;
+          const markerTtl = await redis.ttl(claimKey(name, "outlived"));
+
+          const closing = queue.close();
+          await vi.waitFor(
+            async () => {
+              expect(await redis.get(beaconKey(name, workerId))).toBe(
+                "retired",
+              );
+            },
+            { timeout: 5000, interval: 50 },
+          );
+          const tombstoneTtl = await redis.ttl(beaconKey(name, workerId));
+          releaseHandler();
+          await closing;
+
+          // If the tombstone expired first, a marker still naming this worker
+          // would decay from "retired" into "no beacon" — a false death.
+          expect(await redis.get(beaconKey(name, workerId))).toBe("retired");
+          expect(tombstoneTtl).toBeGreaterThan(markerTtl);
+        });
+      });
+    });
+
+    describe("given a claim marker whose owner is still running", () => {
+      describe("when another worker claims the same group", () => {
+        /** @scenario a claim left behind by a worker that is still running is not a death */
+        it("does not book a death against the group", async () => {
+          const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+          processed.mockResolvedValue(undefined);
+          const { queue, name } = createQueue(processed);
+          await queue.waitUntilReady();
+
+          // A peer that holds the marker and is provably alive — the shape a
+          // lost release leaves behind, and the one that used to park healthy
+          // groups roughly ten times a day in production.
+          const livePeer = "peer-worker-still-running";
+          await redis.set(beaconKey(name, livePeer), "alive", "EX", 90);
+          await redis.hset(claimKey(name, "shared"), {
+            owner: livePeer,
+            deaths: String(DEFAULT_CONFIRMED_DEATH_THRESHOLD - 1),
+            stagedJobId: "staged-by-the-live-peer",
+          });
+
+          await queue.send({ id: "job-1", groupId: "shared", value: "x" });
+
+          await vi.waitFor(
+            () => {
+              expect(processed).toHaveBeenCalledTimes(1);
+            },
+            { timeout: 5000, interval: 50 },
+          );
+          expect(await blockedMembers(name)).not.toContain("shared");
+        });
+      });
+    });
+
+    describe("given a claim marker owned by the claiming worker itself", () => {
+      describe("when that worker re-claims the group after its lease lapsed", () => {
+        /** @scenario a worker re-claiming its own lapsed lease is not a death */
+        it("does not book a death against the group", async () => {
+          const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+          processed.mockResolvedValue(undefined);
+          const { queue, name } = createQueue(processed);
+          await queue.waitUntilReady();
+
+          await redis.hset(claimKey(name, "self"), {
+            owner: workerIdOf(queue),
+            deaths: String(DEFAULT_CONFIRMED_DEATH_THRESHOLD - 1),
+            stagedJobId: "staged-under-the-lapsed-lease",
+          });
+
+          await queue.send({ id: "job-1", groupId: "self", value: "x" });
+
+          await vi.waitFor(
+            () => {
+              expect(processed).toHaveBeenCalledTimes(1);
+            },
+            { timeout: 5000, interval: 50 },
+          );
+          expect(await blockedMembers(name)).not.toContain("self");
+        });
+      });
+    });
+
+    describe("given a worker whose claim release never reaches Redis", () => {
+      describe("when it processes far more jobs for one group than the threshold", () => {
+        // The regression that motivated the rewrite. Under the count-and-
+        // subtract guard every dropped release was indistinguishable from a
+        // worker death, so a healthy high-fan-out group parked itself after
+        // `threshold` of them. Here the releases are dropped outright and the
+        // group still has to survive, because the owner never stops being alive.
+        /** @scenario a release that never reaches Redis does not park a healthy group */
+        it("never parks the group", async () => {
+          const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+          processed.mockResolvedValue(undefined);
+          const { queue, name } = createQueue(processed);
           await queue.waitUntilReady();
 
           const internals = queue as unknown as {
             scripts: {
-              recordClaimStrike: (groupId: string) => Promise<number>;
+              releaseClaim: (params: {
+                groupId: string;
+                workerId: string;
+              }) => Promise<void>;
             };
-            drainAndDisconnect: () => Promise<void>;
           };
-
-          // Park the claim AFTER its strike lands in Redis but BEFORE
-          // processWithRetries adds the group to the in-flight set, so close()'s
-          // sweep snapshot runs against a set that does not yet hold the group.
-          const realRecordStrike = internals.scripts.recordClaimStrike.bind(
-            internals.scripts,
+          vi.spyOn(internals.scripts, "releaseClaim").mockResolvedValue(
+            undefined,
           );
-          let gatedOnce = false;
-          vi.spyOn(internals.scripts, "recordClaimStrike").mockImplementation(
-            async (groupId: string) => {
-              const strikes = await realRecordStrike(groupId);
-              if (groupId === "raced" && !gatedOnce) {
-                gatedOnce = true;
-                signalStrikeRecorded();
-                await strikeGate;
-              }
-              return strikes;
+
+          const jobs = DEFAULT_CONFIRMED_DEATH_THRESHOLD * 3;
+          for (let i = 0; i < jobs; i++) {
+            await queue.send({
+              id: `job-${i}`,
+              groupId: "leaky",
+              value: "x",
+            });
+          }
+
+          await vi.waitFor(
+            () => {
+              expect(processed).toHaveBeenCalledTimes(jobs);
             },
+            { timeout: 10000, interval: 50 },
           );
+          expect(await blockedMembers(name)).not.toContain("leaky");
+          // Every claim found the marker's owner alive, so nothing accrued.
+          expect(await confirmedDeaths(name, "leaky")).toBe("0");
+        });
+      });
+    });
 
-          // drainAndDisconnect() is invoked synchronously right after the sweep
-          // snapshot, so this fires only once close() has provably passed it -
-          // with the group still unswept.
-          let signalDrainReached!: () => void;
-          const drainReached = new Promise<void>((resolve) => {
-            signalDrainReached = resolve;
-          });
-          const realDrain = internals.drainAndDisconnect.bind(internals);
-          internals.drainAndDisconnect = () => {
-            signalDrainReached();
-            return realDrain();
-          };
+    describe("given a group being parked by the poison guard", () => {
+      describe("when the park completes", () => {
+        /** @scenario parking a group releases its claim marker */
+        it("releases the claim marker so an unblock gets a fresh run", async () => {
+          const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+          processed.mockResolvedValue(undefined);
+          const { queue, name } = createQueue(processed);
+          await queue.waitUntilReady();
 
-          await queue.send({ id: "job-1", groupId: "raced", value: "x" });
-          await strikeRecorded;
-          // The strike a hard death would leave behind is present in Redis.
-          expect(await redis.get(strikesKey(name, "raced"))).toBe("1");
+          await seedDeadOwner(name, "parked");
+          await queue.send({ id: "job-1", groupId: "parked", value: "x" });
 
-          // Begin the shutdown: it flips shutdownRequested synchronously, then
-          // snapshots the still-group-less in-flight set before the drain.
-          const closing = queue.close();
-          await drainReached;
-
-          // Let the claim finish - it adds the group to the set now, after the
-          // sweep already ran, then runs the shutdown recheck.
-          releaseStrike();
-          await handlerEntered;
-
-          // The recheck cleared the strike while the handler is still in flight,
-          // so a drain the budget abandons leaves nothing behind. Without it the
-          // strike would survive until the finally the abandon path never runs.
           await vi.waitFor(
             async () => {
-              expect(await redis.get(strikesKey(name, "raced"))).toBeNull();
+              expect(await blockedMembers(name)).toContain("parked");
             },
             { timeout: 5000, interval: 50 },
           );
 
-          releaseHandler();
-          await closing;
-
-          // The group was never mistaken for poison.
-          expect(await blockedMembers(name)).not.toContain("raced");
+          // Left at the threshold, an operator unblocking inside the marker's
+          // hour would have the group re-park on its very next claim.
+          await vi.waitFor(
+            async () => {
+              expect(await redis.exists(claimKey(name, "parked"))).toBe(0);
+            },
+            { timeout: 5000, interval: 50 },
+          );
         });
       });
     });
@@ -502,8 +817,8 @@ describe.skipIf(!hasTestcontainers)(
 
     describe("given a group whose job always throws", () => {
       describe("when an attempt fails with the process alive", () => {
-        /** @scenario a failing-but-not-crashing job does not accumulate claim strikes */
-        it("clears the strike recorded for that claim", async () => {
+        /** @scenario a failing-but-not-crashing job does not accumulate confirmed deaths */
+        it("releases the marker recorded for that claim", async () => {
           const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
           processed.mockRejectedValue(new Error("handler failure"));
           const { queue, name } = createQueue(processed);
@@ -518,12 +833,12 @@ describe.skipIf(!hasTestcontainers)(
             { timeout: 5000, interval: 50 },
           );
 
-          // The failure path survives the process, so the claim strike is
-          // cleared - retries are accounted by the retry budget, not by the
+          // The failure path survives the process, so the claim marker is
+          // released - retries are accounted by the retry budget, not by the
           // poison guard.
           await vi.waitFor(
             async () => {
-              expect(await redis.get(strikesKey(name, "group-a"))).toBeNull();
+              expect(await redis.exists(claimKey(name, "group-a"))).toBe(0);
             },
             { timeout: 5000, interval: 50 },
           );
@@ -659,16 +974,13 @@ describe.skipIf(!hasTestcontainers)(
     describe("given a parked poison group", () => {
       describe("when an operator unblocks it", () => {
         /** @scenario a parked poison group can be unblocked by an operator */
-        it("resets the strikes and returns the group to dispatch", async () => {
+        it("resets the death count and returns the group to dispatch", async () => {
           const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
           processed.mockResolvedValue(undefined);
           const { queue, name } = createQueue(processed);
           await queue.waitUntilReady();
 
-          await redis.set(
-            strikesKey(name, "poisoned"),
-            String(DEFAULT_CLAIM_STRIKE_THRESHOLD),
-          );
+          await seedDeadOwner(name, "poisoned");
           await queue.send({ id: "job-1", groupId: "poisoned", value: "x" });
 
           await vi.waitFor(
@@ -684,7 +996,7 @@ describe.skipIf(!hasTestcontainers)(
             groupId: "poisoned",
           });
           expect(wasBlocked).toBe(true);
-          expect(await redis.get(strikesKey(name, "poisoned"))).toBeNull();
+          expect(await redis.exists(claimKey(name, "poisoned"))).toBe(0);
 
           await vi.waitFor(
             () => {
@@ -697,17 +1009,14 @@ describe.skipIf(!hasTestcontainers)(
       });
 
       describe("when an operator drains it", () => {
-        /** @scenario draining a parked poison group resets its claim strikes */
+        /** @scenario draining a parked poison group resets its confirmed death count */
         it("resets the strikes so a re-created group dispatches normally", async () => {
           const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
           processed.mockResolvedValue(undefined);
           const { queue, name } = createQueue(processed);
           await queue.waitUntilReady();
 
-          await redis.set(
-            strikesKey(name, "poisoned"),
-            String(DEFAULT_CLAIM_STRIKE_THRESHOLD),
-          );
+          await seedDeadOwner(name, "poisoned");
           await queue.send({ id: "job-1", groupId: "poisoned", value: "x" });
 
           await vi.waitFor(
@@ -723,7 +1032,7 @@ describe.skipIf(!hasTestcontainers)(
             groupId: "poisoned",
           });
           expect(jobsRemoved).toBeGreaterThan(0);
-          expect(await redis.get(strikesKey(name, "poisoned"))).toBeNull();
+          expect(await redis.exists(claimKey(name, "poisoned"))).toBe(0);
           expect(await blockedMembers(name)).not.toContain("poisoned");
 
           // A new job under the same group id gets a fresh run instead of
@@ -741,17 +1050,14 @@ describe.skipIf(!hasTestcontainers)(
       });
 
       describe("when an operator moves it to the dead-letter queue", () => {
-        /** @scenario moving a parked poison group to the dead-letter queue resets its claim strikes */
+        /** @scenario moving a parked poison group to the dead-letter queue resets its confirmed death count */
         it("resets the strikes so a re-created group dispatches normally", async () => {
           const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
           processed.mockResolvedValue(undefined);
           const { queue, name } = createQueue(processed);
           await queue.waitUntilReady();
 
-          await redis.set(
-            strikesKey(name, "poisoned"),
-            String(DEFAULT_CLAIM_STRIKE_THRESHOLD),
-          );
+          await seedDeadOwner(name, "poisoned");
           await queue.send({ id: "job-1", groupId: "poisoned", value: "x" });
 
           await vi.waitFor(
@@ -767,7 +1073,7 @@ describe.skipIf(!hasTestcontainers)(
             groupId: "poisoned",
           });
           expect(jobsMoved).toBeGreaterThan(0);
-          expect(await redis.get(strikesKey(name, "poisoned"))).toBeNull();
+          expect(await redis.exists(claimKey(name, "poisoned"))).toBe(0);
           expect(await blockedMembers(name)).not.toContain("poisoned");
 
           await queue.send({ id: "job-2", groupId: "poisoned", value: "y" });

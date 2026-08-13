@@ -19,7 +19,7 @@ export const PushToCopiesDialog = ({
 }) => {
   const { project } = useOrganizationTeamProject();
   const pushToCopies = api.prompts.pushToCopies.useMutation();
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const [selectedCopyIds, setSelectedCopyIds] = useState<Set<string>>(
     new Set(),
   );
@@ -78,7 +78,7 @@ export const PushToCopiesDialog = ({
         await utils.prompts.getAllPromptsForProject.invalidate();
         return result;
       }}
-      pushLoading={pushToCopies.isLoading}
+      pushLoading={pushToCopies.isPending}
       bodyIntro="Select which replicas to push the latest version to:"
       onSuccess={() => setSelectedCopyIds(new Set())}
     />

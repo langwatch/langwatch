@@ -554,6 +554,50 @@ test_component_toggles() {
   assert_contains "toggles: app still renders with both disabled" "$off" "${RELEASE}-app"
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# SUITE: Langy opt-out — one values key removes the assistant completely
+# ─────────────────────────────────────────────────────────────────────────────
+# langyagent.chartManaged is the single documented opt-out, and it has to be
+# genuinely single. An operator who sets it and still finds the agent's Service,
+# its shared secret key, or the rollout flag forced on has been told something
+# untrue — and this is the escape hatch we point locked-down clusters at, so a
+# leak here is a support call rather than a cosmetic bug.
+#
+# Worth asserting on all four surfaces rather than the Deployment alone: the
+# subchart disappears via a Chart.yaml `condition:`, while the app's and
+# workers' references to it are separate `if` guards in the umbrella chart.
+# Nothing links them. Each is its own edit, and each can be forgotten on its
+# own while the Deployment correctly vanishes and the render stays green.
+test_langy_disabled() {
+  sep; info "Suite: langy opt-out"
+
+  local on off
+  on=$(tmpl --set autogen.enabled=true)
+  off=$(tmpl --set autogen.enabled=true -f "${OVERLAYS}/langy-disabled.yaml")
+
+  # Negative controls, and not a formality here: a failed render arrives as an
+  # error string (tmpl folds stderr into stdout), and every absence assertion
+  # below would pass against it. These are what stop this suite reporting a
+  # clean opt-out for a chart that rendered nothing at all.
+  assert_contains "langy: agent Deployment present when enabled"  "$on" "name: ${RELEASE}-langyagent"
+  assert_contains "langy: agent URL wired when enabled"           "$on" "OPENCODE_AGENT_URL"
+  assert_contains "langy: rollout flag forced when enabled"       "$on" "release_langy_enabled"
+  assert_contains "langy: shared secret key present when enabled" "$on" "LANGY_INTERNAL_SECRET"
+
+  # The subchart itself — Deployment, Service, ConfigMap and NetworkPolicy all
+  # carry this name, so one assertion covers every object it contributes.
+  assert_not_contains "langy: no agent resources when disabled" "$off" "${RELEASE}-langyagent"
+
+  # The umbrella chart's own references, each behind its own guard.
+  assert_not_contains "langy: agent URL not wired when disabled"      "$off" "OPENCODE_AGENT_URL"
+  assert_not_contains "langy: rollout flag not forced when disabled"  "$off" "release_langy_enabled"
+  assert_not_contains "langy: shared secret key absent when disabled" "$off" "LANGY_INTERNAL_SECRET"
+
+  # Opting out of the assistant must not take anything else with it.
+  assert_contains "langy: app still renders when disabled"    "$off" "${RELEASE}-app"
+  assert_contains "langy: workers still render when disabled" "$off" "${RELEASE}-workers"
+}
+
 test_size_overlays() {
   sep; info "Suite: size overlays"
 
@@ -1298,6 +1342,7 @@ main() {
   test_backup_metrics_gate
   test_size_overlays
   test_component_toggles
+  test_langy_disabled
   test_pod_security
   test_infra_overlays
   test_overlay_stacking

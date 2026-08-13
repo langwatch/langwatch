@@ -7,8 +7,9 @@
  * The `revokeAllSessionsForUser` helper clears BOTH stores so admin
  * actions like `user.deactivate` actually kick the user out.
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 const mockRedisGet = vi.fn();
 const mockRedisDel = vi.fn();

@@ -248,3 +248,61 @@ describe("when delete is called and the file does not exist", () => {
     await expect(driver.delete(uri)).resolves.toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// containment
+// ---------------------------------------------------------------------------
+
+describe("given a URI whose encoded segment decodes into path separators", () => {
+  // `new URL()` leaves `%2F` encoded, so this URI looks like a single path
+  // segment right up until `decodeURIComponent` turns it back into `../../`.
+  // A caller that percent-encoded its segments is therefore NOT protected by
+  // having done so — this is the backstop that catches it.
+  const escaping = `file://${tmpDir}/proj/${encodeURIComponent("../../../../etc/evil")}/obj`;
+
+  it("refuses to read, write or delete outside the path it names", async () => {
+    await expect(
+      driver.put(escaping, Buffer.from("owned"), "text/plain"),
+    ).rejects.toThrow(/single component/i);
+    await expect(driver.get(escaping)).rejects.toThrow(/single component/i);
+    await expect(driver.delete(escaping)).rejects.toThrow(/single component/i);
+    await expect(driver.exists(escaping)).rejects.toThrow(/single component/i);
+  });
+
+  it("leaves nothing behind at the escaped location", async () => {
+    const escaped = path.resolve(
+      decodeURIComponent(new URL(escaping).pathname),
+    );
+
+    await driver.put(escaping, Buffer.from("owned"), "text/plain").catch(() => {
+      // expected — the assertion is that the refusal wrote nothing
+    });
+
+    await expect(fs.access(escaped)).rejects.toThrow();
+  });
+});
+
+describe("given a storage root configured with a trailing slash", () => {
+  // `LANGWATCH_LOCAL_STORAGE_PATH` and the chart's
+  // `app.storedObjects.localFilesystem.path` both accept one, so the minted URI
+  // carries a doubled separator. That is not a traversal, and refusing it would
+  // break every local-filesystem write on those installs — datasets and
+  // scenario media included, none of which this containment check is about.
+  it("stores and reads back through the collapsed path", async () => {
+    const uri = mintFileUri({
+      root: `${tmpDir}/`,
+      projectId: "proj-1",
+      sha256: "abc123",
+    });
+    expect(uri).toContain("//proj-1/");
+
+    await driver.put(uri, Buffer.from("payload"), "application/octet-stream");
+
+    expect(await streamToBuffer(await driver.get(uri))).toEqual(
+      Buffer.from("payload"),
+    );
+    await expect(
+      fs.access(path.join(tmpDir, "proj-1", "abc123")),
+    ).resolves.toBeUndefined();
+  });
+});

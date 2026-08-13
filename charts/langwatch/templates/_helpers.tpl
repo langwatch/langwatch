@@ -615,15 +615,27 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- if not $chartWritesIt }}
     {{- $found := lookup "v1" "Secret" .Release.Namespace $langySecretName }}
     {{- $hint := printf "Either add the key to that Secret (kubectl -n %s create secret generic %s --from-literal=%s=$(openssl rand -hex 32), or patch it if it already exists), point langyagent.secrets.existingSecretName at the Secret that does hold it, or let the chart generate it by leaving autogen.enabled=true with no secrets.existingSecret override." .Release.Namespace $langySecretName $langyKey }}
-    {{- if not $found }}
-      {{/* Every lookup comes back empty during `helm template` and dry runs, so
-           "Secret not found" there means "we cannot see the cluster", not "it is
-           missing". Probe with an object every real cluster has: if kube-system
-           is invisible too, stay quiet rather than failing a plain render. */}}
-      {{- if lookup "v1" "Namespace" "" "kube-system" }}
-        {{- $errors = append $errors (printf "Langy is enabled (langyagent.chartManaged=true) but Secret %q was not found in namespace %q, and this chart is not generating it. The app, the workers, and the agent pod all read %q from it to authenticate to each other, so all three would start into CreateContainerConfigError. %s" $langySecretName .Release.Namespace $langyKey $hint) }}
-      {{- end }}
-    {{- else if not (index ($found.data | default dict) $langyKey) }}
+    {{/* Only the "Secret is readable but the key is missing" case is reported,
+         and reporting it needs no permission beyond the read on the line above.
+
+         A Secret that is absent is deliberately NOT reported. `lookup` returns
+         the same empty result for "not there" and "no cluster behind this
+         render", so telling them apart takes a SECOND read whose only job is to
+         prove the cluster is visible — and every candidate for that read costs
+         a permission the chart otherwise does not need. kube-system was
+         cluster-scoped, which is the bug this whole change exists to remove.
+         The namespace's own default ServiceAccount is at least namespaced, but
+         `get serviceaccounts` is still a distinct grant a role can withhold,
+         so it reintroduces the same class of failure in a smaller blast radius.
+         Neither is worth a hard render failure for an operator whose setup is
+         correct, in service of a message.
+
+         What that costs: a completely absent Secret is no longer named at
+         render time. It surfaces as CreateContainerConfigError on the pods,
+         which is exactly where it surfaced before this guard existed. What it
+         keeps is the case operators actually hit — the Secret is there and the
+         one key was never added — reported precisely, for free. */}}
+    {{- if and $found (not (index ($found.data | default dict) $langyKey)) }}
       {{- $errors = append $errors (printf "Langy is enabled (langyagent.chartManaged=true) but Secret %q in namespace %q has no %q key. The app, the workers, and the agent pod all read that one key to authenticate to each other. %s" $langySecretName .Release.Namespace $langyKey $hint) }}
     {{- end }}
   {{- end }}
@@ -890,6 +902,18 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # why the connection settings below can outlive it (see legacyAzureRead).
 - name: STORED_OBJECTS_BACKEND
   value: "azure"
+{{- if .Values.app.dataplane.providers.azureBlob.spoolRetentionConfirmed }}
+# The ADR-022 trace spool stays off on Azure until the operator states that the
+# container has a lifecycle rule deleting `trace-blobs/spool/` blobs after 3
+# days. That policy is management-plane; the app holds a data-plane key and
+# cannot read it back, so this is an assertion, not a check. Left unset, an
+# oversized span keeps its payload inline instead of leaving an object behind
+# that nothing reaps. Emitted here, beside the write toggle rather than with
+# the connection settings below, because it gates only the spool WRITE path —
+# a legacyAzureRead migration reads existing spool objects without it.
+- name: AZURE_BLOB_SPOOL_RETENTION_CONFIRMED
+  value: "true"
+{{- end }}
 {{- else }}
 - name: STORED_OBJECTS_BACKEND
   value: "s3"

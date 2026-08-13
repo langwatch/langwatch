@@ -3,9 +3,9 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { OrganizationUserRole } from "@prisma/client";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 
 import { CurrentDrawer } from "../CurrentDrawer";
 

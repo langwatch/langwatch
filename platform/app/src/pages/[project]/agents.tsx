@@ -34,7 +34,7 @@ import { useRouter } from "~/utils/compat/next-router";
 function Page() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const router = useRouter();
 
   // State for tracking which agent is being deleted
