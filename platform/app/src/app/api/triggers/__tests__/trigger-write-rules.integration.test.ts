@@ -53,7 +53,7 @@ describe("Feature: the API saves what the dashboard would accept", () => {
 
   const withWebhookChannel = async <T>(
     on: boolean,
-    run: () => Promise<T>,
+    run: () => T | Promise<T>,
   ): Promise<T> => {
     const previous = process.env.FEATURE_FLAG_FORCE_ENABLE;
     if (on)
