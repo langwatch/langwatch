@@ -29,8 +29,9 @@ export function GeneratePromptApiSnippetDialog({
 }: GeneratePromptApiSnippetButtonProps) {
   // Memoized: GenerateApiSnippetDialog used to sync state via an effect keyed
   // on `snippets`, so a fresh array identity every render caused infinite
-  // re-render loops. That effect is gone, but a stable identity keeps every
-  // downstream consumer cheap.
+  // re-render loops. That effect is gone; keeping the identity stable while
+  // the inputs are unchanged still spares reference-sensitive consumers
+  // (memo comparisons, effect deps) from reacting to a rebuilt array.
   const snippets = useMemo(
     () =>
       getGetPromptSnippets({
