@@ -54,7 +54,7 @@ def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PatchApiTeamsByIdBody | Unset = UNSET,
 ) -> Response[Any]:
     """Update a team by its id
@@ -86,7 +86,7 @@ def sync_detailed(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PatchApiTeamsByIdBody | Unset = UNSET,
 ) -> Response[Any]:
     """Update a team by its id

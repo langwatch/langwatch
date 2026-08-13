@@ -96,7 +96,7 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiPromptsTagsBody | Unset = UNSET,
 ) -> Response[
     PostApiPromptsTagsResponse201
@@ -131,7 +131,7 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiPromptsTagsBody | Unset = UNSET,
 ) -> (
     PostApiPromptsTagsResponse201
@@ -162,7 +162,7 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiPromptsTagsBody | Unset = UNSET,
 ) -> Response[
     PostApiPromptsTagsResponse201
@@ -195,7 +195,7 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiPromptsTagsBody | Unset = UNSET,
 ) -> (
     PostApiPromptsTagsResponse201

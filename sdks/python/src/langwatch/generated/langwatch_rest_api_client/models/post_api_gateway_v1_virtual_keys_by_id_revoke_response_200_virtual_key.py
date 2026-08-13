@@ -41,7 +41,14 @@ class PostApiGatewayV1VirtualKeysByIdRevokeResponse200VirtualKey:
         purpose (PostApiGatewayV1VirtualKeysByIdRevokeResponse200VirtualKeyPurpose):
         display_prefix (str):
         principal_user_id (None | str):
-        trace_project_id (None | str):
+        trace_project_id (None | str): The project this key's traces and costs land in, which is the project its spend
+            is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it,
+            so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only
+            on a key created before this was stored, in an organization that had no governance project to fall back to;
+            those keys export no spans until they are given a destination.
+        trace_project_archived (bool): True when the project in `trace_project_id` has been deleted. The key goes on
+            sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never
+            refused for it. Nothing else on the key says the destination is gone.
         external_id (None | str):
         metadata (PostApiGatewayV1VirtualKeysByIdRevokeResponse200VirtualKeyMetadata):
         scopes (list[PostApiGatewayV1VirtualKeysByIdRevokeResponse200VirtualKeyScopesItem]):
@@ -64,6 +71,7 @@ class PostApiGatewayV1VirtualKeysByIdRevokeResponse200VirtualKey:
     display_prefix: str
     principal_user_id: None | str
     trace_project_id: None | str
+    trace_project_archived: bool
     external_id: None | str
     metadata: PostApiGatewayV1VirtualKeysByIdRevokeResponse200VirtualKeyMetadata
     scopes: list[PostApiGatewayV1VirtualKeysByIdRevokeResponse200VirtualKeyScopesItem]
@@ -98,6 +106,8 @@ class PostApiGatewayV1VirtualKeysByIdRevokeResponse200VirtualKey:
 
         trace_project_id: None | str
         trace_project_id = self.trace_project_id
+
+        trace_project_archived = self.trace_project_archived
 
         external_id: None | str
         external_id = self.external_id
@@ -141,6 +151,7 @@ class PostApiGatewayV1VirtualKeysByIdRevokeResponse200VirtualKey:
                 "display_prefix": display_prefix,
                 "principal_user_id": principal_user_id,
                 "trace_project_id": trace_project_id,
+                "trace_project_archived": trace_project_archived,
                 "external_id": external_id,
                 "metadata": metadata,
                 "scopes": scopes,
@@ -201,6 +212,8 @@ class PostApiGatewayV1VirtualKeysByIdRevokeResponse200VirtualKey:
 
         trace_project_id = _parse_trace_project_id(d.pop("trace_project_id"))
 
+        trace_project_archived = d.pop("trace_project_archived")
+
         def _parse_external_id(data: object) -> None | str:
             if data is None:
                 return data
@@ -260,6 +273,7 @@ class PostApiGatewayV1VirtualKeysByIdRevokeResponse200VirtualKey:
             display_prefix=display_prefix,
             principal_user_id=principal_user_id,
             trace_project_id=trace_project_id,
+            trace_project_archived=trace_project_archived,
             external_id=external_id,
             metadata=metadata,
             scopes=scopes,

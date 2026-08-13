@@ -54,7 +54,7 @@ def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 def sync_detailed(
     slug_or_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PatchApiDatasetBySlugOrIdBody | Unset = UNSET,
 ) -> Response[Any]:
     """Update a dataset by its slug or id
@@ -86,7 +86,7 @@ def sync_detailed(
 async def asyncio_detailed(
     slug_or_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PatchApiDatasetBySlugOrIdBody | Unset = UNSET,
 ) -> Response[Any]:
     """Update a dataset by its slug or id

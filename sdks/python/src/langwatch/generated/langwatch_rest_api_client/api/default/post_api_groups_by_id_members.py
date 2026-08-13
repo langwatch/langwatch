@@ -54,7 +54,7 @@ def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiGroupsByIdMembersBody | Unset = UNSET,
 ) -> Response[Any]:
     """Add a member to a group
@@ -86,7 +86,7 @@ def sync_detailed(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiGroupsByIdMembersBody | Unset = UNSET,
 ) -> Response[Any]:
     """Add a member to a group

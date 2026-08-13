@@ -109,7 +109,7 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiMonitorsByIdToggleBody | Unset = UNSET,
 ) -> Response[
     PostApiMonitorsByIdToggleResponse200
@@ -148,7 +148,7 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiMonitorsByIdToggleBody | Unset = UNSET,
 ) -> (
     PostApiMonitorsByIdToggleResponse200
@@ -183,7 +183,7 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiMonitorsByIdToggleBody | Unset = UNSET,
 ) -> Response[
     PostApiMonitorsByIdToggleResponse200
@@ -220,7 +220,7 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiMonitorsByIdToggleBody | Unset = UNSET,
 ) -> (
     PostApiMonitorsByIdToggleResponse200

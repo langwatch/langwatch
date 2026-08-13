@@ -101,7 +101,7 @@ def _build_response(
 def sync_detailed(
     provider: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PutApiModelProvidersByProviderBody | Unset = UNSET,
 ) -> Response[
     PutApiModelProvidersByProviderResponse200
@@ -139,7 +139,7 @@ def sync_detailed(
 def sync(
     provider: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PutApiModelProvidersByProviderBody | Unset = UNSET,
 ) -> (
     PutApiModelProvidersByProviderResponse200
@@ -173,7 +173,7 @@ def sync(
 async def asyncio_detailed(
     provider: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PutApiModelProvidersByProviderBody | Unset = UNSET,
 ) -> Response[
     PutApiModelProvidersByProviderResponse200
@@ -209,7 +209,7 @@ async def asyncio_detailed(
 async def asyncio(
     provider: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PutApiModelProvidersByProviderBody | Unset = UNSET,
 ) -> (
     PutApiModelProvidersByProviderResponse200

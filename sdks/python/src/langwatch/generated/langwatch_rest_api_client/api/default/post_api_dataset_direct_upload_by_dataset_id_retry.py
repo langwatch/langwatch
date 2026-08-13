@@ -44,7 +44,7 @@ def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 def sync_detailed(
     dataset_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[Any]:
     """Retry normalization of a failed or stuck dataset
 
@@ -73,7 +73,7 @@ def sync_detailed(
 async def asyncio_detailed(
     dataset_id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[Any]:
     """Retry normalization of a failed or stuck dataset
 
