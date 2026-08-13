@@ -440,6 +440,7 @@ describe("ViewAutomationDrawer in-depth view", () => {
               traceId: "trace_1",
               name: "checkout agent",
               timestamp: Date.now() - MINUTE_MS,
+              durationMs: 1234,
               status: "error",
               input: "book me a flight",
               output: "upstream timed out",
@@ -456,6 +457,9 @@ describe("ViewAutomationDrawer in-depth view", () => {
           screen.getByText("3 traces matched in the last 7 days"),
         ).toBeDefined();
         expect(screen.getByText("checkout agent")).toBeDefined();
+        // Enough identity to find the trace again: its id and duration.
+        expect(screen.getByText("trace_1")).toBeDefined();
+        expect(screen.getByText(/1\.2s/)).toBeDefined();
         expect(screen.getByText(/book me a flight/)).toBeDefined();
         expect(screen.getByText(/upstream timed out/)).toBeDefined();
       });

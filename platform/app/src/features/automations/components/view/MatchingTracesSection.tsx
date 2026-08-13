@@ -2,6 +2,7 @@ import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 import { describeError } from "~/features/errors";
 import { api } from "~/utils/api";
+import { formatMilliseconds } from "~/utils/formatMilliseconds";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 /** How far back the on-demand run looks. The composer's live preview uses the
@@ -112,6 +113,7 @@ interface MatchedTrace {
   traceId: string;
   name: string;
   timestamp: number;
+  durationMs: number;
   status: string;
   input: string | null;
   output: string | null;
@@ -186,9 +188,21 @@ function MatchedTraceRow({ trace }: { trace: MatchedTrace }) {
           flexShrink={0}
           whiteSpace="nowrap"
         >
+          {trace.durationMs > 0
+            ? `${formatMilliseconds(trace.durationMs)} · `
+            : ""}
           {formatTimeAgo(trace.timestamp)}
         </Text>
       </HStack>
+      <Text
+        textStyle="2xs"
+        color="fg.subtle"
+        fontFamily="mono"
+        truncate
+        maxWidth="full"
+      >
+        {trace.traceId}
+      </Text>
       {trace.input ? (
         <Text textStyle="xs" color="fg.muted" lineClamp={1}>
           Input: {trace.input}

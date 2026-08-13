@@ -14,6 +14,7 @@ import {
 } from "@chakra-ui/react";
 import type { NotificationCadence } from "@langwatch/automations/cadences";
 import { keepPreviousData } from "@tanstack/react-query";
+import { format } from "date-fns";
 import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
@@ -28,6 +29,7 @@ import {
   type TriggerFilterValue,
 } from "~/server/filters/types";
 import { api } from "~/utils/api";
+import { formatMilliseconds } from "~/utils/formatMilliseconds";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { queryIsStructurable } from "../logic/conditionQuery";
 import { type DailyCapAdvice, dailyCapAdvice } from "../logic/dailyCapAdvice";
@@ -496,6 +498,7 @@ interface PreviewTrace {
   traceId: string;
   name: string;
   timestamp: number;
+  durationMs: number;
   status: "ok" | "error" | "warning";
 }
 
@@ -859,22 +862,58 @@ function TracePreview({
   );
 }
 
-/** A single matched trace, kept to the essentials: status dot, name, time ago. */
+/**
+ * A single matched trace. Two compact lines: the name, duration and how long
+ * ago on top; the trace id and the exact date underneath, so a row is enough
+ * to recognise a trace and to find it again in the traces view.
+ */
 function PreviewTraceRow({ trace }: { trace: PreviewTrace }) {
+  const named = trace.name.length > 0;
   return (
-    <HStack gap={2.5} paddingX={3} paddingY={1.5} _hover={{ bg: "bg.muted" }}>
+    <HStack
+      gap={2.5}
+      paddingX={3}
+      paddingY={1.5}
+      align="start"
+      _hover={{ bg: "bg.muted" }}
+    >
       <Box
         boxSize={2}
         borderRadius="full"
         bg={STATUS_DOT_COLOR[trace.status]}
         flexShrink={0}
+        marginTop="5px"
       />
-      <Text textStyle="xs" color="fg" truncate flex={1} minWidth={0}>
-        {trace.name || trace.traceId}
-      </Text>
-      <Text textStyle="2xs" color="fg.subtle" flexShrink={0}>
-        {formatTimeAgoCompact(trace.timestamp)}
-      </Text>
+      <VStack align="start" gap={0} flex={1} minWidth={0}>
+        <Text
+          textStyle="xs"
+          color={named ? "fg" : "fg.muted"}
+          truncate
+          maxWidth="full"
+        >
+          {named ? trace.name : "Unnamed trace"}
+        </Text>
+        <Text
+          textStyle="2xs"
+          color="fg.subtle"
+          fontFamily="mono"
+          truncate
+          maxWidth="full"
+        >
+          {trace.traceId}
+        </Text>
+      </VStack>
+      <VStack align="end" gap={0} flexShrink={0}>
+        <Text textStyle="2xs" color="fg.muted" whiteSpace="nowrap">
+          {trace.durationMs > 0
+            ? `${formatMilliseconds(trace.durationMs)} · `
+            : ""}
+          {formatTimeAgoCompact(trace.timestamp)}
+        </Text>
+        <Text textStyle="2xs" color="fg.subtle" whiteSpace="nowrap">
+          {format(new Date(trace.timestamp), "d MMM, HH:mm")}
+        </Text>
+      </VStack>
     </HStack>
   );
 }

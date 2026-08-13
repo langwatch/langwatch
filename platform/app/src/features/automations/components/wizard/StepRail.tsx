@@ -127,11 +127,20 @@ function StepRailItem({
             </Box>
           ) : null}
         </HStack>
-        {summary ? (
-          <Text textStyle="2xs" color="fg.muted" lineClamp={1}>
-            {summary}
-          </Text>
-        ) : null}
+        {/* Always rendered: the rail must not change height when a step
+            gains its first summary (typing a name would make the whole bar
+            hop), so an empty line holds the second row's space. */}
+        <Text
+          textStyle="2xs"
+          color="fg.muted"
+          lineClamp={1}
+          width="full"
+          aria-hidden={summary ? undefined : true}
+        >
+          {/* The fallback is a non-breaking space — a collapsible one would
+              leave a zero-height line box and reintroduce the hop. */}
+          {summary ?? " "}
+        </Text>
       </VStack>
     </chakra.button>
   );
