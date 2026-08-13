@@ -54,7 +54,7 @@ Constraints (locked in Phase 1):
 
 | Invariant | Meaning | Test anchor |
 |---|---|---|
-| NULL → SDK default | Unset fields produce identical behavior to pre-change runs | Existing scenario tests stay green without modification |
+| NULL → SDK default | Unset fields produce identical behaviour to pre-change runs | Existing scenario tests stay green without modification |
 | Optional parsing | `ChildProcessJobData` without maxTurns/minTurns still parses | Zod schema uses `.optional()` — in-flight jobs from before the deploy parse correctly |
 | Form → DB → SDK | A value set in the form reaches `ScenarioRunner.run()` | Integration: save scenario with maxTurns=3, run, assert SDK receives maxTurns=3 |
 

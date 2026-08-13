@@ -10,6 +10,7 @@
 ALTER TABLE "Scenario" ADD COLUMN "maxTurns" INTEGER;
 ALTER TABLE "Scenario" ADD COLUMN "minTurns" INTEGER;
 
--- Down (manual):
+-- Down (manual — WARNING: dropping these columns permanently discards any
+-- customer-configured turn limits; there is no recovery path):
 --   ALTER TABLE "Scenario" DROP COLUMN "maxTurns";
 --   ALTER TABLE "Scenario" DROP COLUMN "minTurns";
