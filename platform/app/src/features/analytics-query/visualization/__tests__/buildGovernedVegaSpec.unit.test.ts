@@ -12,6 +12,7 @@
 import { describe, expect, it } from "vitest";
 
 import callerSuppliedDatasets from "../../__tests__/fixtures/adversarial/caller-supplied-datasets.json";
+import usermetaEmbedOptions from "../../__tests__/fixtures/adversarial/usermeta-embed-options.json";
 import barOverQueryResult from "../../__tests__/fixtures/valid/bar-over-query-result.json";
 import lookupBetweenRegisteredDatasets from "../../__tests__/fixtures/valid/lookup-between-registered-datasets.json";
 import {
@@ -63,6 +64,22 @@ describe("building the specification the chart runtime is given", () => {
         for (const name of Object.keys(datasets)) {
           expect(datasets[name]).toEqual([...QUERY_ROWS]);
         }
+      });
+
+      /** @scenario "Spec-controlled runtime options are rejected" */
+      it("hands the runtime no usermeta, which is where a spec would replace the loader", () => {
+        // vega-embed reads `usermeta.embedOptions` off the specification and
+        // lets a `loader` found there stand in for the one it was passed — the
+        // deny-everything loader. The policy refuses the property; this is the
+        // second lock, and the one that holds if the first is ever loosened.
+        const smuggled = (
+          usermetaEmbedOptions as { usermeta?: { embedOptions?: object } }
+        ).usermeta;
+        expect(smuggled?.embedOptions).toBeDefined();
+
+        const { spec } = build(usermetaEmbedOptions);
+        expect(spec.usermeta).toBeUndefined();
+        expect(JSON.stringify(spec)).not.toContain("embedOptions");
       });
 
       /** @scenario "The renderer contract accepts multiple registered named datasets" */

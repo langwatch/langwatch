@@ -16,12 +16,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { explainHandledError, readHandledError } from "~/features/errors";
 
 import { CustomQueryMenuLink } from "../components/CustomQueryMenuLink";
-import { governedSqlUnavailablePayload } from "../logic/governedSqlFailure";
+import {
+  governedSqlNotEnabledPayload,
+  governedSqlUnavailablePayload,
+} from "../logic/governedSqlFailure";
 
 import { SCHEMA_RESPONSE } from "./governedSqlFixtures";
 
 const harness = vi.hoisted(() => ({
   available: true,
+  reason: undefined as "disabled" | "unprovisioned" | undefined,
   hasPermission: true,
 }));
 
@@ -32,7 +36,7 @@ vi.mock("~/utils/api", () => ({
       governedSql: {
         availability: {
           useQuery: () => ({
-            data: { available: harness.available },
+            data: { available: harness.available, reason: harness.reason },
             isLoading: false,
             error: null,
           }),
@@ -117,8 +121,16 @@ function renderMenuLink() {
 
 beforeEach(() => {
   harness.available = true;
+  harness.reason = undefined;
   harness.hasPermission = true;
 });
+
+/** The words the registry keys to a code, as a member reads them. */
+function copyFor(payload: unknown) {
+  const copy = explainHandledError(readHandledError(payload)!);
+  expect(copy.isRegistered).toBe(true);
+  return copy;
+}
 
 describe("the Custom query page", () => {
   describe("given a deployment with no governed SQL provisioning", () => {
@@ -126,6 +138,7 @@ describe("the Custom query page", () => {
       /** @scenario "The workbench is unreachable while governed SQL is not provisioned" */
       it("offers no navigation entry", () => {
         harness.available = false;
+        harness.reason = "unprovisioned";
         renderMenuLink();
 
         expect(
@@ -136,13 +149,32 @@ describe("the Custom query page", () => {
       /** @scenario "The workbench is unreachable while governed SQL is not provisioned" */
       it("renders the backend's unavailable state instead of the workbench", async () => {
         harness.available = false;
+        harness.reason = "unprovisioned";
         renderPage();
 
-        const copy = explainHandledError(
-          readHandledError(governedSqlUnavailablePayload())!,
-        );
-        expect(copy.isRegistered).toBe(true);
+        const copy = copyFor(governedSqlUnavailablePayload());
         expect(await screen.findByText(copy.title)).toBeInTheDocument();
+        expect(
+          screen.queryByTestId("governed-sql-workbench"),
+        ).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a project whose feature switch is off", () => {
+    describe("when the member opens the route directly", () => {
+      /** @scenario "The whole surface stays dark until the experimental feature switch is on" */
+      it("says the switch is off rather than blaming the deployment", async () => {
+        harness.available = false;
+        harness.reason = "disabled";
+        renderPage();
+
+        const switchedOff = copyFor(governedSqlNotEnabledPayload());
+        const unprovisioned = copyFor(governedSqlUnavailablePayload());
+        expect(switchedOff.title).not.toBe(unprovisioned.title);
+
+        expect(await screen.findByText(switchedOff.title)).toBeInTheDocument();
+        expect(screen.queryByText(unprovisioned.title)).not.toBeInTheDocument();
         expect(
           screen.queryByTestId("governed-sql-workbench"),
         ).not.toBeInTheDocument();

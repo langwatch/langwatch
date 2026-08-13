@@ -19,6 +19,7 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import "@testing-library/jest-dom/vitest";
@@ -74,6 +75,25 @@ const BAR_SPECIFICATION = {
   },
 };
 
+/**
+ * The owner's half of the specification state, which in the product is the
+ * workbench. Chart mode never holds the text itself — a refused query unmounts
+ * it — so anything exercising an edit has to supply the half that does.
+ */
+function ChartModeHost({ view }: { view: "chart" | "specification" }) {
+  const [editedSpecText, setEditedSpecText] = useState<string | null>(null);
+
+  return (
+    <GovernedSqlChartMode
+      result={RESULT}
+      submittedLabel="SELECT evaluator_name, count() AS evaluations"
+      view={view}
+      editedSpecText={editedSpecText}
+      onEditedSpecTextChange={setEditedSpecText}
+    />
+  );
+}
+
 function chartView(): HTMLElement | null {
   return document.querySelector<HTMLElement>(
     '[data-testid="governed-vega-chart-view"]',
@@ -114,11 +134,7 @@ describe("governed chart mode in real Chromium", () => {
       it("draws one bar per category from the registered dataset, sized by its value", async () => {
         const { rerender } = render(
           <ChakraProvider value={defaultSystem}>
-            <GovernedSqlChartMode
-              result={RESULT}
-              submittedLabel="SELECT evaluator_name, count() AS evaluations"
-              view="specification"
-            />
+            <ChartModeHost view="specification" />
           </ChakraProvider>,
         );
 
@@ -129,11 +145,7 @@ describe("governed chart mode in real Chromium", () => {
         await userEvent.fill(editor, JSON.stringify(BAR_SPECIFICATION));
         rerender(
           <ChakraProvider value={defaultSystem}>
-            <GovernedSqlChartMode
-              result={RESULT}
-              submittedLabel="SELECT evaluator_name, count() AS evaluations"
-              view="chart"
-            />
+            <ChartModeHost view="chart" />
           </ChakraProvider>,
         );
 

@@ -30,6 +30,8 @@ import {
 
 const harness = vi.hoisted(() => ({
   mutation: vi.fn(),
+  /** Stands for whatever the member wrote in the specification editor. */
+  editedSpec: '{"mark":"point"}',
 }));
 
 vi.mock("@trpc/client", async (importOriginal) => {
@@ -88,16 +90,28 @@ vi.mock("~/utils/compat/next-dynamic", () => {
 // Chart mode's own behavior is covered by its own suites; what belongs to THIS
 // suite is the wiring — which result and which label the workbench hands the
 // chart slot. The stub makes both observable.
+// It also stands in for the member editing a specification: the text it is
+// given is on screen, and the button writes one back. Chart mode holds none of
+// that state, which is exactly what this suite has to be able to see.
 vi.mock("../components/LazyGovernedSqlChartMode", () => ({
   LazyGovernedSqlChartMode: (props: {
     result: { rows: readonly Record<string, unknown>[] };
     submittedLabel?: string;
+    editedSpecText: string | null;
+    onEditedSpecTextChange: (text: string | null) => void;
   }) => (
     <div
       data-testid="stub-chart-mode"
       data-submitted-label={props.submittedLabel}
+      data-spec-text={props.editedSpecText ?? ""}
     >
       {JSON.stringify(props.result.rows)}
+      <button
+        type="button"
+        onClick={() => props.onEditedSpecTextChange(harness.editedSpec)}
+      >
+        Edit the specification
+      </button>
     </div>
   ),
 }));
@@ -216,7 +230,125 @@ describe("the governed SQL workbench", () => {
       });
     });
 
+    describe("when a query is refused between two runs of a chart the member wrote", () => {
+      /** @scenario "A new result reshapes the starter specification until it is edited" */
+      it("still has their specification once the query succeeds again", async () => {
+        const editor = await renderWorkbench();
+        typeSql(editor, SQL);
+        fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+        await screen.findByTestId("governed-sql-result-summary");
+
+        await userEvent.click(screen.getByRole("tab", { name: "Chart" }));
+        await userEvent.click(
+          await screen.findByRole("button", { name: "Edit the specification" }),
+        );
+        expect(screen.getByTestId("stub-chart-mode")).toHaveAttribute(
+          "data-spec-text",
+          harness.editedSpec,
+        );
+
+        // A refusal takes the whole result body off the page, chart and all.
+        harness.mutation.mockRejectedValue(
+          handledErrorEnvelope({ code: "governed_sql_not_permitted" }),
+        );
+        typeSql(editor, `${SQL} FORMAT JSON`);
+        fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+        await waitFor(() =>
+          expect(screen.queryByTestId("stub-chart-mode")).toBeNull(),
+        );
+
+        // They fix the statement and run it again: the chart is theirs, not the
+        // example they started from.
+        harness.mutation.mockResolvedValue(governedSqlResult());
+        typeSql(editor, SQL);
+        fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+
+        const chart = await screen.findByTestId("stub-chart-mode");
+        expect(chart).toHaveAttribute("data-spec-text", harness.editedSpec);
+      });
+    });
+
+    describe("when a parameter row carries something the form cannot send", () => {
+      /** @scenario "Named scalar parameters accompany the SQL without rewriting it" */
+      it("says so on the row and holds Run back rather than dropping it", async () => {
+        const editor = await renderWorkbench();
+        typeSql(editor, SQL);
+        addParameter({ name: "since", value: "not a number" });
+        fireEvent.change(screen.getByLabelText("Parameter type"), {
+          target: { value: "number" },
+        });
+
+        const parameters = screen.getByTestId("governed-sql-parameters");
+        expect(within(parameters).getByText("Enter a number.")).toBeVisible();
+        expect(
+          screen.getByRole("button", { name: "Run query" }),
+        ).toBeDisabled();
+
+        // Nothing was sent behind their back while the row was unsendable.
+        expect(harness.mutation).not.toHaveBeenCalled();
+
+        fireEvent.change(screen.getByLabelText("Parameter value"), {
+          target: { value: "12" },
+        });
+        expect(screen.getByRole("button", { name: "Run query" })).toBeEnabled();
+      });
+
+      /** @scenario "Named scalar parameters accompany the SQL without rewriting it" */
+      it("names a row whose value was filled in without a name", async () => {
+        const editor = await renderWorkbench();
+        typeSql(editor, SQL);
+        fireEvent.click(screen.getByRole("button", { name: "Parameters" }));
+        fireEvent.click(screen.getByRole("button", { name: "Add parameter" }));
+        fireEvent.change(screen.getByLabelText("Parameter value"), {
+          target: { value: "2026-01-01" },
+        });
+
+        const parameters = screen.getByTestId("governed-sql-parameters");
+        expect(
+          within(parameters).getByText("Name this parameter."),
+        ).toBeVisible();
+        expect(
+          screen.getByRole("button", { name: "Run query" }),
+        ).toBeDisabled();
+      });
+    });
+
     describe("when the backend refuses the submission for missing parameters", () => {
+      /** @scenario "A missing bound parameter is reported against the parameter editor" */
+      it("keeps the form open under the refusal and closes it once it clears", async () => {
+        harness.mutation.mockRejectedValue(
+          handledErrorEnvelope({
+            code: "governed_sql_parameter_missing",
+            meta: { parameters: ["since"] },
+          }),
+        );
+
+        const editor = await renderWorkbench();
+        typeSql(editor, SQL);
+        fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+
+        const toggle = await screen.findByRole("button", {
+          name: "Parameters",
+        });
+        await waitFor(() =>
+          expect(toggle).toHaveAttribute("aria-expanded", "true"),
+        );
+
+        // The refusal is answered in this form, so a click cannot close it.
+        fireEvent.click(toggle);
+        expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+        // And once the refusal is gone the form is closed, rather than open
+        // because of a flag that had been toggled behind it.
+        harness.mutation.mockResolvedValue(governedSqlResult());
+        typeSql(editor, `${SQL} LIMIT 1`);
+        fireEvent.click(screen.getByRole("button", { name: "Run query" }));
+
+        await waitFor(() =>
+          expect(toggle).toHaveAttribute("aria-expanded", "false"),
+        );
+      });
+
       /** @scenario "A missing bound parameter is reported against the parameter editor" */
       it("lists the missing names at the parameter editor", async () => {
         harness.mutation.mockRejectedValue(

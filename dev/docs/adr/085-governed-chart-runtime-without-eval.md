@@ -96,6 +96,20 @@ remains available if the checked-in size becomes the binding constraint.
   source-graph test is what catches that, because nothing about it would look
   wrong.
 
+## Boundary: this is a rendering-time control, not admission control
+
+Everything above runs in the browser of the member who wrote the specification,
+at the moment it is drawn. That is the whole of what it protects: this member,
+this render, this session. It is not a check on what may be *stored*.
+
+Nothing persists a specification today — it lives in memory for as long as the
+result is on screen — which is what makes rendering-time validation sufficient
+for now. The moment a specification can be saved, shared, or replayed for
+someone else, a spec that reaches a second person's browser has been admitted by
+whatever wrote it, and the browser that renders it is the wrong place to decide
+that. Any such path re-validates server-side at write, against the same policy,
+before the specification is stored.
+
 ## References
 
 - Related ADRs: [081](./081-governed-sql-table-function-and-ssrf-policy.md),

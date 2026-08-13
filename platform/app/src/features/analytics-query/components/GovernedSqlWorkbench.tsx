@@ -33,7 +33,10 @@ import {
 
 import { GovernedSchemaBrowser } from "./GovernedSchemaBrowser";
 import { GovernedSqlEditor } from "./GovernedSqlEditor";
-import { GovernedSqlParametersEditor } from "./GovernedSqlParametersEditor";
+import {
+  type GovernedSqlParametersChange,
+  GovernedSqlParametersEditor,
+} from "./GovernedSqlParametersEditor";
 import {
   GovernedSqlResultPane,
   type GovernedSqlResultView,
@@ -219,6 +222,11 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
   const query = useGovernedSqlQuery({ projectId });
 
   const [schemaVisible, setSchemaVisible] = useState(true);
+  // The chart specification lives here rather than in chart mode, which a
+  // refused query unmounts. A member who edits a chart, hits a refusal, fixes
+  // the SQL and runs again finds the chart they wrote, not the example.
+  const [editedSpecText, setEditedSpecText] = useState<string | null>(null);
+  const { parameters, parametersSendable } = useParameterState(query);
   const { registerInsert, handleInsert, insertExample } = useDraftInsert({
     query,
     exampleSql: schema.model.datasets[0]?.exampleSql,
@@ -257,6 +265,8 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
           registerInsert={registerInsert}
           schemaVisible={schemaVisible}
           onToggleSchema={() => setSchemaVisible((visible) => !visible)}
+          onParametersChange={parameters}
+          parametersSendable={parametersSendable}
         />
 
         <Box
@@ -275,7 +285,11 @@ export function GovernedSqlWorkbench({ projectId }: GovernedSqlWorkbenchProps) {
             state={query.state}
             onRun={query.runQuery}
             {...(insertExample ? { onInsertExample: insertExample } : {})}
-            renderChartArea={chartArea(query.state)}
+            renderChartArea={chartArea({
+              state: query.state,
+              editedSpecText,
+              onEditedSpecTextChange: setEditedSpecText,
+            })}
           />
         </Box>
       </Box>
@@ -309,6 +323,29 @@ function SchemaSidebar({
   );
 }
 
+/**
+ * The parameters form's two answers, which are computed together and must not
+ * disagree: the values to send, and whether every row can be sent at all.
+ *
+ * A row the form cannot send is dropped from the values — so without the second
+ * answer, Run stays lit and the round-trip comes back naming a parameter the
+ * member is looking at, filled in.
+ */
+function useParameterState(query: ReturnType<typeof useGovernedSqlQuery>) {
+  const [parametersSendable, setParametersSendable] = useState(true);
+  const { setParameters } = query;
+
+  const parameters = useCallback(
+    ({ parameters: values, sendable }: GovernedSqlParametersChange) => {
+      setParameters(values);
+      setParametersSendable(sendable);
+    },
+    [setParameters],
+  );
+
+  return { parameters, parametersSendable };
+}
+
 function QueryCard({
   query,
   schemaModel,
@@ -316,6 +353,8 @@ function QueryCard({
   registerInsert,
   schemaVisible,
   onToggleSchema,
+  onParametersChange,
+  parametersSendable,
 }: {
   query: ReturnType<typeof useGovernedSqlQuery>;
   schemaModel: ReturnType<typeof useGovernedSqlSchema>["model"];
@@ -323,6 +362,8 @@ function QueryCard({
   registerInsert: (insert: ((text: string) => void) | null) => void;
   schemaVisible: boolean;
   onToggleSchema: () => void;
+  onParametersChange: (change: GovernedSqlParametersChange) => void;
+  parametersSendable: boolean;
 }) {
   const { draft } = query.state;
 
@@ -340,7 +381,11 @@ function QueryCard({
         schemaVisible={schemaVisible}
         onToggleSchema={onToggleSchema}
         actionLabel={query.actionLabel}
-        runnable={draft.sql.trim().length > 0 && !query.state.inFlight}
+        runnable={
+          draft.sql.trim().length > 0 &&
+          parametersSendable &&
+          !query.state.inFlight
+        }
         inFlight={query.state.inFlight}
         // Always the draft, under either label. When the label reads
         // "Reload" the draft is byte-identical to what produced the visible
@@ -368,7 +413,7 @@ function QueryCard({
         paddingY={2}
       >
         <GovernedSqlParametersEditor
-          onChange={query.setParameters}
+          onChange={onParametersChange}
           missingParameters={failure.missingParameters}
         />
       </Box>
@@ -385,9 +430,15 @@ function QueryCard({
  * reads. One render function serves both tabs so the specification being
  * edited is a single piece of state however the member looks at it.
  */
-function chartArea(
-  state: GovernedSqlRequestState,
-):
+function chartArea({
+  state,
+  editedSpecText,
+  onEditedSpecTextChange,
+}: {
+  state: GovernedSqlRequestState;
+  editedSpecText: string | null;
+  onEditedSpecTextChange: (text: string | null) => void;
+}):
   | ((view: GovernedSqlResultView, openSpecification: () => void) => ReactNode)
   | undefined {
   if (state.outcome?.kind !== "result") return undefined;
@@ -405,6 +456,8 @@ function chartArea(
       submittedLabel={chartResultLabel(snapshot.sql)}
       view={view === "specification" ? "specification" : "chart"}
       onOpenSpecification={openSpecification}
+      editedSpecText={editedSpecText}
+      onEditedSpecTextChange={onEditedSpecTextChange}
     />
   );
   return renderArea;

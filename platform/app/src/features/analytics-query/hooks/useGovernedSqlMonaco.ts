@@ -181,6 +181,12 @@ function insertAtCursor({
 export interface UseGovernedSqlMonaco {
   /** Hand this to `<Editor onMount>`. */
   handleMount: OnMount;
+  /**
+   * Adopts a disposable the component registered on the same editor, so
+   * everything attached at mount is released together on unmount rather than
+   * outliving the editor it listens to.
+   */
+  trackDisposable: (disposable: { dispose: () => void }) => void;
 }
 
 export function useGovernedSqlMonaco({
@@ -206,6 +212,10 @@ export function useGovernedSqlMonaco({
   const editorRef = useRef<MonacoEditorInstance | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
   const disposablesRef = useRef<{ dispose: () => void }[]>([]);
+
+  const trackDisposable = useCallback((disposable: { dispose: () => void }) => {
+    disposablesRef.current.push(disposable);
+  }, []);
 
   const applyMarkers = useCallback(
     (next: readonly GovernedSqlEditorMarker[]) => {
@@ -269,5 +279,5 @@ export function useGovernedSqlMonaco({
     applyMarkers(markers);
   };
 
-  return { handleMount };
+  return { handleMount, trackDisposable };
 }

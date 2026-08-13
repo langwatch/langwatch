@@ -94,7 +94,7 @@ export function GovernedSqlEditor({
   // the app.
   const theme = colorMode === "dark" ? "vs-dark" : "vs";
 
-  const { handleMount } = useGovernedSqlMonaco({
+  const { handleMount, trackDisposable } = useGovernedSqlMonaco({
     schema,
     markers,
     ...(registerInsert ? { registerInsert } : {}),
@@ -111,11 +111,13 @@ export function GovernedSqlEditor({
       if (instance.getContentHeight && instance.onDidContentSizeChange) {
         const follow = () =>
           setEditorHeight(clampEditorHeight(instance.getContentHeight()));
-        instance.onDidContentSizeChange(follow);
+        // Handed to the hook, so this listener is released on unmount with the
+        // providers registered beside it.
+        trackDisposable(instance.onDidContentSizeChange(follow));
         follow();
       }
     },
-    [handleMount],
+    [handleMount, trackDisposable],
   );
 
   return (
