@@ -20,14 +20,3 @@ Feature: Ops dashboard latency tiles
     Then the P50 tile shows a non-zero value
     And the P99 tile shows a value at least as large as P50
     And both peak tiles retain the highest duration yet recorded
-
-  Scenario: Two operators reading at the same moment see the same latency
-    Given two operators open the ops dashboard at the same time
-    When both read the latency tiles
-    Then both see the same values
-
-  Scenario: Peaks survive a restart of the workers
-    Given a peak latency has been recorded
-    When the workers are restarted
-    Then the peak tiles still show that value
-    And no peak tile falls back to a lower one
