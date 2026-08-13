@@ -892,8 +892,13 @@ const appConfig = defineConfig({
       table: defineSlotRecipe({
         slots: ["root", "row", "cell", "columnHeader"],
         base: {
+          // Deliberately NO borderRadius on root: the table is
+          // border-collapse: collapse, where border-radius does not apply to
+          // internal elements — so a rounded root under square header/row
+          // paints rendered as a clipped-corner artifact on every table.
+          // Rounding belongs to the clipping CONTAINER (Card overflow=hidden,
+          // Table.ScrollArea), never to the <table> itself.
           root: {
-            borderRadius: "lg",
             background: "bg.panel",
           },
           row: {
@@ -907,12 +912,6 @@ const appConfig = defineConfig({
             textTransform: "uppercase",
             color: "fg.muted",
             letterSpacing: "wider",
-            // The root carries borderRadius lg, but a collapsed <table> cannot
-            // clip its children — square header-cell backgrounds (bg.subtle)
-            // poke past the rounded corner and read as a clipping artifact.
-            // Round the outer header cells to match the root.
-            "&:first-of-type": { borderTopLeftRadius: "lg" },
-            "&:last-of-type": { borderTopRightRadius: "lg" },
           },
         },
         variants: {
@@ -938,10 +937,12 @@ const appConfig = defineConfig({
               },
               // Chakra's stock line variant paints every row bg="bg" (the PAGE
               // background) — darker than the root's bg.panel in dark mode, so
-              // the whole body rendered as a mismatched slab with square
-              // corners. Rows are transparent; the root's panel shows through.
+              // the whole body rendered as a mismatched slab. The override must
+              // use the same `bg` KEY the stock recipe uses: a `background`
+              // key merges alongside `bg` instead of replacing it, and the
+              // stock paint wins.
               row: {
-                background: "transparent",
+                bg: "transparent",
               },
               columnHeader: {
                 borderColor: "border",

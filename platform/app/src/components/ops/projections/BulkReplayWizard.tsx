@@ -326,7 +326,7 @@ export function BulkReplayWizard({
               </Button>
             }
           >
-            <Table.ScrollArea>
+            <Table.ScrollArea borderRadius="lg" overflow="hidden">
               <Table.Root size="sm" variant="line">
                 <Table.Header>
                   <Table.Row>
