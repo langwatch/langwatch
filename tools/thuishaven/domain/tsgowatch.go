@@ -207,10 +207,11 @@ func parsePSClock(s string) (time.Duration, bool) {
 
 // TsgoKill is one enforcement decision, with the reason it carries into the log.
 type TsgoKill struct {
-	PID    int
-	Class  TsgoClass
-	RSS    int64
-	Reason string
+	PID     int
+	Class   TsgoClass
+	RSS     int64
+	Started time.Time
+	Reason  string
 }
 
 // GovernTsgo decides what to reclaim from a sample of live tsgo processes.
@@ -228,7 +229,7 @@ func GovernTsgo(procs []TsgoProcess, l TsgoLimits) []TsgoKill {
 	var survivors []TsgoProcess
 	for _, p := range procs {
 		if reason, over := overOwnLimit(p, l); over {
-			kills = append(kills, TsgoKill{PID: p.PID, Class: p.Class, RSS: p.RSS, Reason: reason})
+			kills = append(kills, TsgoKill{PID: p.PID, Class: p.Class, RSS: p.RSS, Started: p.Started, Reason: reason})
 		} else {
 			survivors = append(survivors, p)
 		}
@@ -270,7 +271,7 @@ func reclaimOverBudget(survivors []TsgoProcess, budget int64) []TsgoKill {
 		if p.Class != TsgoRun {
 			continue
 		}
-		kills = append(kills, TsgoKill{PID: p.PID, Class: p.Class, RSS: p.RSS, Reason: "combined tsgo footprint exceeds the machine budget"})
+		kills = append(kills, TsgoKill{PID: p.PID, Class: p.Class, RSS: p.RSS, Started: p.Started, Reason: "combined tsgo footprint exceeds the machine budget"})
 		total -= p.RSS
 	}
 	return kills

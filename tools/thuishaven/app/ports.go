@@ -163,9 +163,14 @@ type ProcessSample struct {
 // into a spam stream.
 type ProcTelemetry interface {
 	// RecordSample publishes the current footprint of every watched class.
+	// Called from the daemon's monitor goroutine only — implementations may
+	// rely on that and skip synchronization.
 	RecordSample(procs []domain.WatchedProcess)
 	// RecordKill counts one governor enforcement, by class and reason.
 	RecordKill(class, reason string)
+	// Close flushes the final observations and stops the exporter. Bounded:
+	// it must never block daemon shutdown on an unreachable stack.
+	Close()
 }
 
 // System is the set of OS facts the app needs, behind a port so it can be faked.

@@ -32,7 +32,8 @@ func (o *Orchestrator) governProcesses() {
 	if o.procActivity == nil {
 		o.procActivity = map[int]tsgoSeen{}
 	}
-	watched, tsgo := o.sampleWatched(o.sys.Now())
+	now := o.sys.Now()
+	watched, tsgo := o.sampleWatched(now)
 	if o.procTel != nil {
 		o.procTel.RecordSample(watched)
 	}
@@ -45,6 +46,7 @@ func (o *Orchestrator) governProcesses() {
 			zap.Int("pid", k.PID),
 			zap.String("role", string(k.Class)),
 			zap.String("rss", domain.HumanBytes(k.RSS)),
+			zap.Duration("age", now.Sub(k.Started)),
 			zap.String("reason", k.Reason))
 	}
 }
@@ -61,7 +63,11 @@ func (o *Orchestrator) sampleWatched(now time.Time) (watched []domain.WatchedPro
 		}
 		live[s.PID] = true
 		seen, known := o.procActivity[s.PID]
-		if !known || s.CPUTime > seen.cpu {
+		// Any change in the CPU clock marks the process active now — including
+		// a DECREASE, which means the pid was reused by a new process between
+		// ticks: inheriting the old entry's activeAt would let a fresh
+		// language server be evicted as idle on its first tick.
+		if !known || s.CPUTime != seen.cpu {
 			seen = tsgoSeen{cpu: s.CPUTime, activeAt: now}
 			o.procActivity[s.PID] = seen
 		}

@@ -55,6 +55,11 @@ func (o *Orchestrator) RunDaemon(ctx context.Context, dash Dashboard) error {
 		fmt.Println("haven daemon already running")
 		return nil
 	}
+	if o.procTel != nil {
+		// The final process-watch sample is flushed on the way out; without
+		// this the periodic reader's last 30-second window dies with us.
+		defer o.procTel.Close()
+	}
 	ports, err := o.sys.FreePorts(1)
 	if err != nil {
 		return err

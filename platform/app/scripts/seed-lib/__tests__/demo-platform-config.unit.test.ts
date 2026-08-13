@@ -13,7 +13,7 @@ import { getLatestConfigVersionSchema } from "../../../src/server/prompt-config/
 
 describe("demo platform seed configs", () => {
   describe("when the seeded configs are checked against the validators the app applies at read time", () => {
-    /** @scenario The demo preset's prompt and HTTP agent pass the app's own validators */
+    /** @scenario The demo preset ships a working prompt and HTTP agent */
     it("parses both the HTTP agent config and the prompt configData cleanly", () => {
       const parsedAgent = httpComponentSchema.parse(DEMO_HTTP_AGENT_CONFIG);
       expect(parsedAgent.url).toBe(DEMO_HTTP_AGENT_CONFIG.url);

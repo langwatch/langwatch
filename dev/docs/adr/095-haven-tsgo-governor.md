@@ -65,7 +65,8 @@ on the machine — however it was spawned — and applies policy:
   CPU clock has not moved for the TTL is evicted. This is what stops the
   one-2.5-GiB-LSP-per-worktree accumulation.
 - **Aggregate budget** (`HAVEN_TSGO_TOTAL_BUDGET_MB`, default two thirds of
-  RAM): when all tsgo together exceed it, the watchdog reclaims in order —
+  RAM, never below the per-run ceiling): when all tsgo together exceed it,
+  the watchdog reclaims in order —
   idle LSPs first, then the **youngest** whole-tree run (the oldest is closest
   to finishing) — until under budget.
 - Setting a knob to 0 disables that rule; `HAVEN_TSGO_RUN_MAX_RSS_MB=0`
@@ -102,10 +103,9 @@ agent, or anything else.
 
 ### Observability
 
-Every kill is logged with the reason, class, RSS and age. The watchdog also
-logs each run's peak RSS at exit (observed passively from the samples), so
-"did the Prisma 7 upgrade make types cheaper" becomes a number rather than a
-hunch.
+Every kill is logged with the reason, class, RSS and age, and counted in the
+kill metric by reason — so "did the Prisma 7 upgrade make types cheaper" is
+answered from the recorded per-class footprint history rather than a hunch.
 
 ## Consequences
 

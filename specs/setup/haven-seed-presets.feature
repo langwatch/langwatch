@@ -57,15 +57,13 @@ Feature: Seed presets — a database that is ready to look at
   # The demo content includes a prompt and an HTTP agent pointed at a public
   # echo service (httpbin.org), so prompt management and HTTP-agent scenario
   # targets both have something real to open — the agent completes a live
-  # round-trip with no API key. Both configs are seeded as raw JSON, and the
-  # app re-validates that JSON on every read, so the seed must stay parseable
-  # by the same validators the app enforces.
+  # round-trip with no API key. Both are seeded as raw JSON that the app
+  # re-validates on every read; the binding test runs those exact validators.
   @unit
-  Scenario: The demo preset's prompt and HTTP agent pass the app's own validators
-    Given the demo platform's seeded prompt and HTTP-agent configurations
-    When they are checked against the validators the app applies at read time
-    Then both configurations parse cleanly
-    And the HTTP agent targets the public echo service over HTTPS
+  Scenario: The demo preset ships a working prompt and HTTP agent
+    Given the demo preset has been seeded
+    When the prompt and the HTTP agent are opened
+    Then both load the way the product reads them, ready to use
 
   # Cheap variants composed from switches the seed scripts already understand:
   #   traces          — sample traces on top of the identity, no demo content

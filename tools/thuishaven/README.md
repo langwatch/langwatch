@@ -253,7 +253,8 @@ registry, and dashboard stay the same.
   whole-tree run past `HAVEN_TSGO_RUN_MAX_RSS_MB` (default 12 GiB), a language
   server past `HAVEN_TSGO_LSP_MAX_RSS_MB` (default 4 GiB) or idle past
   `HAVEN_TSGO_LSP_IDLE_TTL` (default 45m), and — over
-  `HAVEN_TSGO_TOTAL_BUDGET_MB` (default two thirds of RAM) — the youngest run
+  `HAVEN_TSGO_TOTAL_BUDGET_MB` (default two thirds of RAM, never below the
+  per-run ceiling) — the youngest run
   until the rest fits. The check queue also sets `GOMEMLIMIT` on the runs it
   spawns so the common case degrades to "slower", not "10 GiB resident". The
   same watch observes gopls, biome, vitest workers, node, bun and claude

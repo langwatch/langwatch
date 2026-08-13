@@ -1,6 +1,6 @@
 module github.com/langwatch/langwatch
 
-go 1.26.5
+go 1.26.6
 
 require (
 	github.com/0xdeafcafe/moron v1.0.1-0.20260714030656-2b32ef25bff8

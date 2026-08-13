@@ -11,13 +11,16 @@ import (
 
 type fakeProcTel struct {
 	samples [][]domain.WatchedProcess
-	kills   []string
+	kills   [][2]string // class, reason
 }
 
 func (f *fakeProcTel) RecordSample(procs []domain.WatchedProcess) {
 	f.samples = append(f.samples, procs)
 }
-func (f *fakeProcTel) RecordKill(class, reason string) { f.kills = append(f.kills, class) }
+func (f *fakeProcTel) RecordKill(class, reason string) {
+	f.kills = append(f.kills, [2]string{class, reason})
+}
+func (f *fakeProcTel) Close() {}
 
 func watchOrch(sys *fakeSystem, tel ProcTelemetry) *Orchestrator {
 	return &Orchestrator{
@@ -56,8 +59,11 @@ func TestProcessWatchKillsARunawayTsgo(t *testing.T) {
 				if len(tel.samples) != 1 || len(tel.samples[0]) != 2 {
 					t.Fatalf("expected one sample of two watched processes, got %+v", tel.samples)
 				}
-				if len(tel.kills) != 1 || tel.kills[0] != "tsgo" {
-					t.Fatalf("expected the kill counted for tsgo, got %v", tel.kills)
+				// The reason is the attribute the governor dashboards slice
+				// on, so the exact wording is part of the contract.
+				want := [2]string{"tsgo", "run exceeds the per-run memory ceiling"}
+				if len(tel.kills) != 1 || tel.kills[0] != want {
+					t.Fatalf("expected the kill counted as %v, got %v", want, tel.kills)
 				}
 			})
 		})
@@ -86,6 +92,7 @@ func TestProcessWatchNeverKillsObserveOnlyClasses(t *testing.T) {
 	})
 }
 
+// @scenario "An idle language server is evicted after the idle period"
 func TestProcessWatchTracksIdleAcrossTicks(t *testing.T) {
 	start := time.Date(2026, 8, 13, 12, 0, 0, 0, time.UTC)
 
@@ -121,4 +128,44 @@ func TestProcessWatchTracksIdleAcrossTicks(t *testing.T) {
 			t.Fatalf("an active LSP must never be idle-evicted, got %v", sys.killed)
 		}
 	})
+
+	t.Run("given the OS reused the pid for a fresh LSP between ticks", func(t *testing.T) {
+		sys := &fakeSystem{now: start, procSamples: []ProcessSample{
+			{PID: 7, RSSBytes: 2 << 30, CPUTime: time.Hour, Elapsed: 2 * time.Hour, Command: "/x/lib/tsgo --lsp --stdio"},
+		}}
+		o := watchOrch(sys, &fakeProcTel{})
+
+		o.governProcesses()
+		// A new process on the same pid: LOWER CPU clock, short elapsed. If
+		// it inherited the old entry's activity time it would be evicted as
+		// idle on its first tick.
+		sys.now = start.Add(50 * time.Minute)
+		sys.procSamples[0] = ProcessSample{
+			PID: 7, RSSBytes: 1 << 30, CPUTime: time.Second, Elapsed: time.Minute,
+			Command: "/x/lib/tsgo --lsp --stdio",
+		}
+		o.governProcesses()
+
+		if len(sys.killed) != 0 {
+			t.Fatalf("a reused pid must reset idle tracking, got kills %v", sys.killed)
+		}
+	})
+}
+
+// @scenario "The operator can disable the governor"
+func TestProcessWatchDisabled(t *testing.T) {
+	sys := &fakeSystem{now: time.Date(2026, 8, 14, 12, 0, 0, 0, time.UTC), procSamples: []ProcessSample{
+		{PID: 8, RSSBytes: 30 << 30, CPUTime: time.Minute, Elapsed: time.Hour,
+			Command: "/x/lib/tsgo --noEmit -p tsconfig.tsgo.json"},
+	}}
+	tel := &fakeProcTel{}
+	o := watchOrch(sys, tel)
+	o.cfg.Tsgo.RunMaxRSS = 0
+
+	o.governProcesses()
+
+	if len(sys.killed) != 0 || len(tel.samples) != 0 {
+		t.Fatalf("a disabled governor must neither sample nor kill, got kills %v samples %d",
+			sys.killed, len(tel.samples))
+	}
 }

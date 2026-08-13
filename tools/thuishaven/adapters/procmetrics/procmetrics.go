@@ -22,13 +22,16 @@ import (
 
 // Recorder implements the app's ProcTelemetry port.
 type Recorder struct {
-	rss    metric.Int64Gauge
-	count  metric.Int64Gauge
-	oldest metric.Int64Gauge
-	kills  metric.Int64Counter
+	rss      metric.Int64Gauge
+	count    metric.Int64Gauge
+	oldest   metric.Int64Gauge
+	kills    metric.Int64Counter
+	provider *sdkmetric.MeterProvider
 	// lastSeen tracks which class/role attribute pairs were published on the
 	// previous sample, so a class that vanishes is zeroed rather than frozen
-	// at its final value on the dashboard.
+	// at its final value on the dashboard. Unsynchronized on purpose: the
+	// ProcTelemetry port's contract is that only the daemon's monitor
+	// goroutine calls RecordSample.
 	lastSeen map[[2]string]bool
 }
 
@@ -66,10 +69,24 @@ func New(otlpHTTPPort int) *Recorder {
 	if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
 		return nil
 	}
-	return &Recorder{rss: rss, count: count, oldest: oldest, kills: kills, lastSeen: map[[2]string]bool{}}
+	return &Recorder{rss: rss, count: count, oldest: oldest, kills: kills, provider: provider, lastSeen: map[[2]string]bool{}}
 }
 
-// RecordSample publishes the current footprint of every watched class.
+// Close flushes the final sample and stops the periodic reader's goroutine and
+// exporter. Nil-safe, bounded: a Grafana that is down cannot delay daemon
+// shutdown by more than the timeout, and per the package contract the failed
+// flush is dropped silently.
+func (r *Recorder) Close() {
+	if r == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	_ = r.provider.Shutdown(ctx)
+}
+
+// RecordSample publishes the current footprint of every watched class. Called
+// from the daemon's monitor goroutine only — lastSeen relies on that.
 func (r *Recorder) RecordSample(procs []domain.WatchedProcess) {
 	if r == nil {
 		return
