@@ -13,6 +13,7 @@ import type { StudioClientEvent } from "~/optimization_studio/types/events";
 import { getTestUser } from "../../../../utils/testUtils";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import { engineRepliesWith } from "./agentTestEngine";
 
 const mockPostEvent = vi.fn();
 vi.mock("~/app/api/workflows/post_event/post-event", () => ({
@@ -32,20 +33,7 @@ vi.mock("~/utils/ssrfProtection", async (importOriginal) => ({
   ssrfSafeFetch: (...args: unknown[]) => mockSsrfSafeFetch(...args),
 }));
 
-/** Replies to the dispatch with the state a node finishes in. */
-const engineReplies = (
-  executionState: Record<string, unknown>,
-  { componentId = "http_agent_test" }: { componentId?: string } = {},
-) => {
-  mockPostEvent.mockImplementation(
-    async ({ onEvent }: { onEvent: (event: unknown) => void }) => {
-      onEvent({
-        type: "component_state_change",
-        payload: { component_id: componentId, execution_state: executionState },
-      });
-    },
-  );
-};
+const engineReplies = engineRepliesWith(mockPostEvent);
 
 /** The event the router handed to the engine. */
 const dispatchedEvent = (): StudioClientEvent =>
@@ -162,6 +150,20 @@ describe("HTTP agent test button", () => {
         responseHeaders: { "Content-Type": "application/json" },
         extractedOutput: "the answer",
       });
+    });
+
+    it("measures the call itself when the engine timed only one end of it", async () => {
+      engineReplies({
+        status: "success",
+        outputs: { output: "the answer" },
+        timestamps: { finished_at: 1_770_000_000_000 },
+      });
+
+      const result = await caller.httpProxy.execute(testRequest);
+
+      // Subtracting a missing start would report the epoch as a duration and
+      // the panel would say the request took fifty-odd years.
+      expect(result.duration).toBeLessThan(60_000);
     });
 
     /** @scenario "the panel shows the body the engine actually sent" */
@@ -281,15 +283,18 @@ describe("HTTP agent test button", () => {
       expect(result.error).toBe("ssrf_blocked");
     });
 
-    it("reports a dispatch that never reached the engine", async () => {
-      mockPostEvent.mockRejectedValue(new Error("engine unreachable"));
+    it("fails a dispatch that never reached the engine without quoting it", async () => {
+      mockPostEvent.mockRejectedValue(
+        new Error("connect ECONNREFUSED 10.4.1.9:5560"),
+      );
 
       const result = await caller.httpProxy.execute(testRequest);
 
-      expect(result).toMatchObject({
-        success: false,
-        error: "engine unreachable",
-      });
+      expect(result.success).toBe(false);
+      // Reaching the engine is our problem and its transport error names our
+      // hosts. The author gets the generic failure; the detail is in the log.
+      expect(JSON.stringify(result)).not.toContain("10.4.1.9");
+      expect(result.error).toBeUndefined();
     });
 
     it("reports an engine that answered without a node result", async () => {
@@ -300,9 +305,7 @@ describe("HTTP agent test button", () => {
       const result = await caller.httpProxy.execute(testRequest);
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(
-        "The engine reported no result for this request",
-      );
+      expect(result.error).toBeUndefined();
     });
   });
 });

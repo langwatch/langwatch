@@ -11,6 +11,7 @@ import type { StudioClientEvent } from "~/optimization_studio/types/events";
 import { getTestUser } from "../../../../utils/testUtils";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import { engineRepliesWith } from "./agentTestEngine";
 
 // The request itself is the workflow engine's now, so the engine is what these
 // tests stand in for. What is being tested is the trace the app writes around
@@ -155,20 +156,7 @@ describe("HTTP Proxy Tracing", () => {
     vi.clearAllMocks();
   });
 
-  /** Replies to the dispatch with the state the engine finished the node in. */
-  function engineReplies(executionState: Record<string, unknown>) {
-    mockPostEvent.mockImplementation(
-      async ({ onEvent }: { onEvent: (event: unknown) => void }) => {
-        onEvent({
-          type: "component_state_change",
-          payload: {
-            component_id: "http_agent_test",
-            execution_state: executionState,
-          },
-        });
-      },
-    );
-  }
+  const engineReplies = engineRepliesWith(mockPostEvent);
 
   function mockSuccessResponse(
     body: Record<string, unknown> = { result: "success" },
@@ -429,7 +417,44 @@ describe("HTTP Proxy Tracing", () => {
       expect(mockScheduleTrace).toHaveBeenCalledOnce();
       const span = getTraceJob().spans[0]!;
       expect(span.error?.has_error).toBe(true);
-      expect(span.error?.message).toBe("engine unreachable");
+      expect(span.error?.message).toBe("Request failed");
+    });
+  });
+
+  describe("when a credential is configured as a plain header", () => {
+    // The Auth tab is not the only way an author attaches a token, and a trace
+    // is a durable place for one to end up.
+    it("redacts credential-shaped header values, keeping their names", async () => {
+      mockSuccessResponse();
+
+      await caller.httpProxy.execute({
+        projectId,
+        agentId: "agent-123",
+        url: "https://api.example.com/test",
+        method: "POST",
+        headers: [
+          { key: "X-API-Key", value: "sk-live-must-not-be-stored" },
+          { key: "X-Session-Token", value: "also-a-credential" },
+          { key: "Cookie", value: "session=abc123" },
+          { key: "X-Api-Version", value: "2026-08-01" },
+          { key: "X-Idempotency-Key", value: "req-42" },
+        ],
+        bodyTemplate: "{}",
+      });
+
+      const inputValue = getTraceJob().spans[0]!.input?.value as Record<
+        string,
+        unknown
+      >;
+      const headers = inputValue.headers as Record<string, string>;
+      expect(headers["X-API-Key"]).toBe("[REDACTED]");
+      expect(headers["X-Session-Token"]).toBe("[REDACTED]");
+      expect(headers.Cookie).toBe("[REDACTED]");
+      // Not everything with "key" or "api" in the name is a secret, and a trace
+      // that hides the version an author sent is a trace that cannot debug it.
+      expect(headers["X-Api-Version"]).toBe("2026-08-01");
+      expect(headers["X-Idempotency-Key"]).toBe("req-42");
+      expect(JSON.stringify(getTraceJob())).not.toContain("sk-live");
     });
   });
 

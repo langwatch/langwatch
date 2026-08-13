@@ -334,8 +334,9 @@ function ResponseDisplay({ result }: { result: HttpTestResult }) {
         </HStack>
       )}
 
-      {/* Error Message */}
-      {result.error && <TestFailure result={result} />}
+      {/* A failure we could not name still has to say so, so this follows the
+          result and not the presence of a message. */}
+      {!result.success && <TestFailure result={result} />}
 
       {/* Variables the template asked for and the test did not supply. Worth
           saying out loud: the endpoint received an empty value where the

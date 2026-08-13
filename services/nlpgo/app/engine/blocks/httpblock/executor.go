@@ -205,8 +205,9 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	return result, nil
 }
 
-// statusText pulls the reason phrase out of the status line ("200 OK" -> "OK"),
-// falling back to the canonical text for the code when the upstream sent none.
+// statusText prefers the upstream's own reason phrase over the canonical text
+// for the code, because a service that answers "403 Quota Exceeded" has told
+// the author more than "Forbidden" will.
 func statusText(resp *http.Response) string {
 	if _, phrase, ok := strings.Cut(resp.Status, " "); ok && phrase != "" {
 		return phrase
@@ -214,14 +215,30 @@ func statusText(resp *http.Response) string {
 	return http.StatusText(resp.StatusCode)
 }
 
-// flattenHeaders renders the response headers one line each, joining repeats
-// the way they would have appeared on the wire.
+const redactedHeaderValue = "[REDACTED]"
+
+// credentialResponseHeaders hand out a session rather than describe one. The
+// name survives, so the author still sees that their endpoint set a cookie,
+// which is usually the thing they are checking. The value does not, because
+// these diagnostics travel into a workflow's execution state and onto the
+// screen of whoever opens it next.
+var credentialResponseHeaders = map[string]bool{
+	"Set-Cookie":  true,
+	"Set-Cookie2": true,
+}
+
+// flattenHeaders joins repeated headers the way they appeared on the wire, so
+// two Vary lines read as two rather than silently becoming one.
 func flattenHeaders(h http.Header) map[string]string {
 	if len(h) == 0 {
 		return nil
 	}
 	out := make(map[string]string, len(h))
 	for name, values := range h {
+		if credentialResponseHeaders[http.CanonicalHeaderKey(name)] {
+			out[name] = redactedHeaderValue
+			continue
+		}
 		out[name] = strings.Join(values, ", ")
 	}
 	return out

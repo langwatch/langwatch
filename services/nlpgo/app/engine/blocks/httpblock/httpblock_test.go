@@ -302,6 +302,41 @@ func TestExecute_HappyPath(t *testing.T) {
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 }
 
+// The response headers are diagnostics: they travel into the workflow's
+// execution state and onto the screen of whoever opens it. A cookie handed out
+// by the endpoint is a live session, so the name survives and the value does
+// not, while the headers an author is actually debugging stay readable.
+func TestExecute_RedactsCredentialResponseHeaders(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Request-Id", "req-42")
+		w.Header().Add("Set-Cookie", "session=super-secret; HttpOnly")
+		w.Header().Add("Set-Cookie", "refresh=also-secret")
+		_, _ = io.WriteString(w, `{"result":"pong"}`)
+	}))
+	defer srv.Close()
+	host, _, _ := net.SplitHostPort(srv.Listener.Addr().String())
+
+	exec := httpblock.New(httpblock.Options{
+		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{host}},
+	})
+	res, err := exec.Execute(context.Background(), httpblock.Request{
+		URL:    srv.URL + "/echo",
+		Method: http.MethodGet,
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, "[REDACTED]", res.ResponseHeaders["Set-Cookie"],
+		"a session handed out by the endpoint is not a diagnostic")
+	assert.Equal(t, "req-42", res.ResponseHeaders["X-Request-Id"],
+		"the headers an author came to read are still readable")
+	assert.Equal(t, "application/json", res.ResponseHeaders["Content-Type"])
+
+	for name, value := range res.ResponseHeaders {
+		assert.NotContains(t, value, "secret", "header %q leaked a credential", name)
+	}
+}
+
 func TestExecute_TimeoutAbortsRequest(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(2 * time.Second)

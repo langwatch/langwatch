@@ -29,35 +29,55 @@ type TraceTestContext = {
 };
 
 /**
- * Sanitizes request headers for trace storage by redacting auth-related values.
+ * Header names whose value is a credential often enough that keeping it is not
+ * worth the one case where reading it would have helped.
  *
- * Redacts:
- * - Authorization header values (Bearer, Basic, etc.)
- * - Custom auth header values (e.g., X-API-Key) when headerName is specified
+ * The Auth tab is not the only way a token reaches a request: an author who
+ * types `X-API-Key: sk-live-…` on the Headers tab has configured a credential
+ * the auth-aware redaction below knows nothing about, and trace storage is not
+ * where it should end up. Names are kept either way, so the trace still shows
+ * which headers the request carried.
+ */
+const CREDENTIAL_HEADER_NAMES = new Set(["proxy-authorization", "cookie"]);
+
+/**
+ * Whole words only, so `X-Api-Version` and `X-Idempotency-Key` keep their
+ * values while `X-Api-Key` and `X-Auth-Token` lose theirs.
+ */
+const CREDENTIAL_HEADER_WORD =
+  /(^|[-_])(api[-_]?key|token|secret|password|credential)s?([-_]|$)/i;
+
+const REDACTED = "[REDACTED]";
+
+const isCredentialHeader = (lowerName: string): boolean =>
+  CREDENTIAL_HEADER_NAMES.has(lowerName) ||
+  CREDENTIAL_HEADER_WORD.test(lowerName);
+
+/**
+ * Sanitizes request headers for trace storage by redacting credential values.
+ *
+ * `Authorization` keeps its scheme, since "the Bearer token was wrong" and "no
+ * credential was sent at all" are different bugs and the trace should be able
+ * to tell them apart.
  */
 export function sanitizeHeadersForTrace(
   headers: Record<string, string>,
   customAuthHeaderName?: string,
 ): Record<string, string> {
   const sanitized = { ...headers };
+  const customLower = customAuthHeaderName?.toLowerCase();
 
   for (const key of Object.keys(sanitized)) {
-    if (key.toLowerCase() === "authorization") {
-      const parts = sanitized[key]!.split(" ");
-      if (parts.length >= 2) {
-        sanitized[key] = `${parts[0]} [REDACTED]`;
-      } else {
-        sanitized[key] = "[REDACTED]";
-      }
-    }
-  }
+    const lower = key.toLowerCase();
 
-  if (customAuthHeaderName) {
-    const customLower = customAuthHeaderName.toLowerCase();
-    for (const key of Object.keys(sanitized)) {
-      if (key.toLowerCase() === customLower) {
-        sanitized[key] = "[REDACTED]";
-      }
+    if (lower === "authorization") {
+      const [scheme, ...rest] = sanitized[key]!.split(" ");
+      sanitized[key] = rest.length > 0 ? `${scheme} ${REDACTED}` : REDACTED;
+      continue;
+    }
+
+    if (lower === customLower || isCredentialHeader(lower)) {
+      sanitized[key] = REDACTED;
     }
   }
 

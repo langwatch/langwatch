@@ -126,10 +126,14 @@ export const httpProxyRouter = createTRPCRouter({
           fallbackDuration: Date.now() - startedAt,
         });
       } catch (err) {
-        result = {
-          success: false,
-          error: err instanceof Error ? err.message : "Request failed",
-        };
+        // Failing to reach the engine is our problem, not the author's, and its
+        // message is a transport detail that can name an internal host and
+        // port. It is logged and it degrades to the generic failure, which is
+        // ADR-045: only a coded failure gets words written for it. The engine's
+        // own messages, which are what the author needs, arrive on the node's
+        // state below and are not this path.
+        logger.error({ err, projectId, agentId }, "agent test dispatch failed");
+        result = { success: false };
       }
 
       await recordTestTrace({ input, traceIds, headers, result, ctx });
@@ -271,9 +275,10 @@ const toProxyResult = ({
     responseHeaders: http?.response_headers,
     renderedBody: http?.rendered_body,
     warnings: http?.warnings,
-    duration: state.timestamps?.finished_at
-      ? state.timestamps.finished_at - (state.timestamps.started_at ?? 0)
-      : fallbackDuration,
+    // Both ends or neither: subtracting a missing start from a real finish
+    // would report the epoch as a duration, which the panel renders as a
+    // request that took fifty-odd years.
+    duration: durationOf(state.timestamps) ?? fallbackDuration,
   };
 
   if (state.status === "error" || state.error) {
@@ -301,13 +306,21 @@ const toProxyResult = ({
   };
 };
 
+const durationOf = (
+  timestamps: NonNullable<BaseComponent["execution_state"]>["timestamps"],
+): number | undefined =>
+  timestamps?.started_at !== undefined && timestamps.finished_at !== undefined
+    ? timestamps.finished_at - timestamps.started_at
+    : undefined;
+
 /**
  * The headers the engine will send, as the trace should record them.
  *
- * The credential itself is deliberately absent. The trace redacts auth values
- * anyway, so only the header name and the scheme survive to storage, and
- * building it from names rather than real credentials keeps this from becoming
- * a second implementation of the engine's credential encoding.
+ * Auth credentials are named rather than encoded: the scheme is what the trace
+ * needs and rebuilding the real value here would be a second implementation of
+ * the engine's credential encoding. Values on the headers themselves are the
+ * author's own text, and `sanitizeHeadersForTrace` is what decides which of
+ * those are too credential-shaped to keep.
  */
 const tracedRequestHeaders = ({
   headers,
