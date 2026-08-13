@@ -199,7 +199,13 @@ async function authorizeTurn(c: Context) {
  * fault the shared handler logs and masks behind a trace id — re-classifying
  * either one here could only lose information.
  */
-async function startTurn(c: Context, conversationId: string | null) {
+async function startTurn({
+  c,
+  conversationId,
+}: {
+  c: Context;
+  conversationId: string | null;
+}) {
   const auth = await authorizeTurn(c);
   // Hono's default 404, byte-for-byte what an unmounted path returns.
   if (auth.dark) return c.notFound();
@@ -231,7 +237,7 @@ secured
   .post(
     "/conversations",
     bodyLimit({ maxSize: MAX_TURN_BODY_BYTES }),
-    async (c) => startTurn(c, null),
+    async (c) => startTurn({ c, conversationId: null }),
   );
 
 secured
@@ -239,7 +245,8 @@ secured
   .post(
     "/conversations/:conversationId/messages",
     bodyLimit({ maxSize: MAX_TURN_BODY_BYTES }),
-    async (c) => startTurn(c, c.req.param("conversationId")),
+    async (c) =>
+      startTurn({ c, conversationId: c.req.param("conversationId") }),
   );
 
 export const app = secured.hono;

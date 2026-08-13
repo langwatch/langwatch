@@ -1453,7 +1453,7 @@ const presentations = {
   langy_api_request_invalid: {
     title: "Invalid request body",
     describe: () =>
-      "The request body did not match the turn schema. The `issues` list in the error meta names each field that failed.",
+      "Some fields in this request were not valid. The error details list each one that was rejected — correct those and send it again.",
   },
   langy_agent_errored: {
     title: "Langy's reply failed",
