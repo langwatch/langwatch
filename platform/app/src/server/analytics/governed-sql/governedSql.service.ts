@@ -95,8 +95,13 @@ export interface GovernedSqlQueryResult {
    */
   readonly diagnostics: readonly GovernedSqlDiagnostic[];
   /**
-   * Whether the statement declared the reserved time-window parameters and so
-   * followed the period the surface is showing.
+   * Whether the statement declared the reserved time-window parameters and was
+   * therefore given the period the surface is showing.
+   *
+   * Declaring is all this reports. The author writes the comparison, so a
+   * statement that names the parameters without comparing against them reads
+   * all of time and still answers `true` — the surface can know what it handed
+   * over, not what the `WHERE` clause did with it.
    *
    * `false` is not a failure — an all-time total is a legitimate chart — but it
    * is the fact a card has to say out loud, because a chart that quietly ignores

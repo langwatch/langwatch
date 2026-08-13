@@ -68,6 +68,7 @@ import {
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import { prisma } from "~/server/db";
 import { getFeatureFlagStore } from "~/server/featureFlag";
+import { pinTimezone } from "~/test-utils/pinTimezone";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
@@ -756,13 +757,7 @@ describe("given the governed analytics SQL REST endpoints", () => {
    * instant, and every count below would be green either way.
    */
   describe("when the surface supplies the reserved time window", () => {
-    const originalZone = process.env.TZ;
-    beforeAll(() => {
-      process.env.TZ = "America/Sao_Paulo";
-    });
-    afterAll(() => {
-      process.env.TZ = originalZone;
-    });
+    pinTimezone("America/Sao_Paulo");
 
     /** Every seeded trace shares this instant. */
     const SEEDED_AT = new Date(`${SEED_AT.replace(" ", "T")}Z`);

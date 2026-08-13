@@ -42,22 +42,42 @@ const TYPED_INSTANT =
  * Read as UTC, matching what is displayed and what the database is bound with.
  * Reading it in the browser's zone would mean the member's own text meant
  * something different from the identical text in their `WHERE` clause.
+ *
+ * The shape alone is not enough to accept it. `Date.UTC` rolls an out-of-range
+ * part over without a word — `2026-13-45` is the 14th of February 2027, and
+ * `2026-02-30 99:00` the 6th of March — so the window committed would be one
+ * the member never typed, with the field showing nothing wrong. Requiring the
+ * parsed instant to format back to the text that produced it is what refuses
+ * them.
+ *
+ * That also covers the halfway states of typing, which the shape check misses
+ * for the same reason: `2026-02-24 09:60` is a complete shape a member reaches
+ * while spelling out a minute, and it parses to ten o'clock — an hour that was
+ * never on screen.
  */
 export function parseGovernedSqlTimeWindowText(
   text: string,
 ): number | undefined {
   const match = TYPED_INSTANT.exec(text.trim());
   if (!match) return undefined;
-  const [, year, month, day, hours, minutes, seconds] = match;
+  // An absent group is `undefined`, so a date with no time means midnight —
+  // which is what the member reads, since that is how the fields spell it back.
+  const [, year, month, day, hours = "00", minutes = "00", seconds = "00"] =
+    match;
   const parsed = Date.UTC(
     Number(year),
     Number(month) - 1,
     Number(day),
-    Number(hours ?? 0),
-    Number(minutes ?? 0),
-    Number(seconds ?? 0),
+    Number(hours),
+    Number(minutes),
+    Number(seconds),
   );
-  return Number.isNaN(parsed) ? undefined : parsed;
+  if (Number.isNaN(parsed)) return undefined;
+
+  const typed = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  return formatGovernedDateTimeParameter(new Date(parsed)) === typed
+    ? parsed
+    : undefined;
 }
 
 interface WindowText {
@@ -130,7 +150,7 @@ function FollowsPeriodNote({ follows }: { follows: boolean | undefined }) {
 
   return (
     <Text fontSize="12px" color="fg.muted" data-testid="does-not-follow-period">
-      {`This query does not use the time window. Declare {${GOVERNED_SQL_PERIOD_START_PARAMETER}:DateTime} and {${GOVERNED_SQL_PERIOD_END_PARAMETER}:DateTime} to follow the period of the page it is shown on.`}
+      {`This query does not use the time window. Declare {${GOVERNED_SQL_PERIOD_START_PARAMETER}:DateTime} and {${GOVERNED_SQL_PERIOD_END_PARAMETER}:DateTime} and the page fills them with the period it is showing, then compare against them to report over it.`}
     </Text>
   );
 }

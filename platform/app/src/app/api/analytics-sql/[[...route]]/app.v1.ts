@@ -104,9 +104,12 @@ const governedSqlResultSchema = z.object({
     rowsReturned: z.number(),
   }),
   truncated: z.boolean(),
-  // Whether the statement declared the reserved time-window parameters, so a
-  // consumer placing this result beside another can say which of them follows
-  // the period it is showing.
+  // Whether the statement DECLARED the reserved time-window parameters and was
+  // therefore given the surface's window. It is not a claim about the rows: the
+  // author writes the comparison, so a statement that declares the names and
+  // never compares against them reports `true` and still reads all of time.
+  // What a consumer can say from it is that this result was offered the period
+  // beside it, not that the period bounded it.
   followsTimeWindow: z.boolean(),
   diagnostics: z.array(
     z.object({

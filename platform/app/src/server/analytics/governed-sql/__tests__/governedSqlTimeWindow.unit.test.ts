@@ -9,7 +9,9 @@
  * @see specs/analytics/governed-sql-workbench.feature
  */
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+
+import { pinTimezone } from "~/test-utils/pinTimezone";
 
 import { resolveGovernedTimeWindow } from "../resolveTimeWindow";
 import {
@@ -61,13 +63,7 @@ function metaOf(run: () => unknown): Record<string, unknown> {
 const NON_UTC_ZONE = "America/Sao_Paulo";
 
 describe("given an instant to hand the database", () => {
-  const originalZone = process.env.TZ;
-  beforeAll(() => {
-    process.env.TZ = NON_UTC_ZONE;
-  });
-  afterAll(() => {
-    process.env.TZ = originalZone;
-  });
+  pinTimezone(NON_UTC_ZONE);
 
   describe("when it is formatted as a bound parameter", () => {
     /** @scenario "The injected window is a UTC ClickHouse date-time, not an ISO-8601 instant" */
@@ -204,6 +200,48 @@ describe("given a statement and the window a surface is showing", () => {
         resolveGovernedTimeWindow({ declared: [], timeWindow: WINDOW })
           .parameters,
       ).toBeUndefined();
+    });
+  });
+
+  /**
+   * Pinned, not endorsed.
+   *
+   * A window whose end precedes its start, or whose ends coincide, is bound
+   * exactly as it arrives; the half-open comparison then matches no row and the
+   * member gets an empty answer rather than a refusal. Nothing in the resolver
+   * inspects the order, and these two cases exist so that giving it an opinion
+   * later is a deliberate edit to this file rather than a behavior change
+   * nobody notices — the surfaces above are what own the period, and a resolver
+   * that second-guesses one of them would be a second place the window can be
+   * decided.
+   */
+  describe("when the window is inverted or has no width", () => {
+    it("binds an inverted window exactly as given, refusing nothing", () => {
+      const resolved = resolveGovernedTimeWindow({
+        declared: PERIOD,
+        timeWindow: { start: WINDOW.end, end: WINDOW.start },
+      });
+
+      expect(resolved.parameters).toEqual({
+        period_start: "2026-02-27 00:00:00",
+        period_end: "2026-02-20 00:00:00",
+      });
+      expect(resolved.followsTimeWindow).toBe(true);
+      expect(resolved.awaitingTimeWindow).toEqual([]);
+    });
+
+    it("binds a zero-width window exactly as given, refusing nothing", () => {
+      const resolved = resolveGovernedTimeWindow({
+        declared: PERIOD,
+        timeWindow: { start: WINDOW.start, end: WINDOW.start },
+      });
+
+      expect(resolved.parameters).toEqual({
+        period_start: "2026-02-20 00:00:00",
+        period_end: "2026-02-20 00:00:00",
+      });
+      expect(resolved.followsTimeWindow).toBe(true);
+      expect(resolved.awaitingTimeWindow).toEqual([]);
     });
   });
 
