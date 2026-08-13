@@ -67,27 +67,43 @@ describe("ClickHouseQueryClient", () => {
        * back of the queue and compete with fresh work — which is how a queue
        * turns a small overload into a persistent one (2026-07-31).
        *
-       * Observed rather than asserted on a spy: `inFlight` is sampled from
-       * inside the driver on every attempt, so a slot released between
-       * attempts would show up as a second acquisition.
+       * Proven by contention rather than by a count. Sampling `inFlight` from
+       * inside the driver cannot tell the two arrangements apart: a limiter
+       * *inside* retry reacquires before each attempt and reads 1 just the
+       * same. The only observable difference is whether other work can take
+       * the slot mid-retry, so a second statement is offered the single slot
+       * while the first is between attempts, and must not get it.
        */
-      it("holds one slot for the whole statement, not one per attempt", async () => {
-        const limiter = new ConcurrencyLimiter({ maxConcurrent: 4 });
-        const inFlightPerAttempt: number[] = [];
-        let attempts = 0;
+      it("holds its slot across a retry, so waiting work cannot start between attempts", async () => {
+        const limiter = new ConcurrencyLimiter({ maxConcurrent: 1 });
+        const FIRST = "SELECT 1 FROM t WHERE TenantId = {tenantId:String}";
+        const SECOND = "SELECT 2 FROM t WHERE TenantId = {tenantId:String}";
 
-        const execute = vi.fn(async () => {
-          inFlightPerAttempt.push(limiter.stats().inFlight);
-          attempts += 1;
-          if (attempts < 3) throw new Error("socket hang up");
-          return { rows: [attempts] };
+        const started: string[] = [];
+        let attempts = 0;
+        let sleepEntered = false;
+        let releaseRetrySleep: (() => void) | undefined;
+        const retrySleepReleased = new Promise<void>((resolve) => {
+          releaseRetrySleep = resolve;
+        });
+
+        const execute = vi.fn(async ({ sql }: QueryRequest) => {
+          started.push(sql === FIRST ? "first" : "second");
+          if (sql === FIRST) {
+            attempts += 1;
+            if (attempts === 1) throw new Error("socket hang up");
+          }
+          return { rows: [] };
         });
 
         const client = new ClickHouseQueryClient({
           driver: { execute },
           limiter,
           retries: new RetryPolicy({
-            sleep: async () => {},
+            sleep: async () => {
+              sleepEntered = true;
+              await retrySleepReleased;
+            },
             random: () => 0,
             // Named explicitly: the classifier is owned by the caller so it
             // cannot drift from the job queue's, so the default list is
@@ -96,10 +112,25 @@ describe("ClickHouseQueryClient", () => {
           }),
         });
 
-        await expect(client.query(request())).resolves.toEqual({ rows: [3] });
+        const first = client.query(request({ sql: FIRST }));
+        // The first attempt has failed and the policy is now backing off.
+        await vi.waitFor(() => expect(sleepEntered).toBe(true));
 
-        expect(attempts).toBe(3);
-        expect(inFlightPerAttempt).toEqual([1, 1, 1]);
+        const second = client.query(request({ sql: SECOND }));
+        await vi.waitFor(() => expect(limiter.stats().queued).toBe(1));
+
+        // The retrying statement still owns the only slot: had the limiter sat
+        // inside the retry loop, `second` would have been admitted by now.
+        expect(started).toEqual(["first"]);
+        expect(limiter.stats()).toEqual({ inFlight: 1, queued: 1 });
+
+        releaseRetrySleep?.();
+        await expect(first).resolves.toEqual({ rows: [] });
+        await expect(second).resolves.toEqual({ rows: [] });
+
+        // The retry ran to completion before the queued statement was admitted.
+        expect(started).toEqual(["first", "first", "second"]);
+        expect(attempts).toBe(2);
         expect(limiter.stats()).toEqual({ inFlight: 0, queued: 0 });
       });
     });
@@ -151,7 +182,10 @@ describe("ClickHouseQueryClient", () => {
         // Occupy the only slot so the next statement has to wait.
         let release: (() => void) | undefined;
         const blocker = limiter.run(
-          () => new Promise<void>((resolve) => (release = resolve)),
+          () =>
+            new Promise<void>((resolve) => {
+              release = resolve;
+            }),
         );
         await vi.waitFor(() => expect(release).toBeDefined());
 

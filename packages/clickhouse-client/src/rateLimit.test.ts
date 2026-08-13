@@ -3,7 +3,6 @@ import {
   AcquireAbortedError,
   ConcurrencyLimiter,
   QueueFullError,
-  rateLimit,
 } from "./rateLimit";
 import { ClickHouseQueryClient } from "./client";
 
