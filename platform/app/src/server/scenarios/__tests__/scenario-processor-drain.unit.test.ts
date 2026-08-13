@@ -66,6 +66,7 @@ describe("drainInFlightRuns", () => {
 
   describe("given a running job and a buffered pending job", () => {
     describe("when the processor drains for a worker restart", () => {
+      /** @scenario "In-flight runs are failed when the worker restarts" */
       it("emits a terminal failure for every in-flight run", async () => {
         pool.submit(makeJob("running-run")); // starts immediately
         pool.submit(makeJob("pending-run")); // buffered (concurrency is 1)
@@ -116,6 +117,7 @@ describe("drainInFlightRuns", () => {
 
   describe("given a cancelled in-flight run", () => {
     describe("when the processor drains", () => {
+      /** @scenario "A cancelled in-flight run is preserved as cancelled, not failed" */
       it("emits a cancellation event, not an error failure", async () => {
         const job = makeJob("cancelled-run");
         pool.submit(job);

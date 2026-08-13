@@ -214,8 +214,21 @@ export const handleCancelRequested: EventHandler<
   SimulationRunExecutionIntents
 > = (state, _payload, ctx) => {
   switch (state.phase) {
-    case "queued":
-      // Never submitted (or still buffered): nothing to kill, finish now.
+    case "queued": {
+      // No child is running, so the run goes terminal now instead of waiting
+      // out the grace window.
+      //
+      // It still needs the broadcast if it was ever submitted. `queued` does
+      // not mean "not dispatched": the execute intent goes out the moment
+      // the run is queued, so the pool may already hold this job — buffered
+      // behind a busy slot, or in prefetch — and `pool.wasCancelled`, which
+      // is what stops it spawning, is set by the cancellation subscriber and
+      // by nothing else. Without the broadcast the run reads CANCELLED while
+      // the scenario runs to completion and bills for it.
+      //
+      // An uninitialized process (the cancel overtook the queued event) never
+      // emitted execute, so there is nothing to call off.
+      const wasSubmitted = state.scenarioRunId !== "";
       return {
         state: {
           ...state,
@@ -223,8 +236,17 @@ export const handleCancelRequested: EventHandler<
           cancelRequestedAtMs: ctx.at,
         },
         nextWakeAt: null,
-        intents: [finishCancelledIntent(ctx)],
+        intents: wasSubmitted
+          ? [
+              ctx.intents.cancel(cancelKey(ctx.key), {
+                scenarioRunId: ctx.key,
+                projectId: ctx.projectId,
+              }),
+              finishCancelledIntent(ctx),
+            ]
+          : [finishCancelledIntent(ctx)],
       };
+    }
     case "running":
       // The child may live on another pod: broadcast the cancel through the
       // outbox (retried), and arm the grace wake as the backstop for a lost

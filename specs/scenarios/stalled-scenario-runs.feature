@@ -26,7 +26,7 @@ Feature: Detect and display stalled scenario runs
   # ============================================================================
   # Pure logic: given a run quiet past the deadline, the wake finishes it.
 
-  @unit @unimplemented
+  @unit
   Scenario: Run quiet past the stall threshold finishes ERROR
     Given a scenario run has had no activity for longer than the stall threshold
     And no RUN_FINISHED event exists

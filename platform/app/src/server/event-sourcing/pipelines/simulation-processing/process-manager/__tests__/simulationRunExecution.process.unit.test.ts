@@ -160,6 +160,7 @@ function collectKeys(
 
 describe("simulationRunExecution process (runtime-built definition)", () => {
   describe("when a run is queued", () => {
+    /** @scenario "Process manager dispatches execute intent on queued event" */
     it("opens the process in queued phase and emits the execute intent", () => {
       const evolution = evolveEvent(
         initialState,
@@ -276,6 +277,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
       expect(lateQueued.nextWakeAt).toBeNull();
     });
 
+    /** @scenario "Process manager skips already-cancelled runs" */
     it("never submits to the pool when state already records a cancellation (defensive branch)", () => {
       const evolution = evolveEvent(
         { ...initialState, cancelRequestedAtMs: 9_000 },
@@ -373,7 +375,8 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
   });
 
   describe("when cancellation is requested", () => {
-    it("finishes a queued run CANCELLED without a cancel broadcast", () => {
+    /** @scenario "Cancelling a queued run writes both cancel and finished events" */
+    it("finishes a queued run CANCELLED and still broadcasts so the pool drops it", () => {
       const evolution = evolveEvent(
         queuedState(),
         makeEvent({
@@ -383,11 +386,23 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
         }),
       );
 
-      // Never submitted to the pool: nothing to kill, finish straight away.
+      // No child to kill, so the run goes terminal without waiting out the
+      // grace window. The broadcast is not optional: the execute intent went
+      // out when the run was queued, so the pool may already hold this job
+      // buffered behind a busy slot, and `pool.wasCancelled` — set only by
+      // the cancellation subscriber — is what stops it spawning.
       expect(evolution.state.phase).toBe("terminal");
       expect(evolution.state.cancelRequestedAtMs).toBe(15_000);
       expect(evolution.nextWakeAt).toBeNull();
       expect(evolution.intents).toEqual([
+        {
+          messageKey: intentKey(`cancel:${RUN_ID}`),
+          intentType: "cancel",
+          payload: {
+            scenarioRunId: RUN_ID,
+            projectId: PROJECT_ID,
+          },
+        },
         {
           messageKey: intentKey(`finish:${RUN_ID}:cancelled`),
           intentType: "finish",
@@ -444,6 +459,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
   });
 
   describe("when the wake fires", () => {
+    /** @scenario "Cancel-grace watchdog force-finishes when the broadcast is lost" */
     it("force-finishes a cancelling run CANCELLED once the grace window passed", () => {
       const state = queuedState({
         phase: "cancelling",
@@ -481,9 +497,13 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
       );
 
       // If both paths fire (the broadcast raced the wake), the outbox must
-      // collapse them into ONE finished event.
-      expect(graceWake.intents[0]!.messageKey).toBe(
-        cancelWhileQueued.intents[0]!.messageKey,
+      // collapse them into ONE finished event. Select by intent type rather
+      // than position — the queued path also emits the cancel broadcast.
+      const finishKey = (intents: typeof graceWake.intents) =>
+        intents.find((intent) => intent.intentType === "finish")!.messageKey;
+
+      expect(finishKey(graceWake.intents)).toBe(
+        finishKey(cancelWhileQueued.intents),
       );
     });
 
@@ -501,6 +521,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
       expect(evolution.nextWakeAt).toBe(15_000 + CANCEL_GRACE_MS);
     });
 
+    /** @scenario "Run quiet past the stall threshold finishes ERROR" */
     it.each([
       "queued",
       "running",
@@ -538,6 +559,36 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
       expect(evolution.state).toEqual(state);
       expect(evolution.intents).toEqual([]);
       expect(evolution.nextWakeAt).toBe(10_000 + STALL_THRESHOLD_MS);
+    });
+
+    /** @scenario "A queued run whose execute intent never lands is finished as stalled" */
+    it("finishes a run that never left queued, so a lost execute cannot pin it", () => {
+      // The old failure: the execute dispatch was fire-and-forget, so a run
+      // the pool never accepted sat QUEUED with no terminal event and nothing
+      // to close it. The wake is what makes that unreachable now — no
+      // activity ever arrives, so the stall deadline is the backstop.
+      const neverStarted = queuedState({
+        phase: "queued",
+        lastActivityAtMs: 10_000,
+      });
+      const now = 10_000 + STALL_THRESHOLD_MS;
+
+      const evolution = evolveWake(neverStarted, now, now);
+
+      expect(evolution.state.phase).toBe("terminal");
+      expect(evolution.nextWakeAt).toBeNull();
+      expect(evolution.intents).toEqual([
+        {
+          messageKey: intentKey(`finish:${RUN_ID}:stalled`),
+          intentType: "finish",
+          payload: {
+            scenarioRunId: RUN_ID,
+            projectId: PROJECT_ID,
+            status: ScenarioRunStatus.ERROR,
+            error: "stalled",
+          },
+        },
+      ]);
     });
 
     it("clears itself for a process that never initialized", () => {

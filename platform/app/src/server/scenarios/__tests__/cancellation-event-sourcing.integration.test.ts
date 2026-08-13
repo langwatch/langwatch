@@ -42,6 +42,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
+import { createCancelExecutionHandler } from "../../event-sourcing/pipelines/simulation-processing/process-manager";
 import type {
   CancellationMessage,
   CancellationSubscriber,
@@ -133,7 +134,6 @@ describe("Event-sourcing cancellation (real Redis)", () => {
   });
 
   describe("when a single worker is running a scenario", () => {
-    /** @scenario "Cancel reactor broadcasts to Redis on cancel_requested event" */
     /** @scenario "Worker kills its own child process on cancel broadcast" */
     it("kills the child process on cancel broadcast", async () => {
       const worker = createMockWorker(redis);
@@ -155,6 +155,49 @@ describe("Event-sourcing cancellation (real Redis)", () => {
 
       await waitFor(() => worker.killed.get("run-1") === true);
       expect(worker.killed.get("run-1")).toBe(true);
+    });
+
+    /** @scenario "Process manager broadcasts cancel to Redis on cancel_requested event" */
+    it("reaches the worker when the cancel intent is dispatched by the process manager", async () => {
+      // Drives the process manager's own cancel executor rather than calling
+      // publishCancellation directly, so the intent payload -> channel
+      // message mapping is covered end to end on real Redis.
+      const worker = createMockWorker(redis);
+      worker.startChild("run-pm-1");
+      const unsubscribe = await worker.subscribe();
+      cleanupFns.push(unsubscribe);
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      const dispatchCancel = createCancelExecutionHandler({
+        getPool: () => null,
+        commands: () => {
+          throw new Error("unused: the cancel intent never reports an outcome");
+        },
+        // Mirrors the registry wiring: the PM publishes through the shared
+        // Redis connection.
+        publishCancellation: async ({ projectId, scenarioRunId }) => {
+          await publishCancellation({
+            publisher: redis,
+            message: { projectId, scenarioRunId, batchRunId: null },
+          });
+        },
+      });
+
+      await dispatchCancel(
+        { projectId: "proj-1", scenarioRunId: "run-pm-1" },
+        {
+          processName: "simulation_run_execution",
+          projectId: "proj-1",
+          processKey: "run-pm-1",
+          tenantId: "proj-1",
+          messageKey: "process:run-pm-1:cancel:run-pm-1",
+          attempt: 1,
+        },
+      );
+
+      await waitFor(() => worker.killed.get("run-pm-1") === true);
+      expect(worker.killed.get("run-pm-1")).toBe(true);
     });
   });
 
@@ -196,6 +239,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
   });
 
   describe("when a batch cancel fires for multiple scenarios", () => {
+    /** @scenario "Batch cancel across multiple workers terminates all active runs" */
     it("all matching child processes across workers are killed", async () => {
       const workerA = createMockWorker(redis);
       workerA.startChild("run-1");

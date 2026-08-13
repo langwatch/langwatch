@@ -95,7 +95,7 @@ describe("customerIoSimulationSync subscriber", () => {
       expect(subscriber.events).toEqual([SIMULATION_RUN_EVENT_TYPES.FINISHED]);
     });
 
-    /** @scenario 'Simulation sync uses project-scoped dedup ID for debouncing' */
+    /** @scenario 'Simulation sync subscriber uses project-scoped dedup ID for debouncing' */
     it("dedups per tenant with the CIO debounce TTL", () => {
       const subscriber = createCustomerIoSimulationSyncSubscriber(createDeps());
       const event = createEvent({ tenantId: "project-42" });
@@ -124,6 +124,28 @@ describe("customerIoSimulationSync subscriber", () => {
             first_simulation_at: expect.any(String),
           }),
         });
+      });
+
+      /** @scenario 'First simulation fires immediately without debouncing' */
+      it("calls Customer.io within the handler, without waiting on a timer", async () => {
+        // The debounce is declarative — dedupId + ttl, applied by the
+        // dispatcher — so the handler itself must never defer. Fake timers
+        // are installed and deliberately never advanced: anything the
+        // handler parked on a timer would leave these calls unmade.
+        vi.useFakeTimers();
+        try {
+          const deps = createDeps({
+            simulationCountFn: vi.fn().mockResolvedValue(1),
+          });
+          const subscriber = createCustomerIoSimulationSyncSubscriber(deps);
+
+          await subscriber.handler(createEvent(), CONTEXT);
+
+          expect(deps.nurturing.identifyUser).toHaveBeenCalledTimes(1);
+          expect(deps.nurturing.trackEvent).toHaveBeenCalledTimes(1);
+        } finally {
+          vi.useRealTimers();
+        }
       });
 
       /** @scenario 'First simulation run fires first_simulation_ran event' */

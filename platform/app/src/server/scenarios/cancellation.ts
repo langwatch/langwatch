@@ -9,8 +9,10 @@
  * force-terminates the run if no worker ever confirms.
  *
  * - Active jobs: killed by the worker that owns the child process
- * - Queued jobs: the process manager finishes them CANCELLED without
- *   dispatching execution (no worker will ever pick them up)
+ * - Queued jobs: finished CANCELLED straight away rather than waiting out the
+ *   grace window. They are still broadcast: a run is submitted to the pool
+ *   when it is queued, so it may be buffered behind a busy slot, and the
+ *   broadcast is what stops the pool spawning it.
  *
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */

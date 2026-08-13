@@ -57,6 +57,7 @@ function makeDeps(
 
 describe("createExecuteRunHandler", () => {
   describe("when this pod has no execution pool", () => {
+    /** @scenario "The execute intent survives a worker restart" */
     it("throws so the outbox retries instead of silently dropping the run", async () => {
       const run = createExecuteRunHandler(makeDeps({ getPool: () => null }));
 

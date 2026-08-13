@@ -11,7 +11,7 @@ import {
 
 /**
  * Row shape of the `simulation_run_metrics` ClickHouse table (migration
- * 00071). Field names match the CH columns 1:1; `OccurredAt` is Unix ms on
+ * 00078). Field names match the CH columns 1:1; `OccurredAt` is Unix ms on
  * the record and is written as DateTime64(3) by the repository.
  */
 export interface SimulationRunMetricsProjectionRecord {

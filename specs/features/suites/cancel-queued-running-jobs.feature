@@ -3,19 +3,19 @@ Feature: Cancel queued and running suite jobs
   I want to cancel queued or in-progress suite jobs
   So that I can stop work I no longer need without waiting for it to finish
 
-  # Parity status: 12 of 15 scenarios bound to existing tests.
-  # Remaining scenarios (#3458):
-  #   3 NO_TEST: shipped behavior, no integration test yet
-  # NO_TEST gaps:
-  #   - "Cancellation reaches a worker on a different pod"
-  #   - "Batch cancel across multiple workers terminates all active runs"
-  #   - "Cancel-grace watchdog force-finishes when the broadcast is lost"
+  # Parity status: every scenario is bound except the one below.
+  # NO_TEST gap (#3458):
+  #   - "Cancellation reaches a worker on a different pod" — needs a genuine
+  #     two-pod harness; the multi-worker tests run both subscribers in one
+  #     process, which proves routing but not cross-pod delivery.
 
   Background:
     Cancellation is implemented via event-sourcing. When the user requests
     cancellation, a `cancel_requested` event is written to the event log.
-    The simulation_run_execution process manager (ADR-094) owns the rest: for
-    a QUEUED run it finishes the run CANCELLED directly; for a running run it
+    The simulation_run_execution process manager (ADR-094) owns the rest: a
+    QUEUED run is finished CANCELLED directly rather than waiting out the
+    grace window, and a running run is left to reach its own terminal event.
+    Either way, once the run has been submitted to the pool the manager
     persists a cancel intent to its durable outbox, which broadcasts the
     cancellation to all worker pods via Redis pub/sub (retried on failure).
     Each worker checks if it owns the scenario and kills its child process.
@@ -59,7 +59,7 @@ Feature: Cancel queued and running suite jobs
     And a message is published to the "scenario:cancel" Redis channel
     And the message contains the scenarioRunId
 
-  @integration @unimplemented
+  @unit
   Scenario: Cancel-grace watchdog force-finishes when the broadcast is lost
     Given a cancel intent was broadcast for a running scenario
     And the pub/sub message was lost so no worker received it
@@ -110,9 +110,15 @@ Feature: Cancel queued and running suite jobs
 
   @unit
   Scenario: Cancelling a queued run writes both cancel and finished events
+    A run is submitted to the execution pool the moment it is queued, so a
+    queued run may already be waiting on a busy slot. Recording it CANCELLED
+    without also calling it off with the workers leaves the scenario to run to
+    completion and bill for it.
+
     Given a simulation run has Status "QUEUED"
     When the user requests cancellation
     Then a cancel_requested event is dispatched
+    And the cancellation is broadcast to the workers so the pool never starts it
     And the process manager finishes the run with a finished event status CANCELLED
     And the fold projection shows Status "CANCELLED"
 
@@ -127,7 +133,7 @@ Feature: Cancel queued and running suite jobs
     Then cancel_requested events are dispatched for the QUEUED and IN_PROGRESS runs
     And no cancel event is dispatched for the SUCCESS run
 
-  @integration @unimplemented
+  @integration
   Scenario: Batch cancel across multiple workers terminates all active runs
     Given worker A runs scenario X and worker B runs scenario Y in the same batch
     When the user cancels the entire batch

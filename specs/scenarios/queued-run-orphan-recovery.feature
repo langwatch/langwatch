@@ -33,13 +33,13 @@ Feature: Queued scenario run orphan recovery
   # Layer 0 (primary): process manager stall watchdog + durable execute intent
   # ---------------------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: A queued run whose execute intent never lands is finished as stalled
     Given a scenario run has been QUEUED with no activity for longer than the stall threshold
     When the process manager's stall watchdog wake fires
     Then the run is finished with status ERROR and reason "stalled"
 
-  @unit @unimplemented
+  @unit
   Scenario: The execute intent survives a worker restart
     Given a queued run's execute intent is persisted in the process manager outbox
     When the worker restarts before the intent is dispatched

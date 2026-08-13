@@ -12,7 +12,7 @@ import type { SimulationRunMetricsProjectionRecord } from "./simulationRunMetric
  * Deliberately does NOT extend BaseAnalyticsRollupAppendStore: that base
  * resolves per-tenant retention and stamps `_retention_days`, but
  * `simulation_run_metrics` has no retention/TTL column yet (migration
- * 00071), so there is nothing to stamp. Tenant routing happens inside the
+ * 00078), so there is nothing to stamp. Tenant routing happens inside the
  * repository, which resolves the ClickHouse client from the record's own
  * TenantId (bulk appends are tenant-scoped per the BulkAppendContext
  * contract).

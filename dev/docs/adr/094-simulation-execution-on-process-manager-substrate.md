@@ -56,8 +56,14 @@ There is no `.schedule()` — wakes are per-run deadlines:
   the `cancel` intent and arms `nextWakeAt = now + CANCEL_GRACE_MS` (60s). If
   no terminal event lands within the grace (the pub/sub message was lost, the
   owning pod was down), the wake force-finishes the run `CANCELLED`. A cancel
-  against a queued run finishes `CANCELLED` immediately — the cancellation
-  service no longer dual-dispatches that event.
+  against a queued run finishes `CANCELLED` immediately instead of waiting out
+  the grace window — the cancellation service no longer dual-dispatches that
+  event. It still emits the `cancel` intent, because `queued` does not mean
+  undispatched: the execute intent goes out the moment the run is queued, so
+  the pool may already hold the job behind a busy slot, and `pool.wasCancelled`
+  (set only by the cancellation subscriber) is what stops it spawning. The one
+  case that skips the broadcast is a cancel that overtook the queued event, so
+  no execute intent was ever emitted.
 
 ### Event-carried subscribers
 

@@ -39,14 +39,14 @@ Feature: Event-driven scenario execution
   # 3. Process manager dispatches queued runs to the execution pool
   # ============================================================================
 
-  @integration @unimplemented
+  @unit
   Scenario: Process manager dispatches execute intent on queued event
     Given the simulation_run_execution process manager is registered on the simulation pipeline
     When a queued event is processed by the GroupQueue
     Then the process manager emits an execute intent via the durable outbox
     And the intent handler submits the job to the execution pool
 
-  @integration @unimplemented
+  @unit
   Scenario: Process manager skips already-cancelled runs
     Given a scenario run has CancellationRequestedAt set in the fold projection
     When a queued event for that run is processed
