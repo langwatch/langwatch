@@ -19,13 +19,13 @@
  * This module is the registration and wiring seam only: the wire vocabulary
  * lives in `wire.ts` and the handlers in `handlers.ts`.
  */
-import type { VersionBuilder } from "@langwatch/api";
+
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsService } from "@ee/webhooks/webhookEvents.service";
 import { WebhookHealthService } from "@ee/webhooks/webhookHealth.service";
-import { z } from "zod";
-
+import type { VersionBuilder } from "@langwatch/api";
 import { routeHandlers } from "@langwatch/api";
+import { z } from "zod";
 import { createManagementService } from "~/server/api/management/managed-service";
 import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
 import { getApp } from "~/server/app-layer/app";
@@ -60,8 +60,8 @@ import {
   nextCursorSchema,
   testFireResultSchema,
   updateEndpointSchema,
-  webhookEventEnvelopeSchema,
   type WebhooksFamilyApp,
+  webhookEventEnvelopeSchema,
 } from "./wire";
 
 const { service, guard } = createManagementService({
