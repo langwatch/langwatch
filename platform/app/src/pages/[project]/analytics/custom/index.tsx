@@ -17,6 +17,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import { keepPreviousData } from "@tanstack/react-query";
 
 import {
   chakraComponents,
@@ -697,7 +698,7 @@ function CustomGraphForm({
   const updateGraphById = api.graphs.updateById.useMutation();
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
   // Get dashboardId from URL query param
   const dashboardId = router.query.dashboard as string | undefined;
 
@@ -974,7 +975,7 @@ function CustomGraphForm({
           <Button
             colorPalette="orange"
             onClick={updateGraph}
-            loading={updateGraphById.isLoading}
+            loading={updateGraphById.isPending}
             marginX={2}
             minWidth="fit-content"
           >
@@ -983,7 +984,7 @@ function CustomGraphForm({
         ) : (
           <Button
             colorPalette="orange"
-            loading={addNewGraph.isLoading}
+            loading={addNewGraph.isPending}
             onClick={() => {
               addGraph();
             }}
@@ -1489,7 +1490,7 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
     {
       refetchOnMount: false,
       refetchOnWindowFocus: false,
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
       enabled: queryOpts.enabled,
     },
   );

@@ -11,12 +11,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import {
-  type Organization,
-  OrganizationUserRole,
-  type Project,
-  type Team,
-} from "@prisma/client";
-import {
   Activity,
   ChevronDown,
   ChevronRight,
@@ -37,6 +31,12 @@ import {
   LANGY_TRANSITION,
 } from "~/features/langy/logic/langyPanelLayout";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
+import {
+  type Organization,
+  OrganizationUserRole,
+  type Project,
+  type Team,
+} from "~/generated/prisma/client";
 import Head from "~/utils/compat/next-head";
 import { useRouter } from "~/utils/compat/next-router";
 import { ImpersonationBanner } from "../../ee/admin/ImpersonationBanner";

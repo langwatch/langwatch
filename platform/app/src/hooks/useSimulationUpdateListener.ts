@@ -66,7 +66,7 @@ export function useSimulationUpdateListener({
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastFireRef = useRef<number>(0);
   const isVisible = usePageVisibility();
-  const trpcUtils = api.useContext();
+  const trpcUtils = api.useUtils();
   const knownBatchRunIdsRef = useRef<Set<string>>(new Set());
 
   const matchesFilter = useCallback(

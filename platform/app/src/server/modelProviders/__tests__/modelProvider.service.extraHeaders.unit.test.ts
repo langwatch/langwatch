@@ -1,5 +1,5 @@
-import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import type { ModelProviderRepository } from "../modelProvider.repository";

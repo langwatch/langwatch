@@ -182,7 +182,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!props.open]);
 
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
 
   const performUpsert = (data: DatasetRecordForm) => {
     upsertDataset.mutate(
@@ -400,7 +400,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               colorPalette="blue"
               type="submit"
               minWidth="fit-content"
-              loading={upsertDataset.isLoading}
+              loading={upsertDataset.isPending}
             >
               {props.localOnly
                 ? "Apply"

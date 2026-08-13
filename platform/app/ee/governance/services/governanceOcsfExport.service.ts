@@ -24,7 +24,7 @@
  *   - GovernanceOcsfEventsSyncReactor (the producer)
  *   - migration 00023_create_governance_ocsf_events.sql
  */
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 import type {
   GovernanceOcsfEventsClickHouseRepository,

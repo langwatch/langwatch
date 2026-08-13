@@ -102,7 +102,7 @@
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.38.0",
     "vitest": "^4.1.0",
-    "vitest-mock-extended": "^4.0.0",
+    "vitest-mock-extended": "^5.1.1",
     "yaml": "^2.8.1"
   },
   "dependencies": {

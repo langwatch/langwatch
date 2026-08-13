@@ -13,8 +13,8 @@
  * mocked app layer + mocked utils).
  */
 
-import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
 import { sharedTraceRouter } from "../sharedTrace";
 import { SHARE_MAX_FULL_SPANS } from "../sharedTrace.schemas";

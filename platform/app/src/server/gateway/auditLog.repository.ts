@@ -8,7 +8,7 @@
  * Gateway services pass an `actorUserId` through to keep attribution
  * consistent with the platform `auditLog()` helper.
  */
-import { Prisma, type PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 
 // Dotted-lowercase past-tense convention (Stripe / GitHub / Vercel / Datadog).
 // Namespaced under `gateway.` so a single `LIKE 'gateway.%'` filter scopes

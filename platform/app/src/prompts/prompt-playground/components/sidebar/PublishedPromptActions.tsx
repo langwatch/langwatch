@@ -55,7 +55,7 @@ export function PublishedPromptActions({
 
   const syncFromSource = api.prompts.syncFromSource.useMutation();
   const duplicatePrompt = api.prompts.duplicate.useMutation();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   // Cascade-resolved model for new-tab "view history" prompts.
   const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(

@@ -44,7 +44,7 @@ vi.mock("~/components/me/PersonalFeatureGateDialog", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       annotation: {
         getByTraceId: { invalidate: vi.fn() },
         getByTraceIds: { invalidate: vi.fn() },

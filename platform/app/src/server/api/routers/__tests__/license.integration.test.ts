@@ -5,11 +5,6 @@
  * Tests the router layer including permissions and error handling.
  */
 
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -20,6 +15,11 @@ import {
   it,
   vi,
 } from "vitest";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 import {
   ENTERPRISE_TEMPLATE,
   LicenseHandler,

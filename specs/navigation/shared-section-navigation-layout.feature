@@ -17,6 +17,16 @@ Feature: Shared section navigation layout
       | AI Gateway    |
       | AI Governance |
 
+  # A fixed-width rail that never shrinks does not degrade on a phone, it
+  # disappears: the content column is left with a handful of pixels and the
+  # page it was framing cannot be read at all.
+  @integration
+  Scenario: The local navigation stops taking a column on a narrow viewport
+    Given I open a section workspace on a phone-width screen
+    Then the local navigation sits above the content instead of beside it
+    And it scrolls sideways rather than pushing the content off the screen
+    And the content column gets the full width of the page
+
   Scenario: Keep product-level and local navigation labels distinct
     Given I open the primary project navigation
     Then the expandable product section is named "Build"

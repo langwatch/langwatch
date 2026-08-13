@@ -238,7 +238,7 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: { enabled: false }, isLoading: false }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       annotation: {
         getPendingItemsCount: { invalidate: stableSetFn },
         getAssignedItemsCount: { invalidate: stableSetFn },

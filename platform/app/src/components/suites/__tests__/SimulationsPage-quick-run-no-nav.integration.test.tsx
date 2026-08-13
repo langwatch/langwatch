@@ -157,7 +157,7 @@ vi.mock("~/components/suites/RunHistoryPanel", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       suites: {
         getAll: { invalidate: vi.fn() },
         getSummaries: { invalidate: mockGetSummariesInvalidate },

@@ -859,7 +859,6 @@ export const langyRouter = createTRPCRouter({
     const emitter = getApp().broadcast.getTenantEmitter(projectId);
     try {
       for await (const eventArgs of on(emitter, "langy_conversation_updated", {
-        // @ts-expect-error - signal is not typed on the events overload
         signal: opts.signal,
       })) {
         const data = eventArgs[0] as { event?: unknown; timestamp?: number };
@@ -936,7 +935,6 @@ export const langyRouter = createTRPCRouter({
       const signals: AbortSignal[] = [
         AbortSignal.timeout(AGENT_CHAT_TIMEOUT_MS),
       ];
-      // @ts-expect-error - signal is not typed
       if (opts.signal) signals.push(opts.signal);
       const signal = AbortSignal.any(signals);
 

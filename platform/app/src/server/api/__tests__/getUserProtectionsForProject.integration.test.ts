@@ -7,14 +7,15 @@
  * the redaction reason, and applies retroactively (changing the rule changes
  * what an existing reader sees, with no re-ingestion).
  */
-import type { Project } from "@prisma/client";
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import type { Project } from "~/generated/prisma/client";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+} from "~/generated/prisma/client";
 
 import type { Session } from "~/server/auth";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";

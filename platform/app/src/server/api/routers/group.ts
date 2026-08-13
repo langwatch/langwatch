@@ -1,11 +1,11 @@
 import { generate } from "@langwatch/ksuid";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
+} from "~/generated/prisma/client";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
 import { RoleService } from "~/server/role/role.service";

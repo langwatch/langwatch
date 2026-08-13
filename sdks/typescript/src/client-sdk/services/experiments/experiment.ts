@@ -21,11 +21,14 @@ import { generateHumanReadableId } from "./humanReadableId";
 import {
   ExperimentInitError,
   TargetMetadataConflictError,
+  ComparisonError,
   EvaluatorError,
 } from "./errors";
 import type {
   Batch,
   BatchEntry,
+  ComparisonOptions,
+  ComparisonVerdict,
   EvaluationResult,
   TargetInfo,
   TargetMetadata,
@@ -43,11 +46,48 @@ import type {
   TargetExecutionContext,
   TargetContext,
 } from "./types";
+import type { CapturedTargetOutput } from "./comparison";
+import {
+  COMPARISON_EVALUATOR_SLUG,
+  DEFAULT_COMPARISON_NAME,
+  buildComparisonCandidates,
+  buildComparisonData,
+  buildComparisonSettings,
+  comparisonEntryLabel,
+  comparisonEntryStatus,
+  describeSkippedComparison,
+  renderTargetOutput,
+  toComparisonVerdict,
+} from "./comparison";
 import { printSummary } from "./printSummary";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 const DEFAULT_CONCURRENCY = 4;
 const DEBOUNCE_INTERVAL_MS = 1000;
+
+/**
+ * How many rows of captured target outputs compare() keeps around.
+ *
+ * A comparison runs while its row is still being processed, and at most
+ * `concurrency` rows are ever in flight, so this bound sits orders of
+ * magnitude above what any run needs while keeping memory flat over a dataset
+ * of any size.
+ */
+const MAX_COMPARISON_ROWS_RETAINED = 1000;
+
+/**
+ * How long an evaluator call may take before the socket is given up on.
+ *
+ * The ceiling has to clear the slowest legitimate judge: a comparison with
+ * swap-and-reconcile on makes two sequential LLM calls over every candidate
+ * the row produced, and a large reasoning model can spend minutes on each. It
+ * exists because the alternative is worse: a judge that accepts the socket and
+ * never answers would hold its slot in the concurrency window for the life of
+ * the process, so a single dead connection stalls the whole run rather than
+ * costing it one row. This is the ceiling the Python SDK already applies to
+ * the same endpoint.
+ */
+export const EVALUATOR_TIMEOUT_MS = 900_000;
 
 // Slim projections retained across the lifetime of an Experiment for
 // printSummary() — deliberately excludes large fields (inputs, tracebacks,
@@ -60,12 +100,18 @@ type SummaryEntry = Pick<BatchEntry, "duration" | "error" | "cost" | "target_id"
 
 /**
  * AsyncLocalStorage for iteration context isolation.
- * This stores the current item and index for each iteration,
+ * This stores the current item, index and trace for each iteration,
  * preventing race conditions in concurrent execution.
+ *
+ * `traceId` is the row's own iteration trace, and is null for a row whose
+ * targets each opened a trace of their own: there is no single trace such a
+ * row belongs to, and naming one would attribute its comparison to a trace
+ * that judged something else.
  */
 type IterationContext = {
   index: number;
   item: unknown;
+  traceId: string | null;
 };
 const iterationContextStorage = new AsyncLocalStorage<IterationContext>();
 
@@ -111,9 +157,12 @@ export class Experiment {
   // Target registry
   private targets = new Map<string, TargetInfo>();
 
-  // Current iteration context (for log/evaluate calls)
-  private currentTraceId: string | null = null;
-  private currentIndex: number | null = null;
+  // Per-row target outputs for compare(), keyed by row then by target name.
+  // Captured when a withTarget() callback resolves and kept independently of
+  // the batch, which is flushed on a timer and may be long gone by the time
+  // the row is compared. Insertion-ordered, and reaped oldest-first past
+  // MAX_COMPARISON_ROWS_RETAINED.
+  private capturedOutputs = new Map<number, Map<string, CapturedTargetOutput>>();
 
   // Track whether withTarget() was used in the current iteration
   // If so, we don't create dataset entries in executeItem()
@@ -298,14 +347,12 @@ export class Experiment {
     this.iterationUsedWithTarget.set(index, false);
 
     // Set up iteration context (thread-safe via AsyncLocalStorage)
-    const iterationContext: IterationContext = { index, item };
+    const iterationContext: IterationContext = { index, item, traceId: null };
 
     // If evaluation uses targets, skip creating iteration-level traces
     // Each withTarget() call will create its own independent trace
     if (this.evaluationUsesTargets) {
       await iterationContextStorage.run(iterationContext, async () => {
-        this.currentIndex = index;
-
         try {
           // Create a minimal span context for the callback
           const span = {
@@ -323,8 +370,6 @@ export class Experiment {
         } catch (err) {
           error = err instanceof Error ? err : new Error(String(err));
           this.logger.error(`Evaluation error at index ${index}:`, error);
-        } finally {
-          this.currentIndex = null;
         }
       });
     } else {
@@ -343,9 +388,10 @@ export class Experiment {
             const spanContext = otelSpan.spanContext();
             const traceId = spanContext.traceId;
 
-            // Set current context for log/evaluate calls
-            this.currentTraceId = traceId;
-            this.currentIndex = index;
+            // The row's own trace, for the log/evaluate/compare calls made
+            // inside it. It rides the iteration context rather than the
+            // instance, so a row reads its own trace and never a neighbour's.
+            iterationContext.traceId = traceId;
             capturedTraceId = traceId;
 
             try {
@@ -367,8 +413,6 @@ export class Experiment {
               this.logger.error(`Evaluation error at index ${index}:`, error);
             } finally {
               span.end();
-              this.currentTraceId = null;
-              this.currentIndex = null;
             }
           }
         );
@@ -451,9 +495,11 @@ export class Experiment {
       targetId = this.registerTarget(target, metadata);
     }
 
-    // Use trace ID from context, then current iteration, then OTEL context
+    // Use trace ID from the target, then the row being iterated, then OTEL context
     const traceId =
-      targetContext?.traceId ?? this.currentTraceId ?? this.getTraceIdFromContext();
+      targetContext?.traceId ??
+      iterationContextStorage.getStore()?.traceId ??
+      this.getTraceIdFromContext();
 
     const result: EvaluationResult = {
       name: metric,
@@ -473,6 +519,13 @@ export class Experiment {
       target_id: targetId ?? null,
     };
 
+    this.pushEvaluation(result);
+  }
+
+  /**
+   * Queue an evaluation result for the next batch
+   */
+  private pushEvaluation(result: EvaluationResult): void {
     this.batch.evaluations.push(result);
     this.cumulativeEvaluations.push({
       name: result.name,
@@ -528,37 +581,23 @@ export class Experiment {
     } = options;
 
     const startTime = Date.now();
-    // Use trace ID from context, then current iteration, then OTEL context
+    // Use trace ID from the target, then the row being iterated, then OTEL context
     const traceId =
-      targetContext?.traceId ?? this.currentTraceId ?? this.getTraceIdFromContext();
+      targetContext?.traceId ??
+      iterationContextStorage.getStore()?.traceId ??
+      this.getTraceIdFromContext();
     const spanId = targetContext?.spanId ?? this.getSpanIdFromContext();
 
     try {
-      const response = await fetch(
-        `${this.endpoint}/api/evaluations/${evaluatorSlug}/evaluate`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...buildAuthHeaders({ apiKey: this.apiKey }),
-          },
-          body: JSON.stringify({
-            trace_id: traceId ?? null,
-            span_id: spanId ?? null,
-            name: name ?? evaluatorSlug,
-            data,
-            settings,
-            as_guardrail: asGuardrail,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const text = await response.text();
-        throw new EvaluatorError(evaluatorSlug, text);
-      }
-
-      const result = (await response.json()) as RunEvaluatorResponse;
+      const result = await this.callEvaluator({
+        evaluatorSlug,
+        data,
+        settings,
+        name,
+        traceId,
+        spanId,
+        asGuardrail,
+      });
       const duration = Date.now() - startTime;
 
       // Log the result
@@ -609,6 +648,270 @@ export class Experiment {
 
       throw wrappedError;
     }
+  }
+
+  /**
+   * Call an evaluator and return its raw result
+   */
+  private async callEvaluator({
+    evaluatorSlug,
+    data,
+    settings,
+    name,
+    traceId,
+    spanId,
+    asGuardrail = false,
+  }: {
+    evaluatorSlug: string;
+    data: Record<string, unknown>;
+    settings?: Record<string, unknown>;
+    name?: string;
+    traceId?: string | null;
+    spanId?: string | null;
+    asGuardrail?: boolean;
+  }): Promise<RunEvaluatorResponse> {
+    const response = await fetch(
+      `${this.endpoint}/api/evaluations/${evaluatorSlug}/evaluate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...buildAuthHeaders({ apiKey: this.apiKey }),
+        },
+        body: JSON.stringify({
+          trace_id: traceId ?? null,
+          span_id: spanId ?? null,
+          name: name ?? evaluatorSlug,
+          data,
+          settings,
+          as_guardrail: asGuardrail,
+        }),
+        signal: AbortSignal.timeout(EVALUATOR_TIMEOUT_MS),
+      }
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new EvaluatorError(evaluatorSlug, text);
+    }
+
+    return (await response.json()) as RunEvaluatorResponse;
+  }
+
+  /**
+   * Compare a row's targets and pick the best one
+   *
+   * Every target that recorded an output for the row is judged together in a
+   * single call, and the winner comes back named with the target name you
+   * registered. Call it once the row's withTarget() calls have all settled,
+   * which under the usual Promise.all is right after the await.
+   *
+   * The verdict grades no single target, so it is recorded against the row.
+   *
+   * The row is named the way log() names it: inside a run() callback it is
+   * inferred from the row being processed, and outside one it is required.
+   *
+   * A row with fewer than two outputs cannot be compared: it is recorded as
+   * skipped, naming the targets that produced nothing, and the run carries on.
+   * A judge that fails or cannot be reached comes back as an `error` verdict
+   * for the same reason, and stays distinct from `inconclusive`, which is the
+   * judge telling you something about your candidates. Naming a target that
+   * produced no output is a different thing again, and throws, because a
+   * two-way verdict read as the three-way one you asked for is worse than a
+   * failure.
+   *
+   * @param options - How the judge should read the row, and which row when
+   *                  it cannot be inferred
+   * @returns The verdict, including the candidates it actually saw
+   *
+   * @example
+   * ```typescript
+   * await experiment.run(dataset, async ({ item }) => {
+   *   await Promise.all([
+   *     experiment.withTarget('gpt-5-mini', () => askGpt(item.question)),
+   *     experiment.withTarget('claude-sonnet-5', () => askClaude(item.question)),
+   *   ]);
+   *
+   *   const verdict = await experiment.compare({ input: item.question });
+   *   console.log(verdict.winner);
+   * });
+   * ```
+   */
+  async compare(options: ComparisonOptions = {}): Promise<ComparisonVerdict> {
+    const {
+      name = DEFAULT_COMPARISON_NAME,
+      targets,
+      input,
+      golden,
+    } = options;
+
+    const index = this.resolveComparisonRow(options.index);
+
+    const captured =
+      this.capturedOutputs.get(index) ?? new Map<string, CapturedTargetOutput>();
+
+    if (targets) {
+      const missing = targets.filter((target) => !captured.has(target));
+      if (missing.length > 0) {
+        throw new ComparisonError(
+          `Cannot compare row ${index}: no output was recorded for ${missing
+            .map((target) => `'${target}'`)
+            .join(", ")}. Compare a row once every withTarget() call for it has settled.`,
+          missing
+        );
+      }
+    }
+
+    // Registration order, not the order the outputs happened to land in:
+    // targets usually run concurrently, so completion order varies per row and
+    // would reshuffle what the judge sees from one row to the next.
+    const requested = targets ? new Set(targets) : null;
+    const candidates = Array.from(this.targets.keys()).filter(
+      (target) =>
+        captured.has(target) && (requested === null || requested.has(target))
+    );
+
+    if (candidates.length < 2) {
+      const missing = Array.from(this.targets.keys()).filter(
+        (target) =>
+          !captured.has(target) && (requested === null || requested.has(target))
+      );
+      const verdict: ComparisonVerdict = {
+        status: "skipped",
+        winner: null,
+        reasoning: describeSkippedComparison({ candidates, missing }),
+        candidates,
+      };
+
+      this.recordComparison({ name, index, verdict });
+
+      return verdict;
+    }
+
+    const data = buildComparisonData({
+      input,
+      golden,
+      candidates: buildComparisonCandidates(candidates, captured),
+      index,
+    });
+    const settings = buildComparisonSettings(options);
+
+    const startTime = Date.now();
+
+    // A judge that could not be reached measured nothing about the
+    // candidates, so it is an errored row rather than a finding about them.
+    // One unreachable judge must not end a run over a thousand rows either,
+    // so the failure is reported to the caller instead of thrown.
+    let response: RunEvaluatorResponse;
+    try {
+      response = await this.callEvaluator({
+        evaluatorSlug: COMPARISON_EVALUATOR_SLUG,
+        data,
+        settings,
+        name,
+        traceId:
+          iterationContextStorage.getStore()?.traceId ??
+          this.getTraceIdFromContext(),
+        spanId: this.getSpanIdFromContext(),
+      });
+    } catch (error) {
+      response = {
+        status: "error",
+        details: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    const verdict = toComparisonVerdict({ response, candidates });
+
+    this.recordComparison({
+      name,
+      index,
+      verdict,
+      score: response.score ?? null,
+      cost: response.cost?.amount ?? null,
+      duration: Date.now() - startTime,
+    });
+
+    return verdict;
+  }
+
+  /**
+   * The row a comparison is about
+   *
+   * Inferred from the row being processed, the same way withTarget() and
+   * log() infer theirs, so a comparison inside a run() callback never repeats
+   * an index the SDK already has. It reads that row from the iteration's own
+   * context, which is what keeps a run of many rows at once from handing one
+   * row's comparison the row a neighbour happens to be on.
+   *
+   * What it deliberately does not do is fall back to a row: judging row 0
+   * because no row was named would hand back a confident verdict about
+   * candidates the caller never asked about.
+   */
+  private resolveComparisonRow(index?: number): number {
+    const resolved = index ?? iterationContextStorage.getStore()?.index;
+
+    if (resolved === undefined) {
+      throw new ComparisonError(
+        "Cannot compare: no row was given and none could be inferred. Pass index explicitly when comparing outside a run() iteration."
+      );
+    }
+
+    return resolved;
+  }
+
+  /**
+   * Record a comparison verdict against the row
+   *
+   * The verdict the caller is handed is the only input, so the row can never
+   * say one thing while the return value says another.
+   *
+   * Deliberately not routed through log(): a comparison grades no single
+   * target, so it must not pick one up from an ambient withTarget() context,
+   * and it is recorded under the judge's own evaluator id so the results page
+   * can tell it apart from a hand-logged metric.
+   */
+  private recordComparison({
+    name,
+    index,
+    verdict,
+    score = null,
+    cost = null,
+    duration = null,
+  }: {
+    name: string;
+    index: number;
+    verdict: ComparisonVerdict;
+    score?: number | null;
+    cost?: number | null;
+    duration?: number | null;
+  }): void {
+    const status = comparisonEntryStatus(verdict.status);
+
+    this.pushEvaluation({
+      name,
+      evaluator: COMPARISON_EVALUATOR_SLUG,
+      trace_id:
+        iterationContextStorage.getStore()?.traceId ??
+        this.getTraceIdFromContext(),
+      status,
+      // The results page keys a comparison column off this candidate list.
+      data: {
+        candidates: verdict.candidates.map((candidate) => ({ id: candidate })),
+      },
+      // A row that established nothing carries no score: 0.5 would read as the
+      // tie it is not, and 1.0 as a win for a winner it does not have.
+      score: status === "processed" ? score : null,
+      passed: null,
+      details: verdict.reasoning,
+      index,
+      label: comparisonEntryLabel(verdict),
+      cost,
+      duration,
+      error_type: null,
+      traceback: null,
+      target_id: null,
+    });
   }
 
   /**
@@ -673,7 +976,7 @@ export class Experiment {
 
     // Get iteration context (thread-safe via AsyncLocalStorage)
     const iterationContext = iterationContextStorage.getStore();
-    const index = iterationContext?.index ?? this.currentIndex ?? 0;
+    const index = iterationContext?.index ?? 0;
     const currentItem = iterationContext?.item;
 
     // Mark that withTarget() was used - prevents executeItem from creating a dataset entry
@@ -777,6 +1080,12 @@ export class Experiment {
       cost: entry.cost,
       target_id: entry.target_id,
     });
+    this.captureTargetOutput({
+      index,
+      targetName,
+      output: renderTargetOutput(result),
+      durationMs: duration,
+    });
     this.scheduleSend();
 
     return {
@@ -785,6 +1094,43 @@ export class Experiment {
       traceId,
       spanId,
     };
+  }
+
+  /**
+   * Keep a target's output for the row so compare() can reach it later
+   *
+   * The batch this output also went into is flushed on a timer and cleared, so
+   * a comparison that read its candidates from there would find them missing
+   * whenever the flush landed first. A target that produced nothing is not
+   * captured at all: it has no output to judge.
+   */
+  private captureTargetOutput({
+    index,
+    targetName,
+    output,
+    durationMs,
+  }: {
+    index: number;
+    targetName: string;
+    output: string;
+    durationMs?: number;
+  }): void {
+    if (output === "") {
+      return;
+    }
+
+    let row = this.capturedOutputs.get(index);
+    if (!row) {
+      row = new Map<string, CapturedTargetOutput>();
+      this.capturedOutputs.set(index, row);
+    }
+    row.set(targetName, { output, durationMs });
+
+    while (this.capturedOutputs.size > MAX_COMPARISON_ROWS_RETAINED) {
+      const oldest = this.capturedOutputs.keys().next();
+      if (oldest.done) break;
+      this.capturedOutputs.delete(oldest.value);
+    }
   }
 
   /**
