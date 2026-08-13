@@ -148,14 +148,14 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
               {
                 role: "user",
                 content: [
-                  { type: "text", text: "summarise this consult note" },
+                  { type: "text", text: "summarise this shipping manifest" },
                 ],
               },
             ]),
             "gen_ai.completion": JSON.stringify([
               {
                 role: "assistant",
-                content: [{ type: "text", text: "The patient reports ..." }],
+                content: [{ type: "text", text: "The shipment contains ..." }],
               },
             ]),
           },
@@ -166,8 +166,8 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
       // models, real content reaches trace_summaries. Without this passing,
       // an empty result elsewhere is equally well explained by a broken
       // fixture and the whole file proves nothing.
-      expect(input).toContain("summarise this consult note");
-      expect(output).toContain("The patient reports ...");
+      expect(input).toContain("summarise this shipping manifest");
+      expect(output).toContain("The shipment contains ...");
     });
   });
 
@@ -183,13 +183,13 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
             "gen_ai.prompt": JSON.stringify([
               {
                 role: "user",
-                content: [{ text: "summarise this consult note" }],
+                content: [{ text: "summarise this shipping manifest" }],
               },
             ]),
             "gen_ai.completion": JSON.stringify([
               {
                 role: "assistant",
-                content: [{ text: "The patient reports ..." }],
+                content: [{ text: "The shipment contains ..." }],
               },
             ]),
           },
@@ -197,8 +197,8 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
       );
 
       expect({ input, output }).toEqual({
-        input: "summarise this consult note",
-        output: "The patient reports ...",
+        input: "summarise this shipping manifest",
+        output: "The shipment contains ...",
       });
     });
   });
@@ -217,8 +217,8 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
                   {
                     toolUse: {
                       toolUseId: "tool-1",
-                      name: "lookup_patient",
-                      input: { patientId: "p-42" },
+                      name: "lookup_order",
+                      input: { orderId: "ord-42" },
                     },
                   },
                 ],
@@ -228,7 +228,7 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
         }),
       );
 
-      expect(output).toContain('"patientId":"p-42"');
+      expect(output).toContain('"orderId":"ord-42"');
     });
   });
 
@@ -246,7 +246,7 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
                   {
                     toolResult: {
                       toolUseId: "tool-1",
-                      content: [{ text: "patient p-42 found" }],
+                      content: [{ text: "order ord-42 found" }],
                     },
                   },
                 ],
@@ -256,7 +256,7 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
         }),
       );
 
-      expect(input).toBe("patient p-42 found");
+      expect(input).toBe("order ord-42 found");
     });
   });
 });
@@ -276,13 +276,13 @@ describe("given a Bedrock span whose messages sit under aws.bedrock.* keys", () 
           "aws.bedrock.request.messages": JSON.stringify([
             {
               role: "user",
-              content: [{ text: "summarise this consult note" }],
+              content: [{ text: "summarise this shipping manifest" }],
             },
           ]),
           "aws.bedrock.response.output": JSON.stringify({
             message: {
               role: "assistant",
-              content: [{ text: "The patient reports ..." }],
+              content: [{ text: "The shipment contains ..." }],
             },
           }),
         },
@@ -296,8 +296,8 @@ describe("given a Bedrock span whose messages sit under aws.bedrock.* keys", () 
       // Before the BedrockExtractor existed this pair degraded asymmetrically
       // to {input: "bedrock.converse", output: null} — the span name and the
       // HTTP-status fallback. The real content now reaches trace_summaries.
-      expect(input).toBe("summarise this consult note");
-      expect(output).toBe("The patient reports ...");
+      expect(input).toBe("summarise this shipping manifest");
+      expect(output).toBe("The shipment contains ...");
     });
   });
 
@@ -314,7 +314,7 @@ describe("given a Bedrock span whose messages sit under aws.bedrock.* keys", () 
             "aws.bedrock.request.messages": JSON.stringify([
               {
                 role: "user",
-                content: [{ text: "summarise this consult note" }],
+                content: [{ text: "summarise this shipping manifest" }],
               },
             ]),
           },
@@ -325,7 +325,7 @@ describe("given a Bedrock span whose messages sit under aws.bedrock.* keys", () 
       // method + target. The mapped request messages now win; the output
       // still falls back to the HTTP status because this span carries no
       // aws.bedrock.response.output.
-      expect(input).toBe("summarise this consult note");
+      expect(input).toBe("summarise this shipping manifest");
       expect(output).toBe("200");
     });
   });
