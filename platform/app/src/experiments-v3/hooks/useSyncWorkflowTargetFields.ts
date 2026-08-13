@@ -26,6 +26,32 @@ const sameFields = (recorded: Field[] | undefined, derived: Field[]): boolean =>
   );
 
 /**
+ * The fields a target records that its workflow no longer agrees with, or
+ * undefined when the two already match.
+ *
+ * An empty derivation counts as agreement rather than as a change: the agent
+ * reports no fields both for a workflow that genuinely declares none and for
+ * one that could not be read, and clearing a column's fields on a failed
+ * lookup would take the user's mappings with them.
+ */
+const staleFields = (
+  target: TargetConfig,
+  derived: DerivedTargetFields,
+): Partial<Pick<TargetConfig, "inputs" | "outputs">> | undefined => {
+  const updates: Partial<Pick<TargetConfig, "inputs" | "outputs">> = {};
+  const { inputFields, outputFields } = derived;
+
+  if (inputFields.length > 0 && !sameFields(target.inputs, inputFields)) {
+    updates.inputs = inputFields;
+  }
+  if (outputFields.length > 0 && !sameFields(target.outputs, outputFields)) {
+    updates.outputs = outputFields;
+  }
+
+  return Object.keys(updates).length > 0 ? updates : undefined;
+};
+
+/**
  * Keeps a workflow agent target's recorded fields in step with its workflow.
  *
  * Every other target owns the fields it declares: a prompt, a code agent and
@@ -39,13 +65,6 @@ const sameFields = (recorded: Field[] | undefined, derived: Field[]): boolean =>
  *
  * Reconciling on load fixes both directions — columns added before these
  * fields were derived at all, and columns whose workflow has since changed.
- *
- * Two deliberate restraints:
- *
- * An empty derivation is never applied. The agent reports no fields both for a
- * workflow that genuinely declares none and for one that could not be read
- * (deleted, archived, or never committed), and clearing a column's fields on a
- * failed lookup would take the user's mappings with them.
  *
  * The reconciliation stays out of undo history. It is not an edit the user
  * made, so Ctrl+Z landing on it would either look like nothing happened or put
@@ -90,22 +109,10 @@ export const useSyncWorkflowTargetFields = () => {
   useEffect(() => {
     const targets = useEvaluationsV3Store.getState().targets;
     const pending = (JSON.parse(derived) as DerivedTargetFields[]).flatMap(
-      ({ targetId, inputFields, outputFields }) => {
-        const target = targets.find((t) => t.id === targetId);
-        if (!target) return [];
-
-        const updates: Partial<Pick<TargetConfig, "inputs" | "outputs">> = {};
-        if (inputFields.length > 0 && !sameFields(target.inputs, inputFields)) {
-          updates.inputs = inputFields;
-        }
-        if (
-          outputFields.length > 0 &&
-          !sameFields(target.outputs, outputFields)
-        ) {
-          updates.outputs = outputFields;
-        }
-
-        return Object.keys(updates).length > 0 ? [{ targetId, updates }] : [];
+      (fields) => {
+        const target = targets.find((t) => t.id === fields.targetId);
+        const updates = target ? staleFields(target, fields) : undefined;
+        return updates ? [{ targetId: fields.targetId, updates }] : [];
       },
     );
 

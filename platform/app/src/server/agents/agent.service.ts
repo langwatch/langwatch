@@ -3,11 +3,6 @@
 import type { PrismaClient } from "@prisma/client";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 import {
-  type AgentWithFields,
-  linkedWorkflowId,
-  resolveAgentFields,
-} from "./agent-fields";
-import {
   type AgentComponentConfig,
   type AgentCopyRow,
   AgentRepository,
@@ -16,6 +11,11 @@ import {
   type TypedAgent,
   type UpdateAgentInput,
 } from "./agent.repository";
+import {
+  type AgentWithFields,
+  linkedWorkflowId,
+  resolveAgentFields,
+} from "./agent-fields";
 import { AgentNotFoundError } from "./errors";
 
 /**
