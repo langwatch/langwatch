@@ -17,6 +17,7 @@ vi.mock("../useShowComparisonLeaderboard", () => ({
   useShowComparisonLeaderboard: () => false,
 }));
 
+import { STABLE_EMPTY_QUERY_RESULTS } from "~/test-utils/stableEmptyQueryResults";
 import {
   ComparisonCharts,
   computeRunMetrics,
@@ -27,6 +28,16 @@ import type { BatchEvaluationData, ComparisonRunData } from "../types";
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
+
+// ComparisonCharts fetches annotations (useAnnotationsByTraceIds ->
+// api.useQueries) for the judge-vs-reviewer confusion matrix. None of these
+// tests enable `showConfusionMatrix`, so the hook's traceIds list is always
+// empty — see the fixture for why the result array must be one constant.
+vi.mock("~/utils/api", () => ({
+  api: {
+    useQueries: vi.fn(() => STABLE_EMPTY_QUERY_RESULTS),
+  },
+}));
 
 // Mock data for testing
 type MockRunOptions = {
@@ -129,6 +140,13 @@ const createMockRunData = (
 describe("ComparisonCharts", () => {
   afterEach(() => {
     cleanup();
+    // `api.useQueries` (mocked above) is invoked on every render of every
+    // test in this file. vi.fn()'s call-history tracking (mock.calls,
+    // mock.results) retains every past invocation's arguments — including
+    // the render-scoped closures useAnnotationsByTraceIds passes in — until
+    // explicitly cleared, which otherwise leaks across this file's full
+    // test run rather than being scoped per test.
+    vi.clearAllMocks();
   });
 
   describe("Rendering", () => {

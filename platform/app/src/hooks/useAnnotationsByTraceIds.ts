@@ -83,7 +83,32 @@ export function useAnnotationsByTraceIds({
     ),
   );
 
-  const data = useMemo(() => results.flatMap((r) => r.data ?? []), [results]);
+  // `api.useQueries` hands back a NEW array on every render — react-query v4's
+  // QueriesObserver.getOptimisticResult maps over its observers each call — so
+  // memoising on `results` identity never hits, and `data` would be a fresh
+  // array every render. That is not merely wasteful: callers memoise on `data`,
+  // and an unstable value there propagates through their memo chains into
+  // effects that setState, which is how a render loop starts.
+  //
+  // Key on a content signature instead. `dataUpdatedAt` changes exactly when a
+  // chunk's data changes, and `status` covers the loading/error transitions, so
+  // this recomputes when the contents actually move and not otherwise. The
+  // chunk's own ids go in too: swap `traceIds` for a different, already-cached
+  // set of the same size and every chunk can settle on the same millisecond,
+  // leaving the timestamps identical and the memo serving the previous run's
+  // annotations.
+  const dataSignature = results
+    .map(
+      (r, i) => `${chunks[i]?.join(",") ?? ""}:${r.dataUpdatedAt}:${r.status}`,
+    )
+    .join("|");
+
+  const data = useMemo(
+    () => results.flatMap((r) => r.data ?? []),
+    // `results` is deliberately not a dependency — see above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dataSignature],
+  );
 
   return {
     data,

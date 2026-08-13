@@ -19,17 +19,25 @@ import {
   YAxis,
 } from "recharts";
 
+import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
 import { ChartTooltip } from "../analytics/ChartTooltip";
+import { buildJudgeAnnotationPairs } from "./buildJudgeAnnotationPairs";
 import { ComparisonLeaderboardChart } from "./ComparisonLeaderboardChart";
+import { ConfusionMatrixChart } from "./ConfusionMatrixChart";
 import {
   axisLabelProps,
   buildAxisLabels,
   chartHeightFor,
   truncateLabel,
 } from "./chartAxisLabels";
+import {
+  collectConfusionMatrixTraceIds,
+  EMPTY_TRACE_LOOKUP,
+} from "./collectConfusionMatrixTraceIds";
 import type {
   BatchComparisonColumn,
   BatchEvaluationData,
+  BatchEvaluatorResult,
   BatchResultRow,
   BatchTargetColumn,
   ComparisonRunData,
@@ -39,6 +47,138 @@ import { useResultsGrouping } from "./useResultsGrouping";
 import { useShowComparisonLeaderboard } from "./useShowComparisonLeaderboard";
 import { WinRateChart } from "./WinRateChart";
 
+/**
+ * Minimum resolved (annotated, non-conflicting) rows before the confusion
+ * matrix is offered at all — below this, a 2x2 table is two anecdotes, not
+ * a matrix, and showing it invites false confidence (mirrors the low-sample
+ * framing already used for the Bradley-Terry comparison leaderboard).
+ */
+const CONFUSION_MATRIX_MIN_ANNOTATED_ROWS = 5;
+
+/**
+ * Metric id for one confusion-matrix card.
+ *
+ * Must carry BOTH ids. A run has several targets and the same pass/fail
+ * evaluator scores all of them, so keying on the evaluator alone gave every
+ * target's card the same id: duplicate React keys, identical rows in the
+ * metrics menu, and toggling one card silently toggled all of them.
+ */
+const confusionMetricId = ({
+  targetId,
+  evaluatorId,
+}: {
+  targetId: string;
+  evaluatorId: string;
+}) => `confusion_${targetId}__${evaluatorId}` as MetricType;
+
+/**
+ * Stable empty-array fallback for `confusionMatrixRows` — a `?? []` literal
+ * would hand out a fresh reference on every render with no rows, breaking
+ * every downstream useMemo's referential stability and cascading into
+ * `availableMetrics` recomputing (and its consuming useEffect re-firing)
+ * on every render: an infinite render loop, not just wasted work.
+ */
+const EMPTY_ROWS: BatchResultRow[] = [];
+
+/** Same stability contract as `EMPTY_ROWS`, for the run's target columns. */
+const EMPTY_COLUMNS: BatchTargetColumn[] = [];
+
+/** One (target, evaluator) pairing that can be scored as a 2x2. */
+type PassFailTarget = {
+  targetId: string;
+  targetName: string;
+  evaluatorId: string;
+  evaluatorName: string;
+};
+
+/** Stable identity for the "no pass/fail evaluator here" path. */
+const EMPTY_PASS_FAIL_TARGETS: PassFailTarget[] = [];
+
+/**
+ * Whether one evaluator result is a verdict this chart can score: a
+ * resolvable pass/fail, and not a Comparison judge — a ranking judge picks a
+ * winner among variants, so it has no single "predicted class" to build a
+ * 2x2 from.
+ */
+const isPassFailVerdict = ({
+  result,
+  comparisonEvaluatorIds,
+}: {
+  result: BatchEvaluatorResult;
+  comparisonEvaluatorIds: Set<string>;
+}): boolean =>
+  !comparisonEvaluatorIds.has(result.evaluatorId) &&
+  // A skipped or errored evaluation can still carry a `passed` value, and
+  // scoring it would enter a verdict the judge never actually reached.
+  result.status === "processed" &&
+  result.passed !== null &&
+  result.passed !== undefined;
+
+const passFailPairingsInRow = ({
+  row,
+  comparisonEvaluatorIds,
+}: {
+  row: BatchResultRow;
+  comparisonEvaluatorIds: Set<string>;
+}): { targetId: string; evaluatorId: string; evaluatorName: string }[] => {
+  const pairings: {
+    targetId: string;
+    evaluatorId: string;
+    evaluatorName: string;
+  }[] = [];
+
+  for (const [targetId, target] of Object.entries(row.targets)) {
+    for (const result of target.evaluatorResults) {
+      if (!isPassFailVerdict({ result, comparisonEvaluatorIds })) continue;
+      pairings.push({
+        targetId,
+        evaluatorId: result.evaluatorId,
+        evaluatorName: result.evaluatorName,
+      });
+    }
+  }
+
+  return pairings;
+};
+
+/**
+ * Every distinct (targetId, evaluatorId) pairing with a resolvable pass/fail
+ * verdict anywhere in the run.
+ *
+ * The same evaluator runs against every target, so a card is only
+ * identifiable by BOTH ids — hence the target name travels with the pairing,
+ * to label the otherwise identical cards apart.
+ */
+const collectPassFailTargets = ({
+  rows,
+  comparisonEvaluatorIds,
+  targetNameById,
+}: {
+  rows: BatchResultRow[];
+  comparisonEvaluatorIds: Set<string>;
+  targetNameById: Map<string, string>;
+}): PassFailTarget[] => {
+  const seen = new Set<string>();
+  const targets: PassFailTarget[] = [];
+
+  for (const row of rows) {
+    for (const pairing of passFailPairingsInRow({
+      row,
+      comparisonEvaluatorIds,
+    })) {
+      const key = `${pairing.targetId}::${pairing.evaluatorId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      targets.push({
+        ...pairing,
+        targetName: targetNameById.get(pairing.targetId) ?? pairing.targetId,
+      });
+    }
+  }
+
+  return targets;
+};
+
 /** Metric types that can be displayed */
 type MetricType =
   | "cost"
@@ -46,7 +186,8 @@ type MetricType =
   | `score_${string}`
   | `pass_${string}`
   | `comparison_${string}`
-  | `leaderboard_${string}`;
+  | `leaderboard_${string}`
+  | `confusion_${string}`;
 
 /** Available metric definition */
 type MetricDefinition = {
@@ -58,7 +199,8 @@ type MetricDefinition = {
     | "score"
     | "passRate"
     | "comparison"
-    | "leaderboard";
+    | "leaderboard"
+    | "confusion";
   evaluatorId?: string;
 };
 
@@ -140,6 +282,13 @@ type ComparisonChartsProps = {
    * through per-run in `comparisonData`.
    */
   comparisonRows?: BatchResultRow[];
+  /**
+   * Whether the judge-vs-reviewer confusion matrix is available at all
+   * (release_ui_judge_annotation_confusion_matrix_enabled). Additive to the
+   * existing per-evaluator pass-rate chart — gated separately since it's a
+   * power-user surface, not a replacement.
+   */
+  showConfusionMatrix?: boolean;
 };
 
 type EvaluatorMetrics = {
@@ -407,6 +556,7 @@ export const ComparisonCharts = ({
   onTargetColorsChange,
   comparisonColumns,
   comparisonRows,
+  showConfusionMatrix,
 }: ComparisonChartsProps) => {
   // Rollout gate for the Bradley-Terry leaderboard (#5103). Read here rather
   // than passed in as a prop so the flag cannot drift from the two surfaces it
@@ -907,6 +1057,129 @@ export const ComparisonCharts = ({
     return evaluators;
   }, [runMetrics]);
 
+  // Judge-vs-reviewer confusion matrix candidates. Row-level data (not the
+  // run-aggregated `runMetrics`) is required here, since annotation matching
+  // needs each target's actual trace id — only available on `comparisonData`'s
+  // first run's rows. Multi-run compare mode is out of scope for v1 (matches
+  // the single-run assumption `ComparisonLeaderboardChart`'s data source
+  // makes): this feature simply doesn't offer itself when comparing runs.
+  const firstRunData =
+    comparisonData.length === 1 ? (comparisonData[0]?.data ?? null) : null;
+  // `?? EMPTY_ROWS` (a module-level stable reference), NOT `?? []` — a fresh
+  // array literal on every render with no rows would break every downstream
+  // useMemo's referential stability, cascading into availableMetrics
+  // recomputing every render and re-firing its consuming useEffect forever
+  // (an infinite render loop, not just wasted work).
+  const confusionMatrixRows = firstRunData?.rows ?? EMPTY_ROWS;
+  const confusionMatrixProjectId = firstRunData?.projectId;
+  const confusionMatrixColumns = firstRunData?.targetColumns ?? EMPTY_COLUMNS;
+  // The names are only used to label otherwise identical cards apart, so a
+  // digest of the ids and names is everything the pipeline below reacts to.
+  // Keying on it instead of on the columns array keeps a parent re-render that
+  // rebuilds the array around the same columns from re-firing the whole matrix
+  // pipeline, which walks every row of the run. Serialised rather than joined
+  // on a separator, so no id or name can spell one and collide two different
+  // column sets into the same key.
+  const targetColumnsKey = JSON.stringify(
+    confusionMatrixColumns.map((column) => [column.id, column.name]),
+  );
+
+  const targetNameById = useMemo(
+    () =>
+      new Map(confusionMatrixColumns.map((column) => [column.id, column.name])),
+    // Keyed on the digest above rather than on the array, deliberately: the
+    // digest already covers every field this map reads.
+    [targetColumnsKey],
+  );
+
+  const passFailTargets = useMemo(() => {
+    if (!showConfusionMatrix) return EMPTY_PASS_FAIL_TARGETS;
+    return collectPassFailTargets({
+      rows: confusionMatrixRows,
+      comparisonEvaluatorIds,
+      targetNameById,
+    });
+  }, [
+    confusionMatrixRows,
+    comparisonEvaluatorIds,
+    showConfusionMatrix,
+    targetNameById,
+  ]);
+
+  const confusionMatrixLookup = useMemo(() => {
+    if (passFailTargets.length === 0) return EMPTY_TRACE_LOOKUP;
+    return collectConfusionMatrixTraceIds({
+      rows: confusionMatrixRows,
+      targetIds: new Set(passFailTargets.map((target) => target.targetId)),
+    });
+  }, [confusionMatrixRows, passFailTargets]);
+
+  const { data: confusionMatrixAnnotations } = useAnnotationsByTraceIds({
+    projectId: confusionMatrixProjectId ?? "",
+    traceIds: confusionMatrixLookup.traceIds,
+    // Gated on isVisible: the charts panel collapses, and paying a
+    // multi-request fan-out for a chart nobody is looking at is the kind of
+    // cost that only shows up in someone else's slow page.
+    enabled:
+      !!showConfusionMatrix &&
+      !!isVisible &&
+      !!confusionMatrixProjectId &&
+      confusionMatrixLookup.traceIds.length > 0,
+  });
+
+  const annotationsByTraceId = useMemo(() => {
+    const map = new Map<string, typeof confusionMatrixAnnotations>();
+    for (const annotation of confusionMatrixAnnotations) {
+      const existing = map.get(annotation.traceId) ?? [];
+      existing.push(annotation);
+      map.set(annotation.traceId, existing);
+    }
+    return map;
+  }, [confusionMatrixAnnotations]);
+
+  // Each candidate's resolved judge/reviewer pairs, keyed by evaluatorId —
+  // only ones meeting the annotation floor become an available metric.
+  const confusionMatrixData = useMemo(() => {
+    // Annotation lookup is capped, so past the cap a row's annotations were
+    // never fetched and "not annotated" would be a lie. The lookup reports how
+    // many whole rows it reached, so score exactly those and mark the slice so
+    // the drawer can say so. A row the cap cut in half is excluded outright:
+    // its later targets were never fetched, so scoring them would invent
+    // agreement out of a request that was never made.
+    const { coveredRows, truncated } = confusionMatrixLookup;
+    const scoredRows = truncated
+      ? confusionMatrixRows.slice(0, coveredRows)
+      : confusionMatrixRows;
+
+    return passFailTargets
+      .map((candidate) => ({
+        ...candidate,
+        coverage: {
+          ...buildJudgeAnnotationPairs({
+            rows: scoredRows,
+            targetId: candidate.targetId,
+            evaluatorId: candidate.evaluatorId,
+            annotationsByTraceId,
+          }),
+          // The builder only saw the slice, so it reports the slice as the
+          // run. The run's real row count is what makes the coverage figure
+          // readable: a bounded walk otherwise reads as near-full coverage.
+          runRows: confusionMatrixRows.length,
+          truncated,
+        },
+      }))
+      .filter(
+        (candidate) =>
+          candidate.coverage.pairs.length >=
+          CONFUSION_MATRIX_MIN_ANNOTATED_ROWS,
+      );
+  }, [
+    passFailTargets,
+    confusionMatrixRows,
+    confusionMatrixLookup,
+    annotationsByTraceId,
+  ]);
+
   // Build available metrics list
   const availableMetrics: MetricDefinition[] = useMemo(
     () => [
@@ -928,28 +1201,41 @@ export const ComparisonCharts = ({
         columns: comparisonColumns ?? [],
         showLeaderboard: showComparisonLeaderboard,
       }),
+      // Judge-vs-reviewer confusion matrix — only meaningful once a pass/fail
+      // evaluator has enough annotated rows, so `confusionMatrixData` is
+      // already empty both when the flag is off and when coverage is thin.
+      ...confusionMatrixData.map((candidate) => ({
+        id: confusionMetricId(candidate),
+        // Names the target too, since the same evaluator produces one card
+        // per target and the rows would otherwise be indistinguishable.
+        name: `${candidate.evaluatorName} vs reviewers — ${candidate.targetName}`,
+        type: "confusion" as const,
+        evaluatorId: candidate.evaluatorId,
+      })),
     ],
     [
       scoreEvaluators,
       passRateEvaluators,
       comparisonColumns,
       showComparisonLeaderboard,
+      confusionMatrixData,
     ],
   );
 
   // Show every metric the run offers, including ones that appear later.
   //
-  // The previous guard keyed off `internalVisibleMetrics.size <= 2`, which
-  // fails in both directions. A metric that becomes available after the first
-  // load — a comparison column arriving with run data, an evaluator finishing
-  // — was never switched on, because by then the set had grown past two; a
-  // chart nobody knows to look for is a chart nobody finds. And since the
-  // initial set is exactly {cost, latency}, a run offering only those two kept
-  // the guard true forever, setting a fresh Set on every pass.
+  // Two problems with keying this off `internalVisibleMetrics.size <= 2`, the
+  // previous guard. It never re-fired once three metrics were visible, so a
+  // metric that becomes available afterwards — annotations finish loading, an
+  // evaluator finishes running — stayed switched off, and a feature nobody
+  // knows to look for is a feature nobody finds. And because the initial set
+  // is exactly {cost, latency}, a run offering only those two kept the guard
+  // true forever: each pass set a NEW Set, re-rendering, and if
+  // `availableMetrics` churned identity it could re-fire without end.
   //
-  // Track which ids have already been offered instead. Newly-offered metrics
-  // switch on once; anything the user has since unchecked stays unchecked,
-  // because it is already in `seen`.
+  // Track which ids have been offered instead. Newly-offered ones switch on;
+  // ids the user has since unchecked are never resurrected, because they are
+  // already in `seen`.
   const seenMetricIdsRef = useRef<Set<MetricType>>(new Set());
   useEffect(() => {
     const unseen = availableMetrics
@@ -1611,6 +1897,25 @@ export const ComparisonCharts = ({
                       </BarChart>
                     </ResponsiveContainer>
                   </Box>
+                ),
+            )}
+
+            {/* Judge-vs-reviewer confusion matrix — one per pass/fail
+                evaluator with enough annotation coverage. Rendered in the
+                same flex row as its siblings, gated on `visibleMetrics`. */}
+            {confusionMatrixData.map(
+              (candidate) =>
+                visibleMetrics.has(confusionMetricId(candidate)) && (
+                  <ConfusionMatrixChart
+                    key={confusionMetricId(candidate)}
+                    evaluatorId={candidate.evaluatorId}
+                    evaluatorName={candidate.evaluatorName}
+                    targetName={candidate.targetName}
+                    targetId={candidate.targetId}
+                    coverage={candidate.coverage}
+                    rows={confusionMatrixRows}
+                    chartHeight={chartHeight}
+                  />
                 ),
             )}
           </HStack>

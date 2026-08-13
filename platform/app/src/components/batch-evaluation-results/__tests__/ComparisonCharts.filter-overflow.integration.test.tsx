@@ -15,6 +15,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { STABLE_EMPTY_QUERY_RESULTS } from "~/test-utils/stableEmptyQueryResults";
+
 // ComparisonCharts reads the leaderboard rollout flag, which reaches for the
 // organization context and tRPC. Neither is mounted here, and none of these
 // tests are about the leaderboard.
@@ -24,6 +26,17 @@ vi.mock("../useShowComparisonLeaderboard", () => ({
 
 import { ComparisonCharts } from "../ComparisonCharts";
 import type { ComparisonRunData } from "../types";
+
+// ComparisonCharts reads annotations through tRPC's `useQueries`, which
+// touches the tRPC context unconditionally — an `enabled: false` guard does
+// not spare it, so rendering under a bare ChakraProvider would throw
+// "Cannot destructure property 'ssrState'". See the fixture for why the
+// result array must be one constant.
+vi.mock("~/utils/api", () => ({
+  api: {
+    useQueries: vi.fn(() => STABLE_EMPTY_QUERY_RESULTS),
+  },
+}));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
