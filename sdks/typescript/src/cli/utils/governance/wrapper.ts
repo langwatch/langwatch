@@ -18,11 +18,11 @@ import { spawn } from "node:child_process";
 import { normalizeEndpoint } from "../../../internal/endpoint";
 import { lwTag } from "./brand";
 import { checkBudget, renderBudgetExceeded } from "./budget";
+import { updateLangwatchClaudePlugin } from "./claude-plugin";
 import { getCliBootstrap } from "./cli-api";
 import { createCodexIOStreamer } from "./codex-rollout-otlp";
 import type { GovernanceConfig } from "./config";
 import { isLoggedIn, loadConfig, saveConfig } from "./config";
-import { updateLangwatchClaudePlugin } from "./claude-plugin";
 import {
 	copilotGatewayModelPreflight,
 	copilotPrespawnWarnings,
@@ -581,7 +581,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 		onCheckStart: () =>
 			process.stderr.write(
 				`${lwTag()} checking whether the LangWatch plugin for Claude Code ` +
-					`is up to date (once a day).\n`,
+					`is up to date.\n`,
 			),
 	});
 	if (pluginUpdate.action === "updated") {

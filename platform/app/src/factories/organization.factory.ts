@@ -1,6 +1,6 @@
-import { type Organization, PricingModel } from "@prisma/client";
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
+import { type Organization, PricingModel } from "~/generated/prisma/client";
 
 export const organizationFactory = Factory.define<
   Omit<Organization, "stripeCustomerId" | "currency" | "signupData">

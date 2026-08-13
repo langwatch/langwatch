@@ -11,10 +11,10 @@
  * @see specs/features/suites/suite-sidebar-status-summary.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { SimulationSuite } from "@prisma/client";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { SimulationSuite } from "~/generated/prisma/client";
 
 // VoiceAgentsCallout pulls project context via useOrganizationTeamProject,
 // which in turn fires tRPC queries the bare SuiteSidebar test rig doesn't

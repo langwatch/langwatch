@@ -114,9 +114,9 @@ function retryEligibleRequestBody(
     return undefined;
   }
   if (typeof parsed !== "object" || parsed === null) return undefined;
-  const carriesTools =
+  const hasTools =
     Array.isArray(parsed.tools) && (parsed.tools as unknown[]).length > 0;
-  if (!carriesTools || parsed.reasoning_effort !== undefined) return undefined;
+  if (!hasTools || parsed.reasoning_effort !== undefined) return undefined;
   return parsed;
 }
 

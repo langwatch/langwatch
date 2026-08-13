@@ -1,7 +1,6 @@
 package langwatch
 
 import (
-	"encoding/base64"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -29,35 +28,35 @@ func TestBuildAuthHeaders_EmptyApiKey(t *testing.T) {
 	assert.Empty(t, buildAuthHeaders("", ""))
 }
 
-func TestBuildAuthHeaders_LegacyKey(t *testing.T) {
+func TestBuildAuthHeaders_KeyWithoutProjectID(t *testing.T) {
 	t.Setenv("LANGWATCH_PROJECT_ID", "")
 	headers := buildAuthHeaders("sk-lw-legacy", "")
 
 	assert.Equal(t, "Bearer sk-lw-legacy", headers["Authorization"])
-	assert.Equal(t, "sk-lw-legacy", headers["X-Auth-Token"])
+	assert.NotContains(t, headers, "X-Project-Id", "no project id is sent when none is known")
+	assert.NotContains(t, headers, "X-Auth-Token", "the legacy header is no longer emitted")
 }
 
-func TestBuildAuthHeaders_PATWithExplicitProjectID(t *testing.T) {
+func TestBuildAuthHeaders_KeyWithProjectID(t *testing.T) {
+	t.Setenv("LANGWATCH_PROJECT_ID", "")
+	headers := buildAuthHeaders("sk-lw-legacy", "project_123")
+
+	assert.Equal(t, "Bearer sk-lw-legacy", headers["Authorization"])
+	assert.Equal(t, "project_123", headers["X-Project-Id"])
+}
+
+func TestBuildAuthHeaders_PATWithProjectID(t *testing.T) {
 	t.Setenv("LANGWATCH_PROJECT_ID", "")
 	headers := buildAuthHeaders("pat-lw-abc_secret", "project_123")
 
-	expected := base64.StdEncoding.EncodeToString([]byte("project_123:pat-lw-abc_secret"))
-	assert.Equal(t, "Basic "+expected, headers["Authorization"])
-	assert.Empty(t, headers["X-Auth-Token"], "PATs with Basic Auth must not also emit the legacy header")
+	assert.Equal(t, "Bearer pat-lw-abc_secret", headers["Authorization"])
+	assert.Equal(t, "project_123", headers["X-Project-Id"])
 }
 
-func TestBuildAuthHeaders_PATUsesEnvProjectID(t *testing.T) {
+func TestBuildAuthHeaders_UsesEnvProjectID(t *testing.T) {
 	t.Setenv("LANGWATCH_PROJECT_ID", "env_project")
 	headers := buildAuthHeaders("pat-lw-envtok", "")
 
-	expected := base64.StdEncoding.EncodeToString([]byte("env_project:pat-lw-envtok"))
-	assert.Equal(t, "Basic "+expected, headers["Authorization"])
-}
-
-func TestBuildAuthHeaders_PATFallsBackToBearerWithoutProjectID(t *testing.T) {
-	t.Setenv("LANGWATCH_PROJECT_ID", "")
-	headers := buildAuthHeaders("pat-lw-nopid", "")
-
-	assert.Equal(t, "Bearer pat-lw-nopid", headers["Authorization"])
-	assert.Equal(t, "pat-lw-nopid", headers["X-Auth-Token"])
+	assert.Equal(t, "Bearer pat-lw-envtok", headers["Authorization"])
+	assert.Equal(t, "env_project", headers["X-Project-Id"])
 }

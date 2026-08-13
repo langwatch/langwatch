@@ -237,7 +237,7 @@ function ReportsContent() {
               onGraphSizeChange={handleGraphSizeChange}
               onGraphsReorder={handleGraphsReorder}
               deletingGraphId={
-                deleteGraph.isLoading
+                deleteGraph.isPending
                   ? (deleteGraph.variables?.id ?? null)
                   : null
               }

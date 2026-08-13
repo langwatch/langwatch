@@ -5,8 +5,9 @@
  * organization up front, so these lookups must never return or affect
  * another organization's role.
  */
-import { Prisma, type PrismaClient } from "@prisma/client";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { RoleService } from "../role.service";
 
 function buildMockPrisma() {

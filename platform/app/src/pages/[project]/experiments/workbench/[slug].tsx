@@ -59,7 +59,7 @@ export default function ExperimentsWorkbenchPage() {
   const updatePrompt = api.prompts.update.useMutation();
   const upsertDataset = api.dataset.upsert.useMutation();
   const createDatasetRecords = api.datasetRecord.create.useMutation();
-  const utils = api.useContext();
+  const utils = api.useUtils();
   const { execute: executeEvaluation } = useExecuteEvaluation();
   const { openDrawer } = useDrawer();
 

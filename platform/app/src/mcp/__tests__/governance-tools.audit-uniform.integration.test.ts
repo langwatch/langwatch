@@ -16,13 +16,14 @@
  * Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
  *       (@audit-uniform)
  */
+
+import { nanoid } from "nanoid";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { beforeAll, describe, expect, it } from "vitest";
+} from "~/generated/prisma/client";
 
 import { prisma } from "~/server/db";
 

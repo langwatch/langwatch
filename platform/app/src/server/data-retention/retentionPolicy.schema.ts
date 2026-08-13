@@ -310,6 +310,38 @@ const SHADOW_METRIC_STORAGE_TABLES = new Set<RetentionManagedTable>([
   "metric_time_rollups",
 ]);
 
+/**
+ * Retention-managed tables that carry no `_size_bytes` column, so nothing can
+ * meter them.
+ *
+ * Migration 00032 added `_size_bytes` to every table that existed then, and
+ * tables created afterwards declare it themselves (00047, 00049, 00050). The
+ * ADR-034 analytics projections are the gap: they were added to the retention
+ * map, which is what enrolls a table in metering, but their migrations
+ * (00038 to 00041) never declared the column.
+ *
+ * Metering them therefore raises UNKNOWN_IDENTIFIER rather than returning a
+ * number. That is not contained to the four tables: they are summed in one
+ * UNION ALL with everything else, so the single-query total fails outright and
+ * every call falls back to the per-table breakdown, which is the path whose
+ * `byteSize(...)` recompute on un-materialized parts is the known memory and
+ * timeout hazard. The four then fail again individually and degrade to zero.
+ *
+ * Excluding them here leaves every tenant's reported total exactly as it is
+ * today (the failing queries already contribute zero) and restores the single
+ * aggregate for the tables that can answer. Metering them for real means
+ * adding the column and deciding whether their bytes should be billed, which
+ * is tracked separately.
+ */
+const TABLES_WITHOUT_SIZE_COLUMN = new Set<RetentionManagedTable>([
+  "trace_analytics",
+  "trace_analytics_rollup",
+  "evaluation_analytics",
+  "evaluation_analytics_rollup",
+]);
+
 export const PRODUCTION_STORAGE_METER_TABLES = RETENTION_MANAGED_TABLES.filter(
-  (table) => !SHADOW_METRIC_STORAGE_TABLES.has(table),
+  (table) =>
+    !SHADOW_METRIC_STORAGE_TABLES.has(table) &&
+    !TABLES_WITHOUT_SIZE_COLUMN.has(table),
 );

@@ -13,6 +13,8 @@ const span = {
   parentSpanId: null,
   name: "web_search",
   type: "tool",
+  // The pill under the name, which goes with the row when it is removed.
+  toolName: "search_the_web",
   startTimeMs: 0,
   endTimeMs: 10,
   durationMs: 10,
@@ -53,21 +55,47 @@ describe("TreeRow with a correction", () => {
   afterEach(cleanup);
 
   describe("given a span a correction removes", () => {
-    describe("when the reader is on the captured trace", () => {
-      /** @scenario "A deleted span is marked in the captured trace" */
+    describe("when the reader is on the corrected trace", () => {
+      /** @scenario "A deleted span is listed and struck through in the corrected trace" */
       it("lists the span and marks it as deleted", () => {
         const { getByText } = renderRow({ isDeletedByCorrection: true });
 
         expect(getByText("web_search")).toBeInTheDocument();
         expect(getByText("Deleted")).toBeInTheDocument();
       });
+
+      /** @scenario "A deleted span is listed and struck through in the corrected trace" */
+      it("strikes through its name and the tool it ran", () => {
+        const { getByText } = renderRow({ isDeletedByCorrection: true });
+
+        expect(getByText("web_search")).toHaveStyle({
+          textDecoration: "line-through",
+        });
+        expect(getByText("search_the_web")).toHaveStyle({
+          textDecoration: "line-through",
+        });
+      });
+
+      /** @scenario "A deleted span is not also coloured as changed" */
+      it("does not also read as edited", () => {
+        const { queryByText } = renderRow({
+          isDeletedByCorrection: true,
+          isCorrected: true,
+        });
+
+        expect(queryByText("Edited")).not.toBeInTheDocument();
+      });
     });
 
-    describe("when the reader is on the corrected trace", () => {
-      it("carries no marker, because the row is not there at all", () => {
-        const { queryByText } = renderRow();
+    describe("when the reader is on the captured trace", () => {
+      /** @scenario "A deleted span reads plainly in the captured trace" */
+      it("reads like any other row, with nothing said about the removal", () => {
+        const { getByText, queryByText } = renderRow();
 
         expect(queryByText("Deleted")).not.toBeInTheDocument();
+        expect(getByText("web_search")).not.toHaveStyle({
+          textDecoration: "line-through",
+        });
       });
     });
   });

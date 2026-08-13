@@ -30,11 +30,14 @@
 
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { CustomGraph, Prisma, PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
-
 import { GOVERNED_QUERY_RESULT_DATASET } from "~/features/analytics-query/visualization/governedDatasetNames";
 import { validateVegaLiteSpecStructure } from "~/features/analytics-query/visualization/validateVegaLiteSpec";
+import type {
+  CustomGraph,
+  Prisma,
+  PrismaClient,
+} from "~/generated/prisma/client";
 
 import type { Protections } from "../../traces/protections";
 import {

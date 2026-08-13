@@ -157,7 +157,7 @@ vi.mock("~/utils/api", () => ({
         },
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       agents: {
         getAll: { invalidate: vi.fn() },
         getById: { invalidate: vi.fn() },

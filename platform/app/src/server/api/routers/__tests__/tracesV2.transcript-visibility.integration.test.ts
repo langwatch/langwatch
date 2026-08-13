@@ -15,7 +15,7 @@
  * bare spelling hands a session-less caller the namespaced agents' content
  * whatever the policy says.
  */
-import type { Project } from "@prisma/client";
+
 import {
   afterAll,
   beforeAll,
@@ -25,6 +25,7 @@ import {
   it,
   vi,
 } from "vitest";
+import type { Project } from "~/generated/prisma/client";
 
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestProject } from "../../../../utils/testUtils";
