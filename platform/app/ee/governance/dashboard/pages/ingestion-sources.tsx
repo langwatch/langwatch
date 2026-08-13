@@ -67,6 +67,7 @@ type SourceType =
   | "copilot_studio"
   | "openai_compliance"
   | "claude_compliance"
+  | "anthropic_admin"
   | "databricks_genie"
   | "s3_custom"
   | "http_custom";
@@ -124,6 +125,13 @@ const SOURCE_TYPE_OPTIONS: Array<{
     label: "Anthropic Claude Enterprise Compliance",
     mode: "pull",
     blurb: "Polls Anthropic's compliance API with a workspace API key.",
+  },
+  {
+    value: "anthropic_admin",
+    label: "Anthropic Admin API (usage & cost)",
+    mode: "pull",
+    blurb:
+      "Polls Anthropic's organization usage/cost reports with an Admin API key (sk-ant-admin-...). Pick ONE report per source: usage (token counts, we price them) or cost (invoice amounts, carried verbatim). Never create both for the same org — the same spend would be counted twice.",
   },
   {
     value: "databricks_genie",
@@ -198,6 +206,7 @@ const PULL_ADAPTER_FOR_SOURCE: Partial<Record<SourceType, string>> = {
   copilot_studio: "copilot_studio",
   openai_compliance: "openai_compliance",
   claude_compliance: "claude_compliance",
+  anthropic_admin: "anthropic_admin",
   databricks_genie: "databricks_genie",
   http_custom: "http_polling",
 };
@@ -212,6 +221,7 @@ const PULL_SCHEDULE_DEFAULTS: Record<string, string> = {
   copilot_studio: "*/15 * * * *",
   openai_compliance: "*/15 * * * *",
   claude_compliance: "*/15 * * * *",
+  anthropic_admin: "0 * * * *",
   databricks_genie: "*/15 * * * *",
   http_polling: "*/15 * * * *",
 };
@@ -331,9 +341,11 @@ function IngestionSourcesPage() {
         ? buildHttpCustomPullConfig(composer)
         : composer.sourceType === "databricks_genie"
           ? buildDatabricksGeniePullConfig(composer)
-          : pullAdapter
-            ? { adapter: pullAdapter }
-            : null;
+          : composer.sourceType === "anthropic_admin"
+            ? buildAnthropicAdminPullConfig(composer)
+            : pullAdapter
+              ? { adapter: pullAdapter }
+              : null;
     if (composer.sourceType === "http_custom" && !pullConfig) {
       // buildHttpCustomPullConfig returns null when required fields are
       // empty - keep the drawer open so the user can fix the form.
@@ -341,6 +353,15 @@ function IngestionSourcesPage() {
         title: "Missing required HTTP source fields",
         description:
           "URL, auth header value, token, events JSONPath, cursor JSONPath, and event mapping are all required.",
+        type: "error",
+      });
+      return;
+    }
+    if (composer.sourceType === "anthropic_admin" && !pullConfig) {
+      toaster.create({
+        title: "Missing or invalid Anthropic fields",
+        description:
+          "Admin API key is required, report must be `usage` or `cost`, bucket width is usage-only and must be 1m/1h/1d, and the backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z).",
         type: "error",
       });
       return;
@@ -1069,6 +1090,37 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       placeholder: "300",
     },
   ],
+  anthropic_admin: [
+    {
+      // `credentials*` prefix routes this into the encrypted `credentials`
+      // subtree — same rule as the Genie token below.
+      key: "credentialsToken",
+      label: "Admin API key",
+      placeholder: "sk-ant-admin-...",
+      hint: "Generate under Anthropic Admin Console → API Keys → Admin Keys. A regular workspace key returns 401 on the organization reports. We encrypt this server-side.",
+      required: true,
+      secret: true,
+    },
+    {
+      key: "report",
+      label: "Report (usage or cost)",
+      placeholder: "cost",
+      hint: "Exactly one per source. `cost` carries Anthropic's invoice amounts verbatim; `usage` pulls token counts that we price ourselves. Never create both reports for the same organization — the same spend would be counted twice.",
+      required: true,
+    },
+    {
+      key: "bucketWidth",
+      label: "Bucket width (optional, usage report only)",
+      placeholder: "1d",
+      hint: "1m, 1h or 1d. Only affects the usage report; cost is always daily. Default 1d.",
+    },
+    {
+      key: "startingAt",
+      label: "Backfill start (optional)",
+      placeholder: "2026-08-01",
+      hint: "The date the first run reads from: `2026-08-01`, or an instant carrying a timezone (`2026-08-01T00:00:00Z`). A time without a timezone is rejected rather than read as yours. Empty = 24 hours back.",
+    },
+  ],
   databricks_genie: [
     {
       key: "workspaceUrl",
@@ -1284,6 +1336,111 @@ function buildHttpCustomPullConfig(
 }
 
 /**
+ * The Anthropic Admin adapter config, or null when a required field is empty
+ * or `report` is not one of the two values the adapter accepts. Nothing
+ * validates pullConfig against the adapter schema at save time — a bad value
+ * here would sit in the row looking fine and fail on every pull — so the
+ * builder is the last checkpoint before the database.
+ */
+export function buildAnthropicAdminPullConfig(
+  c: ComposerState,
+): Record<string, unknown> | null {
+  const p = c.parserConfig;
+  const token = trimmedField(p, "credentialsToken");
+  const report = trimmedField(p, "report").toLowerCase();
+  if (!token) return null;
+  if (report !== "usage" && report !== "cost") return null;
+
+  const bucketWidth = validBucketWidth(trimmedField(p, "bucketWidth"), report);
+  if (bucketWidth === null) return null;
+
+  const startingAt = normalizeStartingAt(trimmedField(p, "startingAt"));
+  if (startingAt === null) return null;
+
+  return {
+    adapter: "anthropic_admin",
+    report,
+    ...(bucketWidth ? { bucketWidth } : {}),
+    ...(startingAt ? { startingAt } : {}),
+    schedule:
+      c.pullSchedule.trim() ||
+      PULL_SCHEDULE_DEFAULTS.anthropic_admin ||
+      "0 * * * *",
+    credentials: { token },
+  };
+}
+
+/** One composer field, trimmed, with an absent key reading as empty. */
+function trimmedField(p: Record<string, string>, key: string): string {
+  return (p[key] ?? "").trim();
+}
+
+/**
+ * The bucket width to store, or null when it is one the adapter will not honour.
+ *
+ * Only the usage report reads this. The cost report pins `1d` — the puller sends
+ * `COST_REPORT_BUCKET_WIDTH` and deliberately ignores `config.bucketWidth` — so
+ * saving `1m` on a cost source writes a setting that silently never applies, and
+ * the form's own hint already promises the opposite.
+ *
+ * Empty yields undefined (the field is optional); rejected yields null.
+ */
+function validBucketWidth(
+  raw: string,
+  report: string,
+): string | null | undefined {
+  if (!raw) return undefined;
+  if (report !== "usage") return null;
+  return ["1m", "1h", "1d"].includes(raw) ? raw : null;
+}
+
+/** Whether y-m-d is a date that exists, rather than one Date would roll forward. */
+function isRealCalendarDate(year: number, month: number, day: number): boolean {
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  return (
+    probe.getUTCFullYear() === year &&
+    probe.getUTCMonth() === month - 1 &&
+    probe.getUTCDate() === day
+  );
+}
+
+/**
+ * A bare `YYYY-MM-DD`, or a timestamp carrying an explicit offset. Anything else
+ * is rejected rather than guessed.
+ *
+ * The two shapes are the ones `Date.parse` reads unambiguously. An offset-less
+ * `2026-08-01T00:00` is spec'd as *local* time, so the same typed value would
+ * mean a different instant for an admin in Amsterdam than one in Tokyo.
+ */
+const STARTING_AT =
+  /^(\d{4})-(\d{2})-(\d{2})(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2}))?$/;
+
+/**
+ * ISO-normalizes an admin-typed backfill start for the adapter's
+ * `z.string().datetime()`.
+ *
+ * Strict on purpose: `Date.parse` rolls `2026-02-30` forward to March 2 instead
+ * of failing, which would silently backfill from a date nobody chose.
+ *
+ * Empty is not an error — the field is optional — so it yields undefined, while
+ * anything rejected yields null for the caller to turn into a toast.
+ */
+function normalizeStartingAt(raw: string): string | null | undefined {
+  if (!raw) return undefined;
+
+  const match = STARTING_AT.exec(raw);
+  if (!match) return null;
+  if (
+    !isRealCalendarDate(Number(match[1]), Number(match[2]), Number(match[3]))
+  ) {
+    return null;
+  }
+
+  const parsed = Date.parse(raw);
+  return Number.isNaN(parsed) ? null : new Date(parsed).toISOString();
+}
+
+/**
  * The Databricks Genie adapter config, or null when a required field is empty.
  *
  * Genie needs a real builder rather than the bare `{ adapter }` the other
@@ -1421,6 +1578,11 @@ function PullScheduleField({
  */
 const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
   {
+    // `report`/`bucketWidth` pass through unchanged, but `startingAt` is
+    // normalized to an ISO instant by the builder — the raw form value
+    // winning the merge would fail the adapter's `.datetime()` check at
+    // pull time.
+    anthropic_admin: ["report", "bucketWidth", "startingAt"],
     databricks_genie: ["workspaceUrl", "spaceIds"],
   };
 
