@@ -1,4 +1,5 @@
 export * from "./_constants";
+export { BedrockExtractor } from "./bedrock";
 export { ClaudeCodeExtractor } from "./claudeCode";
 export { CodexExtractor } from "./codex";
 export { CopilotExtractor } from "./copilot";

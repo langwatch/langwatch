@@ -55,7 +55,9 @@ export const extractMessageContentText = (message: unknown): string | null => {
  * Handles plain strings, {type:"text", text:...}, {text:...}, {content:...},
  * {type:"thinking", thinking:...}, {type:"tool_use", input:...}, and
  * {type:"tool_result", content:...} so unwrapped Anthropic typed blocks
- * still surface as a meaningful raw match.
+ * still surface as a meaningful raw match. Also handles the AWS Bedrock
+ * Converse block union, which is discriminated by which key is present
+ * rather than a `type` field: {toolUse:{...}} and {toolResult:{content:[...]}}.
  */
 const extractTextsFromParts = (parts: unknown[]): string[] => {
   const texts: string[] = [];
@@ -81,6 +83,21 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
         }
       } else if (p.type === "tool_result" && Array.isArray(p.content)) {
         const inner = extractTextsFromParts(p.content);
+        if (inner.length > 0) texts.push(inner.join("\n"));
+      } else if (isRecord(p.toolUse)) {
+        const input = (p.toolUse as Record<string, unknown>).input;
+        try {
+          texts.push(JSON.stringify(input ?? p.toolUse));
+        } catch {
+          // ignore unstringifiable inputs
+        }
+      } else if (
+        isRecord(p.toolResult) &&
+        Array.isArray((p.toolResult as Record<string, unknown>).content)
+      ) {
+        const inner = extractTextsFromParts(
+          (p.toolResult as Record<string, unknown>).content as unknown[],
+        );
         if (inner.length > 0) texts.push(inner.join("\n"));
       }
     }
