@@ -29,7 +29,9 @@ export const SQS_SECRET_ENV = "LANGWATCH_SQS_SECRET_ACCESS_KEY";
 
 export function sqsSecretFromEnv(): string | undefined {
   const secret = process.env[SQS_SECRET_ENV]?.trim();
-  return secret ? secret : undefined;
+  // A variable set to whitespace is a variable someone meant to fill in, so
+  // it reads as absent rather than as a secret that will fail at AWS.
+  return secret === "" ? undefined : secret;
 }
 
 /**

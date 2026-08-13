@@ -44,7 +44,7 @@ export const updateWebhookCommand = async (
     options.maxInFlight === undefined
   ) {
     console.error(
-      "Nothing to update: pass at least one of --url, --queue-url, --role-arn, --access-key-id, --secret-access-key, --events, --max-batch-size, --max-batch-delay, --max-in-flight.",
+      "Nothing to update: pass at least one of --url, --queue-url, --role-arn, --access-key-id, --events, --max-batch-size, --max-batch-delay, --max-in-flight.",
     );
     process.exit(1);
   }
