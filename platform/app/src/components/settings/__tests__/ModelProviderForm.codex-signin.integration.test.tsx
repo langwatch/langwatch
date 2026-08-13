@@ -104,6 +104,10 @@ vi.mock("../../../utils/api", () => ({
       isManagedProvider: {
         useQuery: () => ({ data: { managed: false } }),
       },
+      // The drawer offers a credential check, so the form reaches for both
+      // routes it can take. Neither is exercised here.
+      testConnection: { useMutation: () => ({ mutateAsync: vi.fn() }) },
+      validateApiKey: { useMutation: () => ({ mutateAsync: vi.fn() }) },
       listAllForOrganizationForFrontend: { useQuery: mockListAllForOrgQuery },
       listAllForProjectForFrontend: { useQuery: mockListAllForProjectQuery },
       // CodexSignIn's own endpoints: idle, not yet connected.

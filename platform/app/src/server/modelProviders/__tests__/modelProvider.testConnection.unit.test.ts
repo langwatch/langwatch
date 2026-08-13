@@ -32,6 +32,7 @@ vi.mock("../../api/rbac", () => ({
     hasProjectPermissionMock(...args),
 }));
 
+import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import {
   ModelProviderNotFoundError,
   ModelProviderScopeForbiddenError,
@@ -102,26 +103,102 @@ describe("testConnection", () => {
       });
     });
 
-    /** @scenario "A test never accepts an endpoint from the caller" */
-    it("probes the endpoint saved on the row, with no way to name another", async () => {
+    /** @scenario "A test with nothing supplied uses what is stored" */
+    it("probes the endpoint saved on the row when the call supplies none", async () => {
       findByIdForOrganizationMock.mockResolvedValueOnce(orgScopedRow());
 
-      // The call site has nowhere to put a destination: the input is a row id
-      // and a tenant handle. This is the property that keeps a credential the
-      // caller may never read from being posted somewhere they choose.
       await service().testConnection({
-        input: {
-          modelProviderId: "mp_1",
-          organizationId: ORGANIZATION_ID,
-          // @ts-expect-error — an endpoint is not part of the contract
-          customBaseUrl: "https://attacker.example.com",
-        },
+        input: { modelProviderId: "mp_1", organizationId: ORGANIZATION_ID },
         ctx,
       });
 
       const [, keys] = validateProviderApiKeyMock.mock.calls[0]!;
       expect(keys.OPENAI_BASE_URL).toBe("https://saved.example.com/v1");
-      expect(JSON.stringify(keys)).not.toContain("attacker.example.com");
+    });
+  });
+
+  describe("given settings supplied with the call", () => {
+    /** @scenario "A test never sends a stored credential to an endpoint from the caller" */
+    it("uses only what was supplied, never merging the stored credential in", async () => {
+      // The whole security property in one assertion. A caller who can edit a
+      // provider may never have been allowed to read its key; if an endpoint
+      // they chose were filled in with a key out of storage, this server would
+      // post that key wherever they liked, and permission to edit would have
+      // become permission to extract.
+      findByIdForOrganizationMock.mockResolvedValueOnce(orgScopedRow());
+
+      await service().testConnection({
+        input: {
+          modelProviderId: "mp_1",
+          organizationId: ORGANIZATION_ID,
+          customKeys: {
+            OPENAI_API_KEY: "sk-typed-just-now",
+            OPENAI_BASE_URL: "https://attacker.example.com/v1",
+          },
+        },
+        ctx,
+      });
+
+      const [, keys] = validateProviderApiKeyMock.mock.calls[0]!;
+      expect(keys).toEqual({
+        OPENAI_API_KEY: "sk-typed-just-now",
+        OPENAI_BASE_URL: "https://attacker.example.com/v1",
+      });
+      expect(JSON.stringify(keys)).not.toContain("sk-stored");
+    });
+
+    /** @scenario "Changing an endpoint without the credential asks for the credential" */
+    it("keeps the stored credential out of it when the supplied one is masked", async () => {
+      // What the drawer sends when someone edits an endpoint without
+      // re-entering the key. The masked sentinel is not a credential, so the
+      // check does not run — and the stored key stays where it is rather than
+      // being substituted in behind the customer's back.
+      findByIdForOrganizationMock.mockResolvedValueOnce(orgScopedRow());
+      validateProviderApiKeyMock.mockResolvedValueOnce({
+        outcome: "unchecked",
+        valid: true,
+        reason: "credential_masked",
+      });
+
+      const result = await service().testConnection({
+        input: {
+          modelProviderId: "mp_1",
+          organizationId: ORGANIZATION_ID,
+          customKeys: {
+            OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            OPENAI_BASE_URL: "https://attacker.example.com/v1",
+          },
+        },
+        ctx,
+      });
+
+      const [, keys] = validateProviderApiKeyMock.mock.calls[0]!;
+      expect(keys.OPENAI_API_KEY).toBe(MASKED_KEY_PLACEHOLDER);
+      expect(JSON.stringify(keys)).not.toContain("sk-stored");
+      expect(result.outcome).toBe("unchecked");
+    });
+
+    it("still refuses a caller who cannot manage the row", async () => {
+      // Supplying settings does not route around the row: it is still looked
+      // up and still scope-checked. The budget is deliberately not reached —
+      // a caller who cannot manage the row is refused rather than throttled,
+      // so their attempt never spends the organization's allowance.
+      findByIdForOrganizationMock.mockResolvedValueOnce(orgScopedRow());
+      hasOrganizationPermissionMock.mockResolvedValue(false);
+
+      await expect(
+        service().testConnection({
+          input: {
+            modelProviderId: "mp_1",
+            organizationId: ORGANIZATION_ID,
+            customKeys: { OPENAI_API_KEY: "sk-typed-just-now" },
+          },
+          ctx,
+        }),
+      ).rejects.toBeInstanceOf(ModelProviderScopeForbiddenError);
+
+      expect(validateProviderApiKeyMock).not.toHaveBeenCalled();
+      expect(rateLimitMock).not.toHaveBeenCalled();
     });
 
     /** @scenario "Testing an organization-scoped provider reaches its credential" */
@@ -243,6 +320,115 @@ describe("testConnection", () => {
       ).rejects.toBeInstanceOf(ModelProviderScopeForbiddenError);
 
       expect(rateLimitMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the credential has only been typed in", () => {
+    /** @scenario "Repeated checks are limited however they are made" */
+    it("counts a typed credential against the same budget as a stored one", async () => {
+      // Two routes to the same outbound request, and only one of them used to
+      // be counted. That was survivable while the typed-credential route was
+      // reachable only by saving — a refusal there arms a gate that skips the
+      // next probe, so a person could not sit on it. A control that checks
+      // without saving removes both bounds at once.
+      rateLimitMock.mockResolvedValueOnce({
+        allowed: false,
+        remaining: 0,
+        resetAt: Date.now() + 30_000,
+      });
+
+      await expect(
+        service().validateCredential({
+          input: {
+            organizationId: ORGANIZATION_ID,
+            provider: "openai",
+            customKeys: { OPENAI_API_KEY: "sk-typed-just-now" },
+          },
+          ctx,
+        }),
+      ).rejects.toBeInstanceOf(ModelProviderTestRateLimitedError);
+
+      expect(validateProviderApiKeyMock).not.toHaveBeenCalled();
+    });
+
+    it("shares one budget with the stored-credential route", async () => {
+      await service().validateCredential({
+        input: {
+          organizationId: ORGANIZATION_ID,
+          provider: "openai",
+          customKeys: { OPENAI_API_KEY: "sk-typed-just-now" },
+        },
+        ctx,
+      });
+
+      // The same keys, so a caller cannot double their allowance by
+      // alternating between the two ways of asking.
+      const keys = rateLimitMock.mock.calls.map(([opts]: any[]) => opts.key);
+      expect(keys).toEqual([
+        `model-provider-test:org:${ORGANIZATION_ID}`,
+        "model-provider-test:global",
+      ]);
+    });
+
+    it("checks exactly the credential it was handed", async () => {
+      await service().validateCredential({
+        input: {
+          organizationId: ORGANIZATION_ID,
+          provider: "openai",
+          customKeys: { OPENAI_API_KEY: "sk-typed-just-now" },
+        },
+        ctx,
+      });
+
+      expect(validateProviderApiKeyMock).toHaveBeenCalledWith("openai", {
+        OPENAI_API_KEY: "sk-typed-just-now",
+      });
+    });
+
+    it("lets a team admin check a credential for their own organization", async () => {
+      // The no-project path exists for scopes below the organization: a team
+      // admin sets up a team-scoped credential and never holds
+      // organization:manage. Requiring it to charge the budget would refuse
+      // them a control the route had already authorized.
+      hasOrganizationPermissionMock.mockImplementation(
+        (_ctx: unknown, _id: string, permission: string) =>
+          Promise.resolve(permission === "organization:view"),
+      );
+      hasTeamPermissionMock.mockResolvedValue(true);
+
+      const result = await service().validateCredential({
+        input: {
+          organizationId: ORGANIZATION_ID,
+          provider: "openai",
+          customKeys: { OPENAI_API_KEY: "sk-typed-just-now" },
+        },
+        ctx,
+      });
+
+      expect(result.outcome).toBe("verified");
+    });
+
+    it("refuses to spend the budget of an organization the caller cannot manage", async () => {
+      // The organization handle is a value the caller chose, and it is the
+      // rate-limit key. Unchecked, naming someone else's organization spends
+      // their allowance — which both supplies the caller with an endless run
+      // of fresh buckets and denies the real owner a control they are entitled
+      // to. Nothing goes out, and nothing is counted.
+      hasOrganizationPermissionMock.mockResolvedValue(false);
+
+      await expect(
+        service().validateCredential({
+          input: {
+            organizationId: "org_someone_else",
+            provider: "openai",
+            customKeys: { OPENAI_API_KEY: "sk-typed-just-now" },
+          },
+          ctx,
+        }),
+      ).rejects.toBeInstanceOf(ModelProviderScopeForbiddenError);
+
+      expect(rateLimitMock).not.toHaveBeenCalled();
+      expect(validateProviderApiKeyMock).not.toHaveBeenCalled();
     });
   });
 

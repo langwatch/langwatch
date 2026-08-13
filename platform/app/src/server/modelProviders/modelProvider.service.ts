@@ -14,6 +14,7 @@ import {
   ModelProviderCredentialsWouldBeDroppedError,
   ModelProviderDeprecatedError,
   ModelProviderNotFoundError,
+  ModelProviderScopeForbiddenError,
   ModelProviderScopesRequiredError,
   ModelProviderTestRateLimitedError,
 } from "./errors";
@@ -120,12 +121,17 @@ export type UpdateModelProviderInput = {
  * and it lives here, beside the method that consumes it, so the service never
  * has to import the router to know its own input shape.
  *
- * Conspicuously absent: anywhere to put an endpoint. See `testConnection`.
+ * `customKeys` carries the settings as they appear on screen, for the customer
+ * who has changed an endpoint and wants to know about the endpoint they are
+ * looking at rather than the one still in storage. They are used whole or not
+ * at all — see `testConnection` for why combining them with what is stored is
+ * the one thing this must never do.
  */
 export const testConnectionInputSchema = z.object({
   modelProviderId: z.string(),
   projectId: z.string().optional(),
   organizationId: z.string().optional(),
+  customKeys: z.record(z.string()).optional(),
 });
 
 export type TestConnectionInput = z.infer<typeof testConnectionInputSchema>;
@@ -867,13 +873,24 @@ export class ModelProviderService {
    *
    * Distinct from the save-time probe in three ways, each of them load-bearing.
    *
-   * It takes a row id and no endpoint. The save-time path accepts a base URL
-   * from the caller, which is reasonable there — the caller supplies the key
-   * too, so there is nothing to escalate. Here the credential comes out of
-   * storage and is one the caller may never have been allowed to read, so
-   * accepting a destination would let anyone who can edit a provider have this
-   * server post the key wherever they liked. The row's own endpoint is the
-   * only one used.
+   * It reads the credential out of storage — which is the point, since the form
+   * deliberately never shows one back — and that is exactly what makes the
+   * destination dangerous. A caller who can edit a provider may never have been
+   * allowed to read its key, so a stored key posted to an address they chose
+   * turns permission to edit into permission to extract. The rule that prevents
+   * it is not "no endpoint from the caller" but something narrower and more
+   * useful: **the two are never combined**. Either the settings come from the
+   * row, or they come from the request, whole. Nothing is merged, so there is
+   * no arrangement of inputs that pairs a stored secret with a chosen address.
+   *
+   * A credential supplied as the masked placeholder is therefore not a
+   * credential: it fails the checkable test and the answer comes back as
+   * unchecked, rather than being quietly swapped for the real one. That is what
+   * a customer editing an endpoint without re-entering their key should get.
+   *
+   * Supplied settings still travel through the same vetted transport as the
+   * save-time probe, so an address pointing somewhere private is refused before
+   * anything is sent.
    *
    * It is anchored by id against the organization rather than looked up by
    * provider name inside a project. `findByProvider` matches PROJECT-scope
@@ -893,7 +910,7 @@ export class ModelProviderService {
     input: TestConnectionInput;
     ctx: AuthzContext;
   }): Promise<ValidationResult> {
-    const { modelProviderId, projectId, organizationId } = input;
+    const { modelProviderId, projectId, organizationId, customKeys } = input;
 
     const anchor = await this.resolveOrganizationAnchor({
       projectId,
@@ -927,9 +944,88 @@ export class ModelProviderService {
     // provider types and projects, so a per-row budget caps nothing.
     await assertTestConnectionWithinBudget(anchor);
 
-    const customKeys = (existing.customKeys ?? {}) as Record<string, string>;
+    // Whole or not at all. A spread of one over the other would read as
+    // helpful — fill in the fields the customer did not retype — and would be
+    // the exfiltration path: a chosen endpoint plus a stored key. There is no
+    // arrangement of inputs that reaches that combination from here.
+    const keysToCheck =
+      customKeys ?? ((existing.customKeys ?? {}) as Record<string, string>);
 
-    return await validateProviderApiKey(existing.provider, customKeys);
+    // The provider is the row's, never the caller's. Otherwise a credential
+    // could be checked under another provider's auth shape and endpoint.
+    return await validateProviderApiKey(existing.provider, keysToCheck);
+  }
+
+  /**
+   * Checks a credential the customer has just typed, before it is stored.
+   *
+   * The sibling above checks one already saved. This one never reads storage:
+   * the credential arrives with the call, so there is nothing to escalate and
+   * no row to authorize against — the caller's permission over the scopes the
+   * credential is being set up for is settled by the route's own guard.
+   *
+   * What it does share is the budget, and that is the reason it exists as a
+   * service method rather than staying a direct call from the route. Both ways
+   * of asking end in the same outbound request, so counting one and not the
+   * other means the uncounted one is the whole limit. That was survivable
+   * while this route could only be reached by saving — a refusal arms a gate
+   * that lets the next save through unprobed, so nobody could sit on it — and
+   * stops being survivable the moment a control checks without saving.
+   *
+   * The organization the budget is charged to has to be one the caller can
+   * actually reach, and that needs asserting here rather than assumed. When a
+   * project anchors the call the route has already authorized it, so the
+   * organization derived from it is trustworthy. When nothing but an
+   * organization handle arrives, it is a value the caller chose: left
+   * unchecked, naming someone else's organization spends *their* budget, which
+   * both hands the caller an unlimited supply of fresh buckets and denies the
+   * real owner a control they are entitled to.
+   */
+  async validateCredential({
+    input,
+    ctx,
+  }: {
+    input: {
+      projectId?: string;
+      organizationId?: string;
+      provider: string;
+      customKeys: Record<string, string>;
+    };
+    ctx: AuthzContext;
+  }): Promise<ValidationResult> {
+    const anchor = await this.resolveOrganizationAnchor({
+      projectId: input.projectId,
+      organizationId: input.organizationId,
+    });
+    if (!anchor) {
+      throw new ModelProviderAnchorRequiredError("project_or_organization");
+    }
+
+    // Only the caller-supplied path needs the check: an anchor derived from a
+    // project came through the route's project permission gate to get here.
+    //
+    // Membership, not authority. Charging an organization's budget is not an
+    // act of administration — the whole point of this path is scopes below the
+    // organization, where a team admin sets up a team-scoped credential and
+    // never holds organization:manage. Demanding it would refuse them a check
+    // the route had already authorized. Being able to see the organization at
+    // all is what a stranger cannot fake, and that is exactly the line this
+    // has to draw.
+    if (!input.projectId) {
+      const belongs = await canReadAnyScope(ctx, [
+        { scopeType: "ORGANIZATION", scopeId: anchor },
+      ]);
+      if (!belongs) {
+        throw new ModelProviderScopeForbiddenError({
+          scopeType: "ORGANIZATION",
+          requiredPermission: "organization:view",
+        });
+      }
+    }
+
+    await assertTestConnectionWithinBudget(anchor);
+
+    return await validateProviderApiKey(input.provider, input.customKeys);
   }
 
   /**

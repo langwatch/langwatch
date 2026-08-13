@@ -14,7 +14,11 @@ import {
   ssrfSafeFetch,
 } from "../../utils/ssrfProtection";
 import { ModelProviderRepository } from "./modelProvider.repository";
-import { modelProviders } from "./registry";
+import {
+  modelProviders,
+  PROVIDERS_WITH_UNPROBEABLE_AUTH,
+  providerValidationBaseUrl,
+} from "./registry";
 
 /**
  * The response shape the probe actually receives.
@@ -142,36 +146,14 @@ const AGENT_PLATFORM_PROBE_BODY = JSON.stringify({
 /**
  * Providers we will not probe, and must not pretend to have probed.
  *
- * `bedrock`, `vertex_ai` and `azure` are here for the original reason: their
- * credentials are AWS signatures, gcloud application-default credentials and
- * deployment-scoped Azure keys, none of which a models listing exercises.
- *
- * `azure_safety` is here because leaving it out was a bug waiting for a
- * caller. It is a content-safety service, not a language model: it
- * authenticates with `Ocp-Apim-Subscription-Key` and has no `/models` route.
- * Nothing in this module excluded it, and it carries an endpoint field, so a
- * stored endpoint was enough to send it down the bearer branch and have a
- * perfectly good credential reported as refused. Until now the only thing
- * standing in the way was `isLlmProvider` in the settings form — a client-side
- * gate, in front of one of several callers. The rule belongs here, where every
- * caller passes.
+ * The list itself lives on the registry, next to the definitions it describes,
+ * because the settings UI has to answer "can this be checked at all?" before
+ * offering the control — and it cannot import this module, which reaches the
+ * provider repository and through it Prisma. Two copies of the list would
+ * disagree the first time either was edited, and the disagreement shows up as
+ * a button that offers a check nothing will perform.
  */
-const NOT_PROBEABLE: ReadonlySet<string> = new Set([
-  "bedrock",
-  "vertex_ai",
-  "azure",
-  "azure_safety",
-] as const);
-
-/**
- * Validation endpoints for providers that are not part of the onboarding
- * registry (which is what feeds `providerDefaultBaseUrls`). ElevenLabs is an
- * audio-only provider added directly in Settings, so its models endpoint
- * lives here.
- */
-const VALIDATION_ONLY_BASE_URLS: Record<string, string> = {
-  elevenlabs: "https://api.elevenlabs.io/v1",
-};
+const NOT_PROBEABLE: ReadonlySet<string> = PROVIDERS_WITH_UNPROBEABLE_AUTH;
 
 /**
  * Builds the models endpoint URL by normalizing and appending /models if needed.
@@ -1238,7 +1220,9 @@ export async function validateProviderApiKey(
   const authStrategy = PROVIDER_AUTH_OVERRIDES[provider] ?? "bearer";
   const defaultBaseUrl =
     providerDefaultBaseUrls[provider] ??
-    VALIDATION_ONLY_BASE_URLS[provider] ??
+    // Providers added straight in Settings have no onboarding tile to carry a
+    // default, so the registry entry is the only record of where to ask.
+    providerValidationBaseUrl(provider) ??
     "";
 
   const agentPlatform = agentPlatformPair({ provider, customKeys });

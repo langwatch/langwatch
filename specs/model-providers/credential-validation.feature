@@ -456,12 +456,25 @@ Feature: Credential Validation
     Then the stored credential is found
     And I am not told the provider has no credential
 
+  # A check can be asked about the settings on screen rather than the ones
+  # stored, because a customer editing an endpoint needs an answer about the
+  # endpoint they are looking at. What must never happen is the two being
+  # combined: an address chosen by the caller, filled in with a credential out
+  # of storage that the caller may never have been allowed to read. That would
+  # turn permission to edit a provider into permission to extract its key.
+
   @unit
-  Scenario: A test never accepts an endpoint from the caller
+  Scenario: A test never sends a stored credential to an endpoint from the caller
     Given I have a configured provider
-    When I test the connection
+    When I test the connection against settings supplied with the request
+    Then only the settings supplied are used
+    And the stored credential is not added to them
+
+  @unit
+  Scenario: A test with nothing supplied uses what is stored
+    Given I have a configured provider
+    When I test the connection without supplying any settings
     Then the endpoint already saved on the provider is used
-    And an endpoint supplied with the request is refused
 
   @unit
   Scenario: Testing a provider I cannot manage is refused
@@ -543,3 +556,117 @@ Feature: Credential Validation
     Given a credential whose check did not run
     When it is saved
     Then the save proceeds exactly as it did before
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Checking a credential from the drawer it was typed into.
+  #
+  # Everything above reaches the check from the provider list, which is a
+  # different moment: the customer has finished, closed the drawer, and gone
+  # looking. The moment they actually want the answer is while they are still
+  # looking at the fields they filled in, so the same check is offered there.
+  #
+  # Two rules govern the whole section, and they pull in opposite directions.
+  # The control must never appear where it cannot tell the truth — so for a
+  # provider we cannot probe it is absent rather than present and unhelpful.
+  # And a check must be about the settings on screen, not the settings that
+  # happen to be stored, or a customer editing an endpoint gets a green
+  # answer about the endpoint they just replaced.
+  # ──────────────────────────────────────────────────────────────────────
+
+  @integration
+  Scenario: A provider that cannot be checked offers no control
+    Given I am configuring a provider whose credentials cannot be probed
+    When I have filled in every field
+    Then no way to check the connection is offered
+    And I am not told the connection works
+
+  @integration
+  Scenario: Both places agree on which providers can be checked
+    Given a provider that offers no way to check the connection in the drawer
+    When I look at that provider in the list
+    Then no way to check the connection is offered there either
+
+  @integration
+  Scenario: Checking is unavailable until the credential is complete
+    Given I am configuring a provider that can be checked
+    And one required field is still empty
+    When I look at the way to check the connection
+    Then it is offered but cannot be used
+    And filling in the last field makes it usable
+
+  @integration
+  Scenario: A credential the provider's own rules reject cannot be checked
+    Given a provider that accepts a project and a location together or not at all
+    And I have filled in the project but not the location
+    When I look at the way to check the connection
+    Then it cannot be used
+
+  # The stored credential is deliberately never shown back, so a customer
+  # editing an endpoint is looking at a real endpoint and a masked key. The
+  # check has to be about both halves or it is about neither.
+
+  @integration
+  Scenario: Checking after changing an endpoint uses the endpoint on screen
+    Given I have a configured provider
+    And I have changed its endpoint and entered the credential again
+    When I check the connection
+    Then the endpoint I am looking at is the one checked
+    And the endpoint that was stored is not checked
+
+  @integration
+  Scenario: Changing an endpoint without the credential asks for the credential
+    Given I have a configured provider whose credential is hidden
+    And I have changed its endpoint but not re-entered the credential
+    When I check the connection
+    Then I am asked to enter the credential again
+    And the stored credential is not sent anywhere
+
+  @integration
+  Scenario: An unchanged provider is still checked against what is stored
+    Given I have a configured provider I have not edited
+    When I check the connection
+    Then the stored credential is used
+    And I am not asked to enter it again
+
+  @integration
+  Scenario: Checking does not save
+    Given I am configuring a provider and have not saved it
+    When I check the connection and am told it works
+    Then the provider has not been created
+
+  # An endpoint typed into the drawer is an address we have not vetted, and it
+  # travels alongside a credential. It needs no rule of its own: the check runs
+  # through the same validator as every other, so "a credential is never
+  # carried to an address we have not vetted" above already governs it. What
+  # is worth pinning is that the drawer reaches that validator rather than
+  # some path around it, which the scenarios above do.
+
+  @integration
+  Scenario: A result disappears when I change the credential
+    Given I have checked a connection from the drawer and been told it works
+    When I change any credential field
+    Then the earlier result is no longer shown
+
+  @integration
+  Scenario: A result still in flight when I change the credential is discarded
+    Given I have asked for a check from the drawer and the answer has not arrived
+    When I change a credential field before it does
+    Then the answer is discarded when it arrives
+    And I am not told the connection works
+
+  # Two saved providers show the same hidden credential and can carry the same
+  # endpoint, so what is on screen cannot tell them apart. Only the provider
+  # being edited can.
+
+  @integration
+  Scenario: A result still in flight when I move to another provider is discarded
+    Given I have asked for a check from the drawer and the answer has not arrived
+    When I start editing a different provider whose settings look the same
+    Then the answer is discarded when it arrives
+    And I am not told the connection works
+
+  @unit
+  Scenario: Repeated checks are limited however they are made
+    Given I have checked connections many times in quick succession
+    When I check a credential I have just typed in
+    Then I am told to wait before checking again

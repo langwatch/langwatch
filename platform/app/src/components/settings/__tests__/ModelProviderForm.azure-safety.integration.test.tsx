@@ -82,6 +82,10 @@ vi.mock("../../../utils/api", () => ({
       isManagedProvider: {
         useQuery: () => ({ data: { managed: false } }),
       },
+      // The drawer offers a credential check, so the form reaches for both
+      // routes it can take. Neither is exercised here.
+      testConnection: { useMutation: () => ({ mutateAsync: vi.fn() }) },
+      validateApiKey: { useMutation: () => ({ mutateAsync: vi.fn() }) },
       // EditModelProviderForm resolves its edit target from the flat
       // (uncollapsed) provider list via useAllModelProvidersList (#5380).
       // primeHooksForProvider seeds both with the same fixture the
