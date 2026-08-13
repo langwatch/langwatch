@@ -69,7 +69,7 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutate: mockArchiveMutate, isLoading: false }),
       },
     },
-    useContext: () => ({
+    useUtils: () => ({
       organization: { getAll: { refetch: vi.fn() } },
     }),
   },

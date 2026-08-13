@@ -4,6 +4,14 @@ on:
   pull_request_target:
     types: [opened, edited, synchronize, reopened]
 
+# `edited` is in the trigger list, so every keystroke-save on a PR title starts
+# a run: 18 of the last 100 overlapped a newer one for the same branch. The
+# check reads the title as it is NOW, so an older run can only ever post a
+# verdict about a title that has already been replaced.
+concurrency:
+  group: pr-conventions-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 permissions:
   pull-requests: read
   statuses: write

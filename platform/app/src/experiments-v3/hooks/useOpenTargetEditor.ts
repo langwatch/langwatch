@@ -101,7 +101,7 @@ export const scrollToTargetColumn = (targetId: string) => {
 export const useOpenTargetEditor = () => {
   const { openDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
-  const trpcUtils = api.useContext();
+  const trpcUtils = api.useUtils();
 
   const {
     datasets,

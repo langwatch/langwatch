@@ -88,6 +88,12 @@ export const evaluateResponseSchema = z.union([
       .string()
       .optional()
       .describe("Why the evaluator declined to score this input"),
+    cost: z
+      .object({ currency: z.string(), amount: z.number() })
+      .optional()
+      .describe(
+        "What the attempt cost, when the evaluator spent money before declining to score",
+      ),
     passed: z
       .boolean()
       .optional()

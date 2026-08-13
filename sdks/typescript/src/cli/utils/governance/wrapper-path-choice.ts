@@ -185,7 +185,7 @@ export function gatewayChoiceTitle(): string {
 }
 
 export function gatewayChoiceDescription(): string {
-  return "route calls through LangWatch with a virtual key, billed per token";
+  return "route calls through LangWatch with a virtual key";
 }
 
 /**

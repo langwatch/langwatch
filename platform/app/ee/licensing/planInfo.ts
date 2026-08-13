@@ -24,9 +24,13 @@ export type PlanInfo = {
   maxMessagesPerMonth: number;
   canPublish: boolean;
   /**
-   * Webhook endpoints platform (signed outbound event delivery). Enterprise
-   * feature: absent/false on free, PRO, and GROWTH plans; enterprise
-   * licenses and subscriptions carry true.
+   * Webhook endpoints platform (signed outbound event delivery). An
+   * enterprise feature, and the tier is what decides it: absent means the
+   * plan said nothing and its tier answers at resolution
+   * (`planEntitlements.ts`), which is how a contract signed before this
+   * field existed is still entitled. An explicit `false` is a decision and
+   * survives resolution, so a contract may withhold it. Nothing below
+   * enterprise grants it.
    */
   webhookEndpointsEnabled?: boolean;
   /**

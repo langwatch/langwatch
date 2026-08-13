@@ -1,3 +1,4 @@
+import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
 import {
@@ -25,11 +26,11 @@ export function useSpansFullCanonical(enabled: boolean) {
     // Hold the span tree in cache for 30 min after the last observer
     // unmounts. Lets users flip between recently-viewed traces in the
     // conversation strip with no loading flash.
-    cacheTime: 1_800_000,
+    gcTime: 1_800_000,
     // While the new trace's spans are loading, keep showing the previous
     // trace's spans rather than a skeleton. The visualizer panel pops
     // back instantly when navigating between siblings.
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 
   if (shared)

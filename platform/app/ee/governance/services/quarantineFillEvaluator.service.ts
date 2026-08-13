@@ -33,7 +33,7 @@
  *       §"Admin warning fires when quarantine fill rate exceeds threshold"
  */
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { ensureHiddenGovernanceProject } from "./governanceProject.service";
 import type { GovernanceTraceActivityClickHouseRepository } from "./governanceTraceActivity.clickhouse.repository";
 

@@ -169,8 +169,40 @@ function createPkceChallenge() {
 // Matches TEST_REDIRECT_URI / TEST_CLIENT_ID below — the values every
 // /oauth/token test request in this file sends, since the token endpoint now
 // requires them to match what /mcp/authorize bound to the code.
+/**
+ * Builds an `application/x-www-form-urlencoded` body. Interpolating the values
+ * into a template works only while none of them contains a `&`, `=`, `+` or
+ * `%`, and a redirect URI that grows a query string is exactly the case where
+ * the shape assertions keep passing against a truncated value.
+ */
+function formBody(fields: Record<string, string>): string {
+  return new URLSearchParams(fields).toString();
+}
+
 const TEST_REDIRECT_URI = "http://localhost/callback";
 const TEST_CLIENT_ID = "test_client";
+
+/**
+ * The registration /oauth/register would have persisted for TEST_CLIENT_ID.
+ * The token endpoint reads it to tell "your code is stale" apart from "your
+ * registration is gone", so every token test that is not about a missing
+ * registration needs it present.
+ */
+const REGISTERED_CLIENT = JSON.stringify({
+  redirectUris: [TEST_REDIRECT_URI],
+  clientName: "Test Client",
+});
+
+/** Redis GET backed by the registered test client plus any extra keys. */
+function redisGetWithRegisteredClient(
+  key: string,
+  extra: Record<string, string> = {},
+): Promise<string | null> {
+  if (key === `mcp:oauth:client:${TEST_CLIENT_ID}`) {
+    return Promise.resolve(REGISTERED_CLIENT);
+  }
+  return Promise.resolve(extra[key] ?? null);
+}
 
 /**
  * Stores a mock auth code in the Redis mock that the handler can retrieve.
@@ -200,12 +232,9 @@ function mockAuthCodeInRedis({
     expiresAt: expiresAt ?? Date.now() + 600_000,
   });
 
-  mockRedis.get.mockImplementation((key: string) => {
-    if (key === `mcp:auth_code:${code}`) {
-      return Promise.resolve(entry);
-    }
-    return Promise.resolve(null);
-  });
+  mockRedis.get.mockImplementation((key: string) =>
+    redisGetWithRegisteredClient(key, { [`mcp:auth_code:${code}`]: entry }),
+  );
 }
 
 async function sendRequest({
@@ -294,7 +323,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   afterAll(async () => {
-    handler.closeAllSessions();
+    await handler.closeAllSessions();
     await new Promise<void>((resolve) => {
       server.close(() => resolve());
     });
@@ -302,7 +331,9 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRedis.get.mockResolvedValue(null);
+    mockRedis.get.mockImplementation((key: string) =>
+      redisGetWithRegisteredClient(key),
+    );
     mockRedis.set.mockResolvedValue("OK");
     mockRedis.del.mockResolvedValue(1);
     mockRedis.expire.mockResolvedValue(1);
@@ -413,7 +444,13 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=${TEST_REDIRECT_URI}&client_id=${TEST_CLIENT_ID}`,
+        body: formBody({
+          grant_type: "authorization_code",
+          code,
+          code_verifier: codeVerifier,
+          redirect_uri: TEST_REDIRECT_URI,
+          client_id: TEST_CLIENT_ID,
+        }),
       });
 
       expect(res.status).toBe(200);
@@ -439,7 +476,13 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=${code}&code_verifier=wrong-verifier&redirect_uri=${TEST_REDIRECT_URI}&client_id=${TEST_CLIENT_ID}`,
+        body: formBody({
+          grant_type: "authorization_code",
+          code,
+          code_verifier: "wrong-verifier",
+          redirect_uri: TEST_REDIRECT_URI,
+          client_id: TEST_CLIENT_ID,
+        }),
       });
 
       expect(res.status).toBe(400);
@@ -456,7 +499,10 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: "grant_type=authorization_code&code_verifier=some-verifier",
+        body: formBody({
+          grant_type: "authorization_code",
+          code_verifier: "some-verifier",
+        }),
       });
 
       expect(res.status).toBe(400);
@@ -473,7 +519,10 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=${randomUUID()}`,
+        body: formBody({
+          grant_type: "authorization_code",
+          code: randomUUID(),
+        }),
       });
 
       expect(res.status).toBe(400);
@@ -507,7 +556,13 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=invalid-code&code_verifier=some-verifier&redirect_uri=${TEST_REDIRECT_URI}&client_id=${TEST_CLIENT_ID}`,
+        body: formBody({
+          grant_type: "authorization_code",
+          code: "invalid-code",
+          code_verifier: "some-verifier",
+          redirect_uri: TEST_REDIRECT_URI,
+          client_id: TEST_CLIENT_ID,
+        }),
       });
 
       expect(res.status).toBe(400);
@@ -549,7 +604,12 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
         const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
           method: "POST",
           headers: { "content-type": "application/x-www-form-urlencoded" },
-          body: `grant_type=authorization_code&code=${randomUUID()}&code_verifier=some-verifier&client_id=${TEST_CLIENT_ID}`,
+          body: formBody({
+            grant_type: "authorization_code",
+            code: randomUUID(),
+            code_verifier: "some-verifier",
+            client_id: TEST_CLIENT_ID,
+          }),
         });
 
         expect(res.status).toBe(400);
@@ -567,7 +627,12 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
         const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
           method: "POST",
           headers: { "content-type": "application/x-www-form-urlencoded" },
-          body: `grant_type=authorization_code&code=${randomUUID()}&code_verifier=some-verifier&redirect_uri=${TEST_REDIRECT_URI}`,
+          body: formBody({
+            grant_type: "authorization_code",
+            code: randomUUID(),
+            code_verifier: "some-verifier",
+            redirect_uri: TEST_REDIRECT_URI,
+          }),
         });
 
         expect(res.status).toBe(400);
@@ -589,7 +654,13 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
         const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
           method: "POST",
           headers: { "content-type": "application/x-www-form-urlencoded" },
-          body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=https://attacker.invalid/callback&client_id=${TEST_CLIENT_ID}`,
+          body: formBody({
+            grant_type: "authorization_code",
+            code,
+            code_verifier: codeVerifier,
+            redirect_uri: "https://attacker.invalid/callback",
+            client_id: TEST_CLIENT_ID,
+          }),
         });
 
         expect(res.status).toBe(400);
@@ -612,7 +683,13 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
         const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
           method: "POST",
           headers: { "content-type": "application/x-www-form-urlencoded" },
-          body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=${TEST_REDIRECT_URI}&client_id=mcp_someone_elses_client`,
+          body: formBody({
+            grant_type: "authorization_code",
+            code,
+            code_verifier: codeVerifier,
+            redirect_uri: TEST_REDIRECT_URI,
+            client_id: "mcp_someone_elses_client",
+          }),
         });
 
         expect(res.status).toBe(400);
@@ -677,6 +754,154 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
   // --- Bearer Token DB Validation ---
 
+  // --- OAuth discovery documents ---
+  //
+  // A client that only knows the resource URL asks for metadata at the
+  // resource's path under the well-known prefix (RFC 9728 §3.1), and current
+  // MCP clients try that form first. Unclaimed, those probes reach the
+  // single-page-app fallback and come back as 200 text/html, which the client
+  // reports as a JSON parse failure rather than falling back to the bare form.
+
+  describe("given the OAuth discovery documents are published", () => {
+    async function getDiscovery(path: string) {
+      const res = await sendRequest({ server, method: "GET", path });
+      return {
+        status: res.status,
+        contentType: res.headers["content-type"] ?? "",
+        body: JSON.parse(res.body),
+      };
+    }
+
+    describe("when the protected resource metadata is fetched at the resource path", () => {
+      /** @scenario Protected resource metadata is served for the path-suffixed form */
+      it.each([
+        "/sse",
+        "/mcp",
+      ])("describes %s and its authorization server", async (resource) => {
+        const res = await getDiscovery(
+          `/.well-known/oauth-protected-resource${resource}`,
+        );
+
+        expect(res.status).toBe(200);
+        expect(res.contentType).toContain("application/json");
+        expect(res.body.resource).toContain(resource);
+        expect(res.body.authorization_servers.length).toBeGreaterThan(0);
+      });
+    });
+
+    describe("when the authorization server metadata is fetched at the resource path", () => {
+      /** @scenario Authorization server metadata is served for the path-suffixed form */
+      it.each([
+        "/sse",
+        "/mcp",
+      ])("advertises the authorization, token and registration endpoints for %s", async (resource) => {
+        const res = await getDiscovery(
+          `/.well-known/oauth-authorization-server${resource}`,
+        );
+
+        expect(res.status).toBe(200);
+        expect(res.contentType).toContain("application/json");
+        expect(res.body.authorization_endpoint).toContain("/mcp/authorize");
+        expect(res.body.token_endpoint).toContain("/oauth/token");
+        expect(res.body.registration_endpoint).toContain("/oauth/register");
+      });
+    });
+
+    describe("when a discovery document that does not exist is fetched", () => {
+      /** @scenario An unknown OAuth discovery document answers with JSON rather than the web app */
+      it("answers 404 as JSON so the client can fall back", async () => {
+        const res = await getDiscovery(
+          "/.well-known/oauth-protected-resource/nothing-here",
+        );
+
+        expect(res.status).toBe(404);
+        expect(res.contentType).toContain("application/json");
+      });
+    });
+
+    describe("when the OpenID configuration is fetched", () => {
+      /** @scenario OpenID configuration is answered as absent rather than with the web app */
+      it("answers 404 as JSON", async () => {
+        const res = await getDiscovery("/.well-known/openid-configuration");
+
+        expect(res.status).toBe(404);
+        expect(res.contentType).toContain("application/json");
+      });
+    });
+  });
+
+  // --- OAuth token endpoint client authentication ---
+
+  describe("given a client authenticates against the token endpoint", () => {
+    beforeEach(() => {
+      handler.clearRateLimiters();
+    });
+    afterEach(() => {
+      handler.clearRateLimiters();
+    });
+
+    describe("when the client presents its credentials as HTTP Basic", () => {
+      /** @scenario The token endpoint accepts client credentials presented as HTTP Basic */
+      it("issues an access token without client_id in the form body", async () => {
+        mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+        const code = randomUUID();
+        const { codeVerifier, codeChallenge } = createPkceChallenge();
+        mockAuthCodeInRedis({ code, codeChallenge });
+
+        const addr = server.address();
+        const port = typeof addr === "object" && addr ? addr.port : 0;
+        // RFC 6749 §2.3.1: base64(client_id:client_secret), secret empty for
+        // a public client.
+        const basic = Buffer.from(`${TEST_CLIENT_ID}:`).toString("base64");
+
+        const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            authorization: `Basic ${basic}`,
+          },
+          body: formBody({
+            grant_type: "authorization_code",
+            code,
+            code_verifier: codeVerifier,
+            redirect_uri: TEST_REDIRECT_URI,
+          }),
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.access_token).toBeDefined();
+        expect(body.token_type).toBe("Bearer");
+      });
+    });
+
+    describe("when the presented client_id has no registration left", () => {
+      /** @scenario A token exchange from a client that is no longer registered is told to register again */
+      it("answers invalid_client and tells it to register again", async () => {
+        const addr = server.address();
+        const port = typeof addr === "object" && addr ? addr.port : 0;
+
+        const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: formBody({
+            grant_type: "authorization_code",
+            code: randomUUID(),
+            code_verifier: "verifier",
+            redirect_uri: TEST_REDIRECT_URI,
+            client_id: "mcp_registration_is_gone",
+          }),
+        });
+
+        expect(res.status).toBe(401);
+        const body = await res.json();
+        expect(body.error).toBe("invalid_client");
+        expect(body.error_description).toContain("register again");
+      });
+    });
+  });
+
   describe("when a direct API key is used as Bearer token", () => {
     it("validates against the database and accepts the connection", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
@@ -723,7 +948,13 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const tokenRes = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=${TEST_REDIRECT_URI}&client_id=${TEST_CLIENT_ID}`,
+        body: formBody({
+          grant_type: "authorization_code",
+          code,
+          code_verifier: codeVerifier,
+          redirect_uri: TEST_REDIRECT_URI,
+          client_id: TEST_CLIENT_ID,
+        }),
       });
       const tokenBody = await tokenRes.json();
       const accessToken = tokenBody.access_token;
@@ -765,7 +996,13 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const tokenRes = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=${TEST_REDIRECT_URI}&client_id=${TEST_CLIENT_ID}`,
+        body: formBody({
+          grant_type: "authorization_code",
+          code,
+          code_verifier: codeVerifier,
+          redirect_uri: TEST_REDIRECT_URI,
+          client_id: TEST_CLIENT_ID,
+        }),
       });
       const tokenBody = await tokenRes.json();
       const accessToken = tokenBody.access_token;
@@ -833,7 +1070,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
       // 2. Simulate pod switch: close all local sessions (as if this is a
       //    different pod) but keep the Redis entry.
-      handler.closeAllSessions();
+      await handler.closeAllSessions();
 
       // 3. Mock Redis returning the session metadata
       mockRedis.get.mockImplementation(async (key: string) => {
@@ -848,7 +1085,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       mockRedis.expire.mockResolvedValue(1);
 
       // 4. Re-create the server+handler (simulating a different pod)
-      handler.closeAllSessions();
+      await handler.closeAllSessions();
 
       // 5. Send a tool list request with the old session ID — should recover
       const toolsRes = await sendRequest({
@@ -1007,30 +1244,102 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
   // --- Security: rate limiting ---
 
-  describe("when /oauth/token is called more than 10 times per minute", () => {
-    it("returns 429", async () => {
-      mockPrisma.project.findUnique.mockResolvedValue(validProject());
+  describe("Security: per-caller rate limiting", () => {
+    const TOKEN_LIMIT_PER_MINUTE = 30;
 
+    beforeEach(() => {
+      handler.clearRateLimiters();
+    });
+    afterEach(() => {
+      handler.clearRateLimiters();
+    });
+
+    /** Posts a token request, optionally claiming a caller address. */
+    async function tokenRequest({
+      code,
+      callerIp,
+    }: {
+      code: string;
+      callerIp?: string;
+    }) {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
-
-      // Send 10 requests (allowed)
-      for (let i = 0; i < 10; i++) {
-        await fetch(`http://127.0.0.1:${port}/oauth/token`, {
-          method: "POST",
-          headers: { "content-type": "application/x-www-form-urlencoded" },
-          body: `grant_type=authorization_code&code=code-${i}&code_verifier=verifier`,
-        });
-      }
-
-      // 11th request should be rate limited
-      const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+      const headers: Record<string, string> = {
+        "content-type": "application/x-www-form-urlencoded",
+      };
+      if (callerIp) headers["cf-connecting-ip"] = callerIp;
+      return fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=code-11&code_verifier=verifier`,
+        headers,
+        body: formBody({
+          grant_type: "authorization_code",
+          code,
+          code_verifier: "verifier",
+          redirect_uri: TEST_REDIRECT_URI,
+          client_id: TEST_CLIENT_ID,
+        }),
       });
+    }
 
-      expect(res.status).toBe(429);
+    describe("when one caller exceeds the token endpoint budget", () => {
+      /** @scenario A rate limited OAuth request answers with an OAuth error and a retry hint */
+      it("answers with an OAuth error object and a retry hint", async () => {
+        for (let i = 0; i < TOKEN_LIMIT_PER_MINUTE; i++) {
+          await tokenRequest({ code: `code-${i}`, callerIp: "203.0.113.7" });
+        }
+
+        const res = await tokenRequest({
+          code: "code-over",
+          callerIp: "203.0.113.7",
+        });
+
+        expect(res.status).toBe(429);
+        expect(res.headers.get("retry-after")).toBe("60");
+        const body = await res.json();
+        expect(body.error).toBe("temporarily_unavailable");
+        expect(body.error_description).toContain("Rate limit exceeded");
+      });
+    });
+
+    describe("when a different caller arrives through the same proxy", () => {
+      /** @scenario Rate limiting counts callers separately when a proxy reports the caller address */
+      it("does not charge it for the first caller's traffic", async () => {
+        for (let i = 0; i < TOKEN_LIMIT_PER_MINUTE + 5; i++) {
+          await tokenRequest({ code: `noisy-${i}`, callerIp: "203.0.113.7" });
+        }
+
+        const res = await tokenRequest({
+          code: "quiet-caller",
+          callerIp: "203.0.113.9",
+        });
+
+        expect(res.status).not.toBe(429);
+      });
+    });
+
+    describe("when a caller exhausted the client registration budget", () => {
+      /** @scenario Registering a client and exchanging a token do not share one rate limit budget */
+      it("still lets it exchange a token", async () => {
+        const addr = server.address();
+        const port = typeof addr === "object" && addr ? addr.port : 0;
+        for (let i = 0; i < 35; i++) {
+          await fetch(`http://127.0.0.1:${port}/oauth/register`, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              "cf-connecting-ip": "203.0.113.20",
+            },
+            body: JSON.stringify({ redirect_uris: ["https://a.example/cb"] }),
+          });
+        }
+
+        const res = await tokenRequest({
+          code: "after-registering",
+          callerIp: "203.0.113.20",
+        });
+
+        expect(res.status).not.toBe(429);
+      });
     });
   });
 
@@ -1187,7 +1496,13 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const tokenRes = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=${TEST_REDIRECT_URI}&client_id=${TEST_CLIENT_ID}`,
+        body: formBody({
+          grant_type: "authorization_code",
+          code,
+          code_verifier: codeVerifier,
+          redirect_uri: TEST_REDIRECT_URI,
+          client_id: TEST_CLIENT_ID,
+        }),
       });
       const tokenBody = (await tokenRes.json()) as { access_token: string };
       const accessToken = tokenBody.access_token;

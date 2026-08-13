@@ -19,8 +19,9 @@
  * stays runnable on a box with no database.
  */
 
-import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { PrismaClient } from "~/generated/prisma/client";
+import { createPrismaPgAdapter } from "~/server/prismaPgAdapter";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { resolveEvaluatorSettingsWithSource } from "../../event-sourcing/pipelines/evaluation-processing/commands/executeEvaluation.command";
 
@@ -35,7 +36,7 @@ describe.skipIf(!DB_URL)("evaluator config round-trip through Postgres", () => {
   let prisma: PrismaClient | undefined;
 
   beforeAll(async () => {
-    prisma = new PrismaClient({ datasources: { db: { url: DB_URL } } });
+    prisma = new PrismaClient({ adapter: createPrismaPgAdapter(DB_URL ?? "") });
     await cleanupTestRows(prisma, [["evaluator", { projectId: PROJECT_ID }]]);
   });
 

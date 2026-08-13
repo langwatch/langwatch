@@ -1,8 +1,11 @@
 import { createLogger } from "@langwatch/observability";
-import type { AnnotationQueueItem, PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import type {
+  AnnotationQueueItem,
+  PrismaClient,
+} from "~/generated/prisma/client";
 import { AnnotationService } from "~/server/annotations/annotation.service";
 import {
   annotationAnchorColumnsSchema,

@@ -340,9 +340,19 @@
 						// suite past ~60 lines trips this, and the only edit
 						// that satisfies it splits the file on a boundary the
 						// rule picked rather than the subject did.
+						//
+						// Cognitive complexity misreads table-driven tests the
+						// same way: an `it.each` over every auth mode scores one
+						// point per mode, so the most exhaustive test in a file
+						// is always the one the rule flags hardest. useMaxParams
+						// likewise counts a fixture builder's named options.
+						//
 						// `noExcessiveNestedTestSuites` above is the rule that
-						// actually governs the shape of a suite.
-						"noExcessiveLinesPerFunction": "off"
+						// actually governs the shape of a suite — depth is a real
+						// readability signal; length and branch count are not.
+						"noExcessiveCognitiveComplexity": "off",
+						"noExcessiveLinesPerFunction": "off",
+						"useMaxParams": "off"
 					}
 				}
 			}

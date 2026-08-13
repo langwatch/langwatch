@@ -4,7 +4,7 @@ import type {
   RoleBinding,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 
 export interface GroupWithDetails extends Group {
   _count: { members: number };

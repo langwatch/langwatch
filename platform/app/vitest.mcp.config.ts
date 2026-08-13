@@ -30,14 +30,6 @@ export default defineConfig({
       "~/": join(__dirname, "./src/"),
       "@ee/": join(__dirname, "./ee/"),
       "@app/": join(__dirname, "./src/server/app-layer/"),
-      "@injected-dependencies.client": join(
-        __dirname,
-        "./src/injection/injection.client.ts",
-      ),
-      "@injected-dependencies.server": join(
-        __dirname,
-        "./src/injection/injection.server.ts",
-      ),
     },
   },
 });

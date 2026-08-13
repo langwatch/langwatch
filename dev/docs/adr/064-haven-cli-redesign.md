@@ -350,6 +350,19 @@ The rules it adds, and how they honour the constitution:
 - **A hard death is recoverable.** The sandbox is recorded before any
   resource exists; `haven clean` reaps any sandbox whose owning process is
   gone by finishing the same teardown.
+- **`--seed <preset>` reads the same registry as `db seed`.** A sandbox's
+  databases are born empty, so a PR about anything past onboarding opens on
+  the wrong screen. The presets are not duplicated for play and there is no
+  play-only variant — one list, one meaning, per the flag rule above. Where
+  each half lands differs by necessity: the preset's switches go to the
+  sandbox's own seed, before its services start, while data that travels
+  through the collector can only land once the sandbox is serving, so it runs
+  in a lane beside the supervised set that waits on the sandbox's own
+  `/api/health`. That lane is a warning path end to end — a failed ingest
+  names the step and the command that retries it and leaves the sandbox
+  running, because a PR that broke the collector is precisely one worth
+  watching — but teardown still waits for it to stop, rather than racing a
+  `docker volume rm` against a process still writing.
 
 Spec: `specs/setup/haven-play.feature`.
 

@@ -193,7 +193,7 @@ function useSavedViewsInternal() {
   const projectId = project?.id ?? "";
   const router = useRouter();
   const { filters } = useFilterParams();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const [selectedViewId, setSelectedViewIdState] = useState<string | null>(
     null,

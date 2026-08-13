@@ -63,7 +63,7 @@ vi.mock("~/utils/api", () => ({
     useQueries: () => [
       { data: mocks.storedComments, isLoading: false, isError: false },
     ],
-    useContext: () => ({
+    useUtils: () => ({
       annotation: {
         getByTraceId: { invalidate: vi.fn() },
         getByTraceIds: { invalidate: vi.fn() },

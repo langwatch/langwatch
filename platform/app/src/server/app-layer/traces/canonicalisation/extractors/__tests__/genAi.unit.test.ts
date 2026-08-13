@@ -271,6 +271,53 @@ describe("GenAIExtractor", () => {
     });
   });
 
+  describe("when the span carries the flat cached_input_tokens alias", () => {
+    // The Go SDK (and Vertex/Mastra-style emitters) report cache-read tokens as
+    // the flat gen_ai.usage.cached_input_tokens. Cost + the trace cache rollup
+    // only read the dotted gen_ai.usage.cache_read.input_tokens, so the flat
+    // alias must be canonicalised onto the dotted key for any span.
+    it("canonicalises cached_input_tokens to cache_read.input_tokens", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS]: 37127,
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
+        37127,
+      );
+      // The flat alias is consumed (does not leak through to the merged attrs).
+      expect(
+        ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS),
+      ).toBe(false);
+    });
+
+    it("coerces the stringy cached_input_tokens form to a number", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS]: "1024",
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
+        1024,
+      );
+    });
+
+    it("leaves an explicit dotted cache_read.input_tokens untouched", () => {
+      // When the extractor-local out already holds the dotted form, the flat
+      // alias must not clobber it (setAttrIfAbsent).
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS]: 999,
+      });
+      ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] = 42;
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(42);
+    });
+  });
+
   describe("when request parameters arrive as strings", () => {
     it("coerces temperature string to number", () => {
       const ctx = createExtractorContext({

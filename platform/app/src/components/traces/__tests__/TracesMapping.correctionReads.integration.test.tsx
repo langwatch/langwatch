@@ -19,6 +19,9 @@ const mocks = vi.hoisted(() => ({
   threadQuery: vi.fn((_input: { withEditOverlay?: boolean }) => ({
     data: undefined,
   })),
+  digestQuery: vi.fn((_input: { withEditOverlay?: boolean }) => ({
+    data: undefined,
+  })),
   sampleTraces: [] as unknown[],
 }));
 
@@ -54,7 +57,7 @@ vi.mock("~/utils/api", () => ({
     annotationScore: { getAllActive: { useQuery: () => ({ data: [] }) } },
     traces: {
       getTracesWithSpansByThreadIds: { useQuery: mocks.threadQuery },
-      getFormattedSpansDigest: { useQuery: () => ({ data: undefined }) },
+      getFormattedSpansDigest: { useQuery: mocks.digestQuery },
       getSampleTracesDataset: {
         useQuery: () => ({ data: mocks.sampleTraces }),
       },
@@ -79,6 +82,17 @@ const TRACE_IN_A_THREAD = {
 function threadReadInput(): { withEditOverlay?: boolean } {
   return mocks.threadQuery.mock.calls[0]?.[0] ?? {};
 }
+
+/** What the AI-readable column's own read asked for on its first call. */
+function digestReadInput(): { withEditOverlay?: boolean } {
+  return mocks.digestQuery.mock.calls[0]?.[0] ?? {};
+}
+
+/** A mapping that fills its one column from the AI-readable text. */
+const AI_READABLE_MAPPING = {
+  mapping: { input: { source: "formatted_trace" as const } },
+  expansions: [],
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -122,6 +136,43 @@ describe("given a mapping filled from the traces as they were captured", () => {
       );
 
       expect(threadReadInput().withEditOverlay).toBe(false);
+    });
+  });
+});
+
+describe("given a mapping whose column is the AI-readable trace", () => {
+  describe("when the traces it maps carry corrections", () => {
+    /** @scenario "The AI-readable column is read the way the rest of the mapping is" */
+    it("reads the trace behind that column with corrections", () => {
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <TracesMapping
+            traces={[TRACE_IN_A_THREAD]}
+            traceMapping={AI_READABLE_MAPPING}
+            targetFields={["input"]}
+            shouldApplyCorrections
+          />
+        </ChakraProvider>,
+      );
+
+      expect(digestReadInput().withEditOverlay).toBe(true);
+    });
+  });
+
+  describe("when the traces it maps are the captured ones", () => {
+    /** @scenario "The AI-readable column is read the way the rest of the mapping is" */
+    it("reads the trace behind that column as captured", () => {
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <TracesMapping
+            traces={[TRACE_IN_A_THREAD]}
+            traceMapping={AI_READABLE_MAPPING}
+            targetFields={["input"]}
+          />
+        </ChakraProvider>,
+      );
+
+      expect(digestReadInput().withEditOverlay).toBe(false);
     });
   });
 });

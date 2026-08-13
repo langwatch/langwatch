@@ -36,6 +36,10 @@ import type { UsageLimitResult } from "~/server/app-layer/usage/usage.service";
 import { prisma } from "~/server/db";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
+  OTLP_CORRECTED_PATH_HEADER,
+  readCorrectedPath,
+} from "~/server/otel/otlpPathCanonicalisation";
+import {
   OTLP_MAX_BODY_BYTES,
   parseOtlpLogs,
   parseOtlpMetrics,
@@ -179,7 +183,70 @@ async function authenticate(
     };
   }
 
+  logCorrectedPath({ c, projectId: resolved.project.id, logger });
+
   return { project: resolved.project, resolved };
+}
+
+/**
+ * A misconfigured exporter fleet posts continuously and the signal — which
+ * project, which path — is identical on every batch, so a pair is reported at
+ * most once a window. Repetition costs money on an ingestion hot path and
+ * carries no information the first line did not.
+ *
+ * The map is bounded rather than grown: past the cap it is cleared wholesale,
+ * which costs one extra line per live pair afterwards and cannot leak.
+ */
+const CORRECTED_PATH_LOG_WINDOW_MS = 10 * 60 * 1000;
+const CORRECTED_PATH_LOG_MAX_PAIRS = 1000;
+const correctedPathLastLoggedAt = new Map<string, number>();
+
+function correctedPathIsDueToLog({
+  pair,
+  now,
+}: {
+  pair: string;
+  now: number;
+}): boolean {
+  const last = correctedPathLastLoggedAt.get(pair);
+  if (last !== void 0 && now - last < CORRECTED_PATH_LOG_WINDOW_MS)
+    return false;
+
+  if (correctedPathLastLoggedAt.size >= CORRECTED_PATH_LOG_MAX_PAIRS) {
+    correctedPathLastLoggedAt.clear();
+  }
+  correctedPathLastLoggedAt.set(pair, now);
+  return true;
+}
+
+/**
+ * Records that this request reached us on a path a misconfigured exporter
+ * produced (see otel-path-aliases). Logged here rather than at the alias
+ * because the project is what makes it actionable: it is the difference
+ * between "somebody's exporter is misconfigured" and knowing whose.
+ */
+function logCorrectedPath({
+  c,
+  projectId,
+  logger,
+}: {
+  c: RouteContext;
+  projectId: string;
+  logger: ReturnType<typeof createLogger>;
+}): void {
+  const originalPath = readCorrectedPath(
+    c.req.header(OTLP_CORRECTED_PATH_HEADER),
+  );
+  if (!originalPath) return;
+  // NUL joins the pair because it cannot appear in a URL pathname, so no
+  // project and path can collide with a different pair.
+  const pair = `${projectId}\u0000${originalPath}`;
+  if (!correctedPathIsDueToLog({ pair, now: Date.now() })) return;
+
+  logger.warn(
+    { projectId, originalPath, canonicalPath: c.req.path },
+    "OTLP exporter posted to a non-canonical path; served from the canonical route",
+  );
 }
 
 /**

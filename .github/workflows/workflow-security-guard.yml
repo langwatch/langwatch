@@ -17,6 +17,11 @@ on:
       - ".github/scripts/guard-pull-request-target*.ts"
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  # Never on main: a commit that lands keeps its own verdict.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 permissions:
   contents: read
 

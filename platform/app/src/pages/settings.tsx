@@ -11,13 +11,13 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { OrganizationIntent, Project } from "@prisma/client";
 import isEqual from "lodash-es/isEqual";
 import { useState } from "react";
 import { Lock } from "react-feather";
 import { Controller, type SubmitHandler, useForm } from "react-hook-form";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
 import { Tooltip } from "~/components/ui/tooltip";
+import type { OrganizationIntent, Project } from "~/generated/prisma/client";
 import { ProjectSelector } from "../components/DashboardLayout";
 import SettingsLayout from "../components/SettingsLayout";
 import { DepartmentPicker } from "../components/settings/DepartmentPicker";
@@ -126,7 +126,7 @@ function SettingsForm({
     defaultValues,
   });
   const updateOrganization = api.organization.update.useMutation();
-  const apiContext = api.useContext();
+  const apiContext = api.useUtils();
   const [showLlmOpsSetupDialog, setShowLlmOpsSetupDialog] = useState(false);
   const [showCreateProjectDialog, setShowCreateProjectDialog] = useState(false);
 
@@ -204,7 +204,7 @@ function SettingsForm({
         <HStack width="full">
           <Heading as="h2">Organization Settings</Heading>
           <Spacer />
-          {updateOrganization.isLoading && <Spinner />}
+          {updateOrganization.isPending && <Spinner />}
         </HStack>
         {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
         <form onSubmit={handleSubmit(onSubmit)} style={{ width: "100%" }}>
@@ -454,7 +454,7 @@ function SettingsForm({
                 <Button
                   type="submit"
                   colorPalette="blue"
-                  loading={updateOrganization.isLoading}
+                  loading={updateOrganization.isPending}
                 >
                   Save Changes
                 </Button>
@@ -595,7 +595,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
   });
   const { register, handleSubmit, control, formState } = form;
   const updateProject = api.project.update.useMutation();
-  const apiContext = api.useContext();
+  const apiContext = api.useUtils();
   const [changeLanguageFramework, setChangeLanguageFramework] = useState(false);
   const [showTraceSharingDialog, setShowTraceSharingDialog] = useState(false);
 
@@ -674,7 +674,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
       <HStack width="full" marginTop={6}>
         <Heading as="h2">Project-level Settings</Heading>
         <Spacer />
-        {updateProject.isLoading && <Spinner />}
+        {updateProject.isPending && <Spinner />}
         {organizations && (
           <ProjectSelector organizations={organizations} project={project} />
         )}
@@ -844,7 +844,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
           <Button
             type="submit"
             colorPalette="blue"
-            loading={updateProject.isLoading}
+            loading={updateProject.isPending}
           >
             Save Changes
           </Button>

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { ApiKeyRepository } from "~/server/api-key/api-key.repository";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 

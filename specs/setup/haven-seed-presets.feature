@@ -5,7 +5,9 @@ Feature: Seed presets — a database that is ready to look at
   (an idempotent upsert, nothing dropped); `haven db reset [preset]` is the
   destructive sibling that starts from a fresh database. Presets are
   positional and shared by both: demo, traces, onboarding, post-onboarding,
-  bare (ADR-064).
+  bare, mass (ADR-064). One registry serves the whole CLI — `haven play --seed
+  <preset>` seeds a throwaway PR sandbox from the same list
+  (haven-play.feature).
 
   # Behavior lives in tools/thuishaven `app/db.go` (the seedPresets registry,
   # DBSeed, DBReset, the live-stack ingest steps) plus the seed scripts they

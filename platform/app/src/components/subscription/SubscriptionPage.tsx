@@ -18,12 +18,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  OrganizationUserRole,
-  PricingModel,
-  Currency as PrismaCurrency,
-  TeamUserRole,
-} from "@prisma/client";
 import { ArrowRight, Check } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import SettingsLayout from "~/components/SettingsLayout";
@@ -32,6 +26,12 @@ import { Link } from "~/components/ui/link";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
+import {
+  OrganizationUserRole,
+  PricingModel,
+  Currency as PrismaCurrency,
+  TeamUserRole,
+} from "~/generated/prisma/client";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   classifyMemberType,
@@ -41,10 +41,10 @@ import { api } from "~/utils/api";
 import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
 import {
   type BillingInterval,
-  buildTieredCapabilities,
+  buildEnterprisePlanFeatures,
+  buildPlanCapabilities,
   type Currency,
   FREE_PLAN_FEATURES as DEVELOPER_FEATURES,
-  ENTERPRISE_PLAN_FEATURES,
   formatPrice,
   getAnnualDiscountPercent,
   getGrowthFeatures,
@@ -154,7 +154,10 @@ export function SubscriptionPage() {
   const isLicenseOverride = plan?.planSource === "license";
   const isTieredPricingModel =
     organization?.pricingModel === PricingModel.TIERED;
-  const isEnterprisePlan = plan?.type === "ENTERPRISE" && !isLicenseOverride;
+  // An enterprise plan is an enterprise plan whichever leg resolved it. Tying
+  // this to the subscription leg made every licensed enterprise customer an
+  // upgrade candidate for a smaller plan they already exceed.
+  const isEnterprisePlan = plan?.type === "ENTERPRISE";
   const isTieredLegacyPaidPlan =
     isTieredPricingModel &&
     !isDeveloperPlan &&
@@ -343,7 +346,7 @@ export function SubscriptionPage() {
   }
 
   const currentPlanName = isLicenseOverride
-    ? `License: ${plan.name ?? "Growth"}`
+    ? `License: ${plan.name ?? formatPlanTypeLabel(plan.type)}`
     : isTieredPricingModel
       ? (plan.name ?? formatPlanTypeLabel(plan.type))
       : isDeveloperPlan
@@ -357,19 +360,21 @@ export function SubscriptionPage() {
           seatCount: plan?.maxMembers ?? 1,
           perSeatPrice: monthlyEquivalent,
         };
-  const currentPlanFeatures = isLicenseOverride
-    ? getGrowthFeatures(effectiveCurrency)
-    : isTieredLegacyPaidPlan
-      ? buildTieredCapabilities({
+  // A plan the customer already holds is described by what it grants: the
+  // enterprise list minus anything their contract withheld, and every other
+  // held plan read from its own numbers rather than handed another tier's
+  // marketing copy. Only a plan we are selling gets the tier's full pitch.
+  const currentPlanFeatures = isEnterprisePlan
+    ? buildEnterprisePlanFeatures(plan)
+    : isLicenseOverride || isTieredLegacyPaidPlan
+      ? buildPlanCapabilities({
           maxMembers: plan?.maxMembers ?? 0,
           maxMessagesPerMonth: plan?.maxMessagesPerMonth ?? 0,
           maxMembersLite: plan?.maxMembersLite ?? 0,
         })
-      : isEnterprisePlan
-        ? ENTERPRISE_PLAN_FEATURES
-        : isDeveloperPlan
-          ? DEVELOPER_FEATURES
-          : getGrowthFeatures(effectiveCurrency);
+      : isDeveloperPlan
+        ? DEVELOPER_FEATURES
+        : getGrowthFeatures(effectiveCurrency);
 
   const isUpgradeSeatsRequired =
     !isDeveloperPlan &&
@@ -510,7 +515,13 @@ export function SubscriptionPage() {
           }
           isManageLoading={isManageLoading}
           deprecatedNotice={isTieredLegacyPaidPlan}
-          contactSalesUrl={isEnterprisePlan ? CONTACT_SALES_URL : undefined}
+          // Sales has nothing to sell a customer already holding a signed
+          // enterprise contract, so they get no upgrade call to action.
+          contactSalesUrl={
+            isEnterprisePlan && !isLicenseOverride
+              ? CONTACT_SALES_URL
+              : undefined
+          }
         />
 
         {/* Invoices Block - always shown; listInvoices returns [] when no Stripe customer exists */}

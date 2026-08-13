@@ -12,7 +12,7 @@
  * The token format is `vk-lw-<ulid>` with no live/test discriminator;
  * the gateway never branches on environment, so there is no env field.
  */
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 
 import { metadataFromRow, type ResourceMetadata } from "./resourceMetadata";
 import { traceProjectsByIds } from "./scopeResolver";

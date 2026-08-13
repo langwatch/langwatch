@@ -1,3 +1,4 @@
+import { TRANSIENT_NETWORK_CODES } from "@langwatch/clickhouse-client";
 import { describe, expect, it, vi } from "vitest";
 import {
   ClickHouseOverloadedError,
@@ -509,6 +510,80 @@ describe("classifyClickHouseError", () => {
           ),
         ),
       ).toBe(ErrorCategory.RECOVERABLE);
+    });
+
+    describe("when the connection died before the server answered", () => {
+      // A worker rollout aborts whatever ClickHouse work the pod was holding.
+      // The driver reports that as `socket hang up` carrying an errno, not a
+      // ClickHouse code — and classifying it CRITICAL dead-lettered the job
+      // instead of re-staging it, blocking the group. Prod, 2026-08-10.
+      /** @scenario A socket hang up is recoverable, not a data-integrity failure */
+      it("returns RECOVERABLE for a socket hang up carrying ECONNRESET", () => {
+        expect(
+          classifyClickHouseError(
+            Object.assign(new Error("socket hang up"), { code: "ECONNRESET" }),
+          ),
+        ).toBe(ErrorCategory.RECOVERABLE);
+      });
+
+      /** @scenario Socket-level failures are recoverable whatever the errno */
+      it.each([
+        "ECONNRESET",
+        "ECONNREFUSED",
+        "EPIPE",
+        "ETIMEDOUT",
+        "EHOSTUNREACH",
+        "ENETUNREACH",
+        "EAI_AGAIN",
+      ])("returns RECOVERABLE for socket errno %s", (code) => {
+        expect(
+          classifyClickHouseError(
+            Object.assign(new Error("request failed"), { code }),
+          ),
+        ).toBe(ErrorCategory.RECOVERABLE);
+      });
+
+      // Both message forms, because they come from different layers: "socket
+      // hang up" is Node's http module, "other side closed" is undici's.
+      // Either is all that survives an error that crossed a worker or
+      // serialisation boundary and lost its errno.
+      /** @scenario A socket failure that survived only as a message is still recoverable */
+      it.each([
+        "socket hang up",
+        "other side closed",
+      ])("returns RECOVERABLE for a bare %j message with no code", (message) => {
+        expect(classifyClickHouseError(new Error(message))).toBe(
+          ErrorCategory.RECOVERABLE,
+        );
+      });
+
+      // The shared client owns the retry policy for reads; this classifier
+      // owns it for queued jobs. They read the same failures, so a code the
+      // client retries must not be one this classifier dead-letters.
+      /** @scenario The queue classifier agrees with the ClickHouse client's classifier */
+      it("agrees with every socket code the shared ClickHouse client retries", () => {
+        for (const code of TRANSIENT_NETWORK_CODES) {
+          expect(
+            classifyClickHouseError(
+              Object.assign(new Error("request failed"), { code }),
+            ),
+          ).toBe(ErrorCategory.RECOVERABLE);
+        }
+      });
+
+      /** @scenario A genuine data error is still critical */
+      it("returns CRITICAL for an unknown-table error", () => {
+        expect(
+          classifyClickHouseError(
+            Object.assign(
+              new Error(
+                "Code: 60. DB::Exception: Table default.nope does not exist. (UNKNOWN_TABLE)",
+              ),
+              { code: "60" },
+            ),
+          ),
+        ).toBe(ErrorCategory.CRITICAL);
+      });
     });
   });
 

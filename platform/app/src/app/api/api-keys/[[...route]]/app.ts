@@ -1,7 +1,7 @@
-import type { Organization } from "@prisma/client";
 import type { Context } from "hono";
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
+import type { Organization } from "~/generated/prisma/client";
 import { emitManagementAudit } from "~/server/api/management/audit";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";

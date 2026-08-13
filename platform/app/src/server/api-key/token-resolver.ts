@@ -1,5 +1,5 @@
-import type { PrismaClient, Project } from "@prisma/client";
-import { RoleBindingScopeType } from "@prisma/client";
+import type { PrismaClient, Project } from "~/generated/prisma/client";
+import { RoleBindingScopeType } from "~/generated/prisma/client";
 import { ApiKeyService } from "./api-key.service";
 import { API_KEY_PREFIX, getTokenType } from "./api-key-token.utils";
 

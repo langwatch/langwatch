@@ -148,6 +148,18 @@ export default defineConfig(async (): Promise<UserConfig> => {
   plugins: [react(), patchObjectInspectBrowserStub(), havenHmrGate()],
   resolve: {
     alias: {
+      // The generated Prisma client's `client.ts` entry hard-imports the node
+      // runtime (`@prisma/client/runtime/client` → `node:url`), which vite
+      // externalizes — evaluating it in the browser throws and blanks every
+      // page. Frontend files import it for enums and types; the old
+      // `@prisma/client` package routed those through its `browser` package
+      // field, but the generated client is plain source with no package.json,
+      // so the browser bundle is pointed at the generated browser entry here.
+      // Must precede the bare "~" alias — vite matches aliases in order.
+      "~/generated/prisma/client": path.resolve(
+        __dirname,
+        "./src/generated/prisma/browser.ts",
+      ),
       // Path aliases (matching tsconfig paths)
       "~": path.resolve(__dirname, "./src"),
       "@app": path.resolve(__dirname, "./src/server/app-layer"),
@@ -319,6 +331,15 @@ export default defineConfig(async (): Promise<UserConfig> => {
         // No-op when API is on plain HTTP.
         secure: false,
       },
+      // An exporter given the site root as its OTLP endpoint posts to
+      // `/v1/traces`. In production start.ts routes those into the API; in dev
+      // the frontend owns the root, so they need an entry of their own or they
+      // fall through to the SPA. Exact-match, same reasoning as /mcp below.
+      "^/v1/(?:traces|logs|metrics)/?(?:\\?.*)?$": {
+        target: API_TARGET,
+        changeOrigin: true,
+        secure: false,
+      },
       // Exact-match only ("^...$") — a plain "/mcp" prefix also swallows the
       // /mcp/authorize frontend page route (src/pages/mcp/authorize.tsx),
       // sending it to the API server, which has no dev-mode page fallback.
@@ -356,6 +377,14 @@ export default defineConfig(async (): Promise<UserConfig> => {
         secure: false,
       },
       "/.well-known/oauth-authorization-server": {
+        target: API_TARGET,
+        changeOrigin: true,
+        secure: false,
+      },
+      // Probed by MCP clients during discovery. The API answers a JSON 404;
+      // without this entry dev would answer the SPA's HTML instead, which is
+      // the failure mode this route exists to avoid.
+      "/.well-known/openid-configuration": {
         target: API_TARGET,
         changeOrigin: true,
         secure: false,

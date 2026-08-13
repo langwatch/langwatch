@@ -56,7 +56,14 @@ beforeAll(async () => {
   azurite = await startAzurite();
   await ensureAzuriteContainer({ azurite, container: CONTAINER });
 
+  // The full shared-key set: AzureDatasetStorage now resolves credentials
+  // through the one shared resolver (#6087), which validates the account and
+  // container alongside the key rather than trusting each caller to.
+  mockEnv.STORED_OBJECTS_BACKEND = "azure";
+  mockEnv.AZURE_BLOB_AUTH_MODE = "sharedKey";
+  mockEnv.AZURE_BLOB_ACCOUNT_NAME = azurite.accountName;
   mockEnv.AZURE_BLOB_ACCOUNT_KEY = azurite.accountKey;
+  mockEnv.AZURE_BLOB_CONTAINER = CONTAINER;
   mockEnv.AZURE_BLOB_ENDPOINT = azurite.endpointBaseUrl;
 }, 60_000);
 
@@ -78,6 +85,7 @@ describe("AzureDatasetStorage against a real Azurite emulator", () => {
   describe("writeChunks() + readChunks()", () => {
     describe("given a dataset written to Azure Blob", () => {
       /** @scenario "Datasets round-trip through Azure Blob when azure is the configured backend" */
+      /** @scenario "An Azure-only installation supports every shared object-storage workload" */
       it("reads the same rows back in order", async () => {
         const projectId = `p-${nanoid(6)}`;
         const datasetId = `d-${nanoid(6)}`;

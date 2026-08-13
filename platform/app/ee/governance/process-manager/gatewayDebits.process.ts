@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { createLogger } from "@langwatch/observability";
-import type { GatewayBudgetLedgerStatus, PrismaClient } from "@prisma/client";
 import { z } from "zod";
+import type {
+  GatewayBudgetLedgerStatus,
+  PrismaClient,
+} from "~/generated/prisma/client";
 import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import type {
   AdmitSpendCommandData,

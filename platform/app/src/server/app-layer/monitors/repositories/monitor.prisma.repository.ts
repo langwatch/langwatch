@@ -2,7 +2,7 @@ import {
   EvaluationExecutionMode,
   type Monitor,
   type PrismaClient,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import type {
   MonitorRepository,
   MonitorSummary,

@@ -1,4 +1,7 @@
-import type { ModelDefaultScopeType, PrismaClient } from "@prisma/client";
+import type {
+  ModelDefaultScopeType,
+  PrismaClient,
+} from "~/generated/prisma/client";
 
 import type { Session } from "~/server/auth";
 import {

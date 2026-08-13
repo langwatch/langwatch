@@ -37,7 +37,7 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
   const tokens = api.scimToken.list.useQuery({ organizationId });
   const generateMutation = api.scimToken.generate.useMutation();
   const revokeMutation = api.scimToken.revoke.useMutation();
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const {
     open: isGenerateOpen,
@@ -235,7 +235,7 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
               <Button
                 width="full"
                 onClick={handleGenerate}
-                disabled={generateMutation.isLoading}
+                disabled={generateMutation.isPending}
               >
                 Generate Token
               </Button>
@@ -302,7 +302,7 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
                 <Button
                   colorPalette="red"
                   onClick={() => tokenToRevoke && handleRevoke(tokenToRevoke)}
-                  disabled={revokeMutation.isLoading}
+                  disabled={revokeMutation.isPending}
                 >
                   Revoke
                 </Button>

@@ -38,7 +38,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       agents: { getAll: { invalidate: vi.fn() } },
     }),
     agents: {
