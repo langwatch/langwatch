@@ -136,13 +136,6 @@ Feature: Dataset File Upload REST API
     Then the request fails with 422 Unprocessable Entity
 
   @integration
-  Scenario: Create + upload enforces dataset plan limits
-    Given the project has reached its dataset plan limit
-    When I POST /api/dataset/upload with name "Over Limit" and a valid CSV file
-    Then the request fails with 403 Forbidden
-    And the error indicates the dataset limit has been reached
-
-  @integration
   Scenario: Create + upload fails when slug conflicts with existing dataset
     Given a dataset with slug "duplicate" already exists
     When I POST /api/dataset/upload with name "Duplicate" and a valid CSV file

@@ -27,10 +27,46 @@ type Usage struct {
 	PromptTokens        int
 	CompletionTokens    int
 	TotalTokens         int
-	CacheReadTokens     int    // tokens read from the prompt cache (priced at the cache-read rate)
-	CacheCreationTokens int    // tokens written to the prompt cache (priced at the cache-write rate)
-	CostMicroUSD        int64  // cost in microdollars (1/1_000_000 USD)
-	Model               string // resolved model name from the request
+	CacheReadTokens     int // tokens read from the prompt cache (priced at the cache-read rate)
+	CacheCreationTokens int // tokens written to the prompt cache (priced at the cache-write rate)
+	// CacheCreation1hTokens is the portion of CacheCreationTokens that bought
+	// an hour-long cache entry rather than a five-minute one. Anthropic bills
+	// the hour at twice the input rate against the five minutes' 1.25x, so a
+	// write priced without this comes out about a third under the bill. Only
+	// the Anthropic-native lanes can report it: the provider states the split
+	// in its own response body, and the normalized usage struct every other
+	// lane goes through has one flat cache-write count. Zero means unknown,
+	// and the whole write prices short-lived, exactly as before.
+	CacheCreation1hTokens int
+	CostMicroUSD          int64  // cost in microdollars (1/1_000_000 USD)
+	Model                 string // resolved model name from the request
+
+	// Audio measures. TTS is priced by input characters and STT by audio
+	// duration on providers that do not report token usage (ElevenLabs,
+	// whisper-1); providers that DO report tokens (gpt-4o-mini-tts,
+	// gpt-4o-transcribe) fill the token fields above as usual. Zero when
+	// not applicable.
+	InputChars   int     // TTS: characters synthesized
+	AudioSeconds float64 // STT: seconds of audio transcribed
+}
+
+// ReconcileCacheWrites raises CacheCreationTokens to at least
+// CacheCreation1hTokens, restoring the rule that the hour-long count is a
+// portion of the write total.
+//
+// The two can arrive from different sources. On the raw-forward lanes the
+// total comes from the normalized usage struct while the split is read off
+// the provider's own bytes, and the normalized struct reports no writes at
+// all there. An unreconciled pair bills those tokens twice: once inside
+// gen_ai.usage.input_tokens, because the emitter derives fresh input by
+// subtracting the write total, and again as an hour-long write at twice the
+// input rate. Every producer that sets CacheCreation1hTokens calls this
+// before handing the usage on.
+func (u Usage) ReconcileCacheWrites() Usage {
+	if u.CacheCreation1hTokens > u.CacheCreationTokens {
+		u.CacheCreationTokens = u.CacheCreation1hTokens
+	}
+	return u
 }
 
 // StreamIterator provides pull-based iteration over streaming response chunks.

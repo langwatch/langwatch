@@ -46,7 +46,7 @@ func (ic InlineCredentials) Encode() (string, error) {
 // shape, dispatching by `provider` (parsed from the model id by the caller).
 //
 // Unknown fields in `params` are ignored — the source-of-truth fields are
-// dictated by langwatch/src/server/api/routers/modelProviders.utils.ts:225
+// dictated by platform/app/src/server/api/routers/modelProviders.utils.ts:225
 // (prepareLitellmParams). Adding a new field there means adding it here.
 func FromLiteLLMParams(provider string, params map[string]any) (InlineCredentials, error) {
 	switch provider {
@@ -85,9 +85,13 @@ func FromLiteLLMParams(provider string, params map[string]any) (InlineCredential
 			),
 		}, nil
 	case "gemini":
+		// project_id + region are Gemini's second door: present, they mark
+		// an Agent Platform credential and the gateway dispatches to
+		// aiplatform.googleapis.com at the path they name. Absent, the
+		// credential is an AI Studio key for the Gemini API.
 		return InlineCredentials{
 			Provider: "gemini",
-			Gemini:   pickStrings(params, "api_key"),
+			Gemini:   pickStrings(params, "api_key", "project_id", "region"),
 		}, nil
 	case "xai", "groq", "cerebras", "deepseek":
 		return InlineCredentials{

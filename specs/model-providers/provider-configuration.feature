@@ -112,6 +112,61 @@ Feature: Model Provider Configuration
     Then the original API key "sk-actual123" is preserved
     And the base URL is updated to "https://custom.openai.com/v1"
 
+  # Editing headers changes headers. It must never touch the credentials.
+  @integration
+  Scenario: Adding an extra header keeps the stored Azure credentials
+    Given I have "azure" provider configured with an API key and an endpoint
+    When I open the model provider configuration drawer for "azure"
+    And I leave every credential field untouched
+    And I add an extra header "api-key" with a value
+    And I click "Save"
+    Then the extra header is saved
+    And the stored API key and endpoint are preserved
+
+  # Opening a provider and changing nothing is not an edit, whatever it holds.
+  @integration
+  Scenario: A stored extra header does not make the form dirty on open
+    Given I have "azure" provider configured with an extra header
+    When I open the model provider configuration drawer for "azure"
+    And I change nothing
+    Then the Save button is disabled
+
+  # Emptying a field is an edit, so a credential can actually be removed.
+  @integration
+  Scenario: Clearing a stored API key enables Save
+    Given I have "openai" provider configured with API key "sk-actual123"
+    When I open the model provider configuration drawer for "openai"
+    And I clear the API key field
+    Then the Save button is enabled
+
+  # A save that would leave a provider with no credential fails loudly rather
+  # than quietly removing the one on file.
+  @integration
+  Scenario: A header-only payload is refused instead of dropping credentials
+    Given I have "azure" provider configured with an API key and an endpoint
+    When a save carries no credential for the provider
+    Then the save is rejected with an error the customer can act on
+    And the stored API key and endpoint are preserved
+
+  # A save that names one credential is editing that one. An API key is never
+  # shown back, so nobody can send one they did not type, and leaving it out
+  # asks for nothing rather than asking for its removal.
+  @integration
+  Scenario: A save that names one credential keeps the ones it leaves out
+    Given I have "azure" provider configured with an API key and an endpoint
+    When a save carries a new endpoint and no API key
+    Then the endpoint is updated
+    And the stored API key is preserved
+
+  # Everything else is on screen, so a save states it in full. That is how the
+  # API gateway option switches over, and it must not take the key with it.
+  @integration
+  Scenario: Switching Azure to its API gateway keeps the key and drops the direct endpoint
+    Given I have "azure" provider configured with an API key and an endpoint
+    When I switch the provider to its API gateway and save
+    Then the direct endpoint gives way to the gateway address
+    And the stored API key is preserved
+
   @integration @unimplemented
   Scenario: Configure API keys from environment variables
     Given I have "openai" provider enabled via environment variable "OPENAI_API_KEY"
@@ -199,3 +254,76 @@ Feature: Model Provider Configuration
     And I see a validation error for "OPENAI_API_KEY"
     When I start typing in the "OPENAI_API_KEY" field
     Then the validation error is cleared
+
+  # A provider that reaches a self-hosted endpoint needs no API key: the
+  # endpoint decides. The drawer asks for exactly what the provider needs,
+  # so nobody has to invent a value to get past a required field, and no
+  # invented value travels to their server.
+
+  @integration
+  Scenario Outline: The API key stops being required once a base URL is entered
+    Given I open the model provider configuration drawer for "<provider>"
+    Then the API key field is marked required
+    When I enter "https://llm.acme.internal/v1" in the base URL field
+    Then the API key field is not marked required
+    And it is marked required again when I clear the base URL
+
+    Examples:
+      | provider  |
+      | openai    |
+      | anthropic |
+
+  @integration
+  Scenario Outline: A self-hosted endpoint is saved with no API key at all
+    Given I open the model provider configuration drawer for "<provider>"
+    When I enter "https://llm.acme.internal/v1" in the base URL field
+    And I leave the API key field empty
+    And I click "Save"
+    Then the provider is saved
+    And the API key is saved empty, so nothing is sent to my endpoint as a credential
+
+    Examples:
+      | provider  |
+      | openai    |
+      | anthropic |
+
+  @integration
+  Scenario Outline: Saving with neither an API key nor a base URL says what to enter
+    Given I open the model provider configuration drawer for "<provider>"
+    When I leave both credential fields empty
+    And I click "Save"
+    Then I see "Add an API key, or a base URL if your endpoint does not need one." next to the API key field
+    And the provider is not saved
+
+    Examples:
+      | provider  |
+      | openai    |
+      | anthropic |
+
+  @integration
+  Scenario: A provider with a single credential keeps its required marker
+    Given I open the model provider configuration drawer for "gemini"
+    Then the "GEMINI_API_KEY" field is marked required
+    And no base URL field is offered
+
+  # A stored base URL belongs to the customer like any other field: the
+  # drawer shows it as saved, and removing it is an ordinary edit. This
+  # pins a failure mode where emptying the field did not count as a change,
+  # so Save stayed disabled and the endpoint could never be taken off.
+  # Its sibling failure, an edit next to a masked key deleting that key, is
+  # pinned by "Preserve original API key when saving with masked
+  # placeholder" above.
+
+  @integration
+  Scenario Outline: Removing the base URL is a change that can be saved
+    Given I have "<provider>" configured with a saved API key and base URL "https://llm.acme.internal/v1"
+    When I open its model provider configuration drawer
+    Then the base URL field shows the stored value
+    When I clear the base URL field
+    Then I can save the removal
+    And the saved API key is still on file afterwards
+
+    Examples:
+      | provider  |
+      | openai    |
+      | anthropic |

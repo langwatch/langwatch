@@ -152,13 +152,19 @@ curl -sSf http://localhost:5563/healthz | jq .
 # /startupz — 200 once MarkStarted; 503 before
 curl -sSf http://localhost:5563/startupz | jq .
 
-# /readyz — 200 only when all registered readiness checks pass
+# /readyz: 200 unless the pod is draining (deliberately dependency-free)
 curl -sSf http://localhost:5563/readyz | jq .
-# → Note: `auth_cache_warm` will be failing until at least one VK resolves
+
+# /health: public status-page verdict, process + control-plane connectivity.
+# 200 with {"status":"ok"} when the signed probe to
+# /api/internal/gateway/health has succeeded within the last 60s; 503 with
+# {"status":"degraded"} on a sustained control-plane outage. No -f here:
+# it would swallow the degraded body, which is the half worth reading.
+curl -sS http://localhost:5563/health | jq .
 
 # /v1/models — 401 without auth, 200 with a valid VK
 curl -si http://localhost:5563/v1/models
-# → HTTP/1.1 401 + X-LangWatch-Request-Id + X-LangWatch-Gateway-Version
+# → HTTP/1.1 401 + X-Request-Id + X-LangWatch-Gateway-Version
 
 # /metrics — Prometheus scrape
 curl -sSf http://localhost:5563/metrics | head -30
@@ -191,7 +197,7 @@ curl -sSf http://localhost:5563/v1/chat/completions \
   -d '{"model":"openai/gpt-5-mini","messages":[{"role":"user","content":"ping — reply ok"}]}' | jq .
 ```
 
-A successful response completes the end-to-end smoke. Check the control-plane budget view to see the debit event propagated through the outbox.
+A successful response completes the end-to-end smoke. The gateway spools a spend record for the request and ships it to the control plane within a second or so; once that lands, the spend shows up in the control-plane budget view.
 
 ## 6 — Cleanup
 
@@ -214,8 +220,7 @@ kubectl -n langwatch delete pdb gateway-smoke-langwatch-gateway --ignore-not-fou
 - **ImagePullBackOff**: EKS node role needs ECR pull permission. The `lw-dev` cluster's node role already has `AmazonEC2ContainerRegistryReadOnly` attached; if a new node group lacks it, `kubectl describe pod` will show the auth error and the fix is to extend the role policy.
 - **CrashLoopBackOff with `LW_GATEWAY_INTERNAL_SECRET is required`**: step 2 secret is missing or the env var key in the Secret doesn't match `secrets.internalSecretKey` (default `LW_GATEWAY_INTERNAL_SECRET`).
 - **401 `invalid_api_key` on every /v1/* request**: INTERNAL_SECRET on the gateway side doesn't match the control plane's. Re-run step 2 and roll both deploys.
-- **503 on `/readyz` with `auth_cache_warm: cache has not observed any revision yet`**: normal until the first VK resolves. Hit `/v1/models` once with a valid VK.
-- **503 on `/readyz` with `control_plane_reachable`**: the gateway can't reach `http://langwatch-app:5560/api/internal/gateway/health`. Check `kubectl -n langwatch get svc langwatch-app` is on `:5560`. NetworkPolicy off by default so this shouldn't be kube-level.
+- **503 on `/health` with `control_plane: unreachable for Ns`**: the gateway's background probe can't reach the app's `/api/internal/gateway/health` (or the shared INTERNAL_SECRET mismatches, which 401s the probe). Check `kubectl -n langwatch get svc` shows the app Service the ConfigMap's control-plane URL points at, and see the `statusprobe_control_plane_unreachable` log line for the underlying probe failure. `/readyz` stays 200 through this on purpose: pulling pods from the LB on a control-plane blip would kill the warm-cache traffic that still serves fine.
 
 ## Not covered
 

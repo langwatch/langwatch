@@ -14,6 +14,7 @@ Project coding conventions. See also `../TESTING_PHILOSOPHY.md`.
 - **drawers.md** - URL-routed drawers
 - **async-processing-ui.md** - Poll/banner/read-gate pattern for a processing→ready/failed resource
 - **soft-delete-vs-archive.md** - When to archive vs hard-delete
+- **error-handling.md** - When to throw a HandledError, what to put on it, how the client renders it
 - **logging-and-tracing.md** - Logging infrastructure and context propagation
 - **local-observability.md** - Local LGTM stack (Grafana/Loki/Tempo/Prometheus); querying logs/traces as an agent with `gcx`
 - **dependency-age-gates.md** - Dependency release-age gates and emergency security exceptions

@@ -1,0 +1,206 @@
+import type { LlmPromptConfigVersion } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
+import {
+  inputsSchema,
+  messageSchema,
+  outputsSchema,
+  promptingTechniqueSchema,
+  responseFormatSchema,
+  versionSchema,
+} from "~/prompts/schemas/field-schemas";
+import { nodeDatasetSchema } from "../../../optimization_studio/types/dsl";
+import { SchemaVersion } from "../enums";
+import type { LlmConfigVersionDTO } from "./llm-config-versions.repository";
+import { sortKeysDeep } from "./sortKeysDeep";
+
+export const LATEST_SCHEMA_VERSION = SchemaVersion.V1_0 as const;
+
+/**
+ * Schema v1.0 - Base configuration schema
+ * Validates the configData JSON field in LlmPromptConfigVersion
+ */
+const configSchemaV1_0 = z.object({
+  id: z.string(),
+  authorId: z.string().nullable().optional(),
+  author: z
+    .object({
+      id: z.string(),
+      // name is nullable: many SSO/OAuth providers return a profile with no
+      // display name, and the User.name column is nullable. Requiring a string
+      // here made the version-history read path throw for name-less authors.
+      name: z.string().nullable(),
+      email: z.string().nullable().optional(),
+      image: z.string().nullable().optional(),
+    })
+    .nullable()
+    .optional(),
+  projectId: z.string().min(1, "Project ID cannot be empty"),
+  configId: z.string().min(1, "Config ID cannot be empty"),
+  schemaVersion: z.literal(SchemaVersion.V1_0),
+  commitMessage: z.string(),
+  version: versionSchema,
+  createdAt: z.date(),
+  configData: z.object({
+    prompt: z.string(),
+    messages: z.array(messageSchema).default([]),
+    inputs: z.array(inputsSchema).default([]),
+    outputs: z.array(outputsSchema).min(1, "At least one output is required"),
+    model: z.string().min(1, "Model identifier cannot be empty"),
+    temperature: z.number().optional(),
+    max_tokens: z.number().optional(),
+    // Traditional sampling parameters
+    top_p: z.number().optional(),
+    frequency_penalty: z.number().optional(),
+    presence_penalty: z.number().optional(),
+    // Other sampling parameters
+    seed: z.number().optional(),
+    top_k: z.number().optional(),
+    min_p: z.number().optional(),
+    repetition_penalty: z.number().optional(),
+    // Reasoning parameter (canonical/unified field)
+    // Provider-specific mapping happens at runtime boundary (reasoningBoundary.ts)
+    reasoning: z.string().optional(),
+    // Provider-specific fields - kept for backward compatibility reading old data
+    // New data should only use 'reasoning' field
+    reasoning_effort: z.string().optional(), // OpenAI (legacy)
+    thinkingLevel: z.string().optional(), // Gemini (legacy)
+    effort: z.string().optional(), // Anthropic (legacy)
+    verbosity: z.string().optional(),
+    demonstrations: nodeDatasetSchema.optional(),
+    prompting_technique: promptingTechniqueSchema.optional(),
+    // Deprecated: response_format is now derived from outputs at read time.
+    // Kept optional for backward compat reading old data, but never written for new data.
+    response_format: responseFormatSchema.optional(),
+  }),
+});
+
+/**
+ * Map of schema validators by version
+ * Used to validate the configData field in LlmPromptConfigVersion
+ */
+export const schemaValidators = {
+  [SchemaVersion.V1_0]: configSchemaV1_0,
+};
+
+export function getSchemaValidator(version: SchemaVersion | string) {
+  const validator = schemaValidators[version as SchemaVersion];
+  if (!validator) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Unknown schema version: ${version}`,
+    });
+  }
+  return validator;
+}
+
+export type LatestConfigVersionSchema = z.infer<typeof configSchemaV1_0>;
+
+/**
+ * Returns the latest schema version for LlmPromptConfigVersion
+ */
+export function getLatestConfigVersionSchema() {
+  return configSchemaV1_0;
+}
+
+export function getVersionValidator(schemaVersion: SchemaVersion) {
+  return schemaValidators[schemaVersion];
+}
+
+/**
+ * Parses configuration data against a specific schema version
+ * Used to validate configData in LlmPromptConfigVersion before saving
+ * @param llmConfigVersion - The configuration data to parse
+ * @returns The parsed config data
+ * @throws TRPCError if the schema llmConfigVersion is unknown
+ * @throws ZodError if the config data is invalid
+ */
+export function parseLlmConfigVersion(
+  llmConfigVersion:
+    | Omit<LlmPromptConfigVersion, "deletedAt">
+    | LlmConfigVersionDTO,
+): LatestConfigVersionSchema {
+  const { schemaVersion } = llmConfigVersion;
+
+  const validator = getVersionValidator(schemaVersion as SchemaVersion);
+
+  if (!validator) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Unknown schema llmConfigVersion: ${schemaVersion}`,
+    });
+  }
+
+  return validator.parse(llmConfigVersion);
+}
+
+export type RuntimeParameters = Record<string, unknown>;
+
+export function parseRuntimeParameters(value: unknown): RuntimeParameters {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as RuntimeParameters;
+  }
+  return {};
+}
+
+export function runtimeParametersEqual(a: unknown, b: unknown): boolean {
+  return (
+    JSON.stringify(sortKeysDeep(a ?? {})) ===
+    JSON.stringify(sortKeysDeep(b ?? {}))
+  );
+}
+
+/**
+ * Renders a single side of a runtime parameter diff. A key entirely absent
+ * from the object ("unset") must read differently from that key being
+ * present with an explicit `undefined` value, even though
+ * `JSON.stringify(undefined)` can't tell them apart on its own.
+ */
+function describeRuntimeParamValue(hasKey: boolean, value: unknown): string {
+  if (!hasKey) return "unset";
+  return value === undefined ? "undefined" : JSON.stringify(value);
+}
+
+/**
+ * Per-key description of runtime parameters that differ between
+ * `localParameters` and `remoteParameters`, in the same direction as
+ * `runtimeParametersEqual`'s arguments. Canonicalizes nested values with
+ * `sortKeysDeep` (same as `runtimeParametersEqual`) so key reordering alone
+ * isn't reported as a change, and treats a key entirely missing from one
+ * side as distinct from that key being explicitly set to `undefined`.
+ */
+export function diffRuntimeParameters({
+  localParameters,
+  remoteParameters,
+}: {
+  localParameters: unknown;
+  remoteParameters: unknown;
+}): string[] {
+  const paramsA = (localParameters ?? {}) as RuntimeParameters;
+  const paramsB = (remoteParameters ?? {}) as RuntimeParameters;
+  const keys = new Set([...Object.keys(paramsA), ...Object.keys(paramsB)]);
+
+  const differences: string[] = [];
+  for (const key of keys) {
+    const hasA = key in paramsA;
+    const hasB = key in paramsB;
+    const equal =
+      hasA === hasB &&
+      JSON.stringify(sortKeysDeep(paramsA[key])) ===
+        JSON.stringify(sortKeysDeep(paramsB[key]));
+
+    if (!equal) {
+      differences.push(
+        `${key}: ${describeRuntimeParamValue(hasA, paramsA[key])} → ${describeRuntimeParamValue(hasB, paramsB[key])}`,
+      );
+    }
+  }
+  return differences;
+}
+
+export function isValidHandle(handle: string): boolean {
+  // npm package name pattern: allows lowercase letters, numbers, hyphens, and optionally one slash
+  const npmPackagePattern = /^[a-z0-9_-]+(?:\/[a-z0-9_-]+)?$/;
+  const nanoIdPattern = /^prompt_[a-zA-Z0-9_-]+$/;
+  return npmPackagePattern.test(handle) || nanoIdPattern.test(handle);
+}

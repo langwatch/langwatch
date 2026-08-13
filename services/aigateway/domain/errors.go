@@ -24,6 +24,19 @@ type UpstreamError struct {
 	// Message is the provider's error message, used to build a minimal
 	// envelope when Body is empty.
 	Message string
+	// ErrorType and ErrorCode are the provider's own error discriminants
+	// (e.g. OpenAI "insufficient_quota", Anthropic "overloaded_error",
+	// Bedrock "ThrottlingException") as parsed by the provider adapter.
+	// They keep the error's identity on translated lanes where the native
+	// body is not captured: without them the minimal envelope collapses
+	// every provider verdict into a generic "provider_error" and the
+	// client loses the code it dispatches its own handling on.
+	ErrorType string
+	ErrorCode string
+	// Provider names the upstream this error came from (the credential's
+	// provider id), so a multi-provider chain's surviving error says which
+	// account to look at. Empty when the dispatch layer has not stamped it.
+	Provider string
 	// Headers carries the upstream's retry-signaling response headers
 	// (Retry-After, x-should-retry) so the client can honor the provider's
 	// backoff hint and terminal-vs-retryable signal instead of guessing.
@@ -36,22 +49,37 @@ func (e *UpstreamError) Error() string {
 
 // Gateway-specific error codes.
 const (
-	ErrInvalidAPIKey    = herr.Code("invalid_api_key")
-	ErrBudgetExceeded   = herr.Code("budget_exceeded")
+	ErrInvalidAPIKey  = herr.Code("invalid_api_key")
+	ErrBudgetExceeded = herr.Code("budget_exceeded")
+	// A per-end-user budget template is active on this key and the request
+	// carried no end-user id: fail closed, a cap evadable by omitting a
+	// field is not a cap.
+	ErrEndUserRequired  = herr.Code("end_user_required")
 	ErrRateLimited      = herr.Code("rate_limited")
 	ErrGuardrailBlocked = herr.Code("guardrail_blocked")
-	ErrPolicyViolation  = herr.Code("policy_violation")
-	ErrModelNotAllowed  = herr.Code("model_not_allowed")
-	ErrProviderError    = herr.Code("provider_error")
-	ErrPayloadTooLarge  = herr.Code("payload_too_large")
-	ErrBadRequest       = herr.Code("bad_request")
-	ErrNotFound         = herr.Code("not_found")
-	ErrInternal         = herr.Code("internal_error")
-	ErrChainExhausted   = herr.Code("chain_exhausted")
-	ErrCircuitOpen      = herr.Code("circuit_open")
-	ErrProviderTimeout  = herr.Code("provider_timeout")
-	ErrKeyRevoked       = herr.Code("virtual_key_revoked")
-	ErrAuthUpstream     = herr.Code("auth_upstream_unavailable")
+	// ErrGuardrailUpstreamUnavailable means the guardrail could not be
+	// evaluated at all. Fail-closed keys stop here rather than proceeding as
+	// though the guardrail had passed. Contract 5.
+	ErrGuardrailUpstreamUnavailable = herr.Code("guardrail_upstream_unavailable")
+	ErrPolicyViolation              = herr.Code("policy_violation")
+	ErrModelNotAllowed              = herr.Code("model_not_allowed")
+	ErrProviderError                = herr.Code("provider_error")
+	ErrPayloadTooLarge              = herr.Code("payload_too_large")
+	ErrBadRequest                   = herr.Code("bad_request")
+	// ErrMissingModel is a request-shape error with its own stable identity so
+	// clients and rejection metrics do not have to infer it from prose.
+	ErrMissingModel    = herr.Code("missing_model")
+	ErrNotFound        = herr.Code("not_found")
+	ErrInternal        = herr.Code("internal_error")
+	ErrChainExhausted  = herr.Code("chain_exhausted")
+	ErrCircuitOpen     = herr.Code("circuit_open")
+	ErrProviderTimeout = herr.Code("provider_timeout")
+	ErrKeyRevoked      = herr.Code("virtual_key_revoked")
+	// ErrKeyDisabled is the REVERSIBLE stop: the key material is intact and
+	// an administrator can re-enable it. Distinct from revoked (one-way)
+	// so tenant tooling can branch on which one it is.
+	ErrKeyDisabled  = herr.Code("virtual_key_disabled")
+	ErrAuthUpstream = herr.Code("auth_upstream_unavailable")
 	// ErrNoProviderConfigured means the virtual key's bundle carries zero
 	// provider credentials — the organization has no ModelProvider configured.
 	// Without this guard the dispatcher would hand Bifrost a zero-value
@@ -62,4 +90,10 @@ const (
 	// Clients receive it as a 401 with this code so Langy can render the
 	// re-authenticate card instead of a generic provider error.
 	ErrCodexSessionExpired = herr.Code("codex_session_expired")
+	// ErrUnsupportedParameter means the parameter policy refused a request
+	// parameter for the target lane: either the request depends on it
+	// functionally and the lane cannot honor it, or drop_tuning_params is false
+	// and the lane has no mapping for it. The code matches OpenAI's own
+	// parameter rejections so SDK error handling stays familiar.
+	ErrUnsupportedParameter = herr.Code("unsupported_parameter")
 )

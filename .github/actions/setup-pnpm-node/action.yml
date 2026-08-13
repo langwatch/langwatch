@@ -2,26 +2,51 @@
 # Centralizes the pnpm version, Node version, and cache strategy so
 # version bumps happen in one place.
 #
+# Since ADR-076 the repo is a SINGLE pnpm workspace with one lockfile at the
+# root, so installs always run from the root and are narrowed with a filter
+# rather than by changing directory. Installing from a subdirectory would now
+# resolve the whole workspace anyway, because pnpm walks up to the root.
+#
 # Usage:
 #   - uses: ./.github/actions/setup-pnpm-node
 #     with:
-#       cache-dependency-path: "langwatch/pnpm-lock.yaml"
-#       # optional: set install-dir to also run `pnpm install --frozen-lockfile`
-#       install-dir: langwatch
+#       # optional: what to install. Omit to skip installing entirely.
+#       install: "@langwatch/web..."
 name: setup-pnpm-node
 description: Set up pnpm + Node 24 with pnpm-store caching.
 inputs:
   cache-dependency-path:
     description: Path(s) to pnpm-lock.yaml file(s). Multiline strings supported.
-    required: true
+    required: false
+    default: "pnpm-lock.yaml"
   install-dir:
-    description: Working directory to run `pnpm install --frozen-lockfile` in. Omit to skip install.
+    description: >
+      REMOVED — use `install`. Declared only so passing it fails loudly.
+      GitHub reduces an undeclared input to a warning nobody reads, and the
+      job then dies later and elsewhere: a call site left on `install-dir`
+      skipped its install entirely and failed on a stale cache path several
+      steps down, twice, because a rebase reintroduced it from another branch.
+    required: false
+    default: ""
+  install:
+    description: >
+      What to install. Omit to skip the install step. `all` installs every
+      workspace project. Anything else is passed straight to `pnpm --filter`,
+      so a trailing `...` selects a project together with its workspace
+      dependencies (e.g. `@langwatch/web...`).
     required: false
     default: ""
 
 runs:
   using: composite
   steps:
+    - name: Reject the removed install-dir input
+      if: inputs.install-dir != ''
+      shell: bash
+      run: |
+        echo "::error::setup-pnpm-node no longer takes 'install-dir'. The repo is a single pnpm workspace (ADR-076), so installs run from the root and are narrowed with a filter. Replace 'install-dir: <dir>' with 'install: \"<package-name>...\"' — e.g. install-dir: langwatch becomes install: \"@langwatch/web...\"."
+        exit 1
+
     - name: Setup pnpm
       uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
       with:
@@ -36,15 +61,42 @@ runs:
 
     # node-gyp is no longer bundled on PATH under Node-24 + npm-11, so any
     # native-module install lifecycle script (e.g. node-pty's prebuild fallback
-    # in mcp-server) ELIFECYCLEs with "sh: 1: node-gyp: not found". Install it
-    # globally so spawned scripts can resolve it via PATH.
+    # in mcp-server and skills) ELIFECYCLEs with "sh: 1: node-gyp: not found".
+    # Install it globally so spawned scripts can resolve it via PATH.
+    # Pinned, not @latest: a mutable dist-tag makes every workflow using this
+    # action depend on whatever npm published today. 12.3.0 is the version the
+    # workflows that install node-gyp directly already pin to.
     - name: Install node-gyp
-      if: inputs.install-dir != ''
+      if: inputs.install != ''
       shell: bash
-      run: npm install -g node-gyp@latest
+      run: npm install -g node-gyp@12.3.0
+
+    # The global install above only fixes PATH resolution for scripts that
+    # spawn `node-gyp` themselves. pnpm builds native modules with the copy
+    # bundled in its own dist, and that copy reaches the runner without an
+    # executable bit often enough to matter: the generated Makefile's
+    # regeneration rule invokes gyp_main.py by path, so `sh` answers
+    # "Permission denied" and make dies with error 126. It lands on a random
+    # shard each run, which reads as a flaky test rather than an install that
+    # never got to run.
+    - name: Restore the executable bit on pnpm's bundled node-gyp
+      if: inputs.install != ''
+      shell: bash
+      run: |
+        set -euo pipefail
+        pnpm_root="$(dirname "$(dirname "$(readlink -f "$(command -v pnpm)")")")"
+        find "${PNPM_HOME:-$pnpm_root}" "$pnpm_root" \
+          -name 'gyp_main.py' -type f ! -perm -u+x -exec chmod +x {} + 2>/dev/null || true
 
     - name: Install dependencies
-      if: inputs.install-dir != ''
+      if: inputs.install != ''
       shell: bash
-      working-directory: ${{ inputs.install-dir }}
-      run: CI=true pnpm install --frozen-lockfile
+      env:
+        INSTALL: ${{ inputs.install }}
+      run: |
+        set -euo pipefail
+        if [ "$INSTALL" = "all" ]; then
+          CI=true pnpm install --frozen-lockfile
+        else
+          CI=true pnpm install --frozen-lockfile --filter "$INSTALL"
+        fi

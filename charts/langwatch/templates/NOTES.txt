@@ -76,6 +76,64 @@ dev's Personal Workspace at https://<your-host>/me .
   • Healthcheck (in-cluster):
       curl http://{{ .Release.Name }}-gateway/healthz
 {{- end }}
+{{- if (index .Values "langyagent").chartManaged }}
+  • Langy, the in-product assistant:
+      kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/name=langyagent
+{{- $langyRtc := (index .Values "langyagent").runtimeClassName }}
+{{- if $langyRtc }}
+    Isolation: sandboxed. The pod is pinned to the "{{ $langyRtc }}" RuntimeClass.
+    If the command above lists NOTHING, your cluster does not define that class:
+    the pod is rejected at admission, so none is ever created and the reason
+    sits on the Deployment instead:
+      kubectl -n {{ .Release.Namespace }} get deploy {{ .Release.Name }}-langyagent \
+        -o jsonpath='{.status.conditions[?(@.type=="ReplicaFailure")].message}'
+    Everything else in the install keeps running either way.
+{{- else }}
+    Isolation: each conversation's worker runs under its own UID with its own
+    credentials, workers cannot read each other's, and the NetworkPolicy denies
+    egress to the internet{{ if (index .Values "langyagent").networkPolicy.allowExternalHttps }} (you have turned external HTTPS ON){{ end }}. The pod runs on the node's
+    normal runtime, so a worker that escapes its container faces the node
+    kernel. Hardening that last step is a sandboxed RuntimeClass:
+      https://docs.langwatch.ai/self-hosting/langy/setup#hardening-a-sandboxed-runtime
+{{- /* Deliberately NO `lookup` here, and do not reintroduce one. Naming the
+       cluster's own sandboxed classes would take a cluster-scoped list of
+       RuntimeClass, and `lookup` reports an RBAC denial as a template error
+       rather than as an empty result. Where the installer may not list
+       cluster-scoped resources, that turned this optional hint into a hard
+       UPGRADE FAILED, and a Go template cannot recover from it. So the
+       operator runs the check instead, where a denial costs them nothing.
+       No `helm template` catches a regression here: with no cluster behind
+       the render every lookup returns empty. ./tests/restricted-rbac.sh does. */}}
+    To see whether this cluster already offers one:
+      kubectl get runtimeclass
+    If that is denied, nothing is broken: it is a cluster-scoped read, which
+    is exactly what a namespace-scoped operator does not have. Langy keeps
+    running as it is — ask whoever administers the cluster whether a class
+    exists to pin.
+    gVisor reports a handler of runsc; Kata ships under several, such as
+    kata-qemu or kata-mshv-vm-isolation. Handler names are runtime- and
+    platform-specific, so confirm against your platform's documentation
+    rather than the name alone. To pin Langy to a class:
+      langyagent.runtimeClassName=<class>  langyagent.acceptUnsandboxedRuntime=false
+{{- end }}
+{{- if (index .Values "langyagent").enableForAllUsers }}
+    It is available to everyone in this install. Give it a model to talk to
+    by wiring a Model Provider (step 2 above), then open the assistant from
+    any project.
+{{- else }}
+    langyagent.enableForAllUsers=false, so it stays dark until you open it
+    to the projects or organizations you choose from /ops/feature-flags.
+{{- end }}
+{{- if not (index .Values "langyagent").mirror.existingSecretName }}
+    To watch Langy work with LangWatch itself, mirror its turns into one of
+    your projects: create an API key there, then (the read keeps the key out
+    of your shell history and out of the process list)
+      read -rsp "Mirror project API key: " KEY
+      kubectl -n {{ .Release.Namespace }} create secret generic langwatch-langyagent-mirror \
+        --from-env-file=/dev/stdin <<< "LANGY_MIRROR_TRACE_KEY=$KEY"; unset KEY
+    and set langyagent.mirror.existingSecretName to it on your next upgrade.
+{{- end }}
+{{- end }}
   • Self-host docs:
       https://docs.langwatch.ai/self-hosting/
   • Personal-keys onboarding walkthrough:
@@ -170,6 +228,20 @@ message.
     - LW_GATEWAY_INTERNAL_SECRET      (gateway.chartManaged=true)
     - LW_GATEWAY_JWT_SECRET           (gateway.chartManaged=true)
 {{- end }}
+{{- $langy := (index .Values "langyagent") }}
+{{- $langySecrets := $langy.secrets | default dict }}
+{{- $langyKey := $langySecrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
+{{- $langySecretName := $langySecrets.existingSecretName | default (include "langwatch.appSecretName" .) }}
+{{- $langyOwnSecret := ne $langySecretName (include "langwatch.appSecretName" .) }}
+{{- if and $langy.chartManaged (not $langyOwnSecret) }}
+    - {{ $langyKey }}   (langyagent.chartManaged=true)
+{{- end }}
+{{- if and $langy.chartManaged $langyOwnSecret }}
+
+  {{ $langySecretName }} keys (langyagent.chartManaged=true, read by the
+  app, the workers, and the agent pod):
+    - {{ $langyKey }}
+{{- end }}
 
   When autogen.enabled=true the chart materialises this Secret on
   first install via per-key lookup-or-rand and heals missing keys
@@ -191,5 +263,16 @@ message.
       --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
 {{- if and .Values.gateway .Values.gateway.chartManaged }}
       --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
-      --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"
+      --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"{{ if and $langy.chartManaged (not $langyOwnSecret) }} \{{ end }}
+{{- end }}
+{{- if and $langy.chartManaged (not $langyOwnSecret) }}
+      --from-literal={{ $langyKey }}="$(openssl rand -hex 32)"
+{{- end }}
+{{- if and $langy.chartManaged $langyOwnSecret }}
+
+  Langy reads its shared value from a Secret of your own
+  ({{ $langySecretName }}), so create that one too:
+
+    kubectl -n {{ .Release.Namespace }} create secret generic {{ $langySecretName }} \
+      --from-literal={{ $langyKey }}="$(openssl rand -hex 32)"
 {{- end }}

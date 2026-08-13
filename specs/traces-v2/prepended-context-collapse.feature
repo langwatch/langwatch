@@ -1,7 +1,7 @@
 # Implementation:
-#   langwatch/src/features/traces-v2/utils/leadingContext.ts
-#   langwatch/src/features/traces-v2/utils/previewFormatter.ts (list preview)
-#   langwatch/src/features/traces-v2/components/TraceDrawer/transcript/BlockStack.tsx (pretty mode)
+#   platform/app/src/features/traces-v2/utils/leadingContext.ts
+#   platform/app/src/features/traces-v2/utils/previewFormatter.ts (list preview)
+#   platform/app/src/features/traces-v2/components/TraceDrawer/transcript/BlockStack.tsx (pretty mode)
 
 Feature: Prepended context collapse
 

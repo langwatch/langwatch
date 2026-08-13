@@ -1,0 +1,229 @@
+/**
+ * Hook for path-based suite routing.
+ *
+ * All simulation sub-paths are handled by a single catch-all page file
+ * ([[...path]].tsx), so sidebar navigation uses shallow routing — no
+ * full page transitions, no remounting, no skeleton flicker.
+ *
+ * Derives the active selection from router.query.path:
+ *   []                            → All Runs
+ *   ["run-plans", slug]           → Suite detail
+ *   ["run-plans", slug, batchId]  → Suite + highlight batch
+ *   [setSlug]                     → External set
+ *   [setSlug, batchId]            → External set + highlight batch
+ */
+import { useCallback } from "react";
+import { useRouter } from "~/utils/compat/next-router";
+
+export const ALL_RUNS_ID = "all-runs" as const;
+export const EXTERNAL_SET_PREFIX = "external:" as const;
+
+/** Checks if a selection identifier represents an external set. */
+export function isExternalSetSelection(slug: string): boolean {
+  return slug.startsWith(EXTERNAL_SET_PREFIX);
+}
+
+/** Extracts the scenarioSetId from an external set selection identifier. */
+export function extractExternalSetId(slug: string): string {
+  return slug.slice(EXTERNAL_SET_PREFIX.length);
+}
+
+/** Creates a selection identifier for an external set. */
+export function toExternalSetSelection(scenarioSetId: string): string {
+  return `${EXTERNAL_SET_PREFIX}${scenarioSetId}`;
+}
+
+/**
+ * The URL a simulations path should be sent to instead of rendered, or null to
+ * render it as it stands.
+ *
+ * Everything under /simulations that is not a known shape is read as an
+ * external SET slug, so a near-miss URL does not fail — it quietly renders the
+ * run history for a set that does not exist, which reads as "your thing isn't
+ * here". `/simulations/scenarios/<id>` is the near-miss that matters: the
+ * scenario library is a real page one segment away, and a link built by hand
+ * (or by an agent) lands on it constantly. Send those to the library with the
+ * scenario open rather than to an empty set.
+ *
+ * Pure and exported so the redirect rules are testable without a router.
+ */
+export function resolveSimulationsRedirect({
+  projectSlug,
+  segments,
+  query,
+}: {
+  projectSlug: string;
+  segments: string[];
+  query: Record<string, unknown>;
+}): string | null {
+  const base = `/${projectSlug}/simulations`;
+  const [first, second, third] = segments;
+
+  // The scenario LIBRARY, not a simulation set. `/simulations/scenarios` itself
+  // is a route of its own, so only the near-misses reach here.
+  if (first === "scenarios" || first === "scenario") {
+    return second
+      ? `${base}/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${encodeURIComponent(second)}`
+      : `${base}/scenarios`;
+  }
+
+  if (first === "suites") {
+    const suite = query.suite;
+    const externalSet = query.externalSet;
+    if (typeof suite === "string" && suite) return `${base}/run-plans/${suite}`;
+    if (typeof externalSet === "string" && externalSet) {
+      return `${base}/${externalSet}`;
+    }
+    return base;
+  }
+
+  // /setId/batchId/scenarioRunId → the set + batch, with the run's drawer open.
+  if (segments.length === 3 && first !== "run-plans") {
+    return `${base}/${first}/${second}?openRun=${third}`;
+  }
+
+  return null;
+}
+
+type SuiteRouting = {
+  selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
+  navigateToSuite: (slug: string | typeof ALL_RUNS_ID) => void;
+  highlightBatchId: string | null;
+};
+
+/**
+ * Route params, rebuilt from the target selection rather than carried over.
+ */
+const ROUTE_PARAM_KEYS = new Set(["project", "path"]);
+
+/**
+ * Whether a query param carries over when the sidebar selection changes.
+ *
+ * The date window (`period`, or `startDate` plus `endDate`) and the
+ * run-history view state (`groupBy`, `scenarioId`, `passFailStatus`) describe
+ * what the user is looking at rather than which set they picked, so they
+ * follow the selection. Dropping `period` snapped a widened window back to
+ * the 30-day default and hid the older run the user had widened the window to
+ * reach. An open drawer is the exception: it holds a run from the set being
+ * navigated away from.
+ */
+const survivesSelectionChange = (key: string): boolean =>
+  !ROUTE_PARAM_KEYS.has(key) && !key.startsWith("drawer");
+
+export function useSuiteRouting(): SuiteRouting {
+  const router = useRouter();
+
+  // Derive from asPath (actual URL) rather than query.path, because
+  // shallow routing on catch-all [[...path]] may not update query.path
+  // consistently across Next.js versions.
+  const { selectedSuiteSlug, highlightBatchId } = deriveFromPath({
+    isReady: router.isReady,
+    path: router.query.path ?? extractPathFromAsPath(router.asPath),
+  });
+
+  const projectSlug = router.query.project as string | undefined;
+
+  const navigateToSuite = useCallback(
+    (slug: string | typeof ALL_RUNS_ID) => {
+      if (!projectSlug) return;
+
+      const carriedParams: Record<string, string | string[]> = {};
+      for (const [key, value] of Object.entries(router.query)) {
+        if (value === undefined || !survivesSelectionChange(key)) continue;
+        carriedParams[key] = value;
+      }
+
+      let pathSegments: string[];
+      if (slug === ALL_RUNS_ID) {
+        pathSegments = [];
+      } else if (isExternalSetSelection(slug)) {
+        pathSegments = [extractExternalSetId(slug)];
+      } else {
+        pathSegments = ["run-plans", slug];
+      }
+
+      const displayPath =
+        pathSegments.length > 0
+          ? `/${projectSlug}/simulations/${pathSegments.join("/")}`
+          : `/${projectSlug}/simulations`;
+
+      const search = new URLSearchParams();
+      for (const [key, value] of Object.entries(carriedParams)) {
+        if (Array.isArray(value)) {
+          for (const item of value) search.append(key, item);
+        } else {
+          search.set(key, value);
+        }
+      }
+      const carriedQueryString = search.toString();
+      const asUrl = carriedQueryString
+        ? `${displayPath}?${carriedQueryString}`
+        : displayPath;
+
+      // All routes are handled by the same [[...path]] page, so shallow works
+      void router.push(
+        {
+          pathname: "/[project]/simulations/[[...path]]",
+          query: {
+            project: projectSlug,
+            ...(pathSegments.length > 0 ? { path: pathSegments } : {}),
+            ...carriedParams,
+          },
+        },
+        asUrl,
+        { shallow: true },
+      );
+    },
+    [router, projectSlug],
+  );
+
+  return { selectedSuiteSlug, navigateToSuite, highlightBatchId };
+}
+
+/** Determines which selection is active from the catch-all path segments. */
+export function deriveFromPath({
+  isReady,
+  path,
+}: {
+  isReady: boolean;
+  path: string | string[] | undefined;
+}): {
+  selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
+  highlightBatchId: string | null;
+} {
+  if (!isReady) return { selectedSuiteSlug: null, highlightBatchId: null };
+
+  const rawSegments = Array.isArray(path) ? path : path ? [path] : [];
+  // Drop segments that are actually query strings leaking in from the URL
+  // (e.g. when a redirect fires before the catch-all has stripped "?foo=bar").
+  const segments = rawSegments.filter(
+    (s) => s && !s.startsWith("?") && !s.includes("="),
+  );
+
+  // [] → All Runs
+  if (segments.length === 0) {
+    return { selectedSuiteSlug: ALL_RUNS_ID, highlightBatchId: null };
+  }
+
+  // ["run-plans", slug] or ["run-plans", slug, batchId]
+  if (segments[0] === "run-plans" && segments.length >= 2) {
+    return {
+      selectedSuiteSlug: segments[1]!,
+      highlightBatchId: segments[2] ?? null,
+    };
+  }
+
+  // [setSlug] or [setSlug, batchId]
+  return {
+    selectedSuiteSlug: toExternalSetSelection(segments[0]!),
+    highlightBatchId: segments[1] ?? null,
+  };
+}
+
+/** Extract path segments from asPath (e.g., "/project/simulations/run-plans/slug" → ["run-plans", "slug"]) */
+function extractPathFromAsPath(asPath: string): string[] | undefined {
+  const pathOnly = asPath.split("?")[0]?.split("#")[0] ?? "";
+  const match = pathOnly.match(/\/simulations\/(.+?)\/?$/);
+  if (!match?.[1]) return undefined;
+  return match[1].split("/").filter(Boolean);
+}

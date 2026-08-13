@@ -53,7 +53,7 @@ import {
  *     ("this payload proves it is mine"). Conflating them breaks a deliberate
  *     binding the moment a real payload omits a field.
  *
- * ADR: dev/docs/adr/059-card-selection-is-deterministic.md
+ * ADR: dev/docs/adr/079-card-selection-is-deterministic.md
  */
 
 /**
@@ -407,7 +407,7 @@ export const parseCliResult = ({
  * choice travels on the envelope — so re-deriving a kind from the command's
  * name at render time is a second decision that can disagree with the first.
  * It did: a promoted result parsed against the card its name would have earned
- * rather than the card it was stamped with. See ADR-059 §1.
+ * rather than the card it was stamped with. See ADR-079 §1.
  */
 export const parseCardResult = ({
   kind,

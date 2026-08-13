@@ -34,7 +34,7 @@ Source of truth: `services/aigateway/adapters/gatewaytracer/attrs.go`. The gatew
 | `langwatch.organization_id` | Owning organisation. |
 | `langwatch.principal_id` | User or service account that made the call. |
 | `langwatch.vk_display_prefix` | First 16 chars of the VK's display form (for correlation with 401 traces where the full VK isn't known). |
-| `langwatch.gateway_request_id` | The value of the `X-LangWatch-Request-Id` response header. |
+| `langwatch.gateway_request_id` | The value of the `X-LangWatch-Gateway-Request-Id` response header. |
 | `langwatch.model` | Final resolved model name dispatched to the provider. |
 | `langwatch.provider` | Provider name (`openai`, `anthropic`, `gemini`, etc.). |
 | `langwatch.model_source` | How the model was resolved: `alias`, `explicit_slash`, `implicit`. |
@@ -55,7 +55,7 @@ Source of truth: `services/aigateway/adapters/gatewaytracer/attrs.go`. The gatew
 - `langwatch.fallback.winning_credential`, credential ID of the winning provider slot.
 - `langwatch.thread_id`, thread/conversation ID when provided via `X-LangWatch-Thread-Id` header.
 
-<Info>The following attributes are **not yet emitted** (tracked for v1.1): `langwatch.policy.blocked`, `langwatch.budget.breached_scope`, `.warnings`, `langwatch.stream.*`, `langwatch.client.name`, `langwatch.cache.outcome`, `.forced_injected`. Operators looking for these signals should use the Prometheus counters documented below. Request-id correlation via the `X-LangWatch-Request-Id` header lets operators join metric spikes back to individual traces.</Info>
+<Info>The following attributes are **not yet emitted** (tracked for v1.1): `langwatch.policy.blocked`, `langwatch.budget.breached_scope`, `.warnings`, `langwatch.stream.*`, `langwatch.client.name`, `langwatch.cache.outcome`, `.forced_injected`. Operators looking for these signals should use the Prometheus counters documented below. Request-id correlation via the `X-LangWatch-Gateway-Request-Id` header lets operators join metric spikes back to individual traces.</Info>
 
 ## Filtering in the LangWatch UI
 
@@ -69,18 +69,104 @@ Attribute-based filters in the Messages view compose into dashboards:
 
 ## Metrics (Prometheus)
 
-The gateway exposes `/metrics` for Prometheus:
+The gateway serves `GET /metrics` on its main HTTP port (`5563` by default, the same listener that serves `/v1/*` and the health probes). No separate admin port.
 
-- `gateway_requests_total{provider, model, status}`, request counts.
-- `gateway_request_duration_seconds`, end-to-end latency histogram.
-- `gateway_provider_duration_seconds{provider}`, upstream latency histogram.
-- `gateway_cache_hits_total{outcome}`, cache outcome counts.
-- `gateway_budget_blocks_total{scope}`, budget rejections.
-- `gateway_guardrail_blocks_total{direction}`, guardrail rejections.
-- `gateway_circuit_state{provider}`, 0 closed, 1 half-open, 2 open.
-- `gateway_auth_cache_size{layer=l1|l2}`.
-- `gateway_auth_cache_hits_total{layer}`.
-- `gateway_internal_rtt_seconds{endpoint}`, control-plane round-trip times.
+### Traffic and lifecycle
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `gateway_http_requests_total` | counter | `route`, `status`, `provider`, `model` | Requests served. `route` is the chi route pattern (`/v1/chat/completions`), `status` is the numeric HTTP status as a string (`"200"`, `"429"`, `"500"`) |
+| `gateway_http_request_duration_seconds` | histogram | `route`, `provider` | End-to-end latency, client connect to last byte |
+| `gateway_in_flight_requests` | gauge | none | Requests currently being served |
+| `gateway_draining` | gauge | none | `1` while the pod is draining after SIGTERM, `0` otherwise |
+
+### Provider dispatch and fallback
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `gateway_provider_duration_seconds` | histogram | `provider`, `model` | Upstream round-trip per attempt (excludes gateway overhead) |
+| `gateway_provider_attempts_total` | counter | `credential_id`, `outcome` | One increment per attempt against a credential slot |
+| `gateway_fallback_events_total` | counter | `from_credential`, `to_credential` | Chain hops taken |
+| `gateway_circuit_state` | gauge | `credential_id` | Breaker state encoded in the value: `0` closed, `1` open, `2` half-open |
+
+`outcome` is one of `success`, `fallback_success`, `retryable_5xx`, `not_found`, `rate_limit`, `timeout`, `network`, `circuit_open`, `non_retryable`, `chain_exhausted`, `context_done`.
+
+### Auth cache
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `gateway_auth_cache_hits_total` | counter | `tier` | Virtual-key resolutions served from cache |
+| `gateway_auth_cache_misses_total` | counter | `tier` | Resolutions that fell through to the control plane |
+| `gateway_auth_cache_lookups_total` | counter | none | Hits plus misses |
+| `gateway_auth_cache_size` | gauge | `tier` | Entries currently held |
+
+`tier` is always `l1`: the auth cache is an in-process LRU, private to each pod.
+
+### Governance
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `gateway_budget_blocks_total` | counter | `scope` | Requests rejected by the local budget precheck |
+| `gateway_cache_hits_total` | counter | `outcome` | Prompt-cache outcome (`hit` or `miss`), derived from provider cache-read token counts |
+| `gateway_cache_rule_hits_total` | counter | `rule_id`, `mode_applied` | Bundle-baked cache rule matches. `mode_applied` is `RESPECT`, `FORCE`, or `DISABLE` |
+| `gateway_guardrail_verdicts_total` | counter | `direction`, `verdict` | Guardrail decisions. `direction` is `request`, `response`, or `stream_chunk`; `verdict` is `allow`, `block`, `modify`, or `fail_open`. `fail_open` means the traffic passed unchecked, on any direction. It is the default outcome for `stream_chunk`, which never stalls a stream on policy, and opt-in for the other two |
+| `gateway_rate_limit_denied_total` | counter | `dimension`, `vk_id` | Requests denied by the virtual-key rate limiter. `dimension` is `rpm` or `rpd` |
+| `gateway_client_rejects_total` | counter | `code`, `vk_id` | Requests **the gateway itself** rejected as the caller's fault after authentication, by gateway error code (`missing_model`, `bad_request`, `model_not_allowed`, `budget_exceeded`, `payload_too_large`, …) and by the virtual key that sent them. These are logged at `info`, so this counter is the only signal that will move when one client loops on a malformed body. Alert on a sustained per-key rate rather than on any single rejection |
+
+Three things this counter deliberately excludes, because all three would make a per-key alert on it fire for keys doing nothing wrong:
+
+- **Authentication failures.** A missing or unresolvable key is rejected before the request has a key to attribute it to. Watch `gateway_http_requests_total{status="401"}` instead.
+- **Provider rejections.** An upstream 4xx (an OpenAI 429, an Anthropic 402) is the caller's fault too, but it is not the gateway rejecting the client — counting it would turn a bad hour at a provider into an alert that reads as client misbehaviour. Those live on `gateway_provider_attempts_total{outcome="rate_limit"}` and the upstream status on `gateway_http_requests_total`.
+- **Gateway rate limiting.** A key legitimately sustained at its RPM/RPD ceiling would otherwise pin this counter too, muting the exact alert it exists for. Watch `gateway_rate_limit_denied_total` instead.
+
+To find a client stuck in a rejection loop, rank by key, then drill into the one that stands out:
+
+```promql
+topk(5, sum by (vk_id) (rate(gateway_client_rejects_total{code!=""}[15m])))
+```
+
+Copy the complete `vk_id` from that result, then replace `<full-vk-id>` for the code breakdown:
+
+```promql
+sum by (code) (rate(gateway_client_rejects_total{vk_id="<full-vk-id>"}[15m]))
+```
+
+### Streaming
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `gateway_streaming_usage_missing_total` | counter | `provider`, `model` | Streams that finished without the provider reporting usage. These debit nothing, so they bypass budget enforcement silently: alert on any positive rate |
+| `gateway_streaming_active` | gauge | none | Streams currently open |
+
+### Control plane
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `gateway_internal_rtt_seconds` | histogram | `endpoint` | Round-trip to the control plane |
+| `gateway_control_plane_requests_total` | counter | `endpoint`, `status` | Control-plane calls by outcome |
+
+`endpoint` is one of `resolve-key`, `guardrail-check`, `config`, `codex-refresh`. The change-feed long poll is deliberately excluded: it blocks until an event or its own timeout, so timing it would say nothing about control-plane health.
+
+### Spend emission
+
+Every request writes a spend record to a bounded on-disk spool, which a background drainer ships to the control plane. Those records are what the control plane debits budgets from, so a record the spool never took is spend that is never billed and never enforced against.
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `gateway_spend_spool_appended_total` | counter | none | Spend records written to the spool. The denominator for the drop counters |
+| `gateway_spend_spool_dropped_total` | counter | `reason` | Records lost before they could ship |
+
+`reason` is `intake` (the spool's writer could not take the record: its queue was full, or the pod is already shutting down) or `overflow` (the oldest sealed segments were deleted to keep the spool inside its 64 MiB bound, which means the drainer is not keeping up with the pod). Alert on any sustained positive rate:
+
+```promql
+sum by (reason) (rate(gateway_spend_spool_dropped_total[10m])) > 0
+```
+
+Both counters read `0` on a pod whose spool failed to open, which is a pod serving traffic with no spend emission at all. It logs that at startup, and the flat zero next to a live `gateway_http_requests_total` is the scrape-side tell.
+
+The spool is pod-local and deliberately not on a volume: a pod deleted with records still unshipped loses them, bounded by the drain lag of roughly a second of traffic. The alternative is a per-pod PersistentVolume, which buys back that second at the price of a stateful gateway.
+
+The registry also carries the standard Go runtime and process collectors (`go_*`, `process_*`).
 
 Scrape with a `ServiceMonitor` (Prometheus Operator) or standard scrape config, see [Self-Hosting → Helm](/ai-gateway/self-hosting/helm#monitoring).
 
@@ -92,7 +178,7 @@ The gateway itself exports all spans, sampling is applied downstream at the coll
 
 ## Debugging a single request
 
-From a log line or an error at the client, grab the `X-LangWatch-Request-Id` (`grq_01HZX9K3M…`). Paste into the LangWatch search bar and you land on the full trace: every attempt span, upstream latency, guardrail decisions, cache outcome, budget deltas. No digging through provider-side logs.
+From a log line or an error at the client, grab the `X-LangWatch-Gateway-Request-Id` (`req_c2bf5df0b8449f1d1838c4b98dd850`). Paste into the LangWatch search bar and you land on the full trace: every attempt span, upstream latency, guardrail decisions, cache outcome, budget deltas. No digging through provider-side logs.
 
 ## Trace-id propagation: concrete handshake
 
@@ -103,7 +189,7 @@ Every gateway response carries the following headers for W3C traceparent propaga
 | `X-LangWatch-Trace-Id` | 32 hex chars | Equals the incoming `traceparent` trace id when the caller supplied one; otherwise a freshly-minted trace id |
 | `X-LangWatch-Span-Id` | 16 hex chars | The gateway's own span id for this request |
 | `traceparent` | `00-<trace-id>-<span-id>-01` | W3C traceparent re-injected for downstream stitching, forward to any further hop you call |
-| `X-LangWatch-Request-Id` | `grq_<ULID>` | Gateway-scoped id; use this in support tickets |
+| `X-LangWatch-Gateway-Request-Id` | `req_<30 hex characters>` | Gateway-scoped id; use this in support tickets |
 | `X-LangWatch-Gateway-Version` | semver or git-sha | Version of the gateway pod that handled this request. Present on every response, success and error, so "which deploy returned this 500?" is answerable without access-log correlation. SDKs can also version-gate on header presence |
 
 ### Client already has a trace

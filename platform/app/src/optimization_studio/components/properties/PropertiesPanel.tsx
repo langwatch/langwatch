@@ -1,0 +1,222 @@
+import { Box } from "@chakra-ui/react";
+import type { Node } from "@xyflow/react";
+import { motion } from "motion/react";
+import { useEffect, useRef } from "react";
+import { useWindowSize } from "usehooks-ts";
+import { useShallow } from "zustand/react/shallow";
+
+import { useWorkflowStore } from "../../hooks/useWorkflowStore";
+import type { Component, ComponentType } from "../../types/dsl";
+import { InputPanel } from "../component_execution/InputPanel";
+import { OutputPanel } from "../component_execution/OutputPanel";
+import { AgentPropertiesPanel } from "./AgentPropertiesPanel";
+import { CodePropertiesPanel } from "./CodePropertiesPanel";
+import { CustomPropertiesPanel } from "./CustomPropertiesPanel";
+import { EndPropertiesPanel } from "./EndPropertiesPanel";
+import { EntryPointPropertiesPanel } from "./EntryPointPropertiesPanel";
+import { EvaluatorPropertiesPanel } from "./EvaluatorPropertiesPanel";
+import { HttpPropertiesPanel } from "./HttpPropertiesPanel";
+import { IfElsePropertiesPanel } from "./IfElsePropertiesPanel";
+import { SignaturePropertiesPanel } from "./llm-configs/signature-properties-panel/SignaturePropertiesPanel";
+import { PromptingTechniquePropertiesPanel } from "./PromptingTechniquePropertiesPanel";
+import { RetrievePropertiesPanel } from "./RetrievePropertiesPanel";
+
+export function PropertiesPanel() {
+  const { selectedNode, propertiesExpanded, setPropertiesExpanded } =
+    useWorkflowStore(
+      useShallow((state) => ({
+        selectedNode: state.nodes.find((n) => n.selected),
+        propertiesExpanded: state.propertiesExpanded,
+        setPropertiesExpanded: state.setPropertiesExpanded,
+      })),
+    );
+
+  const ComponentPropertiesPanelMap: Record<
+    ComponentType,
+    React.FC<{ node: Node<Component> }>
+  > = {
+    entry: EntryPointPropertiesPanel as React.FC<{ node: Node<Component> }>,
+    end: EndPropertiesPanel as React.FC<{ node: Node<Component> }>,
+    signature: SignaturePropertiesPanel as React.FC<{ node: Node<Component> }>,
+    code: CodePropertiesPanel,
+    http: HttpPropertiesPanel,
+    agent: AgentPropertiesPanel as React.FC<{ node: Node<Component> }>,
+    custom: CustomPropertiesPanel,
+    retriever: RetrievePropertiesPanel,
+    prompting_technique: PromptingTechniquePropertiesPanel,
+    evaluator: EvaluatorPropertiesPanel as React.FC<{ node: Node<Component> }>,
+    if_else: IfElsePropertiesPanel,
+  };
+
+  const { width, height } = useWindowSize();
+
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!selectedNode) {
+      setPropertiesExpanded(false);
+    }
+  }, [selectedNode, setPropertiesExpanded]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isPopoverOpen =
+        document.querySelector(".chakra-popover__popper") !== null;
+      if (e.key === "Escape" && propertiesExpanded && !isPopoverOpen) {
+        setPropertiesExpanded(false);
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [propertiesExpanded, setPropertiesExpanded]);
+
+  const MotionDiv = motion.div;
+
+  if (!selectedNode || !width) {
+    return null;
+  }
+
+  const PropertiesPanel =
+    ComponentPropertiesPanelMap[selectedNode.type as ComponentType];
+
+  const panelWidth = ref.current?.offsetWidth ?? 350;
+  const halfPanelWidth = Math.round(panelWidth / 2);
+  const middlePoint = Math.round(width / 2 - halfPanelWidth);
+  const topPanelHeight = 49;
+  const fullPanelHeight = height - topPanelHeight - 1; // don't know why -1 is needed but if we don't take it creates a body scrollbar
+
+  // TODO: close on X if expanded
+
+  return (
+    <Box>
+      <MotionDiv
+        initial={{
+          right: 0,
+          height: `${fullPanelHeight}px`,
+          marginTop: 0,
+          borderRadius: 0,
+          borderTopWidth: 0,
+          borderBottomWidth: 0,
+          borderRightWidth: 0,
+          boxShadow: "0 0 0 rgba(0,0,0,0)",
+        }}
+        animate={{
+          right: propertiesExpanded ? `${middlePoint}px` : 0,
+          height: propertiesExpanded
+            ? `${fullPanelHeight - 40}px`
+            : `${fullPanelHeight}px`,
+          marginTop: propertiesExpanded ? "20px" : 0,
+          borderRadius: propertiesExpanded ? "8px" : 0,
+          borderTopWidth: propertiesExpanded ? "1px" : 0,
+          borderBottomWidth: propertiesExpanded ? "1px" : 0,
+          borderRightWidth: propertiesExpanded ? "1px" : 0,
+          boxShadow: propertiesExpanded
+            ? "0 0 10px rgba(0,0,0,0.1)"
+            : "0 0 0 rgba(0,0,0,0)",
+        }}
+        transition={{ duration: 0.4, ease: "easeInOut", delay: 0.1 }}
+        style={{
+          position: propertiesExpanded ? "absolute" : "relative",
+          top: 0,
+          right: 0,
+          background: "var(--chakra-colors-bg)",
+          border: "1px solid",
+          borderColor: "var(--chakra-colors-border-emphasized)",
+          zIndex: 100,
+          overflowY: "auto",
+          overflowX: "hidden",
+        }}
+      >
+        <Box ref={ref}>
+          <PropertiesPanel key={selectedNode.id} node={selectedNode} />
+        </Box>
+      </MotionDiv>
+      {propertiesExpanded && (
+        <>
+          <Box
+            className="fade-in"
+            position="absolute"
+            top={0}
+            left={0}
+            height="100%"
+            width="100%"
+            background="rgba(0,0,0,0.1)"
+            zIndex={98}
+            onClick={() => setPropertiesExpanded(false)}
+          />
+          <Box
+            position="absolute"
+            top={0}
+            left={0}
+            height="100%"
+            width={`calc(50% - ${halfPanelWidth}px)`}
+            overflow="hidden"
+            zIndex={99}
+          >
+            <MotionDiv
+              style={{
+                width: "100%",
+                height: "100%",
+                paddingTop: "40px",
+                paddingBottom: "40px",
+                paddingLeft: "40px",
+              }}
+              initial={{ x: "110%" }}
+              animate={{ x: "0%" }}
+              transition={{ duration: 0.1, ease: "easeOut", delay: 0.5 }}
+              // @ts-ignore
+              className="js-outer-box"
+              onClick={(e: React.MouseEvent<HTMLDivElement>) => {
+                if (
+                  (e.target as HTMLElement).classList.contains("js-outer-box")
+                ) {
+                  setPropertiesExpanded(false);
+                }
+              }}
+            >
+              <InputPanel node={selectedNode} />
+            </MotionDiv>
+          </Box>
+          <Box
+            position="absolute"
+            top={0}
+            right={0}
+            height="100%"
+            width={`calc(50% - ${halfPanelWidth}px)`}
+            overflow="hidden"
+            zIndex={99}
+          >
+            <MotionDiv
+              style={{
+                width: "100%",
+                height: "100%",
+                paddingTop: "40px",
+                paddingBottom: "40px",
+                paddingRight: "40px",
+              }}
+              initial={{ x: "-110%" }}
+              animate={{ x: "0%" }}
+              transition={{ duration: 0.1, ease: "easeOut", delay: 0.5 }}
+              // @ts-ignore
+              className="js-outer-box"
+              onClick={(e: React.MouseEvent<HTMLDivElement>) => {
+                if (
+                  (e.target as HTMLElement).classList.contains("js-outer-box")
+                ) {
+                  setPropertiesExpanded(false);
+                }
+              }}
+            >
+              <OutputPanel node={selectedNode} />
+            </MotionDiv>
+          </Box>
+        </>
+      )}
+    </Box>
+  );
+}

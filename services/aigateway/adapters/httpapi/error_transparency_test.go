@@ -3,6 +3,7 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/app"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -104,6 +106,89 @@ func TestRouter_UpstreamTerminal4xx_StreamVerbatim(t *testing.T) {
 	assert.JSONEq(t, upstreamTerminalBody, rec.Body.String())
 }
 
+// midStreamErrIter emits its chunks, then terminates with the given error
+// the shape of a stream that failed AFTER the 200 was established.
+type midStreamErrIter struct {
+	chunks [][]byte
+	err    error
+	i      int
+}
+
+func (it *midStreamErrIter) Next(_ context.Context) bool {
+	if it.i < len(it.chunks) {
+		it.i++
+		return true
+	}
+	return false
+}
+func (it *midStreamErrIter) Chunk() []byte       { return it.chunks[it.i-1] }
+func (it *midStreamErrIter) Usage() domain.Usage { return domain.Usage{TotalTokens: 1} }
+func (it *midStreamErrIter) Err() error          { return it.err }
+func (it *midStreamErrIter) Close() error        { return nil }
+
+// The upstream's own in-stream error event (captured verbatim from a real
+// api.openai.com Responses stream) must reach the client byte-compatible:
+// an OpenAI-SDK client Zod-validates every data payload, so anything but the
+// documented {"type":"error","error":{...}} object crashes the client
+// instead of surfacing the provider's message.
+const upstreamQuotaEvent = `{"type":"error","error":{"type":"insufficient_quota","code":"insufficient_quota","message":"You exceeded your current quota, please check your plan and billing details.","param":null},"sequence_number":2}`
+
+// @scenario "Mid-stream Responses error event is forwarded with its nested payload"
+func TestRouter_MidStreamUpstreamErrorEvent_ForwardedVerbatim(t *testing.T) {
+	provider := &mockStreamProvider{
+		dispatchStreamFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (domain.StreamIterator, error) {
+			return &midStreamErrIter{
+				chunks: [][]byte{[]byte(`{"type":"response.created","sequence_number":0}`)},
+				err: &domain.UpstreamError{
+					Body:    []byte(upstreamQuotaEvent),
+					Message: "You exceeded your current quota, please check your plan and billing details.",
+				},
+			}, nil
+		},
+	}
+	router := buildRouter(
+		app.WithAuth(errTransportAuth()),
+		app.WithProviders(provider),
+		app.WithLogger(zap.NewNop()),
+	)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, messagesRequest(true))
+	body := rec.Body.String()
+
+	require.Equal(t, http.StatusOK, rec.Code, "the stream was already 200-established")
+	assert.Contains(t, body, "data: {\"type\":\"response.created\"",
+		"pre-error chunks still reach the client")
+	require.Contains(t, body, "event: error")
+	assert.Contains(t, body, `data: `+upstreamQuotaEvent,
+		"the upstream error event must be forwarded verbatim as the data payload")
+	assert.NotContains(t, body, `{"error":"`,
+		"the bare-string error shape crashes OpenAI-SDK clients and must be gone")
+}
+
+// @scenario "Gateway-origin stream failures use the standard error-event object"
+func TestRouter_MidStreamPlainError_UsesErrorEventObject(t *testing.T) {
+	provider := &mockStreamProvider{
+		dispatchStreamFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (domain.StreamIterator, error) {
+			return &midStreamErrIter{err: errors.New("upstream connection reset")}, nil
+		},
+	}
+	router := buildRouter(
+		app.WithAuth(errTransportAuth()),
+		app.WithProviders(provider),
+		app.WithLogger(zap.NewNop()),
+	)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, messagesRequest(true))
+	body := rec.Body.String()
+
+	require.Contains(t, body, "event: error")
+	assert.Contains(t, body, `data: {"type":"error","error":{"type":"provider_error","message":"upstream connection reset"}}`,
+		"gateway-origin failures use the standard error-event object, never a bare string")
+	assert.NotContains(t, body, `{"error":"`)
+}
+
 // @scenario "Terminal upstream error is identical across stream and non-stream"
 func TestRouter_UpstreamTerminal_IdenticalAcrossPaths(t *testing.T) {
 	const authErrBody = `{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}`
@@ -154,8 +239,9 @@ func TestRouter_UpstreamRetryable429_ForwardedWithHeaders(t *testing.T) {
 				Body:       []byte(rateLimitBody),
 				Message:    "rate limit exceeded",
 				Headers: map[string]string{
-					"Retry-After":    "30",
-					"X-Should-Retry": "true",
+					"Retry-After":           "30",
+					"X-Should-Retry":        "true",
+					herr.HandledErrorHeader: "spoofed_provider_code",
 				},
 			}
 		},
@@ -175,5 +261,36 @@ func TestRouter_UpstreamRetryable429_ForwardedWithHeaders(t *testing.T) {
 		"upstream Retry-After backoff hint must be preserved")
 	assert.Equal(t, "true", rec.Header().Get("X-Should-Retry"),
 		"upstream x-should-retry signal must be forwarded")
+	assert.Empty(t, rec.Header().Get(herr.HandledErrorHeader),
+		"a provider cannot mark its response as a LangWatch handled error")
 	assert.JSONEq(t, rateLimitBody, rec.Body.String())
+}
+
+// @scenario "A provider-set marker header cannot survive the passthrough lane"
+func TestRouter_WriteJSONResponse_StripsSpoofedMarkerHeader(t *testing.T) {
+	const geminiErrBody = `{"error":{"code":429,"message":"quota exceeded","status":"RESOURCE_EXHAUSTED"}}`
+	provider := &mockProvider{
+		dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
+			return &domain.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Body:       []byte(geminiErrBody),
+				Headers: map[string]string{
+					herr.HandledErrorHeader: "spoofed_provider_code",
+				},
+			}, nil
+		},
+	}
+	router := buildRouter(
+		app.WithAuth(errTransportAuth()),
+		app.WithProviders(provider),
+		app.WithLogger(zap.NewNop()),
+	)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, messagesRequest(false))
+
+	require.Equal(t, http.StatusTooManyRequests, rec.Code)
+	assert.Empty(t, rec.Header().Get(herr.HandledErrorHeader),
+		"a passthrough response's own headers cannot spoof the LangWatch marker")
+	assert.JSONEq(t, geminiErrBody, rec.Body.String())
 }

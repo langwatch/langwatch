@@ -1,0 +1,385 @@
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import type { GovernanceConfig } from "../config";
+import {
+  buildExportBlock,
+  buildScopedToolFunction,
+  detectShell,
+  GATEWAY_RC_MARKERS,
+  isShellAlreadyConfigured,
+  persistBlockToRc,
+  rcPath,
+  removeBlockFromRc,
+  SHELL_FUNCTION_TOOLS,
+  toolMarkers,
+} from "../shell-rc";
+
+const cfg: GovernanceConfig = {
+  gateway_url: "http://gw.example.com",
+  control_plane_url: "http://app.example.com",
+  default_personal_vk: { id: "vk_x", secret: "vk-lw-test", prefix: "vk-lw-" },
+  default_personal_ingest_keys: {
+    claude_code: { id: "ik_c", secret: "sk-lw-claude", prefix: "sk-lw-" },
+    codex: { id: "ik_co", secret: "sk-lw-codex", prefix: "sk-lw-" },
+  },
+};
+
+describe("detectShell", () => {
+  const origShell = process.env.SHELL;
+  afterEach(() => {
+    process.env.SHELL = origShell;
+  });
+
+  it("returns 'zsh' for /bin/zsh", () => {
+    process.env.SHELL = "/bin/zsh";
+    expect(detectShell()).toBe("zsh");
+  });
+
+  it("returns 'bash' for /usr/bin/bash", () => {
+    process.env.SHELL = "/usr/bin/bash";
+    expect(detectShell()).toBe("bash");
+  });
+
+  it("returns 'fish' for /usr/local/bin/fish", () => {
+    process.env.SHELL = "/usr/local/bin/fish";
+    expect(detectShell()).toBe("fish");
+  });
+});
+
+describe("rcPath", () => {
+  it("zsh → ~/.zshrc", () => {
+    expect(rcPath("zsh")).toBe(path.join(os.homedir(), ".zshrc"));
+  });
+  it("bash → ~/.bashrc", () => {
+    expect(rcPath("bash")).toBe(path.join(os.homedir(), ".bashrc"));
+  });
+  it("fish → ~/.config/fish/config.fish", () => {
+    expect(rcPath("fish")).toBe(
+      path.join(os.homedir(), ".config", "fish", "config.fish"),
+    );
+  });
+});
+
+describe("buildExportBlock", () => {
+  it("zsh emits the union'd gateway env pairs across all 5 wrapped tools with key dedup", () => {
+    const block = buildExportBlock(cfg, "zsh");
+    expect(block).toMatch(/^export ANTHROPIC_BASE_URL=http:\/\/gw/m);
+    expect(block).toMatch(/^export ANTHROPIC_AUTH_TOKEN=vk-lw-test/m);
+    expect(block).toMatch(/^export OPENAI_BASE_URL=/m);
+    expect(block).toMatch(/^export OPENAI_API_KEY=/m);
+    expect(block).toMatch(/^export GOOGLE_GEMINI_BASE_URL=/m);
+    expect(block).toMatch(/^export GEMINI_API_KEY=/m);
+    // duplicates collapsed: only one ANTHROPIC_BASE_URL despite many
+    // tools sharing it (claude / cursor / opencode all need it). The
+    // dedup is by KEY, first-write-wins; claude (no /v1 suffix) wins
+    // over opencode (/v1 suffix). That's intentional: shell-rc is for
+    // direct CLI invocation. claude-code + cursor prepend /v1 themselves
+    // so the /v1-less base is what they need. opencode does NOT prepend
+    // /v1 (Vercel AI SDK), so direct `opencode` (without `langwatch`
+    // wrapper) would 404 against shell-rc'd vars - opencode users must
+    // route through the wrapper, which sets the /v1-suffixed values
+    // per-tool. Documented gap; same as gemini-via-shell-rc requiring
+    // `langwatch gemini` for telemetry capture.
+    const matches = block.match(/^export ANTHROPIC_BASE_URL=/gm) ?? [];
+    expect(matches.length).toBe(1);
+    // No OTEL_*_EXPORTER injection - the wrapper is gateway-only.
+    // The gateway captures full I/O server-side, so injecting OTEL
+    // would double-trace. Path A install (OTLP) is a separate flow.
+    expect(block).not.toMatch(/OTEL_TRACES_EXPORTER/);
+    expect(block).not.toMatch(/CLAUDE_CODE_ENABLE_TELEMETRY/);
+  });
+
+  it("fish emits set -gx lines", () => {
+    const block = buildExportBlock(cfg, "fish");
+    expect(block).toMatch(/^set -gx ANTHROPIC_BASE_URL http:\/\/gw/m);
+  });
+
+  it("empty when no personal VK is provisioned", () => {
+    const noVk: GovernanceConfig = {
+      ...cfg,
+      default_personal_vk: undefined,
+    };
+    expect(buildExportBlock(noVk, "zsh")).toBe("");
+  });
+});
+
+describe("buildScopedToolFunction", () => {
+  const otelVars: Record<string, string> = {
+    OTEL_TRACES_EXPORTER: "otlp",
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://app.example.com/api/otel",
+    OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer sk-lw-token",
+    OTEL_RESOURCE_ATTRIBUTES: "service.name=gemini-cli",
+  };
+
+  describe("given a zsh shell", () => {
+    it("wraps <tool> in a function that scopes the env and runs `command <tool>`", () => {
+      const block = buildScopedToolFunction("gemini", otelVars, "zsh");
+      expect(block).toContain("gemini() {");
+      expect(block).toContain('command gemini "$@"');
+      expect(block).toContain(
+        "OTEL_EXPORTER_OTLP_ENDPOINT=http://app.example.com/api/otel",
+      );
+      // header value has a space -> single-quoted
+      expect(block).toContain(
+        "OTEL_EXPORTER_OTLP_HEADERS='Authorization=Bearer sk-lw-token'",
+      );
+      // scoped, NOT a bare global export
+      expect(block).not.toContain("export OTEL");
+    });
+  });
+
+  describe("given the copilot tool-specific telemetry vars", () => {
+    /** @scenario The copilot wrapper function carries the tool-specific telemetry vars */
+    it("carries COPILOT_OTEL_ENABLED alongside the OTEL_EXPORTER_* env", () => {
+      const block = buildScopedToolFunction(
+        "copilot",
+        { ...otelVars, COPILOT_OTEL_ENABLED: "true" },
+        "zsh",
+      );
+      expect(block).toContain("copilot() {");
+      expect(block).toContain("COPILOT_OTEL_ENABLED=true");
+      expect(block).toContain('command copilot "$@"');
+    });
+  });
+
+  describe("given the code (VS Code) tool-specific telemetry vars", () => {
+    /** @scenario A scoped code() function sets the telemetry env only for code launches */
+    it("wraps `code` in a scoped function carrying COPILOT_OTEL_ENABLED + copilot-chat label, never a bare export", () => {
+      const block = buildScopedToolFunction(
+        "code",
+        {
+          ...otelVars,
+          COPILOT_OTEL_ENABLED: "true",
+          OTEL_RESOURCE_ATTRIBUTES: "service.name=copilot-chat",
+        },
+        "zsh",
+      );
+      expect(block).toContain("code() {");
+      expect(block).toContain("COPILOT_OTEL_ENABLED=true");
+      expect(block).toContain('command code "$@"');
+      // scoped, NOT a bare global export that would leak into every shell child
+      expect(block).not.toContain("export OTEL");
+      expect(block).not.toContain("export COPILOT_OTEL_ENABLED");
+    });
+  });
+
+  it("registers `code` as a scoped-function tool (no config-file env target)", () => {
+    expect(SHELL_FUNCTION_TOOLS).toContain("code");
+  });
+
+  describe("given a fish shell", () => {
+    it("uses `function <tool>` with block-local set -lx and `command <tool>`", () => {
+      const block = buildScopedToolFunction("opencode", otelVars, "fish");
+      expect(block).toContain("function opencode");
+      expect(block).toContain("command opencode $argv");
+      expect(block).toContain("set -lx OTEL_TRACES_EXPORTER otlp");
+      expect(block.endsWith("end")).toBe(true);
+    });
+  });
+});
+
+describe("isShellAlreadyConfigured", () => {
+  const origBase = process.env.ANTHROPIC_BASE_URL;
+  const origTok = process.env.ANTHROPIC_AUTH_TOKEN;
+
+  afterEach(() => {
+    process.env.ANTHROPIC_BASE_URL = origBase;
+    process.env.ANTHROPIC_AUTH_TOKEN = origTok;
+  });
+
+  it("true when both gateway env vars are present", () => {
+    process.env.ANTHROPIC_BASE_URL = "http://gw";
+    process.env.ANTHROPIC_AUTH_TOKEN = "vk-lw-x";
+    expect(isShellAlreadyConfigured()).toBe(true);
+  });
+
+  it("false when only one is present", () => {
+    process.env.ANTHROPIC_BASE_URL = "http://gw";
+    delete process.env.ANTHROPIC_AUTH_TOKEN;
+    expect(isShellAlreadyConfigured()).toBe(false);
+  });
+
+  it("false when neither is present", () => {
+    delete process.env.ANTHROPIC_BASE_URL;
+    delete process.env.ANTHROPIC_AUTH_TOKEN;
+    expect(isShellAlreadyConfigured()).toBe(false);
+  });
+});
+
+describe("persistBlockToRc", () => {
+  let tmpHome: string;
+  const origHome = process.env.HOME;
+  const origUserprofile = process.env.USERPROFILE;
+
+  beforeEach(() => {
+    tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "lw-shellrc-"));
+    process.env.HOME = tmpHome;
+    process.env.USERPROFILE = tmpHome;
+  });
+
+  afterEach(() => {
+    process.env.HOME = origHome;
+    process.env.USERPROFILE = origUserprofile;
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  });
+
+  it("creates a fresh rc file when none exists and writes the block with markers", () => {
+    const written = persistBlockToRc("zsh", "export FOO=bar");
+    const content = fs.readFileSync(written, "utf8");
+    expect(content).toMatch(/# >>> langwatch begin >>>/);
+    expect(content).toMatch(/export FOO=bar/);
+    expect(content).toMatch(/# <<< langwatch end <<</);
+  });
+
+  it("appends without disturbing existing rc content", () => {
+    const target = rcPath("zsh");
+    fs.writeFileSync(target, 'alias g="git"\nplugins=(z)');
+    persistBlockToRc("zsh", "export FOO=bar");
+    const content = fs.readFileSync(target, "utf8");
+    expect(content).toMatch(/^alias g="git"\nplugins=\(z\)/);
+    expect(content).toMatch(/# >>> langwatch begin >>>/);
+    expect(content).toMatch(/export FOO=bar/);
+  });
+
+  it("is idempotent - a second run replaces the block in place, not duplicates it", () => {
+    persistBlockToRc("zsh", "export FOO=bar");
+    persistBlockToRc("zsh", "export FOO=baz");
+    const content = fs.readFileSync(rcPath("zsh"), "utf8");
+    const beginCount = (content.match(/# >>> langwatch begin >>>/g) ?? [])
+      .length;
+    expect(beginCount).toBe(1);
+    expect(content).toMatch(/export FOO=baz/);
+    expect(content).not.toMatch(/export FOO=bar/);
+  });
+
+  it("re-writing the scoped tool wrapper replaces it in place, never duplicating", () => {
+    const first = buildScopedToolFunction(
+      "gemini",
+      {
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://app.example.com/api/otel",
+        OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer sk-lw-old",
+      },
+      "zsh",
+    );
+    const second = buildScopedToolFunction(
+      "gemini",
+      {
+        OTEL_EXPORTER_OTLP_ENDPOINT: "http://app.example.com/api/otel",
+        OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer sk-lw-new",
+      },
+      "zsh",
+    );
+    persistBlockToRc("zsh", first);
+    persistBlockToRc("zsh", second);
+    const content = fs.readFileSync(rcPath("zsh"), "utf8");
+    const beginCount = (content.match(/# >>> langwatch begin >>>/g) ?? [])
+      .length;
+    expect(beginCount).toBe(1);
+    expect(content).toContain("Authorization=Bearer sk-lw-new");
+    expect(content).not.toContain("sk-lw-old");
+  });
+});
+
+describe("removeBlockFromRc", () => {
+  let tmpHome: string;
+  const origHome = process.env.HOME;
+  const origUserprofile = process.env.USERPROFILE;
+
+  beforeEach(() => {
+    tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "lw-shellrc-rm-"));
+    process.env.HOME = tmpHome;
+    process.env.USERPROFILE = tmpHome;
+  });
+
+  afterEach(() => {
+    process.env.HOME = origHome;
+    process.env.USERPROFILE = origUserprofile;
+    fs.rmSync(tmpHome, { recursive: true, force: true });
+  });
+
+  describe("when a scoped tool function sits between user lines", () => {
+    it("removes only the tool's marker block, preserving the user lines", () => {
+      const target = rcPath("zsh");
+      fs.writeFileSync(target, 'alias g="git"\n');
+      persistBlockToRc(
+        "zsh",
+        buildScopedToolFunction(
+          "gemini",
+          { OTEL_EXPORTER_OTLP_ENDPOINT: "http://x/api/otel" },
+          "zsh",
+        ),
+        toolMarkers("gemini"),
+      );
+      fs.appendFileSync(target, 'export PATH="$PATH:/opt/bin"\n');
+
+      const removed = removeBlockFromRc("zsh", toolMarkers("gemini"));
+
+      expect(removed).toBe(true);
+      const content = fs.readFileSync(target, "utf8");
+      expect(content).toContain('alias g="git"');
+      expect(content).toContain('export PATH="$PATH:/opt/bin"');
+      expect(content).not.toContain("langwatch gemini begin");
+      expect(content).not.toContain("command gemini");
+    });
+  });
+
+  describe("when multiple tool wrappers coexist", () => {
+    it("removes only the requested tool, leaving the other intact", () => {
+      persistBlockToRc(
+        "zsh",
+        buildScopedToolFunction(
+          "gemini",
+          { OTEL_EXPORTER_OTLP_ENDPOINT: "http://x/api/otel" },
+          "zsh",
+        ),
+        toolMarkers("gemini"),
+      );
+      persistBlockToRc(
+        "zsh",
+        buildScopedToolFunction(
+          "opencode",
+          { OTEL_EXPORTER_OTLP_ENDPOINT: "http://x/api/otel" },
+          "zsh",
+        ),
+        toolMarkers("opencode"),
+      );
+
+      removeBlockFromRc("zsh", toolMarkers("gemini"));
+
+      const content = fs.readFileSync(rcPath("zsh"), "utf8");
+      expect(content).not.toContain("langwatch gemini begin");
+      expect(content).toContain("langwatch opencode begin");
+      expect(content).toContain("command opencode");
+    });
+  });
+
+  describe("when removing the global gateway block", () => {
+    it("removes it via the default markers", () => {
+      persistBlockToRc("zsh", "export ANTHROPIC_BASE_URL=http://gw");
+      expect(
+        fs.readFileSync(rcPath("zsh"), "utf8"),
+      ).toContain("# >>> langwatch begin >>>");
+
+      const removed = removeBlockFromRc("zsh", GATEWAY_RC_MARKERS);
+
+      expect(removed).toBe(true);
+      expect(fs.readFileSync(rcPath("zsh"), "utf8")).not.toContain(
+        "langwatch begin",
+      );
+    });
+  });
+
+  describe("when there is nothing to remove", () => {
+    it("returns false for a file without the block", () => {
+      fs.writeFileSync(rcPath("zsh"), 'alias g="git"\n');
+      expect(removeBlockFromRc("zsh", toolMarkers("gemini"))).toBe(false);
+    });
+
+    it("returns false when the rc file does not exist (idempotent)", () => {
+      expect(removeBlockFromRc("zsh", GATEWAY_RC_MARKERS)).toBe(false);
+    });
+  });
+});

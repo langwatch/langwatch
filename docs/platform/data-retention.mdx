@@ -69,6 +69,12 @@ A few things to keep in mind:
 - **Retention applies to the underlying data, regardless of references.** If another object — for example a dataset or an evaluation — references an event that has since been deleted, that reference will point to data that no longer exists.
 - **More specific scopes override broader ones.** A project with its own policy ignores the team and organization defaults; a team policy overrides the organization default.
 
+## Billing records are exempt
+
+[Gateway spend records](/ai-gateway/billing-events), the per-request billing events platforms use to rebill their own customers, are deliberately **outside** tenant retention. They keep a **fixed 13-month** lifetime regardless of any policy configured here.
+
+Retention policies are customer-shrinkable to weeks and can rewrite existing data retroactively; billing records are invoiceable evidence and must survive both. Shortening your trace retention never deletes spend records, and no policy can extend or shorten their 13-month window. The practical effect: your billing reconciliation window is always 13 months, even when operational traces are kept for far less, and a spend event remains queryable after its underlying trace has aged out (only the trace drill-through is gone).
+
 ## Self-hosted and hybrid instances
 
 Data Retention works the same way on self-hosted deployments, with deletion running against your own storage. Make sure the LangWatch service has permission to delete objects from the storage bucket it manages.

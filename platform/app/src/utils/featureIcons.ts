@@ -1,0 +1,167 @@
+/**
+ * Shared icon and color definitions for features across the application.
+ * This ensures consistency between the sidebar, quick access links, and recent items.
+ */
+import {
+  Bird,
+  BookText,
+  Bot,
+  CheckSquare,
+  Drama,
+  FlaskConical,
+  FolderOpen,
+  Home,
+  ListTree,
+  type LucideIcon,
+  Pencil,
+  Percent,
+  Play,
+  PlayCircle,
+  Settings,
+  Table,
+  TrainFront,
+  TrendingUp,
+  Workflow,
+  Zap,
+} from "lucide-react";
+
+export type FeatureKey =
+  | "home"
+  | "analytics"
+  | "traces"
+  | "traces_v2"
+  | "simulations"
+  | "scenarios"
+  | "simulation_runs"
+  | "suites"
+  | "experiments"
+  | "online_evaluations"
+  | "workflows"
+  | "prompts"
+  | "datasets"
+  | "annotations"
+  | "settings"
+  | "agents"
+  | "evaluators"
+  | "automations"
+  | "gateway";
+
+export type FeatureConfig = {
+  icon: LucideIcon;
+  color: string;
+  label: string;
+};
+
+/**
+ * Central configuration for feature icons and colors.
+ * Used by MainMenu and RecentItemsSection.
+ */
+export const featureIcons: Record<FeatureKey, FeatureConfig> = {
+  home: {
+    icon: Home,
+    color: "gray.600",
+    label: "Home",
+  },
+  analytics: {
+    icon: TrendingUp,
+    color: "gray.600",
+    label: "Analytics",
+  },
+  traces: {
+    icon: ListTree,
+    color: "blue.500",
+    label: "Traces",
+  },
+  traces_v2: {
+    icon: Bird,
+    color: "blue.500",
+    label: "Trace Explorer",
+  },
+  simulations: {
+    icon: Play,
+    color: "pink.500",
+    label: "Simulations",
+  },
+  scenarios: {
+    icon: Drama,
+    color: "pink.500",
+    label: "Scenarios",
+  },
+  simulation_runs: {
+    icon: PlayCircle,
+    color: "pink.500",
+    label: "Runs",
+  },
+  suites: {
+    icon: FolderOpen,
+    color: "pink.500",
+    label: "Run Plans",
+  },
+  experiments: {
+    icon: FlaskConical,
+    color: "green.500",
+    label: "Experiments",
+  },
+  online_evaluations: {
+    icon: CheckSquare,
+    color: "green.500",
+    label: "Online Evaluations",
+  },
+  workflows: {
+    icon: Workflow,
+    color: "blue.500",
+    label: "Workflows",
+  },
+  prompts: {
+    icon: BookText,
+    color: "purple.500",
+    label: "Prompts",
+  },
+  datasets: {
+    icon: Table,
+    color: "blue.500",
+    label: "Datasets",
+  },
+  annotations: {
+    icon: Pencil,
+    color: "teal.500",
+    label: "Annotations",
+  },
+  settings: {
+    icon: Settings,
+    color: "gray.600",
+    label: "Settings",
+  },
+  agents: {
+    icon: Bot,
+    color: "cyan.500",
+    label: "Agents",
+  },
+  evaluators: {
+    icon: Percent,
+    color: "green.500",
+    label: "Evaluators",
+  },
+  automations: {
+    icon: Zap,
+    color: "orange.500",
+    label: "Automations",
+  },
+  gateway: {
+    icon: TrainFront,
+    color: "orange.500",
+    label: "AI Gateway",
+  },
+};
+
+/**
+ * Map from RecentItemType to FeatureKey for consistent icons/colors.
+ */
+export const recentItemTypeToFeature: Record<string, FeatureKey> = {
+  prompt: "prompts",
+  workflow: "workflows",
+  dataset: "datasets",
+  evaluation: "online_evaluations",
+  annotation: "annotations",
+  simulation: "simulations",
+};

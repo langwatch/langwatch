@@ -4,6 +4,14 @@ Feature: Claude Code telemetry turn bounding
   So that one pathological agentic turn cannot serialize all of its work
   behind one queue group and stall every tenant's processing.
 
+  # RETIRED MECHANISM (ADR-055, canonical log ingestion): the `recordLog` command
+  # and the per-turn ingest-lane sharding described below were removed — canonical
+  # `log_records` is now the only log write path, and the coding-agent session
+  # fold consumes each log event incrementally (no whole-turn re-read to bound).
+  # These scenarios are NOT deleted: they are preserved as the behavioural
+  # contract to port to the canonical pipeline, tracked in
+  # dev/docs/coding-agent-pipeline-plan.md.
+
   # Incident 2026-07-10: Claude Code logs arrive with no trace context; the
   # receiver already synthesizes one trace per TURN (session.id:prompt.id) and
   # groups turns into a session via the conversation id. But one agentic turn
@@ -36,7 +44,7 @@ Feature: Claude Code telemetry turn bounding
   # sharded getGroupKey on recordLog), and recordLogCommand.sharding.integration
   # (live GroupQueue staging: records land in more than one
   # `trace:<traceId>:<shard>` group).
-  @sharding @unit @integration
+  @sharding @unimplemented
   Scenario: one turn's logs fan out across ingest lanes
     Given log-command sharding is enabled with more than one shard
     And a Claude Code turn streaming thousands of log records
@@ -65,7 +73,7 @@ Feature: Claude Code telemetry turn bounding
   # spans carry the session id as gen_ai.conversation.id + langwatch.thread.id,
   # so the session view is unchanged. Driving the actual product session view
   # in a browser is a tracked gap.
-  @sharding @integration
+  @sharding @unimplemented
   Scenario: session grouping is unchanged by sharding
     Given a session whose turns were ingested through sharded lanes
     When the session is viewed in the product

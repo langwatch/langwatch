@@ -93,6 +93,22 @@ Feature: The Langy home
     And the setup checklist takes the figures' place directly beneath the block
     And no figures or recent work are shown
 
+  # The home is where a new project lands first, so the way in lives under the
+  # field even though every empty feature page carries its own setup control.
+  Scenario: A new project leads with sending the first trace
+    Given the Langy home renders
+    And the project has never received a trace
+    Then a prominent send-your-first-trace control sits above the example asks
+    And it offers Langy's walkthrough, a prompt for my coding agent, and the docs
+    And the walkthrough route is withheld when I cannot start conversations
+
+  Scenario: A populated project keeps the quiet onboarding route
+    Given the Langy home renders
+    And the project has received traces
+    Then a quiet onboard-your-agent control sits beneath the example asks
+    And no send-your-first-trace lead appears
+    And nothing is offered while what the project holds is not known yet
+
   Scenario: A project with data leads its figures with the compact strip
     Given the Langy home renders
     And the project has received traces

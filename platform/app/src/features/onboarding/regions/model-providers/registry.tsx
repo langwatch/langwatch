@@ -1,0 +1,298 @@
+import { iconWithLabel, singleIcon, themedIcon } from "../shared/types";
+import type { ModelProviderKey, ModelProviderSpec } from "./types";
+
+export type ModelProviderRegistry = ModelProviderSpec[];
+
+export const modelProviderRegistry: ModelProviderRegistry = [
+  {
+    key: "open_ai",
+    backendModelProviderKey: "openai",
+    label: "OpenAI",
+    defaultModel: "gpt-5.2",
+    defaultBaseUrl: "https://api.openai.com/v1",
+    icon: themedIcon(
+      "/images/external-icons/openai-lighttheme.svg",
+      "/images/external-icons/openai-darktheme.svg",
+      "OpenAI",
+    ),
+    externalDocsUrl: "https://platform.openai.com/docs/overview",
+    fieldMetadata: {
+      OPENAI_API_KEY: {
+        label: "OpenAI API Key",
+        description: "Your OpenAI API key from platform.openai.com/api-keys",
+      },
+      OPENAI_BASE_URL: {
+        label: "OpenAI Base URL",
+        description:
+          "Optional: Custom API endpoint for OpenAI-compatible services (e.g., Azure OpenAI proxy)",
+      },
+    },
+  },
+  {
+    key: "anthropic",
+    backendModelProviderKey: "anthropic",
+    label: "Anthropic",
+    defaultModel: "claude-sonnet-4-5",
+    defaultBaseUrl: "https://api.anthropic.com/v1",
+    icon: themedIcon(
+      "/images/external-icons/anthropic-lighttheme.svg",
+      "/images/external-icons/anthropic-darktheme.svg",
+      "Anthropic",
+    ),
+    externalDocsUrl: "https://docs.anthropic.com/",
+    fieldMetadata: {
+      ANTHROPIC_API_KEY: {
+        label: "Anthropic API Key",
+        description: "Your Anthropic API key from console.anthropic.com",
+      },
+      ANTHROPIC_BASE_URL: {
+        label: "Anthropic Base URL",
+        description:
+          "Optional: Custom API endpoint for Anthropic-compatible services",
+      },
+    },
+  },
+  {
+    key: "gemini",
+    backendModelProviderKey: "gemini",
+    label: "Google Gemini",
+    defaultModel: "gemini-2.5-flash",
+    defaultBaseUrl: "https://generativelanguage.googleapis.com/v1",
+    // Google answers the same key on /v1, /v1beta and the OpenAI-compatible
+    // surface, and which one a key was minted for is not knowable up front.
+    apiRoot: "https://generativelanguage.googleapis.com",
+    icon: singleIcon("/images/external-icons/google.svg", "Google Gemini"),
+    externalDocsUrl: "https://ai.google.dev/",
+    fieldMetadata: {
+      GEMINI_API_KEY: {
+        label: "Gemini API Key",
+        // One field for either kind of Google key. An Agent Platform key is
+        // detected when Google refuses it on the Gemini API with a
+        // restriction naming another service; the customer is then asked
+        // for the two extra fields below rather than being told the key is
+        // invalid. See specs/model-providers/google-agent-platform.feature.
+        description:
+          "Your Google AI Studio key, or a Google Cloud key for Gemini — including one restricted to Gemini Enterprise Agent Platform.",
+      },
+      GEMINI_PROJECT: {
+        label: "Google Cloud Project",
+        description:
+          "Only for Agent Platform keys: the project the key belongs to. Its number appears in the error Google returns if the key is used against the wrong service.",
+      },
+      GEMINI_LOCATION: {
+        label: "Location",
+        description:
+          "Only for Agent Platform keys: where to serve the model from — 'global', or a region such as us-central1.",
+      },
+    },
+  },
+  {
+    key: "open_ai_azure",
+    backendModelProviderKey: "azure",
+    label: "Azure OpenAI",
+    defaultModel: "gpt-5",
+    icon: singleIcon("/images/external-icons/ms-azure.svg", "Azure OpenAI"),
+    externalDocsUrl: "https://learn.microsoft.com/azure/ai-services/openai/",
+    fieldMetadata: {
+      AZURE_OPENAI_API_KEY: {
+        label: "API Key",
+        description: "Your Azure OpenAI resource API key from Azure Portal",
+      },
+      AZURE_OPENAI_ENDPOINT: {
+        label: "Endpoint",
+        description:
+          "Your Azure OpenAI resource endpoint URL (e.g., https://your-resource.openai.azure.com)",
+      },
+      AZURE_API_GATEWAY_BASE_URL: {
+        label: "Base URL",
+        description:
+          "Optional: Base URL for Azure API Management gateway if routing through APIM",
+      },
+      AZURE_API_GATEWAY_VERSION: {
+        label: "Version",
+        description: "Optional: API version for Azure API Management gateway",
+      },
+    },
+  },
+  {
+    key: "aws_bedrock",
+    backendModelProviderKey: "bedrock",
+    label: "AWS Bedrock",
+    icon: themedIcon(
+      "/images/external-icons/aws-lighttheme.svg",
+      "/images/external-icons/aws-darktheme.svg",
+      "AWS Bedrock",
+    ),
+    externalDocsUrl: "https://aws.amazon.com/bedrock/",
+    fieldMetadata: {
+      AWS_ACCESS_KEY_ID: {
+        label: "Access Key ID",
+        description: "Your AWS IAM access key ID with Bedrock permissions",
+      },
+      AWS_SECRET_ACCESS_KEY: {
+        label: "Secret Access Key",
+        description: "Your AWS IAM secret access key",
+      },
+      AWS_REGION_NAME: {
+        label: "Region",
+        description:
+          "The AWS region where Bedrock is available (e.g., us-east-1, us-west-2)",
+      },
+    },
+  },
+  {
+    key: "deepseek",
+    backendModelProviderKey: "deepseek",
+    label: "DeepSeek",
+    defaultModel: "deepseek-r1",
+    defaultBaseUrl: "https://api.deepseek.com/v1",
+    icon: singleIcon("/images/external-icons/deepseek.svg", "DeepSeek"),
+    externalDocsUrl: "https://www.deepseek.com/",
+    fieldMetadata: {
+      DEEPSEEK_API_KEY: {
+        label: "API Key",
+        description: "Your DeepSeek API key from platform.deepseek.com",
+      },
+    },
+  },
+  {
+    key: "groq",
+    backendModelProviderKey: "groq",
+    label: "Groq",
+    defaultBaseUrl: "https://api.groq.com/openai/v1",
+    icon: singleIcon("/images/external-icons/groq.svg", "Groq"),
+    externalDocsUrl: "https://groq.com/",
+    fieldMetadata: {
+      GROQ_API_KEY: {
+        label: "API Key",
+        description: "Your Groq API key from console.groq.com",
+      },
+    },
+  },
+  {
+    key: "grok_xai",
+    backendModelProviderKey: "xai",
+    label: "Grok (xAI)",
+    defaultModel: "grok-4",
+    defaultBaseUrl: "https://api.x.ai/v1",
+    icon: themedIcon(
+      "/images/external-icons/grok-lighttheme.svg",
+      "/images/external-icons/grok-darktheme.svg",
+      "Grok",
+    ),
+    externalDocsUrl: "https://x.ai/",
+    fieldMetadata: {
+      XAI_API_KEY: {
+        label: "API Key",
+        description: "Your xAI API key from x.ai",
+      },
+    },
+  },
+  {
+    key: "vertex_ai",
+    backendModelProviderKey: "vertex_ai",
+    label: "Google Vertex AI",
+    icon: singleIcon("/images/external-icons/gcloud.svg", "Google Vertex AI"),
+    externalDocsUrl: "https://cloud.google.com/vertex-ai",
+    fieldMetadata: {
+      GOOGLE_APPLICATION_CREDENTIALS: {
+        label: "Google Service Account JSON",
+        description:
+          "Paste the contents of your Google Cloud service account JSON file. Create one in GCP Console > IAM & Admin > Service Accounts with Vertex AI permissions.",
+      },
+      VERTEXAI_PROJECT: {
+        label: "Vertex Project ID",
+        description: "Your Google Cloud project ID where Vertex AI is enabled",
+      },
+      VERTEXAI_LOCATION: {
+        label: "Vertex Location",
+        description:
+          "The GCP region for Vertex AI (e.g., us-central1, europe-west1)",
+      },
+    },
+  },
+  {
+    key: "cerebras",
+    backendModelProviderKey: "cerebras",
+    label: "Cerebras",
+    defaultBaseUrl: "https://api.cerebras.ai/v1",
+    icon: themedIcon(
+      "/images/external-icons/cerebras-lighttheme.svg",
+      "/images/external-icons/cerebras-darktheme.svg",
+      "Cerebras",
+    ),
+    externalDocsUrl: "https://cerebras.ai/",
+    fieldMetadata: {
+      CEREBRAS_API_KEY: {
+        label: "API Key",
+        description: "Your Cerebras API key from cloud.cerebras.ai",
+      },
+    },
+  },
+  {
+    key: "custom",
+    backendModelProviderKey: "custom",
+    label: "Custom, OpenAI-compatible",
+    icon: iconWithLabel(
+      singleIcon("/images/external-icons/custom.svg", "Custom Provider"),
+      "Custom",
+    ),
+    fieldMetadata: {
+      CUSTOM_API_KEY: {
+        label: "API Key",
+        description:
+          "Optional: API key for your custom OpenAI-compatible endpoint",
+      },
+      CUSTOM_BASE_URL: {
+        label: "Base URL",
+        description:
+          "Your custom API endpoint URL (e.g., LiteLLM proxy, vLLM server, or any /chat/completions compatible service)",
+      },
+    },
+  },
+  {
+    // Last in the array on purpose: settings lists providers in registry
+    // order, and Codex only serves the coding-assistant surfaces. The
+    // surfaces where it SHOULD lead (Langy setup, onboarding) pull it to
+    // the front through `recommendedOn` — see ModelProviderGrid.
+    key: "codex",
+    backendModelProviderKey: "openai_codex",
+    label: "Codex (OpenAI account)",
+    defaultModel: "gpt-5.6-terra",
+    // A distinct terminal-prompt glyph, NOT OpenAI's logo: it must not read as
+    // the plain OpenAI card sitting right next to it, and it mirrors the
+    // settings icon (src/components/icons/Codex.tsx).
+    icon: themedIcon(
+      "/images/external-icons/codex-lighttheme.svg",
+      "/images/external-icons/codex-darktheme.svg",
+      "Codex",
+    ),
+    externalDocsUrl: "https://chatgpt.com/codex",
+    authFlow: "oauth-device",
+    recommendedOn: ["langy", "onboarding"],
+    // Codex cannot run evaluations or prompt executions (subscription
+    // terms); offering it on those setup flows would strand them.
+    hiddenOn: ["evaluations", "prompts"],
+  },
+];
+
+export function getModelProvider(
+  key: ModelProviderKey,
+): ModelProviderSpec | undefined {
+  return modelProviderRegistry.find((provider) => provider.key === key);
+}
+
+/** Default base URLs keyed by backendModelProviderKey for API validation */
+export const providerDefaultBaseUrls: Record<string, string> =
+  Object.fromEntries(
+    modelProviderRegistry
+      .filter((p) => p.defaultBaseUrl)
+      .map((p) => [p.backendModelProviderKey, p.defaultBaseUrl!]),
+  );
+
+/** Version-less API roots keyed by backendModelProviderKey — see `apiRoot`. */
+export const providerApiRoots: Record<string, string> = Object.fromEntries(
+  modelProviderRegistry
+    .filter((p) => p.apiRoot)
+    .map((p) => [p.backendModelProviderKey, p.apiRoot!]),
+);

@@ -110,6 +110,37 @@ Feature: Edit project name and team
     When I call ProjectService.update without teamId
     Then the project's teamId remains "Engineering"
 
+  # ── Personal workspaces ──────────────────────────────────────────────────────
+  #
+  # A personal workspace is one member's private space: one team, one project,
+  # one owner. Editing a project is the way it could leave that space, enter
+  # someone else's, or be taken away from its owner altogether, so every
+  # project edit refuses all three. The plan-allowance side of the same rule
+  # lives in specs/licensing/enforcement-projects.feature.
+
+  @unit
+  Scenario: Editing a project cannot move it out of a personal workspace
+    Given a personal project in Jane's personal workspace
+    And team "Analytics" in the same organization
+    When I move the personal project to "Analytics"
+    Then the move is refused
+    And the project is still in Jane's personal workspace
+
+  @unit
+  Scenario: Editing a project cannot move it into a personal workspace
+    Given a project in team "Engineering"
+    And Jane has a personal workspace in the same organization
+    When I move that project into Jane's personal workspace
+    Then the move is refused
+    And the project is still in team "Engineering"
+
+  @unit
+  Scenario: Deleting a project cannot empty a personal workspace
+    Given a personal project in Jane's personal workspace
+    When I archive that project
+    Then the archival is refused
+    And the project is not archived
+
   # ── RBAC inheritance ─────────────────────────────────────────────────────────
 
   @unit @unimplemented

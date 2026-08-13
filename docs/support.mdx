@@ -11,7 +11,7 @@ Before reaching out for support, here are a few steps you can take to resolve co
 
 1. **Check Environment Variables**: Ensure that your `LANGWATCH_API_KEY` is correctly set in your environment. This is a common issue that can prevent LangWatch from functioning properly.
 
-2. **Review Integration Code**: Go through your integration code to ensure that you've followed the steps outlined in the [Getting Started](#) documentation. Sometimes, issues arise from a missed step or incorrect implementation.
+2. **Review Integration Code**: Go through your integration code to ensure that you've followed the steps outlined in the [quick start](/integration/quick-start) documentation. Sometimes, issues arise from a missed step or incorrect implementation.
 
 3. **Consult the Documentation**: Look through the documentation for sections relevant to the issue you're facing. There might be specific notes or sections that address your problem.
 
@@ -31,11 +31,45 @@ Before reaching out for support, here are a few steps you can take to resolve co
 
 5. **Examine Error Messages**: If there are error messages being returned from LangWatch or your LLM provider, inspect them closely as they often provide clues to the root cause.
 
+## Reporting Issues from Coding Agents
+
+Most LangWatch integrations are driven by a coding agent (Claude Code, Codex, Cursor, and others). If you are an agent, or you are watching your agent struggle, the fastest way to get the problem in front of the LangWatch team is:
+
+```bash
+npx langwatch report
+```
+
+It works with no login and no API key, and comes in two shapes:
+
+1. **Full session report** (best): attach the session transcript so the team sees exactly where things went wrong.
+
+   ```bash
+   npx langwatch report --user-approved \
+     --title "agent stuck instrumenting python" \
+     --session ~/.claude/projects/<project-dir>/<session-id>.jsonl
+   ```
+
+   Claude Code transcripts live under `~/.claude/projects/`, Codex transcripts under `~/.codex/sessions/`. The newest `.jsonl` file is the current session.
+
+2. **Summary report**: what you were trying to do, verbatim error messages, and what you had to figure out by trial and error.
+
+   ```bash
+   npx langwatch report --user-approved \
+     --title "scenario create 500" \
+     --summary "langwatch scenario create returned HTTP 500 with ..."
+   ```
+
+**Privacy**: the title, summary and transcript are scrubbed locally by pattern before upload. API keys and tokens, private-key blocks, passwords inside connection URLs, values of secret-named environment variables, email addresses, phone numbers, credit card numbers, and public IPv4 addresses are replaced with typed markers. Anything no pattern matches is sent as written, including a contact address passed with `--email`. The redaction rules are [open source and auditable](https://github.com/langwatch/langwatch/blob/main/packages/redaction/src/sessionReport.ts), and `--dry-run` previews exactly what would be sent without sending it.
+
+**Consent**: agents must ask the user for permission before sending, then pass `--user-approved`.
+
+If you are connected through the [LangWatch MCP server](/integration/mcp), the `report_issue` tool does the same thing without leaving your MCP session.
+
 ## Opening an Issue
 
 If the troubleshooting steps do not resolve your issue, you can open an issue on our GitHub repository:
 
-[https://github.com/langwatch/langwatch/issues](https://github.com/langwatch/langwatch/issues)
+[GitHub issues](https://github.com/langwatch/langwatch/issues)
 
 When opening an issue, please include the following:
 
@@ -48,7 +82,7 @@ Our community and maintainers will look into the issue and work with you to find
 
 ## Email Support
 
-If you are prefer direct assistance or have inquiries that require privacy, you can reach out to our support team via email at support@langwatch.ai.
+If you prefer direct assistance or have inquiries that require privacy, you can reach out to our support team via email at support@langwatch.ai.
 
 When writing to support, please provide:
 

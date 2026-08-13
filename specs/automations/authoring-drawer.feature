@@ -56,6 +56,97 @@ Feature: Staged automation authoring drawer
       When the When section is shown
       Then it is pre-filled with the active trace filters
 
+  Rule: No API can create an automation that fires on every trace
+
+    The drawer has always blocked a condition-less automation, but only in the
+    browser. Every server write path accepted one, and the REST API went
+    further and DEFAULTED the condition to empty when the caller omitted it, so
+    the easiest possible create call produced an automation that matches every
+    trace forever. That is the one genuinely customer-facing hole behind the
+    volume incident, and it is closed on the server where the drawer's rule
+    always belonged.
+
+    A condition is satisfied either way an automation can express one: a
+    non-empty structured filter set, or a query string. Alerts and reports are
+    exempt, because a graph-threshold alert's condition is the threshold and it
+    has no trace filter to require.
+
+    @integration
+    Scenario: Creating an automation with no condition is refused
+      Given a create request for an automation with no condition
+      When the server handles it
+      Then the request is refused with a condition-required error
+
+    @integration
+    Scenario: Editing an automation down to no condition is refused
+      Given an existing automation with a condition
+      When a request replaces its condition with an empty one
+      Then the request is refused with a condition-required error
+      And the stored condition is unchanged
+
+    @integration
+    Scenario: A query is a condition on its own
+      Given a create request whose only condition is a query string
+      When the server handles it
+      Then the automation is created
+
+    @integration
+    Scenario: Alerts and reports do not need a trace condition
+      Given a create request for a graph alert with no trace condition
+      When the server handles it
+      Then the alert is created
+
+    @integration
+    Scenario: The REST API no longer invents an empty condition
+      Given a REST create request that omits the condition entirely
+      When the server handles it
+      Then the request is refused with a condition-required error
+      And the response carries the machine-readable condition-required code
+
+    # The edit rule above is stated once for every write path, but the REST edit
+    # is the one that can leave a half-applied automation behind, so it names
+    # its own contract: the machine-readable code the caller matches on, and the
+    # stored condition surviving the refusal untouched.
+    @integration
+    Scenario: A REST edit that empties the condition changes nothing
+      Given a stored automation whose condition is a filter set
+      When a REST patch replaces that condition with an empty one
+      Then the request is refused with the machine-readable condition-required code
+      And the stored condition is unchanged
+
+    @integration
+    Scenario: Automations that predate the rule keep firing
+      Given a stored automation with no condition at all
+      When one of its matches dispatches
+      Then the dispatch behaves exactly as before
+
+    # The save-time validation counts any non-empty nested value as a
+    # condition, but the dispatch-time matcher only resolves two levels of
+    # nesting. A shape it cannot evaluate has to fail closed: an automation
+    # whose condition the matcher cannot read must fire on nothing, because
+    # firing on everything is the exact hole this rule closes.
+    @unit
+    Scenario: A condition the matcher cannot evaluate fails closed
+      Given a stored automation whose condition nests deeper than the matcher resolves
+      When a trace is evaluated against it
+      Then the automation does not match
+
+  Rule: Links to an automation survive a change of drawer
+
+    The REST `platformUrl` field and the automation emails name a drawer inside
+    the URL they hand out, and those URLs outlive the drawer they were written
+    for: they sit in inboxes and in whatever a caller stored from an API
+    response. A name that stops resolving turns every one of them into a dead
+    link. A name that resolves to the filter-only drawer is worse than dead in
+    the case that matters, because a limit email asks the customer to narrow a
+    condition and that drawer cannot edit a query at all.
+
+    @integration
+    Scenario: A link issued before the drawer changed still opens the automation
+      Given a link that names the drawer the API used to hand out
+      When the app resolves that URL
+      Then it opens the automation authoring drawer
+
   Rule: Notifications configure templates; actions configure destinations
 
     Scenario: An email notification configures recipients and templates
@@ -68,14 +159,49 @@ Feature: Staged automation authoring drawer
       Then the recipient is accepted
       And it is shown with an "External" warning badge
 
-    Scenario: A Slack notification configures a webhook and a message template
+    Scenario: A Slack notification configures a destination and a message template
       Given the user is configuring a Slack notification
-      Then the user sets the webhook and the message template
+      Then the user sets the channel and the message template
 
     Scenario: A dataset action configures the destination only
       Given the user is configuring an add-to-dataset action
       Then the user selects the target dataset
       And no template section is shown
+
+  Rule: The Slack channel list never claims to be complete when it isn't
+
+    The picker is populated from what the bot token can see, and there are
+    several ways that view comes back partial: a scope the app was never
+    granted, and a workspace with more channels than the picker can list. A
+    partial list that looks complete is worse than no list — the author scrolls
+    past the channel they wanted, concludes the integration is broken, and has
+    nothing to act on. Whenever the list is short of the workspace, the author
+    is told so and given the way through.
+
+    Scenario: The workspace has more channels than the picker can list
+      Given the user is configuring a Slack notification
+      And the workspace has more channels than the picker can list
+      Then the channels that were retrieved are offered
+      And the author is told the list is incomplete
+      And the author is told they can enter the channel directly instead
+
+    Scenario: The app cannot see private channels
+      Given the user is configuring a Slack notification
+      And the Slack app cannot see the workspace's private channels
+      Then the public channels are still offered
+      And the author is told private channels are missing and which permission adds them
+
+    Scenario: The whole workspace fits in the list
+      Given the user is configuring a Slack notification
+      And the workspace has few enough channels for the picker to list them all
+      Then every channel is offered
+      And no incompleteness notice is shown
+
+    Scenario: A channel the list never returned can still be used
+      Given the user is configuring a Slack notification
+      And the channel they want is absent from the list
+      When the author enters the channel themselves
+      Then it is accepted as the destination
 
   Rule: Cadence and debounce apply per trigger
 

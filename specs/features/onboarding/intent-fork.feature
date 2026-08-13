@@ -81,23 +81,100 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
       Then the user is taken to their personal usage page
       And the CLI setup guidance they see there is the existing personal-page surface, unchanged by onboarding
 
-  Rule: the governance track provisions the organization without a project (v6)
+  Rule: the governance track provisions the organization without a shared project (v6)
 
     @unit
-    Scenario: Governance signup creates organization and team, but no project
+    Scenario: Governance signup creates organization and team, but no shared project
       Given the user selected the coding-agent tracking intent
       When onboarding completes
       Then an organization and a team exist for the user
-      And no project was created
-      # Usage data flows through per-user personal workspaces provisioned at
-      # CLI login; a visible project is created only when the organization
-      # later switches its primary use to LLMOps.
+      And no shared project was created
+      # A shared project is created only when the organization later switches
+      # its primary use to LLMOps.
 
     @unit
     Scenario: LLMOps signup still creates the default project
       Given the user selected the LLM-app intent
       When onboarding completes
       Then an organization, a team, and a default project exist for the user
+
+  # ============================================================================
+  # Onboarding is only ever offered to someone who belongs to nothing
+  # ============================================================================
+
+  Rule: a member of an organization is never asked to create one
+
+    # Onboarding is the page that creates an organization, so offering it to
+    # somebody who already belongs to one can only produce a second organization
+    # nobody wanted. Whether they are onboarded used to be read off the
+    # organization's primary intent, which is null for every organization created
+    # before this fork and every one created outside onboarding. So a member who
+    # had just accepted an invitation into such an organization was shown "let's
+    # kick off by creating your organization", and the screen offered nothing else
+    # to do. Reported by a customer whose invited colleague could not escape it.
+
+    @unit
+    Scenario: An invited member of an organization with no shared project goes home
+      Given the user belongs to an organization with no primary intent
+      And that organization has no project in a shared team
+      When the welcome screen decides where they go
+      Then they are sent home rather than into organization creation
+
+    @unit
+    Scenario: A member whose only team is their own workspace goes home
+      Given the user belongs to an organization with no primary intent
+      And their only team there is their personal workspace
+      When the welcome screen decides where they go
+      Then they are sent home rather than into organization creation
+
+    @unit
+    Scenario: Someone who belongs to no organization is still onboarded
+      Given the user belongs to no organization
+      When the welcome screen decides where they go
+      Then they are sent to organization creation
+
+  Rule: the governance track provisions the signer's personal workspace
+
+    # Coding-agent usage lands in a personal workspace, so /me is empty until
+    # one exists. Waiting for the first CLI login meant the page the track
+    # ends on could only tell the user to go install something. Provisioning
+    # it with the organization means the destination is real on arrival.
+    #
+    # This supersedes ADR-038 v6's "provisioned lazily at CLI login" for the
+    # onboarding path. CLI login still provisions on its own, unchanged and
+    # still idempotent, so a user who signs up on one machine and logs in on
+    # another gets the same single workspace either way.
+
+    @unit
+    Scenario: Governance signup provisions the personal workspace
+      Given the user selected the coding-agent tracking intent
+      When onboarding completes
+      Then the user has a personal workspace in the new organization
+
+    @unit
+    Scenario: The personal workspace stays separate from the shared workspace
+      Given the user selected the coding-agent tracking intent
+      When onboarding completes
+      Then the personal project is marked personal and owned by the signer
+      And the organization's shared team is not the personal one
+
+    @unit
+    Scenario: Failing to provision the workspace does not cost the user their organization
+      Given the user selected the coding-agent tracking intent
+      And provisioning the personal workspace fails
+      When onboarding completes
+      Then the organization and team still exist
+      And onboarding reports success
+      # The next session backfills the workspace, so the recovery is a page
+      # load rather than a support ticket.
+
+    @unit
+    Scenario: LLMOps signup provisions no personal workspace
+      Given the user selected the LLM-app intent
+      When onboarding completes
+      Then no personal workspace was provisioned
+      # Nothing on the LLMOps track reads one, and CLI login still creates it
+      # for whoever later goes looking.
 
     @integration
     Scenario: Governance signup records the organization's primary intent

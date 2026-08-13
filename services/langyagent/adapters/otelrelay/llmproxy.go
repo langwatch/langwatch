@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -83,6 +84,18 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 	if entry == nil {
 		return
 	}
+	// A prior call's 200 stream ended in a hard in-stream error event (see the
+	// SSE sniffer below). Every retry re-opens a fresh 200 stream and dies
+	// identically, so status-based cutting never fires, answer this retry
+	// terminally with the provider's own payload instead of proxying it.
+	if body, ok := entry.takeLLMStreamCut(); ok {
+		clog.Get(r.baseCtx).Info("otelrelay llm in-stream failure retry cut",
+			zap.String("conversation", entry.info.ConversationID))
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write(body)
+		return
+	}
 	target, err := llmTargetURL(entry.info.GatewayBaseURL, req.PathValue("token"), req.URL)
 	if err != nil {
 		clog.Get(r.baseCtx).Warn("otelrelay llm target resolution failed",
@@ -142,44 +155,11 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 		// "AI_APICallError" prose the control plane must never trust. A typed
 		// gateway herr envelope decodes losslessly (herr.FromBody — the
 		// cross-process continuation); a provider-native body the gateway
-		// forwarded verbatim (Anthropic's "credit balance too low", the codex
-		// backend's `detail`) is captured best-effort with the provider's
-		// message. The body is restored untouched for the worker's SDK.
+		// forwarded verbatim is reduced to bounded classification (reason code,
+		// status, and body kind), never provider prose. The body is restored
+		// untouched for the worker's SDK.
 		ModifyResponse: func(resp *http.Response) error {
-			if resp.StatusCode < 400 {
-				// A later successful call clears the capture: a transient failure
-				// the SDK retried past must not be blamed for an unrelated error
-				// the agent reports afterwards.
-				entry.clearLLMError()
-				return nil
-			}
-			peeked, err := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodyBytes))
-			// Chain any unread remainder back on so a >cap body still reaches the
-			// worker's SDK intact (truncating against a larger Content-Length
-			// would corrupt the response); Close closes the original body.
-			rest := resp.Body
-			resp.Body = struct {
-				io.Reader
-				io.Closer
-			}{io.MultiReader(bytes.NewReader(peeked), rest), rest}
-			if err != nil {
-				return nil // capture is best-effort; the proxied response stands.
-			}
-			e, typed := decodeLLMErrorBody(peeked)
-			if !typed {
-				clog.Get(r.baseCtx).Info("otelrelay llm error body not a typed envelope; captured best-effort",
-					zap.String("conversation", entry.info.ConversationID),
-					zap.Int("status", resp.StatusCode),
-					zap.Int("body_bytes", len(peeked)),
-					zap.String("content_type", resp.Header.Get("Content-Type")))
-			}
-			if e.Meta == nil {
-				e.Meta = herr.M{}
-			}
-			// The envelope deliberately carries no HTTP status; keep it in meta.
-			e.Meta["http_status"] = resp.StatusCode
-			entry.setLLMError(e)
-			return nil
+			return r.captureLLMFailure(entry, resp)
 		},
 		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
 			clog.Get(r.baseCtx).Warn("otelrelay llm proxy error",
@@ -190,6 +170,148 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 		},
 	}
 	proxy.ServeHTTP(w, req)
+}
+
+// captureLLMFailure is handleLLM's ModifyResponse body, pulled out to a named
+// method so its branching is not charged against handleLLM's own cognitive
+// complexity. See the ModifyResponse call site for what it is responsible
+// for.
+func (r *Relay) captureLLMFailure(entry *workerEntry, resp *http.Response) error {
+	if resp.StatusCode < 400 {
+		if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream") {
+			// A 200 stream can still fail: providers signal hard limits
+			// (OpenAI's insufficient_quota) as an in-stream error event
+			// after the stream opens. Watch the frames as they pass through
+			// untouched; a clean end clears the capture, an error event
+			// captures and latches (see llmStreamSniffer).
+			resp.Body = newLLMStreamSniffer(resp.Body, entry, clog.Get(r.baseCtx))
+			return nil
+		}
+		// A later successful call clears the capture: a transient failure
+		// the SDK retried past must not be blamed for an unrelated error
+		// the agent reports afterwards.
+		entry.clearLLMError()
+		return nil
+	}
+	peeked, err := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodyBytes))
+	// Chain any unread remainder back on so a >cap body still reaches the
+	// worker's SDK intact (truncating against a larger Content-Length would
+	// corrupt the response); Close closes the original body.
+	rest := resp.Body
+	resp.Body = struct {
+		io.Reader
+		io.Closer
+	}{io.MultiReader(bytes.NewReader(peeked), rest), rest}
+	if err != nil {
+		return nil // capture is best-effort; the proxied response stands.
+	}
+	e, typed := decodeLLMErrorBody(peeked, upstreamResponse{
+		handledCode: resp.Header.Get(herr.HandledErrorHeader),
+		status:      resp.StatusCode,
+		contentType: resp.Header.Get("Content-Type"),
+	})
+	if !typed {
+		r.warnIfMarkerLooksStripped(entry, resp, peeked)
+		r.logUntypedLLMFailure(entry, failureBody{resp: resp, peeked: peeked}, &e)
+	}
+	if typed {
+		if e.Meta == nil {
+			e.Meta = herr.M{}
+		}
+		// Gateway envelopes deliberately carry no HTTP status.
+		e.Meta["http_status"] = resp.StatusCode
+		scrubUpstreamRelayedProse(&e)
+	}
+	entry.setLLMError(e)
+	r.cutRetryLoopOnHardLimit(entry, resp, e)
+	return nil
+}
+
+// warnIfMarkerLooksStripped diagnoses a specific mid-rollout failure mode: a
+// body carrying the exact triplet shape a herr envelope always has (code ==
+// type, both non-empty, a non-empty message) that nonetheless failed
+// isGatewayEnvelope's marker check, because the header was absent or did not
+// match the body's own code. That shape is unlikely by coincidence, so it is
+// worth a warn even though the untyped/no-prose trust decision does not
+// change — logs only the two codes being compared, never the message.
+func (r *Relay) warnIfMarkerLooksStripped(entry *workerEntry, resp *http.Response, peeked []byte) {
+	var envelope herr.ErrorResponse
+	if json.Unmarshal(peeked, &envelope) != nil {
+		return
+	}
+	body := envelope.Error
+	if body.Code == "" || body.Type != body.Code || body.Message == "" {
+		return
+	}
+	handledCode := resp.Header.Get(herr.HandledErrorHeader)
+	if handledCode == body.Code {
+		return // isGatewayEnvelope would have trusted this; nothing stripped.
+	}
+	clog.Get(r.baseCtx).Warn("otelrelay llm handled-error marker missing or mismatched",
+		zap.String("conversation", entry.info.ConversationID),
+		zap.String("body_code", body.Code),
+		zap.String("marker", handledCode))
+}
+
+// failureBody is the raw response plus the bytes captureLLMFailure already
+// peeked off it, bundled so logUntypedLLMFailure stays under the repo's
+// 3-argument limit (revive argument-limit).
+type failureBody struct {
+	resp   *http.Response
+	peeked []byte
+}
+
+// logUntypedLLMFailure records the bounded, safe-to-log classification of a
+// provider-native failure body: never the provider's own prose, which can
+// echo credentials (an invalid-key response quoting the key back).
+func (r *Relay) logUntypedLLMFailure(entry *workerEntry, body failureBody, e *herr.E) {
+	bodyKind, _ := e.Meta["body_kind"].(string)
+	if bodyKind == "" {
+		bodyKind = "unknown"
+	}
+	// The gateway sets this header itself on the errors it authors
+	// (writeUpstreamError); it names which provider the failure came from,
+	// not anything the provider wrote, so it is safe to carry into the
+	// capture even though the body around it is not.
+	provider := body.resp.Header.Get("X-LangWatch-Provider")
+	if provider != "" {
+		if e.Meta == nil {
+			e.Meta = herr.M{}
+		}
+		e.Meta["provider"] = provider
+	}
+	clog.Get(r.baseCtx).Info("otelrelay llm error normalized as handled upstream error",
+		zap.String("conversation", entry.info.ConversationID),
+		zap.Int("status", body.resp.StatusCode),
+		zap.Int("body_bytes", len(body.peeked)),
+		zap.String("body_kind", bodyKind),
+		zap.String("upstream_code", string(firstHandledReasonCode(*e))),
+		zap.String("provider", provider))
+}
+
+// cutRetryLoopOnHardLimit answers a rate-limited retry terminally once the
+// conversation has hit rateLimitCutAfter consecutive 429s, or immediately on
+// a hard plan-limit discriminant — see cutRateLimitRetry and
+// hasHardLimitReason for why a 429 alone is not enough to cut on.
+//
+// The count is of UNINTERRUPTED 429s: any other answer, a 500 included,
+// resets it (without touching the capture already set on entry). A mixed
+// flap is not a deterministic limit, and only a limit that answers every
+// backoff identically should be cut.
+func (r *Relay) cutRetryLoopOnHardLimit(entry *workerEntry, resp *http.Response, e herr.E) {
+	if resp.StatusCode != http.StatusTooManyRequests {
+		entry.resetRateLimitStrikes()
+		return
+	}
+	hard := hasHardLimitReason(e)
+	strikes := entry.strikeRateLimit()
+	if hard || strikes >= rateLimitCutAfter {
+		cutRateLimitRetry(resp)
+		clog.Get(r.baseCtx).Info("otelrelay llm rate-limit retry loop cut",
+			zap.String("conversation", entry.info.ConversationID),
+			zap.Bool("hard_limit", hard),
+			zap.Int("consecutive", strikes))
+	}
 }
 
 // llmTargetURL joins the request path BEYOND /w/{token}/llm onto the
@@ -215,90 +337,314 @@ func llmTargetURL(gatewayBaseURL, token string, reqURL *url.URL) (*url.URL, erro
 // llmUpstreamErrorCode marks a failed mediated LLM call whose response body was
 // NOT the gateway's typed herr envelope — a provider-native error the gateway
 // forwarded verbatim (an Anthropic "credit balance too low", the codex
-// backend's `{"detail": ...}`). The provider's message rides Meta["message"]
-// so the turn's terminal error frame still names the real failure.
+// backend's `{"detail": ...}`). The provider's own error type rides as a typed
+// reason so the control plane can name the failure; the provider's prose does
+// not travel with it (see decodeLLMErrorBody).
 const llmUpstreamErrorCode = herr.Code("llm_upstream_error")
 
-// maxUpstreamMessageBytes bounds the provider message carried on a best-effort
-// capture, so a pathological body never bloats the error frame.
-const maxUpstreamMessageBytes = 2048
+// rateLimitCutAfter is how many CONSECUTIVE 429s a conversation's mediated LLM
+// calls may accumulate before the proxy converts the next one into a
+// non-retryable failure. A genuine burst (tokens-per-minute) clears within a
+// retry or two; only a limit that answers every backoff identically reaches
+// three in a row.
+const rateLimitCutAfter = 3
 
-// maxProviderTypeBytes bounds the provider error type carried as a typed
-// reason on a best-effort capture; a longer string is not a discriminant
-// anyone classifies on.
-const maxProviderTypeBytes = 128
+// hardLimitReasonCodes are the provider discriminants that mark a failure as a
+// PLAN limit, deterministic until the provider's window or billing resets
+// rather than a burst. These cut the retry loop on the FIRST strike: every
+// retry would be answered identically, and the panel already has bespoke copy
+// for them (langyErrorExplainer promotes `usage_limit_reached` to the
+// plan-limit card). Applies to rejected calls (429) and to in-stream error
+// events on 200 streams alike.
+var hardLimitReasonCodes = map[herr.Code]bool{
+	"usage_limit_reached":        true,
+	"codex_plan_limit":           true,
+	"insufficient_quota":         true,
+	"billing_hard_limit_reached": true,
+}
+
+// hasHardLimitReason walks a captured LLM error's code and reason chain for a
+// hard plan-limit discriminant.
+func hasHardLimitReason(e herr.E) bool {
+	if hardLimitReasonCodes[e.Code] {
+		return true
+	}
+	for _, reason := range e.Reasons {
+		if nested, ok := reason.(herr.E); ok && hasHardLimitReason(nested) {
+			return true
+		}
+	}
+	return false
+}
+
+// cutRateLimitRetry rewrites an upstream 429 into a response the worker SDK
+// treats as FINAL. The body — the provider's own error JSON — passes through
+// untouched, so the agent's error event and the captured herr both still name
+// the real cause; only the status stops being an invitation to retry. The
+// retry-steering headers go with it so no SDK second-guesses the status.
+func cutRateLimitRetry(resp *http.Response) {
+	resp.StatusCode = http.StatusBadRequest
+	resp.Status = "400 Bad Request"
+	resp.Header.Del("Retry-After")
+	resp.Header.Del("x-should-retry")
+	resp.Header.Del("retry-after-ms")
+}
+
+// maxProviderCodeBytes bounds a provider discriminant carried as a typed
+// reason. Longer strings are prose, not codes anyone should dispatch on.
+const maxProviderCodeBytes = 128
+
+// providerCodePattern deliberately admits identifiers rather than arbitrary
+// strings. Provider prose can contain credentials and belongs neither in the
+// handled-error wire contract nor in logs.
+var providerCodePattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_.:-]*$`)
+
+// providerCodePaths cover the provider JSON dialects observed in production
+// and the common OpenAI/Anthropic/JSON:API variants. Prefer a semantic `code`
+// over a broad `type` whenever both exist.
+var providerCodePaths = []string{
+	"error.code",
+	"error.error.code",
+	"errors.0.code",
+	"code",
+	// Google's dialect: error.code is a NUMBER (HTTP status), and the string
+	// discriminant lives under status/error.status instead ("RESOURCE_EXHAUSTED").
+	"error.status",
+	"error.error.status",
+	"status",
+	"error.type",
+	"error.error.type",
+	"errors.0.type",
+	"type",
+}
 
 // decodeLLMErrorBody turns a failed LLM response body into the herr.E the turn's
 // terminal error frame carries as its cause. Typed gateway envelopes (see
-// isGatewayEnvelope) decode losslessly (typed=true). Anything else, whether
-// provider-native error JSON the gateway forwards byte-for-byte or plain text,
-// is captured best-effort as an `llm_upstream_error` whose Meta["message"]
-// holds the provider's own message (typed=false). Provider error messages are
-// client-facing by design (the same body the SDK shows), so carrying the prose
-// is safe. When a provider-native body names its own error type, that
-// discriminant rides as a typed reason under the `llm_upstream_error`: the
-// control plane classifies known provider discriminants by exact reason code
-// (the codex backend's `usage_limit_reached` becomes the plan-limit card)
-// while the top-level cause still says the failure came from upstream.
-func decodeLLMErrorBody(peeked []byte) (e herr.E, typed bool) {
+// isGatewayEnvelope) decode losslessly (typed=true) — that message is OUR own,
+// written by the gateway for a cause it named, so it travels as it always has.
+//
+// Anything else, whether provider-native error JSON the gateway forwards
+// byte-for-byte or plain text, becomes an `llm_upstream_error` carrying the
+// provider's DISCRIMINANT and no prose (typed=false).
+//
+// It used to carry the prose too, in Meta["message"], reasoning that provider
+// error messages are client-facing by design because they are the same body the
+// SDK shows. The flaw is who "the client" is: that body is written for whoever
+// holds the API key, and on a mediated call the key holder is LangWatch.
+// OpenAI rejects a bad key with `Incorrect API key provided: sk-proj-…`, so
+// forwarding the sentence hands a customer a platform credential — and because
+// Meta is a client contract, it does that whether or not any UI renders it.
+// Filtering the prose instead was considered and rejected: matching credential
+// shapes only catches the shapes someone enumerated.
+//
+// What remains is strictly better structured. When a provider-native body names
+// its own error type, that discriminant rides as a typed reason under the
+// `llm_upstream_error`, and the control plane classifies the ones it knows by
+// exact reason code (the codex backend's `usage_limit_reached` becomes the
+// plan-limit card) while the top-level cause still says the failure came from
+// upstream. A discriminant is a value from a set the provider enumerates, so it
+// cannot smuggle a key the way free text can.
+//
+// Unknown prose is intentionally not retained. The caller logs the safe
+// handled classification (status, body kind, and discriminant) instead.
+// upstreamResponse carries the response metadata decodeLLMErrorBody needs
+// beyond the body bytes, collapsed into one param to stay under the
+// repo's 3-argument limit (revive argument-limit).
+type upstreamResponse struct {
+	handledCode string
+	status      int
+	contentType string
+}
+
+func decodeLLMErrorBody(peeked []byte, resp upstreamResponse) (e herr.E, typed bool) {
 	var envelope herr.ErrorResponse
-	if json.Unmarshal(peeked, &envelope) == nil && isGatewayEnvelope(envelope.Error) {
-		return herr.FromBody(envelope.Error), true
+	if err := json.Unmarshal(peeked, &envelope); err == nil {
+		if isGatewayEnvelope(envelope.Error, resp.handledCode) {
+			return herr.FromBody(envelope.Error), true
+		}
+	} else if resp.handledCode != "" {
+		// The marker header is gateway-minted and stripped from anything the
+		// gateway did not author (writeJSONResponse, writeUpstreamError), so
+		// its presence is trustworthy even when the body itself failed to
+		// parse (truncated by a proxy, transport-mangled). Trust the code,
+		// carry nothing else: there is no message to lose.
+		//
+		// herrgen:external — this reads whichever of OUR OWN codes the marker
+		// names; the code itself is already declared (and generated) at its
+		// origin, this is just a dynamic read of that value off a header.
+		return herr.E{Code: herr.Code(resp.handledCode)}, true
 	}
-	e = herr.E{Code: llmUpstreamErrorCode, Meta: herr.M{}}
-	if message := extractUpstreamErrorMessage(peeked); message != "" {
-		e.Meta["message"] = message
-	}
-	if t := gjson.GetBytes(peeked, "error.type"); t.Type == gjson.String &&
-		t.Str != "" && len(t.Str) <= maxProviderTypeBytes {
-		e.Reasons = []error{herr.E{Code: herr.Code(t.Str)}}
-	}
-	return e, false
+	return decodeProviderErrorBody(peeked, resp.status, resp.contentType), false
 }
 
-// isGatewayEnvelope reports whether a failed response body is the gateway's
-// own herr envelope rather than provider-native error JSON. The gateway
-// always emits `error.type` and `error.code` with the SAME value plus a
-// non-empty `error.message` (pkg/herr's toErrorBody dual emission); provider
-// dialects reuse the field names but not the matched pair: Anthropic sends
-// `type` without `code`, the codex backend sends `type` only or a bare
-// `detail`, and OpenAI's `code` (when present) rarely matches its `type`.
-// A provider body that does emit the full matched shape decodes typed; its
-// message is preserved in Meta["message"] either way (herr.FromBody), so the
-// terminal error frame names the real failure regardless of which side of
-// the gate a body lands on.
-func isGatewayEnvelope(body herr.ErrorBody) bool {
-	return body.Code != "" && body.Type == body.Code && body.Message != ""
+// decodeProviderErrorBody captures a body KNOWN to be provider-native, skipping
+// the gateway-envelope test that decodeLLMErrorBody opens with.
+//
+// Callers that already know which side a body came from should use this rather
+// than paying for a shape guess they do not need. An SSE error event inside a
+// 200 stream is the case in point: the gateway reports its own failures as
+// non-200 JSON responses through herr.WriteHTTP, so nothing arriving mid-stream
+// is ever its envelope — and the guess is not free, because a provider dialect
+// CAN satisfy it by coincidence. OpenAI's quota body sets type and code to the
+// same `insufficient_quota` with a message alongside, which is precisely the
+// shape isGatewayEnvelope reads as ours; routing it through here keeps its
+// prose out of the frame on the strength of where it came from rather than
+// what it looks like.
+func decodeProviderErrorBody(peeked []byte, status int, contentType string) herr.E {
+	e := herr.E{Code: llmUpstreamErrorCode, Meta: herr.M{
+		"body_kind": providerBodyKind(peeked, contentType),
+	}}
+	if status > 0 {
+		e.Meta["http_status"] = status
+	}
+
+	code := providerErrorCode(peeked)
+	if code == "" {
+		code = upstreamHTTPReasonCode(status)
+	}
+	if code != "" {
+		// herrgen:external — provider and upstream-HTTP discriminants are
+		// relayed as reasons so clients can branch on them. They are not our
+		// top-level error codes and do not belong in the generated code list.
+		e.Reasons = []error{herr.E{Code: code}}
+	}
+	return e
 }
 
-// extractUpstreamErrorMessage pulls the human-readable message out of the known
-// provider error dialects: OpenAI/Anthropic `error.message`, the codex
-// backend's `detail`, a bare `message`. Falls back to the raw body when it is
-// short, printable text. Returns "" when nothing readable is found.
-func extractUpstreamErrorMessage(body []byte) string {
-	for _, path := range []string{"error.message", "detail", "message"} {
-		if v := gjson.GetBytes(body, path); v.Type == gjson.String && v.Str != "" {
-			return boundMessage(v.Str)
+func providerErrorCode(body []byte) herr.Code {
+	if !json.Valid(body) {
+		return ""
+	}
+	// A hard-limit discriminant wins regardless of path order. providerCodePaths
+	// prefers a semantic `code` over a broad `type`, but a body carrying BOTH (a
+	// plan-limit `type` alongside an unrelated `code`) must not let the generic
+	// code bury the plan-limit signal — it is what disables the first-strike
+	// retry cut in hasHardLimitReason.
+	for _, path := range providerCodePaths {
+		if candidate, ok := providerCodeCandidate(body, path); ok && hardLimitReasonCodes[candidate] {
+			return candidate
 		}
 	}
-	trimmed := strings.TrimSpace(string(body))
-	if trimmed != "" && !strings.HasPrefix(trimmed, "{") && !strings.HasPrefix(trimmed, "[") {
-		return boundMessage(trimmed)
+	for _, path := range providerCodePaths {
+		if candidate, ok := providerCodeCandidate(body, path); ok {
+			return candidate
+		}
 	}
 	return ""
 }
 
-// boundMessage caps a provider message at maxUpstreamMessageBytes, backing off
-// to a rune boundary.
-func boundMessage(message string) string {
-	if len(message) <= maxUpstreamMessageBytes {
-		return message
+// providerCodeCandidate reads path out of body and reports whether it is a
+// well-formed provider discriminant (a short identifier, not prose).
+func providerCodeCandidate(body []byte, path string) (herr.Code, bool) {
+	value := gjson.GetBytes(body, path)
+	if value.Type != gjson.String || len(value.Str) > maxProviderCodeBytes ||
+		!providerCodePattern.MatchString(value.Str) {
+		return "", false
 	}
-	cut := message[:maxUpstreamMessageBytes]
-	for len(cut) > 0 && !utf8.ValidString(cut) {
-		cut = cut[:len(cut)-1]
+	// herrgen:external — this is the provider's identifier, not ours.
+	return herr.Code(value.Str), true
+}
+
+// upstreamReasonCodes name the upstream HTTP status when the provider's own
+// body carries no discriminant of its own (see providerErrorCode for that
+// case). Status 0 is never a real HTTP status; decodeProviderErrorBody passes
+// it for the SSE lane, where a terminal in-stream event has no status at all,
+// so every capture still carries exactly one reason.
+var upstreamReasonCodes = map[int]herr.Code{
+	0:                              "upstream_stream_error",
+	http.StatusBadRequest:          "upstream_bad_request",
+	http.StatusUnauthorized:        "upstream_unauthorized",
+	http.StatusForbidden:           "upstream_forbidden",
+	http.StatusNotFound:            "upstream_not_found",
+	http.StatusRequestTimeout:      "upstream_timeout",
+	http.StatusGatewayTimeout:      "upstream_timeout",
+	http.StatusConflict:            "upstream_conflict",
+	http.StatusUnprocessableEntity: "upstream_unprocessable_entity",
+	http.StatusTooManyRequests:     "upstream_rate_limited",
+}
+
+func upstreamHTTPReasonCode(status int) herr.Code {
+	if code, ok := upstreamReasonCodes[status]; ok {
+		return code
 	}
-	return cut + "…"
+	if status >= 500 {
+		return "upstream_unavailable"
+	}
+	return "upstream_http_error"
+}
+
+func providerBodyKind(body []byte, contentType string) string {
+	trimmed := bytes.TrimSpace(body)
+	if len(trimmed) == 0 {
+		return "empty"
+	}
+	if json.Valid(trimmed) {
+		return "json"
+	}
+	if !utf8.Valid(trimmed) {
+		return "binary"
+	}
+	lower := strings.ToLower(string(trimmed))
+	declaredHTML := strings.HasPrefix(strings.ToLower(strings.TrimSpace(contentType)), "text/html")
+	if declaredHTML || strings.HasPrefix(lower, "<!doctype html") || strings.HasPrefix(lower, "<html") {
+		return "html"
+	}
+	return "text"
+}
+
+func firstHandledReasonCode(e herr.E) herr.Code {
+	for _, reason := range e.Reasons {
+		if nested, ok := reason.(herr.E); ok {
+			return nested.Code
+		}
+	}
+	return e.Code
+}
+
+// upstreamRelayCodes carry a message classifyBifrostError built from the
+// provider's own error text — typed (gateway-authored, marker-verified)
+// but not OUR prose, so it must not reach the customer turn span.
+var upstreamRelayCodes = map[herr.Code]bool{
+	"provider_error":   true,
+	"provider_timeout": true,
+	"rate_limited":     true,
+	"chain_exhausted":  true,
+}
+
+// scrubUpstreamRelayedProse deletes the upstream-derived message (and any
+// tips) from every node of a typed envelope whose code relays provider text,
+// so the relay never trusts what the gateway itself only forwarded.
+//
+// It walks the reason chain rather than stopping at the top, because the
+// wrapper codes are precisely the ones that carry the prose one level down:
+// chain_exhausted's own message says the chain ran out, and it is the
+// per-attempt provider_error REASONS underneath that hold what each provider
+// said. Scrubbing only the root would delete the harmless sentence and keep
+// the ones written for whoever holds the API key.
+func scrubUpstreamRelayedProse(e *herr.E) {
+	if upstreamRelayCodes[e.Code] {
+		delete(e.Meta, "message")
+		delete(e.Meta, "tips")
+	}
+	for i, reason := range e.Reasons {
+		nested, ok := reason.(herr.E)
+		if !ok {
+			continue
+		}
+		// herr.E is a value type, so the scrubbed copy has to be written
+		// back over the slot it came from or the edit is lost.
+		scrubUpstreamRelayedProse(&nested)
+		e.Reasons[i] = nested
+	}
+}
+
+// isGatewayEnvelope reports whether a failed response body is the gateway's
+// own herr envelope rather than provider-native error JSON. Shape alone is not
+// provenance: a provider can emit the same type/code/message triplet. The
+// explicit herr response marker must match the body's code before its message
+// and metadata are trusted.
+func isGatewayEnvelope(body herr.ErrorBody, handledCode string) bool {
+	return handledCode != "" && body.Code == handledCode && body.Type == body.Code && body.Message != ""
 }
 
 // remapWorkerParent translates the worker's outbound trace context into the

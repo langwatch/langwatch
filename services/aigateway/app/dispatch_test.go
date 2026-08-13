@@ -20,6 +20,7 @@ import (
 type mockProvider struct {
 	dispatchFn func(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error)
 	streamFn   func(ctx context.Context, req *domain.Request, cred domain.Credential) (domain.StreamIterator, error)
+	listFn     func(ctx context.Context, creds []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error)
 }
 
 func (m *mockProvider) Dispatch(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error) {
@@ -30,8 +31,11 @@ func (m *mockProvider) DispatchStream(ctx context.Context, req *domain.Request, 
 	return m.streamFn(ctx, req, cred)
 }
 
-func (m *mockProvider) ListModels(_ context.Context, _ []domain.Credential) ([]domain.Model, error) {
-	return nil, nil
+func (m *mockProvider) ListModels(ctx context.Context, creds []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
+	if m.listFn != nil {
+		return m.listFn(ctx, creds)
+	}
+	return nil, nil, nil
 }
 
 type mockRateLimiter struct {
@@ -46,14 +50,14 @@ func (m *mockRateLimiter) Allow(ctx context.Context, vkID string, limits domain.
 }
 
 type mockBudget struct {
-	precheckFn func(ctx context.Context, bundle *domain.Bundle) (domain.BudgetVerdict, error)
+	precheckFn func(ctx context.Context, bundle *domain.Bundle) (domain.BudgetDecision, error)
 }
 
-func (m *mockBudget) Precheck(ctx context.Context, bundle *domain.Bundle) (domain.BudgetVerdict, error) {
+func (m *mockBudget) Precheck(ctx context.Context, bundle *domain.Bundle) (domain.BudgetDecision, error) {
 	if m.precheckFn != nil {
 		return m.precheckFn(ctx, bundle)
 	}
-	return domain.BudgetAllow, nil
+	return domain.BudgetDecision{Verdict: domain.BudgetAllow}, nil
 }
 
 type mockGuardrails struct {
@@ -91,12 +95,16 @@ func (m *mockPolicy) Check(ctx context.Context, rules []domain.PolicyRule, body 
 }
 
 type mockModels struct {
-	resolveFn func(ctx context.Context, rawModel string, config domain.BundleConfig) (*domain.ResolvedModel, error)
+	resolveFn func(ctx context.Context, req *domain.Request, config domain.BundleConfig) (*domain.ResolvedModel, error)
 }
 
-func (m *mockModels) Resolve(ctx context.Context, rawModel string, config domain.BundleConfig) (*domain.ResolvedModel, error) {
+func (m *mockModels) Resolve(ctx context.Context, req *domain.Request, config domain.BundleConfig) (*domain.ResolvedModel, error) {
 	if m.resolveFn != nil {
-		return m.resolveFn(ctx, rawModel, config)
+		return m.resolveFn(ctx, req, config)
+	}
+	rawModel := ""
+	if req != nil {
+		rawModel = req.Model
 	}
 	return &domain.ResolvedModel{ModelID: rawModel, ProviderID: "openai", Source: domain.ModelSourceImplicit}, nil
 }
@@ -194,8 +202,8 @@ func TestHandleChat_BudgetBlocked(t *testing.T) {
 		},
 	}
 	budget := &mockBudget{
-		precheckFn: func(_ context.Context, _ *domain.Bundle) (domain.BudgetVerdict, error) {
-			return domain.BudgetBlock, nil
+		precheckFn: func(_ context.Context, _ *domain.Bundle) (domain.BudgetDecision, error) {
+			return domain.BudgetDecision{Verdict: domain.BudgetBlock}, nil
 		},
 	}
 
@@ -217,8 +225,11 @@ func TestHandleChat_BudgetWarn(t *testing.T) {
 		},
 	}
 	budget := &mockBudget{
-		precheckFn: func(_ context.Context, _ *domain.Bundle) (domain.BudgetVerdict, error) {
-			return domain.BudgetWarn, nil
+		precheckFn: func(_ context.Context, _ *domain.Bundle) (domain.BudgetDecision, error) {
+			return domain.BudgetDecision{
+				Verdict:  domain.BudgetWarn,
+				Warnings: []domain.BudgetWarning{{Scope: "project", PctUsed: 95}},
+			}, nil
 		},
 	}
 
@@ -230,7 +241,7 @@ func TestHandleChat_BudgetWarn(t *testing.T) {
 
 	result, err := application.HandleChat(context.Background(), testBundle(), bytes.NewReader(testBody()), "gpt-4")
 	require.NoError(t, err)
-	assert.Contains(t, result.Meta.BudgetWarnings, "near_limit")
+	assert.Contains(t, result.Meta.BudgetWarnings, "project:95")
 }
 
 func TestHandleChat_GuardrailPreBlocked(t *testing.T) {
@@ -328,7 +339,7 @@ func TestHandleChat_ModelResolution(t *testing.T) {
 		},
 	}
 	models := &mockModels{
-		resolveFn: func(_ context.Context, _ string, _ domain.BundleConfig) (*domain.ResolvedModel, error) {
+		resolveFn: func(_ context.Context, _ *domain.Request, _ domain.BundleConfig) (*domain.ResolvedModel, error) {
 			return &domain.ResolvedModel{
 				ModelID:    "gpt-4-turbo",
 				ProviderID: domain.ProviderOpenAI,
@@ -548,7 +559,7 @@ func TestHandleChat_ModelAwareSkipsWrongProvider(t *testing.T) {
 		},
 	}
 	models := &mockModels{
-		resolveFn: func(_ context.Context, _ string, _ domain.BundleConfig) (*domain.ResolvedModel, error) {
+		resolveFn: func(_ context.Context, _ *domain.Request, _ domain.BundleConfig) (*domain.ResolvedModel, error) {
 			return &domain.ResolvedModel{
 				ModelID:    "claude-3-5-sonnet-20241022",
 				ProviderID: domain.ProviderAnthropic,
@@ -593,9 +604,9 @@ func TestHandleChat_ModelAwareImplicitInfersProvider(t *testing.T) {
 		},
 	}
 	models := &mockModels{
-		resolveFn: func(_ context.Context, raw string, _ domain.BundleConfig) (*domain.ResolvedModel, error) {
+		resolveFn: func(_ context.Context, req *domain.Request, _ domain.BundleConfig) (*domain.ResolvedModel, error) {
 			return &domain.ResolvedModel{
-				ModelID:    raw,
+				ModelID:    req.Model,
 				ProviderID: "", // implicit — dispatcher must infer
 				Source:     domain.ModelSourceImplicit,
 			}, nil

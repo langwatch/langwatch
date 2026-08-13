@@ -93,6 +93,9 @@ func StampInternalGenAI(ctx context.Context, params domain.AITraceParams) {
 	if params.GatewayRequestID != "" {
 		attrs = append(attrs, attribute.String(customertracebridge.AttrGatewayReqID, params.GatewayRequestID))
 	}
+	if params.ModelProviderID != "" {
+		attrs = append(attrs, attribute.String(customertracebridge.AttrModelProviderID, params.ModelProviderID))
+	}
 	if params.UpstreamErrorType != "" {
 		attrs = append(attrs, attribute.String(AttrErrorType, params.UpstreamErrorType))
 	}
@@ -122,8 +125,17 @@ func usageAttributes(usage domain.Usage) []attribute.KeyValue {
 	if usage.CacheCreationTokens > 0 {
 		attrs = append(attrs, attribute.Int(customertracebridge.AttrGenAIUsageCacheCreate, usage.CacheCreationTokens))
 	}
+	if usage.CacheCreation1hTokens > 0 {
+		attrs = append(attrs, attribute.Int(customertracebridge.AttrGenAIUsageCacheCreate1h, usage.CacheCreation1hTokens))
+	}
 	if usage.CostMicroUSD > 0 {
 		attrs = append(attrs, attribute.Float64(AttrCostUSD, float64(usage.CostMicroUSD)/1_000_000))
+	}
+	if usage.InputChars > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageInputChars, usage.InputChars))
+	}
+	if usage.AudioSeconds > 0 {
+		attrs = append(attrs, attribute.Float64(AttrGenAIUsageAudioSeconds, usage.AudioSeconds))
 	}
 	return attrs
 }

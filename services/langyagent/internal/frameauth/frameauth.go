@@ -1,7 +1,6 @@
-// Package frameauth is the Langy authenticated frame contract
-// (LANGY_WORKER_REDESIGN_PLAN.md §0a): every frame the worker streams back to
-// the control plane carries a per-frame HMAC proving BOTH who it is and that it
-// really is who it says.
+// Package frameauth is the Langy authenticated frame contract: every frame the
+// worker streams back to the control plane carries a per-frame HMAC proving
+// BOTH who it is and that it really is who it says.
 //
 // This package SIGNS (the worker); the TS Hono relay VERIFIES. The wire contract
 // is pinned cross-language by specs/langy/langy-frame-auth.vectors.json — the

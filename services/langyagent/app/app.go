@@ -410,9 +410,14 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		failureMessage := "the agent hit an error before finishing"
 		if llmErr, ok := worker.LastLLMError(); ok {
 			reasons = append(reasons, llmErr)
-			// The captured cause's message is the provider's own error text
-			// (client-facing by design) — the trace should name the real
-			// failure, not the generic wrapper.
+			// The captured cause's message is OURS by the time it gets
+			// here: the relay keeps a gateway-authored message only when
+			// the response marker proved we wrote it, and strips it back
+			// off the codes that merely relay provider text (see
+			// scrubUpstreamRelayedProse). So this names the real failure
+			// rather than the generic wrapper, without putting a
+			// provider's sentence — written for whoever holds the API
+			// key, which on a mediated call is us — into the turn.
 			if m, _ := llmErr.Meta["message"].(string); m != "" {
 				failureMessage = m
 			}

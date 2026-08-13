@@ -1,21 +1,24 @@
 ---
 title: Health Checks
-description: Liveness, readiness, and startup probes for the LangWatch AI Gateway.
+description: Kubernetes probes and the public status endpoint for the LangWatch AI Gateway.
 sidebarTitle: Health Checks
 ---
 
-The gateway exposes three HTTP endpoints for Kubernetes probes, all on the same port the API listens on (`5563` by default, referenced as the named container port `http` in the chart). Each is deliberately scoped, `/readyz` flipping to 503 must mean "this replica should not serve customer traffic right now", and nothing more.
+The gateway exposes three HTTP endpoints for Kubernetes probes plus one public status endpoint, all on the same port the API listens on (`5563` by default, referenced as the named container port `http` in the chart). Each is deliberately scoped, `/readyz` flipping to 503 must mean "this replica should not serve customer traffic right now", and nothing more.
 
 ## Endpoint summary
 
 | Endpoint   | Used by                                | Returns 200 when                                                    |
 |------------|----------------------------------------|---------------------------------------------------------------------|
 | `/healthz` | Kubernetes `livenessProbe`             | The Go process is responsive (no registered checks fail)            |
-| `/readyz`  | Kubernetes `readinessProbe` + LB       | The pod is not draining and all readiness checks pass               |
-| `/startupz`| Kubernetes `startupProbe`              | Bootstrap (auth-cache warm-up) has completed, then mirrors `/readyz`|
+| `/readyz`  | Kubernetes `readinessProbe` + LB       | The pod is not draining                                             |
+| `/startupz`| Kubernetes `startupProbe`              | Startup is marked complete, then mirrors `/readyz`                  |
+| `/health`  | Your status page / uptime monitor      | The process is up and the control plane has answered within the last 60s |
 | `/metrics` | Prometheus                              | Always, counter + histogram surface (see [Observability](/ai-gateway/observability)) |
 
-All three return the same JSON shape:
+The three probes are in-cluster signals. `/health` is the one meant to be reachable from outside; the chart publishes it through the ingress and leaves the rest internal.
+
+The three probes return the same JSON shape:
 
 ```json
 {
@@ -26,7 +29,7 @@ All three return the same JSON shape:
 }
 ```
 
-`checks` is omitted when there are no registered checks AND the status is `ok`. Today the gateway registers `MarkStarted` (after the auth-cache bootstrap completes) and `MarkDraining` (on `SIGTERM`), but no per-dependency liveness or readiness checks, the probes are intentionally lightweight signals about process state and lifecycle, not external-dependency health. Dependency health is reported via per-request error codes and the OTel trace surface, not the probes.
+`checks` is omitted when there are no registered checks AND the status is `ok`. The gateway registers `MarkStarted` (at boot) and `MarkDraining` (on `SIGTERM`), but no per-dependency liveness or readiness checks. The probes are intentionally lightweight signals about process state and lifecycle, not external-dependency health. Dependency health is reported on `/health`, per-request error codes, and the OTel trace surface, never on the probes.
 
 ## `/healthz` (liveness)
 
@@ -77,10 +80,11 @@ readinessProbe:
 ### What `/readyz` does NOT check
 
 - **Per-provider live health.** If OpenAI is rate-limiting, the gateway still serves and falls back per the VK's configured chain. Reporting `not_ready` for one upstream would amplify the incident.
-- **Redis L2.** The current gateway has no Redis client; the auth cache is in-process LRU.
+- **The control plane.** A control-plane blip is a degradation the auth cache is built to absorb: warm keys keep serving from the in-process cache. Failing readiness on it would drop every replica from the load balancer at once and turn that degradation into a total outage. Control-plane reachability is reported on `/health` instead, where it informs a status page rather than gating traffic.
+- **Any shared cache.** The gateway has no Redis client; the auth cache is an in-process LRU, private to the pod.
 - **PostgreSQL.** The gateway never talks to Postgres directly; the control plane mediates persistence.
 
-The blast-radius of readiness is specifically: "is this pod still meant to serve traffic?", and the only conditions today are `MarkDraining` and (transitively, via `/startupz` mirroring `/readyz` once started) the auth-cache bootstrap.
+The blast-radius of readiness is specifically: "is this pod still meant to serve traffic?", and the only condition today is `MarkDraining`.
 
 ## `/startupz` (startup)
 
@@ -94,7 +98,7 @@ GET /startupz
 { "status": "ok", "version": "git-a1412a4", "uptime_s": 12.48 }
 ```
 
-The bootstrap step is the auth-cache warm-up: the gateway calls the control plane's `/api/internal/gateway/keys/changes` once on boot to fill the L1 cache before taking traffic. Tenants with 50K+ virtual keys take 2–3 seconds; the failure threshold gives ~60 s of room before the kubelet declares the pod failed and restarts it (chart default `failureThreshold: 30 × periodSeconds: 2 = 60 s` of bootstrap time).
+There is no blocking bootstrap step today: `MarkStarted` is called while dependencies are being constructed, which finishes before the HTTP listener opens, so `/startupz` is already 200 on the first request it can possibly receive and the `starting` state is unobservable over HTTP. The auth cache warms organically on the first request per virtual key; an unwarmed gateway costs a cold-cache request one extra control-plane round trip, which is the correct behavior for a fresh deployment. The chart's generous failure threshold is headroom kept for a future bootstrap-pull, not a window the gateway currently uses.
 
 ```yaml
 startupProbe:
@@ -106,32 +110,73 @@ startupProbe:
 
 Once `/startupz` first returns 200, Kubernetes stops calling it; readiness + liveness take over.
 
+## `/health` (public status endpoint)
+
+This is the endpoint to point a status page or uptime monitor at. Plain HTTP monitor semantics: 200 healthy, 503 not. `HEAD` returns the same status and headers with no body, as HTTP requires, so a monitor that probes with `HEAD` reads the same verdict. Responses carry `Cache-Control: no-store` so a CDN cannot serve a stale verdict. Any other method is 405: the ingress publishes the path, the gateway bounds the methods.
+
+```
+GET /health
+→ 200 OK
+{ "status": "ok", "checks": { "gateway": "ok", "control_plane": "ok" } }
+```
+
+```
+GET /health
+→ 503 Service Unavailable
+{ "status": "degraded", "checks": { "gateway": "ok", "control_plane": "unreachable for 65s" } }
+```
+
+The body is deliberately smaller than the probes': no `version`, no `uptime_s`. This endpoint is polled by the public internet, and restart cadence and build identity are not something to publish.
+
+### What it covers, and what it never will
+
+The verdict covers the gateway process and the dependencies you own: the control plane. It is structurally independent of model providers.
+
+- **A provider outage cannot turn it red.** Nothing on the verdict path reads dispatch state, so if OpenAI and Anthropic are both down, completions fail while `/health` stays 200. That is the providers' status page's news, not yours, and a gateway that goes red on someone else's outage trains people to ignore the page.
+- **A poll never triggers an upstream call.** A background monitor probes the control plane every 15 s and `/health` serves the cached verdict, so poll rate and control-plane load are unrelated. On an unauthenticated public endpoint, fanning out per poll would be an amplification and cost bug.
+
+### Control-plane semantics
+
+The monitor probes the control plane's `/api/internal/gateway/health` over the same HMAC-signed internal channel every request uses. That is the point of the design: a 200 proves DNS, TCP/TLS, the app being up, **and** the shared `LW_GATEWAY_INTERNAL_SECRET` matching. A mismatched secret is the misconfiguration where every pod looks green while every virtual-key resolve is refused, and this is the only signal that catches it.
+
+Unreachability shorter than 60 s stays 200: warm keys keep serving from the auth cache through a blip, and a page that flaps on what customers cannot feel is worse than no page. Past 60 s, cold-cache requests are failing with `auth_upstream_unavailable` and the page should say so. A booting pod is given one full 60 s window before it can report red, so a rolling deploy never blinks the page.
+
+Because the tolerance is 60 s and the probe interval is 15 s, a monitor polling every 30 to 60 s sees a sustained outage within about two minutes of onset.
+
+### Exposure
+
+The chart publishes exactly this one path through the ingress, as an `Exact` match, so `/healthz`, `/readyz`, `/startupz`, `/metrics` and `/internal` stay in-cluster:
+
+```yaml
+ingress:
+  host: gateway.your-corp.com
+  healthPath:
+    enabled: true   # default
+    path: /health
+```
+
+Point the monitor at `https://gateway.your-corp.com/health`. Set `ingress.healthPath.enabled: false` if you would rather not publish it at all; the endpoint still answers in-cluster.
+
 ## Graceful shutdown
 
-`SIGTERM` triggers (the chart's `shutdown.preDrainWait` and `shutdown.timeout` knobs are not currently wired into the gateway code; the gateway uses `Server.GracefulSeconds` from `pkg/config/server.go`, default `5`, bump via `SERVER_GRACEFUL_SECONDS` if you need a longer window):
+`SIGTERM` triggers (the chart's `shutdown.preDrainWaitSeconds` and `shutdown.timeoutSeconds` knobs are wired into the gateway via `SERVER_DRAIN_DELAY_SECONDS`/`SERVER_GRACEFUL_SECONDS` — see [helm.mdx](/ai-gateway/self-hosting/helm#graceful-drain) for the full four-phase drain sequence):
 
 1. **Immediately**: `MarkDraining()` flips `/readyz` to 503 with `status:"draining"`. The Service's endpoint controller and the LB observe and stop routing new traffic.
-2. **Drain window**: existing in-flight requests continue. SSE streams continue until the upstream provider closes them or the request finishes naturally.
-3. **End of `GracefulSeconds`**: the HTTP server shuts down; remaining sockets close cleanly.
+2. **Pre-drain wait**: the pod keeps accepting connections for `shutdown.preDrainWaitSeconds` (default 5) while the LB catches up on the `/readyz` flip.
+3. **Drain window**: existing in-flight requests continue for up to `shutdown.timeoutSeconds` (default 60). SSE streams continue until the upstream provider closes them or the request finishes naturally.
 4. **Process exits 0**.
 
-Match your `terminationGracePeriodSeconds` to the drain window plus a few seconds of slack:
+Match your `terminationGracePeriodSeconds` to `preDrainWaitSeconds + timeoutSeconds` plus a few seconds of slack:
 
 ```yaml
-terminationGracePeriodSeconds: 30  # chart default
+terminationGracePeriodSeconds: 75  # chart default: 5 + 60 + 10 slack
 ```
 
-Without giving the LB time to notice `/readyz=503` before the listener closes, a small fraction of in-flight requests during rolling deploys hits a replica that has already shut down, the LB returns 502. If you observe this on rollout, add a `preStop` sleep so the pod stays around long enough for the LB to remove it:
-
-```yaml
-lifecycle:
-  preStop:
-    exec: { command: ["sleep", "3"] }
-```
+`preDrainWaitSeconds` exists precisely to give the LB time to notice `/readyz=503` before the listener stops accepting, so if you still see a fraction of in-flight requests hit an already-draining replica during rolling deploys, bump `shutdown.preDrainWaitSeconds` (and `terminationGracePeriodSeconds` to match) rather than reaching for a manual `preStop` sleep. A `preStop` hook does the same job less precisely: it delays SIGTERM instead of delaying the listener shutdown, so the pod is not yet reporting `/readyz=503` for any of that time and the LB has no signal to act on.
 
 ## End-to-end synthetic check
 
-`/readyz` validates lifecycle state but not the request path. For real-traffic confidence, run a synthetic completion every 30 s:
+Neither the probes nor `/health` exercise the request path, and `/health` will not tell you a provider is down, on purpose. For real-traffic confidence, run a synthetic completion every 30 s. Keep it on an internal alert rather than on the public status page, so a provider incident does not read as a LangWatch incident:
 
 ```bash
 curl --fail --max-time 5 \
@@ -143,7 +188,7 @@ curl --fail --max-time 5 \
 
 On alert:
 
-1. Capture the `X-LangWatch-Request-Id` header from the response.
+1. Capture the `X-LangWatch-Gateway-Request-Id` header from the response.
 2. Look up the request's trace in the LangWatch UI under Origin = `gateway`.
 3. If the gateway returned 5xx, pull the gateway pod logs filtered by pod name (`GATEWAY_NODE_ID` is unused; the gateway derives `node_id` from `os.Hostname()` which inside a Kubernetes pod is the pod name).
 4. If the gateway returned the upstream provider's error verbatim, the gateway is healthy, the provider is degraded.
@@ -153,6 +198,7 @@ On alert:
 | Symptom                                                         | Likely cause                                           | First step                                                         |
 |-----------------------------------------------------------------|--------------------------------------------------------|--------------------------------------------------------------------|
 | `/healthz` 200, `/v1/chat/completions` returns 500 `auth_upstream_unavailable` | Gateway can't reach control plane (`LW_GATEWAY_BASE_URL` wrong/missing) | Check the env var on the pod; confirm Service, DNS resolves       |
-| `/startupz` fails 30× in a row, pod CrashLoopBackOff             | Control plane unreachable on boot, or auth secret mismatch | Compare `LW_GATEWAY_INTERNAL_SECRET` byte-for-byte between gateway and control-plane pods |
+| `/health` 503 with `control_plane: unreachable for Ns`           | Control plane down, unroutable, or the shared internal secret does not match (a mismatch 401s the probe and reads the same) | Compare `LW_GATEWAY_INTERNAL_SECRET` byte-for-byte between gateway and control-plane pods, then check the Service and DNS. The `statusprobe_control_plane_unreachable` log line carries the underlying probe failure |
+| `/health` 503 while completions still succeed                    | Expected during a control-plane outage longer than 60 s: warm keys keep serving from the auth cache, cold ones do not | Confirm it is a real outage and not a secret mismatch (row above, which reads identically), then fix whichever side is wrong. `/readyz` stays 200 on purpose so warm traffic keeps flowing |
 | `/readyz` flips to 503 mid-life                                  | Pod received `SIGTERM` (rolling deploy, eviction, OOMKill) | `kubectl describe pod` for the termination reason                   |
-| 502 from LB for a small window during rolling deploy             | LB hasn't yet removed the draining replica             | Add a `preStop: sleep 3` lifecycle hook (see Graceful shutdown above) |
+| 502 from LB for a small window during rolling deploy             | LB hasn't yet removed the draining replica             | Raise `shutdown.preDrainWaitSeconds`, and `terminationGracePeriodSeconds` to match (see Graceful shutdown above) |

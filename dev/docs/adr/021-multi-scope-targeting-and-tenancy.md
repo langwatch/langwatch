@@ -95,7 +95,7 @@ We reject two alternatives the team weighed explicitly:
 
 ### 2. A shared scope contract, with per-table storage enums
 
-We add one value-type module, `langwatch/src/server/scopes/scope.types.ts`:
+We add one value-type module, `platform/app/src/server/scopes/scope.types.ts`:
 
 - `SCOPE_TIERS = ["ORGANIZATION", "TEAM", "PROJECT"]` and `ScopeTier`.
 - `scopeAssignmentSchema` (Zod) and `ScopeAssignment` (`{ scopeType, scopeId }`).
@@ -113,7 +113,7 @@ three universal tiers); the storage enum is the table's own invariant. This is
 the existing per-table-enum decision in `scoped-resources.md`, kept deliberately.
 
 The cascade walk is captured once in
-`langwatch/src/server/scopes/resolveScopeChain.ts`: it returns the
+`platform/app/src/server/scopes/resolveScopeChain.ts`: it returns the
 `PROJECT → TEAM → ORGANIZATION` chain for a project context,
 most-specific-first. Junction readers apply it as
 `scopes: { some: { OR: resolveScopeChain(ctx) } }`; inline readers apply it as
@@ -173,8 +173,23 @@ We bring the org path up to the project path's bar:
   resource-derived permission checks.
 - `validateRoleBindingPermissions` rejects organization-level permissions in a
   non-`ORGANIZATION`-scoped binding at create and update time, and the EXTERNAL
-  membership boundary is evaluated before custom-role permissions so a custom role
-  can never lift an EXTERNAL member above its floor.
+  (Lite Member) seat ceiling is enforced at write time for direct rows: a
+  binding with a `userId` on a Lite Member seat stores Viewer or nothing, and
+  a custom role requires a full seat.
+
+Amendment (Lite Member seat as stored truth): the EXTERNAL seat used to be a
+runtime cap layered over whatever the rows said, which let stored rows claim
+Admin while resolution quietly answered Viewer. Direct rows are now truthful at
+write time: `roleBinding.create/update` and the member dialog's batch refuse
+rows above Viewer, custom roles, and organization-scoped rows for a Lite Member
+seat, and moving a member to that seat corrects their shared team and project
+rows to Viewer. Custom-role rows that predate the rule are grandfathered: they
+keep resolving (and keep billing the member as a full seat) until the member's
+next seat change clears them; no sweep touches them. Group-derived access and
+the personal workspace stay runtime-capped by design: the group's binding
+belongs to the group, and the stored personal-workspace owner role plus the cap
+is what makes re-promoting a member restore their workspace untouched. The
+runtime cap in `resolveBindingPermission` remains as defense in depth.
 
 Gateway virtual-key authentication (lookup by hashed secret or by id) stays the
 narrow exemption inside `SCOPED_MODELS`; it authenticates a key principal, not a
@@ -276,5 +291,5 @@ change gated on a backfill, so it lands last.
 - `specs/security/org-level-tenancy-enforcement.feature`
 - `specs/model-providers/model-cost-scoping.feature`
 - `specs/ai-gateway/gateway-budget-targeting.feature`
-- `langwatch/src/server/scopes/scope.types.ts`,
-  `langwatch/src/server/scopes/resolveScopeChain.ts`: the shared contract
+- `platform/app/src/server/scopes/scope.types.ts`,
+  `platform/app/src/server/scopes/resolveScopeChain.ts`: the shared contract

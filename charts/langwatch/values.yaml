@@ -27,7 +27,13 @@ global:
     seccompProfile:
       type: RuntimeDefault
   ## @param global.containerSecurityContext [object] Default container security context (applied cluster-wide unless overridden).
+  # runAsNonRoot is also set at the pod level above; Kubernetes inherits it,
+  # but some Gatekeeper constraints (e.g. certain flavours of
+  # k8sreadonlyrootfilesystem) inspect the *container-level* field directly and
+  # deny pods that only carry it at pod level. Setting it on both keeps every
+  # policy variant happy without changing runtime behaviour.
   containerSecurityContext:
+    runAsNonRoot: true
     allowPrivilegeEscalation: false
     capabilities:
       drop:
@@ -35,14 +41,45 @@ global:
     readOnlyRootFilesystem: true
   ## @param global.automountServiceAccountToken [default: false] Mount the ServiceAccount token into first-party workload pods (app, workers, nlp, langevals, cronjobs, postgresql, redis). Defaults to false — none of these call the Kubernetes API, and many clusters deny pods that automount the token. Set true only if a sidecar needs in-cluster API access.
   automountServiceAccountToken: false
+
+  # ServiceAccount for the first-party workloads that touch object storage
+  # (app and workers; the cron pods only curl the app over HTTP, so they are
+  # deliberately left off it). Opt-in: disabled by default, so installs that
+  # do not need it render exactly as they did before and keep using the
+  # namespace `default` account.
+  #
+  # This is what cloud identity attaches to. Both providers grant storage
+  # access to a ServiceAccount rather than to a pod:
+  #   AWS  — annotate with eks.amazonaws.com/role-arn        (IRSA)
+  #   Azure— annotate with azure.workload.identity/client-id (workload identity)
+  #          AND label the pods azure.workload.identity/use: "true"
+  #
+  # Note this is NOT Azure-specific: without it, S3's existing keyless
+  # sign-in (the AWS SDK default provider chain) is unreachable through
+  # chart values too. See issues #6182 and #6087.
+  ## @extra global.serviceAccount ServiceAccount used by app, workers and cronjobs.
+  ## @param global.serviceAccount.create [default: false] Create a ServiceAccount for the first-party workloads.
+  ## @param global.serviceAccount.name [string] Name to use. Defaults to the release name when create is true; set to use an existing account.
+  ## @param global.serviceAccount.annotations [object] Annotations on the ServiceAccount — where the cloud identity binding goes.
+  serviceAccount:
+    create: false
+    name: ""
+    annotations: {}
   ## @extra global.scheduling Global scheduling defaults for all pods.
   ## @param global.scheduling.nodeSelector [object] Node selector labels for all pods.
   ## @param global.scheduling.affinity [object] Affinity rules for all pods.
   ## @param global.scheduling.tolerations [array] Tolerations applied to all pods.
+  ## @param global.scheduling.priorityClassName [string] PriorityClass for every pod this chart renders (app, workers, nlp, langevals, cronjobs, and the bundled postgresql/redis). Set a per-component priorityClassName to override. Bundled SUBCHARTS (gateway, langyagent, clickhouse) manage their own scheduling and are not covered.
   scheduling:
     nodeSelector: {}
     affinity: {}
     tolerations: []
+    # Names an existing PriorityClass so the scheduler preempts less important
+    # workloads rather than leaving LangWatch pods Pending when a node fills
+    # up. The class must already exist in the cluster — the chart does not
+    # create one, since a PriorityClass is cluster-scoped and its value only
+    # means anything relative to the other classes an operator has defined.
+    priorityClassName: ""
 
 # =============================================================================
 # Auto-Generation Mode (Development Only)
@@ -106,21 +143,21 @@ images:
   ## @param images.app.pullPolicy [string] App image pull policy.
   app:
     repository: langwatch/langwatch
-    tag: 3.5.0 # x-release-please-version
+    tag: 3.13.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langwatch_nlp.repository [string] NLP image repository (Go nlpgo binary, published as langwatch_nlp).
   ## @param images.langwatch_nlp.tag [string] NLP image tag.
   ## @param images.langwatch_nlp.pullPolicy [string] NLP image pull policy.
   langwatch_nlp:
     repository: langwatch/langwatch_nlp
-    tag: 3.5.0 # x-release-please-version
+    tag: 3.13.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langevals.repository [string] Langevals image repository.
   ## @param images.langevals.tag [string] Langevals image tag.
   ## @param images.langevals.pullPolicy [string] Langevals image pull policy.
   langevals:
     repository: langwatch/langevals
-    tag: 3.5.0 # x-release-please-version
+    tag: 3.13.0 # x-release-please-version
     pullPolicy: IfNotPresent
 
 # =============================================================================
@@ -142,12 +179,22 @@ app:
   ## @param app.replicaCount [default: 1] Number of application replicas.
   replicaCount: 1
 
+  # Shutdown budget — same shape and the same rule as workers.* below. The app
+  # shares the workers' entrypoint watchdog and can host the worker stack
+  # itself (the `all` process role), so it is sized the same way. A web-only
+  # pod drains in well under this; the grace period is a ceiling, not a wait.
+  ## @param app.shutdownDrainSeconds [default: 25] Seconds the queue may spend draining in-flight jobs on shutdown.
+  shutdownDrainSeconds: 25
+  ## @param app.terminationGracePeriodSeconds [default: 55] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.
+  terminationGracePeriodSeconds: 55
+
   # Kubernetes service configuration
   # See: https://kubespec.dev/v1/Service
   ## @extra app.service Service configuration for the app.
   ## @param app.service.type [string, default: ClusterIP] Service type.
   ## @param app.service.port [default: 5560] Service port.
-  service: { type: ClusterIP, port: 5560 }
+  ## @param app.service.annotations [object] Additional Service annotations. Required for cloud load-balancer configuration (AWS NLB scheme/subnets, GCP internal LB, ingress-controller hints) — those controllers are driven entirely by annotations, so without this a `type: LoadBalancer` install cannot be steered at all.
+  service: { type: ClusterIP, port: 5560, annotations: {} }
 
   # Resource requirements and limits for the application pods
   # See: https://kubespec.dev/v1/Pod#spec.containers.resources
@@ -209,6 +256,16 @@ app:
     # chart-default installs boot past the post-#3541 required-env validation.
     langwatchEndpoint: ""
 
+  # Base URL for content-hashed frontend assets (JS/CSS chunks). Empty (default)
+  # serves them same-origin straight from the pod, exactly as before. Set to a
+  # commit-prefixed CDN base — e.g. "https://cdn.langwatch.ai/git-<short-sha>/" — so
+  # a rolling deploy never strands a browser on a 404: every past build's assets
+  # remain under their own immutable prefix. The deploy pipeline both uploads
+  # dist/client/assets to that prefix and sets this value for the same SHA. See
+  # ADR-086. Rendered into the LANGWATCH_ASSET_BASE env var when non-empty.
+  ## @param app.assetBase [string, default: ""] CDN base URL for content-hashed assets; empty = serve same-origin from the pod.
+  assetBase: ""
+
   # Feature flags to enable/disable specific functionality
   ## @extra app.features Feature flags for the app.
   ## @param app.features.skipEnvValidation [default: false] Skip env var validation (dev only).
@@ -269,12 +326,15 @@ app:
   # Controls how LangWatch stores and manages training datasets
   ## @extra app.dataplane Object storage configuration for datasets.
   ## @param app.dataplane.enabled [default: false] Enable dataset object storage.
-  ## @param app.dataplane.provider [string, default: awsS3] Object storage provider.
-  ## @param app.dataplane.bucket [string, default: langwatch-dataset] Bucket name for datasets.
+  ## @param app.dataplane.provider [string, default: awsS3] Object storage provider. Options: awsS3, azureBlob.
+  ## @param app.dataplane.bucket [string, default: langwatch-dataset] Bucket name for datasets (awsS3 provider).
   dataplane:
     enabled: false
-    # Storage provider to use. Options: awsS3 (default)
-    # When set to 'awsS3', enables AWS S3 native integration
+    # Storage provider to use. Options: awsS3 (default), azureBlob.
+    # When set to 'awsS3', enables AWS S3 native integration.
+    # When set to 'azureBlob', enables Azure Blob Storage (STORED_OBJECTS_BACKEND=azure,
+    # AC37 / issue #4133) — shared key or a Microsoft Entra identity, selected
+    # by providers.azureBlob.authMode; mirrors the awsS3 shape.
     provider: awsS3
     bucket: "langwatch-dataset" # Bucket name for dataset storage
 
@@ -304,6 +364,100 @@ app:
           ## @param app.dataplane.providers.awsS3.keySalt.secretKeyRef [object] Secret ref for optional key salt.
           secretKeyRef: { name: "", key: "" }
 
+      # Azure Blob Storage configuration for dataset + stored-objects storage
+      # (AC37, issue #4133). Shared key or a Microsoft Entra identity, selected
+      # by authMode below (#6087). Per-project Azure BYOC is still #6088.
+      ## @extra app.dataplane.providers.azureBlob Azure Blob provider configuration.
+      ## @param app.dataplane.providers.azureBlob.accountName.value [string] Azure Storage account name (not recommended in production — use accountName.secretKeyRef).
+      ## @param app.dataplane.providers.azureBlob.accountKey.value [string] Azure Storage account key (not recommended in production — use accountKey.secretKeyRef).
+      ## @param app.dataplane.providers.azureBlob.container.value [string] Azure Blob container name (not recommended in production — use container.secretKeyRef).
+      azureBlob:
+        # How the app authenticates to Azure Blob. Explicit — never inferred
+        # from which values happen to be filled in (issue #6087).
+        #   sharedKey        the storage account key. Requires accountKey below.
+        #                    Unusable when the account sets
+        #                    allowSharedKeyAccess=false, which many enterprises
+        #                    enforce by policy.
+        #   workloadIdentity AKS workload identity. No key anywhere. Requires
+        #                    global.serviceAccount with the client-id
+        #                    annotation, and the pod label
+        #                    azure.workload.identity/use: "true".
+        #   managedIdentity  IMDS — Azure VM / VMSS / App Service.
+        #   azureCli         a developer's signed-in CLI. Local use only.
+        # Grant the identity "Storage Blob Data Contributor" on the account or
+        # container; the control-plane "Contributor" role does NOT grant data
+        # access.
+        ## @param app.dataplane.providers.azureBlob.authMode [string, default: sharedKey] Azure authentication mode: sharedKey, workloadIdentity, managedIdentity, or azureCli.
+        authMode: sharedKey
+        accountName:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.accountName.secretKeyRef [object] Secret ref for the Azure Storage account name.
+          secretKeyRef: { name: "", key: "" }
+        accountKey:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.accountKey.secretKeyRef [object] Secret ref for the Azure Storage account key.
+          secretKeyRef: { name: "", key: "" }
+        container:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.container.secretKeyRef [object] Secret ref for the Azure Blob container name.
+          secretKeyRef: { name: "", key: "" }
+        ## @param app.dataplane.providers.azureBlob.spoolRetentionConfirmed [boolean] Confirms the container has a lifecycle rule deleting `trace-blobs/spool/` blobs after 3 days. The ADR-022 trace spool refuses to write to Azure until this is true, because a crash between the spool write and its delete is bounded only by that rule and the app cannot verify a management-plane policy with a data-plane key. Leave false unless you have created the policy.
+        spoolRetentionConfirmed: false
+        # Optional. Override the blob endpoint for sovereign clouds
+        # (*.usgovcloudapi.net, *.chinacloudapi.cn), private endpoints, or an
+        # emulator. Defaults to https://{accountName}.blob.core.windows.net.
+        ## @param app.dataplane.providers.azureBlob.endpoint.value [string] Custom Azure Blob endpoint base URL.
+        endpoint:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.endpoint.secretKeyRef [object] Secret ref for a custom Azure Blob endpoint.
+          secretKeyRef: { name: "", key: "" }
+        # Sovereign clouds (Azure Government, Azure China) issue tokens from a
+        # different identity authority and may use a different storage
+        # audience. Required alongside a non-public endpoint in any
+        # identity-based authMode — the app refuses to guess, because asking
+        # the public-cloud issuer for a sovereign token fails confusingly.
+        ## @param app.dataplane.providers.azureBlob.authorityHost.value [string] Entra authority host for sovereign clouds.
+        authorityHost:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.authorityHost.secretKeyRef [object] Secret ref for the identity authority host.
+          secretKeyRef: { name: "", key: "" }
+        ## @param app.dataplane.providers.azureBlob.tokenAudience.value [string] Storage token audience override for sovereign clouds.
+        tokenAudience:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.tokenAudience.secretKeyRef [object] Secret ref for the storage token audience.
+          secretKeyRef: { name: "", key: "" }
+
+      # Migration aid: when provider is azureBlob, the chart still emits the
+      # S3 read config below if it is populated, so legacy s3:// objects
+      # (stored-objects, trace spool, staged payloads) written before the
+      # switch stay readable. New writes go to Azure. Leave empty on a
+      # greenfield Azure install.
+      ## @param app.dataplane.legacyS3ReadBucket [string] Existing S3 bucket to keep reading during an S3->Azure migration.
+    legacyS3ReadBucket: ""
+
+    # Mirror of legacyS3ReadBucket for the Azure->S3 direction. Set true when
+    # moving writes back to S3 while objects written to Azure must stay
+    # readable: the Azure connection settings under providers.azureBlob keep
+    # being emitted, but STORED_OBJECTS_BACKEND does not, so new writes go to
+    # S3 and historical azure-blob:// URIs still resolve. Leave false unless
+    # Azure objects exist.
+    #
+    # SCOPE — this covers URI-addressed STORED OBJECTS only (externalized byte
+    # content, trace payloads, staged uploads): each one carries an
+    # `azure-blob://` URI whose scheme picks the driver, so a read re-derives
+    # its own provider regardless of the write toggle.
+    #
+    # It does NOT cover DATASET chunks. Those are addressed by
+    # {projectId, datasetId, index} with no provider recorded on the row, so
+    # dataset reads follow the CURRENT toggle and cannot reach chunks written
+    # to Azure. Switching a deployment that already has datasets makes them
+    # unreachable (not deleted — reachable again if the toggle is reverted).
+    # A migration that carries datasets needs per-dataset storage provenance,
+    # tracked in #6323. Do not use this flag on an install with datasets until
+    # that lands.
+    ## @param app.dataplane.legacyAzureRead [default: false] Keep Azure settings for reads after moving writes back to S3.
+    legacyAzureRead: false
+
   # Stored Objects - externalized byte content (audio, image, PDF, document).
   # By default, uses a local-filesystem PVC so the chart works plug-and-play
   # for single-replica installs. Operators running horizontally-scaled
@@ -323,17 +477,22 @@ app:
       storageClassName: ""
 
   # Email notification configuration
-  # Enables sending alerts and notifications via email
+  # Naming a provider is what turns email on, so there is one switch rather
+  # than a toggle and a name that can disagree with each other.
   ## @extra app.email Email provider configuration.
-  ## @param app.email.enabled [default: false] Enable email notifications.
   ## @param app.email.defaultFrom [string] Default "from" address.
-  ## @param app.email.provider [string, default: sendgrid] Email provider.
+  ## @param app.email.provider [string] Email provider. Empty sends no email.
   email:
-    enabled: false
     defaultFrom: ""
-    # Email provider to use. Options: sendgrid (default)
-    # When set to 'sendgrid', enables SendGrid integration
-    provider: sendgrid
+    # Gateway to send through: sendgrid, ses, smtp or resend. Leave empty and
+    # LangWatch sends no email at all.
+    # Use 'smtp' for an internal relay, Azure Communication Services, Office 365,
+    # Postmark, Mailgun or any other gateway that speaks SMTP.
+    # Deployments whose only egress is a corporate proxy can set HTTPS_PROXY and
+    # NO_PROXY through app.extraEnvs; every gateway that calls a vendor API over
+    # HTTPS routes through it. Only smtp ignores them, on purpose, because an
+    # internal relay is reached directly.
+    provider: ""
 
     providers:
       ## @extra app.email.providers.sendgrid Sendgrid provider configuration.
@@ -344,6 +503,70 @@ app:
           ## @param app.email.providers.sendgrid.apiKey.secretKeyRef [object] Secret ref for SendGrid API key.
           secretKeyRef: { name: "", key: "" }
 
+      ## @extra app.email.providers.ses AWS SES provider configuration.
+      ## @param app.email.providers.ses.region [string] AWS region for SES.
+      ## @param app.email.providers.ses.endpoint [string] Override the SES endpoint (VPC endpoint or egress relay).
+      ses:
+        region: ""
+        endpoint: ""
+
+      ## @extra app.email.providers.smtp SMTP relay configuration.
+      ## @param app.email.providers.smtp.url.value [string] Full SMTP connection URL. Takes precedence over the discrete settings.
+      ## @param app.email.providers.smtp.host [string] SMTP host, when not using a URL.
+      ## @param app.email.providers.smtp.port [string] SMTP port. Defaults to 587.
+      ## @param app.email.providers.smtp.secure [string] Force implicit TLS ("true") or STARTTLS ("false"). Defaults to true on port 465.
+      ## @param app.email.providers.smtp.user [string] Username. Omit for an unauthenticated internal relay.
+      smtp:
+        url:
+          value: ""
+          ## @param app.email.providers.smtp.url.secretKeyRef [object] Secret ref for the SMTP URL.
+          secretKeyRef: { name: "", key: "" }
+        host: ""
+        port: ""
+        secure: ""
+        user: ""
+        ## @param app.email.providers.smtp.password.value [string] SMTP password.
+        password:
+          value: ""
+          ## @param app.email.providers.smtp.password.secretKeyRef [object] Secret ref for the SMTP password.
+          secretKeyRef: { name: "", key: "" }
+
+      ## @extra app.email.providers.resend Resend provider configuration.
+      ## @param app.email.providers.resend.apiKey.value [string] Resend API key.
+      resend:
+        apiKey:
+          value: ""
+          ## @param app.email.providers.resend.apiKey.secretKeyRef [object] Secret ref for the Resend API key.
+          secretKeyRef: { name: "", key: "" }
+
+  # Enterprise license, applied to the whole instance.
+  #
+  # Leave empty to run the open source edition: unlimited people, projects,
+  # teams and history, with no license needed. A license adds the enterprise
+  # security surface (SSO, SCIM provisioning, audit logs) and support.
+  # See https://docs.langwatch.ai/self-hosting/licensing
+  #
+  # The alternative to setting it here is activating the same key per
+  # organization in Settings > License, which suits a single-tenant install
+  # but has to be repeated for every organization the instance hosts.
+  ## @extra app.license Enterprise license configuration.
+  ## @param app.license.key.value [string] License key issued by LangWatch.
+  ## @param app.license.key.secretKeyRef [object] Secret ref holding the license key.
+  ## @param app.license.publicKey.value [string] Verification key, only for a private signing chain.
+  ## @param app.license.publicKey.secretKeyRef [object] Secret ref holding the verification key.
+  license:
+    key:
+      value: ""
+      secretKeyRef: { name: "", key: "" }
+    # Overrides the built-in verification key. Almost no deployment sets this:
+    # it exists for installs that LangWatch issues licenses to from a separate
+    # signing chain. Replacing this key does not grant an Enterprise License,
+    # and a key that verifies only against a replaced value is not one; see
+    # platform/app/ee/LICENSE.md.
+    publicKey:
+      value: ""
+      secretKeyRef: { name: "", key: "" }
+
   # NextAuth.js authentication configuration
   # Handles user authentication and session management
   # Note: publicUrl is automatically used from http.publicUrl
@@ -351,14 +574,16 @@ app:
   ## @param app.nextAuth.provider [string, default: email] Default auth provider.
   ## @param app.nextAuth.secret.value [string] NextAuth secret value (not recommended inline for production).
   nextAuth:
-    # Authentication provider to use. Options: email (default), google, github, gitlab, azureAd, cognito, okta
-    # When set to 'email', enables email-based authentication
-    # When set to 'google', enables Google OAuth integration
-    # When set to 'github', enables GitHub OAuth integration
-    # When set to 'gitlab', enables GitLab OAuth integration
-    # When set to 'azureAd', enables Azure Active Directory OAuth integration
-    # When set to 'cognito', enables AWS Cognito OAuth integration
-    # When set to 'okta', enables Okta OAuth integration
+    # Authentication provider to use. This value is passed to the app verbatim
+    # as NEXTAUTH_PROVIDER, so it has to be one the app recognises:
+    #   email (default), google, github, gitlab, azure-ad, auth0, okta,
+    #   cognito, onelogin, oidc
+    # Note that Azure AD is 'azure-ad' here while its credentials live under
+    # providers.azureAd below — the first is the app's provider id, the second
+    # is this chart's key for the AZURE_AD_* variables.
+    # A value the app does not recognise, or one whose credentials are missing,
+    # starts the deployment in email mode rather than leaving it unsignable.
+    # Every provider except email needs an Enterprise license to take effect.
     provider: email
     secret:
       value: ""
@@ -370,9 +595,6 @@ app:
     providers:
       # Auth0 OAuth integration
       ## @extra app.nextAuth.providers.auth0 Auth0 OAuth configuration.
-      ## @param app.nextAuth.providers.auth0.clientId.value [string] Auth0 client ID.
-      ## @param app.nextAuth.providers.auth0.clientSecret.value [string] Auth0 client secret.
-      ## @param app.nextAuth.providers.auth0.issuer.value [string] Auth0 issuer URL.
       auth0:
         clientId:
           ## @param app.nextAuth.providers.auth0.clientId.value [string] Auth0 client ID.
@@ -421,6 +643,9 @@ app:
           ## @param app.nextAuth.providers.cognito.clientSecret.secretKeyRef [object] Secret ref for Cognito client secret.
           secretKeyRef: { name: "", key: "" }
         issuer:
+          # The user pool's issuer, https://cognito-idp.<region>.amazonaws.com/<userPoolId>,
+          # not the hosted-UI domain. The hosted-UI endpoints are read from the
+          # issuer's discovery document.
           ## @param app.nextAuth.providers.cognito.issuer.value [string] Cognito issuer URL.
           value: ""
           ## @param app.nextAuth.providers.cognito.issuer.secretKeyRef [object] Secret ref for Cognito issuer URL.
@@ -481,6 +706,44 @@ app:
           ## @param app.nextAuth.providers.okta.issuer.value [string] Okta issuer URL.
           value: ""
           ## @param app.nextAuth.providers.okta.issuer.secretKeyRef [object] Secret ref for Okta issuer URL.
+          secretKeyRef: { name: "", key: "" }
+      # OneLogin OAuth integration
+      ## @extra app.nextAuth.providers.onelogin OneLogin OAuth configuration.
+      onelogin:
+        clientId:
+          ## @param app.nextAuth.providers.onelogin.clientId.value [string] OneLogin client ID.
+          value: ""
+          ## @param app.nextAuth.providers.onelogin.clientId.secretKeyRef [object] Secret ref for OneLogin client ID.
+          secretKeyRef: { name: "", key: "" }
+        clientSecret:
+          ## @param app.nextAuth.providers.onelogin.clientSecret.value [string] OneLogin client secret.
+          value: ""
+          ## @param app.nextAuth.providers.onelogin.clientSecret.secretKeyRef [object] Secret ref for OneLogin client secret.
+          secretKeyRef: { name: "", key: "" }
+        issuer:
+          # https://<subdomain>.onelogin.com/oidc/2
+          ## @param app.nextAuth.providers.onelogin.issuer.value [string] OneLogin issuer URL.
+          value: ""
+          ## @param app.nextAuth.providers.onelogin.issuer.secretKeyRef [object] Secret ref for OneLogin issuer URL.
+          secretKeyRef: { name: "", key: "" }
+      # Any other OpenID Connect provider, configured by issuer alone
+      ## @extra app.nextAuth.providers.oidc Generic OpenID Connect configuration.
+      oidc:
+        clientId:
+          ## @param app.nextAuth.providers.oidc.clientId.value [string] OIDC client ID.
+          value: ""
+          ## @param app.nextAuth.providers.oidc.clientId.secretKeyRef [object] Secret ref for OIDC client ID.
+          secretKeyRef: { name: "", key: "" }
+        clientSecret:
+          ## @param app.nextAuth.providers.oidc.clientSecret.value [string] OIDC client secret.
+          value: ""
+          ## @param app.nextAuth.providers.oidc.clientSecret.secretKeyRef [object] Secret ref for OIDC client secret.
+          secretKeyRef: { name: "", key: "" }
+        issuer:
+          # Whatever your provider publishes .well-known/openid-configuration under.
+          ## @param app.nextAuth.providers.oidc.issuer.value [string] OIDC issuer URL.
+          value: ""
+          ## @param app.nextAuth.providers.oidc.issuer.secretKeyRef [object] Secret ref for OIDC issuer URL.
           secretKeyRef: { name: "", key: "" }
 
   # Telemetry and monitoring configuration
@@ -569,11 +832,42 @@ app:
     strategy: {}
     ## @param app.deployment.revisionHistoryLimit [default: 10] Number of old replicasets to retain.
     revisionHistoryLimit: 10
+  # Release flags this install forces ON, comma-separated, regardless of the
+  # flag store. Reach for it to switch on a feature that ships dark by default;
+  # the flag keys are listed in the app's /ops/feature-flags screen. Forcing a
+  # flag on here also means it cannot be turned off from that screen — the env
+  # var wins — so prefer the store for anything you want to toggle later.
+  # The Langy assistant appends its own key here when the agent is deployed;
+  # see the langyagent section at the bottom of this file.
+  ## @param app.featureFlagForceEnable [string, default: ""] Comma-separated feature flag keys to force on for this install.
+  featureFlagForceEnable: ""
+
+  # PriorityClass for the app pods, overriding global.scheduling.priorityClassName.
+  # See: https://kubespec.dev/v1/Pod#spec.priorityClassName
+  ## @param app.scratchSizeLimit [string, default: 1Gi] Size cap for the writable scratch emptyDirs the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node and taking its neighbours with it.
+  scratchSizeLimit: 1Gi
+  ## @param app.priorityClassName [string] PriorityClass for app pods (overrides global.scheduling.priorityClassName).
+  priorityClassName: ""
+
   # Additional Kubernetes resources
   # Extra environment variables
   # See: https://kubespec.dev/v1/Pod#spec.containers.env
   ## @param app.extraEnvs [array] Additional environment variables for app container.
   extraEnvs: []
+  # Bulk-import environment variables from existing ConfigMaps or Secrets.
+  # Entries are rendered verbatim into the container's `envFrom`, so each one
+  # is a `configMapRef` or `secretRef`. Use this when the operator's own
+  # tooling (External Secrets, SOPS, Terraform, Vault Agent) already
+  # materialises a Secret holding the app's configuration — listing every key
+  # under extraEnvs instead would mean re-declaring it here and keeping the
+  # two in sync by hand.
+  #
+  # Note: values arriving via envFrom are NOT available for `$(VAR)`
+  # interpolation in other env entries — Kubernetes only expands names defined
+  # in `env`. Anything referenced that way must stay in extraEnvs.
+  # See: https://kubespec.dev/v1/Pod#spec.containers.envFrom
+  ## @param app.extraEnvFrom [array] Additional envFrom sources (configMapRef/secretRef) for the app container.
+  extraEnvFrom: []
   # Additional containers in the pod
   # See: https://kubespec.dev/v1/Pod#spec.containers
   ## @param app.extraContainers [array] Additional sidecar containers.
@@ -619,6 +913,24 @@ workers:
   # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
   ## @param workers.replicaCount [default: 1] Number of worker replicas.
   replicaCount: 1
+
+  # Shutdown budget. shutdownDrainSeconds is how long the GroupQueue may wait
+  # for in-flight jobs to finish their ClickHouse writes; it must match the
+  # app's own SHUTDOWN_DRAIN_TIMEOUT_MS, which the chart sets from this value.
+  #
+  # terminationGracePeriodSeconds is the kubelet's SIGKILL clock and must cover
+  # the drain plus 5s for App.close, 15s for process teardown and 10s of
+  # kubelet slack — so at least shutdownDrainSeconds + 30. Because it is set
+  # here, raising shutdownDrainSeconds alone always fails the render: raise
+  # both together. The chart refuses rather than installing a release the
+  # kubelet kills mid-drain. Both must be whole numbers of seconds greater
+  # than zero — a quoted or fractional value is rejected, because Helm's `int`
+  # would silently turn it into a zero budget.
+  # See: https://kubespec.dev/v1/Pod#spec.terminationGracePeriodSeconds
+  ## @param workers.shutdownDrainSeconds [default: 25] Seconds the queue may spend draining in-flight jobs on shutdown.
+  shutdownDrainSeconds: 25
+  ## @param workers.terminationGracePeriodSeconds [default: 55] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.
+  terminationGracePeriodSeconds: 55
 
   # Resource requirements for worker pods
   # Workers are CPU/memory intensive for processing evaluations and trace collection
@@ -690,9 +1002,19 @@ workers:
     strategy: {}
     ## @param workers.deployment.revisionHistoryLimit [default: 10] Number of old replicasets to retain.
     revisionHistoryLimit: 10
+  # PriorityClass for the worker pods, overriding global.scheduling.priorityClassName.
+  # See: https://kubespec.dev/v1/Pod#spec.priorityClassName
+  ## @param workers.scratchSizeLimit [string, default: 1Gi] Size cap for the writable scratch emptyDirs the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node and taking its neighbours with it.
+  scratchSizeLimit: 1Gi
+  ## @param workers.priorityClassName [string] PriorityClass for worker pods (overrides global.scheduling.priorityClassName).
+  priorityClassName: ""
   # Additional Kubernetes resources
   ## @param workers.extraEnvs [array] Additional environment variables.
   extraEnvs: []
+  # See app.extraEnvFrom.
+  # See: https://kubespec.dev/v1/Pod#spec.containers.envFrom
+  ## @param workers.extraEnvFrom [array] Additional envFrom sources (configMapRef/secretRef) for the workers container.
+  extraEnvFrom: []
   ## @param workers.extraContainers [array] Additional sidecar containers.
   extraContainers: []
   ## @param workers.extraVolumes [array] Additional pod volumes.
@@ -712,6 +1034,18 @@ workers:
 # used to sandbox user code blocks. The published image is named langwatch_nlp.
 ## @section NLP service
 langwatch_nlp:
+  # Deploy the NLP service as part of this release. Turn it off when the
+  # service is run outside the chart — a shared instance for several releases,
+  # or a serverless deployment — and point app.upstreams.nlp / workers at that
+  # address instead. Disabling stops the chart rendering the Deployment, the
+  # Service AND the PodDisruptionBudget — so an external instance is no longer
+  # covered by this release's disruption protection either, and needs its own
+  # wherever it runs. The app still expects to reach an NLP service somewhere,
+  # so an install with this off and no upstream override fails at runtime, not
+  # at render time.
+  ## @param langwatch_nlp.enabled [default: true] Deploy the NLP service (Deployment, Service and PDB).
+  enabled: true
+
   # Number of NLP service replicas
   # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
   ## @param langwatch_nlp.replicaCount [default: 1] Number of NLP service replicas.
@@ -812,6 +1146,10 @@ langwatch_nlp:
   # Additional Kubernetes resources
   # Extra environment variables
   # See: https://kubespec.dev/v1/Pod#spec.containers.env
+  ## @param langwatch_nlp.scratchSizeLimit [string, default: 1Gi] Size cap for the writable scratch emptyDirs the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node and taking its neighbours with it.
+  scratchSizeLimit: 1Gi
+  ## @param langwatch_nlp.priorityClassName [string] PriorityClass for NLP pods (overrides global.scheduling.priorityClassName).
+  priorityClassName: ""
   ## @param langwatch_nlp.extraEnvs [array] Additional environment variables.
   extraEnvs: []
   # Additional containers in the pod
@@ -843,6 +1181,15 @@ langwatch_nlp:
 # This service handles model evaluation, testing, and quality assessment
 ## @section Langevals service
 langevals:
+  # Deploy the evaluations service as part of this release. Same shape as
+  # langwatch_nlp.enabled: turn it off to point at a shared or externally-run
+  # instance via app.upstreams.langevals. Disabling stops the chart rendering
+  # the Deployment, the Service AND the PodDisruptionBudget. Evaluators that
+  # call this service will fail at runtime if it is disabled without an
+  # upstream override.
+  ## @param langevals.enabled [default: true] Deploy the evaluations service (Deployment, Service and PDB).
+  enabled: true
+
   # Number of evaluation service replicas
   # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
   ## @param langevals.replicaCount [default: 1] Number of Langevals replicas.
@@ -857,6 +1204,13 @@ langevals:
 
   # Resource requirements for evaluation tasks
   # Higher memory requirements due to model loading and evaluation
+  #
+  # The CPU limit here also sizes the service's worker pool, via the CPU_COUNT
+  # the chart derives from it: each worker loads its own copy of every local
+  # model it serves (~2.1Gi), so memory scales with the pool. Raise the CPU and
+  # the memory together, or pin the pool with a CPU_COUNT of your own in
+  # extraEnvs. See langwatch.langevals.cpuCount in templates/_helpers.tpl.
+  #
   # See: https://kubespec.dev/v1/Pod#spec.containers.resources
   ## @extra langevals.resources Resource requests and limits.
   ## @param langevals.resources.requests.cpu [string, default: 1000m] Requested CPU.
@@ -934,6 +1288,10 @@ langevals:
   # Additional Kubernetes resources
   # Extra environment variables
   # See: https://kubespec.dev/v1/Pod#spec.containers.env
+  ## @param langevals.scratchSizeLimit [string, default: 2Gi] Size cap for the writable scratch emptyDirs the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node and taking its neighbours with it.
+  scratchSizeLimit: 2Gi
+  ## @param langevals.priorityClassName [string] PriorityClass for Langevals pods (overrides global.scheduling.priorityClassName).
+  priorityClassName: ""
   ## @param langevals.extraEnvs [array] Additional environment variables.
   extraEnvs: []
   # Additional containers in the pod
@@ -968,6 +1326,10 @@ cronjobs:
   # Enable or disable all cron jobs
   ## @param cronjobs.enabled [default: true] Enable all cron jobs.
   enabled: true
+  ## @param cronjobs.priorityClassName [string] PriorityClass for cronjobs pods (overrides global.scheduling.priorityClassName).
+  priorityClassName: ""
+  ## @param cronjobs.scratchSizeLimit [string, default: 1Gi] Size cap for the writable scratch emptyDirs the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node and taking its neighbours with it.
+  scratchSizeLimit: 1Gi
   ## @param cronjobs.labels [object] Additional labels for CronJob resources.
   labels: {}
 
@@ -1125,6 +1487,36 @@ ingress:
   # See: https://kubespec.dev/networking.k8s.io/v1/Ingress#metadata.annotations
   ## @param ingress.annotations [object] Additional ingress annotations.
   annotations: {}
+
+  # Extra labels applied to the Ingress and to the blackhole Service that backs
+  # ingress.blockedPaths. Merged on top of the chart's standard label set.
+  # See: https://kubespec.dev/networking.k8s.io/v1/Ingress#metadata.labels
+  ## @param ingress.labels [object] Additional labels for the Ingress and its blackhole Service.
+  labels: {}
+
+  # Path prefixes this ingress must never route to the app. Everything under
+  # `/api/internal/*` is the private control plane (Langy + AI-gateway callbacks,
+  # shared-secret gated), and the app's catch-all `/` would otherwise publish it.
+  #
+  # Each prefix is routed to a Service with no endpoints, so the controller has
+  # nowhere to forward the request (503 on ingress-nginx). In-cluster callers use
+  # the internal Service and are unaffected. The chart refuses to render a config
+  # that would defeat the block — an `ingress.hosts` path nested under a prefix,
+  # or a malformed prefix — rather than shipping one that only looks protected.
+  #
+  # This covers THIS ingress only, not the app: an install that publishes the app
+  # another way needs its own restriction. To disable, set `[]` in a values file
+  # or `--set-json` (plain `--set` assigns a string and is rejected).
+  #
+  # `/api/cron`, `/metrics` and `/api/ops` are internal-only in the default
+  # topology but are NOT blocked by default — some installs drive cron
+  # externally, federate metrics, or run ops tooling from outside. Add them here
+  # if yours does not.
+  #
+  # Full operator guide, including the AWS/GKE caveat: docs/self-hosting/security
+  ## @param ingress.blockedPaths [array] Path prefixes this ingress hard-blocks by routing them to a no-endpoints blackhole Service. Defaults to ["/api/internal"], the private control-plane surface. Set to an empty list to disable.
+  blockedPaths:
+    - /api/internal
 
   # Host configurations for routing
   # See: https://kubespec.dev/networking.k8s.io/v1/Ingress#spec.rules
@@ -1292,6 +1684,21 @@ prometheus:
 # Primary database for LangWatch application data
 ## @section PostgreSQL
 postgresql:
+  ## @extra postgresql.podSecurityContext Pod security context overrides.
+  ## @param postgresql.podSecurityContext [object] Layered over the image's own uid 999 base (runAsUser/runAsGroup/fsGroup, runAsNonRoot, RuntimeDefault seccomp). Keys you omit keep their hardened default.
+  podSecurityContext: {}
+  ## @param postgresql.containerSecurityContext [object] Container security context overrides. Layered over global.containerSecurityContext; keys you omit keep their hardened default.
+  containerSecurityContext: {}
+  ## @param postgresql.nodeSelector [object] Node selector. Falls back to global.scheduling.nodeSelector.
+  nodeSelector: {}
+  ## @param postgresql.tolerations [array] Tolerations. Falls back to global.scheduling.tolerations.
+  tolerations: []
+  ## @param postgresql.affinity [object] Affinity rules. Falls back to global.scheduling.affinity.
+  affinity: {}
+  ## @param postgresql.priorityClassName [string] PriorityClass for postgresql pods (overrides global.scheduling.priorityClassName).
+  priorityClassName: ""
+  ## @param postgresql.scratchSizeLimit [string, default: 1Gi] Size cap for the writable scratch emptyDirs (socket dir, /tmp) the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node.
+  scratchSizeLimit: 1Gi
   # Whether to manage PostgreSQL via this chart or use external instance
   ## @param postgresql.chartManaged [default: true] Manage PostgreSQL via this chart.
   chartManaged: true
@@ -1494,6 +1901,21 @@ clickhouse:
 # In-memory data store for caching and session management
 ## @section Redis
 redis:
+  ## @extra redis.podSecurityContext Pod security context overrides.
+  ## @param redis.podSecurityContext [object] Layered over the image's own uid 999 base (runAsUser/runAsGroup/fsGroup, runAsNonRoot, RuntimeDefault seccomp). Keys you omit keep their hardened default.
+  podSecurityContext: {}
+  ## @param redis.containerSecurityContext [object] Container security context overrides. Layered over global.containerSecurityContext; keys you omit keep their hardened default.
+  containerSecurityContext: {}
+  ## @param redis.nodeSelector [object] Node selector. Falls back to global.scheduling.nodeSelector.
+  nodeSelector: {}
+  ## @param redis.tolerations [array] Tolerations. Falls back to global.scheduling.tolerations.
+  tolerations: []
+  ## @param redis.affinity [object] Affinity rules. Falls back to global.scheduling.affinity.
+  affinity: {}
+  ## @param redis.priorityClassName [string] PriorityClass for redis pods (overrides global.scheduling.priorityClassName).
+  priorityClassName: ""
+  ## @param redis.scratchSizeLimit [string, default: 1Gi] Size cap for the writable scratch emptyDirs (socket dir, /tmp) the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node.
+  scratchSizeLimit: 1Gi
   # Whether to manage Redis via this chart or use external instance
   ## @param redis.chartManaged [default: true] Manage Redis via this chart.
   chartManaged: true
@@ -1580,6 +2002,9 @@ gateway:
   ## @param gateway.publicUrl [string, default: ""] Externally-reachable URL of the AI Gateway (e.g. https://gateway.your-corp.com). The control plane hands this to CLI users (langwatch claude/codex/cursor) at login. REQUIRED for self-hosted CLI/agentic use: without it the CLI falls back to http://localhost:5563, which a developer laptop cannot reach against a remote cluster. Leave empty to auto-derive from gateway.ingress.host when you set your own host. Set LANGWATCH_GATEWAY_URL on the client to override per-user.
   publicUrl: ""
 
+  ## @param gateway.internalUrl [string, default: ""] URL the control plane itself uses to reach the gateway, from inside the cluster. Distinct from publicUrl, which is for browsers and laptops: an install with no gateway ingress still needs this, and Langy refuses every turn without it. Empty derives the Service this chart renders, so set it only for a gateway that lives outside this release or behind a mesh address.
+  internalUrl: ""
+
   # The gateway needs its OWN externally-reachable endpoint, separate from
   # the main app — point a second ingress / load balancer at gateway.ingress
   # below (the LLM clients hit the gateway, the browser hits the app). The
@@ -1590,9 +2015,9 @@ gateway:
   # PDB, SecurityContext) live in charts/gateway/values.yaml. Common
   # umbrella-level overrides below; everything else inherits.
 
-  ## @param gateway.controlPlane.baseUrl [string, default: http://langwatch-app:5560] URL the gateway uses to reach langwatch-app. Defaults assume release name `langwatch`.
+  ## @param gateway.controlPlane.baseUrl [string, default: ""] URL the gateway uses to reach the app. Empty resolves to this install's own app Service, `<release>-app:5560`. Set it for a control plane outside this install, or an app served on another port.
   controlPlane:
-    baseUrl: http://langwatch-app:5560
+    baseUrl: ""
 
   ## @param gateway.secrets.existingSecretName [string, default: langwatch-app-secrets] Name of the Secret the gateway pod mounts for LW_GATEWAY_INTERNAL_SECRET + LW_GATEWAY_JWT_SECRET. this release collapsed gateway-auth into the umbrella's app Secret so both langwatch-app and the gateway pod mount the SAME Secret. Default matches the autogen app-secret name when release name is `langwatch`. If you override the release name OR set `autogen.secretNames.app` / `secrets.existingSecret`, set this to the same Secret name so the gateway subchart bridges to it.
   secrets:
@@ -1628,29 +2053,80 @@ gateway:
 ## assistant. Internal-only (no ingress); the control plane reaches it over
 ## cluster DNS. The subchart defaults (image, probes, NetworkPolicy,
 ## SecurityContext, single-replica) live in charts/langyagent/values.yaml.
-## `langyagent.chartManaged: false` (the default) disables the agent and the
-## app's wiring to it; flip to true once the prerequisite secret + opt-in
-## steps are done (see docs/langy-github-app.md).
 ##
-## WHY default off: the agent + app Deployments both reference a `secretKeyRef`
-## to `langwatch-langyagent-auth` (created out-of-band — terraform / external-
-## secrets / a manual `kubectl create secret`). The umbrella chart does NOT
-## materialise that secret, so an upgrade with chartManaged=true on top of a
-## values file that hasn't been prepared yields `CreateContainerConfigError`
-## on the main app pod — turning an optional, dark-by-flag feature into a
-## blocker for every operator's next upgrade. Default-off keeps existing
-## installs unaffected; operators flip the switch when they're ready.
+## Langy ships ENABLED: a plain `helm install` deploys the agent, wires the app
+## and workers to it, and opens the assistant to the install's users. The shared
+## LANGY_INTERNAL_SECRET lands in the app Secret alongside the gateway's pair.
+## There is no out-of-band `kubectl create secret` step and no internal screen to
+## visit. What Langy still needs from you is a model to talk to: configure a model
+## provider for the project as you would for any other LangWatch feature.
+##
+## ISOLATION. The agent runs shell written by a language model, and the workers
+## hold the requesting user's credentials, so the controls that bound that are
+## on by DEFAULT and cost nothing: each conversation's worker runs under its own
+## UID with its own credentials, workers cannot read each other's, the per-worker
+## opencode password separates them, and the NetworkPolicy denies egress to the
+## internet unless you turn it on.
+##
+## Those are the controls that stop the attack that actually happens: a worker
+## reached by prompt injection through ingested data, using its own legitimate
+## access to exfiltrate. They work identically on every cluster.
+##
+## A sandboxed RuntimeClass (gvisor, Kata) is the rung ABOVE that: it protects
+## the node kernel from a worker that escapes its container, which needs a kernel
+## exploit on top of the injection. It is worth having, and it is deliberately
+## NOT the default here, because it behaves differently on every cluster (node
+## image, containerd version, runsc build) and a default we cannot test on your
+## nodes fails in ways that look like Langy being broken. Harden into it once,
+## on purpose, per the guide:
+##
+##   https://docs.langwatch.ai/self-hosting/langy/setup#hardening-a-sandboxed-runtime
+##
+##   langyagent:
+##     runtimeClassName: "gvisor"          # or your Kata class on AKS
+##     acceptUnsandboxedRuntime: false
+##
+## The install notes tell you which posture you got, and point at the guide when
+## your cluster already offers a sandboxed class you are not using.
+##
+## To not run Langy at all: langyagent.chartManaged: false removes the pod and
+## every reference to it.
 ## NOTE: hyphenated key — reference as (index .Values "langyagent") in templates.
 langyagent:
-  ## @param langyagent.chartManaged [default: false] Lift the Langy agent pod as part of this chart. Default off so existing upgrades aren't broken by the absent shared Secret; opt in once the LANGY_INTERNAL_SECRET secret is created out-of-band.
-  chartManaged: false
+  ## @param langyagent.chartManaged [default: true] Deploy the Langy agent pod as part of this chart, wire the app and workers to it, and open the assistant to this install. Set false to run without the assistant; the pod and every reference to it are removed on the next upgrade.
+  chartManaged: true
 
-  ## @param langyagent.controlPlane.agentUrl [string, default: http://<release>-langyagent:80] URL the app uses to reach the agent Service. Leave empty to auto-derive from the release name.
+  ## @param langyagent.runtimeClassName [string, default: ""] RuntimeClass for the agent pod. Empty runs on the node's normal runtime, which works on any cluster. Set it to a sandboxed class to harden ("gvisor", or your Kata class on AKS) and drop acceptUnsandboxedRuntime to false alongside it. See the hardening guide linked above.
+  runtimeClassName: ""
+
+  ## @param langyagent.acceptUnsandboxedRuntime [default: true] Accept running the agent without a pod-to-host sandbox. Default true so the chart installs and works on any cluster. Setting it false without also setting runtimeClassName is refused at render time, so a cluster that has hardened cannot silently lose its sandbox.
+  acceptUnsandboxedRuntime: true
+
+  ## @param langyagent.enableForAllUsers [default: true] Make Langy available to everyone in this install as soon as the agent is deployed. Set false to keep the rollout flag authoritative and open Langy to chosen projects/orgs from /ops/feature-flags instead — the staged path the hosted product uses.
+  enableForAllUsers: true
+
+  ## @param langyagent.controlPlane.agentUrl [string, default: http://<release>-langyagent:80] URL the app and workers use to reach the agent Service. Leave empty to auto-derive from the release name.
   controlPlane:
     agentUrl: ""
 
-  ## @param langyagent.secrets.existingSecretName [string, default: langwatch-langyagent-auth] Secret carrying LANGY_INTERNAL_SECRET, shared between the app and the agent pod. Created out-of-band (terraform / external-secrets); the umbrella chart does NOT materialise it.
-  ## @param langyagent.secrets.internalSecretKey [string, default: LANGY_INTERNAL_SECRET] Key inside the existing Secret that holds the shared internal secret.
+  ## @param langyagent.secrets.existingSecretName [string, default: the app Secret] Secret carrying LANGY_INTERNAL_SECRET, shared by the app, the workers, and the agent pod. Defaults to this chart's own app Secret, which materialises the key for you (generated when autogen.enabled, supplied by you otherwise — add LANGY_INTERNAL_SECRET to your existing Secret in that case). Point it elsewhere only if the value is managed by external-secrets or terraform.
+  ## @param langyagent.secrets.internalSecretKey [string, default: LANGY_INTERNAL_SECRET] Key inside that Secret holding the shared value.
   secrets:
-    existingSecretName: langwatch-langyagent-auth
+    existingSecretName: langwatch-app-secrets
     internalSecretKey: LANGY_INTERNAL_SECRET
+
+  # Watch Langy work with LangWatch itself. Point the mirror at one of your own
+  # projects and every Langy turn lands there as a trace: the model calls it
+  # made, the tools it ran, what each cost. Two steps, because only you can say
+  # which project: create an API key in that project, put it in a Secret, and
+  # name the Secret here. The endpoint resolves to this install automatically.
+  #
+  #   read -rsp "Mirror project API key: " KEY
+  #   kubectl -n <namespace> create secret generic langwatch-langyagent-mirror \
+  #     --from-env-file=/dev/stdin <<< "LANGY_MIRROR_TRACE_KEY=$KEY"; unset KEY
+  #
+  ## @param langyagent.mirror.existingSecretName [string, default: ""] Secret holding the mirror project's API key. Empty leaves the mirror off.
+  ## @param langyagent.mirror.traceEndpoint [string, default: ""] LangWatch base URL to mirror into. Empty means this install's own app Service; set it to mirror into a different deployment.
+  mirror:
+    existingSecretName: ""
+    traceEndpoint: ""

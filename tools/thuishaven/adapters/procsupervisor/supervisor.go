@@ -51,6 +51,16 @@ func (s Supervisor) RunOnce(ctx context.Context, name, dir, shell string, env []
 	return err
 }
 
+// WaitReady blocks until url answers non-5xx, logging under name so the wait is
+// visible in the same stream as the lanes. It is the same probe that gates a
+// child on its dependency, exposed for callers that are not a child themselves:
+// the play sandbox's seed ingest, which has to reach the stack it just started.
+func (s Supervisor) WaitReady(ctx context.Context, name, url string) bool {
+	c := proc{name: name, color: "90", isPlain: s.isPlain}
+	waitForReady(ctx, url, c.logln)
+	return ctx.Err() == nil
+}
+
 // RunOnceBounded is RunOnce plus a reaper: a background poll kills the whole
 // process group (the child owns its own group via Setpgid, same as every other
 // supervised child) if its total RSS or wall-clock time crosses limits. Reaping
@@ -228,7 +238,7 @@ func containsAny(value string, needles []string) bool {
 // superviseChild runs one child, restarting it (1s backoff) on exit until ctx
 // is cancelled, then SIGTERMs the process group and SIGKILLs after 5s.
 func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
-	c := proc{name: ac.Name, dir: ac.Dir, shell: ac.Shell, env: ac.Env, color: ac.Color, isPlain: s.isPlain, preview: s.recent}
+	c := proc{name: ac.Name, dir: ac.Dir, shell: ac.Shell, env: ac.Env, color: ac.Color, isPlain: s.isPlain, preview: s.recent, sink: newLogSink(ac.LogPath)}
 	// Gate the start on a dependency being ready (e.g. the web lane on the API),
 	// so this process — and the hostname routed to it — never comes up before what
 	// it needs is serving.
@@ -304,6 +314,9 @@ type proc struct {
 	env                     []string
 	isPlain                 bool
 	preview                 *recentLogs
+	// sink captures every line (timestamped) to the per-service log file the
+	// `haven logs` command reads — nil for one-shot lanes.
+	sink *logSink
 }
 
 func (c proc) command(ctx context.Context) *exec.Cmd {
@@ -332,6 +345,7 @@ func (c proc) stream(r io.Reader) {
 
 func (c proc) logln(line string) {
 	line = strings.TrimRight(line, "\n")
+	c.sink.writeLine(line)
 	if c.preview != nil {
 		c.preview.Lock()
 		c.preview.lines = append(c.preview.lines, fmt.Sprintf("%-8s │ %s", c.name, line))

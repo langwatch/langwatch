@@ -12,7 +12,7 @@ Feature: AI Gateway — Virtual Keys
   # (3) Integration-level VK-config persistence (fallback chain,
   #     trigger conditions, model aliases, ModelProvider linkage) —
   #     could bind once a tRPC router integration test is added under
-  #     langwatch/src/server/api/routers/__tests__/.
+  #     platform/app/src/server/api/routers/__tests__/.
   # All aspirational pending those harnesses.
 
   As a LangWatch user with gateway permissions
@@ -115,6 +115,24 @@ Feature: AI Gateway — Virtual Keys
     And the Anthropic fallback icon at 60% opacity after a "→" separator
     And hovering the chain exposes a tooltip reading "openai → anthropic"
 
+  @integration
+  Scenario: Virtual key list Routing column states its three modes
+    Given a key with a pinned routing policy, a key that falls back to any
+      provider, and a key that falls back nowhere
+    When I open the virtual keys list
+    Then the pinned key's Routing cell names its policy
+    And the falling-back key's cell reads "fallback"
+    And the third key's cell is the null glyph, with no wording around it
+
+  @integration
+  Scenario: Virtual key list shows a key's own budget under its month spend
+    Given a key with a $1.00 daily budget that has spent $0.50 today
+      and $2.50 across the month
+    When I open the virtual keys list
+    Then its Spent this month cell shows the month total
+    And a bar under it reads $0.50 of $1.00 for the day, naming when the day resets
+    And a key with no budget of its own gets no bar and no space reserved for one
+
   @visual
   Scenario: Virtual key list Last-used column shows relative time
     Given virtual key "prod-openai" was last used 3 hours ago
@@ -122,6 +140,43 @@ Feature: AI Gateway — Virtual Keys
     When I open the virtual keys list
     Then the prod-openai row shows "about 3 hours ago" with the exact timestamp on hover
     And the dev-sandbox-legacy row shows "never" in muted text
+
+  # ============================================================================
+  # Reading a key's traces
+  #
+  # The gateway stamps the virtual key id on every span it proxies and the
+  # trace fold hoists it onto the trace summary, so the destination project's
+  # Trace Explorer can filter to one key. The action is only offered when it
+  # leads somewhere the reader can actually open.
+  # ============================================================================
+
+  @integration
+  Scenario: View traces opens the key's destination filtered to that key
+    Given virtual key "prod-key" files its traces into the project "web-app"
+    And I am a member of the team that holds "web-app"
+    When I choose "View traces" for "prod-key"
+    Then the Trace Explorer for "web-app" opens
+    And it lists only the traces that key produced, over the last 30 days
+
+  @integration
+  Scenario: View traces is absent when the key has no trace destination
+    Given virtual key "legacy-key" has no trace destination
+    When I look at the actions for "legacy-key"
+    Then "View traces" is not offered
+
+  @integration
+  Scenario: View traces is absent when the trace destination was deleted
+    Given virtual key "prod-key" files its traces into a project that was deleted
+    When I look at the actions for "prod-key"
+    Then "View traces" is not offered
+    And the trace destination is still badged as deleted
+
+  @integration
+  Scenario: View traces is absent when the destination sits on a team I cannot open
+    Given virtual key "prod-key" files its traces into the project "web-app"
+    And I am not a member of the team that holds "web-app"
+    When I look at the actions for "prod-key"
+    Then "View traces" is not offered
 
   # ============================================================================
   # Create-drawer capability preview (Lane B iter 23) — minimum-viable
@@ -156,6 +211,41 @@ Feature: AI Gateway — Virtual Keys
       Anthropic cache_control, OpenAI/Azure automatic caching, and Gemini
       cachedContent
     And the description does NOT frame caching as Anthropic-specific
+
+  # ============================================================================
+  # Tags field — typing a tag here is the moment a person decides what will be
+  # visible on every trace the key produces, so the field has to say so. The
+  # explanation lives behind the label's information icon, the way every other
+  # field in the drawer explains itself, and the field itself stays quiet
+  # unless what is typed would not survive the save.
+  # ============================================================================
+
+  @integration
+  Scenario: The Tags field explains itself behind the label's information icon
+    When I open the "New virtual key" drawer
+    Then no explanation sits under the Tags field
+    When I open the information icon next to the "Tags" label
+    Then it says tags group this key's traffic by team, app, or environment
+    And it says every trace the key sends carries its tags as labels that
+      anyone with access to the project can see and filter on
+    And it says a cache rule listing tags applies to any key carrying all of them
+    And it says how many tags are kept, how long each may be, and that
+      blanks and repeats are dropped
+    And it links to the cache-rules documentation
+
+  @integration
+  Scenario: A tag list that will not survive the save says so before saving
+    When I open the "New virtual key" drawer
+    And I type more tags than the key keeps
+    Then the field warns that only the first tags will be saved
+    When I type a tag longer than a tag may be
+    Then the field warns that over-long tags will be shortened
+
+  @integration
+  Scenario: A tag list within the limits gets no warning
+    When I open the "New virtual key" drawer
+    And I type a handful of ordinary tags
+    Then the field shows no warning under it
 
   # ============================================================================
   # Cache control (Lane B iter 35) — provider-agnostic framing in the edit

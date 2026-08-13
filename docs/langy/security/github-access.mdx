@@ -1,0 +1,66 @@
+---
+title: What Langy Can Do in Your GitHub
+description: Langy touches your code only through a GitHub App that opens bot-authored pull requests; the app private key is the only stored credential, tokens are minted per turn with two write scopes, and the install is the access boundary.
+sidebarTitle: GitHub access
+keywords:
+  - langy github permissions
+  - ai agent github app
+  - bot authored pull requests
+---
+
+Langy contributes to your code in exactly one way: **bot-authored pull requests through a GitHub App**. Langy pushes only to the branch it creates for that PR, never to your default or existing branches, and never merges its own PR. A human reviews and merges.
+
+## The credential model
+
+- **No per-user OAuth.** Installing the app does not ask a user to authorize it against their GitHub account. The bot-authored flow uses no user OAuth at all.
+- **The app private key is the only stored credential.** It lives only in the control plane (as `GITHUB_LANGY_PRIVATE_KEY`) and never reaches a worker. When it is unset, the GitHub feature is silently off.
+- **Installation tokens are minted per turn.** Each turn mints a fresh 1-hour installation token, cached in Redis just under its lifetime and never persisted. The worker receives it as the `GH_TOKEN` environment variable only; nothing is written to disk.
+- **Least privilege at mint time.** Tokens are minted with only `contents:write` and `pull_requests:write`, scoped to the installation's repositories, or to a single repository when the turn targets one.
+
+Inside the worker, `git config credential.helper '!gh auth git-credential'` wires `git` to read the token from the environment, so there is no `.gitconfig` or `.git-credentials` on disk.
+
+Commits are authored by `langwatch[bot]`, and the requesting user is credited with a `Co-authored-by` trailer plus a `Requested by @<login> via LangWatch` note in the PR body.
+
+## The install is the access boundary
+
+Langy can open pull requests only on the repositories the app is installed on. Installing the app on a repository is what grants access; there is no separate grant.
+
+A single LangWatch organization can install the app on several GitHub accounts, and each installation is listed separately.
+
+If the app is not installed when Langy reaches for `git` or `gh`, the platform stops the turn, shows an install card in chat, and re-runs the turn once the app is installed.
+
+## App permissions
+
+These are the only repository permissions the app requests:
+
+| Permission | Access |
+|---|---|
+| Contents | Read and write |
+| Pull requests | Read and write |
+| Metadata | Read |
+
+The app subscribes to no events beyond the installation lifecycle that GitHub sends automatically (`installation`, `installation_repositories`).
+
+<Note>
+`Contents: Read and write` is what lets Langy clone a repository, create a branch, and push commits to that branch. It does not let Langy merge; merging a pull request is a separate action that a human takes in GitHub after review.
+</Note>
+
+## Disconnecting
+
+Disconnect from **Settings, Integrations, GitHub, Disconnect**, which opens GitHub's uninstall page (an app cannot be uninstalled through the API). Once GitHub confirms, the `installation.deleted` webhook removes the local record.
+
+<Warning>
+Removing the installation cuts off **new** turns immediately. A worker that is already running with a token keeps that token until the idle reaper kills it (up to 10 minutes idle) or the token self-expires (up to 1 hour). There is no way for a live worker to mint a new token once the install is gone.
+</Warning>
+
+Install and disconnect actions are recorded in the audit log as `langy.github.install` and `langy.github.disconnect`.
+
+<Info>
+**Also check:** [How Langy is isolated](/langy/security/sandbox), [Data flow and privacy](/langy/security/data-flow-and-privacy), [Register the Langy GitHub App](/self-hosting/langy/github-app).
+</Info>
+
+## Reference
+
+- [Register the Langy GitHub App](/self-hosting/langy/github-app) for the setup steps (registering the app, plumbing the secrets, and installing it).
+- [How Langy is isolated](/langy/security/sandbox)
+- [Data flow and privacy](/langy/security/data-flow-and-privacy)

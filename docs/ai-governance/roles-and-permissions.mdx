@@ -26,6 +26,43 @@ The three pre-built org roles. Each user in the org has exactly one.
 
 The minimum-privilege default is intentional: an `ORGANIZATION` role binding for a MEMBER does **not** grant team-level access. Team-level permissions come from team-role bindings (next).
 
+## Seats
+
+Paid plans meter seats, and there are two kinds. Which one a person occupies follows from what they can do, not from a separate billing switch:
+
+- A **full seat** is someone who can change things.
+- A **lite seat** is someone who can only look at what the team produces.
+
+ADMIN and MEMBER are always full seats. EXTERNAL is a lite seat on its built-in permissions.
+
+Assign a **custom role** to an EXTERNAL member and that role decides the seat instead: if it grants anything beyond viewing, they can change things and count as a full seat from then on. The rule reads the custom role, not the built-in defaults, which is why annotations below stay part of a lite seat while a custom role granting only `annotations:create` would make the same person a full one. If you want a reviewer who annotates, leave them on the built-in lite role rather than building a custom role for it.
+
+### What a lite member can do
+
+They can open the projects they are invited to and read what the team produces there:
+
+| They can see | They cannot |
+|---|---|
+| Traces, including the detail view | See costs |
+| Analytics | Create, edit or delete projects, datasets, prompts, evaluations, workflows or experiments |
+| Evaluations and their results | Invite anyone or change roles |
+| Scenario runs | Manage the gateway, virtual keys or budgets |
+| Datasets, prompts, workflows and experiments | Reach any project they were not invited to |
+| Their own team | |
+| The names of the project's secrets, never their values | |
+
+Annotations are the exception: on the built-in lite role a member can leave and edit them, so reviewers can mark up what they read without needing a full seat.
+
+These are permissions, not screens, so they hold wherever the data is reached. A lite member using the [MCP server](/integration/mcp) with their own account, or the API with their own credentials, sees exactly what they see in the app.
+
+<Note>
+Trace **viewing** is included in a lite seat. If you want someone who cannot open a trace at all, build a custom role that withholds `traces:view` and bind it to them.
+</Note>
+
+### Choosing between them
+
+The question to ask about a person is whether they need to change anything. Someone who reviews output, watches dashboards and comments on what they find is a lite seat. Someone who builds prompts, runs experiments, edits datasets, or configures the gateway is a full seat.
+
 ## Team roles
 
 The four pre-built team roles. A user can have **different** team roles on different teams (`ADMIN` on Engineering, `VIEWER` on Marketing).

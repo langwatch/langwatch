@@ -15,8 +15,9 @@ Feature: AI Gateway Governance — Personal budget exceeded surfaces (CLI + dash
   Background:
     Given user "jane@acme.com" has a USD 500/month personal budget
     And jane has spent USD 500.00 in the current month
-    And the gateway budget-fold from ClickHouse confirms the spend total
-    And the gateway's `/budget/check` endpoint will return `blocked_by: "personal"`
+    And the ClickHouse spend ledger totals that spend for the current month
+    And the CLI budget pre-check `GET /api/auth/cli/budget/status` answers 402
+      with `error.scope: "principal"`, jane's own allowance being the blocker
 
   # ---------------------------------------------------------------------------
   # Gateway response shape
@@ -113,6 +114,16 @@ Feature: AI Gateway Governance — Personal budget exceeded surfaces (CLI + dash
     Then a yellow `colorPalette="yellow"` banner reads "You've used 82% of your monthly budget."
     And requests are NOT blocked at the gateway
     And the card shows "$410 of $500" without colour change beyond the banner
+
+  @bdd @gateway @budget-exceeded @warn
+  Scenario: 80% threshold puts the same warning on the gateway response
+    Given jane has spent USD 410 of her USD 500/month budget (82%)
+    When jane's CLI sends a request via her personal VK
+    Then the gateway responds with HTTP 200
+    And the response includes header `X-LangWatch-Budget-Warning: principal:82`
+    And the same header is present whether the request streams or not
+    And the header threshold matches the one behind the dashboard banner,
+      so a customer never sees one surface warn while the other stays quiet
 
   @bdd @cli @budget-exceeded @warn
   Scenario: 80% threshold injects a single-line warning at the top of `langwatch claude` output

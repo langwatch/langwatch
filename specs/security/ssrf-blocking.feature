@@ -8,7 +8,7 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Python parity)
   on indirect signals like NODE_ENV or IS_SAAS.
 
   Implementations:
-    - TS: langwatch/src/utils/ssrfProtection.ts (httpProxyRouter, scenario runner)
+    - TS: platform/app/src/utils/ssrfProtection.ts (httpProxyRouter, scenario runner)
     - Python: langwatch_nlp/langwatch_nlp/studio/execute/http_node.py
 
   # ============================================================================

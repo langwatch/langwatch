@@ -1,3 +1,4 @@
+{{- include "gateway.validateShutdownValues" . }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -12,7 +13,13 @@ data:
   # them avoids misleading operators into thinking they're tuning behavior.
   SERVER_ADDR: ":5563"
   LOG_LEVEL: {{ .Values.logging.level | quote }}
-  LW_GATEWAY_BASE_URL: {{ .Values.controlPlane.baseUrl | quote }}
+  {{/* The route back to the control plane. Derived from the release name,
+       because that is what the cluster names the app Service after: a fixed
+       address resolves only on an install called the same as ours, and the
+       breakage is silent and late — every pod healthy, every probe green,
+       and nothing wrong until a request arrives carrying a virtual key that
+       then cannot be resolved. */}}
+  LW_GATEWAY_BASE_URL: {{ .Values.controlPlane.baseUrl | default (printf "http://%s-app:5560" .Release.Name) | quote }}
   {{- if .Values.otel.endpoint }}
   # Official OpenTelemetry name, plus the deprecated LangWatch-only name so
   # older gateway images keep reading their endpoint during upgrades. The
@@ -20,7 +27,15 @@ data:
   OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.otel.endpoint | quote }}
   OTEL_OTLP_ENDPOINT: {{ .Values.otel.endpoint | quote }}
   {{- end }}
+  {{/* Rendered on both settings, never omitted: the gateway's own default is
+       on, so an operator who set spend.enabled=false has to see that decision
+       carried into the pod env rather than silently dropped. */}}
+  LW_GATEWAY_SPEND_ENABLED: {{ .Values.spend.enabled | quote }}
   SERVER_MAX_REQUEST_BODY_BYTES: {{ printf "%d" (int64 .Values.security.maxRequestBodyBytes) | quote }}
+  # The drain timing from values.yaml, carried to the two fields serve.go
+  # reads (pkg/config.Server.DrainDelaySeconds / GracefulSeconds).
+  SERVER_DRAIN_DELAY_SECONDS: {{ .Values.shutdown.preDrainWaitSeconds | quote }}
+  SERVER_GRACEFUL_SECONDS: {{ .Values.shutdown.timeoutSeconds | quote }}
   BLOCK_LOCAL_HTTP_CALLS: {{ .Values.security.blockLocalHTTPCalls | quote }}
   REQUIRE_HTTPS_CUSTOM_ENDPOINTS: {{ .Values.security.requireHTTPSCustomEndpoints | quote }}
   ALLOWED_PROXY_HOSTS: {{ join "," .Values.security.allowedProxyHosts | quote }}

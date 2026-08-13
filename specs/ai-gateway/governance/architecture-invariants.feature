@@ -86,7 +86,7 @@ Feature: AI Gateway Governance — Architecture Invariants
     Then there is NO ClickHouse table named "gateway_activity_events"
     And there is NO Prisma migration creating one
     And the activity-monitor-processing pipeline directory under
-      langwatch/src/server/event-sourcing/pipelines/ no longer exists
+      platform/app/src/server/event-sourcing/pipelines/ no longer exists
     And no code path writes to a parallel governance event store
 
   # ---------------------------------------------------------------------------
@@ -288,7 +288,7 @@ Feature: AI Gateway Governance — Architecture Invariants
       /api/ingest/otel/:sourceId (source bearer auth) both exist
     When either URL receives an OTLP body
     Then they share the OTLP read/decompress/parser internals
-      (single helper module under langwatch/src/server/otel/)
+      (single helper module under platform/app/src/server/otel/)
     And they share the trace/log ingestion pipeline downstream
     And the only differences are: auth shape, tenancy resolution
       (project vs hidden Governance Project lookup), and origin

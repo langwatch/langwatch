@@ -4,7 +4,9 @@
 # base using dorny/paths-filter. On every other event (push, schedule,
 # workflow_dispatch, merge_group) we force every declared filter to
 # `true` so the real jobs always run — required aggregator checks need
-# a concrete result.
+# a concrete result. Exception: with `push-strategy: diff` a push is
+# diffed against its before-commit instead of force-run, for workflows
+# whose real jobs spend money on live LLM calls.
 #
 # The caller MUST check out the repo first so this composite action is
 # accessible — dorny/paths-filter then reads the diff against the PR
@@ -41,32 +43,51 @@ inputs:
   filters:
     description: YAML filter block for dorny/paths-filter (must define `relevant` + `feature-parity` filters).
     required: true
+  push-strategy:
+    description: >-
+      How push events are treated. 'force' (default) marks every filter
+      true so the real jobs always run post-merge. 'diff' diffs the push
+      against its before-commit with dorny/paths-filter instead, so
+      workflows whose real jobs spend money (live LLM calls) only run
+      them when the push actually touched relevant paths.
+    required: false
+    default: force
 outputs:
   relevant:
-    description: "'true' if relevant paths changed, or if event is not a PR."
+    description: "'true' if relevant paths changed, or if the event is neither a PR nor a diff-mode push."
     value: ${{ steps.filter.outputs.relevant || steps.force.outputs.relevant }}
   feature-parity:
-    description: "'true' if feature-parity-relevant paths changed, or if event is not a PR."
+    description: "'true' if feature-parity-relevant paths changed, or if the event is neither a PR nor a diff-mode push."
     value: ${{ steps.filter.outputs.feature-parity || steps.force.outputs.feature-parity }}
   lambda-image:
-    description: "'true' if Lambda-image-relevant paths changed, or if event is not a PR. Used by langwatch-nlp-ci's LWA-readiness job — covers Go-binary source + Dockerfile + entrypoint, which aren't matched by the Python-only `relevant` filter."
+    description: "'true' if Lambda-image-relevant paths changed, or if the event is neither a PR nor a diff-mode push. Used by langwatch-nlp-ci's LWA-readiness job — covers Go-binary source + Dockerfile + entrypoint, which aren't matched by the Python-only `relevant` filter."
     value: ${{ steps.filter.outputs.lambda-image || steps.force.outputs.lambda-image }}
+  ingest:
+    description: "'true' if the app's HTTP ingest spine changed, or if the event is neither a PR nor a diff-mode push. Used by sdk-javascript-ci's e2e job, which drives real SDK telemetry at a running server and is therefore the only check that sees those routes answer over a socket. Separate from `relevant` because the sibling `ci` job shares that filter and spends LLM budget."
+    value: ${{ steps.filter.outputs.ingest || steps.force.outputs.ingest }}
 
 runs:
   using: composite
   steps:
     - name: Detect relevant changes
-      if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
+      if: >-
+        github.event_name == 'pull_request'
+        || github.event_name == 'pull_request_target'
+        || (github.event_name == 'push' && inputs.push-strategy == 'diff')
       id: filter
       uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
       with:
         filters: ${{ inputs.filters }}
 
     - name: Force every filter true on non-PR events
-      if: github.event_name != 'pull_request' && github.event_name != 'pull_request_target'
+      if: >-
+        github.event_name != 'pull_request'
+        && github.event_name != 'pull_request_target'
+        && (github.event_name != 'push' || inputs.push-strategy != 'diff')
       id: force
       shell: bash
       run: |
         echo "relevant=true" >> "$GITHUB_OUTPUT"
         echo "feature-parity=true" >> "$GITHUB_OUTPUT"
         echo "lambda-image=true" >> "$GITHUB_OUTPUT"
+        echo "ingest=true" >> "$GITHUB_OUTPUT"

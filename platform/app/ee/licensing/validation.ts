@@ -1,0 +1,124 @@
+import crypto from "crypto";
+import { LICENSE_ERRORS, PUBLIC_KEY } from "./constants";
+import { normalizePemKey } from "./pem";
+import { mapToPlanInfo } from "./planMapping";
+import type { SignedLicense, ValidationResult } from "./types";
+import { SignedLicenseSchema } from "./types";
+
+/**
+ * Parses a base64-encoded license key into a SignedLicense object.
+ * Uses Zod schema validation for type-safe parsing.
+ *
+ * @param licenseKey - Base64-encoded license string
+ * @returns SignedLicense if valid, null if parsing fails
+ */
+export function parseLicenseKey(licenseKey: string): SignedLicense | null {
+  if (!licenseKey || licenseKey.trim() === "") {
+    return null;
+  }
+
+  try {
+    const decoded = Buffer.from(licenseKey, "base64").toString("utf-8");
+    const parsed = JSON.parse(decoded) as unknown;
+    const result = SignedLicenseSchema.safeParse(parsed);
+
+    return result.success ? result.data : null;
+  } catch {
+    // Invalid base64, JSON parse, or schema validation - all indicate an invalid license
+    return null;
+  }
+}
+
+/**
+ * Verifies the RSA-SHA256 signature of a license.
+ *
+ * The key is normalized first, the same choke point `signLicense` uses for the
+ * private key. An operator supplies the verification key through a `.env` line,
+ * a Helm value or a Kubernetes secret, all of which routinely carry it as one
+ * line with escaped newlines; read as pasted, OpenSSL rejects the layout and
+ * every license reports as a bad signature, which sends the operator to look at
+ * their license instead of at their formatting.
+ *
+ * @param signedLicense - The license with data and signature
+ * @param publicKey - RSA public key in PEM format (defaults to production key)
+ * @returns true if signature is valid, false otherwise
+ */
+export function verifySignature(
+  signedLicense: SignedLicense,
+  publicKey: string = PUBLIC_KEY,
+): boolean {
+  if (!signedLicense.signature || signedLicense.signature.trim() === "") {
+    return false;
+  }
+
+  try {
+    const dataString = JSON.stringify(signedLicense.data);
+    const verify = crypto.createVerify("SHA256");
+    verify.update(dataString);
+    verify.end();
+
+    return verify.verify(
+      normalizePemKey(publicKey),
+      signedLicense.signature,
+      "base64",
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Checks if a license has expired.
+ *
+ * @param expiresAt - ISO 8601 date string
+ * @param now - Current date (for testing)
+ * @returns true if the license is expired
+ */
+export function isExpired(expiresAt: string, now: Date = new Date()): boolean {
+  const expirationDate = new Date(expiresAt);
+  if (Number.isNaN(expirationDate.getTime())) {
+    return true; // Treat invalid dates as expired for security
+  }
+  return now >= expirationDate;
+}
+
+/**
+ * Validates a license key completely: parsing, signature, and expiration.
+ *
+ * @param licenseKey - Base64-encoded license string
+ * @param publicKey - RSA public key (defaults to production key)
+ * @param now - Clock used for the expiration check (defaults to current time)
+ * @returns ValidationResult indicating success or failure with error
+ */
+export function validateLicense({
+  licenseKey,
+  publicKey = PUBLIC_KEY,
+  now = new Date(),
+}: {
+  licenseKey: string;
+  publicKey?: string;
+  now?: Date;
+}): ValidationResult {
+  // Step 1: Parse
+  const signedLicense = parseLicenseKey(licenseKey);
+  if (!signedLicense) {
+    return { valid: false, error: LICENSE_ERRORS.INVALID_FORMAT };
+  }
+
+  // Step 2: Verify signature
+  if (!verifySignature(signedLicense, publicKey)) {
+    return { valid: false, error: LICENSE_ERRORS.INVALID_SIGNATURE };
+  }
+
+  // Step 3: Check expiration
+  if (isExpired(signedLicense.data.expiresAt, now)) {
+    return { valid: false, error: LICENSE_ERRORS.EXPIRED };
+  }
+
+  // Success!
+  return {
+    valid: true,
+    licenseData: signedLicense.data,
+    planInfo: mapToPlanInfo(signedLicense.data),
+  };
+}

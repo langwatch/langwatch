@@ -6,7 +6,7 @@ Feature: Batch Evaluation Results Visualization
 
   # Many scenarios in this file are bound below to existing JSDOM
   # render tests under
-  # `langwatch/src/components/batch-evaluation-results/__tests__/`:
+  # `platform/app/src/components/batch-evaluation-results/__tests__/`:
   #   * BatchEvaluationResultsTable.test.tsx — table rendering +
   #     loading skeleton + empty state + dataset/target columns.
   #   * BatchTargetCell.test.tsx — output display + cost/duration,
@@ -92,16 +92,16 @@ Feature: Batch Evaluation Results Visualization
     Given a target execution failed with an error longer than two lines
     When I click on the error cell
     Then the error expands into an overlay showing the full message
-    And I can dismiss the expanded view by clicking outside
+    And I can dismiss the expanded view by clicking outside or by pressing Escape
 
   @unimplemented
   Scenario: Expand long target output
-    Given a target output is longer than the cell max height (120px)
+    Given a target output is longer than the cell's collapsed height
     When the results table renders
     Then a fade overlay appears at the bottom of the cell
     When I click on the cell
     Then the output expands to show the full content
-    And I can dismiss the expanded view by clicking outside
+    And I can dismiss the expanded view by clicking outside or by pressing Escape
 
   # ============================================================================
   # Evaluator Results Display
@@ -142,6 +142,56 @@ Feature: Batch Evaluation Results Visualization
     When I hover over the evaluator chip
     Then I see the full score
     And I see the evaluation details/reasoning
+
+  # ============================================================================
+  # Fields / Row Height
+  # ============================================================================
+  # A "Fields" control in the results header lets users toggle which target
+  # details render — outputs, scores, and latency/cost — independently of
+  # each other. A separate "Row height" control changes how much of each
+  # cell's content is visible before it needs expanding. Dataset columns stay
+  # controlled by the separate column-visibility popover. Field choices reset
+  # on reload — a hidden section left on from a previous visit should never
+  # silently explain "no results" on a different run.
+
+  Scenario: Hide scores to focus on outputs
+    Given an evaluation run with target outputs and evaluator score chips
+    When I turn off the "Scores" field
+    Then the target outputs remain visible
+    And the evaluator score chips are hidden
+
+  Scenario: Hide outputs to focus on scores
+    Given an evaluation run with target outputs and evaluator score chips
+    When I turn off the "Outputs" field
+    Then the evaluator score chips remain visible
+    And the target outputs are hidden
+
+  Scenario: Hide cost and latency to reduce clutter
+    Given a target produced output with a cost and a latency
+    When I turn off the "Latency and cost" field
+    Then the cost and latency are hidden
+    And the target output remains visible
+
+  Scenario: Hide the target column when no fields are shown
+    Given an evaluation run with a target column
+    When I turn off the outputs, scores, and latency and cost fields
+    Then the target column is removed from the table
+    And the dataset columns remain visible
+
+  Scenario: Field visibility does not persist across reloads
+    Given I have turned off the "Scores" field
+    When I reload the page
+    Then all fields are shown again
+
+  Scenario: Increase row height to see more of a long output before expanding
+    Given a target output long enough to be clipped at the default row height
+    When I switch the row height to "Large"
+    Then more of the output is visible without expanding the cell
+
+  Scenario: Row height choice persists across reloads
+    Given I have switched the row height to "Large"
+    When I reload the page
+    Then the row height is still "Large"
 
   # ============================================================================
   # Trace Links
@@ -222,6 +272,17 @@ Feature: Batch Evaluation Results Visualization
     And the CSV contains target output columns
     And the CSV contains cost and duration columns
     And the CSV contains evaluator result columns (score, passed, details)
+
+  # A comparison grades no single target, so it has no per-target column to ride
+  # in. Without a block of its own the export silently loses the verdict, and
+  # the reader sees every candidate's output with no record of which one won.
+  @unit
+  Scenario: CSV contains the comparison verdict
+    Given the evaluation ran a comparison over several targets
+    When I export to CSV
+    Then each comparison has a winner, candidates and reasoning column
+    And the winner column names the winning target, or reads tie
+    And a row the judge did not call leaves those columns empty
 
   @unimplemented
   Scenario: CSV handles special characters

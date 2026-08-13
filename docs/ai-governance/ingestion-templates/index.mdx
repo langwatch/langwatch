@@ -137,8 +137,8 @@ Open the trace. You should see:
 - `langwatch.cost.usd`, derived by the receiver's `canonicalCostExtractor` from the
   upstream-emitted `gen_ai.usage.*` + `gen_ai.response.model`.
 - `langwatch.user.id`, `langwatch.project.id`, `langwatch.template.id`,
-  `langwatch.api_key.id`, `langwatch.source = "claude_code"`, all receiver-stamped
-  post-auth (authoritative attribution + template provenance), with
+  `langwatch.api_key.id`, `langwatch.source = "claude_code"`, all
+  receiver-stamped post-auth (authoritative attribution + template provenance), with
   `langwatch.origin = "coding_agent"` (derived from the source: a CLI coding
   assistant becomes `coding_agent`, any other ingest source becomes `ai_tool`).
 
@@ -225,8 +225,12 @@ The `protectedTemplateAttributeKeys` closed list:
   `langwatch.project.id`, `langwatch.tenant.id`, virtual-key shapes,
   ingestion-source shapes, governance shapes.
 - `langwatch.template.id`, receiver-stamped provenance.
-- `langwatch.api_key.id`, receiver-stamped provenance (the ingestion key that landed
-  the trace).
+- `langwatch.api_key.id`, receiver-written provenance (the id of the API key
+  that landed the trace, never the key material). Rewritten from the
+  authenticated identity on every authenticated OTLP request, so a payload
+  cannot set it. Redaction exempts this exact name from the secret-name
+  deny-list on the strength of that guarantee, and still scrubs real key
+  material under it by shape.
 - `langwatch.origin`, receiver-stamped provenance (`coding_agent` for a CLI
   assistant, `ai_tool` for any other ingest source).
 - `langwatch.source`, receiver-stamped provenance (used for tile filtering at
@@ -335,7 +339,7 @@ discipline**: (a) a fixture-track verification, canned OTLP payloads emitted via
 base and tier-2 protected lists, and (b) a real-user track, admin publishes via
 `/settings/governance/tool-catalog`, a real user installs via `/me`, the real upstream
 tool emits a real trace, and the result is verified end-to-end with cross-user isolation.
-Per-template rituals live at `langwatch/ee/governance/ingestion-templates/<slug>/dogfood.md`.
+Per-template rituals live at `platform/app/ee/governance/ingestion-templates/<slug>/dogfood.md`.
 
 ### What is audited
 
@@ -396,13 +400,13 @@ and we'll evaluate.
 ## Verifying the contract
 
 The full admin OTTL authoring flow has a Playwright real-user dogfood at
-`langwatch/e2e/admin-ottl-dogfood.ts` (~30s loop), 8 steps end-to-end:
+`platform/app/e2e/admin-ottl-dogfood.ts` (~30s loop), 8 steps end-to-end:
 navigate → list 3 platform rows → View OTTL drawer → Clone-to-customise →
 Save OTTL → list 4 rows → Edit OTTL → Archive. Pairs with the
 service-level integration test at
-`langwatch/ee/governance/services/__tests__/ingestionTemplate.authoring.integration.test.ts`
+`platform/app/ee/governance/services/__tests__/ingestionTemplate.authoring.integration.test.ts`
 and the wire-level REST integration test at
-`langwatch/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`.
+`platform/app/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`.
 
 If you're touching the IngestionTemplatesEditor surface, the OttlEditor
 component, or the IngestionTemplateService, run the dogfood + both

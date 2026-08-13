@@ -21,7 +21,7 @@ Feature: Gateway span shape — mandatory attributes per completed request
   # ─────────────────────────────────────────────────────────────────────────
   # Per rchaves iter 107: "EVERYTHING should follow the gen_ai specs."
   # The LangWatch trace pipeline already canonicalises these attributes
-  # from SDK-instrumented clients (see langwatch/src/server/tracer/
+  # from SDK-instrumented clients (see platform/app/src/server/tracer/
   # otel.traces.ts). Gateway spans MUST carry the same set so UI,
   # evaluators, and analytics treat gateway traffic identically to
   # SDK-instrumented traffic.
@@ -143,6 +143,21 @@ Feature: Gateway span shape — mandatory attributes per completed request
     But gen_ai.usage.input_tokens / output_tokens are ABSENT (not emitted as 0)
     # Absent signals "no data" — downstream shouldn't treat 0 as "0 tokens used".
 
+  # Not every failure after model resolution is the provider's. A handled
+  # error already carries the two facts the span needs — the status the client
+  # was answered with, and a stable code — so recording a generic 502
+  # provider_error instead sends the customer to a provider status page for a
+  # failure only they can fix (a dead sign-in, a guardrail block, a limit we
+  # imposed).
+  # Bindings: services/aigateway/app/pipeline/trace_classify_test.go
+  Scenario: A gateway-authored failure records its own status and code
+    Given the request fails after model resolution with one of the gateway's own handled errors
+    When the exported span arrives at the collector
+    Then http.response.status_code is the status that error answers with
+    And error.type is that error's own code, not a generic provider_error
+    # An error we cannot type at all is still the upstream's until proven otherwise.
+    And an untyped failure still records the generic 502 provider_error
+
   # ─────────────────────────────────────────────────────────────────────────
   # §6. Fallback attempts
   # ─────────────────────────────────────────────────────────────────────────
@@ -174,7 +189,50 @@ Feature: Gateway span shape — mandatory attributes per completed request
     And the PR cannot merge to main
 
   # ─────────────────────────────────────────────────────────────────────────
-  # §8. Out of scope (for now)
+  # §8. VK tags land on customer spans as labels
+  # ─────────────────────────────────────────────────────────────────────────
+  # VK tags exist so operators can slice gateway traffic by team / app /
+  # environment. The trace pipeline already ingests the langwatch.labels
+  # span attribute into metadata.labels, which the Trace Explorer filters
+  # as "Label" — stamping tags there makes gateway traffic sliceable with
+  # zero changes on the explorer side.
+
+  Scenario: Virtual-key tags are stamped on the customer span as labels
+    Given the VK carries tags ["app=nexttrace", "team=offsecops"]
+    When a /v1/messages request completes through the gateway
+    Then the exported customer span has attribute langwatch.labels = ["app=nexttrace", "team=offsecops"]
+    And the trace appears in the Trace Explorer under the "Label" filter for either tag
+
+  Scenario: A VK without tags stamps no labels attribute
+    Given the VK carries no tags
+    When a request completes through the gateway
+    Then the exported customer span has no langwatch.labels attribute
+
+  # Tags are stamped on every span of every request the key makes, and the
+  # Label filter aggregates every distinct value it finds. That makes the tag
+  # list a cardinality surface rather than a free-form notes field, so the
+  # bundle the gateway receives is normalised before any of it reaches a span.
+
+  Scenario: Blank and repeated tags do not reach the span
+    Given the VK's tags contain a blank entry and the same tag written twice
+    When a request completes through the gateway
+    Then the exported customer span carries each distinct tag exactly once
+    And the blank entry is absent
+
+  Scenario: An oversized tag list is capped before it reaches the span
+    Given the VK's tags were set through the API to hundreds of entries
+    When a request completes through the gateway
+    Then the exported customer span carries a capped number of labels
+    And each label is no longer than the per-tag limit
+
+  Scenario: A virtual key stored before the tag limits existed stays servable
+    Given a stored virtual key whose tags exceed the limits
+    When the gateway fetches that key's configuration
+    Then the configuration resolves with its tags normalised
+    And the request is served rather than failing on the oversized tag list
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # §9. Out of scope (for now)
   # ─────────────────────────────────────────────────────────────────────────
 
   # - Vendor-specific embedding-token attributes — embeddings is a narrow

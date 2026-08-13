@@ -295,7 +295,7 @@ Feature: Langy renders domain-capability cards for tool calls
       Then the card's link opens that scenario in the library
 
   # WHICH card a result renders in is decided once, at the command boundary,
-  # from the command's name and the result's own shape together (ADR-059). The
+  # from the command's name and the result's own shape together (ADR-079). The
   # panel then re-derived the card from the NAME alone and dropped any result
   # whose card disagreed — so a result that had earned a RICHER card was the one
   # case guaranteed to disagree, and shape-driven promotion could only ever make

@@ -1,0 +1,115 @@
+/**
+ * Custom error types for invite domain.
+ * These are framework-agnostic and can be mapped to tRPC/HTTP errors in the router layer.
+ */
+import { HandledError } from "@langwatch/handled-error";
+
+import { remediation } from "../app-layer/error-remediation";
+
+/**
+ * Message thrown by `organization.acceptInvite` when the invite has already
+ * been consumed. Shared between server (where it's thrown) and client (where
+ * it's matched to trigger a redirect) so the two cannot drift.
+ */
+export const INVITE_ALREADY_ACCEPTED_MESSAGE =
+  "Invite was already accepted" as const;
+
+export const INVITE_NOT_READY_MESSAGE =
+  "Invite is not ready to be accepted" as const;
+
+/**
+ * An invite for this email is already pending in the organization.
+ *
+ * Handled (409): the tRPC router keeps its own instanceof mapping, and the
+ * REST surface answers the code directly, so a provisioning tool can treat
+ * the conflict as already-done. `email` is in `meta` because a batch invite
+ * needs to say WHICH address collided.
+ */
+export class DuplicateInviteError extends HandledError {
+  declare readonly code: "duplicate_invite";
+
+  constructor(email: string) {
+    super(
+      "duplicate_invite",
+      `An active invitation for ${email} already exists`,
+      {
+        httpStatus: 409,
+        meta: { email },
+        ...remediation("duplicate_invite"),
+      },
+    );
+    this.name = "DuplicateInviteError";
+  }
+}
+
+/**
+ * The address being invited already belongs to a member of this organization.
+ *
+ * Handled rather than silently allowed: inviting someone who is already here
+ * used to succeed, writing a pending invite row beside the membership it
+ * duplicated. The admin saw a new "Invited" line under a table that already
+ * listed that person as an ADMIN, and nothing said the two were the same
+ * human. Whatever they were actually trying to do — change a role, add a team
+ * — did not happen, and they had no way to know.
+ *
+ * `email` is in `meta` because the client renders it: an invite form takes
+ * several addresses at once, so "one of these is already a member" is not an
+ * answer.
+ */
+export class AlreadyOrganizationMemberError extends HandledError {
+  declare readonly code: "already_organization_member";
+
+  constructor(email: string) {
+    super(
+      "already_organization_member",
+      "This person is already a member of the organization",
+      { meta: { email }, httpStatus: 409, fault: "customer" },
+    );
+    this.name = "AlreadyOrganizationMemberError";
+  }
+}
+
+export class InviteNotFoundError extends HandledError {
+  declare readonly code: "invite_not_found";
+
+  constructor(message = "Invitation not found or is not waiting for approval") {
+    super("invite_not_found", message, { httpStatus: 404 });
+    this.name = "InviteNotFoundError";
+  }
+}
+
+/**
+ * An invite's team assignment named a team outside the organization.
+ *
+ * Refused loudly on the API surface: silently dropping the assignment (the
+ * lenient mode the invite form uses) would let a provisioning tool believe
+ * the team membership was granted.
+ */
+export class TeamNotInOrganizationError extends HandledError {
+  declare readonly code: "team_not_in_organization";
+
+  constructor(teamId: string) {
+    super(
+      "team_not_in_organization",
+      "That team does not belong to this organization",
+      { httpStatus: 422, meta: { teamId } },
+    );
+    this.name = "TeamNotInOrganizationError";
+  }
+}
+
+export class InviteNotReadyError extends Error {
+  constructor(inviteId: string, status: string) {
+    super(
+      `Cannot apply invite ${inviteId}: status is ${status}, expected PENDING`,
+    );
+    this.name = "InviteNotReadyError";
+  }
+}
+
+export class OrganizationNotFoundError extends Error {
+  constructor() {
+    super("Organization not found");
+    this.name = "OrganizationNotFoundError";
+  }
+}

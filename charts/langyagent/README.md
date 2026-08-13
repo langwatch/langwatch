@@ -14,50 +14,85 @@ The chart ships as a sub-chart of the umbrella `langwatch` chart (aliased
 `docker.io/langwatch/langyagent`, tag tracking the `langwatch` chart's
 `appVersion`.
 
-## Pre-install: create the shared auth Secret
+## Install
 
-**Read this before `helm install`.** The chart references a Kubernetes
-`Secret` (default name `langwatch-langyagent-auth`) holding the
-service-to-service token. The control plane sends this token as a Bearer
-header; the agent verifies it. If the Secret is missing at install time the
-pod loops with `secret "langwatch-langyagent-auth" not found`.
+Preferred: via the umbrella `langwatch` chart, which deploys the agent by
+default, wires the app and the workers to it, materialises the shared
+`LANGY_INTERNAL_SECRET` into its own app Secret, and opens the assistant to
+the people in the install:
 
-The **same value** must be present on both the agent pod and the
-`langwatch-app` env (`LANGY_INTERNAL_SECRET`). When you deploy both via the
-umbrella chart, both pods read it from this one Secret:
+```bash
+helm install langwatch ./charts/langwatch -n langwatch \
+  -f values.prod.yaml
+```
+
+There is nothing to create beforehand. If you supply your own app Secret
+instead of letting the chart generate one (`autogen.enabled: false`), add a
+`LANGY_INTERNAL_SECRET` key to it — the install tells you so and stops rather
+than half-deploying. To run without the assistant, set
+`langyagent.chartManaged=false`.
+
+### The sandboxed runtime
+
+The agent runs LLM-written shell, so a pod-to-host sandbox is worth having.
+It is not required, and not the default: `runtimeClassName` ships empty with
+`acceptUnsandboxedRuntime` true, so the agent installs and runs on any
+cluster and hardening is a deliberate later step. GKE ships a sandboxed class
+managed (GKE Sandbox), on AKS point `runtimeClassName` at your Kata VM
+isolation class, on EKS install gVisor on the node group. To pin one:
+
+```yaml
+langyagent:
+  runtimeClassName: "gvisor"
+  acceptUnsandboxedRuntime: false
+```
+
+Blanking the class afterwards while `acceptUnsandboxedRuntime` stays false is
+refused at render time, so a cluster that has hardened cannot quietly lose its
+sandbox.
+
+Pin a class the cluster does not define and no pod is created at all.
+Kubernetes rejects it at admission (`pod rejected: RuntimeClass "..." not
+found`), so `kubectl get pods` lists nothing rather than showing something
+Pending, and the reason lands on the Deployment instead:
+
+```bash
+kubectl -n <namespace> get deploy <release>-langyagent \
+  -o jsonpath='{.status.conditions[?(@.type=="ReplicaFailure")].message}'
+```
+
+Everything else in the install keeps running either way.
+
+Unsandboxed, you keep per-worker UID isolation, the per-worker opencode
+password, and the NetworkPolicy; you give up the pod-to-host sandbox. A
+single-tenant install whose users are colleagues carries a much smaller
+worker-versus-worker risk than a multi-tenant one; read the trade that way,
+not as a formality.
+
+### Standalone
+
+You bring your own control plane, set `OPENCODE_AGENT_URL` on it manually, and
+create the shared Secret yourself so both sides hold the same value:
 
 ```bash
 kubectl create secret generic langwatch-langyagent-auth \
   --namespace langwatch \
   --from-literal=LANGY_INTERNAL_SECRET="$(openssl rand -hex 32)"
+
+helm install langyagent ./charts/langyagent -n langwatch -f values.prod.yaml
 ```
 
 Override the Secret/key names via `secrets.existingSecretName` and
 `secrets.internalSecretKey`.
-
-## Install
-
-Preferred — via the umbrella `langwatch` chart, which also wires the app's
-`OPENCODE_AGENT_URL` + `LANGY_INTERNAL_SECRET` for you:
-
-```bash
-helm install langwatch ./charts/langwatch -n langwatch \
-  -f values.prod.yaml \
-  --set langyagent.chartManaged=true
-```
-
-Standalone (you bring your own control plane and set `OPENCODE_AGENT_URL`
-on it manually):
-
-```bash
-helm install langyagent ./charts/langyagent -n langwatch -f values.prod.yaml
-```
 
 ## Values reference
 
 | Path                          | Purpose                                                                 |
 |-------------------------------|-------------------------------------------------------------------------|
 | `chartManaged`                | Master on/off switch for the agent (umbrella: `langyagent.chartManaged`) |
+| `enableForAllUsers`           | Umbrella-only. Opens Langy to everyone in the install as soon as the agent is deployed. `false` keeps the rollout flag authoritative so you open it per project/org from `/ops/feature-flags` |
+| `runtimeClassName`            | Sandboxed runtime for the pod (default `gvisor`). Blank it only together with `acceptUnsandboxedRuntime` |
+| `acceptUnsandboxedRuntime`    | Accept running with no pod-to-host sandbox, on clusters that cannot offer one. Required for a blank `runtimeClassName`, so an unsandboxed deploy is always deliberate |
 | `environment`                 | Deployment environment reported as `ENVIRONMENT` (empty → inherits `global.env` → `production`). Security-load-bearing: prod pods must report a production environment so the manager refuses `LANGY_UNSAFE_DEV_DISABLE_ISOLATION` |
 | `image.tag`                   | Image tag override (defaults to `Chart.AppVersion`)                     |
 | `replicaCount`                | **Keep at 1** — see Scaling below                                       |
@@ -68,7 +103,7 @@ helm install langyagent ./charts/langyagent -n langwatch -f values.prod.yaml
 | `networkPolicy.ingressFrom`   | Which pods may call the agent (default: `app.kubernetes.io/name: langwatch`) |
 | `networkPolicy.allowExternalHttps` | Allow egress :443 to anywhere (OpenCode update/telemetry); tighten once pinned |
 | `networkPolicy.privateExcept` / `privateExceptV6` | Private/link-local/CGNAT CIDRs carved out of the `:443`-to-anywhere rule so a worker cannot pivot to internal services. Includes `100.64.0.0/10` (EKS CGNAT). Append your cluster's CIDR if it lives outside RFC1918 |
-| `egress.fqdnFloor` / `requireTls` / `enforceFloor` / `sniCrossCheck` / `cilium.enabled` | ADR-043 per-worker L7 egress adapter: operator FQDN floor + enforcement toggles. Stock posture is monitor-only; `cilium.enabled` ships a bypass-proof datapath `toFQDNs` policy |
+| `egress.fqdnFloor` / `requireTls` / `enforceFloor` / `sniCrossCheck` / `egress.cilium.enabled` | ADR-076 per-worker L7 egress adapter: operator FQDN floor + enforcement toggles. Stock posture is monitor-only for destination decisions; `egress.cilium.enabled` ships a bypass-proof datapath `toFQDNs` policy |
 | `nodeSelector` / `affinity` / `tolerations` | Node placement. Opt-in **public-subnet** pinning is a defence-in-depth wall (a node with no route to private RDS/ElastiCache). Needs a Terraform-side node group; see Network policy below |
 
 ## Probes
@@ -121,7 +156,7 @@ which the RFC1918 ranges do NOT cover. **If your service CIDR or a VPC CIDR live
 outside RFC1918, append it to `privateExcept`.** The metadata service over plain
 `:80` (IMDSv2) is denied by default-deny — there is no `:80` egress rule at all.
 
-**FQDN egress (ADR-043).** FQDN bounding ("only github/npm/…") is enforced at L7
+**FQDN egress (ADR-076).** FQDN bounding ("only GitHub/npm/…") is enforced at L7
 by the per-worker egress adapter (worker tools egress via `HTTPS_PROXY`), tuned
 by `egress.*`. For bypass-proof datapath FQDN egress on a Cilium CNI, set
 `egress.cilium.enabled: true` (renders a `CiliumNetworkPolicy` enforcing the same

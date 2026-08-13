@@ -11,7 +11,7 @@
 | Component | Repo | Path |
 |---|---|---|
 | Go gateway service (data plane) | `langwatch-saas` | `services/gateway/` (new standalone `go.mod`) |
-| Platform control-plane (VK CRUD, budgets, RBAC, provider-settings cohesion, drawers) | `langwatch` (open-source) | `langwatch/langwatch/src/...` |
+| Platform control-plane (VK CRUD, budgets, RBAC, provider-settings cohesion, drawers) | `langwatch` (open-source) | `langwatch/platform/app/src/...` |
 | BDD specs | `langwatch` | `specs/ai-gateway/` |
 | Docs | `langwatch` | `docs/docs/ai-gateway/` |
 | Helm chart (self-host) | `langwatch-saas` | `infrastructure/charts/` (existing chart, new `gateway` sub-chart) |
@@ -72,7 +72,7 @@ Routing pattern:
   - `<alias>` (e.g. `gpt-4o`, `claude`) — resolved via VK config `model_aliases`. **Aliases always win** if defined; they are the VK owner's explicit redirect.
   - `<provider>/<model>` explicit form (e.g. `openai/gpt-5-mini`, `bedrock/anthropic.claude-haiku-4-5-20251001`, `azure/my-deployment`) — bypasses aliases and addresses the provider directly. Still subject to `models_allowed` allowlist.
 - If the alias/explicit form doesn't resolve to a provider in the VK's `providers` list, returns `model_not_allowed` error.
-- `GET /v1/models` returns the **effective** model list: the union of aliases + explicitly-allowed models for this VK, filtered by `models_allowed` if set.
+- `GET /v1/models` returns the **effective** model list: the union of aliases + explicitly-allowed models for this VK, filtered by `models_allowed` if set. Without an allowlist, the list is discovered from the chain's catalogs: base-URL endpoints and hosted providers are asked for their models, deployment-mapped providers (Azure / Bedrock / Vertex) list their mapped ids. Providers that dispatch can route to but that contributed nothing are named in the `X-Langwatch-Models-Discovery-Incomplete` response header as `provider:reason` tokens (`not-enumerable`, `probe-failed`), so an empty or partial list is diagnosable rather than silent.
 
 ---
 
@@ -228,6 +228,22 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
   },
   "model_aliases": { "gpt-4o": "azure/my-deployment", "claude": "anthropic/claude-haiku-4-5-20251001" },
   "models_allowed": ["gpt-5-mini", "claude-haiku-*", "gemini-2.5-flash"],
+  /* Provider allowlist. `null` means every provider the key reaches through
+     its scope graph, INCLUDING providers added after the key was created;
+     that is what the drawer's "All providers" persists, and `providers[]`
+     above is already filtered to match. A list narrows to those
+     ModelProvider ids; it is never empty. */
+  "providers_allowed": null,
+  /* How the key behaves when its provider fails.
+       none          - no failover. `fallback.max_attempts` is pinned to 1,
+                       so a gateway that does not yet read this field still
+                       behaves correctly. Default for keys created after the
+                       routing-mode split.
+       fallback_all  - walk every eligible provider in `fallback.chain`.
+                       Keys created before the split are migrated to this,
+                       so their behaviour is unchanged.
+       policy        - ordering and rules come from the linked RoutingPolicy. */
+  "routing_mode": "none",
   "cache": { "mode": "respect|force|disable", "ttl_s": 3600 },
   "guardrails": {
     /* Both fail-open flags default false (fail-closed). Flip to true per
@@ -261,19 +277,33 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
      error code = vk_rate_limit_exceeded. TPM deferred to v1.1 (requires
      Redis-coordinated cluster-wide counters; pre-request token count is
      an estimate too imprecise for a hard cap). */
+  /* `scope_id` is the bucket spend accumulates under, which is the budget's
+     target for every scope except "group". `provider_key` is orthogonal to
+     the scope: null counts every dispatch, set counts and constrains only
+     dispatches to that ModelProvider id. See §4.6 for how a filtered budget
+     is enforced. */
   "budgets": [
     {
-      "scope": "virtual_key", "scope_id": "vk_01HZ...",
+      "scope": "virtual_key", "scope_id": "vk_01HZ...", "provider_key": null,
       "window": "day", "limit_usd": 25.00,
       "spent_usd": 4.12, "remaining_usd": 20.88, "resets_at": "2026-04-19T00:00:00Z",
       "on_breach": "block"
     },
-    { "scope": "project", "scope_id": "proj_01HZ...", "window": "month", "limit_usd": 1000.00,
+    { "scope": "project", "scope_id": "proj_01HZ...", "provider_key": "mp_01HZ...",
+      "window": "month", "limit_usd": 1000.00,
       "spent_usd": 437.55, "remaining_usd": 562.45, "resets_at": "2026-05-01T00:00:00Z",
       "on_breach": "block" },
-    { "scope": "team", "scope_id": "team_01HZ...", "window": "month", "limit_usd": 5000.00,
+    { "scope": "team", "scope_id": "team_01HZ...", "provider_key": null,
+      "window": "month", "limit_usd": 5000.00,
       "spent_usd": 3210.00, "remaining_usd": 1790.00, "resets_at": "2026-05-01T00:00:00Z",
-      "on_breach": "warn" }
+      "on_breach": "warn" },
+    /* A group budget is per member: one budget row materialises one
+       bucket per member, so `scope_id` is `<groupId>:<userId>` and
+       `principal_id` names the member. Two members never share a pot. */
+    { "scope": "group", "scope_id": "grp_01HZ...:user_01HZ...", "principal_id": "user_01HZ...",
+      "provider_key": null, "window": "month", "limit_usd": 50.00,
+      "spent_usd": 12.40, "remaining_usd": 37.60, "resets_at": "2026-05-01T00:00:00Z",
+      "on_breach": "block" }
   ],
   "metadata": { "label": "dev/codex", "tags": ["coding-cli"], "created_by": "user_01HZ..." }
 }
@@ -301,72 +331,203 @@ Returns array of diffs:
 
 Gateway re-fetches affected `config/:vk_id`. This replaces the 60s full-refresh with tailed diffs. Full-refresh is the fallback on startup / after disconnect.
 
-### 4.4 `POST /api/internal/gateway/budget/check`
+### 4.4 Enforcement freshness (no pre-request control-plane call)
 
-Live reconciliation for near-limit scopes. Called by the gateway only when the cached snapshot shows any scope ≥ 90% of its hard limit (see `budgets.mdx` "Tier 2 — live reconciliation"). For cold scopes the cached snapshot is authoritative and this endpoint is never hit.
+The gateway decides every request against data it already holds. There is no
+control-plane round trip on the hot path, and exactly one narrow read for the
+one figure a bundle structurally cannot carry.
 
-Request:
-```json
-{
-  "vk_id": "vk_01HZ...",
-  "gateway_request_id": "grq_01HZ...",
-  "projected_cost_usd": 0.012,
-  "model": "gpt-5-mini",
-  "hot_scopes": [                            // optional: which scopes to check live
-    { "scope": "project", "scope_id": "proj_..." },
-    { "scope": "principal", "scope_id": "user_..." }
-  ]
-}
-```
+**Totals baked into the bundle.** Each applicable scope arrives in the config
+bundle (§4.2) with its `limit_usd` and its `spent_usd`, and the checker
+compares them in process. A cached bundle is therefore as fresh as the last
+time it was refreshed.
 
-Response (dual-shape; both tiers populate both for now):
-```json
-{
-  "decision":     "allow | soft_warn | hard_block",
-  "warnings":    [ { "scope": "team", "pct_used": 89.2 } ],
-  "block_reason": null,
-  "blocked_by":   null,                      // or { "scope": "project", "window": "month" }
+**Change events do the refreshing.** Writing debits emits a `BUDGET_UPDATED`
+change event on the `/changes` long-poll (§4.3), and the gateway drops the
+bundles it affects: the bundles of one project when the event carries a
+`project_id`, otherwise every bundle of the polled organization, since only
+project-scoped budget events can name a project. The next request through an
+evicted key refetches and enforces against the new totals. The 60s
+`CONFIG_TTL` on a cached bundle is the backstop rather than the mechanism: it
+bounds staleness when a change event is missed or arrives while the gateway is
+disconnected.
 
-  "scopes": [                                // raw per-scope ledger snapshot
-    { "scope": "project",   "scope_id": "proj_...",  "window": "month",  "spent_usd": "4824.12", "limit_usd": "5000.00" },
-    { "scope": "principal", "scope_id": "user_...",  "window": "day",    "spent_usd": "19.40",   "limit_usd": "25.00"   }
-  ]
-}
-```
+**Routing policies and cache rules take the same route.** A policy edit or
+delete (`ROUTING_POLICY_UPDATED` / `ROUTING_POLICY_DELETED`) and any cache-rule
+mutation (`CACHE_RULE_CREATED` / `CACHE_RULE_UPDATED` / `CACHE_RULE_DELETED`)
+also evict every bundle of the polled organization. Both are folded into the
+bundle by the materialiser and neither leaves an id on it to join back on, so
+the organization is the finest key available, the same position a budget event
+without a `project_id` is in. Deleting a policy also releases the keys that
+pointed at it, in the same transaction: the pointer is cleared and the key's
+routing mode moves off `POLICY`, which cannot exist without one.
 
-Consumers can read EITHER the `decision`/`warnings`/`block_reason`/`blocked_by` top-level fields (dispatcher-style; used by older call sites) OR the `scopes` array (raw per-scope data; used by the gateway `Checker.ApplyLive` path landed in Lane A iter 4 pt3). Both are derived from the same authoritative ledger query, so they agree by construction.
+**The one read a bundle cannot carry.** A per-end-user budget is a template:
+one budget row governs a separate allowance for every end user it has seen, a
+fan-out the bundle cannot bake without the control plane enumerating every
+customer of every key. The bundle carries the template's limit, and the
+gateway reads the single bucket the request needs from
+`GET /api/internal/gateway/budget-bucket-spend`, cached 15s per
+`(budget, end user)`. An unreadable bucket (no reader wired, fetch failed,
+cache cold and the fetch slow) skips that scope: permissive on error, never
+permissive on a missing end-user id, which is refused before enforcement runs.
 
-Timeout and fail-open: gateway uses a 200 ms deadline on this call. On timeout or 5xx, the gateway falls back to its tier-1 cached decision (allow-through if cache said allow). Configurable via `LW_GATEWAY_BUDGET_LIVE_TIMEOUT_MS`.
+Both surfaces read the same aggregate from the same materialised view (§4.5),
+so they cannot disagree about what was spent, only about how recently they
+looked. The bounded overshoot that follows from enforcing on a cached figure
+is deliberate and is described in `budgets.mdx` under "The stale-snapshot
+trade-off".
 
-### 4.5 Budget debit — derived from traces (no dedicated endpoint)
+**The retired projective check.** This section used to specify
+`POST /api/internal/gateway/budget/check`, a "tier 2 live reconciliation" the
+gateway was to call whenever a cached scope came within 90% of its hard limit.
+The control plane implemented it; no gateway release ever posted it, and no
+other client did either. It is deleted. The service method behind it,
+`GatewayBudgetService.check()`, is alive and called in process by the surfaces
+that do need a projective answer: the CLI budget pre-check
+(`GET /api/auth/cli/budget/status`) and the personal-budget screens.
+
+### 4.5 Budget debit: derived from spend commands (no dedicated endpoint)
 
 There is no `POST /api/internal/gateway/budget/debit`. Spend is derived from
-the OTel trace the gateway already emits for every request. The flow:
+the spend commands the gateway emits for every request (§4.9), and the
+debits process manager on the `gateway_spend_processing` pipeline is the
+only writer of the ledger. The flow:
 
-1. Gateway emits one span per request, carrying `langwatch.virtual_key_id`,
-   `langwatch.gateway_request_id`, `gen_ai.request.model`, `gen_ai.usage.input_tokens`,
-   `gen_ai.usage.output_tokens`, `gen_ai.usage.cache_read.input_tokens`,
-   `gen_ai.usage.cache_creation.input_tokens`, and `langwatch.status`.
-2. The trace-processing pipeline's `OtlpSpanCostEnrichmentService` computes
-   cost from the pricing catalog (matching on `gen_ai.request.model` +
-   per-project custom costs) and stamps it onto the span.
-3. The `gatewayBudgetSync` reactor reads the enriched span, resolves the
-   applicable budgets (VK, project, team, org, principal scopes), and
-   writes one row per applicable budget to the ClickHouse table
-   `gateway_budget_ledger_events`, keyed by `(TenantId, BudgetId, GatewayRequestId)`.
+1. The gateway admits every request before any gating runs, then confirms or
+   fails it, emitting those commands through its local spool. Admission
+   carries attribution and the end user; the outcome carries token
+   quantities by class, the resolved model and provider, and, on a failure,
+   the gateway's own taxonomy token.
+2. The ingest route prices the outcome once, in integer nano-USD, and joins
+   the admission to the attribution the gateway cannot see: the key's
+   principal and the tenant project's team. The appended event carries both
+   the price and the attribution from then on, so no consumer re-rates or
+   re-resolves identity.
+3. The debits process manager joins one request's admission to its outcome,
+   resolves the applicable budgets (org, team, project, VK, principal, group
+   and attributed-user scopes) and writes one row per applicable budget to
+   the ClickHouse table `gateway_budget_ledger_events`, keyed by
+   `(TenantId, BudgetId, GatewayRequestId)`. Each row stamps `ProviderKey`,
+   the provider the request was dispatched to, read from the command's
+   `model_provider_id`. A budget with a provider filter is only debited when
+   that provider matches; a dispatch with no reported provider debits
+   unfiltered budgets only, because attributing it to a named provider would
+   be a guess.
 4. A `gateway_budget_scope_totals_mv` AggregatingMergeTree materialised view
    aggregates `sumState(AmountUSD)` per `(scope, scope_id, window, period_start)`.
-5. `/budget/check` reads `finalizeAggregation(sumMerge(SpendUSD))` against the
-   materialised view, window-bounded by the current `PeriodStart`.
+5. Enforcement reads `finalizeAggregation(sumMerge(SpendUSD))` against that
+   materialised view, window-bounded by the current `PeriodStart`, through the
+   two surfaces in §4.4: the totals baked into the config bundle and the
+   per-end-user bucket read.
+
+**Only successful rows accrue enforcement spend.** A failed request still
+writes its rows, under `PROVIDER_ERROR` or, for the gateway's own guardrail
+refusal, `BLOCKED_BY_GUARDRAIL`. Both the rollup view and the floored read
+filter on `Status='success'`, so those rows are visibility only: they show
+in a budget's activity list and never move a cap. This is deliberate. A
+provider that errored after billing some tokens is a cost the operator
+should see, but capping a customer on an attempt the platform failed to
+serve would be the platform charging for its own outage.
+
+A request that moved no money AND burned no tokens writes nothing at all.
+Budget and guardrail refusals are the bulk of those, and a rejection storm
+must not amplify into ledger writes that would sum to zero. Zero cost alone
+is not the test: an unpriced model confirms at $0 with real tokens, and
+those rows are written so the activity list still shows the request.
 
 Idempotency is structural: ReplacingMergeTree's ORDER BY
-`(TenantId, BudgetId, GatewayRequestId)` collapses any re-ingestion of the
-same trace (OTel replay, retry, manual backfill). No separate dedup table
-or 24h window is required.
+`(TenantId, BudgetId, GatewayRequestId)` collapses any redelivery of the
+same command (spool retry, drainer replay, manual backfill). No separate
+dedup table or 24h window is required. The key holds no bucket, so it is
+only sound while exactly one writer owns a budget's row for a given
+request, which is why there is exactly one.
 
 The Postgres `GatewayBudgetLedger` table is deprecated — the schema remains
 for rollback safety but no code writes to it. `GatewayBudget` (the budget
 *definition*) stays authoritative for limits/windows/on_breach.
+
+**Buckets.** The ledger accumulates by `(Scope, ScopeId)`, so anything that
+must accrue separately is separate in `ScopeId`:
+
+| Budget | `ScopeId` written |
+|---|---|
+| Plain | the target id |
+| Provider-filtered | `<targetId>\|provider:<modelProviderId>` |
+| Group (per member) | `<groupId>:<userId>` |
+| Group, provider-filtered | `<groupId>:<userId>\|provider:<modelProviderId>` |
+
+Two budgets on the same target, one counting everything and one counting one
+provider, would otherwise share a bucket and each report the other's spend.
+The control plane computes these keys in `budgetResolution.service.ts`; the
+gateway does not need to construct them, it receives them as `scope_id`.
+
+**Group (GROUP-scoped) budgets require the ClickHouse spend path.** On deploys
+without ClickHouse, `budget.check` falls back to the single Postgres
+`GatewayBudget.spentUsd` column, one running figure per budget row. Per-member
+buckets cannot be represented there: the fallback would enforce each member
+against the whole group's combined spend. `GatewayBudgetService.create`
+therefore refuses GROUP budgets with `group_budget_requires_clickhouse` when
+no ClickHouse spend repository is wired (the same detection `check()` uses to
+pick ClickHouse over the Postgres fallback). The other scope types keep
+working on the fallback because their bucket is the budget row itself.
+
+**Every key must resolve a trace project.** This is an observability rule,
+not a spend one: debits ride the commands above and no longer depend on a
+trace landing anywhere. VK create/update still refuse org/team-owned keys
+with no resolvable trace project (`trace_project_required`); project-owned and
+personal keys resolve one structurally, and org/team keys resolve the org's
+governance project when it exists. A null `project_id` can still appear in
+bundles for keys that predate the rule; the gateway skips span export for
+those, which is exactly the hole the refusal stops new keys from entering.
+
+**The ledger's `TenantId` is the key's own project**, the one carried on the
+auth JWT, not the project its traces are exported to. The two differ for
+org- and team-owned keys, whose traces fall back to the organization's
+governance project. Enforcement is unaffected: every spend read spans all of
+the organization's projects, so a bucket totals the same wherever its rows
+landed.
+
+**What key spend is read from.** Per-key spend shown to users (the keys
+table's "Spent this month" column and the Usage tab) is NOT read from this
+ledger. The ledger is per budget: it holds nothing for a key nobody capped,
+and one row per budget for a key covered several times. Those surfaces read
+`trace_summaries`, the enriched per-trace cost, keyed on
+`langwatch.virtual_key_id`, deduped per trace. The ledger remains the source
+for budget enforcement and for a budget's own debit list.
+
+### 4.6 Provider-filtered budget enforcement
+
+A budget with `provider_key` set constrains one vendor, not the request. At
+check time (the Budget interceptor runs after Resolve, so the candidate
+providers are known):
+
+- A breached provider-filtered budget removes that provider from the
+  candidate chain, exactly like provider unavailability.
+- If candidates remain, the request is served by one of them and no
+  budget error is returned. The exhausted filtered budget still rides
+  `X-LangWatch-Budget-Warning` (provider-qualified, §5) so the caller
+  hears why the routing changed.
+- If the chain empties, the request is blocked with `budget_exceeded`,
+  naming the budget that emptied it.
+- With `routing_mode: "none"` the chain is length one, so this degenerates
+  to a plain block.
+
+Unfiltered budgets are unchanged: a breach blocks the request outright.
+
+Every `budget_exceeded` envelope names its budget in `error.meta`:
+`budget_id`, `budget_scope`, `budget_window`, plus `budget_provider` (the
+ModelProvider id) when the block came from a provider-filtered budget
+emptying the chain. The message states the scope and window in words, so an
+agent client rendering only `message` still tells the user which allowance
+to raise.
+
+Two enforcement guarantees are the gateway's own, independent of what the
+control plane materialises (defense in depth against a stale or hand-crafted
+bundle): a request can never dispatch to a provider outside
+`providers_allowed`, even when the credential chain still carries one, and
+`routing_mode: "none"` pins the attempt budget to 1 at bundle decode even if
+`fallback.max_attempts` disagrees.
 
 ### 4.6 `POST /api/internal/gateway/guardrail/check`
 
@@ -377,7 +538,7 @@ Request:
 {
   "vk_id": "vk_01HZ...",
   "project_id": "proj_01HZ...",
-  "gateway_request_id": "grq_01HZ...",
+  "gateway_request_id": "req_4f3c...",
   "direction": "request | response | stream_chunk",
   "guardrail_ids": ["guard_01HZ...", "guard_01HZ..."],
   "content": {
@@ -402,6 +563,19 @@ Response:
 ```
 
 Gateway applies modifications **before** dispatch (request direction) or **before** returning to client (response/stream_chunk).
+
+### 4.7 `GET /api/internal/gateway/health`
+
+Connectivity probe backing the gateway's public `GET /health` status-page endpoint (`specs/ai-gateway/gateway-health.feature`). The gateway's statusprobe monitor calls this on its own clock (default every 15s per gateway node) and serves the cached verdict to public polls, so status-page traffic never reaches the control plane.
+
+Riding the signed channel is the point: a 200 proves DNS/TCP/TLS, the app being up, and the shared HMAC secret matching. The gateway only reads the status code.
+
+Response (200):
+```json
+{ "status": "ok" }
+```
+
+Any non-200 (including 401 on a secret mismatch) marks the probe failed.
 
 ---
 
@@ -443,12 +617,12 @@ All errors OpenAI-compatible:
 
 **Response headers (all requests):**
 
-- `X-LangWatch-Request-Id: grq_01HZ...` — opaque gateway request id, also emitted on errors and in OTel trace.
+- `X-LangWatch-Gateway-Request-Id: req_4f3c...`: opaque gateway request id, also emitted on errors and in OTel trace. Generated by the request-id middleware as `req_` plus 30 hex characters (`pkg/httpmiddleware/requestid.go`); a `gtwyreq_` ksuid appears only on the fallback path where no middleware id is in context. This is the id `gateway_request_id` carries on every spend event and webhook envelope, so it is the join key between a live response and its billing records.
 - `X-LangWatch-Provider: openai|anthropic|...` — which provider was actually used (may differ from requested model due to fallback or alias).
 - `X-LangWatch-Model: gpt-5-mini` — resolved provider model.
 - `X-LangWatch-Cache: hit|miss|bypass|force` — cache outcome as observed by the gateway. (`force` is v1.1 — deferred with 400 cache_override_not_implemented in v1; header value matches the internal `Kind` enum in `services/gateway/internal/cacheoverride`.)
 - `X-LangWatch-Cache-Mode: respect|disable` — echoes the cache-override mode that was applied to the request (independent of upstream outcome). Emitted on every `/v1/messages` response.
-- `X-LangWatch-Budget-Warning: <scope>:<pct>` — optional, emitted on soft-cap breaches (can repeat).
+- `X-LangWatch-Budget-Warning: <scope>:<pct>`: optional, emitted on soft-cap breaches (can repeat). A provider-filtered budget qualifies the scope segment as `<scope>/<model_provider_id>` (e.g. `project/mp_01HZ:95`) so the warning names WHICH budget is running out; the percentage always sits after the only colon, so `split(":")` keeps parsing.
 - `X-LangWatch-Fallback-Count: <n>` — number of fallbacks attempted before success (0 when primary succeeded).
 
 ---
@@ -504,7 +678,7 @@ Idempotency: gateway does **not** retry POST unless upstream responded before he
 
 ## 7b. Streaming contract (SSE)
 
-- **Pre-first-chunk mutations allowed:** gateway may inject response headers (e.g. `X-LangWatch-Request-Id`, `X-LangWatch-Provider`), run pre-call guardrails that modify the request payload, and transparently switch providers via fallback.
+- **Pre-first-chunk mutations allowed:** gateway may inject response headers (e.g. `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Provider`), run pre-call guardrails that modify the request payload, and transparently switch providers via fallback.
 - **Post-first-chunk immutability:** once the first byte has been emitted to the client, the gateway MUST pass through subsequent SSE chunks byte-for-byte from the upstream provider. No reordering, no delta merging, no re-chunking. Coding CLIs (Claude Code, Codex) depend on exact tool-call delta shapes.
 - **Mid-stream failure:** if the upstream connection drops mid-stream, the gateway closes the client connection (rather than silently switching to a fallback, which would produce a Frankenstein stream). A terminal SSE `error` event is emitted with `type: provider_error`.
 - **Post-response guardrails (stream case):** run on the **reassembled full stream** after the client connection closes. Non-blocking to the response. If a guardrail flags the completed response, emit an OTel trace attribute (`langwatch.guardrail.post_flag`) but do not retroactively alter the response; for real-time redaction, use `direction: stream_chunk` guardrails which gate each chunk before it's emitted.
@@ -526,13 +700,16 @@ Pattern (from Bifrost `ObservabilityPlugin.Inject(trace)`):
 
 ## 9. Auth cache strategy (gateway side)
 
-Three layers, documented here so Go code + infra agree:
+Documented here so Go code + infra agree:
 
-1. **L1 in-memory LRU:** 64k entries, TTL = JWT `exp`. Resolved JWT cached by SHA-256(vk_plain). Zero-RTT hot path.
-2. **L2 Redis (optional):** same key, shared across gateway nodes. TTL = JWT `exp`. `$LW_GATEWAY_REDIS_URL` env toggles. When L2 miss, one node wins the resolve; others read cached.
-3. **L3 bootstrap-pull (enterprise opt-in):** on startup, gateway calls `GET /api/internal/gateway/bootstrap` → paginated stream of all non-revoked VKs' JWTs. Enables gateway to serve traffic when control-plane is offline. Flag: `$LW_GATEWAY_BOOTSTRAP_PULL=true`.
+1. **L1 in-memory LRU:** 10k entries by default (`Options.LRUSize`; the chart's `cache.lruSize` is not wired yet). Resolved JWT cached by SHA-256(vk_plain). Zero-RTT hot path. One per pod, shared with nothing: a cross-node tier buys a warm start that a rolling deploy pays for anyway, and costs an invalidation path that has to reach it.
 
-Background refresh: single goroutine long-polls `/api/internal/gateway/changes?since=<rev>` with 25s timeout. On diff → re-fetch affected VK configs and invalidate L1/L2 entries.
+   JWT `exp` bounds normal freshness, it is not the eviction point. Past `exp` an entry is refreshed before it serves, and if that refresh fails for transport reasons the entry keeps serving while its soft expiry is bumped, up to a hard cap of `exp + LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default 6h, negative disables the grace entirely). An auth-class rejection evicts immediately at any point.
+2. **Bootstrap-pull (enterprise opt-in):** on startup, gateway calls `GET /api/internal/gateway/bootstrap` → paginated stream of all non-revoked VKs' JWTs. Enables gateway to serve traffic when control-plane is offline. Flag: `LW_GATEWAY_BOOTSTRAP_PULL=true`, the same name §6 uses. Nothing reads it yet, so it is a name this document reserves rather than one the binary honors.
+
+Background refresh: single goroutine long-polls `/api/internal/gateway/changes?since=<rev>` with 25s timeout. On diff → re-fetch affected VK configs and invalidate the matching L1 entries.
+
+Config staleness is bounded by a TTL refresh underneath the change feed, and that refresh is conditional: it sends `If-None-Match: <etag>` to §4.2 and takes the 304 as "keep the bundle, restart the staleness clock". A key nobody changed costs the control plane a revision lookup rather than a full config materialization.
 
 No filesystem-persisted secrets. JWTs and configs are in-memory only; on restart we re-fetch.
 
@@ -572,9 +749,9 @@ Scoping rules follow the existing project/team/org hierarchy already in LangWatc
 Each lane's feature file elaborates the contract with testable scenarios. Keep these in sync:
 
 - `specs/ai-gateway/virtual-keys.feature` — VK CRUD, show-once-secret, peppered HMAC-SHA256 hashing (§2), provider-creds linking, fallback chain, rotation/revoke, RBAC, attribution, internal endpoints (resolve-key JWT + config/:vk_id ETag + /changes long-poll).
-- `specs/ai-gateway/budgets.feature` — hierarchical scopes (org/team/project/vk/principal), windows (min→total), `on_breach: block|warn`, trace-driven ClickHouse fold (idempotent by `gateway_request_id`), timezone-aware resets.
+- `specs/ai-gateway/budgets.feature`: hierarchical scopes (org/team/project/vk/principal), windows (min→total), `on_breach: block|warn`, spend-command ClickHouse debits (idempotent by `gateway_request_id`), timezone-aware resets.
 - `specs/ai-gateway/gateway-provider-settings.feature` — ModelProvider IS the single source of truth (no separate `GatewayProviderCredential` binding); gateway-only settings (rate limits, rotation policy, gateway-only extraHeaders) live on the ModelProvider Advanced (Gateway) tab and must not leak into the legacy litellm path.
-- `specs/ai-gateway/epic.feature` — cross-cutting E2E scenarios (end-to-end request through gateway → fallback → OTel trace → trace-driven budget fold → per-tenant OTel emit).
+- `specs/ai-gateway/epic.feature`: cross-cutting E2E scenarios (end-to-end request through gateway → fallback → spend-command debits → per-tenant OTel emit).
 - `specs/ai-gateway/` (pending, Lane A): `gateway-service.feature`, `health-checks.feature`, `auth-cache.feature`, `provider-routing.feature`, `caching-passthrough.feature`, `fallback.feature`, `streaming.feature`, `guardrails.feature`.
 
 When a spec and this contract disagree, **the contract wins** and the spec is amended (after consensus in #langwatch-ai-gateway).
@@ -619,7 +796,7 @@ To avoid this, the gateway **honours incoming trace context** on every request:
 | `X-LangWatch-Thread-Id` | Optional conversation thread id; carried on the span as `langwatch.thread_id`. |
 | `X-LangWatch-Trace-Metadata` | JSON object merged into the span's custom metadata. |
 
-If **no** trace headers are present, the gateway creates a new trace and emits **`X-LangWatch-Trace-Id: <trace_id>`** and **`X-LangWatch-Request-Id: grq_…`** on the response so the caller can stitch later if desired.
+If **no** trace headers are present, the gateway creates a new trace and emits **`X-LangWatch-Trace-Id: <trace_id>`** and **`X-LangWatch-Gateway-Request-Id: req_…`** on the response so the caller can stitch later if desired.
 
 If the caller wants to keep traces independent (rare — e.g. a shared internal gateway that shouldn't expose its trace graph to callers), simply don't set the headers. No double-cost attribution in this case because the caller's side has no LLM span — only the gateway does.
 
@@ -665,11 +842,22 @@ Auth: existing LangWatch API tokens (personal access or service-account) present
 | `POST` | `/api/gateway/v1/budgets` | Create budget | `gatewayBudgets:create` |
 | `PATCH` | `/api/gateway/v1/budgets/:id` | Update | `gatewayBudgets:update` |
 | `DELETE` | `/api/gateway/v1/budgets/:id` | Delete | `gatewayBudgets:delete` |
-| `GET` | `/api/gateway/v1/model-providers` | List ModelProviders (gateway + legacy paths share this) | `modelProviders:view` |
-| `POST` | `/api/gateway/v1/model-providers` | Create ModelProvider (with optional gateway-Advanced fields) | `modelProviders:manage` |
-| `PATCH` | `/api/gateway/v1/model-providers/:id` | Update (including Advanced fields) | `modelProviders:manage` |
-| `DELETE` | `/api/gateway/v1/model-providers/:id` | Delete | `modelProviders:manage` |
-| `GET` | `/api/gateway/v1/usage` | Spend / volume aggregations | `gatewayUsage:view` |
+| `GET` `POST` | `/api/gateway/v1/providers` | Tombstone. Gateway provider bindings folded into ModelProvider in iter 110, so all four answer `410 Gone` with `gateway_provider_bindings_gone` and point at `/api/model-providers` | n/a |
+| `PATCH` `DELETE` | `/api/gateway/v1/providers/:id` | Tombstone, same as above | n/a |
+| `POST` | `/api/gateway/v1/virtual-keys/:id/disable` | Reversible stop (distinct `virtual_key_disabled` on use; grace preserved) | `virtualKeys:update` |
+| `POST` | `/api/gateway/v1/virtual-keys/:id/enable` | Reverse of disable; restores the key exactly as it was | `virtualKeys:update` |
+| `GET` | `/api/gateway/v1/virtual-keys/:id/spend` | Per-key spend + request count over a window | `gatewayUsage:view` |
+| `POST` | `/api/gateway/v1/budgets/:id/reset` | Move the period boundary; never mutates recorded spend; `?end_user_id=` for one template bucket | `gatewayBudgets:update` |
+| `GET` | `/api/gateway/v1/end-users/:id/spend` | Rolling-window usage rollup + the applicable template caps at their current-period spend; org key, billing surface | `gatewaySpend:view` |
+| `GET` | `/api/gateway/v1/cache-rules` | List cache rules, cursor-paged | `gatewayCacheRules:view` |
+| `POST` | `/api/gateway/v1/cache-rules` | Create a cache rule | `gatewayCacheRules:create` |
+| `GET` | `/api/gateway/v1/cache-rules/:id` | Get one cache rule | `gatewayCacheRules:view` |
+| `PATCH` | `/api/gateway/v1/cache-rules/:id` | Update a cache rule | `gatewayCacheRules:update` |
+| `DELETE` | `/api/gateway/v1/cache-rules/:id` | Delete a cache rule | `gatewayCacheRules:delete` |
+| `GET` | `/api/gateway/v1/spend-events` | Read the spend event log, cursor-paged and filterable by key, end user, model, and status | `gatewaySpend:view` |
+| `POST` | `/api/gateway/v1/spend-events/replay` | Re-deliver a window of spend events to the subscribed webhook endpoints | `gatewaySpend:manage` |
+| `GET` | `/api/gateway/v1/spend-summaries` | Aggregated spend over a window, grouped by the requested dimension | `gatewaySpend:view` |
+| `GET` | `/api/gateway/v1/openapi.json` | This API's OpenAPI description | none, deliberately public |
 
 **Response shape convention:** snake_case (`virtual_key_id`, `created_at`) to match the OpenAI / Anthropic API aesthetic that external integrations already expect.
 
@@ -677,7 +865,21 @@ Auth: existing LangWatch API tokens (personal access or service-account) present
 
 **Shared service layer:** the Hono REST routes and the internal tRPC routes **both** call the same `VirtualKeyService`, `GatewayBudgetService`, `ModelProviderService`. No business logic is duplicated. Only the DTO-shape helpers differ (snake_case for REST, camelCase for tRPC) and they live in a shared mapper module (`src/server/gateway/mappers/`).
 
-**OpenAPI spec:** generated via `pnpm run openapi:gen` (TBD if not present) and published at `/api/gateway/v1/openapi.json` plus the docs site.
+**OpenAPI spec:** generated into `platform/app/src/app/api/openapiLangWatch.json` by `pnpm run task generateOpenAPISpec`, served unauthenticated at `/api/gateway/v1/openapi.json`, and published on the docs site. `pnpm check:openapi-completeness` gates the generated document over both `/api/gateway/v1` and `/api/webhooks/v1`: every body-accepting write declares a `requestBody`, every operation whose handler reads the query string declares its query parameters, and every operation declares a 2xx response carrying a schema. Exemptions live in `platform/app/scripts/check-openapi-completeness.ts` as data with a reason per entry, and an entry that stops excusing anything fails the check.
+
+## 12b. Billing events, webhooks, and end-user attribution (2026-07)
+
+The billing platform's wire-locked contracts. Feature files: `billing-spend-events.feature`, `gateway-spend-rest.feature`, `end-user-attribution.feature`, `specs/webhooks/webhook-endpoints.feature`, `specs/webhooks/webhook-settings-ui.feature`.
+
+**End-user capture.** Resolution precedence on the request: `x-langwatch-end-user-id` header, then `x-litellm-end-user-id` (migration alias), then the OpenAI `user` body field; headers beat body. One resolver feeds spend admission and budget enforcement. Caller metadata echo: `x-langwatch-metadata` header (JSON object, 4 KB cap) returns verbatim as `metadata` on the request's spend event. Fail-closed rule: an active `ATTRIBUTED_USER` template + no resolvable end-user id rejects with `error.code = "end_user_required"` naming both wire fields.
+
+**Spend record.** One per gateway request, keyed by the `gateway_request_id` ULID (also the `X-LangWatch-Gateway-Request-Id` response header). Envelope `{id, type, created, schema_version: "1", data}`; ids are type-suffixed (`<gateway_request_id>:completed` / `:settled`) so the settled/completed pair never collides in consumer dedup while `data.gateway_request_id` joins it. `data`: org/project/vk/principal/end-user attribution, trace id, model + `model_provider_id`, `request_type`, `usage` (5 integer token classes), `cost` (`total_usd` string, `nano_usd` int64, `rate_version`), `status` (`success|error|admitted|settled`), `error {class, http_status}`, `duration_ms`, `labels`, `metadata`. Settled events (grace default 30 min, `LW_SPEND_SETTLEMENT_GRACE_MS`) carry null `usage`/`cost`/`duration_ms`, `needs_reconciliation: true`, `settle_reason`; a later completed event for the same request id supersedes: consumers REPLACE, never sum. `occurred_at` is request time. Money: integers, summed as integers, rounded once at invoice.
+
+**Delivery.** Body `{"batch": [envelope, ...]}` (up to `max_batch_size`). Headers: `X-LangWatch-Delivery-Id` (delivery id, NOT an event id: one delivery carries many envelopes, so consumer dedup is on the envelope `id` in the body), `X-LangWatch-Signature: t=<unix>,v1=<hex hmac-sha256(secret, "<t>.<raw body>")>` (5-min tolerance, raw-bytes verification, constant-time compare; `v1` REPEATS during a secret rotation, one per valid secret newest first, and a receiver must accept a match against any of them), `X-LangWatch-Delivery-Attempt`, `X-LangWatch-Test-Fire` on tests. `roll-secret` keeps the previous secret valid for 24h and signs with both, mirroring the gateway JWT's {current, previous} verification key set. 2xx acks; 5xx/429/408 retry honoring `Retry-After`; other statuses terminal; redirects refused. Ladder 1m/5m/30m/2h/6h/12h then 12h cadence, 11 attempts, last inside 72h. 72h of unbroken failures auto-disables (`disabled_reason: "auto_failures_72h"`); re-enable does not re-send the gap, replay covers it. Per-endpoint controls with server bounds: `max_batch_size` 1-100, `max_batch_delay_ms` 0-60000, `max_in_flight` 1-8. Health headline: `oldest_undelivered_age_ms`. Delivery log retained 30 days. SSRF: private/loopback always blocked; `WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS=1` relaxes only that fence.
+
+**Event catalog (family `gateway`).** `gateway.request.completed|settled`; `gateway.budget.threshold_crossed|breached` (80 percent threshold; breached fires on `warn` budgets too; once per crossing per period, the envelope id embeds `<budget>:<bucket>:<kind>:<period_started_at_ms>`); `gateway.virtual_key.created|rotated|disabled|enabled|revoked`. Selectors: exact type, `gateway.*`, `*`; an exact selector must name a registered type, so every emitted type carries a registry entry.
+
+**Org-key REST (enterprise flag `webhookEndpointsEnabled`; org-exclusive permissions).** `/api/webhooks/v1/endpoints*` CRUD + `roll-secret` + `test` + `deliveries` + `health` (`webhookEndpoints:manage|view`), `/api/webhooks/v1/event-types` + `/events` (view). `/api/gateway/v1/spend-events` (RANGED pull: `from`/`to` unix ms required, safe ints, `from <= to`; cursor stable under live writes; garbled cursor 400; status filter incl `admitted`) + `/spend-summaries` (`group_by=virtual_key|end_user`, `event_count` + `settled_count` separate, settled never in cost sums) under `gatewaySpend:view`; `/spend-events/replay` (`{from, to, endpoint_id}`, 7-day window cap, 10k envelope cap, original envelope ids, honors subscriptions) under `gatewaySpend:manage`. Spend retention: fixed 13 months, exempt from tenant retention and the TTL reconciler (pinned by unit test).
 
 ## 13. Open questions (to resolve in next iterations)
 
@@ -685,7 +887,7 @@ Auth: existing LangWatch API tokens (personal access or service-account) present
 - [ ] **Streaming fallback semantics:** the mid-stream policy above is conservative; verify Portkey / Helicone behaviour. — @andr competitor research.
 - [ ] **Budget windows & timezone:** `day` window in whose tz — org's or UTC? — default UTC, org-level override. — @alexis Prisma field.
 - [ ] **Multi-region gateway routing:** do we need region-pinning for data residency? — @sergey + infra.
-- [ ] **Webhook for budget breach:** notify Slack/email on hard block? — post-MVP.
+- [x] **Webhook for budget breach:** shipped as the webhook endpoints platform (§12b): `gateway.budget.threshold_crossed` / `gateway.budget.breached` families, once per crossing per period.
 
 ---
 
@@ -704,3 +906,5 @@ Auth: existing LangWatch API tokens (personal access or service-account) present
   2. **Cache-rules full stack (§6 extended)** — Lane B iter 38 (2ef1dbd42): `GatewayCacheRule` PG model + service + tRPC + RBAC + audit + multitenancy exemption. Lane B iter 39 (bb9c8ebe8): `config.materialiser.bundleFor(orgId)` emits cache-rules into the VK bundle pre-sorted priority DESC, enabled=true, archived=null. Lane B iter 40 (73552f964): `/gateway/cache-rules` list + create/edit drawers + matcher summary + colour-coded action badges + precedence copy + inline enable toggle + archive from row menu. Matcher shape `{vk_id?, vk_tags?, vk_prefix?, principal_id?, model?, request_metadata?}` + action shape `{mode: respect|force|disable, ttl?, salt?}` wire-locked. `GatewayChangeEvent` emits on every write so /changes long-poll triggers bundle refresh ≤30s. BDD spec `cache-control-rules.feature` §§1–7 cover precedence / matchers / actions / hot-path / observability / RBAC / UI — 29 scenarios total. Go evaluator (`internal/cacherules/eval.go`) still in Lane A's queue; when it lands it reads `bundle.cache_rules` linearly → first-match-wins → emits `langwatch.cache.rule_id` + `gateway_cache_rule_hits_total` per spec §5.
   3. **Helm chart lw-dev smoke (§11 self-hosting)** — Lane A iter 44: ECR push + `helm upgrade --install gateway-smoke ./charts/gateway` on lw-dev EKS; pod Running, /healthz 200 with `X-LangWatch-Gateway-Version` + `X-LangWatch-Request-Id` headers present. /readyz 503 is expected until the langwatch-app Deployment gets `LW_GATEWAY_INTERNAL_SECRET` via local `terraform apply` on lw-dev (mirroring the `infra-env-development.yaml` CI pipeline). rchaves clarification logged: validate-on-lw-dev-before-merge, prod apply stays CI-only via saas PR merge.
   - No wire contract changes on §§3–5 (VK format, auth, endpoints, /api/internal/gateway/*). Permission names updated: §9 RBAC adds `gatewayCacheRules` resource with `:view / :create / :update / :delete / :manage` (default MEMBER = view-only; ADMIN = full CRUD + :manage).
+- **v0.1.6 (2026-07-31)** §12b added: the billing events platform contracts (end-user capture precedence, metadata echo, the spend record and settled supersession, the signed delivery contract with ladder and bounds, the event catalog, the org-key REST families, the 13-month retention exemption). §12 table: the phantom `GET /usage` row replaced with the real per-key spend read, and the disable/enable/reset/end-user-spend routes added. §13 webhook-for-budget-breach open question closed as shipped.
+- **v0.1.5 (2026-07-27)** Gateway enforcement for budgets on every dimension (Wave 2 of the n x n budgets work; bundle fields landed in Wave 1). §4.6 is now live in the Go gateway: a breached provider-filtered blocking budget removes its provider from the candidate chain at dispatch, an emptied chain blocks with `budget_exceeded` naming the budget (`error.meta.budget_id` / `budget_scope` / `budget_window` / `budget_provider`), and the exhausted vendor rides the §5 warning header with a provider-qualified scope segment (`<scope>/<model_provider_id>:<pct>`). The gateway stamps `langwatch.model_provider_id` (ModelProvider row id of the dispatched credential) on every customer span, which is what lets §4.5 step 3 attribute debits to provider-filtered buckets. Defense in depth added gateway-side: dispatch refuses providers outside `providers_allowed` even when a stale bundle chain still carries them, and `routing_mode: "none"` re-pins `max_attempts` to 1 at bundle decode. GROUP buckets enforce as materialised (one per member, principal resolved by the control plane); no gateway-side bucket construction. Contract tests in `services/aigateway/adapters/controlplane/budgets_contract_test.go` pin both sides of the bundle fields, the bucket separators, and the span attribute read path.

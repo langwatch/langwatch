@@ -20,13 +20,133 @@ Content:  application/json
 
 Self-hosted: replace the base with your control plane's DNS.
 
+## Paging
+
+Every list on this API is cursor-paged. `limit` defaults to 50 and is capped at 200, and `cursor` is opaque: pass back the `next_cursor` you were given, verbatim, and keep going until it comes back `null`. A full page does **not** mean there is more, and a short page does not mean there is not: `next_cursor` is the only end-of-walk signal. A cursor this API did not issue answers `400` with `error.code = "invalid_cursor"` rather than silently restarting the walk.
+
+## Retrying a create safely
+
+The four creates (`/virtual-keys`, `/budgets`, `/cache-rules`, and `/api/webhooks/v1/endpoints`) accept an `Idempotency-Key` header, so a client that never learned the outcome can retry without creating a second resource:
+
+```bash
+curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
+  -H "Authorization: Bearer $LANGWATCH_API_KEY" \
+  -H "Idempotency-Key: signup-acme-4171" \
+  -H "Content-Type: application/json" \
+  -d '{ "scope": {...}, "name": "customer-acme", "window": "month", "limit_usd": "250" }'
+```
+
+- Send the same key and the same body again within **24 hours** and you get the original response back, with `X-Idempotent-Replay: true`. Nothing is created twice.
+- Send the same key with a **different** body and the request is refused: `409` with `error.code = "idempotency_error"`. The key already stands for a different request.
+- Retry while the first attempt is still running and you also get `409 idempotency_error`, so two racing retries cannot both create.
+- Only successful outcomes are stored. If the create failed, a retry runs it again for real.
+- The key is yours to choose, 8 to 255 characters. Scope it to the thing you are creating, not the attempt.
+
+Replay is what makes a lost create recoverable on the two routes that return a secret exactly once: replaying the original request returns the original `secret`.
+
+<Warning>
+**The body has to be identical on the retry**, because the key is matched against a fingerprint of it. A field computed fresh each attempt makes every retry a `409`: `"cycle_anchor_at": new Date().toISOString()` is a different body every time. Derive such values from something the first call already produced, for example the `created_at` of the virtual key you just minted, rather than from the clock at retry time.
+</Warning>
+
+Keys are scoped to your project on the gateway routes and to your organization on the webhook routes, so two projects can use the same key text without colliding. Stored responses are encrypted at rest and expire after 24 hours.
+
+## From the SDKs
+
+Both LangWatch SDKs wrap this API, so you get the paging walk, the error types, and the idempotency plumbing without writing them. `virtualKeys` / `virtual_keys` and `gatewayBudgets` / `gateway_budgets` cover this page; `spendEvents` / `spend_events` and `webhooks` cover the [billing](/ai-gateway/billing-events) and [webhook](/features/webhooks) surfaces.
+
+<CodeGroup>
+
+```typescript TypeScript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch({ apiKey: process.env.LANGWATCH_API_KEY });
+
+// Three ways to read a list: one page, the whole walk, or a stream.
+const page = await langwatch.gatewayBudgets.listPage({ limit: 100 });
+const { data } = await langwatch.gatewayBudgets.list({ externalId: "acme-tenant-4171" });
+for await (const budget of langwatch.gatewayBudgets.iterate()) {
+  console.log(budget.name, budget.resets_at);
+}
+
+const budget = await langwatch.gatewayBudgets.create(
+  {
+    scope: { kind: "project", project_id: "proj_01HZ..." },
+    name: "customer-acme",
+    window: "month",
+    limit_usd: "250",
+    cycle_anchor_at: "2026-01-17T09:00:00Z",
+    external_id: "acme-tenant-4171",
+  },
+  {
+    idempotencyKey: "signup-acme-4171",
+    onIdempotentReplay: () => console.log("replayed, nothing was created"),
+  },
+);
+
+await langwatch.gatewayBudgets.archive(budget.id);
+```
+
+```python Python
+import os
+
+import langwatch
+
+langwatch.setup(api_key=os.environ["LANGWATCH_API_KEY"])
+
+# Three ways to read a list: one page, the whole walk, or a stream.
+page = langwatch.gateway_budgets.list_page(limit=100)
+listing = langwatch.gateway_budgets.list(external_id="acme-tenant-4171")
+for budget in langwatch.gateway_budgets.iterate():
+    print(budget["name"], budget["resets_at"])
+
+budget = langwatch.gateway_budgets.create(
+    scope={"kind": "project", "project_id": "proj_01HZ..."},
+    name="customer-acme",
+    window="month",
+    limit_usd="250",
+    cycle_anchor_at="2026-01-17T09:00:00Z",
+    external_id="acme-tenant-4171",
+    idempotency_key="signup-acme-4171",
+    on_idempotent_replay=lambda: print("replayed, nothing was created"),
+)
+
+langwatch.gateway_budgets.archive(budget["id"])
+```
+
+</CodeGroup>
+
+Three things are worth knowing before you write against them:
+
+- **Paging has three shapes on purpose.** `listPage` / `list_page` returns one page and its cursor when you want to drive the walk yourself. `list` returns the whole set. `iterate` streams rows and fetches pages behind you, which is what you want over a large window.
+- **`idempotencyKey` / `idempotency_key` is a per-call option**, not a body field, and the replay callback fires when the server answered from a stored receipt. That is how a provisioning job tells "I created it" from "it already existed".
+- **Retirement is named after what it does.** Budgets and webhook endpoints `archive`, which keeps their history readable. Virtual keys `disable` (reversible) or `revoke` (terminal).
+
+## Your own ids and metadata
+
+Virtual keys and budgets both take two optional fields on create, so you do not have to keep a mapping table between your system and LangWatch:
+
+- `external_id`: your identifier for whatever this resource belongs to, for example your customer id. Unique per organization and resource type. Reusing one answers `409` with `error.code = "external_id_conflict"`, which is what makes provisioning safe to retry.
+- `metadata`: a flat object of string keys and values, echoed back on every read.
+
+Filter by your own id instead of storing ours:
+
+```bash
+curl -sS "https://app.langwatch.ai/api/gateway/v1/budgets?external_id=acme-tenant-4171" \
+  -H "Authorization: Bearer $LANGWATCH_API_KEY"
+```
+
 ## Virtual keys
 
 ### List
 
 ```
 GET /virtual-keys
+GET /virtual-keys?limit=100&cursor=<next_cursor>
 ```
+
+Returns the keys visible to your credential: keys scoped to your project, its team, or the whole organization, newest first.
+
+Visibility is applied to each page after it is read, so a page of virtual keys can hold fewer rows than `limit` while the walk still has more to give.
 
 Response:
 
@@ -35,25 +155,32 @@ Response:
   "data": [
     {
       "id": "vk_01HZX...",
+      "organization_id": "org_01HZ...",
       "name": "prod-key",
       "description": null,
-      "environment": "live",
-      "prefix": "vk-lw-01H",
-      "last_four": "NZ0Z",
-      "status": "ACTIVE",
+      "status": "active",
+      "purpose": "user",
+      "display_prefix": "vk-lw-01HZX9",
       "principal_user_id": null,
-      "project_id": "proj_01HZ...",
-      "organization_id": "org_01HZ...",
-      "provider_credential_ids": ["gpc_01HZ...", "gpc_01HZW..."],
-      "config": { /* model_aliases, cache, fallback, ... */ },
+      "trace_project_id": "proj_01HZ...",
+      "trace_project_archived": false,
+      "scopes": [{ "scope_type": "project", "scope_id": "proj_01HZ..." }],
+      "routing_policy_id": null,
+      "routing_mode": "none",
+      "config": { /* modelsAllowed, model_aliases, cache, fallback, ... */ },
+      "revision": "3",
       "created_at": "2026-04-10T12:00:00Z",
       "updated_at": "2026-04-18T18:21:00Z",
-      "revoked_at": null,
-      "last_used_at": "2026-04-18T21:03:12Z"
+      "last_used_at": "2026-04-18T21:03:12Z",
+      "revoked_at": null
     }
   ]
 }
 ```
+
+`purpose: "langy"` marks a product-managed key (auto-provisioned by LangWatch). Those rows appear in listings but refuse every mutation; filter on `purpose` when scripting bulk operations.
+
+`last_used_at` advances when the gateway resolves the key, which it does periodically rather than per request, because it serves traffic from a cached configuration in between. Read it as "this key has been in use recently", not as the timestamp of the last request. A revoked or disabled key never advances it, since the refusal happens before the bump, so the field is a reliable way to find keys nobody is using.
 
 ### Create
 
@@ -61,18 +188,27 @@ Response:
 POST /virtual-keys
 ```
 
-Body:
+Body (only `name` is required):
 
 ```json
 {
   "name": "ci-key",
   "description": "CI smoke tests",
-  "environment": "live",                         // or "test"
-  "principal_user_id": null,                     // optional
-  "provider_credential_ids": ["gpc_01HZ..."],    // required, min 1
-  "config": { /* optional partial config */ }
+  "principal_user_id": null,
+  "scopes": [{ "scope_type": "project", "scope_id": "proj_01HZ..." }],
+  "routing_mode": "none",
+  "routing_policy_id": null,
+  "budget": { "limit_usd": "25", "window": "month", "on_breach": "block" },
+  "config": { "providersAllowed": ["mp_openai..."] }
 }
 ```
+
+- `scopes` defaults to the calling project. Team- and org-scoped keys need a scoped API key holding `virtualKeys:manage` at each requested scope; legacy project keys can only mint keys for their own project.
+- An org- or team-scoped key also needs a place for its traces and spend to land, and has to say where: pass `trace_project_id` (requires `virtualKeys:manage` on that project; it is a destination, not a scope, and grants no access to the key). Without it, and without exactly one project scope naming a live project to take it from, creation refuses with `gateway_trace_project_ambiguous`. The same refusal covers a key scoped to several projects at once. An organization with no other live projects is exempt and the key gets its oldest live governance project, because there is nothing else to name; one with no governance project either refuses with `trace_project_required`. A `trace_project_id` that names a project this organization does not have refuses with `gateway_trace_project_unknown` rather than quietly resolving to somewhere else.
+- `trace_project_id` is decided once, when the key is written, and stored on it. Changing what the key is scoped to therefore never moves where its traces and spend land; send `trace_project_id` on the update to move it, validated the same way create validates it. Sending it as explicit `null` does not clear it: it asks for the destination to be worked out again from what the key is now, under the same rules create uses, so it lands on the key's single project scope when exactly one names a live project, falls back to the organization's oldest live governance project when there are no other live projects to choose from, and is refused with `gateway_trace_project_ambiguous` when nothing selects a destination and the organization has live projects that could have been named. A key written before this was stored, in an organization that had no governance project to give it, can carry `null`: its traces are dropped and no budget counts its spend, so give it a `trace_project_id`.
+- `trace_project_archived` says the project the key traces into has been deleted. The key goes on sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never refused for it. Point the key somewhere else if that is not what you want.
+- `budget` creates a budget atomically with the key and manages exactly that row on later updates: the key can never exist without the cap you asked for. Windows: `day`, `week`, `month`.
+- `routing_mode` is one of `none` (default: no silent failover), `fallback_all`, or `policy` (requires `routing_policy_id`).
 
 Response `201`:
 
@@ -93,6 +229,16 @@ GET /virtual-keys/:id
 
 Response: `{ "virtual_key": {...} }`. No secret.
 
+### Spend
+
+```
+GET /virtual-keys/:id/spend?from=1782950400000&to=1784160000000
+```
+
+Requires `gatewayUsage:view`. `from` and `to` are epoch milliseconds, both optional, defaulting to the current UTC calendar month. Answers `{ "virtual_key_id", "spent_usd", "requests", "window" }`, with `window` echoed in the same unit so a response feeds straight back as the next request. It reads the cost path the dashboard reads, so this number and the UI agree by construction.
+
+On deployments without a ClickHouse spend source the endpoint answers `412` with `error.code = "spend_source_unavailable"` rather than a `$0.00` that cannot be told apart from a zero-spend key.
+
 ### Update
 
 ```
@@ -101,39 +247,35 @@ PATCH /virtual-keys/:id
 
 Body (all fields optional):
 
-```json
+```jsonc
 {
   "name": "new-name",
-  "description": null,                         // null clears
-  "provider_credential_ids": ["gpc_...", "..."],
+  "scopes": [{ "scope_type": "team", "scope_id": "team_..." }],
+  "trace_project_id": "proj_01HZ...", // or null to re-resolve it
+  "routing_mode": "fallback_all",
+  "budget": { "limit_usd": "50", "window": "month" },
   "config": { /* partial, merges with existing */ }
 }
 ```
 
-### Rotate
+`scopes` replaces the whole visibility set and requires `virtualKeys:manage` at every NEW scope, and does not move where the key's traces and spend land. `trace_project_id` does: omitting it leaves the destination alone, a value moves it, and explicit `null` re-resolves it under the create-time rules rather than clearing it. `budget: null` archives the key's own cap (spend history is retained); omitting `budget` leaves it alone.
+
+### Rotate, disable, enable, revoke
 
 ```
 POST /virtual-keys/:id/rotate
-```
-
-Response `200`:
-
-```json
-{
-  "virtual_key": { /* ... */ },
-  "secret": "vk-lw-NEW..."
-}
-```
-
-The previous secret stops authenticating immediately (modulo ~60 s of gateway L1 cache TTL).
-
-### Revoke
-
-```
+POST /virtual-keys/:id/disable      { "reason": "payment overdue" }   // reason optional
+POST /virtual-keys/:id/enable
 POST /virtual-keys/:id/revoke
 ```
 
-Idempotent: revoking an already-revoked VK returns `200` with the same status.
+**Rotate** answers `{ "virtual_key": {...}, "secret": "vk-lw-NEW..." }`. The previous secret keeps authenticating for a 24 hour grace window, so in-flight clients roll over without a coordinated deploy.
+
+**Disable** is the reversible stop (`virtualKeys:update`): the key's requests are rejected with the distinct `virtual_key_disabled` error until it is enabled again. Budgets, scopes, key material, and any running rotation grace stay intact, and enable restores the key exactly as it was.
+
+**Revoke** is one-way. It also archives the key's own budgets and discards any rotation grace.
+
+All four are idempotent, audit-logged, propagate to the gateway in seconds, and emit a [webhook event](/features/webhooks#family-gateway). See [Virtual Keys](/ai-gateway/virtual-keys#disable-and-enable-the-reversible-stop).
 
 ## Budgets
 
@@ -141,9 +283,52 @@ Idempotent: revoking an already-revoked VK returns `200` with the same status.
 
 ```
 GET /budgets
+GET /budgets?scope_type=virtual_key,principal
+GET /budgets?limit=100&cursor=<next_cursor>
 ```
 
-Response: `{ "data": [{...}, ...] }`. Each entry has `limit_usd` and `spent_usd` as strings (decimal precision preserved).
+Returns the non-archived budgets in your organization across all seven scope types (`organization`, `team`, `project`, `virtual_key`, `principal`, `group`, `attributed_user`), newest first, with live `spent_usd` from the spend ledger. `scope_type` is an optional comma-separated filter, applied in the query, so `limit` counts the rows you get back.
+
+Response:
+
+```json
+{
+  "spend_available": true,
+  "data": [
+    {
+      "id": "bgt_01HZ...",
+      "organization_id": "org_01HZ...",
+      "scope_type": "virtual_key",
+      "scope_id": "vk_01HZX...",
+      "name": "customer-acme cap",
+      "description": null,
+      "window": "month",
+      "on_breach": "block",
+      "limit_usd": "25",
+      "limit_nano_usd": 25000000000,
+      "spent_usd": "12.4531",
+      "spent_nano_usd": 12453100000,
+      "timezone": null,
+      "provider_key": null,
+      "external_id": "acme-tenant-4171",
+      "metadata": { "plan": "growth" },
+      "current_period_started_at": "2026-07-01T00:00:00.000Z",
+      "resets_at": "2026-08-01T00:00:00.000Z",
+      "cycle_anchor_at": null,
+      "last_reset_at": null,
+      "archived_at": null,
+      "created_at": "2026-06-12T10:00:00.000Z"
+    }
+  ]
+}
+```
+
+- **Money is an integer.** `limit_nano_usd` and `spent_nano_usd` are int64 billionths of a USD, and they are the source of truth; `limit_usd` and `spent_usd` are decimal strings rendered from them for display. Compare and sum the integers, and round exactly once at the end. Reading the strings back into a float is how a reconciliation drifts by a cent.
+- `spend_available: false` means spend could not be totalled server-side; do not read `spent_usd` or `spent_nano_usd` as real spend in that case.
+- `group` rows are per-member allowances: `limit_usd` is what EACH member may spend, `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers.
+- `attributed_user` rows are per-person templates: `limit_usd` is what EACH end user may spend, `end_users_seen` counts the end users with at least one successful request this period, and `end_users_over` how many of those are at or over the cap. Read the pair rather than `spent_usd`, which has no single meaning when one row fans out into one bucket per person.
+- `provider_key` names the ModelProvider the budget is pinned to; `null` counts every provider.
+- `current_period_started_at` and `resets_at` are computed as you read them, so they always describe the period the budget is actually in. `cycle_anchor_at` is the instant the cycle rolls from, or `null` for calendar alignment.
 
 ### Create
 
@@ -153,20 +338,40 @@ POST /budgets
 
 Body:
 
-```json
+```jsonc
 {
   "scope": {
-    "kind": "PROJECT",         // or ORGANIZATION, TEAM, VIRTUAL_KEY, PRINCIPAL
-    "project_id": "proj_..."   // the id field depends on scope.kind
+    "kind": "project",         // or organization, team, virtual_key, principal, group, attributed_user
+    "project_id": "proj_..."   // the id field depends on scope.kind:
+                               // organization_id | team_id | project_id |
+                               // virtual_key_id | principal_user_id | group_id;
+                               // attributed_user takes exactly one of
+                               // anchor_virtual_key_id | anchor_project_id
   },
   "name": "project-monthly-cap",
   "description": "Standard monthly envelope",
-  "window": "MONTH",           // MINUTE | HOUR | DAY | WEEK | MONTH | TOTAL
+  "window": "month",           // minute | hour | day | week | month | total | manual
   "limit_usd": 5000,           // or "5000.00"
-  "on_breach": "BLOCK",        // or WARN
-  "timezone": "Europe/Amsterdam"
+  "on_breach": "block",        // or warn
+  "timezone": "Europe/Amsterdam",
+  "provider_key": null,        // optional ModelProvider id to pin the budget to one provider
+  "cycle_anchor_at": null,     // optional ISO 8601 instant; rolls the cycle from here
+  "external_id": null,         // optional, your own id
+  "metadata": {}               // optional, flat string map
 }
 ```
+
+`group` budgets track spend per member, which requires the ClickHouse spend ledger; deployments without it answer `400` with `error.code = "group_budget_requires_clickhouse"`. `attributed_user` budgets are per-end-user **templates** on an anchor key or project (each distinct end user: this limit per window) and are service-guarded the same way. `manual` windows accrue until an explicit [reset](#reset-period).
+
+`cycle_anchor_at` moves the period boundary off the calendar and onto your own date, which is how a budget lines up with a billing anniversary. It is rejected on `total` and `manual` with `error.code = "gateway_budget_cycle_anchor_invalid"`, because those windows do not cycle, and it is fixed at creation. See [Budgets](/ai-gateway/budgets#anchoring-a-cycle-to-your-own-date) for the clamping rules.
+
+### Get
+
+```
+GET /budgets/:id
+```
+
+Response: `{ "budget": {...} }`, the same row shape the list returns, including live `spent_usd` and the current period pair.
 
 ### Update
 
@@ -174,7 +379,20 @@ Body:
 PATCH /budgets/:id
 ```
 
-Updatable fields: `name`, `description`, `limit_usd`, `on_breach`, `timezone`.
+Updatable fields: `name`, `description`, `limit_usd`, `on_breach`, `timezone`. Scope, window, and `cycle_anchor_at` are fixed at creation; to move a period boundary, [reset](#reset-period) it.
+
+### Reset period
+
+```
+POST /budgets/:id/reset
+POST /budgets/:id/reset?end_user_id=u_123      // one end-user bucket of a template
+```
+
+Moves the budget's period boundary to now and recomputes the next reset (`gatewayBudgets:update`; optional JSON body `{"reason": "..."}` for the audit log). Recorded spend is **never** mutated: the ledger and every emitted billing event are immutable, so reconciliation is unaffected. On calendar windows this truncates the running period and the next boundary stays calendar; on `manual` windows the new period stays open until the next reset. For attributed-user templates, `end_user_id` resets one end-user bucket's boundary and leaves the template period untouched. Returns the updated budget row.
+
+### End-user spend
+
+Per-end-user usage and the caps that apply to it are served on the billing surface with an **organization** API key rather than here: [`GET /api/gateway/v1/end-users/:id/spend`](/ai-gateway/billing-events#per-end-user-spend), permission `gatewaySpend:view`. It returns a rolling-window rollup plus every applicable attributed-user template at its current-period spend.
 
 ### Archive
 
@@ -182,209 +400,58 @@ Updatable fields: `name`, `description`, `limit_usd`, `on_breach`, `timezone`.
 DELETE /budgets/:id
 ```
 
-Soft archive: preserves ledger history, stops enforcement on new requests.
+Soft archive: preserves ledger history, stops enforcement on new requests. Returns the archived row with `archived_at` set.
 
 ## Provider bindings
 
-### List
-
-```
-GET /providers
-```
-
-Response:
-
-```json
-{
-  "data": [
-    {
-      "id": "gpc_01HZ...",
-      "model_provider_id": "mp_openai",
-      "model_provider_name": "openai",
-      "slot": "primary",
-      "rate_limit_rpm": 10000,
-      "rate_limit_tpm": 1000000,
-      "rate_limit_rpd": null,
-      "rotation_policy": "manual",
-      "fallback_priority_global": 10,
-      "health_status": "healthy",
-      "disabled_at": null,
-      "created_at": "2026-04-10T12:00:00Z"
-    }
-  ]
-}
-```
-
-### Create
-
-```
-POST /providers
-```
-
-Body:
-
-```json
-{
-  "model_provider_id": "mp_openai",   // the existing provider row id
-  "slot": "primary",                  // free-text
-  "rate_limit_rpm": 10000,
-  "rate_limit_tpm": 1000000,
-  "rate_limit_rpd": null,
-  "rotation_policy": "manual",        // v1 accepts "manual" only; auto + external_secret_store are v1.1
-  "extra_headers": null,
-  "provider_config": null,
-  "fallback_priority_global": 10
-}
-```
-
-Response `201`: `{ "provider_credential": { "id": "gpc_01HZ..." } }`.
-
-### Update
-
-```
-PATCH /providers/:id
-```
-
-### Disable
-
-```
-DELETE /providers/:id
-```
-
-Soft disable: existing VKs bound to this credential continue to resolve; new VK creation rejects this credential.
+Provider credentials, rate limits, and fallback priority live on the platform-wide ModelProvider: use `/api/gateway-platform/v1/model-providers` or the Advanced (Gateway) tab in the dashboard. Budgets reference providers by ModelProvider id in `provider_key`. The `/providers` routes on this API answer `410`.
 
 ## Cache rules
 
-Organization-scoped overrides that modulate cache behaviour for requests routed through the gateway. Evaluated first-match-wins by priority DESC; a matched rule wins over the per-VK default but loses to a per-request `X-LangWatch-Cache` header. Full contract in [Cache control](/ai-gateway/cache-control).
-
-### List
+Organization-scoped overrides that modulate cache behaviour for gateway requests. Evaluated first-match-wins by priority descending; a matched rule beats the per-key default but loses to a per-request `X-LangWatch-Cache` header.
 
 ```
-GET /cache-rules
+GET    /cache-rules            gatewayCacheRules:view
+GET    /cache-rules/:id        gatewayCacheRules:view
+POST   /cache-rules            gatewayCacheRules:create
+PATCH  /cache-rules/:id        gatewayCacheRules:update
+DELETE /cache-rules/:id        gatewayCacheRules:delete   (archive)
 ```
 
-Requires `gatewayCacheRules:view`. Returns rules sorted priority DESC, excluding archived.
+The rule shape, the full matcher and action tables, and the evaluation order live on [Cache control](/ai-gateway/cache-control#cache-rules). What is specific to this API:
 
-```json
-{
-  "data": [
-    {
-      "id": "V1StGXR8_Z5jdHi6B-myT",
-      "organization_id": "org_01HZ...",
-      "name": "force-cache-enterprise",
-      "description": "Force cache on Anthropic for enterprise-tagged VKs",
-      "priority": 300,
-      "enabled": true,
-      "matchers": { "vk_tags": ["tier=enterprise"] },
-      "action": { "mode": "force", "ttl": 600 },
-      "mode_enum": "FORCE",
-      "archived_at": null,
-      "created_at": "2026-04-19T09:00:00Z",
-      "updated_at": "2026-04-19T09:00:00Z"
-    }
-  ]
-}
-```
+- A create needs at least one matcher. A rule that matches every request has to be declared explicitly, which v1 does not support.
+- `matchers` and `action` **replace** the stored value when provided, rather than merging field by field. Omit them and the stored value is untouched.
+- `mode_enum` is echoed as a top-level field alongside `action.mode`, so dashboards can filter on it without parsing the action.
+- `GET /cache-rules/:id` answers `404` for archived rules; use the audit log to inspect removed ones.
+- `DELETE` is a soft archive and returns the archived row with `200`, not `204`, so a script can confirm the `archivedAt` timestamp.
 
-`mode_enum` is echoed in upper case alongside the lower-case `action.mode` so Prometheus, dashboards can filter by it without parsing the JSON action.
+## Webhooks and billing surfaces
 
-### Get
+Two sibling REST families complete the platform and are documented on their own pages, because they authenticate with an **organization API key** and organization-exclusive permissions rather than the credential used above:
 
-```
-GET /cache-rules/:id
-```
-
-Requires `gatewayCacheRules:view`. Returns 404 for archived rules, use the audit log to inspect removed rules.
-
-### Create
-
-```
-POST /cache-rules
-```
-
-Requires `gatewayCacheRules:create`. At least one matcher is required (rules that match every request must be declared explicitly, unsupported in v1). Matchers across non-null fields are ANDed.
-
-```json
-{
-  "name": "disable-cache-evals",
-  "description": "Disable cache for evaluation traffic",
-  "priority": 200,
-  "enabled": true,
-  "matchers": {
-    "vk_prefix": "vk-lw-",
-    "request_metadata": { "x-langwatch-suite": "evals" }
-  },
-  "action": { "mode": "disable" }
-}
-```
-
-Matcher fields (all optional, ANDed):
-
-| field | type | semantics |
-|---|---|---|
-| `vk_id` | string | Exact match against the VK's display prefix form (`vk-lw-...`) |
-| `vk_prefix` | string | `strings.HasPrefix` against the same VK display prefix |
-| `vk_tags` | string[] | VK must carry EVERY listed tag (AND subset) |
-| `principal_id` | string | Exact match against the VK's principal user |
-| `model` | string | Exact match against the resolved model name (no regex; trailing `*` as a glob is accepted) |
-| `request_metadata` | object | Exact-match against request headers/metadata key-by-key |
-
-Action fields:
-
-| field | type | semantics |
-|---|---|---|
-| `mode` | `"respect"`, `"force"`, `"disable"` | Required. See [Cache control](/ai-gateway/cache-control) for per-provider semantics |
-| `ttl` | int seconds | Optional. Clamped to `[0, 86400]`. Only meaningful for `force` on providers that support TTL (Anthropic) |
-| `salt` | string (max 64) | Optional cache-bust tag, changing this on an existing rule forces regeneration on next hit |
-
-Response `201`: `{ "cache_rule": { ...full row } }`.
-
-### Update
-
-```
-PATCH /cache-rules/:id
-```
-
-Requires `gatewayCacheRules:update`. Partial update; `matchers` and `action` **replace** the stored value when provided (not merged field-by-field). Omitting them leaves the stored value untouched. Name, description, priority, enabled update independently.
-
-### Archive
-
-```
-DELETE /cache-rules/:id
-```
-
-Requires `gatewayCacheRules:delete`. Soft archive: sets `archivedAt`. The rule stops matching new requests. Returns the archived row (200, not 204) so scripts can confirm the `archivedAt` timestamp.
+- `/api/webhooks/v1/*`: endpoint CRUD, secret roll, test fire, delivery log, health, and the emitted-events log. See [Webhooks](/features/webhooks).
+- `/api/gateway/v1/spend-events`, `/spend-summaries`, `/spend-events/replay`: the billing reconciliation pull surface. See [Billing & spend events](/ai-gateway/billing-events).
 
 ## Errors
 
-All responses follow the OpenAI-compatible envelope:
+All responses follow the OpenAI-compatible envelope, with `type` as the status class and `code` as the stable machine name to branch on:
 
 ```json
 {
   "error": {
     "type": "bad_request",
-    "code": "validation_error",
-    "message": "provider_credential_ids must contain at least 1 element"
+    "code": "trace_project_required",
+    "message": "an organization- or team-owned key needs a project for its traces and costs to land in..."
   }
 }
 ```
 
-See [API: Errors](/ai-gateway/api/errors) for the full type enum.
-
-Common management-side types:
-
-| HTTP | `type` | Meaning |
-|---|---|---|
-| 400 | `bad_request` | Validation, missing required field |
-| 401 | `unauthenticated` | Missing or invalid API token |
-| 403 | `permission_denied` | Token lacks the required RBAC scope |
-| 404 | `not_found` | Resource doesn't exist or isn't visible in this project |
-| 409 | `conflict` | Name collision on create, stale update (optimistic concurrency) |
-| 422 | `validation_error` | Semantic error (e.g. `window=MINUTE` but `limit_usd=100000`, impossibly large per-minute cap) |
+Every code this API answers with, and what to do about each, is on [API: Errors](/ai-gateway/api/errors#control-plane-codes).
 
 ## Audit
 
-Every write emits a row in the platform-wide `AuditLog` (gateway shape, `targetKind`, `targetId`, `before`, `after`). Visible under **/settings/audit-log** with the Source = "Gateway" badge; filter by Target (`virtual_key`, `budget`, `provider_binding`, `cache_rule`) to scope. Writes via API tokens are attributed to the API token's resolved user. See [Audit log](/ai-gateway/audit) for the full schema, REST export path, and migration note from the v3.0 gateway-only table.
+Every write emits a row in the platform-wide `AuditLog` (gateway shape, `targetKind`, `targetId`, `before`, `after`). Visible under **/settings/audit-log** with the Source = "Gateway" badge; filter by Target (`virtual_key`, `budget`, `cache_rule`) to scope. Writes via scoped API keys are attributed to the key's owning user; legacy project keys carry no user, so their writes record the machine principal `svc_<projectId>`. See [Audit log](/ai-gateway/audit) for the full schema, REST export path, and migration note from the v3.0 gateway-only table.
 
 ## Rate limits
 
@@ -392,16 +459,20 @@ Management endpoints are rate-limited to 100 req/min/token. For bulk operations,
 
 ## Shared service layer
 
-Both the REST API and the tRPC routers (`virtualKeys.*`, `gatewayBudgets.*`, `modelProviders.*`) call the same service classes on the server, `VirtualKeyService`, `GatewayBudgetService`, and the platform-wide ModelProvider service. The only difference between REST and tRPC is the DTO shape (snake_case vs camelCase). Behaviour is identical.
-
-This matters for testing: the BDD scenarios in `specs/ai-gateway/public-rest-api.feature` include a parity check that asserts the two surfaces return equivalent data for the same resource after case normalization. If you rely on a field in one, it's guaranteed to exist in the other.
+This API and the dashboard call the same service layer on the server, so a rule enforced in one is enforced in the other. The only differences are the field naming (`snake_case` here, `camelCase` in the app) and how the caller is identified (API credential versus browser session). The refusals are pinned by an integration suite, so the two surfaces cannot drift apart.
 
 ## OpenAPI
 
-All REST routes are annotated with `hono-openapi`'s `describeRoute` schemas. The generated OpenAPI 3.1 spec is served at `/api/gateway/v1/openapi.json` and renders inside the platform's API-reference UI. The CLI's `VirtualKeysApiService`, `GatewayBudgetsApiService` DTOs are hand-authored against the same schemas; a v1.1 improvement is to regenerate them from the OpenAPI output so drift fails at build time.
+Every route on this API is described in LangWatch's OpenAPI 3.1 document, served unauthenticated at:
+
+```
+GET https://app.langwatch.ai/api/gateway/v1/openapi.json
+```
+
+It carries the whole public REST surface, not only the gateway routes, so one fetch feeds a client generator, a Postman import, or an agent that needs the schemas. Self-hosted: same path on your control plane's DNS.
 
 ## See also
 
-- [langwatch CLI](/ai-gateway/cli/langwatch-cli): higher-level access.
+- [langwatch CLI](/integration/cli#ai-gateway-commands): the same operations from a shell.
 - [RBAC](/ai-gateway/rbac): which scopes your token needs.
 - [Security](/ai-gateway/security): how your API tokens and resulting writes are protected.

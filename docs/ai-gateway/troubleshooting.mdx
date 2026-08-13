@@ -6,7 +6,7 @@ sidebarTitle: Troubleshooting
 
 When the gateway misbehaves, this page is the first stop. Each symptom below points to the diagnostic you'd run first and, where possible, the single log line or metric that nails the root cause.
 
-Every gateway response carries `X-LangWatch-Request-Id`. Grab it from your client's error output and paste into the LangWatch search bar, the full trace gives you attempts, upstream latency, cache outcome, and guardrail decisions in one view. **Do this before anything else** for a specific broken request.
+Gateway responses carry `X-LangWatch-Gateway-Request-Id` once the request is authenticated. Grab it from your client's error output and paste into the LangWatch search bar, the full trace gives you attempts, upstream latency, cache outcome, and guardrail decisions in one view. **Do this before anything else** for a specific broken request.
 
 ## `401 invalid_api_key`
 
@@ -133,7 +133,7 @@ curl -s https://gateway.langwatch.ai/readyz | jq
 Non-`ok` checks pinpoint the layer:
 - `control_plane: error: timeout ...` → control-plane degraded; gateway is refusing traffic correctly.
 - `auth_cache_bootstrap: error: ...` → startup failed; pod will be restarted.
-- `outbox_writer: stale ...` → budget debits aren't flushing; budgets are stale.
+- `bundle_refresh: stale ...` → the bundle snapshot is not refreshing, so budget prechecks run against stale spend.
 
 **Fix:**
 - If control plane is down, wait, investigate control plane.
@@ -175,7 +175,7 @@ Also check your client is actually sending `cache_control: {type: "ephemeral"}` 
 
 **Symptoms:**
 - `/v1/chat/completions` returned `200` with a real model response.
-- Response carried `X-LangWatch-Request-Id`.
+- Response carried `X-LangWatch-Gateway-Request-Id`.
 - But the LangWatch **Traces** screen in your project is empty (or doesn't show this request).
 
 **Diagnose:**
@@ -213,7 +213,7 @@ kubectl logs <gateway-pod> | grep -E 'otlp|exporter'
 
 6. **Trace landed but under a different project filter.** Check that the **Traces** screen is scoped to the same project as the auth token's project and that the `Origin = Gateway` quick-filter is either off or explicitly selected (the default view excludes non-Gateway origins when "Gateway" is active, and vice-versa).
 
-**Quick sanity check:** filter **Traces** for the last 5 minutes with **Origin = Gateway** and search for your `X-LangWatch-Request-Id`. If the row is there, you were looking at the wrong filter/project. If not, the export path dropped the span, diagnose via the log grep above.
+**Quick sanity check:** filter **Traces** for the last 5 minutes with **Origin = Gateway** and search for your `X-LangWatch-Gateway-Request-Id`. If the row is there, you were looking at the wrong filter/project. If not, the export path dropped the span, diagnose via the log grep above.
 
 ## `auth_cache_refresh_transport_failure` WARN spew in logs
 
@@ -222,14 +222,14 @@ kubectl logs <gateway-pod> | grep -E 'otlp|exporter'
 - Optionally accompanied by INFO `auth_cache_serve_stale` lines on the same `vk_id`s.
 - Customers report no rejection, traffic flows normally.
 
-This is the gateway's **stale-while-error** path running on a transient control-plane outage. Each cached auth bundle that crosses its JWT expiry while the control plane is unreachable is bumped by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP` (default `5m`) and continues to serve, up to a hard cap of `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` (default `6h`). Customers don't see 401s during this window; the WARN line is informational, not page-worthy.
+This is the gateway's **stale-while-error** path running on a transient control-plane outage. Each cached auth bundle that crosses its JWT expiry while the control plane is unreachable is bumped by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` (default `300`, 5 minutes) and continues to serve, up to a hard cap of `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` (default `21600`, 6 hours). Customers don't see 401s during this window; the WARN line is informational, not page-worthy.
 
 **What to do:**
 
 1. Check whether the control plane is actually unreachable (Kubernetes events, control-plane pod logs, `/api/health` from inside the gateway pod).
 2. If it is, no operator action on the gateway side, wait for control-plane recovery and the WARN spew will stop on the next successful refresh (followed by a DEBUG `auth_cache_refresh_success` line per VK).
 3. If you start seeing `auth_cache_hard_evict reason=hard_cap_exceeded` ERROR lines, **the grace cap has been crossed and customers are now being rejected**: see [Production runbook → Recipe 8](/ai-gateway/cookbooks/production-runbook#recipe-8--control-plane-outage--stale-while-error) for the operator playbook + how to extend the cap if the outage is ongoing.
-4. To disable stale-while-error entirely (regulated deployments where stale-served bundles are unacceptable), set `LW_GATEWAY_AUTH_CACHE_HARD_GRACE=0s`. Refresh failures past JWT exp will then evict immediately and customers will see 401 `invalid_api_key` for the duration of the outage.
+4. To disable stale-while-error entirely (regulated deployments where stale-served bundles are unacceptable), set `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS=-1`. Refresh failures past JWT exp will then evict immediately and customers will see 401 `invalid_api_key` for the duration of the outage.
 
 **What this is NOT:** an HMAC mismatch, a misconfigured `LW_GATEWAY_INTERNAL_SECRET`, or a credential issue. Auth-class failures (401/403/404 from `/resolve-key`) bypass the grace window entirely and emit `auth_cache_hard_evict reason=auth_rejection` instead.
 
@@ -355,7 +355,7 @@ kubectl logs -n langwatch "$POD" | grep -E 'dns resolution failed|tcp dial faile
 **Root cause:** cold start + auth cache miss. New replica's L1 cache is empty; first unknown-VK request triggers a `/resolve-key` round-trip.
 
 **Fix:**
-- Enable Redis L2 (`GATEWAY_REDIS_URL`), new replicas warm from Redis instead of control plane.
+- Expect it. The auth cache is per pod, so a new replica warms from the control plane on its first request for each key, exactly as every replica does after a rolling deploy.
 - Ensure pod readiness probe waits for the long-poll loop to be running (`/readyz` handles this correctly by default).
 - `GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` is a planned v1.1 enhancement that would pre-warm the L1 LRU with every active VK on startup; the flag is reserved in env wiring but currently has no Go-side implementation, so setting it does not help today.
 
@@ -363,10 +363,10 @@ kubectl logs -n langwatch "$POD" | grep -E 'dns resolution failed|tcp dial faile
 
 When you don't know where to start:
 
-1. Take the `X-LangWatch-Request-Id` from the failing request → LangWatch search.
+1. Take the `X-LangWatch-Gateway-Request-Id` from the failing request → LangWatch search.
 2. Compare `X-LangWatch-Provider` to the VK's configured primary, if different, fallback fired.
 3. Check `X-LangWatch-Cache` response header: `hit`, `miss`, `bypass`, `force` (the last is v1.1, deferred in v1).
-4. Gateway pod logs filtered on `request_id=grq_...` for structured entries.
+4. Gateway pod logs filtered on `request_id=req_...` for structured entries.
 5. Control-plane logs filtered on `vk_id` for authorization decisions.
 
 If none of the above narrows it: post in `#ai-gateway-support` with the request id and the full response headers. LangWatch oncall will trace it within an hour.
@@ -376,7 +376,7 @@ If none of the above narrows it: post in `#ai-gateway-support` with the request 
 **Symptoms:**
 - Requests that previously worked return 503 with `type=service_unavailable` when a guardrail evaluator fails and the VK is fail-closed (the default).
 - The LangWatch evaluator dashboard shows errors or timeouts on evaluators attached to the VK.
-- Metric `gateway_guardrail_verdicts_total{verdict="block"}` climbs on the affected direction (request, response), or `{verdict="fail_open"}` if the VK opts in.
+- Metric `gateway_guardrail_verdicts_total{verdict="block"}` climbs on the affected direction (request, response), or `{verdict="fail_open"}` if the VK opts in. The same evaluator outage also shows as `{direction="stream_chunk", verdict="fail_open"}`, which climbs whether or not the VK opted in, because that direction always fails open rather than stall a stream.
 
 **Root cause:** a `pre` or `post` guardrail's evaluator service (LangEvals, custom webhook evaluator, etc.) is unreachable or erroring, and the VK's fail-open toggle is `false`. The gateway's default is **fail closed**: if policy can't be evaluated, the request is refused rather than passed through ungoverned.
 
@@ -483,9 +483,9 @@ See [Policy Rules → RE2 syntax](/ai-gateway/policy-rules).
 
 ```bash
 # Whichever the banner names as missing
-echo "LW_VIRTUAL_KEY_PEPPER=$(openssl rand -hex 32)" >> langwatch/.env
-echo "LW_GATEWAY_INTERNAL_SECRET=$(openssl rand -hex 32)" >> langwatch/.env
-echo "LW_GATEWAY_JWT_SECRET=$(openssl rand -hex 32)" >> langwatch/.env
+echo "LW_VIRTUAL_KEY_PEPPER=$(openssl rand -hex 32)" >> platform/app/.env
+echo "LW_GATEWAY_INTERNAL_SECRET=$(openssl rand -hex 32)" >> platform/app/.env
+echo "LW_GATEWAY_JWT_SECRET=$(openssl rand -hex 32)" >> platform/app/.env
 ```
 
 Restart the entry point (the validator runs at import time, so no incremental refresh).
@@ -500,5 +500,5 @@ Restart the entry point (the validator runs at import time, so no incremental re
 - [Observability](/ai-gateway/observability): what every span attribute means.
 - [Health Checks](/ai-gateway/self-hosting/health-checks): interpreting `/readyz` output.
 - [Cookbook: CI smoke test](/ai-gateway/cookbooks/ci-smoke-test): automate validation.
-- [Cookbook: Production runbook](/ai-gateway/cookbooks/production-runbook): on-call playbook (graceful drain, outbox backlog, pprof diagnostics).
+- [Cookbook: Production runbook](/ai-gateway/cookbooks/production-runbook): on-call playbook (graceful drain, budget spend accumulation, pprof diagnostics).
 - [Cookbook: Grafana dashboard](/ai-gateway/cookbooks/grafana-dashboard): importable JSON to visualise every metric referenced on this page.

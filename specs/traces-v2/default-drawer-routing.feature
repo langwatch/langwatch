@@ -1,7 +1,7 @@
 # Trace Explorer default routing — Gherkin Spec
-# Implementation: langwatch/src/hooks/useDrawer.ts (routeTraceDrawerForV2 +
+# Implementation: platform/app/src/hooks/useDrawer.ts (routeTraceDrawerForV2 +
 # the openDrawer interception) and the legacy deprecation banner in
-# langwatch/src/components/messages/LegacyTracesDeprecationBanner.tsx
+# platform/app/src/components/messages/LegacyTracesDeprecationBanner.tsx
 #
 # The Trace Explorer is the default trace experience. The former per-device
 # opt-in is gone: every request to open a trace's details (no matter which
