@@ -20,17 +20,23 @@ import {
   vi,
 } from "vitest";
 
-// Mock the Redis module so startScenarioProcessor uses the test Redis connection.
-// The getter is wired in beforeAll after testContainers starts.
+// `startScenarioProcessor` reads its connection through `tryGetApp` — skipping
+// the processor is its documented outcome when there is none, so overriding
+// `getApp` here would leave it silently skipped and the suite watching a
+// processor that never started. Partial-mock: only the accessor it reads is
+// replaced, and `beforeAll` fills the connection in once testContainers is up.
 let _testRedis: any = null;
-vi.mock("~/server/redis", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("~/server/redis")>()),
-  get connection() {
-    return _testRedis;
-  },
-}));
+vi.mock("~/server/app-layer/app", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("~/server/app-layer/app")>();
+  return {
+    ...actual,
+    tryGetApp: () => (_testRedis ? { redis: _testRedis } : null),
+  };
+});
 
 import type { Redis } from "ioredis";
+import { tryGetApp } from "../../app-layer/app";
 import {
   getTestRedisConnection,
   startTestContainers,
@@ -366,9 +372,9 @@ describe("Event-sourcing cancellation (real Redis)", () => {
         },
       };
 
-      // Use the REAL startScenarioProcessor with the test Redis
-      // We need to mock the connection module to use test Redis
-      const { connection: testConnection } = await import("../../redis");
+      // Use the REAL startScenarioProcessor with the test Redis, which the
+      // `tryGetApp` mock at the top of this file serves.
+      const testConnection = tryGetApp()?.redis;
 
       // If no Redis in test env, skip (testContainers provides it)
       if (!testConnection) {
@@ -397,7 +403,10 @@ describe("Event-sourcing cancellation (real Redis)", () => {
         });
       } else {
         // Real path: startScenarioProcessor wires everything
-        const handle = await startScenarioProcessor(pool, mockDeps);
+        const handle = await startScenarioProcessor({
+          pool,
+          injectedDeps: mockDeps,
+        });
         if (handle) cleanupFns.push(handle.close);
       }
 

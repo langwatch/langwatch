@@ -1,4 +1,7 @@
-import { type PrismaClient, RoleBindingScopeType } from "@prisma/client";
+import {
+  type PrismaClient,
+  RoleBindingScopeType,
+} from "~/generated/prisma/client";
 import { ScopeNotInOrganizationError } from "~/server/role-bindings/errors";
 import type {
   RoleBindingForSynthesis,

@@ -40,7 +40,7 @@ export const CopyPromptDialog = ({
           sourceProjectId,
         });
       }}
-      isLoading={copyPrompt.isLoading}
+      isLoading={copyPrompt.isPending}
     />
   );
 };

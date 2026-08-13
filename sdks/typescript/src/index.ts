@@ -57,6 +57,10 @@ export {
   type TargetMetadata,
   type TargetInfo,
   type EvaluationResult as ExperimentEvaluationResult,
+  type ComparisonMetric,
+  type ComparisonOptions,
+  type ComparisonStatus,
+  type ComparisonVerdict,
   type ExperimentInitOptions,
   type LogOptions,
   type EvaluateOptions as ExperimentEvaluateOptions,
@@ -70,6 +74,7 @@ export {
   ExperimentInitError,
   ExperimentApiError,
   TargetMetadataConflictError,
+  ComparisonError,
   EvaluatorError,
 } from "./client-sdk/services/experiments";
 

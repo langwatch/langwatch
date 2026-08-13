@@ -24,13 +24,14 @@
  * eadd6e38f (admin-surface tightening), fb8f3e8b8 (email redaction),
  * 4162531ff (personal-workspace strip).
  */
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
 import { globalForApp, resetApp } from "../../../app-layer/app";
 import { OrganizationService } from "../../../app-layer/organizations/organization.service";
 import { PrismaOrganizationRepository } from "../../../app-layer/organizations/repositories/organization.prisma.repository";

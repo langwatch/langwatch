@@ -528,7 +528,6 @@ export const tracesRouter = createTRPCRouter({
 
       try {
         for await (const eventArgs of on(emitter, "trace_updated", {
-          // @ts-expect-error - signal is not typed
           signal: opts.signal,
         })) {
           logger.debug(

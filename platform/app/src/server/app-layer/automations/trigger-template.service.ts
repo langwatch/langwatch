@@ -20,7 +20,7 @@ import {
   type TemplateContext,
 } from "@langwatch/automations/templating/templateContext";
 import { validateLiquid } from "@langwatch/automations/templating/validate";
-import type { AlertType } from "@prisma/client";
+import type { AlertType } from "~/generated/prisma/client";
 import { computeDefaultFrom } from "~/server/mailer/emailSender";
 import {
   buildTriggerNoReplyAddress,

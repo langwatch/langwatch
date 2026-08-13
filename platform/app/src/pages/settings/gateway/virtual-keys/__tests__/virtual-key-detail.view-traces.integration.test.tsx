@@ -100,7 +100,7 @@ vi.mock("~/components/gateway/VirtualKeyUsageSnippet", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       virtualKeys: {
         get: { invalidate: async () => undefined },
         list: { invalidate: async () => undefined },

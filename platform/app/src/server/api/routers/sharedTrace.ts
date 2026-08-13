@@ -1,6 +1,6 @@
-import { Prisma } from "@prisma/client";
 import { createHash } from "crypto";
 import { z } from "zod";
+import { Prisma } from "~/generated/prisma/client";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import {

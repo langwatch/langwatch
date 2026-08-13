@@ -19,9 +19,9 @@ import {
   WebhookEndpointValidationError,
 } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookHealthService } from "@ee/webhooks/webhookHealth.service";
-import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";

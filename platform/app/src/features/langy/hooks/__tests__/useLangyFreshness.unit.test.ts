@@ -29,7 +29,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       langy: {
         messages: { invalidate: messagesInvalidate },
         list: { cancel: listCancel, invalidate: listInvalidate },

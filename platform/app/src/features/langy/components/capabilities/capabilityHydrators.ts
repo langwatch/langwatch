@@ -28,8 +28,8 @@ import type { api } from "~/utils/api";
 import { asFreeTextTerm } from "../../logic/traceExplorerLink";
 import { traceMetaLine, truncateRowText } from "./rowFormat";
 
-/** The tRPC utils proxy (`api.useContext()`), for imperative `.fetch` calls. */
-export type CapabilityTrpcUtils = ReturnType<typeof api.useContext>;
+/** The tRPC utils proxy (`api.useUtils()`), for imperative `.fetch` calls. */
+export type CapabilityTrpcUtils = ReturnType<typeof api.useUtils>;
 
 /** One hydrated row, in the shared vocabulary every card draws. */
 export interface CapabilityHydratedRow {

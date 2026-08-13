@@ -14,13 +14,14 @@
  * rendered "No default models configured" for them while an org-admin
  * teammate saw every row (customer report).
  */
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+} from "~/generated/prisma/client";
 
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { batchScopePermissions, hasProjectPermission } from "../../api/rbac";

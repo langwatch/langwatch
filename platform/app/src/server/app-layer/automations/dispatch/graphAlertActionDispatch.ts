@@ -7,8 +7,8 @@ import {
 import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
 import type { GraphAlertTemplateContext } from "@langwatch/automations/templating/templateContext";
 import { createLogger } from "@langwatch/observability";
-import type { Project, Trigger } from "@prisma/client";
 import { createHash } from "crypto";
+import type { Project, Trigger } from "~/generated/prisma/client";
 import {
   deliverWebhook,
   type WebhookDeliveryRecorder,

@@ -5,13 +5,11 @@ export {
   initializeApp,
   resetApp,
 } from "./app";
-// Client factories. ClickHouse is deliberately absent: it is reached through a
-// repository on the App, never by constructing a client. See
-// ~/server/clickhouse/managedClient.ts.
+// Client factories. ClickHouse and Redis are deliberately absent: both are
+// reached through the App (a repository, or `getApp().redis`), never by
+// constructing a client. See ~/server/clickhouse/managedClient.ts and ADR-093.
 export type { PrismaFactoryOptions } from "./clients/prisma.factory";
 export { createPrismaClient } from "./clients/prisma.factory";
-export type { RedisFactoryOptions } from "./clients/redis.factory";
-export { createRedisConnectionFromConfig } from "./clients/redis.factory";
 export type { AppConfig } from "./config";
 // Config
 export { createAppConfigFromEnv } from "./config";

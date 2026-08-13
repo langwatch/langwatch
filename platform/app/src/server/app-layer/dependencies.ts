@@ -1,5 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
+import type { RedisConnection } from "@langwatch/redis-client";
 import type Stripe from "stripe";
 import type { AnalyticsService } from "~/server/app-layer/analytics/analytics.service";
 import type { InstanceUsageStatsRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
@@ -211,6 +212,23 @@ export interface AppDependencies {
     enabled: boolean;
     resolveClient: ClickHouseClientResolver;
   };
+  /**
+   * The process's one Redis connection, owned by the composition root and
+   * closed with the App (ADR-093).
+   *
+   * `null` when this deployment or test run configures no Redis — a supported
+   * outcome, not an error: consumers branch on it to take their documented
+   * fallback (an in-memory counter, a skipped dedupe, an uncached read).
+   *
+   * Prefer taking a connection as a constructor dependency. Read it from here
+   * only where there is no seam to inject through — a route module or a tRPC
+   * router — and read it *inside the handler*, never at module scope.
+   *
+   * Most such readers go through `tryGetApp()` rather than `getApp()`, because
+   * they already branch on absence and treat "no App" the same as "no Redis".
+   * See ADR-093 for which ones deliberately do not.
+   */
+  redis: RedisConnection | null;
   /** Deduplicated usage counters written to ClickHouse for billing. */
   billing: {
     events: BillableEventsRepository;

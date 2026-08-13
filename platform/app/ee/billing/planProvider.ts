@@ -1,4 +1,4 @@
-import type { PrismaClient, Subscription } from "@prisma/client";
+import type { PrismaClient, Subscription } from "~/generated/prisma/client";
 import { env } from "../../src/env.mjs";
 import type { PlanInfo } from "../licensing/planInfo";
 import { getFreePlanLimits, PLAN_LIMITS } from "./planLimits";
