@@ -29,6 +29,7 @@ describe("redactTriggerForPublicApi", () => {
       expect(JSON.stringify(redacted)).not.toContain("hooks.slack.com");
     });
 
+    /** @scenario "The bot token is protected at rest" */
     it("keeps the stored bot token out and reports that one is set", () => {
       const redacted = redactTriggerForPublicApi({
         action: TriggerAction.SEND_SLACK_MESSAGE,
@@ -166,6 +167,7 @@ describe("redactTriggerForPublicApi", () => {
 
 describe("redactTriggerForRead", () => {
   describe("given a Slack automation the dashboard is about to edit", () => {
+    /** @scenario "The bot token is protected at rest" */
     it("keeps the fields the composer round-trips and drops the token", () => {
       const redacted = redactTriggerForRead({
         action: TriggerAction.SEND_SLACK_MESSAGE,

@@ -49,9 +49,10 @@ describe("sendSlackWebhook", () => {
 
   describe("when the webhook post succeeds", () => {
     /** @scenario "An automation delivers through an incoming webhook" */
-    it("returns without raising", async () => {
+    it("posts once to the configured webhook", async () => {
       sendMock.mockResolvedValue(undefined);
       await expect(callSlack()).resolves.toBeUndefined();
+      expect(sendMock).toHaveBeenCalledTimes(1);
     });
   });
 

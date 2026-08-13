@@ -48,6 +48,7 @@ Feature: Slack delivery
       Given the template picker
       When the automation uses a webhook
       Then templates whose hero block only renders over the Web API are not selectable
+      And a note explains they need a Slack app connection
       When the automation uses a bot connection
       Then those templates become selectable
 

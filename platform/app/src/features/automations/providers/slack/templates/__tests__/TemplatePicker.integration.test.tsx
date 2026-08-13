@@ -239,6 +239,7 @@ describe("SlackBlockKitTemplatePicker", () => {
 
   describe("given a webhook connection", () => {
     /** @scenario "A layout that needs a Slack app connection is previewed but cannot be picked" */
+    /** @scenario "The richer templates are offered only for a bot connection" */
     it("previews a layout that needs a Slack app but refuses to apply it", () => {
       const onSelect = vi.fn();
       const onSelectOtherCadence = vi.fn();
