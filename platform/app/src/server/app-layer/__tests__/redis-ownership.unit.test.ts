@@ -40,6 +40,18 @@ const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);
  */
 const IOREDIS_CONSTRUCTION =
   /\bnew\s+(?:IORedis|Redis|Cluster)(?:\s*\.\s*\w+)*\s*\(/;
+
+/**
+ * Any reference to the retired singleton module, whatever names it.
+ *
+ * Anchored on the quoted specifier rather than on a leading `from`, because the
+ * reference that outlived the first migration was a `vi.mock("~/server/redis")`
+ * in a suite merged from main — which an import-only pattern reads straight
+ * past. A mock of a module that no longer resolves fails the suite at load, so
+ * this guard is what turns that into one legible failure here.
+ */
+const RETIRED_REDIS_MODULE =
+  /["'][^"']*(?:~\/server\/redis|\.\.\/redis|\.\/redis)["']/;
 const SKIP_DIRECTORIES = new Set([
   "node_modules",
   "dist",
@@ -227,13 +239,15 @@ describe("Redis ownership", () => {
         false,
       );
 
-      const importers = allSourceFiles().filter((file) =>
-        /from\s+["'][^"']*(?:~\/server\/redis|\.\.\/redis|\.\/redis)["']/.test(
-          fs.readFileSync(file, "utf8"),
-        ),
-      );
+      const referrers = allSourceFiles()
+        // This file is the one legitimate exception: the fixtures below have to
+        // spell the retired specifier out to prove the pattern still catches it.
+        .filter((file) => file !== fileURLToPath(import.meta.url))
+        .filter((file) =>
+          RETIRED_REDIS_MODULE.test(fs.readFileSync(file, "utf8")),
+        );
 
-      expect(importers.map(relative)).toEqual([]);
+      expect(referrers.map(relative)).toEqual([]);
     });
 
     /** @scenario Nothing constructs a Redis client outside the client package */
@@ -272,6 +286,29 @@ describe("Redis ownership", () => {
         "createRedisConnection({ env })",
       ]) {
         expect(IOREDIS_CONSTRUCTION.test(innocent)).toBe(false);
+      }
+    });
+
+    it("recognises every spelling of a reference to the retired module", () => {
+      // The same silent-miss risk as above, and it has already bitten once: an
+      // import-anchored pattern let a `vi.mock` of the deleted module through.
+      for (const spelling of [
+        'import { connection } from "~/server/redis";',
+        'vi.mock("~/server/redis", () => ({ connection: undefined }));',
+        'from "../redis"',
+        "from './redis'",
+        'await import("~/server/redis")',
+      ]) {
+        expect(RETIRED_REDIS_MODULE.test(spelling)).toBe(true);
+      }
+
+      for (const innocent of [
+        'from "@langwatch/redis-client"',
+        'from "./redis-client"',
+        // How this suite names the deleted file when asserting it is gone.
+        'path.join(APP_ROOT, "src/server/redis.ts")',
+      ]) {
+        expect(RETIRED_REDIS_MODULE.test(innocent)).toBe(false);
       }
     });
   });

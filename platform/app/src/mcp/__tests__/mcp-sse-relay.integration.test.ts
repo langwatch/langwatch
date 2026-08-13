@@ -8,8 +8,11 @@
  * answered it, while every follow-up `POST /messages?sessionId=…` is a fresh
  * connection the balancer may hand to any replica.
  */
+import {
+  createRedisConnection,
+  type RedisConnection,
+} from "@langwatch/redis-client";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { connection as redis } from "~/server/redis";
 import {
   handshake,
   initializeBody,
@@ -23,6 +26,9 @@ import {
 
 const VALID_API_KEY = "lw_relay_key_a";
 const OTHER_API_KEY = "lw_relay_key_b";
+
+/** Opened in `beforeAll`, so the arrange steps below reach it through here. */
+let redis: RedisConnection | null = null;
 
 const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
@@ -60,6 +66,15 @@ describe("Feature: MCP SSE transport across replicas", () => {
   let urlB: string;
 
   beforeAll(async () => {
+    // This suite boots no App of its own, so it owns the connection it opens
+    // and closes it below (ADR-090). The harness lends it to the replicas.
+    redis = createRedisConnection({
+      env: {
+        url: process.env.REDIS_URL,
+        clusterEndpoints: process.env.REDIS_CLUSTER_ENDPOINTS,
+        dbIndex: process.env.REDIS_DB_INDEX,
+      },
+    });
     if (!redis) {
       throw new Error(
         "These tests need a real Redis — set REDIS_URL / LANGWATCH_TEST_REDIS_URL",
@@ -76,6 +91,7 @@ describe("Feature: MCP SSE transport across replicas", () => {
     // beforeAll throws when Redis is missing, which leaves this unset;
     // dereferencing it here would replace that message with a TypeError.
     await replicas?.stop();
+    redis?.disconnect();
   });
 
   describe("given a client opened an SSE connection against one replica", () => {
