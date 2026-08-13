@@ -32,11 +32,14 @@
  * under any key — mapped or unmapped — so there is nothing for stage 2 to read
  * and no mapping change would populate them. The content is never emitted;
  * AWS's botocore instrumentation omits message content unless
- * OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true. This file therefore
- * stands as a characterisation of the pipeline, NOT as a live bug report.
+ * OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true.
  *
- * `describe` titles say which shapes are expected to work; the assertions are
- * the record of what the pipeline actually does today.
+ * The gaps this file originally characterised are now FIXED and these tests
+ * assert the fixed behaviour:
+ * - Converse's key-discriminated content blocks ({toolUse}, {toolResult})
+ *   are handled by extractTextsFromParts in extractors/_messages.ts.
+ * - aws.bedrock.* payload keys are mapped to canonical gen_ai.* keys by
+ *   BedrockExtractor (extractors/bedrock.ts).
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -193,7 +196,7 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
   });
 
   describe("when the assistant turn is a Converse toolUse block", () => {
-    it("records whether the tool call survives extraction", () => {
+    it("extracts the tool call's input as the output text", () => {
       const { output } = computeTraceIO(
         makeSpan({
           spanAttributes: {
@@ -216,12 +219,12 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
         }),
       );
 
-      expect(output).toBe(null);
+      expect(output).toContain('"patientId":"p-42"');
     });
   });
 
   describe("when the user turn is a Converse toolResult block", () => {
-    it("records whether the tool result survives extraction", () => {
+    it("extracts the tool result's inner text as the input", () => {
       const { input } = computeTraceIO(
         makeSpan({
           spanAttributes: {
@@ -243,19 +246,19 @@ describe("given a Bedrock span whose messages sit under canonical gen_ai keys", 
         }),
       );
 
-      expect(input).toBe("bedrock.converse");
+      expect(input).toBe("patient p-42 found");
     });
   });
 });
 
-describe("given a Bedrock span whose messages sit under keys no extractor maps", () => {
+describe("given a Bedrock span whose messages sit under aws.bedrock.* keys", () => {
   describe("when the span carries the Converse request/response bodies verbatim", () => {
-    it("degrades asymmetrically: input becomes the span name, output is lost", () => {
+    it("maps the payloads to canonical keys and extracts both sides", () => {
       const span = makeSpan({
         spanAttributes: {
           // A boto3/OTel AWS-SDK span: the operation is identified, and the
-          // Converse payloads ride along under aws.* keys. No registered
-          // extractor reads any of these — there is no AWS/Bedrock extractor.
+          // Converse payloads ride along under aws.* keys, which the
+          // BedrockExtractor maps onto the canonical gen_ai.* keys.
           "rpc.service": "BedrockRuntime",
           "rpc.method": "Converse",
           "aws.bedrock.model_id": "anthropic.claude-3-5-sonnet",
@@ -273,27 +276,19 @@ describe("given a Bedrock span whose messages sit under keys no extractor maps",
 
       const { input, output, canonicalAttributes } = computeTraceIO(span);
 
-      // Neither canonical I/O key was ever written: the payloads are present in
-      // the span and invisible to the extraction service.
-      expect(canonicalAttributes["langwatch.input"]).toBeUndefined();
-      expect(canonicalAttributes["gen_ai.input.messages"]).toBeUndefined();
+      // The canonical input key is now written from the aws.bedrock.* payload.
+      expect(canonicalAttributes["gen_ai.input.messages"]).toBeDefined();
 
-      // This pair IS the production signature. It is identifiable in stored
-      // data with no access to the customer's account: input equal to the span
-      // name, output empty, on a trace whose spans hold real content.
-      expect(input).toBe("bedrock.converse");
-      expect(output).toBe(null);
-
-      // And the content is demonstrably still in the span — the trace is not
-      // empty, only its summary is.
-      expect(span.spanAttributes["aws.bedrock.request.messages"]).toContain(
-        "summarise this consult note",
-      );
+      // Before the BedrockExtractor existed this pair degraded asymmetrically
+      // to {input: "bedrock.converse", output: null} — the span name and the
+      // HTTP-status fallback. The real content now reaches trace_summaries.
+      expect(input).toBe("summarise this consult note");
+      expect(output).toBe("The patient reports ...");
     });
   });
 
   describe("when such a span is the root of an HTTP-instrumented trace", () => {
-    it("substitutes the HTTP method, target and status for the real I/O", () => {
+    it("prefers the mapped request messages over the HTTP fallback", () => {
       const { input, output } = computeTraceIO(
         makeSpan({
           spanAttributes: {
@@ -308,9 +303,11 @@ describe("given a Bedrock span whose messages sit under keys no extractor maps",
         }),
       );
 
-      // Worth naming separately: here the trace does NOT read as empty. It
-      // reads as plausible-but-wrong, which is harder to notice than a blank.
-      expect(input).toBe("POST /model/anthropic.claude-3-5-sonnet/converse");
+      // Before the fix, the input read as plausible-but-wrong: the HTTP
+      // method + target. The mapped request messages now win; the output
+      // still falls back to the HTTP status because this span carries no
+      // aws.bedrock.response.output.
+      expect(input).toBe("summarise this consult note");
       expect(output).toBe("200");
     });
   });
