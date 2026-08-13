@@ -967,8 +967,8 @@ describe("simulationRunStateFoldProjection finalized-status guard", () => {
   // applies in-order (no re-fold, since occurredAt is not strictly less than
   // LastEventOccurredAt) and would otherwise clobber Status back to a
   // non-terminal value while FinishedAt stays set — an unrecoverable zombie
-  // the read-time stall path can no longer rescue. Once FinishedAt is set,
-  // Status must stay terminal.
+  // nothing can rescue: stored status is the only truth at read time. Once
+  // FinishedAt is set, Status must stay terminal.
   describe("given a run that already finished", () => {
     describe("when a later started event arrives", () => {
       it("keeps the terminal status instead of resurrecting IN_PROGRESS", () => {
@@ -1017,7 +1017,7 @@ describe("simulationRunStateFoldProjection finalized-status guard", () => {
     // The fourth non-terminal Status writer. A `queued` event is in the fold
     // set, so one arriving after `finished` resurrected Status=QUEUED while
     // FinishedAt stayed set -- an unrecoverable run: the orphan reconciler skips
-    // it (FinishedAt IS NULL) and read-time stall detection skips it too.
+    // it (FinishedAt IS NULL) and no read-time derivation remains to mask it.
     describe("when a later queued event arrives", () => {
       it("keeps the terminal status instead of resurrecting QUEUED", () => {
         const state = foldEvents([
@@ -1062,8 +1062,8 @@ describe("simulationRunStateFoldProjection finalized-status guard", () => {
   // The scenario-events ingest route types the finished status as the full
   // ScenarioRunStatus enum, non-terminal members included. Writing one straight
   // through would set a non-terminal Status alongside FinishedAt -- a run the
-  // orphan reconciler skips (FinishedAt IS NULL) and read-time stall detection
-  // skips (it only resolves unfinished runs). Nothing could ever recover it.
+  // orphan reconciler skips (FinishedAt IS NULL) and no read-time derivation
+  // remains to mask. Nothing could ever recover it.
   describe("given a finished event carrying a non-terminal status", () => {
     describe("when it is folded", () => {
       it("refuses the non-terminal status and finishes the run terminally", () => {

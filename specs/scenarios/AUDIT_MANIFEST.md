@@ -212,8 +212,8 @@ Concentrations:
 | specs/scenarios/event-driven-execution-prep.feature | "Terminal statuses remain non-cancellable" | DUPLICATE | cancellation-eligibility.unit.test.ts covers SUCCESS/FAILED/ERROR/CANCELLED returning false |
 | specs/scenarios/event-driven-execution-prep.feature | "Ad-hoc run dispatches queueRun command" | DUPLICATE | simulation-runner.router.unit.test.ts:335 "dispatches queueRun command before scheduling" |
 | specs/scenarios/event-driven-execution-prep.feature | "Suite run dispatches queueRun for each scenario" | KEEP | Suite runner queueRun fan-out (3x2=6); no test for suite-level queueRun fan-out, only ad-hoc covered |
-| specs/scenarios/event-driven-execution-prep.feature | "Execution reactor fires on queued event" | KEEP | scenarioExecution.reactor.ts exists but no test file in reactors/__tests__ exercises submit-on-queued |
-| specs/scenarios/event-driven-execution-prep.feature | "Execution reactor skips already-cancelled runs" | KEEP | Logic in scenarioExecution.reactor.ts:71 (CancellationRequestedAt check); no test exists |
+| specs/scenarios/event-driven-execution-prep.feature | "Process manager dispatches execute intent on queued event" | KEEP | simulationRunExecution.process.ts handleRunQueued emits the execute intent; no integration test exercises submit-on-queued |
+| specs/scenarios/event-driven-execution-prep.feature | "Process manager skips already-cancelled runs" | KEEP | Logic in simulationRunExecution.process.ts (cancel-before-queued branch finishes CANCELLED, never executes); no test exists |
 | specs/scenarios/event-driven-execution-prep.feature | "Pool starts child process when capacity is available" | DUPLICATE | execution-pool.unit.test.ts "when pool has capacity \| starts the job immediately" |
 | specs/scenarios/event-driven-execution-prep.feature | "Pool buffers jobs when at capacity" | DUPLICATE | execution-pool.unit.test.ts "when pool is at capacity \| buffers the job" |
 | specs/scenarios/event-driven-execution-prep.feature | "Pool dequeues pending jobs when a slot opens" | DUPLICATE | execution-pool.unit.test.ts "when pool is at capacity \| dequeues when a slot opens" |

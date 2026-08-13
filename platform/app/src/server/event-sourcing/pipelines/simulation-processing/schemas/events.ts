@@ -96,6 +96,14 @@ export const simulationRunFinishedEventDataSchema = z.object({
   results: simulationResultsSchema.optional(),
   durationMs: z.number().optional(),
   status: z.string().optional(),
+  // Identity + traceIds are event-carried state (ECST) so downstream
+  // subscribers never read fold state. Optional so events written before
+  // 2026-08-06 still parse; FinishRunCommand backfills them from the run's
+  // prior events when the caller did not supply them.
+  scenarioId: z.string().optional(),
+  batchRunId: z.string().optional(),
+  scenarioSetId: z.string().optional(),
+  traceIds: z.array(z.string()).optional(),
 });
 export type SimulationRunFinishedEventData = z.infer<
   typeof simulationRunFinishedEventDataSchema
@@ -184,7 +192,8 @@ export type SimulationRunMetricsComputedEvent = z.infer<
 /**
  * CancelRequested event - emitted when a user requests cancellation of a run.
  * Sets CancellationRequestedAt in the fold projection without changing Status.
- * A reactor broadcasts this to all worker pods via Redis pub/sub.
+ * The simulationRunExecution process manager's cancel intent broadcasts this
+ * to all worker pods via Redis pub/sub.
  */
 export const simulationRunCancelRequestedEventDataSchema = z.object({
   scenarioRunId: z.string(),

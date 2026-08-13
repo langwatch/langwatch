@@ -179,10 +179,10 @@ A query may omit the `TenantId` filter **only** when every one of these holds:
 4. The omission carries an inline comment explaining which of these applies, so a future "you forgot the tenant filter" fix does not silently narrow the sweep to one tenant.
 5. A test pins the cross-tenant behaviour — otherwise item 4's regression passes CI. Single-tenant fixtures cannot catch it.
 
-Current sweeps under this carve-out, both on worker boot:
-
-- `scenarios/scenario-orphan-reconciler.ts` — reconciles `QUEUED` orphans (#3365).
-- `scenarios/orphaned-run-reconciliation.clickhouse.ts` — reconciles `IN_PROGRESS` orphans (#3195).
+No sweeps currently use this carve-out — the two boot-time orphan
+reconcilers that did (`scenario-orphan-reconciler.ts`,
+`orphaned-run-reconciliation.clickhouse.ts`) were deleted under ADR-094. The
+rules above stay as the bar any future sweep must clear.
 
 Anything else that wants to skip the filter should be a repository method taking a `tenantId`, not a sweep.
 

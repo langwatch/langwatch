@@ -15,7 +15,7 @@ Feature: Customer.io nurturing integration
   #   platform/app/src/hooks/__tests__/useAttributionCapture.unit.test.ts
   #   platform/app/src/server/event-sourcing/pipelines/trace-processing/reactors/__tests__/customerIoTraceSync.reactor.unit.test.ts
   #   platform/app/src/server/event-sourcing/pipelines/evaluation-processing/reactors/__tests__/customerIoEvaluationSync.reactor.unit.test.ts
-  #   platform/app/src/server/event-sourcing/pipelines/simulation-processing/reactors/__tests__/customerIoSimulationSync.reactor.unit.test.ts
+  #   platform/app/src/server/event-sourcing/pipelines/simulation-processing/subscribers/__tests__/customerIoSimulationSync.subscriber.unit.test.ts
   # Six scenarios were rewritten to match shipped implementation (was UPDATE-class):
   #   - "Null service resolves..." dropped (impl uses `undefined`, not null pattern)
   #   - "Region defaults to US" → "Region defaults to EU" (matches impl)
@@ -444,9 +444,9 @@ Feature: Customer.io nurturing integration
     And the update is debounced so at most one call per project per debounce window
 
   @unit
-  Scenario: Simulation sync reactor uses project-scoped job ID for debouncing
-    Given the customerIoSimulationSync reactor
-    When makeJobId is called for a project
+  Scenario: Simulation sync subscriber uses project-scoped dedup ID for debouncing
+    Given the customerIoSimulationSync subscriber
+    When the debounce dedup ID is derived for a project
     Then the returned ID is "cio-sim-sync-{tenantId}"
 
   @integration

@@ -3,18 +3,24 @@ Feature: Cancel queued and running suite jobs
   I want to cancel queued or in-progress suite jobs
   So that I can stop work I no longer need without waiting for it to finish
 
-  # Parity status: 12 of 14 scenarios bound to existing tests.
+  # Parity status: 12 of 15 scenarios bound to existing tests.
   # Remaining scenarios (#3458):
-  #   2 NO_TEST: shipped behavior, no integration test yet
+  #   3 NO_TEST: shipped behavior, no integration test yet
   # NO_TEST gaps:
   #   - "Cancellation reaches a worker on a different pod"
   #   - "Batch cancel across multiple workers terminates all active runs"
+  #   - "Cancel-grace watchdog force-finishes when the broadcast is lost"
 
   Background:
     Cancellation is implemented via event-sourcing. When the user requests
     cancellation, a `cancel_requested` event is written to the event log.
-    A reactor broadcasts the cancellation to all worker pods via Redis pub/sub.
+    The simulation_run_execution process manager (ADR-094) owns the rest: for
+    a QUEUED run it finishes the run CANCELLED directly; for a running run it
+    persists a cancel intent to its durable outbox, which broadcasts the
+    cancellation to all worker pods via Redis pub/sub (retried on failure).
     Each worker checks if it owns the scenario and kills its child process.
+    If no terminal event lands within the 60s cancel grace, the process
+    manager's wake watchdog force-finishes the run CANCELLED.
 
   # ---------------------------------------------------------------------------
   # Event-sourcing: cancel_requested event lifecycle
@@ -41,15 +47,24 @@ Feature: Cancel queued and running suite jobs
     Then the original CancellationRequestedAt is preserved
 
   # ---------------------------------------------------------------------------
-  # Reactor: broadcast cancel signal to workers
+  # Process manager: broadcast cancel signal to workers via the durable outbox
   # ---------------------------------------------------------------------------
 
   @integration
-  Scenario: Cancel reactor broadcasts to Redis on cancel_requested event
-    Given the cancellation broadcast reactor is registered
+  Scenario: Process manager broadcasts cancel to Redis on cancel_requested event
+    Given the simulation_run_execution process manager is registered
+    And the run is IN_PROGRESS
     When a cancel_requested event is processed by the pipeline
-    Then a message is published to the "scenario:cancel" Redis channel
+    Then a cancel intent is persisted to the process manager outbox
+    And a message is published to the "scenario:cancel" Redis channel
     And the message contains the scenarioRunId
+
+  @integration @unimplemented
+  Scenario: Cancel-grace watchdog force-finishes when the broadcast is lost
+    Given a cancel intent was broadcast for a running scenario
+    And the pub/sub message was lost so no worker received it
+    When 60 seconds pass without a terminal event for the run
+    Then the process manager's wake watchdog finishes the run with status CANCELLED
 
   # ---------------------------------------------------------------------------
   # Worker: cancel signal reaches the right worker
@@ -74,7 +89,7 @@ Feature: Cancel queued and running suite jobs
   Scenario: Cancellation reaches a worker on a different pod
     Given scenario X is running on worker pod 4
     And the cancel_requested event is processed by worker pod 1
-    When the reactor publishes to Redis
+    When the process manager's cancel intent publishes to Redis
     Then worker pod 4 receives the broadcast
     And terminates the child process for scenario X
 
@@ -85,8 +100,8 @@ Feature: Cancel queued and running suite jobs
   @integration
   Scenario: Worker skips execution if cancel was already requested
     Given a simulation run has CancellationRequestedAt set in the projection
-    When a worker picks up the job for that run
-    Then the worker does not spawn a child process
+    When the queued event for that run reaches the process manager
+    Then the process manager emits no execute intent
     And a finished event with status CANCELLED is dispatched
 
   # ---------------------------------------------------------------------------
@@ -98,7 +113,7 @@ Feature: Cancel queued and running suite jobs
     Given a simulation run has Status "QUEUED"
     When the user requests cancellation
     Then a cancel_requested event is dispatched
-    And a finished event with status CANCELLED is dispatched
+    And the process manager finishes the run with a finished event status CANCELLED
     And the fold projection shows Status "CANCELLED"
 
   # ---------------------------------------------------------------------------

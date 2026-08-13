@@ -33,6 +33,12 @@ export enum ScenarioRunStatus {
   IN_PROGRESS = "IN_PROGRESS",
   PENDING = "PENDING",
   FAILED = "FAILED",
+  /**
+   * Kept for external API/UI compatibility and any legacy stored rows.
+   * No longer produced anywhere: a stalled run now reaches terminal ERROR
+   * (reason "stalled") via the simulationRunExecution process manager's
+   * stall watchdog — nothing derives STALLED at read time anymore.
+   */
   STALLED = "STALLED",
   /** Queue waiting state - job is queued but not yet picked up by a worker */
   QUEUED = "QUEUED",

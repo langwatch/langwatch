@@ -6,13 +6,20 @@ Feature: Queued scenario run orphan recovery
   QUEUED forever: no terminal event was ever written, so the suites page kept
   polling a run that no living worker would ever finish.
 
-  Recovery has two layers. The first is graceful: when a worker shuts down it
-  marks every run it still owns as failed before it goes away, so the common
-  case (a planned max-runtime restart) never orphans anything. The second is a
-  safety net for hard kills (OOM, SIGKILL) where the worker has no chance to
-  clean up: on startup a worker looks for runs that have sat QUEUED with no
-  progress for too long and marks them failed so the user sees a terminal
-  result instead of a spinner.
+  Recovery now has two layers. The primary mechanism is the durable
+  simulation_run_execution process manager (ADR-094): every queued run gets a
+  per-run process instance whose execute intent rides the leased PG outbox
+  (retried until dispatched — a worker restart cannot lose it) and whose stall
+  watchdog wake force-finishes the run ERROR "stalled" once it has been quiet
+  past STALL_THRESHOLD_MS. The second layer is graceful: when a worker shuts
+  down it marks every run it still owns as failed before it goes away, so the
+  common case (a planned max-runtime restart) never orphans anything.
+
+  Runs queued BEFORE the process manager existed have no process instance, so
+  no watchdog covers them: they may remain non-terminal. That is an accepted
+  deployment-window loss — the legacy boot-time startup reconciler
+  (scenario-orphan-reconciler.ts) that used to sweep them was deleted outright
+  rather than kept for a deprecation cycle.
 
   A freshly queued run is never touched by recovery — only runs that have been
   abandoned long enough to prove no worker is coming for them.
@@ -21,6 +28,22 @@ Feature: Queued scenario run orphan recovery
     Given scenario runs are executed by worker processes
     And a scenario run is marked QUEUED when it is accepted for execution
     And a worker recycles itself after it reaches its maximum runtime
+
+  # ---------------------------------------------------------------------------
+  # Layer 0 (primary): process manager stall watchdog + durable execute intent
+  # ---------------------------------------------------------------------------
+
+  @unit @unimplemented
+  Scenario: A queued run whose execute intent never lands is finished as stalled
+    Given a scenario run has been QUEUED with no activity for longer than the stall threshold
+    When the process manager's stall watchdog wake fires
+    Then the run is finished with status ERROR and reason "stalled"
+
+  @unit @unimplemented
+  Scenario: The execute intent survives a worker restart
+    Given a queued run's execute intent is persisted in the process manager outbox
+    When the worker restarts before the intent is dispatched
+    Then the outbox retries the intent until the job reaches the execution pool
 
   # ---------------------------------------------------------------------------
   # Layer 1: graceful drain on worker restart
@@ -38,22 +61,4 @@ Feature: Queued scenario run orphan recovery
     Given a worker is executing a scenario run that was cancelled before it finished
     When the worker begins shutting down
     Then the run is marked cancelled
-    And it is not marked failed
-
-  # ---------------------------------------------------------------------------
-  # Layer 2: startup reconciler for hard kills
-  # ---------------------------------------------------------------------------
-
-  @unit
-  Scenario: A long-abandoned queued run is reconciled to failed on startup
-    Given a scenario run has been QUEUED with no progress for longer than the orphan threshold
-    And no worker is currently executing it
-    When a worker starts up and reconciles orphaned queued runs
-    Then the run is marked failed
-
-  @unit
-  Scenario: A freshly queued run is not failed by the reconciler
-    Given a scenario run was queued moments ago
-    When a worker starts up and reconciles orphaned queued runs
-    Then the run is left QUEUED
     And it is not marked failed
