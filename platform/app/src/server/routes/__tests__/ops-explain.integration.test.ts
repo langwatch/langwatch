@@ -31,6 +31,8 @@ import { startTestClickHouseEndpoints } from "~/test-utils/clickhouseTestEndpoin
 // call, so a single instance built here behaves exactly like one built per
 // request would.
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     opsExplain: {
       service: new OpsExplainService(new OpsExplainClickHouseRepository()),

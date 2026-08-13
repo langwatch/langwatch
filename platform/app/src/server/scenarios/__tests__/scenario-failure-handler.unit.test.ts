@@ -17,6 +17,8 @@ import {
 const mockFinishRun = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     simulations: {
       finishRun: mockFinishRun,

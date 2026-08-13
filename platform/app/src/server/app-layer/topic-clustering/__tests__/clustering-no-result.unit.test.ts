@@ -67,6 +67,8 @@ vi.mock("~/server/api/routers/modelProviders.utils", () => ({
 }));
 
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: vi.fn(() => ({
     traces: { assignTopic: assignTopicMock },
     topicClustering: { recordTopics: recordTopicsMock },

@@ -19,7 +19,6 @@ import type { PrismaClient } from "~/generated/prisma/client";
 // db. Mock both so no real connection keeps the worker alive (established
 // pattern; see auth-middleware.unit.test.ts).
 vi.mock("~/server/db", () => ({ prisma: {} }));
-vi.mock("~/server/redis", () => ({ connection: undefined }));
 
 const resolveOrgOnly = vi.fn();
 const markUsed = vi.fn();

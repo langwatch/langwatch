@@ -25,6 +25,7 @@ import type { SemConvAttributes } from "langwatch/observability";
 import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { SHUTDOWN_BUDGET } from "~/server/shutdown/budget";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { tryGetApp } from "../../../app-layer/app";
 import {
   createContextFromJobData,
   getJobContextMetadata,
@@ -36,7 +37,6 @@ import {
   TenantRateTracker,
   tenantIdFromGroupId,
 } from "../../../observability/tenantRateTracker";
-import { connection } from "../../../redis";
 import {
   type ProjectStorageDestination,
   redactStorageUrisInText,
@@ -412,7 +412,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       auditAdapter,
     } = definition;
 
-    const effectiveConnection = redisConnection ?? connection;
+    // `tryGetApp`, not `getApp`: this is a constructor, and EventSourcing
+    // builds queues while the composition root is still assembling — so an App
+    // may legitimately not exist yet. The caller that matters always passes a
+    // connection; falling through to the ConfigurationError below states the
+    // real problem, where `getApp()` would raise a boot-order error instead.
+    const effectiveConnection = redisConnection ?? tryGetApp()?.redis ?? null;
     if (!effectiveConnection) {
       throw new ConfigurationError(
         "GroupQueueProcessor",

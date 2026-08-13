@@ -40,6 +40,7 @@
     "packages/observability/",
     "packages/react-rum/",
     "packages/redaction/",
+    "packages/redis-client/",
     "packages/ssrf/",
     "platform/app/",
     "services/langevals/",
