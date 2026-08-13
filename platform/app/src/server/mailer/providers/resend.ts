@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { EnvHttpProxyAgent, fetch as undiciFetch } from "undici";
 import { env } from "../../../env.mjs";
 import { sanitizeHeaders } from "./mime";
-import { hostnameOf, resolveProxyForHost } from "./proxy";
+import { hostnameOf, resolveProxyForHost } from "../../outboundProxy";
 import {
   type EmailContent,
   EmailProviderConfigurationError,

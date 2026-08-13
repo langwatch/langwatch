@@ -16,7 +16,7 @@
  */
 import { createServer } from "node:net";
 import { sendEmail } from "../src/server/mailer/emailSender";
-import { isProxyBypassed } from "../src/server/mailer/providers/proxy";
+import { isProxyBypassed } from "../src/server/outboundProxy";
 import { EmailProviderConfigurationError } from "../src/server/mailer/providers/types";
 
 const PROXY_PORT = 8888;
