@@ -42,7 +42,16 @@ func TestNodeLanesUseDevEntryPoints(t *testing.T) {
 	for _, c := range children {
 		m := pnpmRun.FindStringSubmatch(c.Shell)
 		if m == nil {
-			continue // Go services and anything not driven by a pnpm script
+			// Skipping silently is how this check would rot: a lane rewritten
+			// into a pnpm form this regex cannot read (`pnpm --filter x run y`)
+			// would drop out of the loop while the other lane kept `checked`
+			// above zero, and the whole guard would go green on an unread lane.
+			// So a pnpm lane that cannot be parsed is a failure, not a skip;
+			// only genuinely non-pnpm lanes (the Go services, langy) pass here.
+			if strings.Contains(c.Shell, "pnpm") {
+				t.Errorf("lane %q runs pnpm (%q) in a form this test cannot parse, so its entry point went unchecked; widen pnpmRun", c.Name, c.Shell)
+			}
+			continue
 		}
 		name := m[1]
 		body, ok := scripts[name]
