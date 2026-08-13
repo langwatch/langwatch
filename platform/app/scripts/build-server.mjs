@@ -72,12 +72,35 @@ const basePackage = (id) => {
   return id.startsWith("@") ? parts.slice(0, 2).join("/") : (parts[0] ?? id);
 };
 
-// Kept external even by an inlineAll entry. @opentelemetry/* is a correctness
-// requirement, not an optimisation: the scenario child flushes spans at exit
-// through the globally registered provider, so a second inlined copy of the
-// API would split registration and flush across two registries and drop every
-// span. Prisma carries native engines that cannot be inlined at all.
-const NEVER_INLINED = [/^@opentelemetry\//, /^@prisma\//, /^\.prisma(\/|$)/];
+// Kept external even by an inlineAll entry, each for a reason that inlining
+// would break:
+//
+//   @opentelemetry/*  The child flushes spans at exit through the GLOBALLY
+//                     registered provider. A second inlined copy of the API
+//                     splits registration and flush across two registries, so
+//                     every span is dropped while the process still exits 0.
+//   @prisma/*         Native engines; cannot be inlined at all.
+//   pino / thread-stream
+//                     They start their log transport on a worker thread whose
+//                     script they locate with `join(__dirname, "worker.js")`.
+//                     Inlined, __dirname becomes dist/server and the lookup
+//                     misses, and thread-stream reports it by rethrowing on
+//                     nextTick — an UNCAUGHT exception that kills the child,
+//                     not something the transport's try/catch can swallow.
+//                     Every realistic configuration hits it: pretty console
+//                     logs (the dev default) and the OTel log transport both
+//                     create a transport.
+//
+// The rule of thumb for adding to this list: a package that resolves a FILE at
+// runtime relative to its own location cannot be inlined, because inlining is
+// exactly what moves that location.
+const NEVER_INLINED = [
+  /^@opentelemetry\//,
+  /^@prisma\//,
+  /^\.prisma(\/|$)/,
+  /^pino(-|$)/,
+  /^thread-stream$/,
+];
 
 /**
  * Whether a specifier gets inlined into the bundle. First-party source always
