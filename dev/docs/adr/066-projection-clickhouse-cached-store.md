@@ -142,6 +142,7 @@ Independently of the store: fix the **session = traceId fallback** so one large 
 | Component | Kind | Lever |
 |---|---|---|
 | `recordTriggerMatch` command | producer — one `TRIGGER_MATCH_RECORDED` per match (un-coalesced at incident time) | **Pillar 2 adopter #1 — shipped** (append coalescing on the count+byte-bounded drain) |
+| `recordLogContribution` / `recordMetricCorrelation` commands | producers — one event per log record / metric exemplar correlated to a trace, funnelling on the **default** aggregate key | **Pillar 2 adopters — shipped** (langwatch#6827, 256 each). The registration guard never named them; see the correction in *Adopters & sequencing* item 3 |
 | `triggerSettlement` | ADR-052 process manager, Postgres outbox state | None — evolves state incrementally from a PM store, never refolds `event_log`; its backlog is pure `event_log`-stall *symptom*, not a cause |
 
 ### Amendment (2026-07-31): per-item map jobs are a drain floor — append maps coalesce too
@@ -164,8 +165,8 @@ job instead of one. Adopters: coding-agent maps (langwatch#6407, 256),
 `spanStorage` (this change: `span-map:<lane>` at 256, lane pinned by span id, which also
 *fixes* an ordering hole — the per-event key let two deliveries of the same
 span run in parallel). Remaining: `traceAnalyticsRollup` and
-`orgBillableEventsMeter` (needs a billing idempotency review), then the
-`recordSpan` producer under Pillar 2's existing rule.
+`orgBillableEventsMeter` (needs a billing idempotency review). The `recordSpan`
+producer has since adopted Pillar 2's rule (`RECORD_SPAN_COALESCE_MAX_BATCH`).
 
 ## Adopters & sequencing
 
@@ -186,7 +187,9 @@ span run in parallel). Remaining: `traceAnalyticsRollup` and
      This is cheap and self-expiring: in steady state every row carries the current version, `get()` hits, and nothing refolds; a pre-existing row refolds exactly ONCE, on its next event, and is rewritten at the new version — so the population self-heals per aggregate with no backfill migration. It also closes the second gap the read-back PR opened: a state carrying only topic/annotation/name signal fails the store's persistable-signal predicate and writes no row at all, so before the gate it lived in Redis alone and was lost on eviction; now the missing row *is* a store miss and the refold rebuilds the signal from `event_log`.
 
      **Deletion condition:** `refoldOnStoreMiss` (and its executor support) can be removed once `trace_analytics` and `evaluation_analytics` retention has aged out every row written before migration 00056 — and `coding_agent_sessions` likewise every row written before 00053 — i.e. one full retention period after the deploy that carries the `2026-07-27` stamp, observed as a flat-zero `es_fold_refold_on_miss_total{outcome="performed"}` for each projection rather than inferred from the calendar. Removing it earlier re-opens the defects above for any surviving old row. `refoldOnOutOfOrder` is independent of this and can be deleted on its own schedule.
-3. **Pillar 2, first adopter — shipped:** append coalescing for `recordTriggerMatch` (`processCommandBatch` → one multi-row insert; the drain bounds by count AND bytes for every coalescing consumer). **Remaining:** audit other high-fan-in `event_log` producers and coalesce them — serialized command producers registering without coalescing are logged at registration, so the gaps are enumerable.
+3. **Pillar 2, first adopter — shipped:** append coalescing for `recordTriggerMatch` (`processCommandBatch` → one multi-row insert; the drain bounds by count AND bytes for every coalescing consumer). Since shipped: `recordSpan` (64, resolved per span so a spooled one caps at 1), `recordLogRecord` and `recordDataPoint` (256 each), and the trace-side correlation pair `recordLogContribution` / `recordMetricCorrelation` (256, langwatch#6827).
+
+   **Correction — the registration log does NOT enumerate the remaining gaps.** This item used to say serialised command producers registering without coalescing are logged at registration "so the gaps are enumerable". They are not: the guard reads a producer's *declared* grouping (`serializeByAggregate` or an explicit `getGroupKey`), and a command that declares neither still funnels on the default aggregate key whenever many items share one aggregate. That is the shape the correlation pair had — thousands of items per trace, one group, no warning ever emitted — and it is why they survived three earlier pillar-2 sweeps. Auditing "high-fan-in producer" therefore means asking, per command, *how many items can target one aggregate*, which is a domain fact the registration site cannot infer. Tracked as an `@unimplemented` scenario in `specs/event-sourcing/producer-append-coalescing.feature` ("a funnel on the default aggregate key is visible before it backs up"); closing it needs a signal a producer states about itself.
 4. **Durable dedup watermark — shipped:** the applied-event-id set persists next to the state row (`AppliedEventIds`, migration 00054) and the executor commits the union of the loaded set and the fresh ids on retries, so "throw-and-retry" stays idempotent across cache loss for read-back folds. Folds without a durable set keep the cache-only behaviour.
 
 ## codingAgentSession decomposition (Pillar 1 adopter #1)

@@ -33,6 +33,14 @@ on:
       - "charts/langwatch/Chart.yaml"
       - "charts/clickhouse-serverless/Chart.yaml"
 
+# A writer, so it queues rather than cancels: the job pushes a Chart.lock
+# commit to the release PR's branch, and two runs doing that at once is a
+# force-push race rather than wasted minutes. Serialized, the second run finds
+# the lock already in sync and does nothing.
+concurrency:
+  group: release-please-chart-lock-sync-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
   pull-requests: write

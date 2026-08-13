@@ -1,14 +1,18 @@
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import { NotFoundError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { Prisma, PrismaClient, WorkflowVersion } from "@prisma/client";
-import type { JsonValue } from "@prisma/client/runtime/library";
+import type { JsonValue } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
 import { generateText } from "ai";
 import { createPatch } from "diff";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { fireWorkflowCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
+import type {
+  Prisma,
+  PrismaClient,
+  WorkflowVersion,
+} from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
 import { captureException } from "~/utils/posthogErrorCapture";
 import {

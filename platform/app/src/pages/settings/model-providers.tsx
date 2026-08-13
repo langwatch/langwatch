@@ -188,7 +188,7 @@ export default function ModelsPage() {
       });
   }, []);
 
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   useEffect(() => {
     if (!isProviderDrawerOpen) {

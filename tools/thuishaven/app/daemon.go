@@ -157,10 +157,166 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 				o.store.RemoveStack(s.Slug)
 				o.log.Info("reaped stack", zap.String("slug", s.Slug), zap.Bool("dead", dead), zap.Bool("stale", stale))
 			}
+			o.governPressure()
 			o.refreshObservability(ctx)
 			o.reapClickHouse()
 		}
 	}
+}
+
+// vitestWorkerMarker is what an orphaned test worker's command line contains.
+// Narrow on purpose: the sweep below reclaims a process only when it matches
+// this AND is owned by PID 1, which together mean an interrupted run left it
+// behind and nobody is coming back for it.
+const vitestWorkerMarker = "vitest/dist/workers"
+
+// governPressure is the daemon's whole response to a loaded machine (ADR-090).
+//
+// It samples, publishes, and then slows things down — it never kills. macOS can
+// bound a process's memory (`taskpolicy -m` sets a jetsam limit at spawn), but
+// jetsam kills what breaches it, which turns a slow machine into lost work.
+// Demotion is reversible and costs nothing but time.
+//
+// The publish comes first and the work after it runs in the background, because
+// everything after the sample shells out: a sweep, a process list, a taskpolicy
+// call per stack, and two more probes per stack at red. Each is deadline-bound
+// on its own, but on a degraded machine with several stacks running they add up
+// on one tick — and a tick that outlasts domain.PressureStaleAfter makes every
+// reader on the machine fall back to green, switching governance off exactly
+// when the machine is at its worst. Publishing on a bounded path keeps the
+// record fresh however long the slow half takes.
+func (o *Orchestrator) governPressure() {
+	level := domain.ClassifyPressure(o.sys.MemStat())
+	o.publishPressure(level)
+
+	if o.isGoverning.Swap(true) {
+		// The previous tick's work is still going. Skipping is right rather than
+		// sad: what it would do is decided from a reading now two ticks old, and
+		// the run in flight is already doing it.
+		return
+	}
+	o.governance.Add(1)
+	go func() {
+		defer o.governance.Done()
+		defer o.isGoverning.Store(false)
+		o.applyGovernance(level)
+	}()
+}
+
+// awaitGovernance blocks until the slow half of the current tick has finished.
+// For tests, which assert on what it did.
+func (o *Orchestrator) awaitGovernance() { o.governance.Wait() }
+
+// applyGovernance is the slow half: everything that shells out.
+func (o *Orchestrator) applyGovernance(level domain.Pressure) {
+	o.sweepOrphanedWorkers()
+
+	stacks := o.store.Stacks()
+	if len(stacks) == 0 {
+		return
+	}
+	if level == domain.Green {
+		o.restoreDemoted(stacks)
+		return
+	}
+	o.demoteUnfocused(stacks)
+	if level == domain.Red {
+		o.warnCritical()
+	}
+}
+
+// publishPressure runs before any demotion, so readers see the current level
+// even if the demotion does nothing. A failure to publish is not worth a tick:
+// readers treat a missing record as green, which disables narrowing and refusal
+// and leaves slot counting exactly as it was.
+func (o *Orchestrator) publishPressure(level domain.Pressure) {
+	if err := o.store.WritePressure(domain.PressureRecord{
+		Version:   domain.PressureRecordVersion,
+		Level:     level.String(),
+		WrittenAt: o.sys.Now(),
+	}); err != nil {
+		o.log.Warn("could not publish memory pressure", zap.Error(err))
+	}
+}
+
+// governable reports whether a stack's launcher is a pid worth signaling.
+//
+// The zero check is not defensive tidiness: a registered stack can carry
+// LauncherPID == 0 (the reaper above guards it for the same reason), and pid 0
+// in kill(2) addresses the caller's OWN process group. Demoting it would demote
+// the daemon, and every group operation here would then be aimed at haven
+// itself.
+func (o *Orchestrator) governable(s domain.Stack) bool {
+	return s.LauncherPID != 0 && o.sys.ProcessAlive(s.LauncherPID)
+}
+
+func (o *Orchestrator) restoreDemoted(stacks []domain.Stack) {
+	for _, s := range stacks {
+		if o.governable(s) {
+			o.sys.RestoreGroup(s.LauncherPID)
+		}
+	}
+}
+
+// demoteUnfocused slows every live stack except the head of Stacks(), which is
+// ordered most-recently-updated first — the head is the worktree being worked
+// in, and demoting that one would slow down exactly the thing the developer is
+// watching.
+func (o *Orchestrator) demoteUnfocused(stacks []domain.Stack) {
+	focused := stacks[0].Slug
+	for _, s := range stacks {
+		if s.Slug == focused || !o.governable(s) {
+			continue
+		}
+		o.sys.DemoteGroup(s.LauncherPID)
+	}
+}
+
+// warnCritical names the largest stack, and does no more than name it. The
+// daemon did not start this work and has no standing to end it; the operator
+// decides.
+func (o *Orchestrator) warnCritical() {
+	slug, rss := o.fattestStack()
+	if slug == "" {
+		return
+	}
+	o.log.Warn("memory pressure critical",
+		zap.String("largest_stack", slug),
+		zap.String("rss", domain.HumanBytes(int64(rss))),
+		zap.String("hint", "haven down "+slug))
+}
+
+// sweepOrphanedWorkers reclaims test workers an interrupted run left parented to
+// PID 1. haven already does this for dev-runtime processes at every `up`
+// (procsupervisor.reapOrphans); this is the same rule on the tick, widened to
+// the workers CLAUDE.md currently asks people to pkill by hand.
+func (o *Orchestrator) sweepOrphanedWorkers() {
+	orphans := o.sys.OrphanedWorkers(vitestWorkerMarker)
+	for _, pid := range orphans {
+		if pid <= 0 {
+			continue // pid 0 kills the daemon's own process group
+		}
+		o.sys.KillGroup(pid)
+	}
+	if len(orphans) > 0 {
+		o.log.Info("reclaimed orphaned test workers", zap.Int("count", len(orphans)))
+	}
+}
+
+// fattestStack names the live stack with the largest process-group footprint.
+// Approximate by construction — GroupRSS double-counts shared pages — which is
+// fine for "which one should I look at first" and is why it is never a control
+// input.
+func (o *Orchestrator) fattestStack() (slug string, rss uint64) {
+	for _, s := range o.store.Stacks() {
+		if !o.sys.ProcessAlive(s.LauncherPID) {
+			continue
+		}
+		if got := o.sys.GroupRSS(s.LauncherPID); got > rss {
+			slug, rss = s.Slug, got
+		}
+	}
+	return slug, rss
 }
 
 // pruneIdleDatabases drops per-slug ClickHouse + Postgres databases whose

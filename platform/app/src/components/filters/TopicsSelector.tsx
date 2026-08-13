@@ -6,6 +6,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { keepPreviousData } from "@tanstack/react-query";
 import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 import { useFilterParams } from "../../hooks/useFilterParams";
@@ -51,7 +52,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
     },
     {
       ...queryOpts,
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
     },
   );
 

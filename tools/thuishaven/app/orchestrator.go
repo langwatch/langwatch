@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -29,12 +31,45 @@ type Orchestrator struct {
 	// container is the colima VM the langyagent worker runs on in its container
 	// tiers (see domain.LangyTier). May be nil in tests that never launch it.
 	container ContainerRuntime
-	log       *zap.Logger
+	// claude edits Claude Code's own settings, which only `haven setup` does.
+	// Nil everywhere else, including in tests that never install a feature.
+	claude ClaudeSettings
+	log    *zap.Logger
+
+	// isGoverning guards the slow half of a pressure tick, which runs off the
+	// tick so publishing stays bounded. governance is what a caller waits on to
+	// know that half has finished.
+	isGoverning atomic.Bool
+	governance  sync.WaitGroup
+}
+
+// Deps is the injected object graph. A struct rather than a positional
+// parameter list, because thirteen positional dependencies is a call nobody can
+// read and one whose neighbours can be transposed without the compiler noticing.
+type Deps struct {
+	Cfg       Config
+	Proxy     Proxy
+	Store     Store
+	Sup       Supervisor
+	Sys       System
+	CH        ClickHouse
+	PG        Postgres
+	RDS       Redis
+	Obs       Observability
+	Hyg       Hygiene
+	Sem       Semaphore
+	Container ContainerRuntime
+	Claude    ClaudeSettings
+	Log       *zap.Logger
 }
 
 // New builds an Orchestrator from its injected dependencies.
-func New(cfg Config, proxy Proxy, store Store, sup Supervisor, sys System, ch ClickHouse, pg Postgres, rds Redis, obs Observability, hyg Hygiene, sem Semaphore, container ContainerRuntime, log *zap.Logger) *Orchestrator {
-	return &Orchestrator{cfg: cfg, proxy: proxy, store: store, sup: sup, sys: sys, ch: ch, pg: pg, rds: rds, obs: obs, hyg: hyg, sem: sem, container: container, log: log}
+func New(d Deps) *Orchestrator {
+	return &Orchestrator{
+		cfg: d.Cfg, proxy: d.Proxy, store: d.Store, sup: d.Sup, sys: d.Sys,
+		ch: d.CH, pg: d.PG, rds: d.RDS, obs: d.Obs, hyg: d.Hyg, sem: d.Sem,
+		container: d.Container, claude: d.Claude, log: d.Log,
+	}
 }
 
 // UpParams identify the worktree `up` runs in (resolved by the composition root).

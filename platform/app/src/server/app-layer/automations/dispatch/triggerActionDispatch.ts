@@ -3,7 +3,7 @@ import {
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
 import { createLogger } from "@langwatch/observability";
-import { TriggerAction } from "@prisma/client";
+import { TriggerAction } from "~/generated/prisma/client";
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";

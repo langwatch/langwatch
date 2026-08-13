@@ -3505,7 +3505,7 @@ export interface paths {
         };
         /**
          * List emitted events
-         * @description The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type. `from` and `to` bound the created range in epoch milliseconds and are REQUIRED, because the log is a ranged read over the 13-month spend table and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.
+         * @description The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from` must not be later than `to` — a range that ends before it starts is rejected rather than answered with an empty page. They are required because the log is a ranged read over the 13-month spend table and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.
          */
         get: operations["getApiWebhooksV1Events"];
         put?: never;
@@ -6572,6 +6572,11 @@ export interface operations {
                         status: "skipped";
                         /** @description Why the evaluator declined to score this input */
                         details?: string;
+                        /** @description What the attempt cost, when the evaluator spent money before declining to score */
+                        cost?: {
+                            currency: string;
+                            amount: number;
+                        };
                         /** @description Always true in guardrail mode, so a skip does not block */
                         passed?: boolean;
                     } | {
@@ -6723,6 +6728,11 @@ export interface operations {
                         status: "skipped";
                         /** @description Why the evaluator declined to score this input */
                         details?: string;
+                        /** @description What the attempt cost, when the evaluator spent money before declining to score */
+                        cost?: {
+                            currency: string;
+                            amount: number;
+                        };
                         /** @description Always true in guardrail mode, so a skip does not block */
                         passed?: boolean;
                     } | {
@@ -6872,6 +6882,11 @@ export interface operations {
                         status: "skipped";
                         /** @description Why the evaluator declined to score this input */
                         details?: string;
+                        /** @description What the attempt cost, when the evaluator spent money before declining to score */
+                        cost?: {
+                            currency: string;
+                            amount: number;
+                        };
                         /** @description Always true in guardrail mode, so a skip does not block */
                         passed?: boolean;
                     } | {
@@ -7017,6 +7032,11 @@ export interface operations {
                         status: "skipped";
                         /** @description Why the evaluator declined to score this input */
                         details?: string;
+                        /** @description What the attempt cost, when the evaluator spent money before declining to score */
+                        cost?: {
+                            currency: string;
+                            amount: number;
+                        };
                         /** @description Always true in guardrail mode, so a skip does not block */
                         passed?: boolean;
                     } | {
@@ -22880,6 +22900,7 @@ export interface operations {
                     };
                     traceIds?: string[];
                     negateFilters?: boolean;
+                    /** @description Removed. Offset pagination is no longer supported and any value other than 0 is rejected. Page with the scrollId returned by the previous response instead. The field remains on the schema so that sending it produces an explanatory error rather than being silently discarded. */
                     pageOffset?: number;
                     pageSize?: number;
                     groupBy?: string;
@@ -22928,6 +22949,8 @@ export interface operations {
                             scrollId?: string;
                             /** @description Number of traces dropped from this page because they failed to serialize. Present only when non-zero, so a caller can tell that traces.length is below the page size for a reason other than reaching the end of the result set. */
                             skipped?: number;
+                            /** @description Only when dateField is 'updated'. Epoch milliseconds: the upper bound this scroll actually covered, which is at or before the endDate you asked for. The scroll reads every trace as of the moment it started, so anything written after that instant belongs to the next pull. Start your next incremental pull from this value — resuming from the endDate you requested would step over the difference and lose those traces. The bound is inclusive on both sides, so a trace last written at exactly this millisecond arrives in this pull and again in the next one: pulls are at-least-once, and applying them idempotently is what keeps that from becoming a duplicate. */
+                            updatedThrough?: number;
                         };
                         /** @description Present only when 'select' is provided. Describes the resolved columns — the dotted path, its value type, and whether it belongs to a nested child collection — so callers can pre-allocate a typed reader. */
                         schema?: {
@@ -23387,7 +23410,6 @@ export interface operations {
                     actionParams?: {
                         [key: string]: unknown;
                     };
-                    /** @default {} */
                     filters?: {
                         [key: string]: unknown;
                     };

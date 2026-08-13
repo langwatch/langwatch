@@ -126,7 +126,7 @@ vi.mock("~/utils/api", async () => {
           useQuery: () => setup.mockGetLastSubscription(),
         },
       },
-      useContext: vi.fn(() => ({
+      useUtils: vi.fn(() => ({
         organization: {
           getOrganizationWithMembersAndTheirTeams: { invalidate: vi.fn() },
         },

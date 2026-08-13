@@ -9,8 +9,9 @@
  * `RoleBindingService.validateBindingRoles`; group bindings reach the same
  * resolver and must refuse it the same way.
  */
-import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+
 import { describe, expect, it, vi } from "vitest";
+import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { RoleService } from "~/server/role";
 import { OrgExclusivePermissionScopeError } from "~/server/role-bindings/errors";
 import { GroupRestService } from "../group.service";

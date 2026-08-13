@@ -105,7 +105,7 @@ export function useSubscriptionActions({
       organizationId,
       currentSeats: currentMaxMembers ?? totalFullMembers,
       newSeats: updateTotalMembers,
-      onConfirm: async () => {
+      onConfirm: async (quotedAt) => {
         try {
           const plan =
             activePlanType && isGrowthSeatEventPlan(activePlanType)
@@ -115,14 +115,24 @@ export function useSubscriptionActions({
                   interval: billingPeriod,
                 });
 
-          await addTeamMemberOrEvents.mutateAsync({
+          const result = await addTeamMemberOrEvents.mutateAsync({
             organizationId,
             plan,
             upgradeMembers: true,
             upgradeTraces: false,
             totalMembers: updateTotalMembers,
             totalTraces: 0,
+            quotedAt,
           });
+
+          // Resolving is not the same as succeeding: the non-seat pricing path
+          // still answers `{ success: false }` when it has no subscription to
+          // change, and reporting that as "Seats updated successfully" told
+          // customers a seat count had moved when nothing had.
+          if (!result?.success) {
+            throw new Error("The seat update did not go through");
+          }
+
           onSeatsUpdated();
           toaster.create({
             title: "Seats updated successfully",

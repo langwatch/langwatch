@@ -78,6 +78,18 @@
         "promptFile": "recipes-debug-instrumentation.docs.txt"
       },
       {
+        "title": "Root-cause a production issue with my agent",
+        "skill": "langwatch/skills/recipes/debug-with-langwatch",
+        "slashCommand": "/debug-with-langwatch",
+        "promptFile": "recipes-debug-with-langwatch.docs.txt"
+      },
+      {
+        "title": "Triage my failing experiments and evaluations",
+        "skill": "langwatch/skills/recipes/eval-triage",
+        "slashCommand": "/eval-triage",
+        "promptFile": "recipes-eval-triage.docs.txt"
+      },
+      {
         "title": "Evaluate my multimodal agent",
         "skill": "langwatch/skills/recipes/evaluate-multimodal",
         "slashCommand": "/evaluate-multimodal",
@@ -88,6 +100,12 @@
         "skill": "langwatch/skills/recipes/generate-rag-dataset",
         "slashCommand": "/generate-rag-dataset",
         "promptFile": "recipes-generate-rag-dataset.docs.txt"
+      },
+      {
+        "title": "Set up and troubleshoot the LangWatch CLI",
+        "skill": "langwatch/skills/recipes/setup-lw",
+        "slashCommand": "/setup-lw",
+        "promptFile": "recipes-setup-lw.docs.txt"
       },
       {
         "title": "Check my agent doesn't give prescriptive advice",

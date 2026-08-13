@@ -47,7 +47,7 @@ import type {
   GatewayBudgetLedgerStatus,
   GatewayBudgetScopeType,
   GatewayBudgetWindow,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import {
   bucketPeriodFloorMs,

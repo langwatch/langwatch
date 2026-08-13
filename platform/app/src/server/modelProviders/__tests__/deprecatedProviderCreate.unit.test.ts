@@ -12,8 +12,9 @@
  * Covers @unit scenarios from
  * specs/model-providers/google-agent-platform.feature.
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { ModelProviderService } from "../modelProvider.service";
 
 const STORED_ROW = {

@@ -1,5 +1,9 @@
-import type { AlertType, Prisma, TriggerAction } from "@prisma/client";
 import { z } from "zod";
+import type {
+  AlertType,
+  Prisma,
+  TriggerAction,
+} from "~/generated/prisma/client";
 
 /**
  * Builder for the `Trigger` row that represents a custom-graph threshold

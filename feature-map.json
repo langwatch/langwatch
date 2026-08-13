@@ -18,7 +18,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.trace",
-                "typescript": "langwatch"
+                "typescript": "langwatch",
+                "go": "langwatch.Tracer"
               },
               "cli": [
                 "trace search",
@@ -104,7 +105,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.track_event",
-                "typescript": null
+                "typescript": null,
+                "go": "client.Events"
               },
               "cli": null,
               "skill": null,
@@ -129,7 +131,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.annotations",
-                "typescript": "langwatch.annotations"
+                "typescript": "langwatch.annotations",
+                "go": "client.Annotations"
               },
               "cli": [
                 "annotation list",
@@ -231,7 +234,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.monitors",
-                "typescript": "langwatch.monitors"
+                "typescript": "langwatch.monitors",
+                "go": "client.Monitors"
               },
               "cli": [
                 "monitor list",
@@ -292,7 +296,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.scenarios",
-                "typescript": "langwatch.scenarios"
+                "typescript": "langwatch.scenarios",
+                "go": "client.Scenarios"
               },
               "cli": [
                 "scenario list",
@@ -345,7 +350,8 @@
             "code": {
               "sdk": {
                 "python": null,
-                "typescript": "langwatch.simulationRuns"
+                "typescript": "langwatch.simulationRuns",
+                "go": "client.Scenarios.ListRuns"
               },
               "cli": [
                 "simulation-run list",
@@ -450,7 +456,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.prompts",
-                "typescript": "langwatch.prompts"
+                "typescript": "langwatch.prompts",
+                "go": "client.Prompts"
               },
               "cli": [
                 "prompt init",
@@ -682,7 +689,8 @@
             "code": {
               "sdk": {
                 "python": "langwatch.dataset",
-                "typescript": "langwatch.datasets"
+                "typescript": "langwatch.datasets",
+                "go": "client.Datasets"
               },
               "cli": [
                 "dataset list",
@@ -798,7 +806,8 @@
         "code": {
           "sdk": {
             "python": "langwatch.triggers",
-            "typescript": "langwatch.triggers"
+            "typescript": "langwatch.triggers",
+            "go": "client.Triggers"
           },
           "cli": [
             "trigger list",
@@ -1081,7 +1090,8 @@
             "code": {
               "sdk": {
                 "python": null,
-                "typescript": null
+                "typescript": null,
+                "go": "client.Projects"
               },
               "cli": [
                 "projects list",

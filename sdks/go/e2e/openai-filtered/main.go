@@ -8,8 +8,8 @@ import (
 	langwatch "github.com/langwatch/langwatch/sdks/go"
 	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+	"github.com/openai/openai-go/v3"
+	oaioption "github.com/openai/openai-go/v3/option"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
@@ -34,9 +34,10 @@ func main() {
 	client := openai.NewClient(
 		oaioption.WithAPIKey(openaiAPIKey),
 		oaioption.WithMiddleware(otelopenai.Middleware("filtered-spans-openai-client",
-			// Optional: Capture request/response content (be mindful of sensitive data)
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
+			// This example is about span filtering, so it keeps the middleware
+			// default and records request/response content. Be mindful of
+			// sensitive data — DataCaptureInput/Output/None narrow what is sent.
+			otelopenai.WithDataCapture(langwatch.DataCaptureAll),
 		)),
 	)
 

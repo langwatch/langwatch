@@ -138,7 +138,7 @@ export const CopyDatasetDialog = ({
             onClick={() => {
               void handleCopy();
             }}
-            loading={copyDataset.isLoading}
+            loading={copyDataset.isPending}
             disabled={!selectedProjectId.length}
           >
             Replicate

@@ -1,11 +1,11 @@
 import { createLogger } from "@langwatch/observability";
+import { nanoid } from "nanoid";
 import type {
   LlmPromptConfig,
   LlmPromptConfigVersion,
   Prisma,
   PrismaClient,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
+} from "~/generated/prisma/client";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { resolveModelForFeature } from "~/server/modelProviders/resolveModelForFeature";
 import { DEFAULT_MODEL } from "~/utils/constants";

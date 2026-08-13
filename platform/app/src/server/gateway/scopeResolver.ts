@@ -29,7 +29,11 @@
  * than derived, so what lives here is the write-time decision that fills the
  * column and the read that follows it.
  */
-import type { ModelProvider, Prisma, PrismaClient } from "@prisma/client";
+import type {
+  ModelProvider,
+  Prisma,
+  PrismaClient,
+} from "~/generated/prisma/client";
 
 import type { ScopeInput, VirtualKeyWithScopes } from "./virtualKey.repository";
 

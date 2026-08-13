@@ -14,10 +14,10 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { Experiment } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
+import type { Experiment } from "~/generated/prisma/client";
 import { createProjectApp, requires } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { ExperimentService } from "~/server/experiments/experiment.service";

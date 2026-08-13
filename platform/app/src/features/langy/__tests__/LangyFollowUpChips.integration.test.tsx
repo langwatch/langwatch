@@ -25,6 +25,11 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+// tRPC v11's `useUtils()` throws at hook call when no provider is mounted
+// (v10's `useContext()` returned a lazy proxy, so this tree got away without
+// one). The hydrators only `.fetch` on user action, never in these renders.
+vi.mock("~/utils/api", () => ({ api: { useUtils: () => ({}) } }));
+
 import { LangyCapabilityRenderer } from "../components/capabilities/LangyCapabilityRenderer";
 
 afterEach(cleanup);
