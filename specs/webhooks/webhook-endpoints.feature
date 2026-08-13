@@ -100,6 +100,132 @@ Feature: Webhook endpoints, signed outbound event delivery
       Then creating an endpoint with an http URL is refused
       And with the flag set the same endpoint is accepted
 
+  Rule: An endpoint delivers over HTTP or to an Amazon SQS queue
+
+    # The delivery machinery is one machinery: the same batching, the same
+    # ladder, the same delivery log, the same signature. Only the last hop
+    # differs, so the transport is what varies and everything above it does
+    # not know which one it got.
+
+    @unit
+    Scenario: The transport answers with a verdict, not a status
+      Given a delivery transport
+      When a batch is handed to it
+      Then it answers success, retryable or terminal
+      And a queue answers with no status at all
+      # The recorder used to re-derive the verdict from an HTTP status. A
+      # queue has no status, so the transport classifies and the recorder
+      # trusts it.
+
+    @unit
+    Scenario: The HTTP transport classifies exactly as the sender always did
+      Given the HTTP transport
+      Then a 2xx answer is success
+      And 500, 429 and 408 are retryable
+      And every other status, redirects included, is terminal
+
+    @integration
+    Scenario: An HTTP endpoint delivers unchanged through the transport seam
+      Given an endpoint with no destination kind stored
+      When a batch is delivered
+      Then it is posted exactly as before, to the same URL with the same headers
+      And its delivery log rows are indistinguishable from the ones it recorded before
+
+    @integration
+    Scenario: Both destinations answer to the same hourly dispatch cap
+      Given an organization at its hourly dispatch cap
+      When a batch is delivered to a queue destination
+      Then it is refused as retryable with a back-off
+      # The cap used to live inside the HTTP sender, so a queue destination
+      # would have been uncapped.
+
+    @unit
+    Scenario: A queue message carries the same bytes as the HTTP body
+      Given a batch of envelopes
+      When it is delivered to a queue
+      Then the message body is byte-identical to the body the HTTP transport would post
+      And no outer wrapper is added around it
+      # The same bytes means the same signature verifier and the same golden
+      # vectors on the receiving side.
+
+    @unit
+    Scenario: Signature, delivery id and attempt ride as message attributes
+      Given a signed batch delivered to a queue
+      Then the signature travels under the same name as its HTTP header
+      And so do the delivery id and the delivery attempt
+      # A consumer sees no attributes at all unless it asks for them by
+      # passing MessageAttributeNames: ["All"] to ReceiveMessage.
+
+    @unit
+    Scenario: A batch too large for one queue message is refused terminally
+      Given a batch whose body and attributes exceed the queue message limit
+      When it is delivered
+      Then the verdict is terminal
+      And the refusal names the batch-size control as the way to fix it
+      # Retrying is pointless: the same bytes will never fit. Splitting is
+      # not available either, because one batch is one message and its id is
+      # the replay-safety key.
+
+    @integration
+    Scenario: A FIFO queue is refused at save time
+      When an endpoint is saved with a queue URL ending in .fifo
+      Then the response status is 400
+      And error.code = "webhook_endpoint_invalid"
+      And the refusal says standard queues only
+      # Our contract is at-least-once with envelope-id dedup, which is what a
+      # standard queue is; we never promised ordering, and FIFO caps at 300
+      # per second.
+
+    @integration
+    Scenario: A queue URL outside the canonical Amazon SQS shape is refused
+      When an endpoint is saved with a queue URL that is not an Amazon SQS queue URL
+      Then the response status is 400
+      And error.code = "webhook_endpoint_invalid"
+      # The SSRF fence never sees this URL, because the AWS SDK dials it, so
+      # the shape is pinned instead.
+
+    @unit
+    Scenario: The region and the account come from the queue URL
+      Given a canonical Amazon SQS queue URL
+      Then its region is read off the URL rather than configured separately
+      And its account id is surfaced so an operator can see whose queue it is
+
+    @integration
+    Scenario: Ambient AWS credentials need the operator opt-in
+      Given the deployment did not set the unsafe ambient-credentials flag
+      Then saving a queue endpoint with no credentials of its own is refused
+      And with the flag set the same endpoint is accepted
+      # Without the gate a customer could name any queue the deployment's own
+      # role can write to.
+
+    @integration
+    Scenario: Static queue credentials are stored encrypted and never echoed
+      When an endpoint is saved with a static access key and secret
+      Then the secret is encrypted at rest
+      And no read of the endpoint returns it
+
+    @unit
+    Scenario: A missing or forbidden queue is terminal, a throttled one retries
+      Given a queue delivery that failed
+      Then a missing queue or a refused permission is terminal
+      And throttling, a server error and a network failure are retryable
+      And an expired credential is retryable
+
+    @integration
+    Scenario: Saving an endpoint names the field its destination kind is missing
+      When an endpoint of a kind is saved without the field that kind requires
+      Then the response status is 400
+      And the refusal names the missing field rather than the whole body
+
+    @integration
+    Scenario: An endpoint never changes its destination kind
+      Given an endpoint that delivers over HTTP
+      When an update asks for the queue kind
+      Then the response status is 400
+      And error.code = "webhook_endpoint_invalid"
+      # Messages already planned against the old transport are in flight in
+      # the outbox.
+
   Rule: Deliveries are signed and attributable
 
     @unit

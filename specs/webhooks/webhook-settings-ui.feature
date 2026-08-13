@@ -28,6 +28,32 @@ Feature: Webhook settings and the billing events ledger
       Given an empty URL and no selected events
       Then the save action is disabled
 
+  Rule: The drawer asks for the destination before it asks for its address
+
+    @integration
+    Scenario: The destination kind is a choice, and each kind asks for its own fields
+      Given the endpoint drawer is open for a new endpoint
+      Then the destination choice offers HTTP and Amazon SQS
+      And choosing HTTP asks for a URL
+      And choosing Amazon SQS asks for a queue URL instead
+
+    @integration
+    Scenario: An existing endpoint cannot be moved to another destination kind
+      Given the drawer is open for an endpoint that already exists
+      Then the destination choice is disabled
+      And it explains that a new endpoint is how you change destination
+
+    @integration
+    Scenario: A queue endpoint saves only once its queue URL is filled in
+      Given the drawer is open with Amazon SQS chosen and events selected
+      Then the save action is disabled until a queue URL is entered
+
+    @integration
+    Scenario: The list says where each endpoint delivers
+      Given endpoints of both kinds
+      Then each row carries a badge naming its destination
+      And a queue row shows the queue rather than an empty URL
+
   Rule: Signing secrets stay one-shot in the UI
 
     @integration

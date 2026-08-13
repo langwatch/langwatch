@@ -23,11 +23,22 @@ import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
+import { WEBHOOK_DESTINATION_KINDS } from "~/utils/webhookDestinations";
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const orgInput = z.object({ organizationId: z.string() });
 const endpointInput = orgInput.extend({ endpointId: z.string() });
+
+/** The queue half of a destination. Which credential fields are ALLOWED is
+ *  the service's call; this only says what may be sent. */
+const sqsDestinationInput = z.object({
+  queueUrl: z.string(),
+  roleArn: z.string().optional(),
+  externalId: z.string().optional(),
+  accessKeyId: z.string().optional(),
+  secretAccessKey: z.string().optional(),
+});
 
 /**
  * Enterprise gate for the whole surface, mirroring the REST app: the org's
@@ -112,7 +123,9 @@ export const webhookEndpointsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
       orgInput.extend({
-        url: z.string(),
+        destinationKind: z.enum(WEBHOOK_DESTINATION_KINDS).optional(),
+        url: z.string().optional(),
+        sqs: sqsDestinationInput.optional(),
         enabledEvents: z.array(z.string()).min(1),
         maxBatchSize: z.number().int().optional(),
         maxBatchDelayMs: z.number().int().optional(),
@@ -125,7 +138,9 @@ export const webhookEndpointsRouter = createTRPCRouter({
       translating(() =>
         service(ctx.prisma).create({
           organizationId: input.organizationId,
+          destinationKind: input.destinationKind,
           url: input.url,
+          sqs: input.sqs,
           enabledEvents: input.enabledEvents,
           maxBatchSize: input.maxBatchSize,
           maxBatchDelayMs: input.maxBatchDelayMs,
@@ -154,6 +169,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
     .input(
       endpointInput.extend({
         url: z.string().optional(),
+        sqs: sqsDestinationInput.partial().optional(),
         enabledEvents: z.array(z.string()).min(1).optional(),
         maxBatchSize: z.number().int().optional(),
         maxBatchDelayMs: z.number().int().optional(),
@@ -168,6 +184,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
           organizationId: input.organizationId,
           endpointId: input.endpointId,
           url: input.url,
+          sqs: input.sqs,
           enabledEvents: input.enabledEvents,
           maxBatchSize: input.maxBatchSize,
           maxBatchDelayMs: input.maxBatchDelayMs,

@@ -27,14 +27,10 @@ import type {
 } from "~/server/event-sourcing/process-manager/stores/processStore.types";
 import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { nanoUsdToDecimalString } from "~/server/gateway/wireMoney";
+import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { pruneExpiredIdempotencyReceipts } from "~/server/webhooks/deliveryLog";
-import {
-  assertWebhookDelivered,
-  sendWebhook,
-  WEBHOOK_DELIVERY_ID_HEADER,
-  type WebhookSendResult,
-} from "~/server/webhooks/sendWebhook";
-import { allowsInsecureLocalUrls } from "~/server/webhooks/urlPolicy";
+import { webhookDestinationFor } from "~/server/webhooks/destinations";
+import type { WebhookDispatchResult } from "~/server/webhooks/destinations/types";
 import type { PlanInfo } from "../../licensing/planInfo";
 import { spendRowToEnvelope } from "../envelope";
 import { eventMatches } from "../eventRegistry";
@@ -693,44 +689,47 @@ async function runMaintenanceIfDue(
 }
 
 /**
- * POST one frozen batch through the SSRF-fenced signed sender.
+ * Hand one frozen batch to the endpoint's transport.
  *
- * A transport-level failure (DNS, SSRF block, timeout) leaves no receiver
- * status to store, so the attempt is recorded here and the error rethrown:
- * DispatchError carries the retryable classification the dispatcher acts
- * on.
+ * The transport answers with an ALREADY CLASSIFIED verdict, because the
+ * classification depends on the transport: an HTTPS receiver answers with a
+ * status code, a queue answers with a message id and no status at all. What
+ * the two share is the bytes, which are built here, once, so both transports
+ * put the same body on the wire and one signature verifier reads either.
+ *
+ * A transport-level failure (DNS, an SSRF block, a timeout) leaves nothing to
+ * classify, so the attempt is recorded here and the error rethrown:
+ * DispatchError carries the retryable flag the dispatcher acts on.
  */
-async function postWebhookBatch({
+async function dispatchWebhookBatch({
   deps,
   payload,
   context,
-  endpoint,
   startedAt,
 }: {
   deps: WebhookDeliveryProcessDeps;
   payload: SendBatchPayload;
   context: IntentContext;
-  endpoint: WebhookEndpointView;
   startedAt: number;
-}): Promise<WebhookSendResult> {
-  const secrets = await deps.endpoints.getSigningSecrets({
-    organizationId: payload.organizationId,
-    endpointId: payload.endpointId,
-  });
+}): Promise<WebhookDispatchResult> {
+  const [secrets, destination] = await Promise.all([
+    deps.endpoints.getSigningSecrets({
+      organizationId: payload.organizationId,
+      endpointId: payload.endpointId,
+    }),
+    deps.endpoints.getDestinationConfig({
+      organizationId: payload.organizationId,
+      endpointId: payload.endpointId,
+    }),
+  ]);
   try {
-    return await sendWebhook({
-      url: endpoint.url,
+    return await webhookDestinationFor(destination).send({
+      organizationId: payload.organizationId,
+      endpointId: payload.endpointId,
       body: JSON.stringify({ batch: payload.envelopes }),
-      triggerName: payload.endpointId,
-      contextLabel: `Webhook endpoint ${payload.endpointId}`,
-      // Endpoints are organization-scoped, so their dispatch cap buckets
-      // per organization rather than per project.
-      projectId: payload.organizationId,
-      eventId: payload.batchId,
-      dispatchIdHeader: WEBHOOK_DELIVERY_ID_HEADER,
-      signingSecrets: secrets,
+      batchId: payload.batchId,
       attempt: context.attempt,
-      allowInsecureLocal: allowsInsecureLocalUrls(),
+      signingSecrets: secrets,
     });
   } catch (error) {
     const retryable =
@@ -753,10 +752,13 @@ async function postWebhookBatch({
 }
 
 /**
- * Record the receiver's answer and classify it: 2xx acks, 5xx/429/408
- * retry along the ladder (Retry-After honored as a floor), other statuses
- * retire the batch to the dead letter immediately. The endpoint's failure
- * streak and the 72h auto-disable ride every recorded outcome.
+ * Record the transport's verdict and act on it: success acks, retryable
+ * ladders (Retry-After honored as a floor), terminal retires the batch to
+ * the dead letter immediately. The endpoint's failure streak and the 72h
+ * auto-disable ride every recorded outcome.
+ *
+ * The verdict is the transport's, not re-derived here. A status code is only
+ * one transport's way of expressing it, and a queue has none.
  */
 async function recordWebhookBatchOutcome({
   deps,
@@ -768,7 +770,7 @@ async function recordWebhookBatchOutcome({
   deps: WebhookDeliveryProcessDeps;
   payload: SendBatchPayload;
   context: IntentContext;
-  result: WebhookSendResult;
+  result: WebhookDispatchResult;
   latencyMs: number;
 }): Promise<void> {
   const attempt = {
@@ -777,10 +779,10 @@ async function recordWebhookBatchOutcome({
     dispatchId: payload.batchId,
     attempt: context.attempt,
     eventCount: payload.envelopes.length,
-    responseStatus: result.status,
+    ...(result.status !== null ? { responseStatus: result.status } : {}),
     latencyMs,
   };
-  if (result.status >= 200 && result.status < 300) {
+  if (result.verdict === "success") {
     await deps.endpoints.recordDeliveryAttempt({
       ...attempt,
       outcome: "success",
@@ -788,30 +790,33 @@ async function recordWebhookBatchOutcome({
     return;
   }
 
-  const retryable =
-    result.status >= 500 || result.status === 429 || result.status === 408;
   await deps.endpoints.recordDeliveryAttempt({
     ...attempt,
-    outcome: retryable ? "retryable" : "terminal",
-    error: `HTTP ${result.status}`,
+    outcome: result.verdict,
+    error: result.error ?? "",
     response: {
-      body: result.body.slice(0, 1000),
+      body: result.body,
       ...(result.retryAfterMs !== undefined
         ? { retryAfterMs: result.retryAfterMs }
         : {}),
     },
   });
-  // Throws DispatchError with the same classification just recorded; the
-  // dispatcher ladders retryables and dead-letters terminals immediately.
-  assertWebhookDelivered({
-    result,
-    triggerName: payload.endpointId,
+  // The same classification just recorded, as the throw the dispatcher acts
+  // on: it ladders retryables and dead-letters terminals immediately.
+  throw new DispatchError({
+    message: `Webhook endpoint ${payload.endpointId}: ${result.error ?? "delivery failed"}`,
+    retryable: result.verdict === "retryable",
+    // Honor the receiver's backpressure on a retryable verdict (ADR-040 §5);
+    // the queue folds it into its backoff as a floor.
+    ...(result.verdict === "retryable" && result.retryAfterMs !== undefined
+      ? { retryAfterMs: result.retryAfterMs }
+      : {}),
   });
 }
 
 /**
- * Level 2: deliver one frozen batch to one endpoint through the
- * SSRF-fenced signed sender and record what the receiver answered.
+ * Level 2: deliver one frozen batch to one endpoint through whichever
+ * transport it named, and record what came back.
  */
 export function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps) {
   return async (
@@ -819,7 +824,7 @@ export function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps) {
     context: IntentContext,
   ): Promise<void> => {
     // The service's deliverable read owns the liveness predicate. A deleted
-    // or disabled endpoint drains its queue without POSTing: the spend
+    // or disabled endpoint drains its queue without delivering: the spend
     // record keeps the events, re-enable plus replay covers the gap.
     const endpoint = await deps.endpoints.getDeliverable({
       organizationId: payload.organizationId,
@@ -834,11 +839,10 @@ export function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps) {
     }
 
     const startedAt = (deps.now ?? Date.now)();
-    const result = await postWebhookBatch({
+    const result = await dispatchWebhookBatch({
       deps,
       payload,
       context,
-      endpoint,
       startedAt,
     });
     await recordWebhookBatchOutcome({

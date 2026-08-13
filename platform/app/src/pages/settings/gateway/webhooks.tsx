@@ -35,6 +35,7 @@ import { showErrorToast } from "~/features/errors";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
+import { WEBHOOK_DESTINATION_LABELS } from "~/utils/webhookDestinations";
 
 type EndpointView = RouterOutputs["webhookEndpoints"]["list"][number];
 type EventTypesView = RouterOutputs["webhookEndpoints"]["eventTypes"];
@@ -281,19 +282,44 @@ function WebhookRowMenu(props: EndpointActionProps) {
   );
 }
 
+/**
+ * Where the endpoint delivers, in one cell: a badge naming the transport and
+ * the address it uses. A queue endpoint has no URL, so without the address
+ * falling through to the queue this column would simply be blank on one of
+ * the two kinds.
+ */
+function DestinationCell({ endpoint }: { endpoint: EndpointView }) {
+  const address = endpoint.sqs?.queueUrl ?? endpoint.url ?? "";
+  return (
+    <Table.Cell maxWidth="360px">
+      <VStack align="start" gap={1}>
+        <Badge
+          size="sm"
+          colorPalette={endpoint.destinationKind === "sqs" ? "purple" : "gray"}
+          data-testid={`webhook-destination-badge-${endpoint.id}`}
+        >
+          {WEBHOOK_DESTINATION_LABELS[endpoint.destinationKind]}
+        </Badge>
+        <Text
+          fontSize="sm"
+          overflow="hidden"
+          textOverflow="ellipsis"
+          whiteSpace="nowrap"
+          maxWidth="340px"
+          title={address}
+        >
+          {address}
+        </Text>
+      </VStack>
+    </Table.Cell>
+  );
+}
+
 function WebhookRow(props: EndpointActionProps) {
   const { endpoint } = props;
   return (
     <Table.Row>
-      <Table.Cell
-        maxWidth="320px"
-        overflow="hidden"
-        textOverflow="ellipsis"
-        whiteSpace="nowrap"
-        title={endpoint.url}
-      >
-        {endpoint.url}
-      </Table.Cell>
+      <DestinationCell endpoint={endpoint} />
       <Table.Cell>
         <Text fontSize="sm" color="fg.muted">
           {eventsSummary(endpoint.enabledEvents)}
@@ -321,7 +347,7 @@ function WebhookEndpointsTable({
       <Table.Root size="sm">
         <Table.Header>
           <Table.Row>
-            <Table.ColumnHeader>URL</Table.ColumnHeader>
+            <Table.ColumnHeader>Destination</Table.ColumnHeader>
             <Table.ColumnHeader>Events</Table.ColumnHeader>
             <Table.ColumnHeader>Status</Table.ColumnHeader>
             <Table.ColumnHeader>Last success</Table.ColumnHeader>
@@ -454,15 +480,22 @@ function WebhookDialogsStack({
         eventTypes={eventTypes}
         isSaving={mutations.create.isPending || mutations.update.isPending}
         onClose={dialogs.closeDrawer}
-        onSave={(input) => {
+        onSave={({ destinationKind, ...input }) => {
           if (dialogs.editing) {
+            // The kind is not sent on an update: it cannot change, and the
+            // drawer locked the control, so repeating it would only give the
+            // server something to refuse.
             mutations.update.mutate({
               organizationId,
               endpointId: dialogs.editing.id,
               ...input,
             });
           } else {
-            mutations.create.mutate({ organizationId, ...input });
+            mutations.create.mutate({
+              organizationId,
+              destinationKind,
+              ...input,
+            });
           }
         }}
       />
