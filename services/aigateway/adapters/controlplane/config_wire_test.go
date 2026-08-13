@@ -365,12 +365,13 @@ func TestProviderSlotToCredential_GeminiAgentPlatform(t *testing.T) {
 	})
 }
 
-// A rolling deploy runs both versions of the gateway against both versions of
-// the control plane, in both directions, so neither side may refuse the
-// other's payload. "on" and "timeout_ms" were never read; retiring them must
-// stay a decode-time non-event rather than a coordinated release.
+// The older side of a half-done deploy still sends "on" and "timeout_ms".
+// Neither was ever read, so ignoring them has to be a decode-time non-event:
+// the key keeps the attempt budget its operator configured, and the request is
+// served. Refusing the payload instead would take traffic down for the window
+// where the two sides disagree.
 //
-// @scenario "A bundle carrying unread fallback keys still decodes"
+// @scenario "A key keeps serving while a deploy is half done"
 func TestConfigWire_RetiredFallbackKeysStillDecode(t *testing.T) {
 	payload := []byte(`{
 		"routing_mode": "fallback_all",

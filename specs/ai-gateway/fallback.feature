@@ -87,17 +87,17 @@ Feature: Provider fallback chain
     only ever narrow the set, and every narrowing turns a failure the gateway
     could have recovered from into one the customer sees.
 
-    A control plane may still send "on" and "timeout_ms" in the fallback block.
-    Neither is read, and neither is an error: a rolling deploy has both
-    versions of both sides running at once, and neither may refuse the other.
+    A deploy rolls one side at a time, so for a while the two sides disagree
+    about what the fallback block contains. Neither may refuse the other, in
+    either direction, or a routine deploy takes traffic down.
 
     @unit
-    Scenario: A bundle carrying unread fallback keys still decodes
-      Given a config payload whose fallback block carries "on" and "timeout_ms"
-      When the gateway decodes it
-      Then the decode succeeds
-      And max_attempts is taken from the payload
-      And the retired keys change nothing about which failures walk the chain
+    Scenario: A key keeps serving while a deploy is half done
+      Given the control plane and the gateway are mid-deploy on different versions
+      When a request arrives for a key whose policy allows three attempts
+      Then the request is served
+      And the key gets the three attempts its operator configured
+      And this holds whichever of the two sides is the newer one
 
   Rule: All attempts exhausted returns the last error
 
