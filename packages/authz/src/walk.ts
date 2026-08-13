@@ -72,8 +72,9 @@ export function demoProjectStep({
  * every binding tier — organization (rbac.ts:1016), team, and project
  * (resolveProjectPermissionContext, rbac.ts:1083) all read membership before
  * they read bindings, so a stale binding left by a since-closed cross-org
- * path never authorizes. Api-key principals hold no org membership and are
- * exempt (their path is bindings-only). The resource tier is deliberately
+ * path never authorizes. Api-key principals hold no org membership and pass
+ * this gate untouched — past it they may still resolve through bindings or
+ * an api-key-audience resource grant. The resource tier is deliberately
  * outside the gate: share links are how a non-member or an anonymous caller
  * sees anything at all.
  */

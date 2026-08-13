@@ -142,10 +142,6 @@ export class AuthzEngine {
     };
   }
 
-  // ==========================================================================
-  // explain — ADR-092 §6, the decision object rendered as a walk
-  // ==========================================================================
-
   private explainBindingLine({
     binding,
     chain,

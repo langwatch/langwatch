@@ -213,10 +213,13 @@ export class PrismaAuthzGrantsRepository implements AuthzGrantsRepository {
         where: { userId, organizationId },
       });
       // Pending invites are keyed by email, not by user id, so the address
-      // has to be read to match them. It is read HERE, inside the same
-      // transaction as the delete: an address read before the transaction
-      // could have changed by the time the delete runs, which would leave a
-      // live invite behind that the returned counts claim was removed.
+      // has to be read to match them. It is read HERE so the lookup and the
+      // delete commit or roll back together with the other offboarding
+      // writes; reading it before the transaction widened the window in
+      // which an address change strands a live invite the returned counts
+      // claim was removed. (The transaction does not serialize against a
+      // concurrent email update itself — that residual race is the email
+      // writer's, not this read's.)
       const user = await tx.user.findUnique({
         where: { id: userId },
         select: { email: true },
