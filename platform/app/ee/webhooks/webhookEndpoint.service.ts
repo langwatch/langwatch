@@ -718,15 +718,17 @@ export class WebhookEndpointService {
       });
       return { delivered, responseStatus: result.status, responseBody };
     } catch (error) {
-      // The full message goes to the delivery log for the operator; the
+      // A bounded excerpt goes to the delivery log for the operator; the
       // returned summary is sanitized so internal dispatch wording and
       // transport details never reach the caller verbatim.
+      //
+      // Normalize BEFORE slicing: bounding only the `Error` branch left a
+      // thrown non-Error (a rejected string, an object with a huge `toString`)
+      // to reach the log at whatever length it happened to be.
+      const message = error instanceof Error ? error.message : String(error);
       await recordAttempt({
         outcome: "terminal",
-        error:
-          error instanceof Error
-            ? error.message.slice(0, TEST_FIRE_EXCERPT_LIMIT)
-            : String(error),
+        error: message.slice(0, TEST_FIRE_EXCERPT_LIMIT),
       });
       return {
         delivered: false,
