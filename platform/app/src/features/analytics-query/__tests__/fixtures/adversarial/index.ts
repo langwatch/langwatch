@@ -19,6 +19,7 @@ import dataUrlAtTop from "./data-url-at-top.json";
 import dataUrlNestedFiveDeep from "./data-url-nested-five-deep.json";
 import deepNestingPastCeiling from "./deep-nesting-past-ceiling.json";
 import expressionForbiddenIdentifier from "./expression-forbidden-identifier.json";
+import expressionForbiddenLabelExpr from "./expression-forbidden-label-expr.json";
 import imageMark from "./image-mark.json";
 import imageMarkNested from "./image-mark-nested.json";
 import inlineDataValues from "./inline-data-values.json";
@@ -154,5 +155,12 @@ export const ADVERSARIAL_VEGA_FIXTURES: readonly AdversarialVegaFixture[] = [
     name: "expression-forbidden-identifier",
     attacks: "expression.forbidden",
     spec: expressionForbiddenIdentifier,
+  },
+  // An expression under a tick label is still an expression: `labelExpr` is
+  // evaluated like any other, so it is screened like any other.
+  {
+    name: "expression-forbidden-label-expr",
+    attacks: "expression.forbidden",
+    spec: expressionForbiddenLabelExpr,
   },
 ];

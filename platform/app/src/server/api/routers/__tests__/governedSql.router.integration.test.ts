@@ -11,18 +11,24 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockFeatureFlagIsEnabled, mockDescribeSchema, mockExecute } =
-  vi.hoisted(() => ({
-    mockFeatureFlagIsEnabled: vi.fn().mockResolvedValue(true),
-    mockDescribeSchema: vi.fn().mockReturnValue({ datasets: [] }),
-    mockExecute: vi.fn().mockResolvedValue({
-      columns: [],
-      rows: [],
-      statistics: { elapsedMs: 1, rowsRead: 0, bytesRead: 0, rowsReturned: 0 },
-      truncated: false,
-      diagnostics: [],
-    }),
-  }));
+const {
+  mockFeatureFlagIsEnabled,
+  mockDescribeSchema,
+  mockExecute,
+  deployment,
+} = vi.hoisted(() => ({
+  mockFeatureFlagIsEnabled: vi.fn().mockResolvedValue(true),
+  mockDescribeSchema: vi.fn().mockReturnValue({ datasets: [] }),
+  mockExecute: vi.fn().mockResolvedValue({
+    columns: [],
+    rows: [],
+    statistics: { elapsedMs: 1, rowsRead: 0, bytesRead: 0, rowsReturned: 0 },
+    truncated: false,
+    diagnostics: [],
+  }),
+  /** Whether this deployment has a governed identity to run queries as. */
+  deployment: { provisioned: true },
+}));
 
 vi.mock("~/server/featureFlag", () => ({
   featureFlagService: { isEnabled: mockFeatureFlagIsEnabled },
@@ -30,7 +36,7 @@ vi.mock("~/server/featureFlag", () => ({
 
 vi.mock("~/server/analytics/governed-sql", () => ({
   getGovernedSqlService: () => ({
-    available: true,
+    available: deployment.provisioned,
     describeSchema: mockDescribeSchema,
     execute: mockExecute,
   }),
@@ -102,6 +108,7 @@ describe("the governed SQL router's feature switch", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    deployment.provisioned = true;
     mockPrismaClient.project.findUnique.mockResolvedValue({
       id: "proj_test_123",
       apiKey: "key",
@@ -138,10 +145,10 @@ describe("the governed SQL router's feature switch", () => {
     });
 
     /** @scenario "The whole surface stays dark until the experimental feature switch is on" */
-    it("answers unavailable, which is what hides the navigation and the page", async () => {
+    it("answers unavailable, naming the switch as the gate that closed", async () => {
       await expect(
         caller.availability({ projectId: "proj_test_123" }),
-      ).resolves.toEqual({ available: false });
+      ).resolves.toEqual({ available: false, reason: "disabled" });
     });
 
     /** @scenario "The whole surface stays dark until the experimental feature switch is on" */
@@ -172,18 +179,48 @@ describe("the governed SQL router's feature switch", () => {
         });
       }
     });
+  });
+
+  describe("given a stored rule enabling the switch for one organization", () => {
+    beforeEach(() => {
+      // A fake of the rule itself rather than an assertion about the call: it
+      // answers true only for this flag and that organization, so the surface
+      // can only come on if the router resolved and passed the right one.
+      mockFeatureFlagIsEnabled.mockImplementation(
+        async (flag: string, context: { organizationId?: string }) =>
+          flag === "release_governed_sql_workbench" &&
+          context.organizationId === "org_test_123",
+      );
+    });
 
     /** @scenario "An organization-scoped rule can switch the workbench on" */
-    it("evaluates the switch for this member, this project, and its organization", async () => {
-      await caller.availability({ projectId: "proj_test_123" });
-      expect(mockFeatureFlagIsEnabled).toHaveBeenCalledWith(
-        "release_governed_sql_workbench",
-        {
-          distinctId: "user_test_123",
-          projectId: "proj_test_123",
-          organizationId: "org_test_123",
-        },
-      );
+    it("switches the workbench on for that organization's project and no other", async () => {
+      await expect(
+        caller.availability({ projectId: "proj_test_123" }),
+      ).resolves.toEqual({ available: true });
+
+      mockPrismaClient.project.findUnique.mockResolvedValue({
+        id: "proj_other_456",
+        team: { organizationId: "org_other_456" },
+      });
+
+      await expect(
+        caller.availability({ projectId: "proj_other_456" }),
+      ).resolves.toEqual({ available: false, reason: "disabled" });
+    });
+  });
+
+  describe("given the switch is on but the deployment is not provisioned", () => {
+    beforeEach(() => {
+      mockFeatureFlagIsEnabled.mockResolvedValue(true);
+      deployment.provisioned = false;
+    });
+
+    /** @scenario "The workbench is unreachable while governed SQL is not provisioned" */
+    it("answers unavailable, naming provisioning rather than the switch", async () => {
+      await expect(
+        caller.availability({ projectId: "proj_test_123" }),
+      ).resolves.toEqual({ available: false, reason: "unprovisioned" });
     });
   });
 });

@@ -10,9 +10,16 @@
  * dropped socket, a bug in the shaping code — those degrade to "unknown" with a
  * trace id, which is the system working as designed. The one place raw driver
  * failures do become handled errors is `translateClickHouseQueryError`, which
- * already maps the two resource ceilings a caller can act on (memory, timeout)
- * onto the platform's existing `query_memory_exceeded` / `query_timeout` codes —
- * so this module deliberately mints no code of its own for them.
+ * already maps the settings profile's per-query ceilings — memory, execution
+ * time, and the row/byte scan ceilings — onto the platform's existing
+ * `query_memory_exceeded`, `query_timeout` and `query_scan_limit_exceeded`
+ * codes, so this module deliberately mints no code of its own for them.
+ *
+ * The profile's one *aggregate* ceiling, `max_concurrent_queries_for_user`, is
+ * not among them: its breach is admission control against the shared identity's
+ * total load rather than anything about the submitted query, and it currently
+ * degrades to "unknown". Naming it is a follow-up, not an oversight to fix by
+ * reaching for a code that means something else.
  *
  * No message here names a host, a credential, a server setting, a physical
  * table, or another tenant. `message` rides in the REST response body.

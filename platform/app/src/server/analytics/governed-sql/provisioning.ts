@@ -161,23 +161,47 @@ export interface GovernedTable {
 export interface GovernedResourceLimits {
   maxExecutionTimeSeconds: number;
   maxMemoryUsageBytes: number;
-  /** Concurrency ceiling, so one governed query cannot saturate the server's cores. */
+  /** Per-query thread ceiling, so one governed query cannot saturate the server's cores. */
   maxThreads: number;
   /**
+   * How many governed queries the shared restricted identity may run at once.
+   *
+   * The only ceiling here that is not per-query, and the reason it exists: every
+   * other bound in this interface constrains a single statement and says nothing
+   * about N of them arriving together. Because one identity is shared by every
+   * governed query, this is an aggregate bound on the whole API's load — the
+   * N+1th concurrent query is refused rather than admitted alongside the others.
+   */
+  maxConcurrentQueriesForUser: number;
+  /**
    * Scan ceilings, enforced with `read_overflow_mode = 'throw'`: a query that
-   * would read past either bound fails with a coded error instead of silently
-   * returning a partial result — partial data that looks complete is the worse
-   * failure for an analytics caller.
+   * would read past either bound fails instead of silently returning a partial
+   * result — partial data that looks complete is the worse failure for an
+   * analytics caller. The breach reaches the caller as a coded
+   * `query_scan_limit_exceeded`, mapped from TOO_MANY_ROWS (158) /
+   * TOO_MANY_BYTES (307) by
+   * `~/server/app-layer/clients/clickhouse/translate-query-error`.
    */
   maxRowsToRead: number;
   maxBytesToRead: number;
 }
 
-/** Measured working against `clickhouse/clickhouse-server:25.10.2.65`. */
+/**
+ * The shipped ceilings.
+ *
+ * `maxExecutionTimeSeconds` and `maxMemoryUsageBytes` were measured working
+ * against `clickhouse/clickhouse-server:25.10.2.65`. The rest — the thread,
+ * scan and concurrency ceilings — are conservative order-of-magnitude choices
+ * rather than measurements: nothing has profiled where they should sit, and
+ * they are set where a runaway query is refused without a realistic analytical
+ * one noticing. That every one of them is *accepted* by that server version is
+ * proven, by the integration suites provisioning this profile into a container.
+ */
 export const DEFAULT_GOVERNED_RESOURCE_LIMITS: GovernedResourceLimits = {
   maxExecutionTimeSeconds: 10,
   maxMemoryUsageBytes: 1_000_000_000,
   maxThreads: 4,
+  maxConcurrentQueriesForUser: 10,
   maxRowsToRead: 1_000_000_000,
   maxBytesToRead: 10_000_000_000,
 };
@@ -264,6 +288,7 @@ export function governedSettingsProfileStatement({
     `           max_execution_time = ${limits.maxExecutionTimeSeconds} CONST,\n` +
     `           max_memory_usage = ${limits.maxMemoryUsageBytes} CONST,\n` +
     `           max_threads = ${limits.maxThreads} CONST,\n` +
+    `           max_concurrent_queries_for_user = ${limits.maxConcurrentQueriesForUser} CONST,\n` +
     `           max_rows_to_read = ${limits.maxRowsToRead} CONST,\n` +
     `           max_bytes_to_read = ${limits.maxBytesToRead} CONST,\n` +
     `           read_overflow_mode = 'throw' CONST`

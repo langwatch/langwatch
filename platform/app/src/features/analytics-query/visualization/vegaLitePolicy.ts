@@ -21,7 +21,9 @@ import {
   measureSpecBytes,
   measureUtf8Bytes,
   visitJsonObjects,
+  visitPredicate,
 } from "./vegaLiteStructure";
+import { TRANSFORM_ANALYZERS } from "./vegaLiteTransforms";
 import {
   type DatasetRowCounts,
   GOVERNED_VEGA_RULE_IDS,
@@ -61,25 +63,14 @@ export const GOVERNED_VEGA_LIMITS = {
 export type GovernedVegaLimitName = keyof typeof GOVERNED_VEGA_LIMITS;
 
 /**
- * Transforms whose behaviour and produced columns have been reviewed. The list
- * is deliberately shorter than Vega-Lite's: `density`, `regression`, `loess`,
- * `quantile`, `impute`, `sample`, `extent` and the generators are all refused
- * because nothing here bounds what they cost or what they emit.
+ * Transforms whose behaviour and produced columns have been reviewed.
+ *
+ * Read off the analyzer table rather than restated, because a transform this
+ * list permitted without an analyzer behind it would contribute no columns and
+ * refuse a working chart for the wrong reason.
  */
-export const ALLOWED_VEGA_LITE_TRANSFORMS: readonly string[] = [
-  "filter",
-  "calculate",
-  "aggregate",
-  "bin",
-  "timeUnit",
-  "stack",
-  "fold",
-  "flatten",
-  "lookup",
-  "joinaggregate",
-  "window",
-  "pivot",
-];
+export const ALLOWED_VEGA_LITE_TRANSFORMS: readonly string[] =
+  Object.keys(TRANSFORM_ANALYZERS);
 
 const ALLOWED_TRANSFORM_SET = new Set(ALLOWED_VEGA_LITE_TRANSFORMS);
 
@@ -675,50 +666,17 @@ function expressionStringsOf(
   for (const { path, node } of objects) {
     for (const key of EXPRESSION_BEARING_KEYS) {
       if (!(key in node)) continue;
-      collectPredicateStrings({
-        value: node[key],
+      visitPredicate({
+        predicate: node[key],
         path: joinPointer(path, key),
-        found,
+        visit: ({ value, path: valuePath }) => {
+          if (typeof value === "string")
+            found.push({ path: valuePath, expression: value });
+        },
       });
     }
   }
   return found;
-}
-
-function collectPredicateStrings({
-  value,
-  path,
-  found,
-}: {
-  value: unknown;
-  path: string;
-  found: { path: string; expression: string }[];
-}): void {
-  if (typeof value === "string") {
-    found.push({ path, expression: value });
-    return;
-  }
-  if (!isPlainObject(value)) return;
-  for (const key of ["and", "or", "not"]) {
-    const branch = value[key];
-    if (Array.isArray(branch)) {
-      branch.forEach((item, index) =>
-        collectPredicateStrings({
-          value: item,
-          path: joinPointer(joinPointer(path, key), index),
-          found,
-        }),
-      );
-      continue;
-    }
-    if (branch !== undefined) {
-      collectPredicateStrings({
-        value: branch,
-        path: joinPointer(path, key),
-        found,
-      });
-    }
-  }
 }
 
 function checkExpressions(

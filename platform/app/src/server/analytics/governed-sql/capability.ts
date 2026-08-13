@@ -50,6 +50,13 @@ import { createHash } from "node:crypto";
 /**
  * The tenant capability for a project, as the key map stores it.
  *
+ * Refuses an empty secret rather than hashing one. A caller that forgot to
+ * select `governedSqlKey` hands `undefined` here, which hashes to a perfectly
+ * valid digest that matches no key-map row — so the query succeeds, returns
+ * zero rows, and is indistinguishable from a tenant with no data. Throwing is
+ * what turns a silent wrong answer into a loud wiring failure; a plain `Error`
+ * because nothing a caller does fixes it (ADR-045).
+ *
  * @param secret - the project's governed SQL secret (`Project.governedSqlKey`),
  *   in its raw form. Never logged, never sent to the database, and never
  *   returned to a caller.
@@ -59,5 +66,8 @@ export function governedTenantCapability({
 }: {
   secret: string;
 }): string {
+  if (!secret) {
+    throw new Error("governed tenant capability requires a non-empty secret");
+  }
   return createHash("sha256").update(secret).digest("hex");
 }

@@ -20,12 +20,12 @@
 
 import { governedVegaError } from "./vegaLitePolicy";
 import {
-  compositionChildrenOf,
+  collectViewNodes,
   isPlainObject,
-  JSON_POINTER_ROOT,
   joinPointer,
-  repeatFieldsOf,
+  type VegaViewNode,
 } from "./vegaLiteStructure";
+import { analyzeTransform } from "./vegaLiteTransforms";
 import type {
   GovernedDatasetColumn,
   VegaValidationError,
@@ -39,14 +39,6 @@ export type ColumnsByDataset = Readonly<
 export interface FieldValidationOutcome {
   readonly errors: readonly VegaValidationError[];
   readonly warnings: readonly VegaValidationWarning[];
-}
-
-/** What one transform step reads and what it leaves behind. */
-interface TransformEffect {
-  readonly consumes: readonly string[];
-  readonly produces: readonly string[];
-  /** True when the step's output columns are only knowable from the data. */
-  readonly unverifiable: boolean;
 }
 
 interface BranchScope {
@@ -69,6 +61,12 @@ interface FieldReference {
  * Validates every field reference in the spec against the dataset feeding its
  * branch. Assumes the policy walk already established that each branch resolves
  * to a registered dataset.
+ *
+ * The composition tree comes from `collectViewNodes`, which already resolves
+ * inherited data and `repeat` scope; what this adds on top is the one thing
+ * that is field-specific — the columns each branch's own transforms leave
+ * behind. Nodes arrive parent-first, so a branch's inherited scope is always
+ * resolved before the branch itself is read.
  */
 export function validateFieldReferences({
   spec,
@@ -79,83 +77,67 @@ export function validateFieldReferences({
 }): FieldValidationOutcome {
   const errors: VegaValidationError[] = [];
   const warnings: VegaValidationWarning[] = [];
+  const scopeByPath = new Map<string, BranchScope>();
 
-  walkBranch({
-    node: spec,
-    path: JSON_POINTER_ROOT,
-    scope: {
-      datasetName: null,
-      available: new Set(),
-      unverifiable: false,
-      repeatFields: {},
-    },
-    columnsByDataset,
-    errors,
-    warnings,
-  });
+  for (const view of collectViewNodes(spec)) {
+    const inherited =
+      view.parentPath === null
+        ? null
+        : (scopeByPath.get(view.parentPath) ?? null);
 
-  return { errors, warnings };
-}
+    const scope = applyTransforms({
+      node: view.node,
+      path: view.path,
+      scope: startingScope({ view, inherited, columnsByDataset }),
+      errors,
+      warnings,
+    });
+    scopeByPath.set(view.path, scope);
 
-function walkBranch({
-  node,
-  path,
-  scope,
-  columnsByDataset,
-  errors,
-  warnings,
-}: {
-  node: unknown;
-  path: string;
-  scope: BranchScope;
-  columnsByDataset: ColumnsByDataset;
-  errors: VegaValidationError[];
-  warnings: VegaValidationWarning[];
-}): void {
-  if (!isPlainObject(node)) return;
-
-  let current = rebaseOnOwnData({ node, scope, columnsByDataset });
-  current = applyTransforms({ node, path, scope: current, errors, warnings });
-
-  const references = [
-    ...encodingReferences({ node, path }),
-    ...facetReferences({ node, path }),
-  ];
-  reportUnknownFields({ references, scope: current, errors, warnings });
-
-  for (const child of compositionChildrenOf({ node, path })) {
-    walkBranch({
-      ...child,
-      scope: current,
-      columnsByDataset,
+    reportUnknownFields({
+      references: [
+        ...encodingReferences({ node: view.node, path: view.path }),
+        ...facetReferences({ node: view.node, path: view.path }),
+      ],
+      scope,
       errors,
       warnings,
     });
   }
+
+  return { errors, warnings };
 }
 
-/** A node with its own `data` starts a fresh field set; otherwise it inherits. */
-function rebaseOnOwnData({
-  node,
-  scope,
+/**
+ * The field set a view starts from, before its own transforms run: a view that
+ * names its own dataset restarts at that dataset's columns, and anything else
+ * carries on with whatever its parent resolved.
+ */
+function startingScope({
+  view,
+  inherited,
   columnsByDataset,
 }: {
-  node: Record<string, unknown>;
-  scope: BranchScope;
+  view: VegaViewNode;
+  inherited: BranchScope | null;
   columnsByDataset: ColumnsByDataset;
 }): BranchScope {
-  const repeatFields = {
-    ...scope.repeatFields,
-    ...repeatFieldsOf(node.repeat),
-  };
-  const data = node.data;
-  if (!isPlainObject(data) || typeof data.name !== "string") {
-    return { ...scope, repeatFields };
+  const { declaredDatasetName, repeatFields } = view;
+
+  if (declaredDatasetName === null) {
+    return inherited === null
+      ? {
+          datasetName: null,
+          available: new Set(),
+          unverifiable: false,
+          repeatFields,
+        }
+      : { ...inherited, repeatFields };
   }
 
-  const columns = columnsByDataset[data.name] ?? [];
+  const columns = columnsByDataset[declaredDatasetName] ?? [];
   return {
-    datasetName: data.name,
+    datasetName: declaredDatasetName,
     available: new Set(columns.map((column) => column.name)),
     unverifiable: false,
     repeatFields,
@@ -463,157 +445,4 @@ function facetReferences({
   });
 
   return [...direct, ...nested];
-}
-
-/** Per-transform reads and writes. A step outside this table produces nothing. */
-const TRANSFORM_ANALYZERS: Record<
-  string,
-  (step: Record<string, unknown>) => TransformEffect
-> = {
-  filter: (step) => ({
-    consumes: predicateFields(step.filter),
-    produces: [],
-    unverifiable: false,
-  }),
-  calculate: (step) => ({
-    consumes: [],
-    produces: stringList(step.as),
-    unverifiable: false,
-  }),
-  aggregate: (step) => ({
-    consumes: [...opFields(step.aggregate), ...stringList(step.groupby)],
-    produces: [...opOutputs(step.aggregate), ...stringList(step.groupby)],
-    unverifiable: false,
-  }),
-  bin: (step) => ({
-    consumes: stringList(step.field),
-    produces: binOutputs(step),
-    unverifiable: false,
-  }),
-  timeUnit: (step) => ({
-    consumes: stringList(step.field),
-    produces: stringList(step.as),
-    unverifiable: false,
-  }),
-  stack: (step) => ({
-    consumes: [...stringList(step.stack), ...stringList(step.groupby)],
-    produces: stackOutputs(step),
-    unverifiable: false,
-  }),
-  fold: (step) => ({
-    consumes: stringList(step.fold),
-    produces:
-      stringList(step.as).length > 0 ? stringList(step.as) : ["key", "value"],
-    unverifiable: false,
-  }),
-  flatten: (step) => ({
-    consumes: stringList(step.flatten),
-    produces: [...stringList(step.as), ...stringList(step.flatten)],
-    unverifiable: false,
-  }),
-  lookup: (step) => ({
-    consumes: stringList(step.lookup),
-    produces: lookupOutputs(step),
-    unverifiable: false,
-  }),
-  joinaggregate: (step) => ({
-    consumes: [...opFields(step.joinaggregate), ...stringList(step.groupby)],
-    produces: opOutputs(step.joinaggregate),
-    unverifiable: false,
-  }),
-  window: (step) => ({
-    consumes: [...opFields(step.window), ...stringList(step.groupby)],
-    produces: opOutputs(step.window),
-    unverifiable: false,
-  }),
-  pivot: (step) => ({
-    consumes: [
-      ...stringList(step.pivot),
-      ...stringList(step.value),
-      ...stringList(step.groupby),
-    ],
-    produces: stringList(step.groupby),
-    unverifiable: true,
-  }),
-};
-
-/**
- * Reads the effect of one transform step. The policy walk has already refused
- * anything outside the allowlist, so an unrecognised step here is a step whose
- * signature key the analyzer table does not carry — it consumes and produces
- * nothing, which is the conservative reading.
- */
-export function analyzeTransform(
-  step: Record<string, unknown>,
-): TransformEffect {
-  for (const [name, analyze] of Object.entries(TRANSFORM_ANALYZERS)) {
-    if (name in step) return analyze(step);
-  }
-  return { consumes: [], produces: [], unverifiable: false };
-}
-
-function stringList(value: unknown): string[] {
-  if (typeof value === "string") return [value];
-  if (Array.isArray(value))
-    return value.filter((v): v is string => typeof v === "string");
-  return [];
-}
-
-/** `field` on each entry of an `aggregate`/`window`/`joinaggregate` op list. */
-function opFields(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((entry) =>
-    isPlainObject(entry) ? stringList(entry.field) : [],
-  );
-}
-
-function opOutputs(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((entry) =>
-    isPlainObject(entry) ? stringList(entry.as) : [],
-  );
-}
-
-function binOutputs(step: Record<string, unknown>): string[] {
-  const named = stringList(step.as);
-  if (named.length > 0)
-    return [...named, ...named.map((name) => `${name}_end`)];
-  return stringList(step.field).flatMap((field) => [
-    `bin_${field}`,
-    `bin_${field}_end`,
-  ]);
-}
-
-function stackOutputs(step: Record<string, unknown>): string[] {
-  const named = stringList(step.as);
-  if (named.length > 0)
-    return [...named, ...named.map((name) => `${name}_end`)];
-  return stringList(step.stack).flatMap((field) => [
-    `${field}_start`,
-    `${field}_end`,
-  ]);
-}
-
-function lookupOutputs(step: Record<string, unknown>): string[] {
-  const from = step.from;
-  if (!isPlainObject(from)) return stringList(step.as);
-  return [
-    ...stringList(step.as),
-    ...stringList(from.fields),
-    ...stringList(from.as),
-  ];
-}
-
-/** Field names named directly by a filter predicate object. */
-function predicateFields(predicate: unknown): string[] {
-  if (!isPlainObject(predicate)) return [];
-
-  const own = stringList(predicate.field);
-  const nested = ["and", "or", "not"].flatMap((key) => {
-    const branch = predicate[key];
-    if (Array.isArray(branch)) return branch.flatMap(predicateFields);
-    return predicateFields(branch);
-  });
-
-  return [...own, ...nested];
 }

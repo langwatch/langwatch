@@ -25,6 +25,7 @@ export const GOVERNED_SQL_NOT_PERMITTED_CODE = "governed_sql_not_permitted";
 export const GOVERNED_SQL_PARAMETER_MISSING_CODE =
   "governed_sql_parameter_missing";
 export const GOVERNED_SQL_UNAVAILABLE_CODE = "governed_sql_unavailable";
+export const GOVERNED_SQL_NOT_ENABLED_CODE = "governed_sql_not_enabled";
 export const GOVERNED_SQL_TIMEOUT_CODE = "query_timeout";
 
 /** Where in the submitted statement a refusal points. */
@@ -165,6 +166,28 @@ export function governedSqlUnavailablePayload(): unknown {
         code: GOVERNED_SQL_UNAVAILABLE_CODE,
         httpStatus: 503,
         fault: "platform",
+        meta: {},
+      },
+    },
+  };
+}
+
+/**
+ * The counterpart for a project whose feature switch is off — the same shape as
+ * the refusal `GovernedSqlNotEnabledError` sends, so the page renders the copy
+ * the registry keys to `governed_sql_not_enabled`.
+ *
+ * A distinct payload rather than a second use of the unavailable one, because
+ * the two say different things to different people: a switch is the customer's
+ * administrator's to flip, an unprovisioned deployment is ours.
+ */
+export function governedSqlNotEnabledPayload(): unknown {
+  return {
+    data: {
+      error: {
+        code: GOVERNED_SQL_NOT_ENABLED_CODE,
+        httpStatus: 403,
+        fault: "customer",
         meta: {},
       },
     },

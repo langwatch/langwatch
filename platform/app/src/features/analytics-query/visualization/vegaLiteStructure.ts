@@ -154,14 +154,62 @@ function pushDescendants({
   });
 }
 
+/** Keys whose values are nested predicates. */
+const PREDICATE_BRANCH_KEYS = ["and", "or", "not"] as const;
+
+/**
+ * Walks a predicate and everything its `and`/`or`/`not` branches contain,
+ * calling `visit` on each node with the pointer that reaches it — the node
+ * itself first, then its branches in that order.
+ *
+ * Every predicate slot in Vega-Lite is either a value or one of those three
+ * compositions, so this is the whole descent; sharing it keeps the expression
+ * screen and the field check reading the same tree.
+ */
+export function visitPredicate({
+  predicate,
+  path = JSON_POINTER_ROOT,
+  visit,
+}: {
+  predicate: unknown;
+  /** Pointer to `predicate` itself. Only a caller that reports positions needs it. */
+  path?: string;
+  visit: (found: { readonly value: unknown; readonly path: string }) => void;
+}): void {
+  visit({ value: predicate, path });
+  if (!isPlainObject(predicate)) return;
+
+  for (const key of PREDICATE_BRANCH_KEYS) {
+    const branch = predicate[key];
+    if (branch === undefined) continue;
+
+    const branchPath = joinPointer(path, key);
+    if (Array.isArray(branch)) {
+      branch.forEach((item, index) =>
+        visitPredicate({
+          predicate: item,
+          path: joinPointer(branchPath, index),
+          visit,
+        }),
+      );
+      continue;
+    }
+    visitPredicate({ predicate: branch, path: branchPath, visit });
+  }
+}
+
 /** A node of the Vega-Lite composition tree, with its inherited context. */
 export interface VegaViewNode {
   readonly path: string;
+  /** Pointer to the node that contains this one; `null` at the root. */
+  readonly parentPath: string | null;
   readonly node: Record<string, unknown>;
   /** True when the node draws marks itself, rather than composing children. */
   readonly isUnit: boolean;
   /** The dataset feeding this node, resolved by inheritance; `null` when none does. */
   readonly datasetName: string | null;
+  /** The dataset this node names itself; `null` when it names none of its own. */
+  readonly declaredDatasetName: string | null;
   /** Pointer to the `data` object that resolved the name, for error reporting. */
   readonly dataPath: string | null;
   /** Field lists bound to `repeat` variables in scope at this node. */
@@ -181,6 +229,7 @@ export function collectViewNodes(spec: unknown): VegaViewNode[] {
   collectFrom({
     node: spec,
     path: JSON_POINTER_ROOT,
+    parentPath: null,
     inherited: { datasetName: null, dataPath: null, repeatFields: {} },
     collected,
   });
@@ -196,11 +245,13 @@ interface InheritedViewContext {
 function collectFrom({
   node,
   path,
+  parentPath,
   inherited,
   collected,
 }: {
   node: unknown;
   path: string;
+  parentPath: string | null;
   inherited: InheritedViewContext;
   collected: VegaViewNode[];
 }): void {
@@ -209,16 +260,26 @@ function collectFrom({
   const context = extendContext({ node, path, inherited });
   collected.push({
     path,
+    parentPath,
     node,
     isUnit: "mark" in node,
     datasetName: context.datasetName,
+    declaredDatasetName: declaredDatasetNameOf(node),
     dataPath: context.dataPath,
     repeatFields: context.repeatFields,
   });
 
   for (const child of compositionChildrenOf({ node, path })) {
-    collectFrom({ ...child, inherited: context, collected });
+    collectFrom({ ...child, parentPath: path, inherited: context, collected });
   }
+}
+
+/** The dataset a node names itself, or `null` when its `data` names none. */
+function declaredDatasetNameOf(node: Record<string, unknown>): string | null {
+  const data = node.data;
+  return isPlainObject(data) && typeof data.name === "string"
+    ? data.name
+    : null;
 }
 
 function extendContext({
@@ -230,13 +291,12 @@ function extendContext({
   path: string;
   inherited: InheritedViewContext;
 }): InheritedViewContext {
-  const data = node.data;
-  const ownName =
-    isPlainObject(data) && typeof data.name === "string" ? data.name : null;
-  const declaresData = isPlainObject(data);
+  const declaresData = isPlainObject(node.data);
 
   return {
-    datasetName: declaresData ? ownName : inherited.datasetName,
+    datasetName: declaresData
+      ? declaredDatasetNameOf(node)
+      : inherited.datasetName,
     dataPath: declaresData ? joinPointer(path, "data") : inherited.dataPath,
     repeatFields: {
       ...inherited.repeatFields,

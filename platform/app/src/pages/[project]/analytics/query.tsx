@@ -16,7 +16,10 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { GovernedSqlWorkbench } from "~/features/analytics-query/components/GovernedSqlWorkbench";
-import { governedSqlUnavailablePayload } from "~/features/analytics-query/logic/governedSqlFailure";
+import {
+  governedSqlNotEnabledPayload,
+  governedSqlUnavailablePayload,
+} from "~/features/analytics-query/logic/governedSqlFailure";
 import { HandledErrorState } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -38,6 +41,13 @@ export function CustomQueryPage() {
 
   const available = availability.data?.available === true;
   const resolving = projectId.length === 0 || availability.isLoading;
+
+  // Two different refusals: a switch the member's own administrator can turn
+  // on, and a deployment that has nothing to run the query as.
+  const unavailableState =
+    availability.data?.reason === "disabled"
+      ? governedSqlNotEnabledPayload()
+      : governedSqlUnavailablePayload();
 
   return (
     <DashboardLayout>
@@ -69,10 +79,7 @@ export function CustomQueryPage() {
       ) : (
         // The backend's own unavailable state, worded by the error registry
         // rather than by this page.
-        <HandledErrorState
-          error={governedSqlUnavailablePayload()}
-          fullHeight={false}
-        />
+        <HandledErrorState error={unavailableState} fullHeight={false} />
       )}
     </DashboardLayout>
   );

@@ -83,23 +83,49 @@ const parameterValueSchema = z.union([
 const projectScopeSchema = z.object({ projectId: z.string() });
 
 /**
- * Whether the governed query path is provisioned on this deployment.
+ * Which gate closed, when one did.
+ *
+ * `disabled` is the project's own switch being off, which its administrator can
+ * change; `unprovisioned` is a deployment with no governed identity to run as,
+ * which they cannot. They read as different refusals, so the page has to be
+ * able to tell them apart.
+ */
+export type GovernedSqlUnavailableReason = "disabled" | "unprovisioned";
+
+export interface GovernedSqlAvailability {
+  /** What the navigation entry and the page gate on. */
+  readonly available: boolean;
+  /** Absent when available. */
+  readonly reason?: GovernedSqlUnavailableReason;
+}
+
+/**
+ * Whether the governed query path is switched on and provisioned.
  *
  * Separate from `schema` because the schema is answerable without an executor
  * (it is the catalog), so a deployment with no governed identity would describe
  * a surface it cannot run. The navigation gates on this, never on the schema.
+ *
+ * The shape is one object with an optional reason rather than a union, so a
+ * consumer that only cares whether the surface is on keeps reading `available`
+ * and nothing else.
  */
 const availability = protectedProcedure
   .input(projectScopeSchema)
   .use(checkProjectPermission("analytics:view"))
-  .query(async ({ ctx, input }) => ({
-    available:
-      (await workbenchEnabled({
-        prisma: ctx.prisma,
-        userId: ctx.session.user.id,
-        projectId: input.projectId,
-      })) && getGovernedSqlService().available,
-  }));
+  .query(async ({ ctx, input }): Promise<GovernedSqlAvailability> => {
+    const enabled = await workbenchEnabled({
+      prisma: ctx.prisma,
+      userId: ctx.session.user.id,
+      projectId: input.projectId,
+    });
+    if (!enabled) return { available: false, reason: "disabled" };
+
+    if (!getGovernedSqlService().available) {
+      return { available: false, reason: "unprovisioned" };
+    }
+    return { available: true };
+  });
 
 /** The governed datasets and columns this member's permissions unlock. */
 const schema = protectedProcedure
