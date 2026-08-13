@@ -1346,22 +1346,16 @@ export function buildAnthropicAdminPullConfig(
   c: ComposerState,
 ): Record<string, unknown> | null {
   const p = c.parserConfig;
-  const token = (p.credentialsToken ?? "").trim();
-  const report = (p.report ?? "").trim().toLowerCase();
-  if (!token || (report !== "usage" && report !== "cost")) return null;
+  const token = trimmedField(p, "credentialsToken");
+  const report = trimmedField(p, "report").toLowerCase();
+  if (!token) return null;
+  if (report !== "usage" && report !== "cost") return null;
 
-  const bucketWidth = (p.bucketWidth ?? "").trim();
+  const bucketWidth = trimmedField(p, "bucketWidth");
   if (bucketWidth && !["1m", "1h", "1d"].includes(bucketWidth)) return null;
 
-  // The adapter schema wants a full ISO instant (`z.string().datetime()`);
-  // admins type dates. Normalize, and reject anything Date can't parse.
-  const startingAtRaw = (p.startingAt ?? "").trim();
-  let startingAt: string | undefined;
-  if (startingAtRaw) {
-    const parsed = Date.parse(startingAtRaw);
-    if (Number.isNaN(parsed)) return null;
-    startingAt = new Date(parsed).toISOString();
-  }
+  const startingAt = normalizeStartingAt(trimmedField(p, "startingAt"));
+  if (startingAt === null) return null;
 
   return {
     adapter: "anthropic_admin",
@@ -1369,9 +1363,28 @@ export function buildAnthropicAdminPullConfig(
     ...(bucketWidth ? { bucketWidth } : {}),
     ...(startingAt ? { startingAt } : {}),
     schedule:
-      c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.anthropic_admin || "0 * * * *",
+      c.pullSchedule.trim() ||
+      PULL_SCHEDULE_DEFAULTS.anthropic_admin ||
+      "0 * * * *",
     credentials: { token },
   };
+}
+
+/** One composer field, trimmed, with an absent key reading as empty. */
+function trimmedField(p: Record<string, string>, key: string): string {
+  return (p[key] ?? "").trim();
+}
+
+/**
+ * ISO-normalizes an admin-typed date for the adapter's `z.string().datetime()`.
+ *
+ * Empty is not an error — the field is optional — so it yields undefined, while
+ * text Date cannot parse yields null for the caller to reject.
+ */
+function normalizeStartingAt(raw: string): string | null | undefined {
+  if (!raw) return undefined;
+  const parsed = Date.parse(raw);
+  return Number.isNaN(parsed) ? null : new Date(parsed).toISOString();
 }
 
 /**
