@@ -215,10 +215,30 @@ export type PrefetchResult =
  * @param target - Target configuration (prompt or http)
  * @param deps - Injected dependencies for data fetching
  */
+/**
+ * Everything the child's environment needs, which is a strict subset of a full
+ * prefetch and resolves much earlier. See `onChildEnvReady`.
+ */
+export interface ChildEnvInputs {
+  labels: string[];
+  telemetry: { endpoint: string; apiKey: string };
+}
+
 export async function prefetchScenarioData(
   context: ExecutionContext,
   target: TargetConfig,
   deps: DataPrefetcherDependencies,
+  /**
+   * Called once, as soon as the scenario and project resolve, with the only
+   * two prefetched values the child's environment depends on. It exists so the
+   * caller can start the child booting against the rest of this function
+   * rather than after it; a caller that does not care may omit it.
+   *
+   * Never called when the run is doomed — a missing scenario, a failed project
+   * lookup or a project with no API key all skip it, so no child is started
+   * for a run that is about to fail.
+   */
+  onChildEnvReady?: (inputs: ChildEnvInputs) => void,
 ): Promise<PrefetchResult> {
   logger.debug(
     {
@@ -238,12 +258,49 @@ export async function prefetchScenarioData(
   // The checks below keep their original order, so the error reported for any
   // given failure is unchanged; the only difference is that a doomed run may
   // have issued the other queries before finding out.
+  const scenarioPromise = fetchScenario(
+    context.projectId,
+    context.scenarioId,
+    deps.scenarioFetcher,
+  );
+  const projectPromise = fetchProject(context.projectId, deps.projectFetcher);
+  const adapterPromise = fetchAgentData(context.projectId, target, deps);
+  const suitePromise = deps.suiteConfigFetcher.getBySetId(
+    context.setId,
+    context.projectId,
+  );
+
+  // The child's environment needs only the scenario's labels and the project's
+  // API key, and those two land well before the adapter, suite config and
+  // model params. Announcing them here lets the caller start the child booting
+  // against the slow half of this function instead of after it — the child is
+  // still one fresh process per run, only started sooner.
+  //
+  // Deliberately not awaited: a failure here is re-reported by the ordered
+  // checks below, and this must not become the thing that decides the run.
+  if (onChildEnvReady) {
+    void Promise.all([scenarioPromise, projectPromise])
+      .then(([scenario, project]) => {
+        if (!scenario || !project.success || !project.data.apiKey) return;
+        onChildEnvReady({
+          labels: scenario.config.labels,
+          telemetry: {
+            endpoint: env.LANGWATCH_ENDPOINT,
+            apiKey: project.data.apiKey,
+          },
+        });
+      })
+      .catch(() => {
+        // Swallowed on purpose: the awaited results below own error reporting.
+      });
+  }
+
   const [scenarioResult, projectResult, adapterResult, suiteOverrides] =
     await Promise.all([
-      fetchScenario(context.projectId, context.scenarioId, deps.scenarioFetcher),
-      fetchProject(context.projectId, deps.projectFetcher),
-      fetchAgentData(context.projectId, target, deps),
-      deps.suiteConfigFetcher.getBySetId(context.setId, context.projectId),
+      scenarioPromise,
+      projectPromise,
+      adapterPromise,
+      suitePromise,
     ]);
 
   if (!scenarioResult) {

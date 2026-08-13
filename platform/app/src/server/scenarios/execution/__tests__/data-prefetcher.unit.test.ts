@@ -136,6 +136,79 @@ describe("prefetchScenarioData", () => {
     };
   }
 
+  describe("child environment readiness", () => {
+    const promptTarget: TargetConfig = {
+      type: "prompt",
+      referenceId: "prompt_123",
+    };
+
+    describe("when the scenario and project resolve", () => {
+      it("announces the labels and api key the child environment needs", async () => {
+        const deps = createMockDeps({
+          scenarioFetcher: {
+            getById: vi
+              .fn()
+              .mockResolvedValue({ ...defaultScenario, labels: ["smoke"] }),
+          },
+        });
+        const onChildEnvReady = vi.fn();
+
+        await prefetchScenarioData(
+          defaultContext,
+          promptTarget,
+          deps,
+          onChildEnvReady,
+        );
+
+        expect(onChildEnvReady).toHaveBeenCalledTimes(1);
+        expect(onChildEnvReady).toHaveBeenCalledWith(
+          expect.objectContaining({
+            labels: ["smoke"],
+            telemetry: expect.objectContaining({ apiKey: "test-api-key" }),
+          }),
+        );
+      });
+    });
+
+    describe("when the run is already doomed", () => {
+      // No child may be started for a run that is about to fail, so the
+      // signal has to stay silent rather than fire optimistically.
+      it("stays silent when the scenario does not exist", async () => {
+        const deps = createMockDeps({
+          scenarioFetcher: { getById: vi.fn().mockResolvedValue(null) },
+        });
+        const onChildEnvReady = vi.fn();
+
+        await prefetchScenarioData(
+          defaultContext,
+          promptTarget,
+          deps,
+          onChildEnvReady,
+        );
+
+        expect(onChildEnvReady).not.toHaveBeenCalled();
+      });
+
+      it("stays silent when the project has no api key", async () => {
+        const deps = createMockDeps({
+          projectFetcher: {
+            findUnique: vi.fn().mockResolvedValue({ apiKey: null }),
+          },
+        });
+        const onChildEnvReady = vi.fn();
+
+        await prefetchScenarioData(
+          defaultContext,
+          promptTarget,
+          deps,
+          onChildEnvReady,
+        );
+
+        expect(onChildEnvReady).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   describe("model selection", () => {
     describe("given a prompt with a specific model configured", () => {
       const promptWithModel = {
